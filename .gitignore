@@ -15,3 +15,6 @@ results/raw/
 # Beads / Dolt files (added by bd init)
 .dolt/
 .beads-credential-key
+
+# bv (beads viewer) local config and caches
+.bv/
