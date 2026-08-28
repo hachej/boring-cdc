@@ -1,169 +1,286 @@
 # Boring CDC v0.1 implementation plan
 
-This plan was produced from a `/plan`-style architecture pass over the article series and market-research requirements. It is planning only; implementation has not started.
+This is the implementation contract for Boring CDC v0.1. It was derived from the article-series brief and `docs/REQUIREMENTS.md`, then strengthened through an adversarial architecture review. Implementation has not started.
 
-## 1. Objective
+The plan deliberately stays narrow: one PostgreSQL source through `pgoutput`, one publication and one logical replication slot, one Rust binary plus Docker Compose, a local SQLite journal/checkpoint store, ClickHouse, and one scheduled JSONL/Parquet archive materializer. Estuary is the managed reference for externally visible experiments. Debezium is a capture-and-offset design reference only.
 
-Build the smallest inspectable PostgreSQL CDC system that proves:
+## 1. Objective and non-goals
+
+Build the smallest inspectable system that proves this architecture:
 
 ```text
 PostgreSQL
-  → durable local journal
-    → independent ClickHouse materialization
-    → independent scheduled JSONL/Parquet archive
+  -> one pgoutput capture stream
+    -> durable local SQLite journal
+      -> independent ClickHouse materialization
+      -> independent scheduled JSONL/Parquet archive
 ```
 
-The system captures once, acknowledges PostgreSQL only after durable local storage, replays destinations independently, performs production-aware backfills, and converges after expected crashes and outages.
+The system must:
 
-It is a public experimental/educational project and benchmark artifact—not a production SLA or universal connector platform.
+- capture once and durably journal before acknowledging PostgreSQL;
+- backfill existing rows while concurrent writes continue;
+- replay destinations independently;
+- converge after expected crashes, retries, and bounded outages;
+- expose source-WAL, snapshot, local-disk, schema, and destination risk;
+- fail explicitly when an operator must re-seed instead of claiming false health; and
+- publish reproducible correctness and source-impact evidence.
 
-## 2. Core design decisions
+The delivery promise is **at-least-once capture with idempotent destination convergence**. A crash may cause duplicate attempts. Boring CDC does not promise global exactly-once delivery, destination atomicity across tables, or atomicity across destinations.
 
-1. Use `pgoutput` with exactly one publication and one logical replication slot.
-2. Run as one Tokio-based Rust binary plus Docker Compose.
-3. Store the append-only event journal and all checkpoints in SQLite.
-4. Buffer and durably commit a complete Postgres transaction before acknowledging its end LSN.
-5. Keep **journal order** (`journal_seq`) separate from **source version order** (snapshot boundary or WAL LSN plus rank). This prevents a resumed snapshot row written later to SQLite from overwriting a newer WAL update.
-6. Give ClickHouse and archive destinations independent checkpoints, retries, and lag.
-7. Promise at-least-once capture and idempotent convergence only.
-8. Bound journal retention and Postgres WAL retention; fail loudly and require re-seeding when history is genuinely unavailable.
+This is an educational and benchmark-driven public project, not a production SLA, distributed platform, or generalized connector framework.
 
-## 3. Runtime architecture
+## 2. Fixed scope and design principles
+
+### 2.1 Fixed topology
+
+1. One PostgreSQL database.
+2. One publication and one logical replication slot using `pgoutput`.
+3. One Tokio-based Rust binary containing CLI, capture, backfill, journal, materializers, safety monitoring, and benchmark helpers.
+4. Docker Compose for the reproducible local environment.
+5. One SQLite database: `journal_events` is the logical append-only payload journal, and adjacent SQLite tables hold metadata/checkpoints. There is no separate payload-log file.
+6. Two independently checkpointed destinations:
+   - ClickHouse;
+   - one archive materializer capable of scheduled JSONL and Parquet output.
+7. No required Kafka, Kafka Connect, schema registry, Kubernetes, control plane, or plugin API.
+
+### 2.2 Safety and correctness principles
+
+1. **Durable before feedback.** PostgreSQL `flush_lsn` and `apply_lsn` feedback never exceed the end LSN durably committed with the source transaction in SQLite.
+2. **Capture is destination-independent.** Destination success or failure never controls source acknowledgement.
+3. **Journal order is not source order.** `journal_seq` controls local consumption. A total `source_version` controls winner selection for one source key.
+4. **One capture epoch is one continuity claim.** Source replacement, unsafe slot movement, slot invalidation, or full re-seed creates a new epoch; versions are never compared across epochs.
+5. **A retained suffix is not automatically a baseline.** A new empty destination can bootstrap only from a completed, retained reconstruction anchor.
+6. **Re-seed means fresh destination generations.** A new snapshot cannot remove rows that were deleted before it if it is merged into stale destination state.
+7. **Bounded means bounded.** Transaction spool, SQLite files, temporary files, archives on the same filesystem, replay history, snapshot lifetime, and retained PostgreSQL WAL all have declared limits.
+8. **Unsupported means blocked.** No state-changing protocol message, value, schema change, or unavailable history may be silently skipped.
+9. **One active runtime.** The local runtime and asynchronous completions are fenced so a second process or stale worker cannot corrupt checkpoints.
+10. **Idle progress is published, not inferred.** Informational keepalive `wal_end` is never acknowledged. A connector-owned heartbeat row advances through the same published, journaled, durable-before-feedback path as source transactions.
+11. **Claims follow measurements.** Table count, throughput, event size, backfill size, outage duration, and cost claims are limited to published profiles that were actually run.
+
+## 3. Runtime architecture and ownership
 
 ```text
 cli/config
+runtime/ownership
 postgres/preflight
+postgres/bootstrap
 postgres/capture
 postgres/backfill
 journal/sqlite
+journal/retention
 materialize/clickhouse
 materialize/archive
-retention
-safety
+safety/state-machine
 status/metrics
-benchmark
+benchmark/workload
+benchmark/oracle
+benchmark/faults
 ```
 
-Long-running tasks:
+Long-running components inside the one binary:
 
-1. Postgres capture loop.
-2. Backfill coordinator/workers.
-3. ClickHouse materializer loop.
-4. Archive scheduler/materializer loop.
-5. Safety/retention monitor.
-6. Status and metrics server.
+1. PostgreSQL capture loop.
+2. Backfill coordinator and bounded workers.
+3. Capture-priority SQLite writer.
+4. ClickHouse materializer loop.
+5. Archive scheduler/materializer loop.
+6. Retention and safety monitor.
+7. Status and metrics server.
 
-A task failure must transition the affected component into persisted, visible state; it must not silently exit while the process appears healthy.
+`boring-cdc run` acquires an exclusive lock tied to the configured SQLite store. A second runtime fails closed. PostgreSQL also fences the logical slot, but the local lock is required to prevent duplicate materializers, archive publishers, and checkpoint writers.
 
-## 4. Required capabilities
+The publication is owned by a dedicated connector administration role whose credentials are unavailable to the application role and ordinary capture role. Those roles cannot `ALTER` or drop it. Normal `boring-cdc run` never loads or retains the administration DSN. A separate least-privileged heartbeat role may update only the single connector-owned heartbeat row; it cannot alter the publication or selected tables.
 
-### R1 — Postgres capture
+There is exactly one state-store owner path at a time. Ordinary operation is owned by `run`. A workflow that needs the administration role (`init`, confirmed full re-seed, or explicit source recovery) is a **maintenance runtime**: the operator first stops ordinary `run`; the maintenance command then acquires the same exclusive SQLite lock, performs integrity/source reconciliation, and loads the administration DSN only for the minimum owner-only operation. It drops that credential immediately after readback/verification and keeps the exclusive lock until its persisted workflow reaches a safe terminal or resumable phase. There is no second local control process and no unauthenticated side channel into a live `run`. A maintenance command attempted while `run` owns the lock fails closed with handoff instructions.
 
-- Connect to one Postgres database.
-- Use one configured publication and one logical replication slot.
-- Decode `pgoutput` transaction, relation, insert, update, and delete messages.
-- Preserve transaction identity and event order.
-- Record the source system identifier and reject an unexpected source replacement.
-- Require a usable primary key or replica identity where update/delete correctness is required.
-- Preflight supported types and table compatibility.
-- Detect relation/schema changes and block incompatible tables rather than silently corrupting them.
+A selected-table-set change is deliberately disruptive in v0.1. It is never applied online to the current capture epoch. The operator confirms a full re-seed: stop the old runtime, create a new capture epoch, recreate the publication and slot for the complete expanded table set, snapshot every selected table, and build fresh full ClickHouse and archive generations. The old destination generations remain readable until the new full generations pass verification and are promoted. This keeps table addition within the requirements' tested re-backfill path instead of introducing an online schema-control plane.
 
-### R2 — Durable acknowledgement
+Each process start receives a `run_id`. Every backfill and destination has a persisted generation token. State and checkpoint updates use compare-and-swap against that token. A completion from a paused, detached, replaced, or re-seeded component is stale and cannot advance state.
 
-- Buffer one complete source transaction.
-- Commit its events, transaction metadata, relation schema, and durable source LSN in one SQLite transaction.
-- Use durability settings appropriate to the promise, including `synchronous=FULL`.
-- Acknowledge the transaction end LSN to Postgres only after the SQLite commit succeeds.
-- Never couple Postgres acknowledgement to destination progress.
-- Resume from the last durable source LSN.
-- Deduplicate replayed transactions/events using deterministic identities.
+Each destination worker additionally holds a persisted, expiring generation lease containing its destination ID, `capture_epoch`, anchor identity (when bootstrapping), generation, configuration fingerprint, and `run_id`. It validates that lease immediately before every external side effect and writes only into the namespace named by that epoch/generation. A SQLite compare-and-swap does not undo an already completed ClickHouse insert, archive publication, or view switch; the lease and the promotion protocol in section 9 fence which namespace can be made live.
 
-### R3 — Backfill and WAL stitching
+A component failure must become persisted visible state when SQLite remains writable. If SQLite cannot persist the failure, health fails, the process exits non-zero, and the operator must not infer health from stale metadata.
 
-- Create/attach the logical slot and obtain an exported-snapshot boundary.
-- Persist boundary and run metadata before reading history.
-- Copy by stable primary-key chunks with configurable size, rate, and concurrency.
-- Keep WAL capture active during backfill.
-- Persist completed chunks, row counts, progress, rate, and ETA.
-- Support pause/resume/cancellation.
-- On process/session loss, retain completed chunks and resume remaining ranges under a new exported snapshot generation and boundary.
-- Version snapshot rows by their generation boundary so newer WAL always wins.
-- Verify keyed counts and deterministic checksums after capture catches up.
-- Provide a full re-backfill path for incompatible schema changes, new tables, slot loss, or expired replay history.
+## 4. PostgreSQL protocol contract
 
-A restarted backfill guarantees eventual convergence, not one globally atomic point-in-time snapshot across multiple snapshot generations.
+### 4.1 Supported protocol surface
 
-### R4 — ClickHouse materialization
+Before M1 begins, the project selects and pins a Rust PostgreSQL logical-replication transport that explicitly supports replication-mode `CopyBoth`; ordinary query-only `tokio-postgres` usage must not be assumed to provide this protocol. The project freezes supported PostgreSQL major versions, transport/crate versions, wire framing limits, and exact `START_REPLICATION SLOT ... LOGICAL` options. Protocol fixtures exercise bidirectional CopyData/keepalive/feedback behavior on every admitted PostgreSQL version. The v0.1 publication is created or verified with:
 
-- Consume the journal independently from capture.
-- Use explicit primary/order key, source version, event ID, and tombstone columns.
-- Make retries and replay idempotent.
-- Preserve TOAST values marked unchanged; never replace them with null/placeholders.
-- Represent hard deletes with versioned tombstones.
-- Provide a canonical current-state query/view that does not require users to guess merge timing.
-- Document raw-table, background-merge, and `FINAL` behavior/cost.
-- Support compatible column additions.
-- Block and require re-backfill for incompatible type/key/replica-identity changes.
-- Advance checkpoints only after destination batches are durably accepted.
+```text
+publish = 'insert,update,delete,truncate'
+```
 
-No cross-table or cross-destination atomicity is promised.
+`TRUNCATE` is published for **detection only**. It is not materialized in v0.1: receiving a real `Truncate` message blocks capture before acknowledgement, marks the affected continuity as requiring re-seed, and gives an explicit recovery path. Excluding it from the publication would be unsafe because PostgreSQL would then emit no message and stale destination rows would remain undetectable. Any other unsupported state-changing message likewise blocks before acknowledgement.
 
-### R5 — Archive materialization
+Unless separately implemented and covered by the full fault matrix, v0.1 disables or rejects:
 
-- Support scheduled JSONL and Parquet through one archive materializer.
-- Use deterministic segment names based on destination and journal range.
-- Write to a temporary file, flush/fsync where supported, and atomically rename.
-- Store segment hash, journal range, event count, schema/version, and timestamp in a manifest.
-- Advance the checkpoint only after durable publication.
-- After a crash between rename and checkpoint, validate/adopt the deterministic existing segment instead of duplicating it.
-- Archive the CDC changelog and document reconstruction using source version and tombstones.
+- streamed in-progress transactions;
+- two-phase transaction decoding;
+- binary tuple mode;
+- publication row filters;
+- publication column lists;
+- unsupported partition-root/leaf publication configurations;
+- unsupported replica identities; and
+- source types outside the frozen v0.1 type matrix.
 
-### R6 — Independent replay and retention
+Relation and other metadata messages may be emitted again after reconnect. They never affect row-change ordinal assignment or event identity. Every changed `Relation` contract triggers synchronous catalog validation before any subsequent row event for that relation is decoded or its transaction acknowledged; the periodic catalog poll is defense in depth, not the only DDL guard.
 
-- Maintain separate checkpoint, retry, state, and lag for each destination.
-- Allow one destination to stop while capture and the other destination continue.
-- Bootstrap a newly added destination from the earliest retained event.
-- Reject requests outside retained history and direct the operator to re-backfill/re-seed.
-- Never garbage-collect events required by an active destination.
-- Retain consumed events for the configured replay window while the disk budget permits.
-- At hard pressure, stop backfill first and surface required operator action; never silently discard unconsumed events.
+At startup and on a documented polling interval while running, the connector recomputes the publication-definition fingerprint. The expected fingerprint includes owner, published operation set, table membership (including connector control relations), row-filter/column-list absence, and partition settings. An unexpected change is detected no earlier than that interval; once detected, feedback stops before any newly decoded transaction is acknowledged and state transitions to `publication_drift_requires_reseed`. Because changes may have been omitted during the detection interval, continuity is not assumed even when detection is prompt. Planned table-set changes use the full-reseed workflow in section 12.3; direct live `ALTER PUBLICATION` is unsupported.
 
-### R7 — Source safety
+### 4.2 Preflight
 
-Monitor:
+`boring-cdc check` verifies without mutation:
 
-- retained WAL bytes and slot lag;
-- `wal_status`, `safe_wal_size`, slot activity, and invalidation;
-- source free disk where available;
-- journal bytes and local free disk;
-- last received, durable, and acknowledged source positions;
-- capture and destination lag;
-- backfill throughput, source connections, progress, and ETA.
+- `wal_level=logical`, required privileges, and supported server version;
+- publication definition, table membership, and connector-owned published `boring_cdc_control.capture_fences` and `boring_cdc_control.heartbeat` relations;
+- slot name, plugin, activity, `restart_lsn`, `confirmed_flush_lsn`, `wal_status`, and `safe_wal_size` where available;
+- finite `max_slot_wal_keep_size`, unless a clearly labelled local-experiment override is set;
+- selected tables, primary/unique keys, replica identity, partition shape, and supported key forms;
+- source types, row/event-size limits, and ClickHouse/archive mappings;
+- incompatible row filters, column lists, streamed/two-phase settings, publication ownership/drift, the required detection-only `TRUNCATE` operation, and the exact frozen `START_REPLICATION` options;
+- selected CopyBoth-capable replication transport and heartbeat-role privileges limited to updating the one control row;
+- local SQLite/journal path, named supported Linux filesystem semantics, per-filesystem disk budgets, emergency reserves, replay policy, and nonterminal re-seed/promotion intents; and
+- availability of required operational metrics.
 
-Controls:
+A missing source free-disk metric is not reported as healthy. Docker Compose must expose it. For a remote source where it cannot be collected, status reports `unknown` and overall health is at least `degraded`.
 
-- warning, action, and critical thresholds;
-- throttle/stop backfills before stopping capture;
-- require a finite Postgres slot-WAL safety boundary unless explicitly overridden for local experiments;
-- never automatically delete a slot or fake acknowledgement;
-- expose critical states with recovery instructions;
-- provide explicit destination detach, replay, re-seed, and slot recreation workflows.
+### 4.3 Source identity and capture epochs
 
-“Safe stop” means the connector stops accepting work without lying about durability. It cannot make Postgres retain WAL forever. A finite Postgres WAL cap may invalidate the slot and force a re-seed.
+Persist in `source_state`:
 
-## 5. Event envelope
+- `capture_epoch`;
+- PostgreSQL system identifier and timeline;
+- database identity;
+- slot name and plugin;
+- publication-definition fingerprint;
+- supported-protocol configuration fingerprint;
+- last received LSN;
+- durable transaction end LSN;
+- last feedback LSN; and
+- observed server slot positions and status.
 
-A versioned logical event should contain:
+Include `capture_epoch` in transaction and event identities. Never compare `source_version` values across capture epochs.
+
+On every startup, reconcile the live source with local state before streaming:
+
+| Condition | Required behavior |
+|---|---|
+| Source, timeline, database, slot/plugin, publication, or protocol fingerprint mismatch | Block startup and require inspection/re-seed as appropriate |
+| Server `confirmed_flush_lsn` ahead of SQLite durable LSN | `requires_reseed`; local restored state may have lost acknowledged events |
+| Required local resume LSN no longer available or slot invalid | `requires_reseed` |
+| Server slot behind local durable LSN and resume WAL remains available | Request the local durable position; tolerate deterministic duplicate delivery |
+| Server and local positions compatible | Request SQLite's durable transaction end LSN; test PostgreSQL's effective restart rule `max(requested_lsn, confirmed_flush_lsn)` |
+
+Feedback uses only a durably committed published transaction end LSN. It never uses informational keepalive `wal_end`, the merely received WAL end, a timer, or a destination checkpoint. Startup fixtures cover requested positions on both sides of `confirmed_flush_lsn` and verify PostgreSQL's effective `max(requested_lsn, confirmed_flush_lsn)` behavior.
+
+### 4.4 Published heartbeat progress
+
+A quiet selected-table workload can still coexist with unrelated or unpublished WAL. Informational keepalives cannot safely prove that WAL is represented in the journal, so v0.1 advances an idle slot only through a real published transaction:
+
+1. `boring_cdc_control.heartbeat` contains one bounded connector-owned row with a monotonic nonce and update time; it is in the existing single publication.
+2. On the configured interval, the one runtime uses a narrowly scoped SQL credential that can update only this row. The heartbeat has fixed maximum payload size and cannot be user-configured into arbitrary SQL.
+3. `pgoutput` captures the heartbeat transaction. The transaction and an internal `control_kind=heartbeat` event are committed to SQLite under the normal durable-before-feedback invariant.
+4. Only then may feedback advance through that heartbeat transaction's end LSN. Keepalive `wal_end` remains informational.
+5. ClickHouse and archive materializers route heartbeat/control events as journal-only no-ops: they validate the control envelope and advance their complete-transaction checkpoint without writing a user table row.
+6. Heartbeat failure is visible as degraded idle-progress health with WAL-headroom impact; it never causes synthetic feedback.
+
+The capture-fence relation follows the same internal-control routing, except its durable event also completes the matching anchor proof. Heartbeat cadence, role grants, retry policy, and maximum source write rate are frozen in M0 and exercised during idle-source WAL-retention tests.
+
+## 5. Capture, transaction durability, and ordering
+
+### 5.1 Row decoding
+
+Decode `Begin`, `Relation`, `Insert`, `Update`, `Delete`, and `Commit` semantics needed by v0.1, and recognize real `Truncate` messages for fail-closed detection. Preserve source transaction identity and the order of row-change messages.
+
+The WAL transaction ordinal is the zero-based index of **row-changing messages only**. Relation, begin, commit, origin, cache refresh, keepalive, and reconnect-dependent metadata do not change it.
+
+If capture cannot losslessly encode any event in a transaction, it stops before acknowledging that transaction. It must not skip an event and continue.
+
+A primary-key-changing update with a complete new tuple expands deterministically into:
+
+1. an old-key tombstone; and
+2. a new-key upsert.
+
+A `mutation_ordinal` orders those expanded mutations. Repeated changes to the same key in one transaction remain deterministically ordered. If any non-key column is `unchanged_toast` during a key change, lossless new-key reconstruction is impossible under the v0.1 model, so capture blocks before feedback.
+
+### 5.2 Bounded transaction spool
+
+A complete PostgreSQL transaction is the atomic visibility unit in the local journal, but it is not buffered without bounds in memory.
+
+- Incoming row events spool to a bounded temporary file while the transaction is in progress.
+- Spool bytes count against the same local disk budget and emergency reserve as SQLite.
+- `max_transaction_bytes` and `max_transaction_events` are hard limits.
+- Temporary data remains invisible to journal readers.
+- At commit, validated events, immutable relation schemas, transaction metadata, checksums, and durable source LSN are published in one bounded SQLite transaction.
+- The configured transaction limits make that SQLite writer hold time finite and testable.
+- Only after this commit succeeds may the capture loop send PostgreSQL feedback.
+- After publish or rollback, the spool is removed and its directory durability policy is applied.
+- Spool filenames and headers contain capture epoch, transaction identity, creation run, length, and checksum; no spool is treated as committed state.
+- After acquiring the exclusive runtime lock, startup scans and accounts for every spool before accepting source work. A spool whose transaction is already committed in SQLite is removed and the directory is synced. A well-formed uncommitted spool from a dead run is discarded because PostgreSQL will replay it. A malformed, unowned, or contradictory spool is quarantined and startup blocks for inspection rather than guessing.
+- If a limit, checksum error, I/O error, or `ENOSPC` occurs, capture disconnects or safe-stops without acknowledgement.
+
+A single capture-priority SQLite writer serializes source commits, bounded backfill-chunk commits, destination checkpoint changes, archive intents, and metadata. Backfill chunks have byte and writer-hold-time limits so they cannot starve capture.
+
+### 5.3 Deterministic identities and total source order
+
+PostgreSQL `commit_lsn` and `end_lsn` have distinct fixed roles:
+
+- `commit_lsn` orders mutations from committed WAL transactions and populates `source_version.lsn_u64`;
+- `end_lsn` is the complete transaction resume/feedback boundary and the transaction uniqueness position.
+
+`connector_event_id` identifies a stable **position**, not a decoded payload. For WAL events, it is derived only from:
+
+```text
+capture_epoch
+source/slot identity
+transaction end_lsn
+row-change transaction_ordinal
+mutation_ordinal
+```
+
+For snapshot rows, it is derived only from:
+
+```text
+capture_epoch
+backfill generation
+table identity
+chunk identity
+canonical primary key
+```
+
+`journal_seq`, timestamps, run-local fields, relation-message timing, and every payload byte are excluded from the identity hash. The canonical payload hash is stored separately. Re-inserting an existing positional identity is an idempotent duplicate only when its stored payload hash and immutable position metadata match; a mismatch is a decoder/storage conflict and blocks capture or materialization. This makes a conflicting decode observable instead of assigning it a new identity.
+
+Within one capture epoch and one logical key, compare this source version lexicographically:
+
+```text
+source_version = (
+  lsn_u64,              // snapshot boundary or WAL commit_lsn
+  origin_rank,          // snapshot = 0, WAL = 1
+  transaction_ordinal,  // snapshot = 0
+  mutation_ordinal,     // snapshot = 0
+  connector_event_id    // deterministic final tie-breaker
+)
+```
+
+Physical duplicate rows with the same `connector_event_id` are one logical event. A conflicting payload for an existing ID is corruption and blocks. `journal_seq` is a monotonically increasing local consumption position and is never used to decide the newest source row. This is essential because a WAL event may be appended before an older snapshot row.
+
+## 6. Event envelope and value model
+
+The exact v0.1 physical envelope is frozen in a separate `docs/EVENT_FORMAT.md` design artifact during M0, before journal code begins. That artifact defines binary/text encodings, canonicalization, hashes, and compatibility rules. The logical envelope is:
 
 ```text
 Event {
   envelope_version
-  event_id
+  connector_event_id
   journal_seq
+  capture_epoch
 
   source {
     system_identifier
-    database
+    timeline
+    database_identity
     schema
     table
     relation_id
@@ -172,49 +289,162 @@ Event {
 
   transaction {
     xid
-    commit_lsn
-    end_lsn
-    ordinal
+    commit_lsn_u64
+    end_lsn_u64
+    transaction_ordinal
+    mutation_ordinal
   }
 
-  operation       // snapshot | insert | update | delete
+  operation              // snapshot | insert | update | delete | control
+  control_kind           // none | heartbeat | capture_fence
   key
   before_key
-  after_or_patch
-  unchanged_toast_columns
+  columns                 // map of column -> tagged ColumnState
 
   source_version {
-    lsn
-    rank           // snapshot < WAL at an equal boundary
+    lsn_u64              // snapshot boundary or WAL commit_lsn
+    origin_rank           // snapshot=0, WAL=1
+    transaction_ordinal   // snapshot=0
+    mutation_ordinal      // snapshot=0
+    connector_event_id    // deterministic tie-breaker
   }
 
   schema {
     fingerprint
-    columns_and_postgres_types
+    immutable_relation_contract
   }
 
   snapshot {
     run_id
     generation
     chunk_id
-    boundary_lsn
+    boundary_lsn_u64
   }
 
   captured_at
 }
 ```
 
-Rules:
+Each column is a tagged state, never an ambiguous nullable value:
 
-- WAL `event_id` is deterministic from source identity, slot, commit/end LSN, and transaction ordinal.
-- Snapshot IDs are deterministic from run, generation, table, chunk, and primary key.
-- `journal_seq` controls local consumption, never conflict resolution.
-- `source_version` controls destination convergence.
-- `before` is only as complete as replica identity permits.
-- Values preserve precision; unsupported values stay explicitly typed/opaque or fail preflight—never silently coerce.
-- Begin/commit metadata is persisted, but destination-wide transactional application is not guaranteed.
+```text
+explicit_value(value)
+explicit_null
+unchanged_toast
+absent_for_schema
+```
 
-## 6. SQLite model
+The event-format specification defines canonical encodings for keys, booleans, signed values, arbitrary-precision numerics, floating values, timestamps and infinity, dates, UUIDs, text, `bytea`, arrays, and every other admitted v0.1 type. Unsupported values fail preflight or block capture; they are never silently coerced.
+
+`docs/EVENT_FORMAT.md` separately freezes the inputs to positional event identity, canonical payload hash, and provider-neutral benchmark hash. Stable source facts and canonical typed values are included. `captured_at`, `journal_seq`, snapshot `run_id`, process/generation timestamps, retry counts, local paths, writer metadata, and every other local or volatile field are excluded from event identity and canonical payload hashes. The specification includes golden vectors proving that retrying under a different process/run/time yields the same identity and payload hash. Internal `heartbeat` and `capture_fence` control events have explicit fixed schemas and routing; they remain in journal transaction order but never enter user-table state or provider-neutral workload hashes.
+
+`unchanged_toast` means “reuse the newest older explicit value or explicit null for this key and column,” not null and not missing. No destination may query PostgreSQL to repair it. A primary-key-changing update that also contains any `unchanged_toast` column is explicitly unsupported in v0.1: capture blocks before acknowledging that transaction and requires re-seed/recovery. This is narrower and safer than inventing cross-key predecessor lookup semantics. A key change with a complete new tuple still expands to old-key tombstone plus new-key upsert.
+
+The supported type list, maximum key/row/event size, maximum transaction size, and TOAST reconstruction semantics must be approved before M1 begins.
+
+### 6.1 Relation-schema fingerprint contract
+
+The physical envelope stores a frozen relation-contract fingerprint rather than only column names and types. Before M1, `docs/EVENT_FORMAT.md` must define its canonical inputs and ordering:
+
+- relation/table identity, column identity (`attnum`), logical and physical order, name, and dropped-column status;
+- type OID, typmod, and collation;
+- nullability;
+- canonical hashes of default, generated, and identity expressions, including an explicit no-expression value;
+- primary/unique-key definition and replica-identity mode/index;
+- partition-root/leaf routing, partition key/bounds where relevant; and
+- publication projection/membership for the relation.
+
+`relation_schemas` retains each immutable full contract by fingerprint. Every schema referenced by a retained event remains available. At startup and on a bounded catalog-poll interval, the connector recomputes the selected relations' contract even if no row change emits a new `Relation` message. In the streaming path, a changed `Relation` message pauses decoding synchronously and re-reads the contract before any following DML can be decoded or acknowledged. A changed contract is evaluated against the frozen additive-column policy: unsupported capture encoding blocks before feedback; destination-only incompatibility blocks that whole destination; an active snapshot generation is fenced and invalidated. Idle/no-row DDL therefore cannot remain invisible indefinitely, while immediate DDL-to-DML cannot race ahead of validation.
+
+`before_key` is only as complete as replica identity permits; v0.1 refuses unsafe update/delete capture rather than pretending a key exists.
+
+## 7. Snapshot, backfill, and WAL stitching
+
+Initial bootstrap and later/resumed backfills use related but distinct protocols.
+
+### 7.1 Initial bootstrap protocol
+
+The permanent slot and its one-use creation snapshot are created only in the M3 bootstrap vertical slice, after M2 can durably store bootstrap state.
+
+1. Initialize SQLite and validate/create the publication and the connector-owned published fence relation; do not independently create and abandon the permanent slot snapshot.
+2. Persist a `bootstrap_intent` in state `prepared` with a proposed capture epoch, slot/publication identity, selected-table fingerprint, configuration fingerprint, and an `exporter_liveness=not_started` value **before** issuing slot creation.
+3. `boring-cdc run --bootstrap` creates the permanent logical slot with `EXPORT_SNAPSHOT` on one dedicated replication exporter connection, then keeps that connection command-idle; it does not start `START_REPLICATION` on the exporter.
+4. While that exact exporter connection is alive, atomically persist the returned slot `consistent_point`, exported snapshot identifier, source identity, and `start_seq`, then transition through `snapshot_exported` to `imports_pending`. `start_seq` is the current durable complete journal transaction boundary immediately before capture starts (the explicit zero-boundary sentinel in a fresh store). The pair `(consistent_point, start_seq)` is the initial anchor's lower stitch proof and is persisted before any worker copies rows.
+5. Start `START_REPLICATION` at the consistent point on a **separate** CopyBoth-capable replication connection only after that transaction commits. Until every intended importer has durably acknowledged a successful snapshot import, feedback is capped at the consistent point even if later WAL has been journaled; it may not advance the slot beyond the one-use snapshot basis.
+6. Each bounded importer begins a read-only `REPEATABLE READ` transaction and executes `SET TRANSACTION SNAPSHOT` as its first statement before any catalog or data query. A dedicated DDL-guard importer acquires `ACCESS SHARE` locks on every selected relation in frozen canonical order, verifies the relation contracts, and holds those locks through durable observation of the post-copy capture fence. Worker import acknowledgements include assigned ranges and become durable only after import and contract binding succeed.
+7. Once every worker and DDL-guard import acknowledgement is durable, transition to `imports_complete` and `exporter_release_permitted`; closing the command-idle exporter is then a legitimate lifecycle transition, not generation invalidation. Worker transactions remain alive until their assigned reads finish; the DDL guard remains alive through fence observation. Every chunk binds to the immutable `snapshot_schema_fingerprint` imported by its worker.
+8. Snapshot rows use the persisted slot consistent point, `origin_rank=0`, `transaction_ordinal=0`, and `mutation_ordinal=0`. WAL uses its commit LSN and `origin_rank=1`, so WAL at an equal/later source position wins.
+9. After all chunks are durably complete, create the published transactional fence described in section 7.3. Its observed and journaled source-transaction boundary is the sole `post_copy_fence_lsn` proof. Release the DDL guard only after the matching fence record is durably visible in SQLite.
+10. An anchor becomes complete only after all snapshot chunks, all importer/schema acknowledgements, `(consistent_point, start_seq)`, and the matching durable fence record exist. Close exporter/importer transactions at their explicit lifecycle points and report snapshot/XID/lock age throughout.
+
+`bootstrap_intents` records monotonic states including `prepared`, `snapshot_exported`, `imports_pending`, `imports_complete`, `exporter_release_permitted`, `exporter_released`, `snapshot_unusable`, `bootstrap_ambiguous_requires_restart`, and terminal anchor/re-seed states. It separately records exporter liveness and each worker import acknowledgement; a persisted token is not treated as a reusable snapshot after its exporter has died.
+
+There is an unavoidable response/persistence crash window around remote slot creation. On restart, an intent with a now-existing slot but no persisted snapshot token transitions to `bootstrap_ambiguous_requires_restart`. The lost creation snapshot cannot be reconstructed. If the exporter is lost before every worker import acknowledgement, mark the snapshot generation `snapshot_unusable`; never resume or materialize that partial snapshot. Under the normal feedback gate, recovery requires an explicit confirmed drop/recreate of the unused slot and a fresh bootstrap. If any feedback had advanced past the consistent point (including an unsafe override), recovery instead requires a new capture epoch and full re-seed; it must not recreate a slot and claim continuity. Deterministic crash hooks cover before slot creation, after server response, token persistence, every worker import acknowledgement, exporter release, and first feedback.
+
+### 7.2 Existing-slot and restart-generation protocol
+
+A used slot cannot reproduce its creation snapshot. A resumed or explicit re-backfill therefore creates a fenced generation while capture is already active:
+
+1. In one SQLite transaction **before** opening the exporter transaction, read the last complete locally durable source transaction from `source_state` and persist it as `(lower_stitch_lsn, lower_stitch_seq)` in the new generation. `lower_stitch_lsn` is that transaction's durable end LSN and `lower_stitch_seq` is its matching complete journal boundary; retention pins it. It is never an LSN sampled after the snapshot begins.
+2. Open a read-only `REPEATABLE READ` exporter transaction on a dedicated SQL connection, export its snapshot, persist the token/liveness/import state, and keep the exporter command-idle until every importer durably acknowledges importing that exact snapshot. Capture continues independently on the existing CopyBoth replication connection.
+3. Every importer executes `SET TRANSACTION SNAPSHOT` as its first statement. A dedicated DDL-guard importer acquires canonically ordered `ACCESS SHARE` locks on all selected relations, verifies/finalizes per-table contracts through the imported MVCC snapshot, and holds those locks until the matching post-copy fence is durably observed. Bind every chunk to its `snapshot_schema_fingerprint`.
+4. Assign every snapshot row the already persisted `lower_stitch_lsn`, `origin_rank=0`, and zero snapshot ordinals. The exported snapshot itself does not create an LSN; it must never be stamped with an LSN sampled after export. All retained WAL events after the lower boundary win by total source version.
+5. Persist half-open key ranges and completion in generation-fenced SQLite transactions while capture continues from the same slot.
+6. After all chunks finish, create the published transactional fence described in section 7.3. The matching observed source transaction proves `post_copy_fence_lsn` and its complete journal boundary proves `post_copy_fence_seq`.
+7. Publish a completed reconstruction anchor only when the snapshot is complete and the durable capture-fence record exists for the same capture epoch, generation, table-set fingerprint, and lower stitch pair. Release the DDL guard only after that fence record is durable.
+
+Unexpected exporter loss **before** all import acknowledgements, any importer death before its assigned reads finish, DDL-guard loss before durable fence observation, generation cancellation, or a source-impact limit ending the generation marks **all** of that generation's chunks and snapshot events `invalid`. Normal exporter release after every import acknowledgement is durable does not invalidate the generation. The append-only journal retains invalid events only as non-replayable audit records until GC; they are excluded from anchors and live destination state. A materializer may write pending snapshot events only to an isolated candidate namespace, never to a live namespace, and cannot promote it before anchor completion. Reuse is allowed only while the lower boundary, capture epoch, schema contracts, importer assignments, DDL guard, and generation remain valid; after pause, cancellation, worker/process death, or source-impact termination, resume starts a full re-read under a new generation. Capture WAL may continue for an existing slot, but an invalid generation cannot contribute a baseline. This is eventual convergence, not one globally atomic point-in-time snapshot across generations.
+
+### 7.3 Transactional capture-fence proof
+
+The connector-owned `boring_cdc_control.capture_fences` relation is included in the same one publication and is reserved for fenced control rows. After the last snapshot chunk commits, the coordinator inserts one committed row containing `(capture_epoch, generation, table_set_fingerprint, nonce)` into that relation. The `pgoutput` capture loop recognizes the row and, in the **same SQLite transaction** that publishes its complete source transaction and durable source state, inserts `durable_capture_fences(capture_epoch, generation, nonce, post_copy_fence_lsn, post_copy_fence_seq)`. `post_copy_fence_lsn` is the fence transaction's source end LSN; `post_copy_fence_seq` is that transaction's complete journal sequence.
+
+The coordinator never treats `pg_current_wal_lsn()`, a later sampled replication `wal_end`, or a timer as a fence proof. The only accepted proof is the explicitly published fence row observed through `pgoutput` and atomically paired with its journal sequence. No anchor may be complete without its initial/lower stitch pair and this matching fence nonce/LSN/sequence pair. Tests cover source transactions committed before snapshot creation, while workers hold the imported snapshot, after the snapshot read but before the fence, and after the fence.
+
+The DDL guard holds canonically ordered `ACCESS SHARE` locks from relation-contract verification through durable capture-fence observation. M0 must enumerate every admitted contract-changing DDL operation for every supported PostgreSQL version and prove that it conflicts with this lock; any operation that does not conflict is unsupported until a stronger guard is designed and tested. Final fingerprint verification and bounded polling remain defense in depth. Outside backfill, any changed `Relation` message synchronously pauses decoding for contract validation before following DML can be acknowledged.
+
+If relation metadata nevertheless changes while a generation is active, fence and end that generation; do not combine chunks read under different schemas. The only in-place additive change supported by v0.1 is a nullable, non-generated column with no default, outside an active backfill generation. For rows written under older schemas, the canonical projection maps `absent_for_schema` for such a column to SQL null. Columns with defaults, generated/identity expressions, or `NOT NULL` constraints require a fresh destination generation and re-backfill. Tests place DDL immediately before/after chunk-copy and capture-fence boundaries and DDL immediately before DML.
+
+### 7.4 Chunk planning
+
+Before M1, freeze supported primary-key scalar types and composite-key arity. Backfill uses persisted keyset-pagination ranges with deterministic canonical key ordering.
+
+- Ranges are half-open.
+- `OFFSET` and `ctid` chunking are prohibited.
+- Keyset pagination requires a frozen supported, non-null, canonically comparable identity in the imported snapshot.
+- A source primary-key change is allowed only when `pgoutput` supplies complete old and new identities so it can become an old-key tombstone plus new-key upsert; a key change with unchanged TOAST remains blocked.
+- Chunk row, byte, duration, and writer-hold-time limits are configurable.
+- Chunk completion and snapshot-event insertion are atomic.
+- Every worker completion compares its generation token before commit.
+- An old worker cannot commit after pause, resume, restart, or re-seed.
+
+### 7.5 Source-impact controls
+
+Monitor and limit:
+
+- snapshot/exporter age;
+- backend `xmin` and dead-tuple growth where measurable;
+- source CPU, I/O, connections, read latency, and application p50/p95/p99 latency;
+- WAL production and retained-WAL growth;
+- chunk throughput, remaining ranges, progress, and ETA.
+
+At configured source-impact limits, throttle workers and then end the generation rather than leave an exported snapshot paused indefinitely.
+
+### 7.6 Re-backfill and re-seed generations
+
+A snapshot contains present rows but cannot emit tombstones for rows deleted before its boundary. Therefore an incompatible-schema re-backfill, slot-loss recovery, or full re-seed never merges an incomplete baseline into stale destination state.
+
+- A re-seed creates a new `capture_epoch`.
+- ClickHouse writes into a fresh generation/table namespace, verifies it, then atomically switches the canonical current-state view. Old generations retire only after the switch.
+- Archive re-seed writes a new dataset root/generation and records an explicit continuity break.
+- A table-specific incompatible-schema rebuild uses the same fresh-generation principle for that table when the selected table set itself is unchanged.
+- Adding a selected table is a full re-seed: create a new capture epoch, recreate the publication and slot for the complete expanded set, snapshot **all** selected tables, and build fresh full ClickHouse and archive generations. The old complete generations stay readable until the new full generations are verified and promoted; a candidate containing only the new table is forbidden because it would drop existing-table state at switch time.
+
+Recovery tests include a row deleted before re-seed and prove it is absent after the destination-generation switch. The table-add test also proves existing tables remain complete across the full-generation promotion.
+
+## 8. SQLite journal and metadata model
+
+The requirement for an “append-only event journal for payloads and SQLite for metadata/checkpoints” is implemented as one physical SQLite database. `journal_events` is logically append-only: normal operation only inserts, and retention removes only whole eligible transaction ranges through the audited GC path. There is no separate append-only payload file. This single-store choice makes event publication and source-checkpoint advancement one SQLite transaction while preserving the requirement's logical separation.
 
 Minimum logical tables:
 
@@ -227,71 +457,270 @@ Minimum logical tables:
 - `backfill_runs`
 - `backfill_generations`
 - `backfill_chunks`
+- `bootstrap_intents`
+- `bootstrap_imports`
+- `durable_capture_fences`
+- `bootstrap_anchors`
+- `reseed_intents`
+- `destination_generation_leases`
+- `destination_promotion_intents`
+- `clickhouse_batch_intents`
+- `archive_generations`
+- `archive_segment_intents`
 - `archive_segments`
+- `archive_generation_markers`
 - `safety_state`
 - `alerts`
 - `schema_migrations`
 
-Important constraints:
-
-- unique source/slot WAL transaction end LSN;
-- unique event ID;
-- monotonic journal sequence;
-- destination checkpoint references a committed journal sequence;
-- source durable LSN changes in the same transaction as its events;
-- backfill chunk completion and snapshot event insertion are atomic;
-- migrations are versioned and covered by upgrade tests.
-
-Represent LSNs as ordered eight-byte values or canonical hexadecimal strings; do not assume every value safely fits signed SQLite arithmetic.
-
-## 7. Correctness invariants
-
-1. **No acknowledgement before durability:** Postgres `flush_lsn` never exceeds SQLite’s durable source LSN.
-2. **Whole source transaction:** a committed Postgres transaction is absent or fully present in the durable journal.
-3. **Deterministic replay:** replay near an acknowledgement boundary can attempt duplicates but cannot create distinct logical event IDs.
-4. **Destination independence:** destination checkpoints never change source acknowledgement.
-5. **Checkpoint after side effect:** a destination checkpoint advances only after a durable or deterministically discoverable side effect.
-6. **No GC past consumers:** retention never removes events above an active destination checkpoint.
-7. **Bounded bootstrap:** a destination avoids Postgres rereads only when its start lies inside retained history.
-8. **Snapshot/WAL ordering:** a snapshot row cannot overwrite a newer WAL mutation.
-9. **Explicit loss boundary:** slot invalidation, explicit destination detachment, or expired replay transitions to `requires_reseed`, never fake health.
-
-## 8. CLI
-
-Proposed commands:
+`bootstrap_anchors` contains at least:
 
 ```text
-boring-cdc check
-boring-cdc init
-boring-cdc run
-boring-cdc status [--json]
-
-boring-cdc backfill start|pause|resume|status
-boring-cdc backfill restart --confirm
-
-boring-cdc destination list|add|pause|resume
-boring-cdc destination detach --confirm
-
-boring-cdc replay DESTINATION --from-seq/--since
-boring-cdc journal inspect
-boring-cdc journal gc --dry-run
-
-boring-cdc recover inspect
-boring-cdc recover recreate-slot --confirm-data-gap
-boring-cdc recover reseed --confirm
+anchor_id
+capture_epoch
+generation
+lower_stitch_lsn
+start_seq
+snapshot_boundary_lsn
+snapshot_complete_seq
+post_copy_fence_nonce
+post_copy_fence_lsn
+post_copy_fence_seq
+table_set_fingerprint
+snapshot_schema_fingerprints
+state
+expires_at
 ```
 
-`check` is read-only and reports Postgres configuration/privileges, publication and slot state, keys/replica identities, type/ClickHouse compatibility, finite WAL safety boundary, local budget/replay settings, and schema drift.
+A usable anchor represents a complete baseline plus every required concurrent journal event from its lower complete boundary through a post-copy durable capture fence. For initial bootstrap, `(snapshot_boundary_lsn, start_seq)` is the slot `(consistent_point, current complete journal boundary)` persisted before copying; for an existing slot, `(lower_stitch_lsn, start_seq)` is the last locally durable complete source boundary persisted before exporting a snapshot. `post_copy_fence_seq` is the complete journal position atomically paired with the published control-row fence's `post_copy_fence_lsn` and nonce. Anchor state can transition to `complete` only when all valid snapshot chunks, schema bindings/import acknowledgements, the lower proof, and that matching durable capture-fence record exist. Retention pins `start_seq`. An arbitrary retained sequence, an invalidated generation, or snapshot completion without the fence is never advertised as a valid empty-destination bootstrap point.
 
-Mutating commands print intended changes and require confirmation whenever they can introduce a data gap.
+Important constraints:
 
-## 9. Configuration and observability
+- unique `(capture_epoch, source/slot identity, transaction end LSN)`;
+- unique positional connector event ID; an existing identity with a different stored payload hash is corruption, not a second event;
+- monotonic journal sequence;
+- source durable LSN changes in the same transaction as its event publication;
+- bootstrap intent/import transitions are monotonic and make exporter loss or ambiguous remote slot creation visible;
+- durable capture fences and heartbeat control events reference a capture epoch, source transaction, and complete journal sequence; materializers route them as internal transaction-preserving no-ops;
+- destination checkpoint references a complete committed journal transaction boundary plus `capture_epoch`, anchor identity where applicable, configuration fingerprint, and generation;
+- destination lease and promotion intent transitions are compare-and-swap fenced and externally reconcilable;
+- backfill chunk completion and snapshot-event insertion are atomic and generation-fenced; invalid generations cannot become anchors or live state;
+- archive segment intent is immutable once selected;
+- immutable transaction and event payload checksums;
+- immutable relation schemas by fingerprint; and
+- versioned migrations with clean-install and upgrade tests.
 
-Use one documented TOML file with environment-variable secret overrides for source, slot/publication, table allowlist, journal budget/replay window, WAL thresholds, backfill controls, ClickHouse, archive, and metrics listener.
+Represent LSNs as ordered unsigned eight-byte values or canonical hexadecimal strings. Do not rely on signed SQLite arithmetic for every PostgreSQL LSN.
 
-Never put passwords in example configuration or logs.
+### 8.1 Integrity and startup validation
 
-Expose human-readable status, `--json`, structured logs, and preferably Prometheus-compatible metrics. Payload values are excluded from logs by default.
+At startup and at documented maintenance intervals:
+
+- run appropriate SQLite `quick_check`, with full `integrity_check` available for recovery/maintenance;
+- validate journal sequence continuity at committed transaction boundaries;
+- validate event counts and transaction/event checksums;
+- validate source and destination checkpoints against retained complete boundaries;
+- validate every retained event's schema fingerprint;
+- validate archive intent/manifest/`SEGMENT_READY`/generation-live-marker/checkpoint relationships; and
+- block on missing, corrupt, or contradictory state.
+
+Journal corruption or a missing required replay sequence transitions to `journal_corrupt_requires_reseed`. If state cannot be persisted, fail health and exit non-zero.
+
+### 8.2 Admission control and physical storage management
+
+All limits use explicit byte units:
+
+- `wire_frame_bytes` is the length announced by the replication protocol before a frame is allocated;
+- `decoded_row_bytes` is the canonical decoded row/event representation before compression or SQLite-page overhead;
+- `max_event_bytes` bounds one canonical event, and `max_transaction_bytes` bounds the sum of canonical event bytes plus fixed transaction/envelope headers;
+- `on_disk_reservation_bytes` is a conservative allocation reservation, never a compressed-file observation after the fact.
+
+Frame length and field lengths are checked before memory or spool allocation. `max_transaction_bytes` and `max_transaction_events` apply to the canonical bounded transaction spool; a separate frozen `max_wire_frame_bytes` prevents an oversized wire frame from bypassing that bound.
+
+Every physical filesystem used by state, SQLite temporary files, spool files, archive staging, or archive output has its own configured budget and emergency reserve. The state and archive roots may share a filesystem only when their combined reservation is validated. `boring-cdc check` rejects a configuration when the worst-case reservation cannot fit on **each** filesystem:
+
+```text
+required_free(fs) =
+  reserved_free_bytes(fs)
+  + max_capture_spool_reservation(fs)
+  + max_sqlite_main_and_wal_growth(fs)
+  + max_sqlite_temp_reservation(fs)
+  + backfill_worker_count * max_backfill_chunk_reservation(fs)
+  + max_concurrent_archive_segment_reservation(fs)
+  + archive_publish_and_directory_overhead(fs)
+  + fixed_metadata_and_rounding_headroom(fs)
+```
+
+The calculation includes SQLite main, `-wal`, `-shm`, configured SQLite temporary files, temporary source-transaction spools (including orphans), temporary archive directories, final archive output, and metadata/rounding overhead. A separately mounted archive root must pass its own calculation; it is not excused because it is outside the SQLite filesystem. At startup and before each bounded allocation, the runtime reserves its declared share and refuses work before the emergency reserve is crossed. It releases a reservation only after the related cleanup is durably complete.
+
+Thresholds are monotonic for free space: `warning_free_bytes > action_free_bytes > critical_free_bytes > hard_free_bytes >= reserved_free_bytes`; entering a lower state never enables work that a higher state prohibited. Near-limit and separate-filesystem tests prove that no spool, SQLite growth, backfill chunk, or archive publication can consume the reserve.
+
+Before creating any table, set `auto_vacuum=INCREMENTAL` and read it back after database initialization. Configure bounded WAL checkpoints, page reuse, and `incremental_vacuum` work limits so maintenance cannot starve capture. Automatic full `VACUUM` is prohibited in v0.1; any offline full-vacuum operator procedure is outside normal runtime and requires a stopped, backed-up store. GC removes only whole contiguous ranges ending at committed source-transaction boundaries; it never splits a transaction. Repeated crashes before source-transaction publication must not leak spool space: exclusive-lock startup reconciliation removes safely classified orphans, syncs the spool directory, and blocks on anything ambiguous.
+
+### 8.3 SQLite durability boundary
+
+The durable-before-feedback claim is valid only under a frozen storage contract:
+
+- SQLite `journal_mode=WAL`;
+- `synchronous=FULL` applied and read back on **every** connection that can write or read durability-bearing source/journal/checkpoint state, including pooled/reopened maintenance connections;
+- `auto_vacuum=INCREMENTAL` set before schema creation, bounded checkpoints/incremental vacuum, and no automatic full `VACUUM`;
+- controlled checkpoints that never weaken committed WAL durability;
+- a named, tested Linux filesystem/storage stack (initial candidates: ext4 and XFS, each accepted only after crash evidence) with working advisory locks, atomic sector writes as required by SQLite, and honest `fsync`/barrier semantics;
+- directory sync for initial database creation, migrations, and durable file lifecycle where required; and
+- no NFS, SMB, FUSE/object-store mounts, multi-host access, or `:memory:` database.
+
+`boring-cdc check` opens every connection class used by the runtime, applies and reads back the required PRAGMAs, identifies the mounted filesystem against the M0 allowlist, and rejects unknown/unsupported classes. Filesystem API compatibility alone is not a support claim. Weaker settings are available only behind an explicit `unsafe_local_experiment` switch; status is permanently `unsafe_durability`, PostgreSQL feedback remains opt-in, and no durability benchmark/result may be presented as passing.
+
+The v0.1 crash guarantee covers process/container crashes and abrupt host restart when the tested storage stack honors successful sync calls. It does not claim survival of media/controller failure, filesystem corruption, or hardware that lies about flushes. Release evidence includes clean recovery after abrupt VM/host termination on each documented supported filesystem; fault injection alone is not labelled a power-loss test.
+
+## 9. Destination semantics
+
+### 9.1 Shared checkpoint rules
+
+Each destination stores independent:
+
+- configuration fingerprint;
+- `capture_epoch`, anchor identity where bootstrapping, and generation token;
+- checkpoint at a complete journal transaction boundary;
+- retry count and next retry;
+- lag and retained bytes pinned;
+- blocked/degraded reason; and
+- last successful side-effect identity and its externally discoverable batch/segment intent.
+
+Capture and the other destination may continue while one destination is blocked, within configured local and source bounds.
+
+If a destination cannot apply an otherwise losslessly captured schema/event, it blocks **the whole destination immediately before that journal transaction**. Its checkpoint cannot skip the event. Per-table quarantine with independent progress would require separate durable checkpoints and is out of scope for v0.1.
+
+### 9.2 External side effects, leases, and promotion
+
+Every ClickHouse batch and archive segment targets an immutable namespace named by `(destination, capture_epoch, generation)`. A worker holds a `destination_generation_lease` for that exact tuple and rechecks it immediately before the side effect. A stale worker may leave an idempotently discoverable artifact only in its fenced old namespace; it cannot write into a later candidate or live namespace.
+
+A promotion is a durable state machine, not merely a checkpoint CAS. `destination_promotion_intents` records the old live tuple, candidate tuple, capture epoch, compatible anchor, configuration fingerprint, expected external marker, and one of:
+
+```text
+prepared -> old_leases_fenced -> candidate_verified -> switch_pending
+  -> switched -> verified -> retired
+```
+
+1. Persist `prepared`, acquire the candidate lease, and fence/drain old leases before a pause, detach, re-seed, or promotion can proceed.
+2. Materialize and verify the candidate namespace against its anchor/fence and correctness watermark.
+3. Persist `switch_pending`, perform the idempotent external switch (ClickHouse canonical-view target or archive generation-level live pointer), and read the external marker back. Per-segment durability markers are never promotion markers.
+4. Persist `switched` only when the external marker matches the intent, then mark `verified`; retire old namespaces only after the configured grace, verification, and operator policy.
+5. On restart, reconcile every nonterminal intent against the external marker before any worker starts. A state-store checkpoint alone never decides which external generation is live.
+
+A capture-epoch change invalidates all old destination generations for continuation: they require re-seed into the new epoch and cannot advance an old checkpoint. Archive and ClickHouse generation namespaces make a crash after a side effect but before SQLite checkpoint/promotion recovery explicit and replayable. Promotion-crash and stale-write tests cover each transition.
+
+### 9.3 ClickHouse materializer
+
+The ClickHouse destination stores append-only event history containing explicit key, total source version, connector event ID, payload hash, schema fingerprint, tagged column states, and tombstone operation. M0 freezes a concrete `docs/CLICKHOUSE_MODEL.md` contract with executable event-history DDL, canonical queries, pinned server/client image versions and digests, exact storage engine/table settings, and an executable insert-recovery protocol before M4 implementation starts.
+
+The ClickHouse contract must state the acknowledgement boundary precisely. v0.1 disables `async_insert` for materializer batches and rejects any server/client setting that acknowledges only an asynchronous insert queue. It freezes the supported synchronous insert and metadata-`fsync`/write-concern equivalents (including `fsync_after_insert` and directory/part durability settings when supported by the pinned version), volume/filesystem assumptions, batch marker schema, and one-node Compose limitation. It also pins the Rust client/crate version and requires its documented insert-finalization call (for example, completing/finalizing the insert stream and awaiting the server result); dropping a request/stream without successful finalization can never advance a checkpoint. There is no replication quorum or HA guarantee in the single-node Compose environment. A response is called durable only under that frozen contract; a crash-after-ack integration test kills and restarts ClickHouse, then verifies every batch marker/event identity before its checkpoint can be trusted. If recovery cannot verify an accepted batch, it replays it while retained or blocks rather than claiming durability.
+
+The raw history sort key begins with `(capture_epoch, table_fingerprint, key_hash)` and includes the full source version and `connector_event_id`; the exact typed key columns are specified per source table. Each batch has a persisted `clickhouse_batch_intent` with epoch, generation, journal range, event-ID/payload hash summary, and target namespace before insertion. A write-before-checkpoint retry may create physical duplicate rows. Canonical queries first collapse rows by the positional `connector_event_id` and reject any same-ID payload-hash conflict, then compare the full source-version tuple including the event-ID tie-breaker. Correctness never depends on background merge timing.
+
+A naive latest-row `ReplacingMergeTree` is insufficient because an `unchanged_toast` patch may need an older explicit value that a merge discarded. The composite `source_version` must not be narrowed/coerced into a native `ReplacingMergeTree` version column, and no TTL, mutation, merge, or cleanup may physically remove protective tombstones or predecessor values required by reconstruction. The canonical current-state layer therefore:
+
+1. selects row liveness from the latest operation by total source version;
+2. for each live column, selects the latest `explicit_value` or `explicit_null` at or before that row version;
+3. treats `unchanged_toast` as a patch that preserves the prior explicit state;
+4. treats `absent_for_schema` as not-yet-defined, mapping it to null only for the explicitly supported nullable/no-default additive-column case; and
+5. applies complete primary-key changes as old-key tombstone plus new-key upsert, while blocking key changes containing `unchanged_toast` before source acknowledgement.
+
+A table reports `backfill_incomplete` until its baseline anchor is complete. The default documented current-state query/view must be correct without asking users to guess merge timing. Raw table behavior, background merges, canonical view cost, and `FINAL` behavior are documented and benchmarked before any optional compaction design.
+
+ClickHouse requirements:
+
+- deterministic retries and replay;
+- explicit ordering/sort key and source version;
+- versioned tombstones for hard deletes;
+- only the frozen nullable/no-default additive-column projection;
+- destination-wide block before incompatible schema transactions;
+- fresh table/generation and verified view switch for incompatible rebuild/re-seed;
+- checkpoint advancement only after the configured ClickHouse durable-acceptance contract and batch intent are satisfied; and
+- tests before, during, and after merges under update/delete-heavy load.
+
+ClickHouse raw history is deliberately append-only in v0.1 because it preserves the predecessor values required for TOAST patches. v0.1 does not claim unlimited sink history or automatic safe compaction. `docs/CLICKHOUSE_MODEL.md` sets a tested history quota, alert/action/block behavior, and a retired-generation grace period. Reaching the quota blocks the whole ClickHouse destination before its next journal transaction, pins local retention, and therefore surfaces normal source-safety pressure; it never silently drops raw history. Old namespaces may be retired only through the promotion state machine after verification and the configured grace. Published capacity results include raw-history growth, quota behavior, and retained-generation cost.
+
+No destination may query PostgreSQL to reconstruct TOAST values.
+
+### 9.4 JSONL/Parquet archive materializer
+
+The archive is a changelog with documented reconstruction by capture epoch, source version, tagged column state, and tombstone. It is not silently presented as current-state snapshots. Snapshot events from an incomplete or invalid generation are never visible through the live archive generation. A fenced candidate generation may contain individually durable segments, but only generation-level promotion can make them reader-visible.
+
+v0.1 durable publication is scoped to named, tested local Linux filesystems with same-filesystem atomic **directory** rename and file/directory `fsync`. M0 starts with ext4 and XFS candidates and admits each only after the crash matrix passes on the pinned Linux/storage configuration. `boring-cdc check` identifies the filesystem and fails on anything outside that allowlist. Object stores, network mounts, FUSE, and support inferred from API compatibility alone are out of scope.
+
+For every scheduled range:
+
+1. Select a range ending on a complete committed journal transaction and persist an immutable segment intent containing capture epoch, archive generation, compatible anchor where applicable, `start_seq`, `end_seq`, enabled format set, writer configuration hash, and state.
+2. Retry exactly that intent range after failure; never silently widen it because newer events arrived.
+3. Create one deterministic, same-parent temporary directory for the segment. It contains every JSONL/Parquet part and a pending manifest; no reader trusts a temporary directory.
+4. Serialize events in canonical `(journal_seq, transaction_ordinal, mutation_ordinal, connector_event_id)` order. JSONL field order, Parquet column order, compression, row-group limits, `created_by` value, and all metadata are frozen so a retry produces the same hashes without volatile timestamps/UUIDs. Parquet remains grouped by source table and schema fingerprint; heterogeneous schemas never share a file.
+5. Write every part and pending manifest, `fsync` each file, then `fsync` the temporary directory. The manifest records part paths/hashes/sizes, journal range, event count, schema fingerprints, format versions, and the intent/configuration identity.
+6. Atomically rename the **single fully staged directory** to its deterministic final directory and `fsync` its parent. The protocol does not claim atomic publication of unrelated files; directory rename on a named tested filesystem is the only set-publication primitive used here.
+7. Write a final internal `SEGMENT_READY` marker containing the intent ID and manifest hash, `fsync` it and the final directory, then `fsync` the parent again. This proves segment durability only; it does **not** make a candidate generation live.
+8. Persist the durable manifest/segment record and advance the candidate generation's shared archive checkpoint only after every enabled artifact and `SEGMENT_READY` publication is durable.
+
+A crash after any file, manifest, directory-rename, parent-sync, or `SEGMENT_READY` phase leaves either a temporary/unready directory that recovery ignores or a deterministic segment-ready directory that recovery validates and adopts inside its generation. Orphan temporary/unready directories are reconciled against their immutable intent and hashes; a mismatch blocks and is never overwritten.
+
+Archive visibility is generation-level. The promotion state machine verifies the complete candidate generation against its anchor/watermark, persists `switch_pending`, atomically replaces a deterministic live-generation pointer/marker using the same tested rename-and-fsync contract, reads it back, and only then records `switched`. Readers first resolve this one live-generation pointer and then accept only matching `SEGMENT_READY` segments/manifests in that generation. Candidate generations can have segment-ready data but are invisible before promotion. With roots/directories at mode `0700`, v0.1 archive readers run as the same connector Unix account; broader user/group sharing and ACL design are out of scope.
+
+If JSONL and Parquet are both enabled, they share one archive-generation checkpoint and it advances only after both artifact sets are segment-ready. Changing enabled formats or writer configuration creates a new archive generation. To preserve continuity, that generation must replay from a compatible retained anchor/range and be verified/promoted under section 9.2. If no compatible history exists, the change is rejected unless an explicit confirmed continuity break creates a new archive root with a discontinuity record. Archive output has a per-filesystem quota/budget; no automatic deletion is allowed to make a failed archive look caught up.
+
+M0 pins the Parquet Rust writer/crate and version, format version, schema mapping, compression codec/level/library, row-group and page sizing, dictionary/statistics behavior, field/metadata order, `created_by`, and all optional metadata. Golden retry fixtures run under a fresh process/run/time and require byte-identical Parquet parts, JSONL parts, manifests, and hashes for the same immutable segment intent.
+
+## 10. Reconstruction anchors, replay, and retention
+
+### 10.1 Bootstrap rules
+
+An empty destination can bootstrap without re-reading PostgreSQL only from a retained, complete, compatible reconstruction anchor whose capture epoch and table-set/schema fingerprints cover that destination.
+
+A completed anchor pins its `start_seq` while configured as usable. The destination consumes from that lower complete boundary through `snapshot_complete_seq`, `post_copy_fence_seq`, and onward, using total source version to resolve WAL events that were journaled before delayed snapshot rows. An anchor without the persisted initial/last-durable lower stitch proof, worker/schema acknowledgements, and matching published-fence nonce/source-LSN/journal-sequence pair is incomplete and cannot bootstrap anything.
+
+Snapshot events carry their generation eligibility. Until the matching anchor is complete, a live destination ignores them; a candidate destination may consume them only in its isolated epoch/generation namespace. Normal exporter release after all import acknowledgements are durable is valid. Unexpected pre-import exporter loss, an importer dying before assigned reads finish, DDL-guard loss before durable fence observation, cancellation, or any other generation invalidation makes every snapshot event permanently ineligible for anchor/live-state use. This prevents completed chunks from an abandoned generation from leaking a stale baseline through later replay or promotion.
+
+If no complete compatible anchor remains, destination addition fails with explicit guidance to run a shared journaled re-backfill or full re-seed. It never starts from the oldest arbitrary retained event.
+
+### 10.2 Replay rules
+
+A replay start resolves to a retained complete source-transaction boundary. For an empty destination it must additionally resolve to a compatible reconstruction anchor in the same capture epoch. Replaying an established destination never rewrites its live checkpoint. The dry run selects an explicit new destination generation and reports its epoch/anchor/range/storage consequences; execution requires that same generation plus a non-interactive `--confirm-replay` token. The new generation is verified and promoted through the durable state machine in section 9.2. No command can mutate the checkpoint of the currently live generation in place.
+
+### 10.3 Retention and pressure transitions
+
+Retention preserves all events required by:
+
+- each attached destination checkpoint;
+- each active backfill generation stitch boundary;
+- every retained usable reconstruction anchor; and
+- the configured post-consumption replay window while disk permits.
+
+A paused destination remains attached and pins retention. Only explicit detach, with displayed consequences and confirmation, releases its pin.
+
+Pressure states:
+
+| State | Required behavior |
+|---|---|
+| Warning | Surface forecast/headroom; throttle backfill |
+| Action | End snapshot generations safely; continue capture, materializers, and eligible GC |
+| Critical | Reserve space for metadata/source commits and draining consumers; stop new archive/backfill work |
+| Hard | Safe-stop capture before `ENOSPC`; continue consumers that can drain without violating reserve |
+
+If a pinned destination prevents reclamation, status identifies it and forecasts source-WAL consequences. The system escalates retained-WAL risk honestly; a finite PostgreSQL WAL cap may ultimately invalidate the slot and require re-seed. It never detaches a destination, deletes unconsumed events, drops a slot, or sends fake feedback automatically.
+
+## 11. Source-safety state machine and observability
+
+Monitor:
+
+- retained WAL bytes and slot lag;
+- `wal_status`, `safe_wal_size`, slot activity, invalidation, and server WAL end;
+- source free disk or explicit `unknown` capability;
+- source CPU, I/O, connections, application latency, and WAL rate in Compose/benchmarks;
+- per-filesystem reservation, free space, and actual state/archive usage including all files listed in section 8.2;
+- ClickHouse raw-history quota/usage, archive quota/usage, retired-generation grace, and destination-side pressure;
+- oldest/newest retained sequence, usable anchors, and replay duration;
+- last received, durable, and feedback LSN plus last heartbeat attempt, published heartbeat end LSN, success/failure, and idle-WAL headroom;
+- capture and per-destination lag/retries/pinned bytes, generation lease, and promotion-intent state;
+- snapshot age, backend `xmin`, backfill rate/progress/ETA; and
+- integrity-check status and last successful time.
 
 Required states:
 
@@ -299,204 +728,562 @@ Required states:
 healthy
 degraded
 backfill_throttled
+backfill_incomplete
 destination_blocked
+schema_blocked
 capture_safe_stopped
 slot_invalid_requires_reseed
-schema_blocked
+journal_corrupt_requires_reseed
+publication_drift_requires_reseed
+bootstrap_ambiguous_requires_restart
+bootstrap_snapshot_unusable
+reseed_incomplete
+heartbeat_degraded
+promotion_recovery_required
+clickhouse_durability_unverified
+source_identity_blocked
+unsafe_durability
 ```
 
-## 10. Benchmark harness
+Thresholds are warning, action, critical, and hard. Health represents risk, not process liveness. Status always includes the reason, threshold evidence, automated action taken, allowed remaining actions, and exact operator recovery path.
+
+“Safe stop” means the connector stops accepting source work before violating its local durability contract. It cannot preserve PostgreSQL WAL indefinitely. The finite source WAL cap remains the final source-safety boundary and may force an explicit re-seed.
+
+## 12. CLI and operator workflows
+
+### 12.1 Commands
+
+```text
+boring-cdc check
+boring-cdc init
+boring-cdc run
+boring-cdc run --bootstrap
+boring-cdc status [--json]
+
+boring-cdc backfill start|pause|resume|status
+boring-cdc backfill restart --confirm
+
+boring-cdc destination list|add|pause|resume
+boring-cdc destination detach --confirm
+boring-cdc destination promote DESTINATION --generation ID --confirm
+
+boring-cdc replay DESTINATION --from-anchor/--from-seq/--since --new-generation ID --dry-run
+boring-cdc replay DESTINATION --from-anchor/--from-seq/--since --new-generation ID --confirm-replay
+boring-cdc journal inspect
+boring-cdc journal verify
+boring-cdc journal gc --dry-run
+
+boring-cdc recover inspect
+boring-cdc recover reseed --recreate-publication --recreate-slot --confirm-data-gap
+boring-cdc recover reseed --add-table SCHEMA.TABLE --recreate-publication --recreate-slot --confirm-data-gap
+boring-cdc recover reseed --resume RESEED_ID --confirm
+```
+
+`init` initializes local state and publication/control relations; it does not create and abandon the permanent slot's one-time exported snapshot. `run --bootstrap` owns initial slot/snapshot lifecycle after persisting its intent. Direct live `ALTER PUBLICATION` is unsupported and continuity-breaking. Selecting a new table is expressed only as a confirmed full re-seed/new epoch.
+
+Mutating commands print the current epoch/generation, intended transitions, retained-history requirements, source/destination consequences, expected source interruption, and rollback/recovery path. Any operation that can create a gap requires an explicit confirmation flag. Replay of an established destination always targets a named new generation, requires `--confirm-replay` after dry-run, and needs a separate verified promotion; it cannot rewrite the live checkpoint.
+
+`init` and source-mutating recovery/re-seed commands are maintenance-runtime commands under section 3. They refuse to run while ordinary `run` holds the SQLite lock. After a clean handoff they become the sole owner and reconcile persisted state. Only that maintenance owner may load the administration DSN, and only around the exact owner-only request and verification. Read-only commands such as `check` and `status` do not take ownership or load administration credentials.
+
+### 12.2 Required workflows
+
+The operator documentation and integration tests cover:
+
+1. **Fresh bootstrap:** preflight -> init -> `run --bootstrap` -> anchor completion -> destination verification.
+2. **Normal restart:** exclusive lock -> integrity/source reconciliation -> resume from durable source and destination checkpoints.
+3. **Destination pause:** stop materialization while retaining its pin and exposing growing backlog.
+4. **Destination detach:** display lost replay guarantee -> confirm -> generation fence -> release retention pin.
+5. **Late destination add:** choose compatible retained anchor -> dry-run required range/storage -> bootstrap -> attach at live checkpoint.
+6. **Replay/rewind:** resolve complete transaction boundary, create an explicitly named new generation after dry-run and `--confirm-replay`, verify it, then promote separately; never rewrite live state.
+7. **Schema/publication change:** compatible column handling follows the frozen policy. Incompatible changes require a fresh table/destination generation. Adding any selected table follows the full-reseed protocol in section 12.3; unexpected publication drift also requires re-seed.
+8. **Slot invalidation/source mismatch:** refuse unsafe resume and show re-seed procedure.
+9. **Full re-seed:** create a new capture epoch and fresh **full** destination generations, verify each, switch, then retire old state.
+10. **Journal corruption:** fail closed, preserve evidence, and require verified restore or re-seed.
+11. **Idle-source heartbeat failure:** report degraded progress, retry the narrowly scoped control-row update, and show WAL headroom; never acknowledge keepalive `wal_end`.
+
+### 12.3 Table-set change through full re-seed
+
+Adding a selected table deliberately abandons online continuity for the old capture epoch. There is no live table-add command, publication-alter intent/state machine, or new-table-only destination candidate in v0.1. `reseed_intents` records the old and proposed new epochs, complete old/new table-set fingerprints, publication/slot identities, full ClickHouse/archive candidate generations, configuration hash, verification evidence, and monotonic phase.
+
+1. Dry-run displays the expanded table set, source interruption, new epoch, required full snapshot/storage, destination generations, and the fact that the old capture epoch cannot continue. The operator must pass `--confirm-data-gap`.
+2. Stop ordinary `run`; the maintenance runtime acquires the same exclusive SQLite lock, validates old state, and persists `prepared` before any remote mutation. Existing live ClickHouse and archive generations remain reader-visible and immutable.
+3. Through the short-lived administration connection, create/recreate the publication with the **complete expanded table set plus both control relations**, recreate the one permanent slot, and enter the initial exported-snapshot bootstrap protocol for a new `capture_epoch`. Any ambiguous remote response remains a nonterminal re-seed intent; it is never attached as old-epoch continuity.
+4. Snapshot every selected table—not just the added table—under the new epoch, with the corrected exporter/importer lifecycle, DDL guard, concurrent WAL capture, and published post-copy fence. M3 proves a complete expanded-table reconstruction anchor.
+5. Build fresh full ClickHouse and archive candidate generations from that anchor. Existing-table and newly added-table counts/checksums/exact committed mutation sets must all verify. The old generations stay live throughout candidate construction.
+6. M4 verifies/promotes the full ClickHouse generation; M5 verifies/promotes the full archive generation through its generation-level live pointer. Promotions are independently crash-recoverable; cross-destination atomicity is not claimed.
+7. Mark the re-seed terminal only after required promotions and readback verification. Retire old generations only after their configured grace and operator policy.
+
+The phases are `prepared -> source_recreated -> snapshot_imported -> anchor_complete -> clickhouse_verified -> clickhouse_promoted -> archive_verified -> archive_promoted -> complete`, with explicit `ambiguous_requires_restart` and `failed_requires_fresh_reseed` handling. `recover reseed --resume` reacquires the sole lock and may continue only after revalidating the new epoch, full table-set fingerprint, remote publication/slot, anchor, and candidate markers. This deliberately disruptive protocol is smaller and safer than an online schema control plane and satisfies the requirement to detect an added table and provide a tested re-backfill path.
+
+## 13. Configuration
+
+Use one documented TOML file. Secrets come from environment-variable overrides and are never written to examples, logs, status output, benchmark artifacts, or archive manifests.
+
+Configuration groups:
+
+- runtime replication/source DSN reference, separately scoped single-row heartbeat-writer DSN reference, administration-DSN reference for `init`/full re-seed/explicit recovery, publication, slot, selected tables, pinned CopyBoth transport, exact `START_REPLICATION` options, heartbeat cadence, and certificate-verification policy;
+- supported key/type policy and frozen relation-contract inputs;
+- SQLite path, explicit SQLite temp/spool paths, per-connection `WAL`/`FULL` readback policy, pre-schema incremental auto-vacuum and bounded checkpoint/vacuum settings, named supported Linux filesystems, and explicit unsafe-experiment override;
+- `max_wire_frame_bytes`, `max_event_bytes`, `max_transaction_bytes`, `max_transaction_events`, and canonical row/event limits;
+- per-filesystem state/archive budgets, `reserved_free_bytes`, maximum SQLite/WAL/temp growth, capture spool, concurrent backfill, and archive-segment reservations;
+- replay window, usable-anchor policy, and invalid-generation retention/GC policy;
+- finite PostgreSQL WAL thresholds;
+- backfill chunk rows/bytes/duration/concurrency and source-impact limits;
+- ClickHouse pinned endpoint/server/client versions, configuration fingerprint, history quota, synchronous insert/durability and Rust insert-finalization settings, and destination generation;
+- archive root, named filesystem, per-filesystem budget, schedule, JSONL/Parquet formats, pinned writer/crate/compression settings, segment size, `SEGMENT_READY` and generation-live-pointer settings, and explicit continuity-break policy;
+- warning/action/critical/hard thresholds; and
+- structured log/JSON status/Prometheus listener address, authentication, and TLS settings.
+
+Payload values are excluded from logs by default. Configuration fingerprints are persisted with source, destination, archive, backfill, and promotion state so incompatible changes block rather than mutate continuity silently.
+
+### 13.1 Security and exposure defaults
+
+Status and Prometheus listeners bind to loopback (or a local Unix socket) by default. A non-loopback listener requires explicit authentication and TLS; `check` rejects an exposed unauthenticated or plaintext listener. PostgreSQL and ClickHouse connections require certificate verification under the documented TLS policy; an insecure/no-verify connection is allowed only as an explicit local experiment and is permanently reported as degraded/unsafe.
+
+The state, spool, and archive root directories are created with mode `0700`; SQLite, spool, intent, manifest, and configuration files containing secrets use mode `0600` or stricter. `check` rejects weaker permissions on named supported Linux filesystems. Because the archive root is `0700`, v0.1 archive readers run as the connector Unix account; multi-user/group/ACL sharing is out of scope. The administration DSN is loaded only by the sole lock-owning maintenance runtime for the minimum `init`/re-seed/recovery request and readback, then its connection and secret-bearing state are dropped. Normal `run` never loads or retains it. Its heartbeat DSN is independently least-privileged to one bounded control-row update and is included in secret redaction.
+
+Redaction applies before structured logging and artifact collection: DSNs, passwords, tokens, connection-string query values, secret environment-variable names/values, driver error strings, and unapproved source paths are never emitted verbatim. Public benchmark artifacts use synthetic data only. Production archive payloads are not copied into diagnostics or public benchmark results, and an error path must be tested for credential redaction.
+
+## 14. Benchmark and correctness harness
 
 Check in:
 
-- deterministic e-commerce generator;
-- customers, products, orders, and order-items schema;
-- fixed random seed and named scale profiles;
+- deterministic e-commerce generator for customers, products, orders, and order items;
+- fixed seed and named scale profiles;
 - concurrent transactional writer and application reader;
-- mutation ledger with expected event IDs;
-- keyed count/checksum oracle;
-- fault-injection scripts;
-- standard result JSON schema;
-- Boring CDC, Debezium, and Estuary runbooks.
+- application-generated stable `mutation_id` values and diagnostic per-run `mutation_seq` values that are explicitly allowed to contain gaps;
+- a published `benchmark_mutation_ledger` source table written in the same PostgreSQL transaction as each workload mutation;
+- `last_mutation_id` plus diagnostic `last_mutation_seq` columns on inserted and updated workload rows, with deletes represented by their durable ledger entries;
+- keyed count/checksum oracle using canonical typed-row serialization;
+- archive reconstruction/verifier command;
+- fault-injection scripts and deterministic crash hooks;
+- standard raw result JSON schema;
+- Boring CDC and Estuary externally visible scenario runbooks/results; and
+- a Debezium design-reference appendix limited to capture, offsets, and relevant configuration, with no provider score.
 
-Common measurements:
+`connector_event_id` is internal to Boring CDC replay/deduplication and is never used as the provider-neutral comparison identity.
 
-- source CPU, I/O, connections, free disk, retained WAL;
+The provider-neutral ledger schema is frozen with at least:
+
+```text
+run_id
+mutation_seq
+mutation_id
+transaction_group_id
+entity_table
+canonical_entity_key
+operation
+expected_after_hash       // null for delete
+committed_at
+record_kind               // mutation | fence
+```
+
+The ledger is included in the same publication, journal, ClickHouse materialization, and JSONL/Parquet archive as the workload tables. A mutation event and its ledger record correlate through the workload row's last-mutation fields for inserts/updates and the ledger's canonical key for deletes. PostgreSQL sequence allocation and failed transactions can create gaps, so `mutation_seq` is diagnostic ordering evidence only; no correctness claim assumes a gapless allocator.
+
+### 14.1 Correctness fence
+
+A result is checked only at a reproducible exact-set fence:
+
+1. quiesce writers, wait for every workload transaction to finish, then commit a unique ledger `record_kind=fence` row;
+2. in a repeatable source read that observes that fence, capture the exact committed mutation set for the run as sorted pairs `(mutation_id, canonical_ledger_hash)`, plus its count and deterministic digest over the sorted canonical pairs; `mutation_seq` is recorded only for diagnostics;
+3. wait until each destination and archive reconstruction observes the matching fence record, then compute the same exact sorted pair set, count, and digest from its materialized ledger;
+4. compare source and downstream sets by mutation ID/hash and report explicit missing, unexpected, and hash-mismatched entries—never merely a maximum or contiguous sequence;
+5. compute source and destination keyed counts/checksums from one canonical typed-row serialization; and
+6. report correlation failures, duplicate attempts, convergence time, and required operator actions.
+
+`canonical_ledger_hash` excludes sequence values/timestamps and uses the frozen provider-neutral canonical fields (`run_id`, `mutation_id`, transaction group, entity table/key, operation, and expected-after hash). A negative oracle test intentionally omits an intermediate update whose effect is later overwritten. Final row checksums then match, but exact set difference still reports the missing mutation ID. This proves the oracle measures change delivery without falsely failing on legitimate sequence gaps.
+
+“Capture caught up” without a watermark is not a correctness fence.
+
+### 14.2 Common measurements
+
+- source CPU, I/O, connections, free disk, WAL rate, and retained WAL;
 - application p50/p95/p99 latency;
-- capture/destination lag;
-- journal/local storage;
-- loss and duplicate attempts;
-- convergence/recovery time and operator steps;
-- backfill duration and lock impact;
-- ClickHouse query cost, merge backlog, and storage amplification;
-- deployment/resource cost with assumptions.
+- capture and destination lag;
+- SQLite, spool, archive, and total local storage;
+- logical loss, duplicate attempts, and final convergence;
+- recovery time and operator steps;
+- backfill duration, snapshot age, dead tuples, and lock/source impact;
+- ClickHouse query cost, merge backlog, and storage amplification; and
+- deployment/resource cost with explicit assumptions.
 
-Provider comparisons use externally visible behavior and the common oracle, not LSN equality.
+Externally visible Estuary comparisons use the common workload, watermark, and oracle—not provider LSN equality. Failed or unfavorable results remain publishable. No other vendors are introduced into the benchmark.
 
 Do not claim 10,000-table or terabyte-scale support without running and publishing those profiles.
 
-## 11. Required test matrix
+## 15. Required test matrix
 
 | Scenario | Required assertion |
 |---|---|
-| Insert/update/delete | Event order and final state match source |
+| Insert/update/delete | Total event order and final state match source |
+| Repeated same-key changes in one transaction | Transaction/mutation ordinals select the final mutation deterministically |
+| Decoder positional-identity conflict fixture | Same WAL/snapshot position with a different payload hash blocks instead of acquiring a second event ID |
+| Stable identity/hash golden vectors | Changing `captured_at`, `journal_seq`, `run_id`, process time, or retry metadata does not change event identity or canonical payload hash |
+| Internal control-event routing | Heartbeat/fence transactions remain ordered and checkpointable but create no user-table row or benchmark mutation |
+| Primary-key-changing update | Old key is tombstoned and complete new tuple converges |
+| Key change with unchanged TOAST | Capture blocks before acknowledgement and requires explicit recovery/re-seed |
 | Multi-table transaction | Journal is all-or-nothing; no destination-atomicity claim |
-| Crash before SQLite commit | Transaction replays; journal has no partial transaction |
-| Crash after SQLite commit, before PG ack | Duplicate attempt resolves to one logical event |
+| Crash before SQLite commit | Transaction replays; no partial transaction is visible |
+| Crash after SQLite commit, before PostgreSQL feedback | Duplicate attempt resolves to one connector event identity |
+| Crash after PostgreSQL feedback/confirmed flush | Startup reconciliation resumes with no loss |
+| CopyBoth restart position matrix | Pinned transport handles bidirectional frames and PostgreSQL uses `max(requested_lsn, confirmed_flush_lsn)` without loss |
 | Crash after destination write, before checkpoint | Retry converges without logical duplication |
-| Destination offline | Capture continues within bounds; other destination progresses |
+| Oversized source transaction | Limit blocks before acknowledgement and reports tested capacity boundary |
+| Spool/SQLite `ENOSPC` | No acknowledgement; bounded safe-stop and recovery are visible |
+| Near-limit admission accounting | Wire/frame, canonical transaction, SQLite/WAL/temp, backfill, and archive reservations cannot cross the emergency reserve |
+| Separate state/archive filesystems | Each independent budget/reserve is validated and a full archive filesystem blocks only the archive before source-safety escalation |
+| Repeated crash while transaction spools | Exclusive-lock startup reclaims safe orphans; malformed/ambiguous spools block |
+| Unsupported SQLite settings/filesystem | Every connection reads back `WAL`/`FULL`; unknown/non-allowlisted filesystems reject unless explicit unsafe mode disables the durability claim |
+| SQLite vacuum/checkpoint lifecycle | Incremental auto-vacuum is set before schema creation; bounded checkpoints/incremental vacuum preserve latency; automatic full `VACUUM` never runs |
+| Abrupt host/VM termination | On each named supported Linux filesystem, locally committed source state recovers through the last acknowledged end LSN |
 | Network loss | Reconnect resumes from durable position without loss |
-| Journal pressure | Backfill throttles/stops first; remediation is visible |
+| Idle selected tables with unrelated WAL | Published heartbeat is journaled before feedback; keepalive `wal_end` alone never advances acknowledgement |
+| Heartbeat permission/outage | Role can update only one bounded control row; failure degrades health and exposes WAL headroom without synthetic feedback |
+| Destination offline | Capture continues within bounds; other destination progresses |
+| Paused destination pins retention | Pressure identifies the pin; no unconsumed event is silently removed |
+| Journal pressure transitions | Warning/action/critical/hard actions occur in order |
+| Journal corruption/missing sequence | Startup blocks and requires verified restore or re-seed |
 | Slot invalidation | Connector blocks and requires explicit re-seed |
-| Backfill with concurrent writes | Final keyed checksum matches source |
-| Crash during backfill | Completed chunks remain; new generation resumes remaining work |
-| Update/delete during chunk copy | Newer WAL version wins |
-| Compatible added column | Materialization continues after schema update |
-| Incompatible type change | Table blocks with recovery instructions |
+| Slot ahead of restored SQLite | Startup refuses unsafe resume |
+| Timeline/source/publication/slot mismatch | Startup blocks before streaming |
+| External live publication mutation | Ownership denies it; if forced administratively, runtime fingerprint drift blocks and requires re-seed |
+| Bootstrap crash before/after slot response and local persistence | Durable intent distinguishes retryable, exported, and ambiguous-slot recovery states |
+| Bootstrap crash after token persistence, each importer acknowledgement, normal exporter release, and first feedback | Pre-import exporter loss invalidates; normal post-import exporter release remains valid; feedback-gated versus full-reseed recovery is correct |
+| Initial exported-snapshot bootstrap | Exporter stays command-idle, capture uses a separate replication connection, `(consistent_point, start_seq)` persists before copy, and every importer runs `SET TRANSACTION SNAPSHOT` first |
+| Importer/DDL-guard loss | Importer death before assigned reads or guard loss before durable fence invalidates the generation; normal exporter release does not |
+| Existing-slot lower-stitch proof | Snapshot rows use the last locally durable pre-export LSN/sequence, never a post-export sampled LSN |
+| Transactions before/during/after snapshot creation | Snapshot plus WAL total version converges at the transactional fence watermark |
+| Snapshot completion before capture fence | Anchor remains unusable until the published fence nonce, target LSN, and complete journal sequence are durably paired |
+| Backfill with concurrent writes | Final keyed checksum matches at the mutation watermark |
+| Crash during backfill | Old workers are fenced; remaining work resumes under a valid generation |
+| Pre-import exporter loss/cancelled incomplete generation | All snapshot chunks/events become ineligible for anchors/live namespaces; a full new generation leaves no stale baseline row |
+| Snapshot age/source-impact limit | Workers throttle and generation ends rather than pinning indefinitely |
+| Update/delete during chunk copy | Newer WAL total source version wins |
+| WAL journaled before delayed snapshot row | Final state converges independent of journal append order |
+| Late snapshot + GC + new destination | Only a complete retained anchor can bootstrap |
+| Empty destination from arbitrary retained suffix | Request is rejected |
+| Nullable/no-default column added outside backfill | Older `absent_for_schema` projects as null and materialization continues |
+| Idle/no-row DDL | Catalog fingerprint poll detects the full relation-contract change even without a new row event |
+| DDL during active backfill | Canonically ordered `ACCESS SHARE` guards block every admitted contract-changing DDL through durable fence observation; any unguarded operation is unsupported |
+| DDL immediately before/after copy fence | Guard/fingerprint protocol yields one frozen schema and deterministic restart/block behavior at both boundaries |
+| Changed `Relation` immediately followed by DML | Capture synchronously validates the contract before decoding or acknowledging the DML transaction |
+| Defaulted/generated/non-null column addition | Requires fresh generation and re-backfill; no ambiguous projection |
+| Incompatible type change | Whole destination blocks before the transaction; checkpoint cannot skip |
+| Mixed compatible/incompatible tables in one transaction | No event is skipped behind a global checkpoint |
 | Removed replica identity | Unsafe update/delete handling blocks |
-| Added table | Explicit publication update and backfill are required |
-| Unchanged TOAST column | Existing downstream value is preserved |
+| Added selected table | Requires confirmed full re-seed/new epoch, recreated full publication/slot, and complete snapshot of the expanded table set |
+| Expanded-table anchor | M3 proves the anchor contains all old and new tables; no new-table-only candidate can be promoted |
+| Table-add full-generation promotion | Old ClickHouse/archive generations remain readable until full expanded candidates preserve existing tables and pass M4/M5 promotion |
+| Crash during table-add re-seed | `reseed_intents` resumes only after epoch/publication/slot/anchor validation or requires a fresh confirmed re-seed |
+| Re-seed administration credential lifetime | Normal `run` never loads the administration DSN; maintenance loads it only around owner-only requests and redacts/drops it afterward |
+| Explicit null vs unchanged TOAST | Tagged states remain distinct |
+| TOAST patch before/during baseline | Canonical state reconstructs from retained explicit value |
+| ClickHouse duplicate batch after write-before-checkpoint crash | Canonical query collapses identical event IDs and blocks conflicting same-ID payloads |
+| ClickHouse crash after acknowledged batch | Pinned synchronous/fsync and Rust insert-finalization contract survives restart or checkpoint recovery replays/blocks rather than claiming durability |
+| ClickHouse version/tombstone protection | Composite source version is not narrowed into native replacement version; merges/TTL never delete required predecessor values or tombstones |
+| ClickHouse history quota/retired generation | Quota blocks the destination without deleting needed history; promotion grace and retirement are explicit |
 | ClickHouse update/delete load | Canonical current-state query remains correct |
-| Query before/after merge and `FINAL` | Behavior and cost are documented |
-| Add second destination | Bootstrap uses retained journal, not Postgres |
-| Destination beyond retention | Replay rejects and points to re-seed |
-| Archive crash around rename/checkpoint | Existing segment is adopted, not duplicated |
-| Process/journal restart | Migrations and persisted states recover cleanly |
+| Query before/after merge and `FINAL` | Correctness and cost are documented |
+| Re-seed with historically deleted row | Fresh destination generation has no stale row |
+| Stale external write and promotion crash | Epoch/generation namespace, lease, external marker, and durable promotion intent reconcile without selecting the wrong live generation |
+| Capture-epoch change | Old destination generations refuse continuation and require re-seed |
+| Provider-neutral sequence gap | Failed transactions may leave diagnostic `mutation_seq` gaps without failing an otherwise exact set match |
+| Provider-neutral omitted intermediate mutation | Final row checksum may match, but exact `(mutation_id, canonical_ledger_hash)` set difference fails |
+| Add second destination | Bootstrap uses a retained compatible anchor, not PostgreSQL |
+| Destination beyond retention/no anchor | Replay rejects and points to shared re-backfill/re-seed |
+| Established-destination replay | Requires dry-run, named new generation, confirmation, verification, and separate promotion; live checkpoint is unchanged |
+| Archive crash before/after intent | Retry selects exactly the persisted range |
+| Archive crash at every file/manifest/fsync/directory-rename/parent-sync/`SEGMENT_READY`/checkpoint phase | Only matching segment-ready data is adopted inside its candidate generation; temporary/unready output is ignored and mismatches block |
+| Candidate archive segment readiness | Segment-ready candidate data remains invisible until the generation live pointer is atomically promoted and read back |
+| JSONL + Parquet partial publication | Shared generation checkpoint waits until both artifact sets are segment-ready |
+| Parquet/JSONL deterministic retry | Pinned writer/compression/settings produce byte-identical parts, manifests, and hashes across fresh process/run/time |
+| Archive configuration generation change | It replays from a compatible anchor or records an explicit confirmed discontinuity before generation-level promotion |
+| Snapshot event before anchor completion | Live ClickHouse/archive output ignores it; only a fenced candidate namespace may retain it |
+| Real SQL `TRUNCATE` on a published table | Detection-only pgoutput message blocks before acknowledgement and marks continuity for re-seed |
+| Two runtime instances | Exclusive lock prevents concurrent state ownership |
+| Stale destination/backfill worker | Generation compare-and-swap plus the external namespace lease prevents checkpoint/chunk and live-side-effect corruption |
+| Exposed listener/insecure TLS/permission/driver error | `check` rejects unsafe defaults and redaction keeps credentials out of status/log/artifact output |
+| Process/journal upgrade | Migrations and persisted states recover cleanly |
 
-## 12. Milestones
+Every milestone adds its own unit, integration, and fault tests. M6 runs the integrated endurance matrix; it does not postpone foundational safety tests.
 
-### M0 — Repository and contract
+## 16. Milestones and dependency order
 
-- Rust single-binary scaffold.
-- Owner-approved public license.
-- README, requirements, architecture decisions, security/contribution guidance.
-- Docker Compose for Postgres, ClickHouse, and connector.
-- Configuration schema and CI for format, lint, tests, and dependency audit.
-- Requirements traceability.
+### M0 — Contract and irreversible decisions
 
-**Exit:** clean clone builds; Compose validates; no secrets; license decision is recorded.
+Deliver:
 
-### M1 — Workload and `pgoutput` foundation
+- owner-approved public license;
+- Rust single-binary workspace scaffold and Docker Compose shape with every Postgres/ClickHouse image pinned to an explicit tested version and immutable digest;
+- approved `docs/EVENT_FORMAT.md`, including positional identities, canonical payload hashes, explicit exclusion of every local/volatile field, internal heartbeat/fence routing, byte units, canonical encodings, golden vectors, and full relation-contract fingerprint inputs;
+- approved `docs/CLICKHOUSE_MODEL.md`, including executable DDL/query contract, pinned server/client/crate versions, required Rust insert finalization, synchronous/async policy, fsync/write-concern boundary, batch recovery, history quota, prohibition on native replacement-version narrowing/protective-tombstone deletion, and one-node limitations;
+- supported PostgreSQL versions; a selected/pinned CopyBoth-capable Rust replication transport; exact `START_REPLICATION` options and effective `max(requested_lsn, confirmed_flush_lsn)` restart fixtures; key forms; type matrix; and connector-owned published fence/heartbeat relations with least-privilege grants;
+- TOAST reconstruction model, including explicit rejection of key-change plus unchanged-TOAST events;
+- additive-column policy, snapshot-schema binding, synchronous changed-`Relation` validation, catalog-poll interval, canonically ordered DDL-guard locks, a per-version proof that every admitted contract-changing DDL conflicts, and corrected exporter/importer invalid-generation rules;
+- row/event/transaction/wire limits plus per-filesystem admission/reservation equations;
+- frozen SQLite-only physical journal contract (logical append-only `journal_events`, no payload-log file), per-connection `WAL`/`FULL` apply/readback, pre-schema incremental auto-vacuum, bounded checkpoint/incremental-vacuum/no-automatic-full-`VACUUM`, named Linux filesystem, permissions, TLS/listener, and redaction contracts;
+- JSONL/Parquet directory-commit, internal `SEGMENT_READY`, generation-live-pointer, same-Unix-account reader, pinned writer/crate/compression/reproducibility, byte-identical golden retry, and named Linux filesystem durability contracts;
+- finite source-WAL, sink-history, archive, and local disk-pressure policies;
+- named benchmark profiles; and
+- completed decision register with owner, default, validation test, and blocking status for every safety decision.
 
-- E-commerce workload and mutation ledger.
-- Postgres preflight.
-- Publication/slot initialization.
-- Relation/transaction decoding.
-- Raw event inspection demo.
+**Exit:** the decision register contains no `Open`, `Confirm`, or owner-pending safety decision; Compose validates the pinned images; the journal/destination format contracts are approved; no secrets are present; and the license is recorded. M0 is failed—not merely deferred—while a blocking decision remains open. No implementation agent may begin M1 or create journal/destination code before this exit is met.
 
-**Exit:** fixed-seed inserts, updates, deletes, and transaction boundaries reproduce; unsupported tables fail clearly.
+### M1 — Protocol, workload, and bootstrap design
 
-### M2 — Durable journal and first sink
+Depends on M0.
 
-- SQLite schema/migrations.
-- Durable source transaction/ack invariant.
-- Deterministic event IDs.
-- JSONL archive as first materializer.
-- Crash injection at commit/ack/checkpoint boundaries.
-- Status CLI.
+Deliver:
 
-**Exit:** no missing logical events; duplicates converge; acknowledgement never outruns SQLite durability.
+- deterministic workload, published source mutation ledger, exact committed `(mutation_id, canonical_ledger_hash)` set/count/sorted-digest oracle, diagnostic gap-tolerant sequences, and typed-row checksum oracle;
+- read-only preflight;
+- connector-owned publication/control **specification and protocol fixtures** with detection-only `TRUNCATE`, published capture fences and heartbeats, least-privilege roles, full-reseed-only table-set changes, maintenance-runtime ownership, and runtime fingerprint rules;
+- source identity and capture-epoch model;
+- `pgoutput` decoder with unsupported-message fail-closed behavior and positional-ID/payload-conflict fixtures;
+- deterministic row/mutation ordering;
+- full relation-contract catalog fingerprinting, synchronous changed-`Relation` validation, per-version DDL-lock conflict matrix, and idle/immediate-DML/active-backfill fixtures;
+- bootstrap state-machine design with command-idle exporter, separate capture replication connection, first-statement snapshot import, importer-assignment and DDL-guard lifecycle, and slot-creation/exported-snapshot protocol fixtures for the **one permanent-slot path only**; no auxiliary runtime slots and no abandoned permanent-slot snapshot; and
+- raw event inspection demo and protocol fault tests.
 
-### M3 — Backfill and stitching
+**Exit:** fixed-seed transactions decode reproducibly; CopyBoth/restart, heartbeat, bootstrap, exact-set oracle, and full-reseed states are specified and tested as protocol/state-machine fixtures; actual SQL `TRUNCATE`, publication drift, idle and immediate DDL, and unsupported protocol/table/type cases block clearly. No online table-add state machine exists.
 
-- Exported snapshot/boundary.
-- Chunk planner/throttling.
-- Persisted progress/restart generations.
-- Source-version rules.
-- Backfill CLI and checksums.
-- Naive full-read benchmark control.
+### M2 — Bounded durable journal and JSONL commit engine
 
-**Exit:** interrupted backfill with concurrent mutations converges; completed chunks are retained; source-impact metrics publish.
+Depends on M1.
 
-### M4 — ClickHouse correctness
+Deliver:
 
-- Versioned/tombstoned model and current-state view.
-- Idempotent replay.
-- Schema checks and re-backfill path.
-- TOAST preservation.
-- Merge/query/storage benchmark.
+- SQLite schema and migrations, including bootstrap/import/re-seed intents, durable capture fences/control events, destination leases/promotion intents, archive generation markers, and batch/segment intents;
+- sole-owner maintenance runtime for `init`, confirmed full re-seed/resume, and explicit source recovery, including exclusive-lock handoff, ephemeral administration-DSN loading, and startup blocking on nonterminal intents;
+- logical append-only SQLite journal with no separate payload-log file;
+- published heartbeat writer/capture/no-op routing and idle-WAL feedback tests;
+- per-connection `WAL`/`FULL` apply/readback, pre-schema incremental auto-vacuum, bounded checkpoint/vacuum, named-filesystem validation, permissions, and secure listener/TLS checks;
+- bounded source-transaction spool and exclusive-lock orphan-spool recovery;
+- pre-allocation wire/frame/event validation and per-filesystem admission/reservation controller;
+- capture-priority writer and durable acknowledgement invariant;
+- deterministic positional connector event IDs, separate payload hashes, and checksums;
+- startup source-position reconciliation;
+- integrity checks and corruption state;
+- local budget, emergency reserve, transaction-boundary GC, and pressure skeleton;
+- exclusive runtime ownership, component generations, and destination external-side-effect leases;
+- archive intent/directory-commit engine with JSONL and internal `SEGMENT_READY`, gated so candidate data remains generation-invisible before M3 anchors and promotion;
+- capture, feedback, bootstrap-intent, archive, promotion, and checkpoint crash hooks; and
+- status/JSON output.
 
-**Exit:** update/delete-heavy scenarios converge; documented queries are correct before and after merges.
+**Exit:** acknowledgement—including idle heartbeat progress—never outruns SQLite under the declared storage contract; commit/feedback ambiguity produces deterministic duplicates but no loss; near-limit admission cannot exhaust reserves; orphan spools, pressure, corruption, promotion ambiguity, and bootstrap ambiguity fail explicitly; ordinary `run` and maintenance commands cannot own state concurrently; JSONL WAL-only segments survive every directory commit phase but remain invisible without a live-generation pointer.
 
-### M5 — Parquet and fan-out
+### M3 — Chunked backfill, stitching, and anchors
 
-- Parquet serializer/schema metadata.
-- Deterministic archive segments.
-- Independent checkpoints and schedules.
-- Late destination bootstrap.
-- Retention/replay commands.
+Depends on M2.
 
-**Exit:** either destination can stop independently; bootstrap succeeds within retention; expired starts require re-seed.
+Deliver:
 
-### M6 — Source-safety and recovery hardening
+- persisted keyset range planner and bounded workers;
+- permanent slot creation plus exported-snapshot bootstrap vertical slice using the durable M2 intent;
+- crash recovery before/after slot response, local snapshot-token persistence, every importer acknowledgement/assigned read, legitimate exporter release, DDL-guard release, and first feedback;
+- initial `(consistent_point, start_seq)` and existing-slot last-durable `(lower_stitch_lsn, lower_stitch_seq)` protocols with importer acknowledgements;
+- published control-row post-copy fence observed through `pgoutput` and atomically paired `(LSN, seq)` proof; no sampled-LSN shortcut;
+- per-table snapshot-schema binding, additive-column policy, canonically ordered `ACCESS SHARE` DDL guards through durable fence observation, immediate changed-`Relation` validation, corrected invalid-generation rules, and live/candidate gates;
+- generation fencing, pause/resume, and source-impact limits;
+- reconstruction anchor completion and retention pinning;
+- full-reseed table-set expansion from a durable `reseed_intent` through new epoch, recreated full publication/slot, and a complete anchor covering **all** old and new tables; M3 does not depend on or perform final destination promotion;
+- exact committed mutation-set/count/sorted-digest and typed-checksum watermark fence;
+- naive full-read benchmark control; and
+- backfill/restart/late-snapshot/before-during-after-snapshot fault tests.
 
-- Safety state machine and thresholds.
-- WAL/free-disk monitoring.
-- Journal budget controls.
-- Slot invalidation/recovery.
-- Schema drift/source identity checks.
-- Full failure matrix.
+**Exit:** concurrent and interrupted backfills converge; stale workers cannot commit; legitimate exporter release remains valid while importer/DDL-guard loss invalidates; snapshot age is bounded; no invalid generation can materialize live state; an anchor remains unusable until its exact lower proof and published post-copy fence are durably paired; and a full expanded-table anchor can reconstruct an empty sink. Final table-add destination acceptance waits for M4/M5.
 
-**Exit:** every unsafe state is visible with a tested runbook; no command silently creates a gap.
+### M4 — ClickHouse correctness and schema generations
+
+Depends on M3.
+
+Deliver:
+
+- executable event-history DDL and canonical query implementation from `docs/CLICKHOUSE_MODEL.md`;
+- pinned ClickHouse insert/batch-marker durability implementation, required Rust client finalization, and crash-after-ack/restart verification;
+- canonical current-state view with per-column TOAST patch reconstruction;
+- versioned tombstones, complete key-change expansion, and explicit key-change/unchanged-TOAST block;
+- event-ID-first physical duplicate collapse, payload-conflict detection, idempotent replay, and checkpointing;
+- nullable/no-default additive schema handling and destination-wide incompatible-schema block;
+- fresh full table-set generation rebuild, no native replacement-version narrowing or protective-history deletion, durable promotion intent, external marker reconciliation, history quota, and atomic canonical-view switch; and
+- update/delete, merge, `FINAL`, TOAST, re-seed, stale-write, promotion-crash, and quota benchmarks/tests.
+
+**Exit:** state is correct before and after merges; explicit null/TOAST patches remain distinct; accepted batches survive their stated/finalized contract or block/replay; historically deleted rows do not survive re-seed; and a full expanded-table ClickHouse generation preserves existing tables before promotion.
+
+### M5 — Parquet, fan-out, replay, and retention workflows
+
+Depends on M3 and M4.
+
+Deliver:
+
+- pinned Parquet writer/crate/format/compression/schema mapping grouped by table/fingerprint, with byte-identical retry goldens;
+- shared JSONL/Parquet deterministic segment directory, pending manifest, internal `SEGMENT_READY`, generation-level live pointer, and checkpoint/promotion protocol;
+- independent ClickHouse/archive scheduling, retries, leases, and lag;
+- archive configuration-generation replay-from-anchor or explicit discontinuity workflow, with candidate segment durability separate from reader visibility;
+- late destination bootstrap from anchors;
+- explicit pause/detach workflows and new-generation-only replay/rewind with dry-run, confirmation, verification, external-marker promotion, and retirement;
+- final full expanded-table archive verification/promotion for table-add re-seed, preserving all existing tables while the old generation stays live;
+- replay-window and anchor-expiry GC; and
+- independent destination, archive-phase, separate-filesystem, and retention-pressure fault tests.
+
+**Exit:** either destination can stop independently; late bootstrap succeeds only from compatible retained anchors; readers see only `SEGMENT_READY` data under the promoted generation-level pointer; expired requests fail with re-backfill/re-seed guidance; and added-table acceptance passes only after both full destination generations preserve old and new tables.
+
+### M6 — Integrated source-safety and endurance hardening
+
+Depends on M5.
+
+Deliver:
+
+- full source/local/sink pressure state machine and alerting;
+- source free-disk and per-filesystem capability reporting;
+- snapshot/XID/vacuum-impact telemetry;
+- slot invalidation, local-restore mismatch, source timeline, heartbeat, schema/full-reseed table-set change, promotion-recovery, and sink-quota runbooks;
+- full clean-environment failure matrix and endurance profiles;
+- raw benchmark evidence and operational-step accounting.
+
+**Exit:** every unsafe state is visible with a tested runbook; no command silently creates a gap; all earlier milestone fault tests pass under endurance load.
 
 ### M7 — Public v0.1 release
 
-- Linux artifact/container image.
-- Reproducibility instructions and benchmark data.
-- Known limitations and security policy.
-- Debezium and Estuary comparison runbooks/results.
+Depends on M6.
+
+Deliver:
+
+- Linux artifact and container image;
+- reproducibility instructions and raw benchmark data;
+- known limitations, measured source/local/sink capacity boundaries, security policy, and upgrade notes;
+- Boring CDC and Estuary external scenario runbooks/results;
+- Debezium capture/offset design-reference appendix only;
 - `v0.1.0` tag.
 
-**Exit:** a new user can clone, run Compose, generate workload, capture, backfill, materialize both destinations, inject failures, and verify checksums.
+**Exit:** a new user can clone, run Compose, bootstrap, mutate data, materialize ClickHouse and JSONL/Parquet, inject required failures, reconstruct archives, and verify exact committed mutation sets plus watermark checksums.
 
-## 13. v0.1 acceptance criteria
+## 17. v0.1 release acceptance
 
-- All required fault tests pass repeatedly from a clean environment.
-- No expected committed event is missing after recoverable crashes.
-- Duplicate attempts are visible but logical identities stay stable.
-- ClickHouse state and archive reconstruction converge after quiescence.
-- Tests prove Postgres acknowledgement never outruns the journal.
-- Interrupted backfills with concurrent mutations converge.
-- Destination outages do not couple destination progress or source acknowledgement.
-- Bounded local/WAL limits produce explicit degraded, safe-stop, or re-seed states.
-- Schema/delete behavior and measured limits are documented.
-- Benchmark profiles, seed, workload, oracle, raw results, and assumptions are public.
-- At-least-once, single-source, non-HA limitations are prominent.
+v0.1 is complete only when:
 
-## 14. Out of scope
+- all required fault tests pass repeatedly from a clean environment;
+- no expected committed event is missing after recoverable failures;
+- duplicate attempts are observable while connector identities remain stable;
+- PostgreSQL feedback never exceeds the locally durable published transaction end; idle progress comes only from a durably journaled heartbeat, never keepalive `wal_end`;
+- startup rejects source/slot/timeline/local-state contradictions, ambiguous bootstrap slots, incomplete re-seed intents, and unreconciled promotion intents, and the pinned CopyBoth transport passes requested/confirmed restart fixtures;
+- publication ownership prevents ordinary live drift, forced drift is detected as continuity-breaking, and adding a table completes only through a new epoch/full re-seed whose full destination generations preserve existing tables;
+- interrupted backfills with concurrent mutations converge at an exact committed mutation-set/count/sorted-digest and typed-row correctness watermark, while legitimate exporter release remains valid and invalid snapshot generations cannot affect live state;
+- initial bootstrap persists `(consistent_point, start_seq)`, existing backfills persist the last durable lower stitch pair, importer/DDL-guard lifecycle is explicit, and all anchors use a published transaction fence observed through `pgoutput`;
+- new destinations bootstrap only from schema-compatible anchors with a durable post-copy capture fence;
+- ClickHouse current state and archive reconstruction converge after quiescence; ClickHouse acknowledged batches satisfy pinned settings plus Rust insert finalization; native replacement-version narrowing and deletion of required tombstone/predecessor history are absent;
+- archive readers resolve only the promoted generation-level pointer and then complete deterministic `SEGMENT_READY` directories; byte-identical JSONL/Parquet retries pass and configuration changes preserve continuity from an anchor or publish an explicit discontinuity;
+- destination outages do not couple destination progress or source acknowledgement;
+- bounded wire/transaction, per-filesystem local/archive, sink-history, snapshot, replay, and WAL limits produce explicit throttle, safe-stop, block, or re-seed states without crossing the emergency reserve;
+- unsupported schema/protocol/value cases never advance past the offending source transaction or destination checkpoint;
+- schema/delete/TOAST behavior, full relation-contract fingerprint policy, source/sink durability boundaries, and measured limits are public;
+- benchmark profiles, seed, downstream-materialized source ledger, gap-tolerant exact-set oracle, raw results, and assumptions are reproducible;
+- status/metrics security defaults, TLS verification, filesystem permissions, and credential-redaction tests pass; and
+- every durability-bearing SQLite connection reads back required PRAGMAs, incremental auto-vacuum/checkpoint policy passes, and each named supported Linux filesystem has abrupt-restart evidence; and
+- the M0 decision register is closed with its validation evidence, and at-least-once, single-source, single-slot, non-HA, same-host named-Linux-filesystem archive limitations are prominent.
 
-- Non-Postgres sources.
-- More than one publication/slot/source per process.
-- Generic source/sink plugin APIs.
-- Kafka, Kafka Connect, or schema registry integration.
-- Kubernetes/operator/control plane.
-- Distributed HA or automatic source failover.
-- Universal DDL migration.
-- Unsafe update/delete replication without usable identity.
-- Unlimited replay history.
+## 18. Explicitly out of scope
+
+- Sources other than PostgreSQL.
+- More than one source, publication, or slot per process.
+- Generic source/sink plugin APIs or arbitrary destinations.
+- Kafka, Kafka Connect, schema registry, or a distributed log dependency.
+- Kubernetes, an operator, a distributed control plane, or distributed HA.
+- Automatic source failover/PITR continuity.
+- Streamed or two-phase logical transactions unless deliberately added and fully tested before v0.1 scope freezes.
+- Applying `TRUNCATE` downstream; v0.1 publishes it only so actual truncation is detected and continuity fails closed.
+- Universal DDL migration or online selected-table addition; table-set changes require full re-seed in v0.1.
+- Per-table destination quarantine/progress independent of the one destination checkpoint.
+- Unsafe update/delete capture without usable identity.
+- Remote/object-store/network-filesystem archive commit semantics, support inferred only from generic filesystem API compatibility, or multi-user archive sharing.
+- Unlimited replay history or WAL retention.
 - Global exactly-once semantics.
-- Cross-destination or cross-table atomicity.
-- Unmeasured 10,000-table/TB-scale claims.
+- Cross-table or cross-destination atomicity.
+- Unmeasured 10,000-table or terabyte-scale claims.
+- Provider comparison beyond Estuary; Debezium remains a design reference only.
 
-## 15. Decisions to close before implementation
+## 19. Decision register and M0 hard gate
 
-| Decision | Proposed default | Status |
+This register is an implementation gate, not a future-ideas list. A row marked `Open`, `Confirm`, or `Owner approval` is blocking when it changes capture durability, source ordering, source safety, destination correctness, replay, public security, or a published capacity claim. M0 **fails** while any blocking row remains unresolved. Only planning/decision work may proceed; no implementation agent may begin M1, write a journal schema, or generate destination code until every blocking row is `Closed` or `Resolved` with the listed validation evidence.
+
+### 19.1 Auditable repository identity evidence
+
+The public-owner decision was verified on **2026-08-28 UTC** with this reproducible GitHub CLI query:
+
+```bash
+gh repo view hachej/boring-cdc \
+  --json nameWithOwner,visibility,url \
+  --jq '{nameWithOwner,visibility,url}'
+```
+
+Recorded output:
+
+```json
+{"nameWithOwner":"hachej/boring-cdc","url":"https://github.com/hachej/boring-cdc","visibility":"PUBLIC"}
+```
+
+The canonical external evidence is the public repository URL: <https://github.com/hachej/boring-cdc>. A future owner transfer or visibility change invalidates this recorded decision and must update this section and the register. This evidence establishes only GitHub owner/name/visibility; it does not approve the license or any technical decision.
+
+### 19.2 Blocking decisions
+
+| Decision | Accountable owner | Proposed default | Required validation / evidence | Blocking status |
+|---|---|---|---|---|
+| Public owner | GitHub repository owner (`hachej`) | `hachej/boring-cdc` | Reproducible command, dated recorded output, and canonical URL in section 19.1 | **Resolved** |
+| License | Repository owner | Apache-2.0 | Explicit owner approval and committed license text | Owner approval — blocking M0 |
+| Compose images | Implementation lead | Pin Postgres and ClickHouse versions plus immutable image digests | `docker compose config`, clean pull, and documented compatibility run | Open — blocking M0 |
+| Archive scope | Repository owner | One archive materializer; test JSONL and Parquet | Architecture sign-off and segment-format fixtures | Confirm — blocking M0 |
+| Archive durability/continuity | Implementation lead | Named tested Linux filesystems; directory rename; internal `SEGMENT_READY`; generation live pointer; same-account readers; pinned JSONL/Parquet writers | Crash-phase, generation-visibility, filesystem, and byte-identical retry fixtures | Open — blocking M0 |
+| PostgreSQL versions/transport/options | Implementation lead | Explicit matrix; pinned CopyBoth-capable Rust transport; exact `START_REPLICATION`; no streamed/two-phase/binary v0.1 | Bidirectional protocol and `max(requested_lsn, confirmed_flush_lsn)` fixtures per version | Open — blocking M0 |
+| Publication/control relations | Implementation lead | One owned publication with insert/update/delete/detection-only `TRUNCATE`, capture fences, and bounded heartbeat | Privilege/preflight, control-routing, idle-WAL, and heartbeat outage tests | Confirm — blocking M0 |
+| Relation fingerprint/DDL guard | Implementation lead | Full contract plus canonically ordered `ACCESS SHARE` locks through fence and synchronous changed-`Relation` validation | Per-version DDL conflict matrix, idle DDL, immediate DDL→DML, and fence-boundary fixtures | Open — blocking M0 |
+| Supported keys | Implementation lead | Frozen non-null comparable key forms/composite arity; complete old/new identity for key changes | Keyset and primary-key-change fixtures | Open — blocking M0 |
+| Supported values | Implementation lead | Concrete canonical encoding/type matrix | Encode/decode/hash corpus and unsupported-type blocks | Open — blocking M0 |
+| TOAST | Implementation lead | Tagged patch states plus history reconstruction; reject key-change + unchanged-TOAST | Explicit-null/unchanged-TOAST/baseline-order fixtures | Confirm — blocking M0 |
+| Additive columns | Implementation lead | Only nullable/no-default additions outside active backfill; otherwise fresh generation | Schema-contract and destination projection tests | Confirm — blocking M0 |
+| Event identity/payload conflicts | Implementation lead | Positional IDs, canonical payload hashes, no local/volatile fields in either stable hash, explicit control routing | Golden vectors across run/time plus decoder-conflict and duplicate replay tests | Confirm — blocking M0 |
+| SQLite physical journal/durability | Implementation lead | Logical append-only `journal_events` in the one SQLite DB; no payload-log file; per-connection `WAL`/`FULL`; pre-schema incremental auto-vacuum; named Linux filesystems | Fresh/pooled/reopened PRAGMA readback, bounded checkpoint/vacuum, no-auto-full-vacuum, and abrupt-restart tests per filesystem | Confirm — blocking M0 |
+| Admission limits/budgets | Implementation lead | Frozen wire/event/transaction limits and per-filesystem reserve equation | Near-limit and separate-filesystem tests | Open — blocking M0 |
+| ClickHouse durable acceptance | Implementation lead | Pinned single-node/server/client/crate model, synchronous inserts, required Rust insert finalization, no async queue, documented fsync boundary | Finalization failure and crash-after-ack/restart batch verification | Open — blocking M0 |
+| ClickHouse history lifecycle | Repository owner | Tested quota, no composite version narrowing, no deletion of required tombstones/predecessors, explicit retirement grace | Merge/TTL guard, quota/retirement test, and capacity report | Open — blocking M0 |
+| WAL cap | Repository owner | Finite `max_slot_wal_keep_size`; local-only unsafe override | Source-risk threshold/reseed fixture | Confirm — blocking M0 |
+| Initial/restarted backfill | Implementation lead | Command-idle exporter, separate capture connection, first-statement imports, DDL guard, lower stitch, published fence, precise invalidation | Before/during/after snapshot, importer/guard/exporter, and DDL-boundary crash matrix | Confirm — blocking M0 |
+| Late destination bootstrap | Implementation lead | Completed retained reconstruction anchors only | Delayed snapshot/GC/late-destination fixture | Confirm — blocking M0 |
+| Promotion/re-seed/table-set change | Implementation lead | Any added table forces new epoch, recreated full publication/slot, full snapshot, fresh full destination generations, external-marker promotion | Existing-table preservation, stale-write/promotion-crash, deleted-row, and added-table tests | Confirm — blocking M0 |
+| Benchmark oracle | Implementation lead | Exact committed `(mutation_id, canonical_ledger_hash)` set/count/sorted digest; sequence only diagnostic | Legitimate sequence-gap pass and omitted-overwritten-mutation fail fixtures | Confirm — blocking M0 |
+| Security exposure | Security owner or repository owner | Loopback default, authenticated/TLS exposure, verified source/sink TLS, strict permissions/redaction | Config rejection and secret-redaction tests | Open — blocking M0 |
+| Scale profiles | Repository owner | Named table/row/rate/backfill/event-size/outage profiles | Checked-in fixed seeds and capacity-run definition | Open — blocking M0 |
+
+## 20. Main risks and mitigations
+
+| Risk | Consequence | Planned mitigation |
 |---|---|---|
-| Public owner | `hachej/boring-cdc` | **Resolved** |
-| License | Apache-2.0 | Owner approval needed |
-| Archive scope | One archive materializer; ship/test JSONL and Parquet | Confirm |
-| WAL cap | Require finite `max_slot_wal_keep_size`; explicit local-only unsafe override | Confirm |
-| Restarted backfill | Eventual convergence across snapshot generations | Confirm |
-| Supported Postgres types | Freeze a concrete v0.1 list before M1 exits | Open |
-| TOAST | Patch-aware preservation; reject unsupported cases, never silent placeholders | Confirm |
-| Scale profiles | Fix small/medium/large rows and rates before benchmark claims | Open |
-
-## 16. Main risks
-
-- SQLite may bottleneck before decoding; measure rather than claim scale.
-- One very large Postgres transaction can exceed local memory/disk budget.
-- TOAST reconstruction and ClickHouse pre-merge correctness may expand M4.
-- WAL/source free-disk metrics may need additional privileges or collectors.
-- Parquet schema evolution is materially harder than JSONL.
-- Slot invalidation is necessarily a re-seed boundary.
-- Managed Estuary comparisons require account access and manual setup.
+| SQLite writer bottlenecks before decoding | Lag and retained WAL grow | Capture-priority writer, bounded commits, named throughput profiles, no unmeasured claims |
+| Very large source transaction | Memory/disk exhaustion and long writer hold | Bounded spool, hard byte/event limits, emergency reserve, safe-stop before feedback |
+| Exported snapshot held too long | Vacuum/XID/source impact | Snapshot-age and `xmin` monitoring, bounded workers, automatic throttle/end generation |
+| Snapshot and WAL append in different local order | Stale destination winners | Separate `journal_seq` and total source version; late-snapshot tests |
+| Retained suffix or unfenced snapshot lacks a complete baseline | Incorrect late destination | Anchors require lower and post-copy durable `(LSN, seq)` fences; arbitrary suffix rejected |
+| Crash after remote slot creation but before snapshot-token persistence | Permanent slot exists but creation snapshot is lost | Pre-create durable intent, ambiguous state, verified explicit drop/restart; never attach silently |
+| Exporter/importer lifecycle is confused | Legitimate exporter release falsely invalidates or dead importer yields partial baseline | Command-idle exporter, separate capture connection, first-statement imports, per-assignment completion; only pre-import exporter or pre-completion importer/guard loss invalidates |
+| Sampled or post-export LSN is used for snapshot rows | A post-snapshot WAL mutation can lose to stale snapshot data | Persist only initial consistent-point or last-durable lower stitch before export; use published `pgoutput` fence proof |
+| Publication drift removes data from the stream | Connector acknowledges later WAL while selected changes are absent | Dedicated owner prevents ordinary drift; periodic fingerprint blocks forced drift and requires re-seed |
+| Contract-changing DDL races a backfill | Chunks span incompatible schemas | Canonical `ACCESS SHARE` DDL guard through durable fence, per-version conflict proof, immediate `Relation` validation, final fingerprint check |
+| Added table requires full re-seed | Source interruption and full-copy cost | Deliberately accept disruption; dry-run capacity/source impact; preserve old full destinations until new full generations verify/promote |
+| Idle source receives unrelated WAL | Slot retention grows although selected tables are quiet | Least-privilege published heartbeat; journal before feedback; alert on heartbeat failure; never acknowledge keepalive `wal_end` |
+| TOAST patches lose prior explicit values | Silent column corruption | Tagged value states and append-only ClickHouse history; no source repair query; key-change patch rejected |
+| ClickHouse merge behavior hides needed history | Incorrect current state | Canonical per-column view and pre/post-merge tests before compaction |
+| ClickHouse acknowledgement is not durable | Journal checkpoint/GC can make sink loss permanent | Pinned synchronous/fsync/client-finalization contract, batch intents, crash-after-ack restart verification, block/replay on failure |
+| Stale worker or promotion crash changes external live state | SQLite CAS cannot undo an already written external artifact | Epoch/generation namespaces, leases, external markers, durable promotion intents, and restart reconciliation |
+| Append-only ClickHouse history grows without bound | Destination quota exhaustion creates hidden source pressure | Tested quota, no unsafe compaction, explicit block/retirement behavior, and published capacity limits |
+| Paused destination pins all history | Local pressure and eventual slot loss | Explicit pressure states, detach workflow, honest WAL escalation, finite cap |
+| SQLite settings/storage do not honor sync | Loss after acknowledged WAL or host crash | Apply/read back WAL/FULL on every connection, pre-schema incremental auto-vacuum, bounded maintenance, and named filesystem crash evidence; reject weaker/unknown settings |
+| Orphan spools consume bounded disk | Repeated crashes eventually force `ENOSPC` | Exclusive-lock scan, deterministic classification/removal, quarantine ambiguous files |
+| SQLite corruption/local restore divergence | Loss after already acknowledged WAL | Checksums/integrity checks/startup slot reconciliation; block and re-seed |
+| Archive crash or visibility confusion exposes partial candidate | Duplicate/missing files or unverified generation becomes readable | Exact-range intent, staged directory, internal `SEGMENT_READY`, separate generation live pointer, named-filesystem fsync, deterministic reconciliation |
+| Separate state/archive filesystems defeat a single budget | One filesystem reaches `ENOSPC` despite apparent global headroom | Per-filesystem worst-case reservations, reserves, and near-limit tests |
+| Parquet schema evolution/retry is non-reproducible | Delays, ambiguous files, or divergent hashes after crash | Pin crate/format/compression/all metadata; group by table/schema; require byte-identical retry goldens; no generic schema platform |
+| Remote source metrics unavailable | Hidden source risk | Capability reports `unknown/degraded`; Compose baseline remains measurable |
+| Unauthenticated listener, weak TLS, or error logging leaks credentials | Public status endpoint or diagnostics expose source/sink access | Loopback default, TLS/auth gate, strict file modes, least-privilege admin loading, and redaction tests |
+| Slot invalidation or source timeline change | Continuity cannot be proven | Explicit capture epoch boundary and full re-seed; never fake resume |
+| Final-state checksum hides dropped intermediate change | False correctness result after a later overwrite | Publish/materialize mutation ledger and compare exact committed ID/hash sets; sequence gaps are diagnostic; negative omission test |
+| Exact-set verification is expensive | Fence verification uses more memory/I/O than max-sequence checks | Stream canonical sorted pairs/digests with bounded external sort and publish verification cost; retain explicit set-difference diagnostics |
+| Managed Estuary comparison needs access | Incomplete comparative evidence | Keep comparison runbook separate; publish Boring CDC evidence independently |
