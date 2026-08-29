@@ -1,5 +1,7 @@
 # Dolt database (managed by Dolt, not git)
 dolt/
+dolt
+dolt-wal
 embeddeddolt/
 
 # Runtime files
