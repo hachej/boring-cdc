@@ -22,9 +22,12 @@ The delivery contract is:
 - Docker Compose for a reproducible local source, connector, and ClickHouse environment.
 - No required Kafka, Kafka Connect, Kubernetes, schema registry, or generic connector/plugin framework.
 - An append-only event journal for payloads and SQLite for metadata/checkpoints.
+- A bounded-memory capture path: incremental CopyBoth frame delivery and backpressure, with explicit receive-buffer, decoder-queue, and in-memory event-staging limits; a committed transaction must never be collected wholesale in memory.
 - Two destinations:
   1. ClickHouse for mutable serving/analytics state.
   2. A scheduled JSONL/Parquet archive.
+
+Both destinations share one failure and integrity contract: persisted capped retry/backoff for transient environmental failures; stable blocking without hot loops or checkpoint skips for deterministic poison/configuration/contract failures or exhausted retry budgets; explicit corrected resume; and a bounded read-only audit that publishes its retained verified range/audit floor and never claims older history was verified.
 
 ## 3. Capture and event semantics
 
@@ -38,6 +41,7 @@ The capture path must:
 - Resume after process or network failure without silent loss.
 - Tolerate duplicate delivery after ambiguous crashes.
 - Surface unsupported payload/schema cases rather than silently corrupting data.
+- Distinguish retryable environmental failures from deterministic protocol/encoding/transaction-limit failures; deterministic failures must persist their offending boundary and cannot cause an automatic restart hot loop or checkpoint skip.
 
 The exact public event-envelope format and transaction batching policy remain design decisions for the implementation plan.
 
@@ -82,6 +86,8 @@ The ClickHouse destination must provide:
 - Basic schema-compatibility checks.
 - A tested re-backfill path for incompatible schema changes or newly selected tables.
 - Independent checkpointing, retries, lag reporting, and restart recovery.
+- Persist bounded retry/backoff state, stop retrying deterministic poison events or exhausted attempts, and require an explicit corrected resume without skipping the failed journal transaction.
+- Provide a bounded read-only integrity audit for checkpointed event history and correctness-critical destination contracts; report the retained verified range and never claim verification before the retained audit floor.
 
 It must be tested under update-heavy and delete-heavy workloads and report query cost, merge backlog, and storage amplification.
 
@@ -92,9 +98,11 @@ The archive destination must:
 - Read from the same journal, never create a second Postgres extraction path.
 - Run on a declared schedule.
 - Write deterministic, replay-safe archive output with a documented partition/file-commit policy.
-- Keep its own checkpoint, retries, and lag.
+- Keep its own checkpoint, persisted capped retry/backoff schedule, deterministic-poison block/resume state, and lag.
+- Never hot-loop or skip a failed transaction after a deterministic error or exhausted retry budget; corrected resume must revalidate the unchanged failed boundary.
 - Bootstrap from retained journal history when added after capture starts.
 - Fail with an explicit recovery path when the requested bootstrap position is outside the replay window.
+- Audit checkpointed selectors, manifests, readiness markers, and retained file hashes without moving the live checkpoint; corruption blocks only the archive and reports the retained verified range.
 
 Whether v0.1 ships both JSONL and Parquet modes or JSONL first followed by Parquet is an implementation sequencing decision; the completed v0.1 scope requires the documented JSONL/Parquet archive capability from the series.
 
@@ -135,6 +143,8 @@ Operational telemetry must include:
 - source free disk/headroom;
 - connector/journal disk use;
 - capture and destination lag;
+- retry class/fingerprint, attempts, next retry, failed source/journal boundary, and whether automatic retry is armed;
+- destination integrity-audit freshness, verified range/audit floor, contract fingerprint, and mismatch evidence;
 - destination retry/failure state;
 - backfill progress and ETA;
 - source CPU/I/O/connections and application-latency measurements in the benchmark harness.
@@ -179,7 +189,10 @@ Required failure scenarios:
 11. one destination stopped while the other continues;
 12. second destination added after capture starts;
 13. destination falling outside journal retention;
-14. WAL/slot risk and slot invalidation recovery.
+14. WAL/slot risk and slot invalidation recovery;
+15. oversized/commit-burst source transaction with logical-decoding spill visibility and no restart storm;
+16. transient destination retry versus deterministic poison-event blocking;
+17. corruption/removal of already-checkpointed destination data or correctness-critical destination contract drift.
 
 The same externally visible outage/recovery scenarios should be run against Estuary where practical. Debezium is a capture/offset design reference only.
 
@@ -191,7 +204,7 @@ The release documentation must state tested limits for:
 
 - selected tables;
 - transactions/events per second;
-- row/event size, including large TOASTed values;
+- row/event/transaction size, including large TOASTed values, aggregate CopyBoth receive/decoder/staging memory, and peak connector RSS;
 - backfill size;
 - journal disk budget and replay duration;
 - supported outage duration under the tested workload.
@@ -218,5 +231,7 @@ v0.1 is complete only when:
 - Postgres is never acknowledged ahead of durable local state;
 - destinations recover independently without re-reading Postgres while history remains in the journal;
 - source-risk and bounded-storage controls are observable and exercised;
+- deterministic capture/destination failures cannot hot-loop or skip checkpoints, and transient retry schedules survive restart;
+- bounded destination audits detect exercised post-checkpoint corruption/contract drift and state exactly which retained range is verified;
 - schema/delete limitations and all tested capacity boundaries are published;
 - benchmark commands, fixed seeds, raw results, and correctness checks are reproducible.
