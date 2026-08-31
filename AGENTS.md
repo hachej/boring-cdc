@@ -1,84 +1,47 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
+This project uses **br** (`beads_rust`) for all issue tracking. The local database is SQLite and the Git-tracked interchange/source snapshot is `.beads/issues.jsonl`. **Do not use `bd`, Dolt, or `bd dolt push`.**
 
-## Quick Reference
-
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
-bd dolt push          # Push beads data to remote
-```
-
-## Non-Interactive Shell Commands
-
-**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
-
-Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
-
-**Use these forms instead:**
-```bash
-# Force overwrite without prompting
-cp -f source dest           # NOT: cp source dest
-mv -f source dest           # NOT: mv source dest
-rm -f file                  # NOT: rm file
-
-# For recursive operations
-rm -rf directory            # NOT: rm -r directory
-cp -rf source dest          # NOT: cp -r source dest
-```
-
-**Other commands that may prompt:**
-- `scp` - use `-o BatchMode=yes` for non-interactive
-- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
-- `apt-get` - use `-y` flag
-- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
-
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
-## Beads Issue Tracker
-
-This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
-
-### Quick Reference
+## Quick reference
 
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>         # Complete work
+br ready                         # Find unblocked work
+br show <id>                     # Read a Bead
+br update <id> --claim           # Claim work atomically
+br close <id>                    # Close completed work
+br blocked                       # Inspect blocked work
+br lint                          # Validate Bead templates
+br doctor                        # Diagnose workspace state
+br sync --status                 # Compare SQLite and JSONL
+br sync --flush-only             # Export SQLite changes to tracked JSONL
+br sync --import-only            # Import tracked JSONL into SQLite
 ```
 
-### Rules
+Use non-interactive commands. In particular, use `cp -f`, `mv -f`, `rm -f`, and `rm -rf`; never invoke an editor-based command.
 
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
-- Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
+## Rules
 
-## Session Completion
+- Use `br` for all task tracking; do not use markdown TODO lists or another issue tracker.
+- Read the complete Bead before implementation and claim it with `br update <id> --claim`.
+- Treat `.beads/issues.jsonl` as the Git-pinned graph snapshot for the checked-out commit.
+- Use the local `.beads/beads.db` SQLite database for commands; it is ignored by Git.
+- After JSONL changes from Git, run `br sync --import-only` before relying on readiness/status.
+- Before committing Bead changes, run `br sync --flush-only`, then stage `.beads/issues.jsonl`.
+- Never use Dolt or any remote database push. Beads synchronization between collaborators happens through Git-tracked JSONL.
 
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+## Session completion
 
-**MANDATORY WORKFLOW:**
+Work is not complete until Git is pushed successfully:
 
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
+```bash
+git status
+br lint
+br sync --flush-only
+git add <changed-files> .beads/issues.jsonl
+git commit -m "..."
+git pull --rebase
+git push
+git status  # must be clean and synchronized with origin
+```
 
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-<!-- END BEADS INTEGRATION -->
+If a rebase changes `.beads/issues.jsonl`, run `br sync --import-only` and re-check `br doctor`, `br lint`, and `br ready` before continuing.

@@ -1,7 +1,4 @@
 {
-  "database": "dolt",
-  "backend": "dolt",
-  "dolt_mode": "embedded",
-  "dolt_database": "boring_cdc",
-  "project_id": "92a51c23-f4a9-4668-a7aa-4aa44a7a9a13"
+  "database": "beads.db",
+  "jsonl_export": "issues.jsonl"
 }

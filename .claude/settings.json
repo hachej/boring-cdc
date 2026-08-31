@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "bd prime",
+            "command": "br ready",
             "type": "command"
           }
         ],
@@ -15,7 +15,7 @@
       {
         "hooks": [
           {
-            "command": "bd prime",
+            "command": "br sync --import-only >/dev/null && br ready",
             "type": "command"
           }
         ],

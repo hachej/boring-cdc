@@ -12,8 +12,7 @@
 .vscode/
 results/raw/
 
-# Beads / Dolt files (added by bd init)
-.dolt/
+# Local Beads SQLite/runtime files (the tracked snapshot is .beads/issues.jsonl)
 .beads-credential-key
 
 # bv (beads viewer) local config and caches
