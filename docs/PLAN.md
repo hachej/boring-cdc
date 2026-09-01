@@ -1,6 +1,8 @@
-# Boring CDC v0.1 implementation plan
+# Boring CDC v0.1 architecture and implementation roadmap
 
-This is the implementation contract for Boring CDC v0.1. It was derived from the article-series brief and `docs/REQUIREMENTS.md`, then strengthened through an adversarial architecture review. Implementation has not started.
+This document is the canonical architectural synthesis and implementation roadmap for Boring CDC v0.1. It was derived from the article-series brief and `docs/REQUIREMENTS.md`, then strengthened through adversarial architecture review. Implementation has not started.
+
+Authority is deliberately layered. `docs/REQUIREMENTS.md` owns product obligations; this plan owns architectural rationale, invariants, boundaries, and sequencing; approved versioned artifacts under `contracts/` own exact literals and machine contracts; Beads own executable task state and acceptance for a pinned projection; evidence manifests own test results. A generated view, context pack, or handoff never overrides those sources. The freeze, drift, and projection rules are defined in `docs/AGENT_SYSTEM.md` and section 2.3 below.
 
 The plan deliberately stays narrow: one PostgreSQL source through `pgoutput`, one publication and one logical replication slot, one Rust binary plus Docker Compose, a local SQLite journal/checkpoint store, ClickHouse, and one scheduled JSONL/Parquet archive materializer. Estuary is the managed reference for externally visible experiments. Debezium is a capture-and-offset design reference only.
 
@@ -57,6 +59,42 @@ This is an educational and benchmark-driven public project, not a production SLA
 9. **One active runtime.** The local runtime and asynchronous completions are fenced so a second process or stale worker cannot corrupt checkpoints.
 10. **Idle progress is published, not inferred.** Informational keepalive `wal_end` is never acknowledged. A connector-owned heartbeat row advances through the same published, journaled, durable-before-feedback path as source transactions.
 11. **Claims follow measurements.** Table count, throughput, event size, backfill size, outage duration, and cost claims are limited to published profiles that were actually run.
+
+### 2.3 Agent-native implementation and control model
+
+The implementation system mirrors the product's safety model: inspect one authoritative snapshot, derive legal actions, bind mutations to preconditions, verify postconditions, and retain immutable evidence. The full contributor architecture is in `docs/AGENT_SYSTEM.md`; this section fixes its architectural obligations.
+
+#### Tower and authority
+
+The repository forms one linked tower:
+
+```text
+charter -> product requirements -> architecture -> approved contracts
+        -> Beads ownership/dependencies -> generated bounded views
+        -> immutable evidence/claims -> deterministic handoff
+```
+
+Stable semantic IDs connect the tower: `REQ-*`, `INV-*`, `DEC-*`, `CMD-*`, `COND-*`, `TRANS-*`, `SCN-*`, `REL-*`, `RISK-*`, `RUNBOOK-*`, `CLAIM-*`, and `FINDING-*`. Identity never depends on wording, line numbers, or tracker order. Every ID has exactly one canonical owner; consumers cite the owner and digest instead of duplicating semantics. Coverage validation rejects missing, duplicate, dangling, stale, or future-evidence ownership.
+
+The plan is architectural source; a Bead is a frozen executable projection for a specific graph and contract digest set. Its effective contract contains the task-specific delta plus versioned shared policies. A canonical change emits an impact set. Affected open/in-progress Beads become stale until regenerated or explicitly re-approved, and prior evidence remains historical rather than proving changed semantics. Repeated Bead boilerplate may be compacted only after clean-checkout effective-contract materialization can prove that the complete standalone contract is present and digest-bound.
+
+#### World state and progressive disclosure
+
+Every plan, mutation, verification, and handoff binds to one `world_state` containing Git commit/dirty-tree digest, Beads snapshot digest, selected Bead, dependency-closure digest, applicable contract digests, generated-view versions, and evidence-index digest. A changed precondition requires re-planning.
+
+Repository-local tooling produces bounded `orient`, `implement`, `review`, `handoff`, and explicit `expand` context packs. Packs declare source IDs/digests, included and omitted sections, and byte/token estimate. The default target is 16 KiB. Normative content is never silently truncated; an oversized pack returns an explicit expansion plan. Routine work begins from the full claimed Bead and relevant dependency/contract fragments, not from mandatory ingestion of the complete plan and tracker snapshot.
+
+The transparent `scripts/agent/` interface will expose `doctor`, `next`, `context`, `impact`, `verify`, `handoff`, `recover`, and `finish`. It derives views from Git, `br`, contracts, and evidence; explains rankings and invalidation; and never automatically claims, mutates the product, commits, pushes, or hides underlying changes. This is repository tooling, not a product daemon, scheduler, or distributed control plane.
+
+#### Evidence economy and accretion
+
+Evidence claims bind owner/scenario IDs to Git, graph, effective-contract, code, fixture, image, configuration, profile, seed, environment, result, artifact, and redaction digests. Reuse requires exact declared compatibility or an explicitly owned compatibility range; a mismatch reports the invalidating input and rerun owner.
+
+Verification tiers keep resource cost proportional without weakening gates: leaf work runs targeted static/unit/contract checks; component owners run boundary e2e/fault suites; milestone gates run workspace and clean-environment integration/reproducibility; M6/M7 own endurance and release matrices. Findings and failed approaches retain stable IDs, provenance, environment, resolution, and supersession. Handoff observations remain non-normative until promoted through the canonical owner.
+
+#### Control symmetry
+
+The product exposes one canonical runtime `SystemSnapshot` and every mutating dry-run returns an `ActionPlan` bound to its `snapshot_id` and `state_revision`. The plan states preconditions, transitions, external effects, resource/continuity consequences, rollback boundary, expected postconditions, and confirmation policy. Confirmation and terminal evidence cite the action-plan digest; changed state or fingerprints force a new plan. Domain Beads continue to own their transitions—the shared envelopes are not a second state machine.
 
 ## 3. Runtime architecture and ownership
 
@@ -812,6 +850,10 @@ unsafe_durability
 
 Status derives `overall_health` plus a concurrent `conditions[]` set from domain facts in `processing_failures`, `destination_audits`, source/bootstrap/promotion state, and pressure gauges rather than driving an independent safety transition machine. `condition_hysteresis` persists only enter/exit timestamps needed for stable projection. External condition names remain frozen. Every condition also carries a stable versioned `runbook_id` resolved through the checked-in runbook registry, plus a safe copy-pasteable next command when one exists. Conditions have severity precedence, observed-at/fresh-until timestamps, evidence, automated action, allowed remaining actions, and exact recovery path. `overall_health` is the maximum active fresh severity; stale required evidence contributes an explicit unknown/degraded condition rather than disappearing.
 
+`boring-cdc status --json` renders these facts as one versioned `SystemSnapshot` rather than forcing an agent to join unrelated command outputs. It contains `snapshot_id`, monotonically changing `state_revision`, `observed_at`, `fresh_until`, source/capture/run/ownership identity, configuration/table-set fingerprints, durable/feedback boundaries, journal/filesystem budgets, destinations/checkpoints/generations/audit coverage, active conditions/evidence/runbooks, `blocked_by`, `allowed_actions`, safe next-command templates, and an evidence digest. Every field identifies its domain owner and freshness. The snapshot is read-only derived state, not another transition machine, and stale or unavailable required facts remain explicit.
+
+A persisted runtime action result links the before-snapshot, action-plan digest, immutable intent/request IDs, external-effect evidence, after-snapshot or terminal state revision, asserted postconditions, and continuity consequence. This gives operators and agents one causal chain from observation through action to proof without trusting log chronology or prose summaries.
+
 Source-WAL headroom combines the configured slot-retention cap, current source free space where measurable, retained bytes, observed WAL production rate, monitoring delay, and a reaction reserve. M0 freezes the conservative equation and warning/action/critical horizons. Missing required metrics block new bootstrap/backfill unless explicitly overridden; they do not automatically stop otherwise healthy capture, because disconnecting can increase retained WAL.
 
 `promotion_recovery_required` has one bounded exit after local state loss: the lock-owning maintenance command adopts the externally greatest valid fence only after verifying its selector uniqueness and target generation, then persists that fence before any new allocation. Missing, conflicting, or unverifiable external state remains blocked and requires operator repair or a new explicit destination identity.
@@ -854,6 +896,10 @@ boring-cdc recover reseed --recreate-publication --recreate-slot --confirm-data-
 boring-cdc recover reseed --add-table SCHEMA.TABLE --recreate-publication --recreate-slot --confirm-data-gap
 boring-cdc recover reseed --resume RESEED_ID --confirm
 ```
+
+The shared CLI registry assigns every command a stable `CMD-*` ID, canonical handler-owning Bead, mutation/read-only class, ownership requirement, confirmation policy, result schema, exit codes, condition/runbook links, and redaction policy. Help, command inventory, and compatibility fixtures are generated from that registry; command lists in human documents are checked projections rather than independently maintained grammar.
+
+Every mutating dry-run returns a versioned `ActionPlan` with `plan_id`/digest, command ID, bound `SystemSnapshot.snapshot_id` and `state_revision`, asserted preconditions, intended domain transitions, immutable intents and external effects, resource and continuity consequences, affected checkpoints/generations, allowed remaining actions, rollback/recovery boundary, expected postconditions, evidence requirements, expiry, and canonical confirmation argv/token. The lock-owning runtime revalidates the same fields immediately before dispatch. Any state revision or bound fingerprint change invalidates the plan instead of attempting a best-effort mutation. The terminal `CliResult` references the plan digest and persisted postcondition evidence.
 
 `init` initializes local state and publication/control relations; it does not create and abandon the permanent slot's one-time exported snapshot. `run --bootstrap` owns initial slot/snapshot lifecycle after persisting its intent. Direct live `ALTER PUBLICATION` is unsupported and continuity-breaking. Selecting a new table is expressed only as a confirmed full re-seed/new epoch.
 
@@ -1118,6 +1164,7 @@ Every milestone adds its own unit, integration, and fault tests. M6 runs the int
 Deliver:
 
 - owner-approved public license;
+- versioned schemas/validators for stable IDs, authority/ownership registries, Git/Beads `world_state`, effective work contracts, bounded context packs, impact/staleness, evidence claims/compatibility, generated-view drift, and handoff manifests; repository-local `scripts/agent/` entry-point shape and CI wiring, without a daemon or automatic mutation;
 - Rust single-binary workspace scaffold and Docker Compose shape with every Postgres/ClickHouse image pinned to an explicit tested version and immutable digest, connector restart configured for unlimited attempts while the process-owned persisted `FailurePolicy` enforces capped exponential backoff/jitter before transient reconnect, and PostgreSQL TCP keepalive plus `client_connection_check_interval` settings whose measured zombie-backend reap bound does not exceed the ownership takeover interval;
 - approved `docs/EVENT_FORMAT.md`, including positional identities, canonical payload hashes, explicit exclusion of every local/volatile field, internal heartbeat/fence routing, byte units, canonical encodings, golden vectors, and full relation-contract fingerprint inputs;
 - approved `docs/CLICKHOUSE_MODEL.md`, including pre-created generation-keyed append-only history and selector objects, query-time greatest-fence resolution with same-fence conflict detection and no DDL switch, separate runtime/maintenance privilege matrices, executable DDL/query contract, pinned server/client/crate versions, required Rust insert finalization, synchronous/async policy, fsync/write-concern boundary, batch recovery, shared transient/deterministic failure taxonomy with persisted capped backoff/retry budget and corrected resume, incremental retained-range event/marker audit with cursor, byte/event/time budget and freshness-window `journal_verified_range`, correctness-critical object/query/settings fingerprint contract, history quota, prohibition on native replacement-version narrowing/protective-tombstone deletion, and one-node limitations;
@@ -1131,7 +1178,7 @@ Deliver:
 - named benchmark profiles; and
 - completed decision register with owner, default, validation test, and blocking status for every safety decision.
 
-**Exit:** the decision register contains no `Open`, `Confirm`, or owner-pending safety decision; every M0 row has an approved fixture specification and names its later executing Bead, but M0 never requires runtime results from M1–M7; Compose validates the pinned images; the journal/destination format contracts are approved; no secrets are present; and the license is recorded. M0 is failed—not merely deferred—while a blocking decision remains open. No implementation agent may begin M1 or create journal/destination code before this exit is met.
+**Exit:** the decision register contains no `Open`, `Confirm`, or owner-pending safety decision; every M0 row has an approved fixture specification and names its later executing Bead, but M0 never requires runtime results from M1–M7; authority and stable-ID registries validate with one canonical owner per ID; world-state/effective-contract/context/evidence/handoff schemas pass deterministic and hostile/stale fixtures; Compose validates the pinned images; the journal/destination format contracts are approved; no secrets are present; and the license is recorded. M0 is failed—not merely deferred—while a blocking decision remains open. No implementation agent may begin M1 or create journal/destination code before this exit is met.
 
 ### M1 — Protocol, workload, and bootstrap design
 
@@ -1140,6 +1187,7 @@ Depends on M0.
 Deliver:
 
 - deterministic workload, published source mutation ledger, exact committed `(mutation_id, canonical_ledger_hash)` set/count/sorted-digest oracle, diagnostic gap-tolerant sequences, and typed-row checksum oracle;
+- one versioned runtime `SystemSnapshot` and `ActionPlan` envelope, including snapshot/revision binding, preconditions, transitions, effects, consequences, postconditions, plan/evidence digests, compatibility goldens, and domain-owner references without re-owning domain state;
 - one shared CLI contract with a canonical command registry, consistent `--help`, stable exit-code taxonomy, versioned JSON result/error envelope, stdout/stderr discipline, redacted copy-pasteable confirmations, and golden compatibility tests;
 - genuinely read-only, stateless source/config/store preflight, including connector-role session timeout/keepalive compatibility, fixed control-row operation/cardinality/grants, restart/takeover bounds, and listener/socket policy; persistent SQLite application and intent reconciliation remain M2 responsibilities;
 - connector-owned publication/control **specification and protocol fixtures** with detection-only `TRUNCATE`, exactly one seeded fixed row for each published capture-fence/heartbeat relation, column-limited value `UPDATE` plus immutable-key-only `SELECT` privileges, full-reseed-only table-set changes, maintenance/runtime ownership, and runtime fingerprint rules;
@@ -1175,7 +1223,8 @@ Deliver:
 - runtime-owned Unix-domain operator-command endpoint with server-issued per-dry-run nonces, persisted idempotent requests/results, peer/fingerprint/digest validation, lost-response replay, prior-run nonterminal request abort after intent reconciliation, and offline lock-owning intent path;
 - archive intent/directory-commit engine with JSONL and internal `SEGMENT_READY`, opaque safe paths, gated so candidate data remains generation-invisible before M3 anchors and promotion;
 - capture, feedback, ownership-loss, command-response, bootstrap-intent, archive, stale-promotion, and checkpoint crash hooks; and
-- read-only status/JSON/metrics listener with `overall_health` plus concurrent conditions, loopback default, and implemented authentication/TLS for explicit non-loopback exposure.
+- read-only status/JSON/metrics listener with `overall_health` plus concurrent conditions, loopback default, and implemented authentication/TLS for explicit non-loopback exposure; and
+- canonical fresh `SystemSnapshot` projection plus persisted before-plan-after postcondition evidence, with stable owner/freshness/action/runbook links and no independent status state machine.
 
 **Exit:** acknowledgement—including idle heartbeat progress—never outruns SQLite under the declared storage contract; deterministic capture/limit failures cannot trigger an automatic restart storm or move the checkpoint, while retryable environmental failures preserve capped backoff across restart; the creation floor is never mistaken for durable transaction progress; commit/feedback ambiguity produces deterministic duplicates but no loss; near-limit admission cannot exhaust reserves; orphan spools, pressure, corruption, promotion ambiguity, ownership loss, and bootstrap ambiguity fail explicitly; routine mutations execute through the idempotent owner endpoint and ordinary `run`/maintenance commands cannot own state concurrently; JSONL WAL-only segments survive every directory commit phase but remain invisible without a valid monotonic-fence selector.
 
@@ -1243,6 +1292,7 @@ Depends on M5.
 Deliver:
 
 - derived source/local/sink conditions projected from domain facts, stable external names, concurrent-condition freshness/hysteresis, and alerting without an independent safety transition machine;
+- complete stable condition/action/runbook registry and tested agent/operator recovery projections, including snapshot-to-action-to-postcondition causality, evidence freshness, and exact safe next commands;
 - source free-disk/WAL-headroom and per-filesystem capability reporting;
 - snapshot/XID/vacuum-impact, logical-decoding spill/commit-burst, processing-failure/backoff, and destination-audit freshness/range telemetry;
 - slot invalidation, local-restore mismatch, source timeline, heartbeat, DDL-waiter recovery using M3 schema-guard evidence, deterministic capture/destination poison, oversized-transaction recovery, destination integrity mismatch, schema/full-reseed table-set change, verified external-fence adoption for promotion recovery, measured zombie-backend reap/takeover bounds, and sink-quota runbooks;
@@ -1260,6 +1310,7 @@ Deliver:
 
 - Linux artifact and container image;
 - reproducibility instructions and raw benchmark data;
+- public human projections generated or mechanically checked against canonical requirement/command/condition/scenario/runbook/release registries and measured evidence, with source IDs/digests and no private agent context;
 - known limitations, measured source/local/sink capacity boundaries, security policy, and upgrade notes;
 - Boring CDC and Estuary external scenario runbooks/results;
 - Debezium capture/offset design-reference appendix only;
@@ -1291,7 +1342,8 @@ v0.1 is complete only when:
 - routine mutating CLI operations execute exactly once through the lock-owning runtime's peer-validated Unix-domain endpoint (or an offline owner that acquires both locks), while status/metrics remain read-only; per-dry-run nonces distinguish later repeated commands, lost-response replay is idempotent, prior-run nonterminal requests abort instead of re-executing, and stale confirmation/direct second-writer tests pass;
 - both published control relations retain exactly one seeded fixed row and the control writer cannot insert, delete, or change keys;
 - status/metrics security defaults, command-socket permissions/peer/message bounds, TLS verification, filesystem permissions, and credential-redaction tests pass; and
-- every durability-bearing SQLite connection reads back required PRAGMAs, incremental auto-vacuum/checkpoint policy passes, and each named supported Linux filesystem has abrupt-restart evidence; and
+- every durability-bearing SQLite connection reads back required PRAGMAs, incremental auto-vacuum/checkpoint policy passes, and each named supported Linux filesystem has abrupt-restart evidence;
+- canonical requirement/decision/command/condition/transition/scenario/release/risk ownership is complete and unique; generated public views carry source IDs/digests; stale contracts/evidence are rejected; and a clean-checkout agent can obtain a bounded task context and deterministic handoff without private context or full-plan ingestion; and
 - the M0 decision register is closed with approved contracts, fixture specifications, and named later executing Beads—never downstream runtime results— and at-least-once, single-source, single-slot, non-HA, same-host named-Linux-filesystem archive limitations are prominent; and
 - `boring-cdc-m7-release` is closed with the complete clean-checkout release evidence and is the authoritative root-completion record.
 
@@ -1302,6 +1354,7 @@ v0.1 is complete only when:
 - Generic source/sink plugin APIs or arbitrary destinations.
 - Kafka, Kafka Connect, schema registry, or a distributed log dependency.
 - Kubernetes, an operator, a distributed control plane, distributed HA, a remote/network mutating API, or a separate control daemon; the owner command endpoint is local and inside the one binary.
+- A generic agent platform, vector database, remote agent coordinator, autonomous scheduler, cross-repository memory service, or editable generated knowledge base. Agent tooling remains transparent and repository-local over Git, `br`, contracts, and evidence.
 - Automatic source failover/PITR continuity.
 - Streamed or two-phase logical transactions unless deliberately added and fully tested before v0.1 scope freezes.
 - Applying `TRUNCATE` downstream; v0.1 publishes it only so actual truncation is detected and continuity fails closed.
@@ -1404,3 +1457,8 @@ The canonical external evidence is the public repository URL: <https://github.co
 | Final-state checksum hides dropped intermediate change | False correctness result after a later overwrite | Publish/materialize mutation ledger and compare exact committed ID/hash sets; sequence gaps are diagnostic; negative omission test |
 | Exact-set verification is expensive | Fence verification uses more memory/I/O than max-sequence checks | Stream canonical sorted pairs/digests with bounded external sort and publish verification cost; retain explicit set-difference diagnostics |
 | Managed Estuary comparison needs access | Incomplete comparative evidence | Keep comparison runbook separate; publish Boring CDC evidence independently |
+| Canonical contract is copied into PLAN, Beads, registries, and generated views | Agents act on plausible stale text or update the wrong owner | Explicit authority hierarchy, stable IDs, one owner, digest-bound effective contracts, generated-view drift validation, and impact-based stale marking |
+| Context generation hides an omitted safety clause | Agent makes a locally reasonable but globally unsafe change | Bounded packs declare inclusions/omissions and source digests; oversized normative context fails with an explicit expansion plan and never silently truncates |
+| Cached evidence is reused after a relevant change | Gate appears green for an untested contract or environment | Immutable claim ledger with exact applicability digests, explicit compatibility ownership, invalidating-input diagnostics, and tier-owning rerun command |
+| Interrupted agent work leaves ambiguous local or external effects | Successor repeats a destructive action or trusts an unverified hypothesis | Schema-valid redacted handoff bound to world state, facts/observations/hypotheses separation, active-intent reconciliation, unsafe-repeat list, and exact next safe command |
+| Agent ergonomics grows into a second platform or mutable knowledge base | Scope, maintenance cost, and authority ambiguity expand | Repository-local transparent scripts over Git/`br`/contracts/evidence only; no daemon, scheduler, vector store, remote coordinator, automatic claim, commit, push, or product mutation |

@@ -221,6 +221,22 @@ The release documentation must state tested limits for:
 - Global exactly-once semantics.
 - A broad vendor leaderboard.
 
+## 12.1 Repository implementation-system quality
+
+These requirements govern how the implementation is controlled and evidenced; they do not add product runtime scope.
+
+- **REQ-AGENT-AUTHORITY:** Every normative obligation, approved technical contract, work state, and evidence claim has one explicit canonical authority. Generated views, summaries, and handoffs identify source IDs/digests and never override their sources.
+- **REQ-AGENT-TRACEABILITY:** Product requirements, architecture invariants, decisions, commands, conditions, transitions, scenarios, release criteria, risks, owning Beads, and evidence are linked by stable semantic IDs rather than prose wording or line numbers. Every executable ID has exactly one canonical owner.
+- **REQ-AGENT-SNAPSHOT:** Planning, mutation, verification, and handoff bind to a Git- and Beads-pinned world-state digest plus applicable contract digests. Changed preconditions or stale projections require re-planning rather than best-effort continuation.
+- **REQ-AGENT-CONTEXT:** Repository tooling can produce a bounded, expandable, non-truncating context for one task, including owned behavior, direct dependency outputs, relevant invariants, impact, hazards, and required evidence without requiring routine full-plan/full-tracker ingestion.
+- **REQ-AGENT-CONTROL:** Every product mutation dry-run is machine-readable and bound to the inspected runtime snapshot/revision. It states preconditions, intended transitions, external effects, resource and continuity consequences, rollback boundary, expected postconditions, and the exact confirmation policy.
+- **REQ-AGENT-EVIDENCE:** Evidence is immutable, content-addressed, provenance-bearing, and reusable only when every declared code, contract, fixture, image, configuration, profile, and environment compatibility input matches. Verification cost is tiered without weakening milestone or release gates.
+- **REQ-AGENT-ACCRETION:** Verified claims, approved decisions, discovered constraints, supersession, and failed approaches retain provenance and invalidation rules. Observations and hypotheses from handoffs cannot become normative without promotion through the canonical owner.
+- **REQ-AGENT-HANDOFF:** Interrupted work produces a redacted deterministic handoff that separates facts, observations, and hypotheses and identifies active or ambiguous external intents, unsafe repeated commands, residual risks, and the exact next safe action.
+- **REQ-AGENT-ECONOMY:** Agent tooling is transparent, noninteractive, repository-local, and resource-aware. It never silently claims work, mutates the product, commits, pushes, hides Git/`br` changes, silently truncates normative content, or introduces a generic/distributed agent platform.
+
+The detailed architecture and ownership are defined in `docs/AGENT_SYSTEM.md` and `docs/PLAN.md`. Stable-ID registries and generated projections are implementation artifacts; this section remains the product-level source for these repository-quality obligations.
+
 ## 13. v0.1 release acceptance
 
 v0.1 is complete only when:

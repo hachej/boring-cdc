@@ -23,11 +23,24 @@ The intended guarantee is **at-least-once capture with idempotent destination co
 ## Project documents
 
 - [Exact v0.1 requirements](docs/REQUIREMENTS.md)
-- [Implementation plan](docs/PLAN.md)
+- [Architecture and implementation roadmap](docs/PLAN.md)
+- [Agent-native control and knowledge architecture](docs/AGENT_SYSTEM.md)
+
+## For implementation agents
+
+Start with [`AGENTS.md`](AGENTS.md), then inspect the current Git/Beads state and claim one ready Bead. Routine work should begin from the complete claimed Bead and a bounded set of owned contracts—not by loading the entire plan or tracker snapshot. Generated context, impact, evidence, and handoff views are projections with source digests; they never become independent authority.
+
+Until the planned `scripts/agent/` interface exists, the first commands are:
+
+```bash
+git status --short --branch
+br sync --status && br doctor
+br ready
+```
 
 ## Status
 
-Planning. No production-ready connector exists yet.
+Planning and M0 contract work. No production-ready connector exists yet. `br ready` is the authoritative current-work view; this summary must not be used as a readiness gate.
 
 ## Scope guardrails
 
