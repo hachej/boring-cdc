@@ -25,6 +25,7 @@ The intended guarantee is **at-least-once capture with idempotent destination co
 - [Exact v0.1 requirements](docs/REQUIREMENTS.md)
 - [Architecture and implementation roadmap](docs/PLAN.md)
 - [Agent-native control and knowledge architecture](docs/AGENT_SYSTEM.md)
+- [Series execution and evidence handoff](docs/SERIES_EXECUTION.md)
 
 ## For implementation agents
 

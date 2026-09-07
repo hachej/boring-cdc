@@ -102,7 +102,7 @@ Routine work should not require reading all of `docs/PLAN.md` or `.beads/issues.
 | `handoff` | World-state digest, changes, decisions, checks, evidence, risks, unsafe repeats, and exact next safe action |
 | `expand` | A named omitted section or dependency, added explicitly rather than by silent truncation |
 
-A pack declares byte/token estimate, included IDs, omitted references, and source digests. The default target is 16 KiB. If completeness cannot fit, generation fails with an explicit expansion plan; it never silently truncates normative content.
+A pack declares byte/token estimate, included IDs, omitted references, and source digests. The default 16 KiB target applies to the summary body; the full selected Bead, manifest, and explicit expansions are separate attachments whose sizes are also reported. If a complete normative fragment cannot fit the summary, generation returns an explicit expansion plan; it never silently truncates the Bead or normative content.
 
 Planned transparent interfaces under `scripts/agent/` are:
 
@@ -230,13 +230,18 @@ Every agent plan states expected context bytes/tokens, tool calls, external serv
 
 ## 11. Canonical ownership and rollout
 
-- `boring-cdc-m0-validation-tooling`: schemas and validation for stable IDs, world state, effective contracts, generated views, evidence claims, handoffs, graph snapshots, impact, and stale-contract detection.
-- `boring-cdc-m0-scaffold`: repository-local `scripts/agent/` entry points, CI wiring, generated-view installation, and onboarding.
+- `boring-cdc-m0.1`: bootstrap decision/artifact/evidence/log/runbook schemas and validators, pinned graph primitives, and synthetic validation fixtures; no downstream approval, scaffold, or runtime prerequisite.
+- `boring-cdc-m0.2`: initial stable IDs and populated assignment-only coverage, world state, effective contracts, context/impact/staleness and generated-view provenance; first usable read-only `scripts/agent/doctor`, `next`, `context`, and `impact`. Depends on m0.1; missing advanced claim indexes remain explicitly pending, not verified.
+- `boring-cdc-m0.3`: immutable evidence claims/compatibility, findings and handoff schemas/validators. Depends on m0.1; consumes opaque contract/world-state digests with synthetic fixtures, not m0.2 execution or decision approvals.
+- `boring-cdc-m0-validation-tooling`: aggregate tooling compatibility and complete acceptance over those three owners, not a second schema/helper implementation. Decisions require m0.1 and m0.2; all three and this aggregate remain required by M0 completion.
+- `boring-cdc-m0-scaffold`: packaging/CI/onboarding of the four upstream readers, generated-view installation, and `verify`/`handoff`/`recover`/`finish` integration; never reimplements reader semantics.
 - `boring-cdc-m1-cli-contract`: runtime `SystemSnapshot`/`ActionPlan` envelopes and command compatibility.
 - `boring-cdc-m2-fault-status`: fresh runtime snapshot projection and persisted postcondition evidence.
 - Domain Beads: their facts, preconditions, transitions, allowed actions, and scenarios.
 - `boring-cdc-m6-runbooks`: complete procedures consuming condition/action IDs.
 - `boring-cdc-m7-docs`: public human projections checked against canonical registries and measured evidence.
+
+The three repository-only tooling leaves and their aggregate are explicitly authorized before M0 decisions close. They cannot approve decision values, begin product-runtime work, or bypass the full M0 gate. The smaller decision prerequisite permits staged implementation without deleting any repository-quality obligation.
 
 Rollout order:
 

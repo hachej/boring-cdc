@@ -87,7 +87,7 @@ The ClickHouse destination must provide:
 - A tested re-backfill path for incompatible schema changes or newly selected tables.
 - Independent checkpointing, retries, lag reporting, and restart recovery.
 - Persist bounded retry/backoff state, stop retrying deterministic poison events or exhausted attempts, and require an explicit corrected resume without skipping the failed journal transaction.
-- Provide an incremental read-only integrity audit for checkpointed event history and correctness-critical destination contracts, with persisted cursor, per-pass byte/event/time limits, and freshness-window `journal_verified_range`; never claim gaps or older history were verified.
+- Provide an incremental read-only integrity audit for checkpointed event history and correctness-critical destination contracts, with persisted cursor, per-pass byte/event/time limits, and freshness-window `journal_verified_range`; never claim gaps or older history were verified. Verify actual stored correctness-bearing payloads, not only their stored hash columns; payload-only corruption must be detected within the declared audit coverage.
 
 It must be tested under update-heavy and delete-heavy workloads and report query cost, merge backlog, and storage amplification.
 
@@ -161,7 +161,7 @@ The repository must include a reproducible e-commerce workload with customers, p
 - continuous inserts, updates, and deletes;
 - transactional writes and concurrent application reads during tests.
 
-The correctness oracle must use provider-neutral event IDs plus keyed row counts/checksums; it must not compare provider-specific LSNs.
+The correctness oracle must use provider-neutral event IDs plus keyed row counts/checksums; it must not compare provider-specific LSNs. Report ledger delivery, independently observed business-event delivery, and final-state convergence separately. A delivered ledger or matching final row cannot prove an overwritten business change arrived. Event-delivery acceptance requires complete unambiguous correlation against actual observed business events, including deletes and repeated same-key mutations; business-only and ledger-only omission fixtures must fail. Snapshot baselines do not prove pre-baseline event delivery. If the managed reference cannot expose the required independent event evidence, that measurement is explicitly unavailable rather than a pass.
 
 Every relevant scenario must measure:
 
