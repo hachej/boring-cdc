@@ -181,7 +181,7 @@ SystemSnapshot {
 }
 ```
 
-Every mutating dry-run returns an `ActionPlan` bound to `snapshot_id` and `state_revision`, with asserted preconditions, intended transitions, external effects, resource/continuity consequences, confirmation policy, rollback boundary, expected postconditions, and plan digest. Confirmation and terminal evidence cite that digest. If state revision or a bound fingerprint changes, confirmation fails and a new plan is required. Domain Beads still own domain transitions; the shared CLI owns only envelopes and compatibility.
+Every mutating dry-run returns an `ActionPlan` recording `snapshot_id` and `state_revision` as observation provenance and binding authorization to explicit action-relevant control revisions, with asserted preconditions, intended transitions, external effects, resource/continuity consequences, confirmation policy, rollback boundary, expected postconditions, and plan digest. Confirmation and terminal evidence cite that digest. If an action-relevant control revision or bound fingerprint changes, confirmation fails and a new plan is required. Unrelated checkpoint or telemetry progress does not invalidate authorization. Each command declares all relevant revisions and safety predicates; the sole writer atomically revalidates current ownership, generation, retained history, expiry, and resource sufficiency as applicable when accepting the intent and its pins/reservations. External dispatch retains its lease/deadline checks. Domain Beads still own domain transitions; the shared CLI owns only envelopes and compatibility.
 
 ## 8. Evidence economy and accretive knowledge
 

@@ -58,6 +58,8 @@ The local middle layer must:
 - Expose local bytes used, oldest/newest replay position, and per-destination retained backlog.
 - Enter a documented safe-stop/fail-loud state before unbounded buffering can endanger Postgres.
 - Define what happens when a destination falls behind the retained replay window.
+- Bound SQLite reader lifetimes and range sizes, retain logical history pins after releasing physical read snapshots, and explicitly own checkpoint scheduling and automatic-checkpoint configuration. Essential control, failure, destination-checkpoint and GC work must receive bounded service opportunities under capture saturation without splitting source transactions.
+- Distinguish persistent database settings from actual writer-connection readback evidence. A read-only observer's connection-local settings never certify a different writer; missing/stale writer attestation is unverified.
 
 ## 5. Initial snapshot/backfill
 
@@ -134,7 +136,8 @@ The CLI/status surface must provide at least:
 - capture/run;
 - backfill start/status/pause/resume;
 - destination replay/bootstrap;
-- recovery/re-seed guidance or commands.
+- recovery/re-seed guidance or commands;
+- bounded read-only event explanation, separating locally durable capture, checkpoint and audit coverage, generation/baseline eligibility, and live-selector evidence. Missing/GC-expired facts are unavailable, not proof of non-delivery; no source reread, second per-event receipt ledger, or payload/secret disclosure by default.
 
 Operational telemetry must include:
 
@@ -196,6 +199,8 @@ Required failure scenarios:
 
 The same externally visible outage/recovery scenarios should be run against Estuary where practical. Debezium is a capture/offset design reference only.
 
+Destination audits use finite, identity-bound checkpoint targets and repeat rounds over promised freshness coverage. Indivisible units fit pass limits or use bounded resumable verification; insufficient service capacity yields partial/expired/unknown coverage, not endless zero-progress passes or invented freshness. Existing per-destination mismatch blocking and separate journal/self-consistency meanings remain unchanged.
+
 ## 11. Capacity boundaries
 
 v0.1 must declare and test bounded scale profiles rather than imply unlimited scale. The research notes explicitly raise 10,000 tables and terabyte-scale backfills as questions; they are benchmark questions, not accepted v0.1 guarantees unless later quantified and adopted.
@@ -207,7 +212,8 @@ The release documentation must state tested limits for:
 - row/event/transaction size, including large TOASTed values, aggregate CopyBoth receive/decoder/staging memory, and peak connector RSS;
 - backfill size;
 - journal disk budget and replay duration;
-- supported outage duration under the tested workload.
+- supported outage duration under the tested workload;
+- measured recovery capacity under continuing writes and normal audit load, with comparable incoming/drain units, startup time, backlog/storage growth, first limiting boundary and uncertainty. A finite catch-up estimate requires positive drain headroom; missing/stale evidence or overload cannot be presented as a successful finite recovery.
 
 ## 12. Out of scope
 
@@ -229,7 +235,7 @@ These requirements govern how the implementation is controlled and evidenced; th
 - **REQ-AGENT-TRACEABILITY:** Product requirements, architecture invariants, decisions, commands, conditions, transitions, scenarios, release criteria, risks, owning Beads, and evidence are linked by stable semantic IDs rather than prose wording or line numbers. Every executable ID has exactly one canonical owner.
 - **REQ-AGENT-SNAPSHOT:** Planning, mutation, verification, and handoff bind to a Git- and Beads-pinned world-state digest plus applicable contract digests. Changed preconditions or stale projections require re-planning rather than best-effort continuation.
 - **REQ-AGENT-CONTEXT:** Repository tooling can produce a bounded, expandable, non-truncating context for one task, including owned behavior, direct dependency outputs, relevant invariants, impact, hazards, and required evidence without requiring routine full-plan/full-tracker ingestion.
-- **REQ-AGENT-CONTROL:** Every product mutation dry-run is machine-readable and bound to the inspected runtime snapshot/revision. It states preconditions, intended transitions, external effects, resource and continuity consequences, rollback boundary, expected postconditions, and the exact confirmation policy.
+- **REQ-AGENT-CONTROL:** Every product mutation dry-run is machine-readable and bound to inspected snapshot provenance and action-relevant control revisions, with current safety predicates atomically revalidated rather than invalidated by unrelated telemetry/checkpoint progress. It states preconditions, intended transitions, external effects, resource and continuity consequences, rollback boundary, expected postconditions, and the exact confirmation policy.
 - **REQ-AGENT-EVIDENCE:** Evidence is immutable, content-addressed, provenance-bearing, and reusable only when every declared code, contract, fixture, image, configuration, profile, and environment compatibility input matches. Verification cost is tiered without weakening milestone or release gates.
 - **REQ-AGENT-ACCRETION:** Verified claims, approved decisions, discovered constraints, supersession, and failed approaches retain provenance and invalidation rules. Observations and hypotheses from handoffs cannot become normative without promotion through the canonical owner.
 - **REQ-AGENT-HANDOFF:** Interrupted work produces a redacted deterministic handoff that separates facts, observations, and hypotheses and identifies active or ambiguous external intents, unsafe repeated commands, residual risks, and the exact next safe action.

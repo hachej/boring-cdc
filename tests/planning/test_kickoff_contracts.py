@@ -92,6 +92,12 @@ class KickoffContracts(unittest.TestCase):
             declared = {line[2:] for line in leaves}
             self.assertEqual(len(leaves), len(declared), barrier)
             self.assertEqual(int(match[1]), len(declared), barrier)
+            acceptance = self.by_id[barrier]["acceptance_criteria"]
+            counts = re.findall(r"All (\d+) required M\d+ leaves", acceptance)
+            if milestone:  # M0 names its approved contract set without a numeral.
+                self.assertEqual(len(counts), 1, barrier)
+            for count in counts:
+                self.assertEqual(int(count), len(declared), barrier)
             expected = declared | ({TERMINALS[milestone - 1]} if milestone else set())
             self.assertEqual(self.blockers(barrier), expected, barrier)
             self.assertIn(barrier, self.blockers(terminal))
