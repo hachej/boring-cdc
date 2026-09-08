@@ -129,7 +129,7 @@ class Core(unittest.TestCase):
 
     def test_safety_schemas_require_transition_ownership_and_log_correlation(self):
         cases = [
-            ({"schema_version":"plan-to-beads/v1","assignments":[{"id":"TRANS-SYNTHETIC","source":"synthetic","evidence_status":"pending"}]}, ROOT/"contracts/coverage/plan-to-beads.schema.json", "/assignments/0/owner_bead"),
+            ({"schema_version":"plan-to-beads/v1","assignments":[{"id":"TRANS-SYNTHETIC","source":"synthetic","source_digest":"0000000000000000000000000000000000000000000000000000000000000000","evidence_status":"pending"}]}, ROOT/"contracts/coverage/plan-to-beads.schema.json", "/assignments/0/owner_bead"),
             ({"schema_version":"structured-log/v1","level":"error","code":"E_SYNTHETIC","message":"redacted"}, ROOT/"contracts/common/structured-log.schema.json", "/correlation_id"),
         ]
         with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:

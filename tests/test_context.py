@@ -29,19 +29,29 @@ class ContextTests(unittest.TestCase):
   rows=ac.rows();dec=[r for r in rows if r.get('issue_type')=='decision'];self.assertEqual(len(dec),25);self.assertTrue(all(r['status']=='open' for r in dec))
   _,x=self.cli(str(ROOT/'scripts/agent/doctor'),'--observed-at','2026-01-01T00:00:00Z');self.assertEqual(x['claim_index'],'pending_unavailable');self.assertFalse(x['claim_reuse'])
  def test_source_change_reports_exact_stale_owner_without_rewriting_closed(self):
-  old=ac.REG
+  old=ac.REG;self.addCleanup(setattr,ac,'REG',old)
   with tempfile.TemporaryDirectory() as td:
-   p=Path(td)/'reg.json';r=ac.registry();r['source_files']['docs/PLAN.md']='0'*64;p.write_text(json.dumps(r));ac.REG=p
+   p=Path(td)/'reg.json';r=ac.registry();r['source_files']['docs/PLAN.md']='0'*64;changed=next(e for e in r['entries'] if e['source']=='docs/PLAN.md' and e['owner_bead']=='boring-cdc-d-owner');changed['summary']='synthetic changed canonical row';p.write_text(json.dumps(r));ac.REG=p
    out=io.StringIO();ns=type('N',(),{'target':'docs/PLAN.md'})()
    with contextlib.redirect_stdout(out):ac.cmd_impact(ns)
-   x=json.loads(out.getvalue());self.assertIn('boring-cdc-d-owner',x['stale_open_or_in_progress']);self.assertIsInstance(x['historical_closed'],list);self.assertEqual(x['conflicts'][0]['owner_bead'],'boring-cdc-m0.2')
+   x=json.loads(out.getvalue());self.assertEqual(x['stale_open_or_in_progress'],['boring-cdc-d-owner']);self.assertEqual(x['affected_ids'],[changed['id']]);self.assertIsInstance(x['historical_closed'],list);self.assertEqual(x['conflicts'][0]['owner_bead'],'boring-cdc-m0.2')
   ac.REG=old
  def test_hostile_duplicate_dangling_unknown_and_changed_source(self):
-  old=ac.REG
+  old=ac.REG;self.addCleanup(setattr,ac,'REG',old)
   with tempfile.TemporaryDirectory() as td:
    p=Path(td)/'reg.json';r=ac.registry();r['schema_version']='unknown';r['entries'].append(dict(r['entries'][0]));r['entries'][-1]['owner_bead']='boring-cdc-missing';r['source_files']['docs/PLAN.md']='f'*64;p.write_text(json.dumps(r));ac.REG=p
    codes={x[0] for x in ac.validate()};self.assertTrue({'E_SCHEMA_VERSION','E_ID_DUPLICATE','E_OWNER_DANGLING','E_SOURCE_CONFLICT'}<=codes)
   ac.REG=old
+ def test_profiles_are_distinct_and_budget_exact(self):
+  names={}
+  for profile in ['orient','implement','review','handoff']:
+   _,x=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--profile',profile,'--observed-at','2026-01-01T00:00:00Z');names[profile]={a['name'] for a in x['attachments']};self.assertEqual(x['total_bytes'],len(ac.canonical(x).encode()));self.assertEqual(x['token_estimate'],(x['total_bytes']+3)//4)
+  self.assertIn('orientation',names['orient']);self.assertIn('dependency_outputs',names['implement']);self.assertIn('review_diff',names['review']);self.assertIn('handoff_state',names['handoff'])
+ def test_world_state_binds_dirty_content_and_impact_rejects_escape(self):
+  with tempfile.TemporaryDirectory(dir=ROOT/'tests') as td:
+   p=Path(td)/'dirty';p.write_text('one');a=ac.world()['working_tree_digest'];p.write_text('two');b=ac.world()['working_tree_digest'];self.assertNotEqual(a,b)
+  ns=type('N',(),{'target':'../../etc/passwd'})()
+  with self.assertRaisesRegex(SystemExit,'E_PATH_TRAVERSAL'):ac.cmd_impact(ns)
  def test_generated_view_drift_rejected(self):
   p,x=self.cli(str(ROOT/'scripts/validate/plan_coverage.sh'));self.assertTrue(x['valid'])
  def test_above_and_below_16k_beads_are_complete(self):

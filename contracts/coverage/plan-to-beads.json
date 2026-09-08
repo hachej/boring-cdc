@@ -194,7 +194,7 @@
       "id": "COND-DESTINATION-AUDIT-STALE",
       "owner_bead": "boring-cdc-m5-loops",
       "source": "docs/PLAN.md",
-      "source_digest": "f82e402b35ceb04246caf970ec4126eb9b2837b37392c2695d7d2c7a93f07c31"
+      "source_digest": "066ae59dc6175fc49c4cb9850ba2a882ada9adf0fd0ea82e778ae6345b78f175"
     },
     {
       "evidence_status": "pending",
@@ -222,7 +222,7 @@
       "id": "COND-SOURCE-METRICS-UNKNOWN",
       "owner_bead": "boring-cdc-m2-fault-status",
       "source": "docs/PLAN.md",
-      "source_digest": "8ff28e458f730064c0fae50789cac9ffac82e07d238bab55c5c7b9e5961f7127"
+      "source_digest": "e7b01d2e7b89b0f3c30c81e21160f8ea43384391f21bad03d6dbe8436fb78b91"
     },
     {
       "evidence_status": "pending",
