@@ -1,0 +1,12 @@
+test_absent_index_and_exact_mismatch (tests.validate_knowledge.Knowledge.test_absent_index_and_exact_mismatch) ... ok
+test_findings_append_only_and_hypothesis_separation (tests.validate_knowledge.Knowledge.test_findings_append_only_and_hypothesis_separation) ... ok
+test_forged_owner_unowned_range_hash_and_provenance (tests.validate_knowledge.Knowledge.test_forged_owner_unowned_range_hash_and_provenance) ... ok
+test_handoff_redaction_ambiguity_and_separation (tests.validate_knowledge.Knowledge.test_handoff_redaction_ambiguity_and_separation) ... ok
+test_hostile_paths_and_determinism (tests.validate_knowledge.Knowledge.test_hostile_paths_and_determinism) ... ok
+test_superseded_freshness_and_rewritten_history (tests.validate_knowledge.Knowledge.test_superseded_freshness_and_rewritten_history) ... ok
+test_valid_exact_and_compatible (tests.validate_knowledge.Knowledge.test_valid_exact_and_compatible) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 1.876s
+
+OK
