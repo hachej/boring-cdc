@@ -65,7 +65,11 @@ def duplicate_ids(es):
 def validate():
  reg=registry();graph=rows();by={r.get('id'):r for r in graph};f=[]
  if reg.get('schema_version')!='stable-registry/v1':f.append(['E_SCHEMA_VERSION','/schema_version'])
- allowed={'REQ','INV','DEC','CMD','COND','TRANS','SCN','REL','RISK','RUNBOOK','CLAIM','FINDING'}
+ expected={'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':120,'REL':33,'RISK':38,'RUNBOOK':0,'CLAIM':0,'FINDING':0}
+ counts={k:sum(e.get('namespace')==k for e in reg.get('entries',[])) for k in expected}
+ for k,want in expected.items():
+  if counts[k]!=want:f.append(['E_COVERAGE_INCOMPLETE',f'/{k}:{counts[k]}!={want}'])
+ allowed=set(expected)
  for x in duplicate_ids(reg.get('entries',[])):f.append(['E_ID_DUPLICATE',x])
  for i,e in enumerate(reg.get('entries',[])):
   ident=e.get('id');ns=e.get('namespace');own=e.get('owner_bead')
@@ -73,6 +77,8 @@ def validate():
   elif ns not in allowed or not ident.startswith(ns+'-'):f.append(['E_NAMESPACE_INVALID',ident])
   if own not in by:f.append(['E_OWNER_DANGLING',str(own)])
   if e.get('evidence_status')!='pending':f.append(['E_EVIDENCE_NOT_PENDING',str(ident)])
+  source=e.get('source');excerpt=e.get('source_excerpt');sp=safe_path(source) if isinstance(source,str) else None
+  if not isinstance(excerpt,str) or not sp or not sp.is_file() or excerpt not in sp.read_text() or digest_bytes(excerpt.encode())!=e.get('source_digest'):f.append(['E_SOURCE_FRAGMENT',str(ident)])
  f += [['E_SOURCE_CONFLICT',x['source']] for x in source_conflicts(reg)]
  covp=ROOT/'contracts/coverage/plan-to-beads.json';cov=json.loads(covp.read_text())
  if {(e['id'],e['owner_bead'],e['source_digest']) for e in reg['entries']}!={(e.get('id'),e.get('owner_bead'),e.get('source_digest')) for e in cov.get('assignments',[])}:f.append(['E_COVERAGE_DRIFT',str(covp.relative_to(ROOT))])
@@ -96,10 +102,18 @@ def cmd_next(a):
 def profile_attachments(profile,bead,by,reg):
  direct=sorted({d['depends_on_id'] for d in by[bead].get('dependencies',[]) if d.get('depends_on_id') in by});reverse=sorted(r['id'] for r in by.values() if any(d.get('depends_on_id')==bead for d in r.get('dependencies',[])))
  base=[{'name':'dependency_outputs','complete':True,'content':[by[x] for x in direct]},{'name':'consumed_canonical_rows','complete':True,'content':[e for e in reg['entries'] if e['owner_bead'] in direct]}]
- if profile=='orient':return [{'name':'orientation','complete':True,'content':{'blockers':direct,'status':by[bead].get('status')}}]
+ if profile=='orient':return [{'name':'charter','complete':True,'content':(ROOT/'README.md').read_text()},{'name':'agent_rules','complete':True,'content':(ROOT/'AGENTS.md').read_text()},{'name':'orientation','complete':True,'content':{'health':'authority validation passed','current_milestone':'M0','blockers':direct,'status':by[bead].get('status'),'ready_candidates':[r['id'] for r in by.values() if r.get('status')=='open' and not r.get('assignee') and all(by.get(d.get('depends_on_id'),{}).get('status')=='closed' for d in r.get('dependencies',[]) if d.get('type')=='blocks')] }}]
  if profile=='implement':return base
- if profile=='review':return base+[{'name':'review_diff','complete':True,'content':run('git','diff','HEAD').stdout},{'name':'impacted_consumers','complete':True,'content':reverse}]
- return base+[{'name':'handoff_state','complete':True,'content':{'changed_paths':dirty_state()[0],'next_safe_command':f'scripts/agent/context {bead} --profile implement','consumers':reverse}}]
+ if profile=='review':return base+[{'name':'review_diff','complete':True,'content':run('git','show','--format=','--binary','HEAD').stdout},{'name':'impacted_consumers','complete':True,'content':reverse}]
+ return base+[{'name':'handoff_state','complete':True,'content':{'changed_paths':dirty_state()[0],'checks':{'authority':'pass','claim_index':'pending_unavailable'},'evidence':{'status':'pending','reuse':False},'decisions':[],'risks':['revalidate world-state before mutation'],'unsafe_repeats':['do not claim, commit, push, or mutate from this reader'],'next_safe_command':f'scripts/agent/context {bead} --profile implement','consumers':reverse}}]
+def validate_pack(pack):
+ required={'schema_version','profile','world_state','summary','summary_bytes','total_bytes','token_estimate','included_ids','omitted_ids','attachments','expansion_plan','source_digests','effective_contract'}
+ if set(pack)!=required or pack['schema_version']!='context-pack/v1':raise SystemExit('E_CONTEXT_SCHEMA')
+ if pack['summary_bytes']!=len(pack['summary'].encode()) or pack['summary_bytes']>LIMIT:raise SystemExit('E_CONTEXT_BUDGET')
+ if pack['total_bytes']!=len(canonical(pack).encode()) or pack['token_estimate']!=(pack['total_bytes']+3)//4:raise SystemExit('E_CONTEXT_ACCOUNTING')
+ if any(not a.get('complete') or a.get('bytes')!=len(canonical(a.get('content')).encode()) for a in pack['attachments']):raise SystemExit('E_CONTEXT_ATTACHMENT')
+ if set(pack['included_ids'])&set(pack['omitted_ids']):raise SystemExit('E_CONTEXT_IDS')
+ return True
 def cmd_context(a):
  require_authority();reg=registry();rs=rows();by={r['id']:r for r in rs}
  if a.bead not in by:raise SystemExit('E_BEAD_UNKNOWN:'+a.bead)
@@ -111,20 +125,22 @@ def cmd_context(a):
  attachments=[{'name':'selected_bead','complete':True,'content':by[a.bead]},{'name':'manifest','complete':True,'content':ws}]+profile_attachments(a.profile,a.bead,by,reg)
  for x in attachments:x['bytes']=len(canonical(x['content']).encode())
  if a.expand:
-  ids=all_ids if a.expand=='all' else [a.expand];content=[e for e in reg['entries'] if e['id'] in ids];attachments.append({'name':'expansion','complete':True,'bytes':len(canonical(content).encode()),'content':content})
+  ids=all_ids if a.expand=='all' else [a.expand];content=[e for e in reg['entries'] if e['id'] in ids]
+  if a.expand!='all' and not content:raise SystemExit('E_EXPANSION_UNKNOWN:'+a.expand)
+  attachments.append({'name':'expansion','complete':True,'bytes':len(canonical(content).encode()),'content':content})
  pack={'schema_version':'context-pack/v1','profile':a.profile,'world_state':ws,'summary':summary,'summary_bytes':len(summary.encode()),'total_bytes':0,'token_estimate':0,'included_ids':included,'omitted_ids':omitted,'attachments':attachments,'expansion_plan':[{'id':x,'command':f'scripts/agent/context {a.bead} --profile {a.profile} --expand {x}'} for x in omitted],'source_digests':reg['source_files'],'effective_contract':eff}
  for _ in range(8):
   size=len(canonical(pack).encode());tokens=(size+3)//4
   if (size,tokens)==(pack['total_bytes'],pack['token_estimate']):break
   pack['total_bytes']=size;pack['token_estimate']=tokens
- print(canonical(pack));return False
+ validate_pack(pack);print(canonical(pack));return False
 def changed_rows(reg,affected):
  changed=set();cache={}
  for e in affected:
   if e['source'] not in cache:
    p=safe_path(e['source']);cache[e['source']]=p.read_text() if p.is_file() else ''
-  norm=lambda x:re.sub(r'[^a-z0-9]+',' ',x.lower()).strip()
-  if norm(e['summary']) not in norm(cache[e['source']]):changed.add(e['id'])
+  excerpt=e.get('source_excerpt','')
+  if excerpt not in cache[e['source']] or digest_bytes(excerpt.encode())!=e.get('source_digest'):changed.add(e['id'])
  return changed
 def cmd_impact(a):
  reg=registry();rs=rows();by={r['id']:r for r in rs};target=a.target

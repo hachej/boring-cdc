@@ -31,7 +31,7 @@ class ContextTests(unittest.TestCase):
  def test_source_change_reports_exact_stale_owner_without_rewriting_closed(self):
   old=ac.REG;self.addCleanup(setattr,ac,'REG',old)
   with tempfile.TemporaryDirectory() as td:
-   p=Path(td)/'reg.json';r=ac.registry();r['source_files']['docs/PLAN.md']='0'*64;changed=next(e for e in r['entries'] if e['source']=='docs/PLAN.md' and e['owner_bead']=='boring-cdc-d-owner');changed['summary']='synthetic changed canonical row';p.write_text(json.dumps(r));ac.REG=p
+   p=Path(td)/'reg.json';r=ac.registry();r['source_files']['docs/PLAN.md']='0'*64;changed=next(e for e in r['entries'] if e['source']=='docs/PLAN.md' and e['owner_bead']=='boring-cdc-d-owner');changed['source_excerpt']='synthetic changed canonical row';p.write_text(json.dumps(r));ac.REG=p
    out=io.StringIO();ns=type('N',(),{'target':'docs/PLAN.md'})()
    with contextlib.redirect_stdout(out):ac.cmd_impact(ns)
    x=json.loads(out.getvalue());self.assertEqual(x['stale_open_or_in_progress'],['boring-cdc-d-owner']);self.assertEqual(x['affected_ids'],[changed['id']]);self.assertIsInstance(x['historical_closed'],list);self.assertEqual(x['conflicts'][0]['owner_bead'],'boring-cdc-m0.2')
@@ -52,6 +52,17 @@ class ContextTests(unittest.TestCase):
    p=Path(td)/'dirty';p.write_text('one');a=ac.world()['working_tree_digest'];p.write_text('two');b=ac.world()['working_tree_digest'];self.assertNotEqual(a,b)
   ns=type('N',(),{'target':'../../etc/passwd'})()
   with self.assertRaisesRegex(SystemExit,'E_PATH_TRAVERSAL'):ac.cmd_impact(ns)
+ def test_deleted_registry_row_and_unknown_expansion_fail(self):
+  old=ac.REG;self.addCleanup(setattr,ac,'REG',old)
+  with tempfile.TemporaryDirectory() as td:
+   p=Path(td)/'reg.json';r=ac.registry();r['entries'].pop();p.write_text(json.dumps(r));ac.REG=p
+   self.assertIn('E_COVERAGE_INCOMPLETE',{x[0] for x in ac.validate()})
+  ac.REG=old
+  ns=type('N',(),{'bead':'boring-cdc-m0.2','profile':'implement','expand':'REQ-NOT-REAL','observed_at':'2026-01-01T00:00:00Z'})()
+  with self.assertRaisesRegex(SystemExit,'E_EXPANSION_UNKNOWN'):ac.cmd_context(ns)
+ def test_every_source_fragment_is_digest_bound_and_present(self):
+  for e in ac.registry()['entries']:
+   self.assertEqual(ac.digest_bytes(e['source_excerpt'].encode()),e['source_digest']);self.assertIn(e['source_excerpt'],(ROOT/e['source']).read_text())
  def test_generated_view_drift_rejected(self):
   p,x=self.cli(str(ROOT/'scripts/validate/plan_coverage.sh'));self.assertTrue(x['valid'])
  def test_above_and_below_16k_beads_are_complete(self):

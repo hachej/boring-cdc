@@ -1,1 +1,126 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://boring-cdc.dev/contracts/agent/context-pack.schema.json","title":"Bounded expandable context pack","type":"object","additionalProperties":false,"required":["schema_version","profile","world_state","summary","summary_bytes","total_bytes","token_estimate","included_ids","omitted_ids","attachments","expansion_plan","source_digests","effective_contract"],"properties":{"schema_version":{"const":"context-pack/v1"},"profile":{"enum":["orient","implement","review","handoff"]},"world_state":{"type":"object"},"summary":{"type":"string"},"summary_bytes":{"type":"integer","maximum":16384},"total_bytes":{"type":"integer"},"token_estimate":{"type":"integer"},"included_ids":{"type":"array"},"omitted_ids":{"type":"array"},"attachments":{"type":"array"},"expansion_plan":{"type":"array"},"source_digests":{"type":"object"},"effective_contract":{"type":"object"}}}
+{
+  "$id": "https://boring-cdc.dev/contracts/agent/context-pack.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attachments": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "bytes": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "complete": {
+            "const": true
+          },
+          "content": {},
+          "name": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "complete",
+          "bytes",
+          "content"
+        ],
+        "type": "object"
+      },
+      "minItems": 3,
+      "type": "array"
+    },
+    "effective_contract": {
+      "$ref": "effective-contract.schema.json"
+    },
+    "expansion_plan": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "command"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "included_ids": {
+      "items": {
+        "pattern": "^(REQ|INV|DEC|CMD|COND|TRANS|SCN|REL|RISK|RUNBOOK|CLAIM|FINDING)-",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "omitted_ids": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "profile": {
+      "enum": [
+        "orient",
+        "implement",
+        "review",
+        "handoff"
+      ]
+    },
+    "schema_version": {
+      "const": "context-pack/v1"
+    },
+    "source_digests": {
+      "additionalProperties": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minProperties": 1,
+      "type": "object"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "summary_bytes": {
+      "maximum": 16384,
+      "type": "integer"
+    },
+    "token_estimate": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "total_bytes": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "world_state": {
+      "$ref": "world-state.schema.json"
+    }
+  },
+  "required": [
+    "schema_version",
+    "profile",
+    "world_state",
+    "summary",
+    "summary_bytes",
+    "total_bytes",
+    "token_estimate",
+    "included_ids",
+    "omitted_ids",
+    "attachments",
+    "expansion_plan",
+    "source_digests",
+    "effective_contract"
+  ],
+  "title": "Bounded expandable context pack",
+  "type": "object"
+}
