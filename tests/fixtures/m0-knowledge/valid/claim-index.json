@@ -3,14 +3,12 @@
     {
       "claim_id": "CLAIM-M0-KNOWLEDGE-EXACT",
       "claim_sha256": "7967fbd8916efd049454990edb9f553b4d5f9dd7e6f674bfc4193b17d6da44c9",
-      "owner_bead": "boring-cdc-m0.3",
-      "status": "current"
+      "owner_bead": "boring-cdc-m0.3"
     },
     {
       "claim_id": "CLAIM-M0-KNOWLEDGE-COMPATIBLE",
       "claim_sha256": "7b42dbd2ca7efa6a05d3babddce9c84000aa2fc57a7717e3a02822367282e3d9",
-      "owner_bead": "boring-cdc-m0.3",
-      "status": "current"
+      "owner_bead": "boring-cdc-m0.3"
     }
   ],
   "schema_version": "claim-index/v1"

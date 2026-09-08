@@ -8,7 +8,7 @@ from core_validator import validate_schema_instance
 
 ROOT=Path(__file__).resolve().parents[2]; VERSION="knowledge-validators/1.0.0"; OWNER="boring-cdc-m0.3"
 SHA=re.compile(r"^[0-9a-f]{64}$"); GIT=re.compile(r"^[0-9a-f]{40}$"); BEAD=re.compile(r"^boring-cdc-[A-Za-z0-9.-]+$"); SID=re.compile(r"^(CLAIM|FINDING|SCN|REQ|INV|DEC|CMD|COND|TRANS|REL|RISK|RUNBOOK|ART)-[A-Z0-9-]+$")
-SECRET=re.compile(r'(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|[a-z][a-z0-9+.-]*://|-----BEGIN .*PRIVATE KEY-----|(?:^|[=:\s"])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+|raw[_ -]?payload|driver[_ -]?error)')
+SECRET=re.compile(r'(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|[a-z][a-z0-9+.-]*://|-----BEGIN .*PRIVATE KEY-----|(?<![A-Za-z0-9._-])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]*|raw[_ -]?payload|driver[_ -]?error)')
 BINDINGS=("git_commit","graph_digest","effective_contract_digest","capture_epoch_digest","code_digest","binary_digest","fixture_digest","image_digest","config_digest","profile_digest","seed_digest","environment_digest","command_digest","result_digest","artifact_digest","redaction_digest")
 class DuplicateKey(ValueError):pass
 def unique(pairs):
@@ -49,7 +49,13 @@ def digest_fields(o,names,fs,p):
   pattern=GIT if n=="git_commit" else SHA
   if not isinstance(v,str) or not pattern.fullmatch(v):add(fs,"E_DIGEST",f"{p}/{n}",f"invalid {n}")
 def secret_check(o,fs):
- if SECRET.search(json.dumps(o,sort_keys=True)):add(fs,"E_SECRET","/","secret, DSN, raw absolute path, or private key is forbidden")
+ def strings(x):
+  if isinstance(x,str):yield x
+  elif isinstance(x,dict):
+   for k,v in x.items():yield k;yield from strings(v)
+  elif isinstance(x,list):
+   for v in x:yield from strings(v)
+ if any(SECRET.search(v) for v in strings(o)):add(fs,"E_SECRET","/","secret, DSN, raw absolute path, or private key is forbidden")
 def parse_time(v):
  try:return datetime.fromisoformat(v.replace("Z","+00:00"))
  except (ValueError,AttributeError):return None
@@ -61,9 +67,12 @@ def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs
  if not isinstance(rows,list):add(fs,"E_TYPE","/claims","expected array");return
  if index is None:add(fs,"E_CLAIM_INDEX_REQUIRED","/","absent claim index cannot imply verified evidence");idx={}
  else:
+  if not isinstance(index,dict):add(fs,"E_TYPE","/index","claim index must be an object");index={}
   req(index,["schema_version","entries"],fs,"/index");closed(index,["schema_version","entries"],fs,"/index")
   if index.get("schema_version")!="claim-index/v1":add(fs,"E_SCHEMA_VERSION","/index/schema_version","expected claim-index/v1")
-  entries=index.get("entries",[]);idx={e.get("claim_id"):e for e in entries if isinstance(e,dict) and isinstance(e.get("claim_id"),str)}
+  entries=index.get("entries",[])
+  if not isinstance(entries,list):add(fs,"E_TYPE","/index/entries","entries must be an array");entries=[]
+  idx={e.get("claim_id"):e for e in entries if isinstance(e,dict) and isinstance(e.get("claim_id"),str)}
   if len(idx)!=len(entries):add(fs,"E_INDEX_DUPLICATE","/index/entries","index claim IDs must be unique scalar strings")
  if baseline is None:add(fs,"E_INDEX_BASELINE_REQUIRED","/index","trusted immutable index baseline is required")
  elif not isinstance(index,dict) or not isinstance(baseline,dict) or index.get("schema_version")!=baseline.get("schema_version") or index.get("entries",[])[:len(baseline.get("entries",[]))]!=baseline.get("entries",[]):add(fs,"E_INDEX_REWRITTEN","/index","claim index must preserve trusted baseline entries as an exact prefix")
@@ -72,9 +81,12 @@ def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs
  if owners is None:add(fs,"E_OWNER_REGISTRY_REQUIRED","/owners","canonical owner registry is required")
  predicates={}
  if compat is not None:
+  if not isinstance(compat,dict):add(fs,"E_TYPE","/compatibility","compatibility registry must be an object");compat={}
   req(compat,["schema_version","predicates"],fs,"/compatibility")
   if compat.get("schema_version")!="claim-compatibility/v1":add(fs,"E_SCHEMA_VERSION","/compatibility/schema_version","expected claim-compatibility/v1")
-  predicates={x.get("predicate_id"):x for x in compat.get("predicates",[]) if isinstance(x,dict) and isinstance(x.get("predicate_id"),str)}
+  values=compat.get("predicates",[])
+  if not isinstance(values,list):add(fs,"E_TYPE","/compatibility/predicates","predicates must be an array");values=[]
+  predicates={x.get("predicate_id"):x for x in values if isinstance(x,dict) and isinstance(x.get("predicate_id"),str)}
  seen=set();superseded=set()
  if not selected:add(fs,"E_CLAIM_SELECTION_REQUIRED","/claim_id","verification requires an explicit selected claim")
  elif not any(isinstance(r,dict) and r.get("claim_id")==selected for r in rows):add(fs,"E_CLAIM_SELECTION_UNKNOWN","/claim_id","selected claim is absent")
@@ -103,9 +115,6 @@ def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs
    canonical=claim_owners.get(cid)
    if not canonical or canonical!=r.get("owner_bead") or entry.get("owner_bead")!=canonical:add(fs,"E_CLAIM_OWNER_FORGED",p+"/owner_bead","claim owner differs from canonical owner registry",canonical or OWNER)
    if entry.get("claim_sha256")!=expected:add(fs,"E_CLAIM_HASH",p+"/claim_id","claim content differs from immutable index",entry.get("owner_bead",OWNER))
-   if entry.get("status") not in ("current","superseded"):add(fs,"E_INDEX_STATUS",p+"/claim_id","index status must be current or superseded")
-   elif (cid in superseded)!=(entry.get("status")=="superseded"):add(fs,"E_INDEX_SUPERSESSION",p+"/claim_id","index status must match retained supersession history")
-   if selected==cid and entry.get("status")!="current":add(fs,"E_CLAIM_SUPERSEDED",p+"/claim_id","selected index entry is superseded",r.get("owner_bead",OWNER))
   app=r.get("applicability");req(app,["mode","freshness"],fs,p+"/applicability")
   if selected!=cid:continue
   if isinstance(app,dict):
@@ -186,7 +195,7 @@ def validate_handoff(o,fs):
   if not isinstance(o.get(n),list):add(fs,"E_TYPE","/"+n,"expected array")
  ids(o.get("touched_ids"),fs,"/touched_ids",nonempty=False)
  if not isinstance(o.get("next_safe_command"),str) or not o["next_safe_command"].strip():add(fs,"E_NEXT_COMMAND","/next_safe_command","exact next safe command required")
- if o.get("hypotheses") and any(x in o.get("facts",[]) for x in o["hypotheses"]):add(fs,"E_HYPOTHESIS_PROMOTION","/facts","hypothesis cannot also be a fact")
+ if isinstance(o.get("hypotheses"),list) and isinstance(o.get("facts"),list) and any(x in o["facts"] for x in o["hypotheses"]):add(fs,"E_HYPOTHESIS_PROMOTION","/facts","hypothesis cannot also be a fact")
  intents=o.get("intents");req(intents,["active","ambiguous"],fs,"/intents");closed(intents,["active","ambiguous"],fs,"/intents")
  if isinstance(intents,dict) and intents.get("ambiguous") and not o.get("unsafe_repeats"):add(fs,"E_UNSAFE_REPEAT_REQUIRED","/unsafe_repeats","ambiguous effects require unsafe-repeat commands")
  for i,r in enumerate(o.get("log_references",[]) if isinstance(o.get("log_references"),list) else []):

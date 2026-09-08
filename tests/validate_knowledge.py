@@ -30,7 +30,7 @@ class Knowledge(unittest.TestCase):
    doc['claims'][0]['bindings'].pop('artifact_digest');p.write_text(json.dumps(doc));self.assertCode(run('claims',p,'--index',F/'claim-index.json','--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-EXACT','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_REQUIRED')
  def test_superseded_freshness_and_rewritten_history(self):
   doc=json.loads((F/'claims.json').read_text());doc['claims'][1]['supersedes']=['CLAIM-M0-KNOWLEDGE-EXACT'];doc['claims'][0]['applicability']={'mode':'exact','freshness':'fresh_until','fresh_until':'2025-01-01T00:00:00Z'}
-  idx=json.loads((F/'claim-index.json').read_text());idx['entries'][0]['status']='superseded'
+  idx=json.loads((F/'claim-index.json').read_text())
   for i,row in enumerate(doc['claims']):idx['entries'][i]['claim_sha256']=hashlib.sha256(json.dumps(row,sort_keys=True,separators=(',',':')).encode()).hexdigest()
   actual=json.loads((F/'actual-compatible.json').read_text())
   with tempfile.TemporaryDirectory(dir=R/'tests') as td:
@@ -67,8 +67,15 @@ class Knowledge(unittest.TestCase):
    p=Path(td)/'handoff.json'
    for bucket,result in (('completed','fail'),('failed','pass'),('stale','pass')):
     h=copy.deepcopy(base);h['checks'][bucket]=[{'command':'x','result':result,'digest':'1'*64}];p.write_text(json.dumps(h));self.assertCode(run('handoff',p),'E_CHECK_BUCKET')
-   for leak in ('/etc/boring/config','config=/etc/boring/private.json','mysql://host/db','raw payload bytes','driver error detail'):
+   for leak in ('/etc/boring/config','config=/etc/boring/private.json','inspect(/etc/boring/private.json)','root is /','tab\t/etc/private','mysql://host/db','raw payload bytes','driver error detail'):
     h=copy.deepcopy(base);h['observations']=[leak];p.write_text(json.dumps(h));self.assertCode(run('handoff',p),'E_SECRET')
+ def test_malformed_owned_documents_never_crash(self):
+  with tempfile.TemporaryDirectory(dir=R/'tests') as td:
+   p=Path(td)/'bad.json';p.write_text('[]')
+   for args in (("claims",F/'claims.json','--index',p,'--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-EXACT','--actual',F/'actual-exact.json'),("claims",F/'claims.json','--index',F/'claim-index.json','--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-COMPATIBLE','--actual',F/'actual-compatible.json','--compatibility',p),("handoff",p)):
+    cp=run(*args);self.assertNotEqual(cp.returncode,0);json.loads(cp.stdout);self.assertFalse(cp.stderr)
+   for field,value in (("hypotheses",7),("facts",7),("log_references",{}),("intents",[])):
+    h=json.loads((F/'handoff.json').read_text());h[field]=value;p.write_text(json.dumps(h));cp=run('handoff',p);self.assertNotEqual(cp.returncode,0);json.loads(cp.stdout);self.assertFalse(cp.stderr)
  def test_hostile_paths_and_determinism(self):
   for kind,name in (('handoff','handoff.json'),('findings','findings.jsonl')):
    raw=(F/name).read_text().replace('synthetic validator','/home/alice/private') if kind=='handoff' else (F/name).read_text().replace('Validator fails','token=abc Validator fails')
