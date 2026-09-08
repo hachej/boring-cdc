@@ -8,64 +8,79 @@
       "argv": "scripts/validate/test_core_validators.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-1.log 2>&1",
       "exit_code": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "4f2afc2d8c8d03dc9ed2259ccfab4838bf0d747fe5209fc9738263ea39c85355",
+      "stdout_sha256": "09d891ef279ee77c3624e793ccc9ab89af2bee5cd9395d92520bdbffc6aee9ab",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     },
     {
       "argv": "scripts/e2e/m0_validation_core.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-2.log 2>&1",
       "exit_code": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "9f714fdea258db73312e97af5d64e7e13376781abe64fe04f0bb57b7a847bfc1",
+      "stdout_sha256": "d0b08edfe964f2badb163d5ee8d9f8c6c34a5c2aa9a9eb9d034c41775b948b4b",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     },
     {
       "argv": "scripts/faults/m0_validation_core.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-3.log 2>&1",
       "exit_code": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "b9364da3a99a8a1d64feed344fe87f89f3dfd8bb759e54299e87348eecbc1ae5",
+      "stdout_sha256": "33447954cc827182059ca7773aa46769221895c28b74b956109df98479ff88af",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     },
     {
       "argv": "scripts/validate/test_core_validators.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-4.log 2>&1",
       "exit_code": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "704a96566c9d1f310bf9172a016d7fbba2a6343cec5bea1a72c3a22f0ffe6b30",
+      "stdout_sha256": "ee9efa418a214d7404ff88fd4bbd69dc30792e3c2d2087c1584b34b476da5362",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     },
     {
       "argv": "scripts/e2e/m0_validation_core.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-5.log 2>&1",
       "exit_code": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "9f714fdea258db73312e97af5d64e7e13376781abe64fe04f0bb57b7a847bfc1",
+      "stdout_sha256": "d0b08edfe964f2badb163d5ee8d9f8c6c34a5c2aa9a9eb9d034c41775b948b4b",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     },
     {
       "argv": "scripts/faults/m0_validation_core.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-6.log 2>&1",
       "exit_code": 0,
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_sha256": "b9364da3a99a8a1d64feed344fe87f89f3dfd8bb759e54299e87348eecbc1ae5",
+      "stdout_sha256": "eec54c74d493bf928363f6e410e62bab07a70974717fa6eeb7fdd50c07584956",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "component",
-  "git_commit": "63304e1dc20e8814a5a93c0f7f10fa22bf2d76ec",
+  "git_commit": "8618f75541ab719a21ca7492b754ec3e1cc83067",
   "owner_bead": "boring-cdc-m0.1",
   "redaction": {
     "checked": true,
     "secrets_found": 0
   },
   "result": {
-    "digest": "066cfc754a067f61385160bb0582512f04c6f6f284f75a2649c3213f34bc304b",
+    "digest": "0e2abd787541ae6216bb3c2af6b6fef7371e913f3af4317391f2472cc9bde85b",
     "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
     "status": "pass"
   },
   "scenario_id": "SCN-M0-CORE",
   "schema_version": "evidence/v1",
   "seed": "m0-core-v1",
   "source_preservation": {
-    "after_sha256": "dfcd5ec4ee0ab74fa0c04feeee31a3dbb80f194f2889847d3b5e5fef72e6e655",
-    "before_sha256": "dfcd5ec4ee0ab74fa0c04feeee31a3dbb80f194f2889847d3b5e5fef72e6e655",
+    "after_sha256": "4fbf381e722326efd0b3d7f77b14675671642c6a00ceedc2c962b91fe2998840",
+    "before_sha256": "4fbf381e722326efd0b3d7f77b14675671642c6a00ceedc2c962b91fe2998840",
     "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
   }
 }

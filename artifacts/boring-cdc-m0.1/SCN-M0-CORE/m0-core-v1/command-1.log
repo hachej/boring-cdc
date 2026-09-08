@@ -1,11 +1,15 @@
+test_close_guard_traverses_hierarchy_children_and_blockers (tests.validate_core_validators.Core.test_close_guard_traverses_hierarchy_children_and_blockers) ... ok
+test_complete_rejects_missing_inventories_declared_artifacts_and_hash_mismatch (tests.validate_core_validators.Core.test_complete_rejects_missing_inventories_declared_artifacts_and_hash_mismatch) ... ok
 test_empty_skeletons_valid_but_not_complete (tests.validate_core_validators.Core.test_empty_skeletons_valid_but_not_complete) ... ok
-test_evidence_profiles_tiers_redaction_and_cleanup (tests.validate_core_validators.Core.test_evidence_profiles_tiers_redaction_and_cleanup) ... ok
-test_graph_baseline_and_witness_mismatch (tests.validate_core_validators.Core.test_graph_baseline_and_witness_mismatch) ... ok
+test_evidence_profiles_tiers_redaction_cleanup_and_types (tests.validate_core_validators.Core.test_evidence_profiles_tiers_redaction_cleanup_and_types) ... ok
+test_graph_baseline_witness_and_source_isolation (tests.validate_core_validators.Core.test_graph_baseline_witness_and_source_isolation) ... ok
 test_invalid_reason_codes_and_determinism (tests.validate_core_validators.Core.test_invalid_reason_codes_and_determinism) ... ok
-test_real_decision_closure_fails_without_approvals (tests.validate_core_validators.Core.test_real_decision_closure_fails_without_approvals) ... ok
+test_owned_schemas_close_nested_object_shapes (tests.validate_core_validators.Core.test_owned_schemas_close_nested_object_shapes) ... ok
+test_runbook_unknown_stage_and_graph_leaf_orientation (tests.validate_core_validators.Core.test_runbook_unknown_stage_and_graph_leaf_orientation) ... ok
+test_symlink_parent_escape_and_missing_graph_are_stable_failures (tests.validate_core_validators.Core.test_symlink_parent_escape_and_missing_graph_are_stable_failures) ... ok
 test_valid_contracts (tests.validate_core_validators.Core.test_valid_contracts) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 4.528s
+Ran 10 tests in 5.453s
 
 OK
