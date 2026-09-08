@@ -117,6 +117,28 @@ class Core(unittest.TestCase):
                 first=run("decisions",valid/"decisions.json",*args); second=run("decisions",valid/"decisions.json",*args)
                 self.assertCode(first,"E_INVENTORY_ITEM"); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
 
+    def test_non_scalar_graph_dependency_ids_fail_as_stable_json(self):
+        with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
+            p=Path(td)/"graph.jsonl"
+            for value in ([], {}):
+                rows=[{"id":"root","status":"open","dependencies":[{"issue_id":"root","depends_on_id":value,"type":"blocks"}]}]
+                p.write_text("\n".join(map(json.dumps,rows))+"\n")
+                for invoke in (lambda: run("graph",p), lambda: close("root",p)):
+                    first=invoke(); second=invoke()
+                    self.assertCode(first,"E_ID_INVALID"); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
+
+    def test_safety_schemas_require_transition_ownership_and_log_correlation(self):
+        coverage=json.loads((ROOT/"contracts/coverage/plan-to-beads.schema.json").read_text())
+        assignment=coverage["properties"]["assignments"]["items"]
+        transition={"id":"TRANS-SYNTHETIC","source":"synthetic","evidence_status":"pending"}
+        self.assertTrue(transition["id"].startswith("TRANS-"))
+        self.assertIn("owner_bead",assignment["required"])
+        self.assertNotIn("owner_bead",transition)  # hostile unowned expected transition
+        log_schema=json.loads((ROOT/"contracts/common/structured-log.schema.json").read_text())
+        log={"schema_version":"structured-log/v1","level":"error","code":"E_SYNTHETIC","message":"redacted"}
+        self.assertIn("correlation_id",log_schema["required"])
+        self.assertNotIn("correlation_id",log)  # hostile correlation omission
+
     def test_symlink_parent_escape_and_missing_graph_are_stable_failures(self):
         with tempfile.TemporaryDirectory() as outside, tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
             outside_file=Path(outside)/"secret"; outside_file.write_text("secret")
@@ -136,6 +158,7 @@ class Core(unittest.TestCase):
             p.write_text(json.dumps(bogus)); cp=run("evidence",p)
             for code in ("E_EXIT_CODE","E_COMMAND_MISSING","E_GIT_OBJECT","E_DIGEST","E_RESULT_STATUS","E_RESULT_DIGEST","E_RUNTIME_PROVENANCE","E_TIER_PROOF"): self.assertCode(cp,code)
             external=evidence(evidence_profile="external_managed"); p.write_text(json.dumps(external)); self.assertCode(run("evidence",p),"E_EXTERNAL_PROVENANCE")
+            stale=evidence(git_commit="0b034abb0bd02144df8785305ec63caacd655c2a"); p.write_text(json.dumps(stale)); self.assertCode(run("evidence",p),"E_EVIDENCE_STALE")
             not_executable=evidence(); not_executable["commands"][0]["argv"]="tests/fixtures/m0-core/valid/empty.txt"; p.write_text(json.dumps(not_executable)); self.assertCode(run("evidence",p),"E_COMMAND_NOT_EXECUTABLE")
             release=evidence(evidence_tier="release"); release["tier_proof"].update({name:True for name in PROOF_FIELDS}); release["tier_proof"]["boundary_e2e"]=False
             p.write_text(json.dumps(release)); self.assertCode(run("evidence",p),"E_TIER_PROOF")

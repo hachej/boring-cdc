@@ -181,6 +181,8 @@ def validate_evidence(obj, findings, args):
         exists=subprocess.run(["git","cat-file","-e",commit+"^{commit}"],cwd=ROOT,capture_output=True).returncode==0
         ancestor=exists and subprocess.run(["git","merge-base","--is-ancestor",commit,"HEAD"],cwd=ROOT,capture_output=True).returncode==0
         if not exists or not ancestor: add(findings,"E_GIT_OBJECT","/git_commit","commit must exist and be an ancestor of the validating checkout")
+        elif subprocess.run(["git","diff","--quiet",commit+"..HEAD","--","contracts","scripts","tests"],cwd=ROOT).returncode != 0:
+            add(findings,"E_EVIDENCE_STALE","/git_commit","owned implementation, contract, or fixture paths changed after the evidence commit")
     cmds=obj.get("commands")
     if not isinstance(cmds,list) or not cmds: add(findings,"E_COMMANDS_REQUIRED","/commands","at least one command record is required")
     else:
@@ -291,6 +293,23 @@ def witness(path,findings):
             return json.loads(cp.stdout)["witness"]["root_hash"]
     except Exception as e: add(findings,"E_WITNESS","/",f"br witness unavailable: {type(e).__name__}"); return "0"*64
 
+def validated_edges(by, findings):
+    edges=[]
+    for issue,r in by.items():
+        dependencies=r.get("dependencies",[])
+        if not isinstance(dependencies,list): add(findings,"E_TYPE",f"/issues/{issue}/dependencies","dependencies must be an array"); continue
+        for j,d in enumerate(dependencies):
+            p=f"/issues/{issue}/dependencies/{j}"
+            if not isinstance(d,dict): add(findings,"E_EDGE_RECORD",p,"dependency must be an object"); continue
+            edge_owner=d.get("issue_id"); target=d.get("depends_on_id"); typ=d.get("type")
+            if not isinstance(edge_owner,str): add(findings,"E_ID_INVALID",p+"/issue_id","dependency issue_id must be a string")
+            elif edge_owner!=issue: add(findings,"E_EDGE_OWNER",p+"/issue_id","dependency issue_id differs from containing issue")
+            if not isinstance(target,str): add(findings,"E_ID_INVALID",p+"/depends_on_id","dependency target ID must be a string")
+            elif target not in by: add(findings,"E_EDGE_DANGLING",p+"/depends_on_id",f"missing issue: {target}")
+            if not isinstance(typ,str) or typ not in ("blocks","parent-child","related","discovered-from"): add(findings,"E_EDGE_TYPE",p+"/type","unknown dependency type")
+            if isinstance(target,str) and isinstance(typ,str): edges.append((issue,target,typ))
+    return edges
+
 def validate_graph(path, findings, args):
     rows,raw=parse_jsonl(path,findings); by={}
     for i,r in enumerate(rows):
@@ -303,18 +322,7 @@ def validate_graph(path, findings, args):
         for extra in sorted(set(by)-set(baseline)): add(findings,"E_GRAPH_EXTRA",f"/issues/{extra}","unexpected record in captured graph")
         for stale in sorted(set(by)&set(baseline)):
             if by[stale] != baseline[stale]: add(findings,"E_GRAPH_STALE",f"/issues/{stale}","record differs from baseline across one or more fields")
-    edges=[]
-    for issue,r in by.items():
-        dependencies=r.get("dependencies",[])
-        if not isinstance(dependencies,list): add(findings,"E_TYPE",f"/issues/{issue}/dependencies","dependencies must be an array"); continue
-        for j,d in enumerate(dependencies):
-            p=f"/issues/{issue}/dependencies/{j}"
-            if not isinstance(d,dict): add(findings,"E_EDGE_RECORD",p,"dependency must be an object"); continue
-            if d.get("issue_id")!=issue: add(findings,"E_EDGE_OWNER",p+"/issue_id","dependency issue_id differs from containing issue")
-            target=d.get("depends_on_id"); typ=d.get("type")
-            if target not in by: add(findings,"E_EDGE_DANGLING",p+"/depends_on_id",f"missing issue: {target}")
-            if typ not in ("blocks","parent-child","related","discovered-from"): add(findings,"E_EDGE_TYPE",p+"/type","unknown dependency type")
-            edges.append((issue,target,typ))
+    edges=validated_edges(by,findings)
     for kind in ("blocks","parent-child"):
         graph={x:[] for x in by}
         for a,b,t in edges:

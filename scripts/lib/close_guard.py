@@ -2,6 +2,7 @@
 """Fail closed unless a root, all hierarchy descendants, and prerequisites are closed."""
 import hashlib, json, sys
 from pathlib import Path
+from core_validator import validated_edges
 
 OWNER = "boring-cdc-m0.1"
 
@@ -45,19 +46,9 @@ def main():
         findings.append(finding("E_ROOT_MISSING", "/root", f"missing root {root}"))
     children = {issue: [] for issue in by}
     prerequisites = {issue: [] for issue in by}
-    for issue, row in by.items():
-        deps = row.get("dependencies", [])
-        if not isinstance(deps, list):
-            findings.append(finding("E_TYPE", f"/issues/{issue}/dependencies", "dependencies must be an array")); continue
-        for index, dep in enumerate(deps):
-            pointer = f"/issues/{issue}/dependencies/{index}"
-            if not isinstance(dep, dict):
-                findings.append(finding("E_EDGE_RECORD", pointer, "dependency must be an object")); continue
-            target, kind = dep.get("depends_on_id"), dep.get("type")
-            if target not in by:
-                findings.append(finding("E_EDGE_DANGLING", pointer + "/depends_on_id", f"missing issue: {target}")); continue
-            if kind == "blocks": prerequisites[issue].append(target)
-            elif kind == "parent-child": children[target].append(issue)
+    for issue, target, kind in validated_edges(by, findings):
+        if kind == "blocks" and target in by: prerequisites[issue].append(target)
+        elif kind == "parent-child" and target in by: children[target].append(issue)
     stack, checked = [root], set()
     while stack:
         issue = stack.pop()

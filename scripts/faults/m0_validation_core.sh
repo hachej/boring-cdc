@@ -17,6 +17,9 @@ expect E_CLOSE_BLOCKED scripts/validate/close_guard.sh synthetic-root tests/fixt
 # reordered input, and hierarchy-child closure.
 python3 -m unittest -q \
  tests.validate_core_validators.Core.test_complete_rejects_missing_inventories_declared_artifacts_and_hash_mismatch \
+ tests.validate_core_validators.Core.test_non_scalar_ids_and_inventory_entries_fail_as_stable_json \
+ tests.validate_core_validators.Core.test_non_scalar_graph_dependency_ids_fail_as_stable_json \
+ tests.validate_core_validators.Core.test_safety_schemas_require_transition_ownership_and_log_correlation \
  tests.validate_core_validators.Core.test_symlink_parent_escape_and_missing_graph_are_stable_failures \
  tests.validate_core_validators.Core.test_evidence_profiles_tiers_redaction_cleanup_and_types \
  tests.validate_core_validators.Core.test_runbook_unknown_stage_and_graph_leaf_orientation \
