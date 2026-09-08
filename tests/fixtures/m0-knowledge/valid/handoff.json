@@ -1,0 +1,51 @@
+{
+  "base_sha": "1111111111111111111111111111111111111111",
+  "bead_id": "boring-cdc-m0.3",
+  "changed_paths": [
+    "contracts/agent/claims.schema.json"
+  ],
+  "checks": {
+    "completed": [
+      {
+        "command": "synthetic validator",
+        "digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "result": "pass"
+      }
+    ],
+    "failed": [],
+    "stale": []
+  },
+  "dirty": {
+    "is_dirty": false,
+    "paths": []
+  },
+  "facts": [
+    "synthetic exact claim passes"
+  ],
+  "head_sha": "1111111111111111111111111111111111111111",
+  "hypotheses": [
+    "aggregate compatibility remains downstream"
+  ],
+  "intents": {
+    "active": [],
+    "ambiguous": []
+  },
+  "log_references": [],
+  "next_safe_command": "scripts/validate/test_knowledge.sh m0-knowledge-v1",
+  "observations": [
+    "validator output is deterministic"
+  ],
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "risks": [],
+  "schema_version": "handoff/v1",
+  "touched_ids": [
+    "CLAIM-M0-KNOWLEDGE-EXACT"
+  ],
+  "unsafe_repeats": [
+    "do not treat absent index as success"
+  ],
+  "world_state_digest": "2222222222222222222222222222222222222222222222222222222222222222"
+}

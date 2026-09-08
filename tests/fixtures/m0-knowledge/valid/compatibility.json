@@ -1,0 +1,14 @@
+{
+  "predicates": [
+    {
+      "allowed_values": {
+        "profile_digest": [
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      },
+      "owner_bead": "boring-cdc-m0.3",
+      "predicate_id": "PRED-PROFILE-COMPATIBLE"
+    }
+  ],
+  "schema_version": "claim-compatibility/v1"
+}

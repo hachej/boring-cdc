@@ -1,0 +1,72 @@
+{
+  "claims": [
+    {
+      "applicability": {
+        "freshness": "timeless",
+        "mode": "exact"
+      },
+      "bindings": {
+        "artifact_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "binary_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "code_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+        "command_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "config_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+        "effective_contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "environment_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "fixture_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+        "git_commit": "1111111111111111111111111111111111111111",
+        "graph_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "image_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+        "profile_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "redaction_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "result_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "seed_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "claim_id": "CLAIM-M0-KNOWLEDGE-EXACT",
+      "owner_bead": "boring-cdc-m0.3",
+      "rerun": {
+        "command": "scripts/validate/test_knowledge.sh m0-knowledge-v1",
+        "owner_bead": "boring-cdc-m0.3"
+      },
+      "scenario_ids": [
+        "SCN-M0-KNOWLEDGE"
+      ],
+      "supersedes": []
+    },
+    {
+      "applicability": {
+        "freshness": "timeless",
+        "mode": "compatible",
+        "predicate_id": "PRED-PROFILE-COMPATIBLE"
+      },
+      "bindings": {
+        "artifact_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "binary_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "code_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+        "command_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "config_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+        "effective_contract_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "environment_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "fixture_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+        "git_commit": "1111111111111111111111111111111111111111",
+        "graph_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "image_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+        "profile_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "redaction_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "result_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "seed_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "claim_id": "CLAIM-M0-KNOWLEDGE-COMPATIBLE",
+      "owner_bead": "boring-cdc-m0.3",
+      "rerun": {
+        "command": "scripts/validate/test_knowledge.sh m0-knowledge-v1",
+        "owner_bead": "boring-cdc-m0.3"
+      },
+      "scenario_ids": [
+        "SCN-M0-KNOWLEDGE"
+      ],
+      "supersedes": []
+    }
+  ],
+  "schema_version": "claims/v1"
+}

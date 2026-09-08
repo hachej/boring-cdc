@@ -1,0 +1,187 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/agent/claims.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "claims": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "applicability": {
+            "additionalProperties": false,
+            "properties": {
+              "fresh_until": {
+                "type": "string"
+              },
+              "freshness": {
+                "enum": [
+                  "timeless",
+                  "fresh_until"
+                ]
+              },
+              "mode": {
+                "enum": [
+                  "exact",
+                  "compatible"
+                ]
+              },
+              "predicate_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "mode",
+              "freshness"
+            ],
+            "type": "object"
+          },
+          "bindings": {
+            "additionalProperties": false,
+            "properties": {
+              "artifact_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "binary_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "code_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "command_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "config_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "effective_contract_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "environment_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "fixture_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "git_commit": {
+                "pattern": "^[0-9a-f]{40}$",
+                "type": "string"
+              },
+              "graph_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "image_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "profile_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "redaction_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "result_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "seed_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "git_commit",
+              "graph_digest",
+              "effective_contract_digest",
+              "code_digest",
+              "binary_digest",
+              "fixture_digest",
+              "image_digest",
+              "config_digest",
+              "profile_digest",
+              "seed_digest",
+              "environment_digest",
+              "command_digest",
+              "result_digest",
+              "artifact_digest",
+              "redaction_digest"
+            ],
+            "type": "object"
+          },
+          "claim_id": {
+            "pattern": "^CLAIM-[A-Z0-9-]+$",
+            "type": "string"
+          },
+          "owner_bead": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "rerun": {
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "owner_bead": {
+                "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "owner_bead",
+              "command"
+            ],
+            "type": "object"
+          },
+          "scenario_ids": {
+            "items": {
+              "pattern": "^SCN-[A-Z0-9-]+$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "supersedes": {
+            "items": {
+              "pattern": "^CLAIM-[A-Z0-9-]+$",
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "claim_id",
+          "owner_bead",
+          "scenario_ids",
+          "bindings",
+          "applicability",
+          "supersedes",
+          "rerun"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "claims/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "claims"
+  ],
+  "type": "object"
+}
