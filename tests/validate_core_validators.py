@@ -130,9 +130,10 @@ class Core(unittest.TestCase):
     def test_agent_schema_keyword_corpus_rejects_malformed_instances(self):
         schema=ROOT/"contracts/agent/context-pack.schema.json"
         emitted=subprocess.run([str(ROOT/"scripts/agent/context"),"boring-cdc-m0.2","--profile","review","--observed-at","2026-01-01T00:00:00Z"],cwd=ROOT,text=True,capture_output=True,check=True)
+        orient=json.loads(subprocess.run([str(ROOT/"scripts/agent/context"),"boring-cdc-m0.2","--profile","orient","--observed-at","2026-01-01T00:00:00Z"],cwd=ROOT,text=True,capture_output=True,check=True).stdout);orientation=next(a for a in orient["attachments"] if a["name"]=="orientation")
         with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
             p=Path(td)/"pack.json";valid=json.loads(emitted.stdout);p.write_text(json.dumps(valid));self.assertEqual(run("schema",p,"--schema",schema).returncode,0)
-            mutations=[("E_SCHEMA_MINIMUM",lambda x:x.update(summary_bytes=-1)),("E_SCHEMA_MIN_PROPERTIES",lambda x:x.update(source_digests={})),("E_SCHEMA_UNIQUE_ITEMS",lambda x:x.update(included_ids=["REQ-X","REQ-X"])),("E_SCHEMA_ONE_OF",lambda x:x.update(profile="handoff")),("E_SCHEMA_ADDITIONAL_PROPERTY",lambda x:x["effective_contract"]["task"].update(unknown="x"))]
+            mutations=[("E_SCHEMA_MINIMUM",lambda x:x.update(summary_bytes=-1)),("E_SCHEMA_MIN_PROPERTIES",lambda x:x.update(source_digests={})),("E_SCHEMA_UNIQUE_ITEMS",lambda x:x.update(included_ids=["REQ-X","REQ-X"])),("E_SCHEMA_ONE_OF",lambda x:x.update(profile="handoff")),("E_SCHEMA_ONE_OF",lambda x:x["attachments"].append(orientation)),("E_SCHEMA_ADDITIONAL_PROPERTY",lambda x:x["effective_contract"]["task"].update(unknown="x"))]
             for code,mutate in mutations:
                 bad=json.loads(json.dumps(valid));mutate(bad);p.write_text(json.dumps(bad));self.assertCode(run("schema",p,"--schema",schema),code)
 

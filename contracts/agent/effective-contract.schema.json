@@ -259,7 +259,6 @@
         "status",
         "priority",
         "issue_type",
-        "owner",
         "created_at",
         "created_by",
         "updated_at",

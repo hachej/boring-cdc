@@ -47,6 +47,9 @@ class ContextTests(unittest.TestCase):
   for profile in ['orient','implement','review','handoff']:
    _,x=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--profile',profile,'--observed-at','2026-01-01T00:00:00Z');names[profile]={a['name'] for a in x['attachments']};self.assertEqual(x['total_bytes'],len(ac.canonical(x).encode()));self.assertEqual(x['token_estimate'],(x['total_bytes']+3)//4)
   self.assertIn('orientation',names['orient']);self.assertIn('dependency_outputs',names['implement']);self.assertIn('review_diff',names['review']);self.assertIn('handoff_state',names['handoff'])
+ def test_ownerless_selected_bead_is_valid_for_every_profile(self):
+  self.assertNotIn('owner',next(r for r in ac.rows() if r['id']=='boring-cdc-m0.7'))
+  for profile in ['orient','implement','review','handoff']:self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.7','--profile',profile,'--observed-at','2026-01-01T00:00:00Z')
  def test_review_and_handoff_bind_full_selected_bead_range(self):
   _,review=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--profile','review','--observed-at','2026-01-01T00:00:00Z')
   content=next(a['content'] for a in review['attachments'] if a['name']=='review_diff');state=content['implementation_range']
@@ -79,6 +82,8 @@ class ContextTests(unittest.TestCase):
   for value,schema,keyword in malformed:self.assertTrue(any(keyword in e for e in ac.schema_errors(value,schema)))
   _,pack=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--profile','review','--observed-at','2026-01-01T00:00:00Z')
   bad=json.loads(json.dumps(pack));bad['profile']='handoff'
+  with self.assertRaisesRegex(SystemExit,'E_CONTEXT_SCHEMA'):ac.validate_pack(bad)
+  bad=json.loads(json.dumps(pack));bad['attachments'].append({'name':'orientation','complete':True,'bytes':2,'content':{}})
   with self.assertRaisesRegex(SystemExit,'E_CONTEXT_SCHEMA'):ac.validate_pack(bad)
   bad=json.loads(json.dumps(pack));bad['effective_contract']['task']['unknown']='x'
   with self.assertRaisesRegex(SystemExit,'E_CONTEXT_SCHEMA'):ac.validate_pack(bad)
