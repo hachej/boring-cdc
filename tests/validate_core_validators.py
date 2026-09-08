@@ -71,6 +71,12 @@ class Core(unittest.TestCase):
             approval=json.loads((valid/"decisions.json").read_text()); approval["decisions"][0]["approval"].update({"approved_by":"","approved_at":"","extra":"x"}); p.write_text(json.dumps(approval))
             cp=run("decisions",p,"--owners",valid/"owners.json","--fixtures",valid/"fixtures.json","--executors",valid/"executors.json")
             self.assertCode(cp,"E_UNRESOLVED"); self.assertCode(cp,"E_UNKNOWN_FIELD")
+            p.write_text('{"schema_version":"m0-decisions/v1","decisions":[{}]}')
+            cp=run("decisions",p,"--complete","--owners",valid/"owners.json","--fixtures",valid/"fixtures.json","--executors",valid/"executors.json","--expected-decisions",valid/"expected-decisions.json")
+            self.assertCode(cp,"E_REQUIRED"); self.assertCode(cp,"E_DECISION_MISSING")
+            p.write_text('{"schema_version":"m0-artifacts/v1","artifacts":[{}]}')
+            cp=run("artifacts",p,"--complete","--expected-artifacts",valid/"expected-artifacts.json")
+            self.assertCode(cp,"E_REQUIRED"); self.assertCode(cp,"E_ARTIFACT_MISSING")
 
     def test_invalid_reason_codes_and_determinism(self):
         bad=F/"invalid"; cases=[(("decisions",bad/"decisions-duplicate.json"),"E_DUPLICATE_ID"),(("artifacts",bad/"artifact-traversal.json"),"E_PATH_TRAVERSAL"),(("runbooks",bad/"runbook-gap.json"),"E_PROCEDURE_GAP"),(("graph",bad/"graph-cycle.jsonl"),"E_GRAPH_CYCLE"),(("artifacts",bad/"duplicate-key.json"),"E_DUPLICATE_KEY")]
@@ -97,6 +103,7 @@ class Core(unittest.TestCase):
             p.write_text(json.dumps(bogus)); cp=run("evidence",p)
             for code in ("E_EXIT_CODE","E_COMMAND_MISSING","E_GIT_OBJECT","E_DIGEST","E_RESULT_STATUS","E_RESULT_DIGEST","E_RUNTIME_PROVENANCE","E_TIER_PROOF"): self.assertCode(cp,code)
             external=evidence(evidence_profile="external_managed"); p.write_text(json.dumps(external)); self.assertCode(run("evidence",p),"E_EXTERNAL_PROVENANCE")
+            not_executable=evidence(); not_executable["commands"][0]["argv"]="tests/fixtures/m0-core/valid/empty.txt"; p.write_text(json.dumps(not_executable)); self.assertCode(run("evidence",p),"E_COMMAND_NOT_EXECUTABLE")
             release=evidence(evidence_tier="release"); release["tier_proof"].update({name:True for name in PROOF_FIELDS}); release["tier_proof"]["boundary_e2e"]=False
             p.write_text(json.dumps(release)); self.assertCode(run("evidence",p),"E_TIER_PROOF")
 

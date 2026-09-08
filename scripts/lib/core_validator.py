@@ -138,7 +138,7 @@ def validate_decisions(obj, findings, args):
         for option in ("owners", "fixtures", "executors", "expected_decisions"):
             if not getattr(args, option): add(findings,"E_INVENTORY_REQUIRED",f"/{option}",f"--complete requires --{option.replace('_','-')} inventory")
         expected=inventory(args.expected_decisions,findings,"expected_decisions") if args.expected_decisions else set()
-        actual={r.get("id") for r in rows if isinstance(r,dict)}
+        actual={r.get("id") for r in rows if isinstance(r,dict) and isinstance(r.get("id"),str)}
         for missing in sorted(expected-actual): add(findings,"E_DECISION_MISSING",f"/decisions/{missing}","required decision is absent")
         for extra in sorted(actual-expected): add(findings,"E_DECISION_EXTRA",f"/decisions/{extra}","decision is absent from expected inventory")
         for i,r in enumerate(rows):
@@ -162,7 +162,7 @@ def validate_artifacts(obj, findings, args):
         if not rows: add(findings,"E_ARTIFACTS_EMPTY","/artifacts","empty skeleton cannot satisfy aggregate completeness")
         if not args.expected_artifacts: add(findings,"E_INVENTORY_REQUIRED","/expected_artifacts","--complete requires --expected-artifacts inventory")
         expected=inventory(args.expected_artifacts,findings,"expected_artifacts") if args.expected_artifacts else set()
-        actual={r.get("id") for r in rows if isinstance(r,dict)}
+        actual={r.get("id") for r in rows if isinstance(r,dict) and isinstance(r.get("id"),str)}
         for missing in sorted(expected-actual): add(findings,"E_ARTIFACT_MISSING",f"/artifacts/{missing}","required artifact is absent")
         for extra in sorted(actual-expected): add(findings,"E_ARTIFACT_EXTRA",f"/artifacts/{extra}","artifact is absent from expected inventory")
         for i,r in enumerate(rows):
@@ -190,8 +190,13 @@ def validate_evidence(obj, findings, args):
                 check_unknown(c,required,findings,p); check_unresolved(c.get("argv"),p+"/argv",findings); check_unresolved(c.get("version"),p+"/version",findings)
                 if type(c.get("exit_code")) is not int: add(findings,"E_EXIT_CODE",p+"/exit_code","exit_code must be an integer")
                 executable=str(c.get("argv","")).split()[0] if str(c.get("argv","")).split() else ""
-                if "/" in executable: safe_path(executable,p+"/argv",findings,must_exist=True)
-                elif executable and shutil.which(executable) is None: add(findings,"E_COMMAND_MISSING",p+"/argv",f"command executable not found: {executable}")
+                if "/" in executable:
+                    command_path=safe_path(executable,p+"/argv",findings,must_exist=True)
+                    if command_path and command_path.is_file() and not os.access(command_path,os.X_OK): add(findings,"E_COMMAND_NOT_EXECUTABLE",p+"/argv",f"command is not executable: {executable}")
+                elif executable:
+                    resolved_command=shutil.which(executable)
+                    if resolved_command is None: add(findings,"E_COMMAND_MISSING",p+"/argv",f"command executable not found: {executable}")
+                    elif not os.access(resolved_command,os.X_OK): add(findings,"E_COMMAND_NOT_EXECUTABLE",p+"/argv",f"command is not executable: {executable}")
                 for stream in ("stdout","stderr"):
                     key=stream+"_sha256"; target=safe_path(c.get(stream+"_path"),p+"/"+stream+"_path",findings,must_exist=True)
                     if not SHA256.fullmatch(str(c.get(key,""))): add(findings,"E_DIGEST",p+"/"+key,"expected lowercase sha256")
