@@ -5,12 +5,51 @@
   "properties": {
     "assignments": {
       "items": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_status": {
+            "const": "pending"
+          },
+          "id": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "owner_bead": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "source_anchor": {
+            "type": "string"
+          },
+          "source_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "source_excerpt": {
+            "type": "string"
+          },
+          "source_locator": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          }
+        },
         "required": [
           "id",
+          "namespace",
           "owner_bead",
           "source",
+          "source_locator",
           "source_digest",
-          "evidence_status"
+          "source_excerpt",
+          "source_anchor",
+          "evidence_status",
+          "summary"
         ],
         "type": "object"
       },

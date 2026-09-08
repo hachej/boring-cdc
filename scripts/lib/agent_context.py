@@ -65,6 +65,9 @@ def duplicate_ids(es):
 def validate():
  reg=registry();graph=rows();by={r.get('id'):r for r in graph};f=[]
  if reg.get('schema_version')!='stable-registry/v1':f.append(['E_SCHEMA_VERSION','/schema_version'])
+ raw='\n'.join(f"{e.get('id')}\0{e.get('owner_bead')}\0{e.get('source')}\0{e.get('source_digest')}" for e in reg.get('entries',[])).encode()
+ expected_inventory=json.loads((ROOT/'contracts/agent/stable-ids.schema.json').read_text())['properties']['inventory_digest']['const']
+ if digest_bytes(raw)!=reg.get('inventory_digest') or reg.get('inventory_digest')!=expected_inventory:f.append(['E_INVENTORY_DIGEST','/inventory_digest'])
  expected={'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':120,'REL':33,'RISK':38,'RUNBOOK':0,'CLAIM':0,'FINDING':0}
  counts={k:sum(e.get('namespace')==k for e in reg.get('entries',[])) for k in expected}
  for k,want in expected.items():
@@ -78,7 +81,8 @@ def validate():
   if own not in by:f.append(['E_OWNER_DANGLING',str(own)])
   if e.get('evidence_status')!='pending':f.append(['E_EVIDENCE_NOT_PENDING',str(ident)])
   source=e.get('source');excerpt=e.get('source_excerpt');sp=safe_path(source) if isinstance(source,str) else None
-  if not isinstance(excerpt,str) or not sp or not sp.is_file() or excerpt not in sp.read_text() or digest_bytes(excerpt.encode())!=e.get('source_digest'):f.append(['E_SOURCE_FRAGMENT',str(ident)])
+  anchor=e.get('source_anchor');locator=e.get('source_locator','');text=sp.read_text() if sp and sp.is_file() else ''
+  if not isinstance(excerpt,str) or not isinstance(anchor,str) or text.count(anchor)!=1 or excerpt not in anchor or digest_bytes(anchor.encode())!=e.get('source_digest') or not locator.endswith(digest_bytes(anchor.encode())[:12]):f.append(['E_SOURCE_FRAGMENT',str(ident)])
  f += [['E_SOURCE_CONFLICT',x['source']] for x in source_conflicts(reg)]
  covp=ROOT/'contracts/coverage/plan-to-beads.json';cov=json.loads(covp.read_text())
  if {(e['id'],e['owner_bead'],e['source_digest']) for e in reg['entries']}!={(e.get('id'),e.get('owner_bead'),e.get('source_digest')) for e in cov.get('assignments',[])}:f.append(['E_COVERAGE_DRIFT',str(covp.relative_to(ROOT))])
@@ -104,9 +108,39 @@ def profile_attachments(profile,bead,by,reg):
  base=[{'name':'dependency_outputs','complete':True,'content':[by[x] for x in direct]},{'name':'consumed_canonical_rows','complete':True,'content':[e for e in reg['entries'] if e['owner_bead'] in direct]}]
  if profile=='orient':return [{'name':'charter','complete':True,'content':(ROOT/'README.md').read_text()},{'name':'agent_rules','complete':True,'content':(ROOT/'AGENTS.md').read_text()},{'name':'orientation','complete':True,'content':{'health':'authority validation passed','current_milestone':'M0','blockers':direct,'status':by[bead].get('status'),'ready_candidates':[r['id'] for r in by.values() if r.get('status')=='open' and not r.get('assignee') and all(by.get(d.get('depends_on_id'),{}).get('status')=='closed' for d in r.get('dependencies',[]) if d.get('type')=='blocks')] }}]
  if profile=='implement':return base
- if profile=='review':return base+[{'name':'review_diff','complete':True,'content':run('git','show','--format=','--binary','HEAD').stdout},{'name':'impacted_consumers','complete':True,'content':reverse}]
- return base+[{'name':'handoff_state','complete':True,'content':{'changed_paths':dirty_state()[0],'checks':{'authority':'pass','claim_index':'pending_unavailable'},'evidence':{'status':'pending','reuse':False},'decisions':[],'risks':['revalidate world-state before mutation'],'unsafe_repeats':['do not claim, commit, push, or mutate from this reader'],'next_safe_command':f'scripts/agent/context {bead} --profile implement','consumers':reverse}}]
+ if profile=='review':return base+[{'name':'review_diff','complete':True,'content':run('git','show','--format=','--binary','HEAD').stdout},{'name':'impacted_consumers','complete':True,'content':reverse},{'name':'invalidated_claims','complete':True,'content':{'status':'pending_unavailable','reusable':False}}]
+ return base+[{'name':'handoff_state','complete':True,'content':{'base_sha':run('git','rev-parse','HEAD^').stdout.strip(),'head_sha':run('git','rev-parse','HEAD').stdout.strip(),'changed_paths':dirty_state()[0],'stable_ids_touched':[e['id'] for e in reg['entries'] if e['owner_bead']==bead],'checks':{'completed':['authority','schema','source-linkage'],'failed':[],'stale':['claim-index unavailable']},'evidence':{'status':'pending','reuse':False},'decisions':[],'facts':['pack derived from captured Git/Beads sources'],'observations':[],'hypotheses':[],'active_external_intents':[],'blockers':direct,'redaction':{'checked':True,'secrets_found':0},'risks':['revalidate world-state before mutation'],'unsafe_repeats':['do not claim, commit, push, or mutate from this reader'],'next_safe_command':f'scripts/agent/context {bead} --profile implement','consumers':reverse}}]
+def schema_errors(instance,schema,base=ROOT/'contracts/agent',pointer=''):
+ if '$ref' in schema:
+  ref=schema['$ref']
+  if '://' in ref: return ['external ref forbidden']
+  return schema_errors(instance,json.loads((base/ref).read_text()),base,pointer)
+ errors=[];kind=schema.get('type');ok={'object':lambda x:isinstance(x,dict),'array':lambda x:isinstance(x,list),'string':lambda x:isinstance(x,str),'integer':lambda x:type(x)is int,'boolean':lambda x:type(x)is bool,'null':lambda x:x is None}
+ kinds=kind if isinstance(kind,list) else [kind] if kind else []
+ if kinds and not any(k in ok and ok[k](instance) for k in kinds):return [pointer+':type']
+ if 'const' in schema and instance!=schema['const']:errors.append(pointer+':const')
+ if 'enum' in schema and instance not in schema['enum']:errors.append(pointer+':enum')
+ if isinstance(instance,str):
+  if schema.get('minLength',0)>len(instance):errors.append(pointer+':minLength')
+  if schema.get('pattern') and not re.search(schema['pattern'],instance):errors.append(pointer+':pattern')
+ if isinstance(instance,int) and 'maximum' in schema and instance>schema['maximum']:errors.append(pointer+':maximum')
+ if isinstance(instance,dict):
+  props=schema.get('properties',{})
+  for k in schema.get('required',[]):
+   if k not in instance:errors.append(pointer+'/'+k+':required')
+  for k,v in instance.items():
+   if k in props:errors+=schema_errors(v,props[k],base,pointer+'/'+k)
+   elif schema.get('additionalProperties') is False:errors.append(pointer+'/'+k+':additional')
+   elif isinstance(schema.get('additionalProperties'),dict):errors+=schema_errors(v,schema['additionalProperties'],base,pointer+'/'+k)
+ if isinstance(instance,list):
+  if len(instance)<schema.get('minItems',0):errors.append(pointer+':minItems')
+  if schema.get('uniqueItems') and len({canonical(x) for x in instance})!=len(instance):errors.append(pointer+':uniqueItems')
+  if isinstance(schema.get('items'),dict):
+   for i,v in enumerate(instance):errors+=schema_errors(v,schema['items'],base,pointer+'/'+str(i))
+ return errors
 def validate_pack(pack):
+ schema=json.loads((ROOT/'contracts/agent/context-pack.schema.json').read_text());errors=schema_errors(pack,schema)
+ if errors:raise SystemExit('E_CONTEXT_SCHEMA:'+','.join(errors[:5]))
  required={'schema_version','profile','world_state','summary','summary_bytes','total_bytes','token_estimate','included_ids','omitted_ids','attachments','expansion_plan','source_digests','effective_contract'}
  if set(pack)!=required or pack['schema_version']!='context-pack/v1':raise SystemExit('E_CONTEXT_SCHEMA')
  if pack['summary_bytes']!=len(pack['summary'].encode()) or pack['summary_bytes']>LIMIT:raise SystemExit('E_CONTEXT_BUDGET')
@@ -139,8 +173,8 @@ def changed_rows(reg,affected):
  for e in affected:
   if e['source'] not in cache:
    p=safe_path(e['source']);cache[e['source']]=p.read_text() if p.is_file() else ''
-  excerpt=e.get('source_excerpt','')
-  if excerpt not in cache[e['source']] or digest_bytes(excerpt.encode())!=e.get('source_digest'):changed.add(e['id'])
+  anchor=e.get('source_anchor','')
+  if cache[e['source']].count(anchor)!=1 or digest_bytes(anchor.encode())!=e.get('source_digest'):changed.add(e['id'])
  return changed
 def cmd_impact(a):
  reg=registry();rs=rows();by={r['id']:r for r in rs};target=a.target

@@ -1,1 +1,45 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://boring-cdc.dev/contracts/agent/generated-view.schema.json","title":"Generated view provenance","type":"object","additionalProperties":false,"required":["schema_version","generator","sources","source_digests","generated_digest","editable"],"properties":{"schema_version":{"const":"generated-view/v1"},"generator":{"type":"string"},"sources":{"type":"array"},"source_digests":{"type":"object"},"generated_digest":{"type":"string"},"editable":{"const":false}}}
+{
+  "$id": "https://boring-cdc.dev/contracts/agent/generated-view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "editable": {
+      "const": false
+    },
+    "generated_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "generator": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "generated-view/v1"
+    },
+    "source_digests": {
+      "additionalProperties": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minProperties": 1,
+      "type": "object"
+    },
+    "sources": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "generator",
+    "sources",
+    "source_digests",
+    "generated_digest",
+    "editable"
+  ],
+  "title": "Generated view provenance",
+  "type": "object"
+}

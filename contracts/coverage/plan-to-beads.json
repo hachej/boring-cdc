@@ -5,2926 +5,2926 @@
       "id": "CMD-ARCHIVE-RECONSTRUCT-DESTINATION-SELECTOR-FENCE-FENCE-OUTPUT",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "cb9ef33d8afcc3b70cd7a95348a12b18110840b91723e3c02473d899143c643f"
+      "source_digest": "b685739c1ab93a62eea3300cab2fadc525e622c7a52b4eede026e91cd8a409ee"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-ARCHIVE-VERIFY-DESTINATION-SELECTOR-FENCE-FENCE-ORACLE",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "ae69e984fb0997f1387077b52296f51deee1e625e8dfac96d6f87e8f71e48e59"
+      "source_digest": "71ff6f289c8e2053eb0e3ceea518d540853cc92c95ae3fe5b6b1b2a482b2c834"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-BACKFILL-RESTART-CONFIRM",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "2d40ad5242a86b75c6f54e3a4165e02e542c6e4c29ecef72c7ed0230b0e94f11"
+      "source_digest": "2a281b44308abf97dfb22682ce35944b25e8137c39e94b5a1cf3551d648a6cb1"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-BACKFILL-START-PAUSE-RESUME-STATUS",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "6f714c82ecf24de305cd3806a422098fb43e38dbba51f8f9dcf6ebb94d5217a4"
+      "source_digest": "b858d7448fcc008043d2a3da86c6f541b8e15e717e9298ed7d9d12ec3bf65893"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-CHECK",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "3044ffc63373358c961330faff25ab169b07ae9a7b3e636a9663e0085326a63a"
+      "source_digest": "f452dc9ea7c9c8d2c89513325af3ba74cb7ddb63cfc0dcf03ae22d9964cc4dc5"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-DESTINATION-ADD-NEWDESTINATION-ARCHIVE-ROOT-PATH-CONTINUITY",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "edbce39a6e813c871fd89b1d950cf9559bfdbbe98e0613dc6d12d765c40d68f8"
+      "source_digest": "ff3c4dcf48debf2b42707fc3a654c7d20ce78bc43366161117530566766adef9"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-DESTINATION-ADD-NEWDESTINATION-ARCHIVE-ROOT-PATH-CONTINUITY-2",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "968c6da1a9c66e8b39ff03cc528293a56b805baa9b5606d433ed1cf96432cc8c"
+      "source_digest": "fd66b9e5a19175d3bd14d7d9fd535100ce18e35898cb181f2685c8a391ba9803"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-DESTINATION-DETACH-CONFIRM",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "51ad376a1f257b76d0c13a66d0058ac2c57f91b1a31eaf46cfcf23b4fa58bd44"
+      "source_digest": "382179f7cfd3f5e4b888f112720559c280ba64bca6fbadf4613e1244f809da76"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-DESTINATION-LIST-ADD-PAUSE-RESUME",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "293b39ec282445bad10638b97b3d458c3348f63707dc5242dc0510d86f645b93"
+      "source_digest": "cb60cd5a5d55662c93f4dfc3d7a9987a20decdcb22e2a32f3bce013555992ab7"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-DESTINATION-PROMOTE-DESTINATION-GENERATION-ID-CONFIRM",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "dd8b41f1e0b31dabff316dffa01657e30b204ca3593e05c0c34c570cd84410ff"
+      "source_digest": "42dd04b40c9efd25e750a7d85652ee7516692e53f6e15b0ae660400f12e0695e"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-DESTINATION-RETIRE-DESTINATION-GENERATION-ID-CONFIRM",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "254bd0ad4cd0d803379f245324bed03aa45234ccea6765da0349cea2a19f692a"
+      "source_digest": "43a67d8f488974b83e00d52049ef32030da006490a9c2cef896ee03b5fa97326"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-DESTINATION-VERIFY-DESTINATION-FROM-SEQ-SEQ-JSON",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "645b1e84721772d9c2c87c74cacfc36567ce7bfb54985b73c3e8ad0296e34808"
+      "source_digest": "c313f13928e92edf2c3f18ec39bd94402bea73e58c8dc5bd3d4ed73cf6d33f45"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-INIT",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "e00209de9a4a63c7d89642b43f90bc05654f17b5e038af101360f785789d824c"
+      "source_digest": "03b9d14115431637ab9116dd99366174e587c39b725a2eca8c57b8dbed1c1b38"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-JOURNAL-GC-DRY-RUN",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "85ae268e1a67ce40d693b3effb8c551cc38aeec41c507cc95e138ea2c49ca0ff"
+      "source_digest": "eb4101d5f79bf2f6f8ac5b83cc13d642e531e5e040b5c811475a5ecf18ead049"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-JOURNAL-INSPECT-EVENT-ID-ID-EXPLAIN-JSON",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "9b19698526d76adf1f9e2ef30036cb0ddc3f42d81e3c3ea880fbd88566ab9180"
+      "source_digest": "2375098a9582adf60d5f2fdc856d46fc18b0a6efce805696da7924074ae927e3"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-JOURNAL-VERIFY",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "1a1f46242d94412e9139997b846692a1b44642b3f08ffbd16aae46cc5aedf21f"
+      "source_digest": "bd9a968823f6f65f7f9809739589cc62c284eaf2ac6a28f86910891e7c2fb4d4"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-RECOVER-INSPECT",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "6abf70fa37b4318c73b366e70e9722ac31c14733494a9ed32d60049ddf86d60e"
+      "source_digest": "fc7c1b38742078cba4f5f711cf41fb59b8badb033f6ca5ea32ec7f78f0d3b2b8"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-RECOVER-PROMOTION-DESTINATION-ADOPT-EXTERNAL-FENCE-CONFIRM",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "f2ce1ee9539b0475d6b44796c0761a93cc3580545e1a6d76a9e218b0a4430be7"
+      "source_digest": "c32a340ecf23f684d0d673231b3d16a25b432a96975a8625e6fece522910bca7"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-RECOVER-RESEED-ADD-TABLE-SCHEMA-TABLE-RECREATE",
       "owner_bead": "boring-cdc-m1-control-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "9c5d6ec9fc087fccb8545689f79ccf319883a7664b955fa0f17b14110bbe1a75"
+      "source_digest": "467cdcd5c6e48ed0d670863a03de1836bf9caf3943e203b6b5ae2c425aa1a16c"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-RECOVER-RESEED-RECREATE-PUBLICATION-RECREATE-SLOT-CONFIRM",
       "owner_bead": "boring-cdc-m1-control-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "f4a228dd5d381db2ffb7474692c215bdf9ae655250867c6b815482744c294269"
+      "source_digest": "373eea82ca14eefeacd5f7760015a82b2724a37ef80db543d32c67c82a90b2b2"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-RECOVER-RESEED-RESUME-RESEEDID-CONFIRM",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "41fb5d6bd9c7d331b4a7cc179df8a6d4321568f89f3f847dcffef58279d6f099"
+      "source_digest": "7a9131d955eb6970a00374839b078d8bfe46e47aa8d0c5ea933138cb6617376b"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-REPLAY-DESTINATION-FROM-ANCHOR-FROM-SEQ-SINCE",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "af16cf8eb452151d5a4413ab76c66c04a3f74edcce06ed23e35fa82bd279053f"
+      "source_digest": "ddb644b4c885451496c796dfc757507569a4712ecd65874a74914ab852fb17d2"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-REPLAY-DESTINATION-FROM-ANCHOR-FROM-SEQ-SINCE-2",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "45bd6333698cfc1373b5b73ba1994b15a75ae188198ede3b6f560514ad53d48c"
+      "source_digest": "aab3d63ce06e640b07f61805393b6f834afdf5f5ec18813c12006c655f3c912d"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-RUN",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "0cd01327d7ac09a77f4f93c65f5d6d44aa6136a68bc5f02d747c9feed5efea3e"
+      "source_digest": "94b78dde235d6030661bbc66b63a114ea01579077e358657c8be09f8bc6b2187"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-RUN-BOOTSTRAP",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "ae418f830408c95c2707c55f5b1cec9d8d3f00d775700db3088732c1f88b83eb"
+      "source_digest": "675f55f17c5c8f517b9015f2ddc871e844c5256d0117908ac6ebcf2936bf73fb"
     },
     {
       "evidence_status": "pending",
       "id": "CMD-STATUS-JSON",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "5ce066aab399a12b3b58d91ff8a49fa95d6258f794e581351ca5cdf2416b6048"
+      "source_digest": "8edf2c7f686c09f438d253afcd36a744d7eca8d2cb9fe0b5ac00b1f11c319ec5"
     },
     {
       "evidence_status": "pending",
       "id": "COND-CAPTURE-SAFE-STOPPED",
       "owner_bead": "boring-cdc-m2-fault-status",
       "source": "docs/PLAN.md",
-      "source_digest": "22bdc7a318d4700c8cac6b4d8413cc589cc2270b7b9021728a19d268edf39576"
+      "source_digest": "d7813e4a55336bc5cb12e711ed35de8aa73fb4170323a4fe2fd15f4fffb2fd87"
     },
     {
       "evidence_status": "pending",
       "id": "COND-DESTINATION-AUDIT-STALE",
       "owner_bead": "boring-cdc-m5-loops",
       "source": "docs/PLAN.md",
-      "source_digest": "35ea659cd7161ed47d9a814ebce884861e8979aab0c197460addf76b8dbd5d67"
+      "source_digest": "67de97873f21fb94ad42bc9a6e2d2194bb97d348fc694e1d7c0a3137a4d0fef3"
     },
     {
       "evidence_status": "pending",
       "id": "COND-JOURNAL-PRESSURE",
       "owner_bead": "boring-cdc-m2-pressure",
       "source": "docs/PLAN.md",
-      "source_digest": "14c5660f8b983c3e01ccc8863570b96b9365437cff2acd1c68407e7814265036"
+      "source_digest": "8e6b70e5ba3b6e776e0926001513f0e01410a50fc71508cadfbc88483c348c07"
     },
     {
       "evidence_status": "pending",
       "id": "COND-OWNERSHIP-LOSS",
       "owner_bead": "boring-cdc-m2-ownership",
       "source": "docs/PLAN.md",
-      "source_digest": "54939f1e329f2de472ad0563c15b295d2c4c3b648652c59f23c03e41c6a97e0a"
+      "source_digest": "af892b827a80de0e497d215f6c0edec0eaace768d7859e93708b6ba0dad330d6"
     },
     {
       "evidence_status": "pending",
       "id": "COND-PUBLICATION-DRIFT",
       "owner_bead": "boring-cdc-m2-fault-status",
       "source": "docs/PLAN.md",
-      "source_digest": "973757136e01e4be861667856b08e5f6396ac4be55a6bfeb2578967e81d3189b"
+      "source_digest": "d4e0fcdea6502f52f2646527f0d0dc4d10dea9fa4a8bbdd594fe719278e9621d"
     },
     {
       "evidence_status": "pending",
       "id": "COND-SOURCE-METRICS-UNKNOWN",
       "owner_bead": "boring-cdc-m2-fault-status",
       "source": "docs/PLAN.md",
-      "source_digest": "e826afd1b176919fad365cf30de913f58ce3425bfb81a26e21ed874eb65c92ae"
+      "source_digest": "c9a980b1f2f3c9c6d1297a1a7270db9d5ed3cdffe8c5cbf4fea75bc491d08082"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-ADDITIVE-COLUMNS",
       "owner_bead": "boring-cdc-d-additive",
       "source": "docs/PLAN.md",
-      "source_digest": "907ce84138fb99aa90490fffd876b8faf0d262b1c02debf75ecb3202c65378f5"
+      "source_digest": "c052a21fb2c0141333323eb9e14eace5c6850db1a92dfb492ff7419cec7b3677"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-ADMISSION-LIMITS-BUDGETS",
       "owner_bead": "boring-cdc-d-admission",
       "source": "docs/PLAN.md",
-      "source_digest": "f89dea19f79428697c354740c6a0a5082d09bc6579eb9d5356a475c64924941d"
+      "source_digest": "93468caea0205fdf7787b794f1ebff107738973112811995b2a677f04d5688f7"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-ARCHIVE-DURABILITY-CONTINUITY",
       "owner_bead": "boring-cdc-d-archive-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "d3a3f94b1d062c34ad0e85029dacc3a5b28f0a0129e23de0ff66cc075885d8f9"
+      "source_digest": "ccd62e31ab2748cbd01e55c574d659ee452c4f212aaaeb86756c639a943eb00b"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-ARCHIVE-SCOPE",
       "owner_bead": "boring-cdc-d-archive-scope",
       "source": "docs/PLAN.md",
-      "source_digest": "ff66cd257dcfbd78d6c7df4842f6063a6c4e48b3ae2ba30e50bb1d2439501ae8"
+      "source_digest": "af93c563f9da80e1dc74de3d7806fdaf327d89caaa31cafc1480248a729eaccd"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-BENCHMARK-ORACLE",
       "owner_bead": "boring-cdc-d-oracle",
       "source": "docs/PLAN.md",
-      "source_digest": "aaa89dffc3d9c0e6a90926d9334ab09f7309653b395ab6e38b52158fbc4aed67"
+      "source_digest": "bb44b1cf0d3f014734f7fa65cbcecea20ff4c270ae240eceabb291c3c9ef0d1f"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-CLICKHOUSE-DURABLE-ACCEPTANCE",
       "owner_bead": "boring-cdc-d-ch-accept",
       "source": "docs/PLAN.md",
-      "source_digest": "6b9ec43183f294d6b69fcb566b203b64744f6e7baa4ab3ae2c6357f377c81062"
+      "source_digest": "f1327ac47a0fc54846b965778a2ae2d14277813ba93bf231d86c686f2c2cb2aa"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-CLICKHOUSE-HISTORY-LIFECYCLE",
       "owner_bead": "boring-cdc-d-ch-history",
       "source": "docs/PLAN.md",
-      "source_digest": "1d5ebcabc07d0074f298fd79afac5b0cacf4fa8eb880adefefc707eb698ce6c3"
+      "source_digest": "9dbd63bf1a56f13055d628f40554998532928bd12bad76e1681a470956cc2890"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-COMPOSE-IMAGES-RUNTIME-RECOVERY",
       "owner_bead": "boring-cdc-d-compose",
       "source": "docs/PLAN.md",
-      "source_digest": "33c7d6680468086e06ca5b693ee4e262806578588026498b23c87336475941fa"
+      "source_digest": "3aed6e99a865d0f1ad767fc339bf845cb1a8ab4a6e203f01a7ec5e688deb81dd"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-EVENT-IDENTITY-PAYLOAD-CONFLICTS",
       "owner_bead": "boring-cdc-d-event-id",
       "source": "docs/PLAN.md",
-      "source_digest": "9cbc0f733dbbcdfa3a156d4029bf3bb1b00ddffad5373a5c17e137b1db316b42"
+      "source_digest": "c8c19d3763f865a0a04830080cf7c3417a4ea4de633e7b15db600b9f52e71a2a"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-INITIAL-RESTARTED-BACKFILL",
       "owner_bead": "boring-cdc-d-backfill",
       "source": "docs/PLAN.md",
-      "source_digest": "eb878900d8e42886f81ee6ba5246dfa58927f08b2f484791457781f3e3cb6b66"
+      "source_digest": "3d94c5a38516a83e7001c75e9c87d4fe541f3ce3a2301c1cc1af91cc4212342e"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-LATE-DESTINATION-BOOTSTRAP",
       "owner_bead": "boring-cdc-d-anchor",
       "source": "docs/PLAN.md",
-      "source_digest": "b23098af40522272e3d357649c611a7a8d3f194e69af6a2d777d1447128bfb5a"
+      "source_digest": "28a86b485d3fd30ee4516dfda5f63f8f69f9f5907f54504063ca894f5c96aa72"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-LICENSE",
       "owner_bead": "boring-cdc-d-license",
       "source": "docs/PLAN.md",
-      "source_digest": "70da86846abca28ce830ba105d17642ba14df9c6fd7d0828f1d2614afcddaa8e"
+      "source_digest": "62e2d310d4a2ca5c8f2657127fe872db0fd4fee1128b07ecc50b99da7e5cb37f"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-POSTGRESQL-VERSIONS-TRANSPORT-OPTIONS",
       "owner_bead": "boring-cdc-d-pg-protocol",
       "source": "docs/PLAN.md",
-      "source_digest": "8d42cfc7b8826b4ee70ddb1ebe4c46fb01e6f46dd899a76f83f8e96b6ad915a4"
+      "source_digest": "3a240974b048318b46eecf9f8196328def78130feadf6f42d6d3a3e5751b3319"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-PROMOTION-RE-SEED-TABLE-SET-CHANGE",
       "owner_bead": "boring-cdc-d-promotion",
       "source": "docs/PLAN.md",
-      "source_digest": "1c6b2ac2cd5ceb52732bcacf3c10011c104cd7cd70957f957a4bf07ba0055609"
+      "source_digest": "318d7a6a8ce036286d01e78b780891c4e15f4f4a4836aecbfda8821d9b42506a"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-PUBLIC-OWNER",
       "owner_bead": "boring-cdc-d-owner",
       "source": "docs/PLAN.md",
-      "source_digest": "c000650b1a53bf54138f8a469b11166d760779eed559b1940ba75ffb3e7accde"
+      "source_digest": "f974685f8b5636ea64e4a91ac9895a5e8074f00fc0f930665dee52070e005219"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-PUBLICATION-CONTROL-RELATIONS",
       "owner_bead": "boring-cdc-d-publication",
       "source": "docs/PLAN.md",
-      "source_digest": "67bb48a43f5970f60227c6ea98d6e8d9176d8a629686515711a007c37f08b684"
+      "source_digest": "51e1beef982a01f210397e5cda5a6f4b590ed8dd3775f44f8c1eb6e29861e45f"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-RELATION-FINGERPRINT-DDL-GUARD",
       "owner_bead": "boring-cdc-d-ddl",
       "source": "docs/PLAN.md",
-      "source_digest": "560178d8e1b0a09ffaabc840826e8a1a0761dfd45912a16aa9b719462c44e3c4"
+      "source_digest": "2b284b7ca22f3ca9f4ddb9c6fa46db8bd6f74a8799e17b3ceab867894e63e681"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-SCALE-PROFILES",
       "owner_bead": "boring-cdc-d-scale",
       "source": "docs/PLAN.md",
-      "source_digest": "9fcd313456605ff41175c7fa26941487d3feee1db46ed68ef604718cac4c18b8"
+      "source_digest": "0d388ecab5d8f9e3b746b52b3dbf02d59402df0d3b879f595ae8f50abd61da45"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-SECURITY-EXPOSURE",
       "owner_bead": "boring-cdc-d-security",
       "source": "docs/PLAN.md",
-      "source_digest": "282601f69323c983a92656901bcb1033304e70369f3bb7a9d664d5f9316de1fa"
+      "source_digest": "da023fab841e2b9b59f7c8bcc304c96daf68ed0f990d209719ead809a68feb3b"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-SHARED-FAILURE-RETRY-POLICY",
       "owner_bead": "boring-cdc-d-failure-policy",
       "source": "docs/PLAN.md",
-      "source_digest": "37026ce743b44abb93e060d9ea6632e98354326192e6d1c6ae428c7a3fc4efba"
+      "source_digest": "f97f1e51386576dc9ac71131a91a5a785f98f7af0791a0901d763cf96b16fcb1"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-SQLITE-PHYSICAL-JOURNAL-DURABILITY",
       "owner_bead": "boring-cdc-d-sqlite",
       "source": "docs/PLAN.md",
-      "source_digest": "ede9a42ef3050791fcd0e1285a9d279b7d5c306011fa11fea4339b0bed91b08b"
+      "source_digest": "b2fba740f8f6f487720b8cf8c53db55f3afda0142bbeb0a2cfe01afd74d661fd"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-SUPPORTED-KEYS",
       "owner_bead": "boring-cdc-d-keys",
       "source": "docs/PLAN.md",
-      "source_digest": "bbfd0bd7df9757e8445030fdd651edbf95cd973c46875116bab20e83b8d07b87"
+      "source_digest": "17d4ee52e2f99bfb2f50f5b7ed8c20b2e345903a2ff640f7519bd774d8bcc213"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-SUPPORTED-VALUES",
       "owner_bead": "boring-cdc-d-values",
       "source": "docs/PLAN.md",
-      "source_digest": "91111a9d1ac93b29193765ec13ce3cb3007fb29a710cf49a0f6965da7f0a5559"
+      "source_digest": "c5a934f9e7bfbe66fb347fcc0dfba9812938bb72e55b6f61b434d6a3d3e2f4de"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-TOAST",
       "owner_bead": "boring-cdc-d-toast",
       "source": "docs/PLAN.md",
-      "source_digest": "a6c5b4c9e46a02be51bfba5f6275175888f919c181462aeb8263acc986cd073f"
+      "source_digest": "c6ef1572fe47baa6280f752543e2d30948f8eb56a63c436670b22f67d3e479b9"
     },
     {
       "evidence_status": "pending",
       "id": "DEC-WAL-CAP",
       "owner_bead": "boring-cdc-d-wal-cap",
       "source": "docs/PLAN.md",
-      "source_digest": "acd6b8c4a4f1b8e400a85c0028ab37f1342cf8205e452efd49f11a092b9e9923"
+      "source_digest": "c5133808af47c8c4365de70c768de963e7eff7a0c61c56e6039252a19db36ab2"
     },
     {
       "evidence_status": "pending",
       "id": "INV-A-RETAINED-SUFFIX-IS-NOT-AUTOMATICALLY-A",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/PLAN.md",
-      "source_digest": "7fc4b2403cca049bfd21f69de7602cbc692ffac469a4bb19f69f31bd14452735"
+      "source_digest": "2f34dfbd22ff6623998fea66894c368d361fe6f563bc755825ecc7dce4ccfc11"
     },
     {
       "evidence_status": "pending",
       "id": "INV-BOUNDED-MEANS-BOUNDED-TRANSACTION-SPOOL-SQLITE-FILES",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "6a8e82dbc64c267d7681458fc972677549861aaa82b6d156c26597c11f48902f"
+      "source_digest": "4e48cc7cacab5f9f0b625ffafb1829e9d5e1af9c77d8f916499d9830e53d8669"
     },
     {
       "evidence_status": "pending",
       "id": "INV-CAPTURE-IS-DESTINATION-INDEPENDENT-DESTINATION-SUCCESS-OR",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/PLAN.md",
-      "source_digest": "bb6d7da033c0780af7c8049e2bd98db3b92499a38fb5d4edf4db8f999e729403"
+      "source_digest": "1ee9e594536588eb304ccab77d25d44dd9a814866b9b7283adc84f8b56450df3"
     },
     {
       "evidence_status": "pending",
       "id": "INV-CLAIMS-FOLLOW-MEASUREMENTS-TABLE-COUNT-THROUGHPUT-EVENT",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "a675d22480d7fd105f8e7c2f180df7433e8341f9b5f1f3ffd8719d28d3b3e3a9"
+      "source_digest": "13c27044351e71dd29fabb0fa8affa9b3435e1c270a8b43fc9498a1866ce7b2d"
     },
     {
       "evidence_status": "pending",
       "id": "INV-CLICKHOUSE",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "d506a28c1ac62c45237b03d659e6b696108bcbcea8b509172d9b25b2aebc0ada"
+      "source_digest": "73550f2d25bf5e549e28c451459c454b012938037122ed79bc8e6c1e6f12a1b2"
     },
     {
       "evidence_status": "pending",
       "id": "INV-DOCKER-COMPOSE-FOR-THE-REPRODUCIBLE-LOCAL-ENVIRONMENT",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/PLAN.md",
-      "source_digest": "8a029f051b48e3d4a6765372e6d8405cc607d079544e4f0589f32e9efb48ddb3"
+      "source_digest": "e557e0972026d6e2949507481e6306b440c8496363afcf493759b57ee3242aff"
     },
     {
       "evidence_status": "pending",
       "id": "INV-DURABLE-BEFORE-FEEDBACK-POSTGRESQL-FLUSHLSN-AND-APPLYLSN",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "94f82027a97a2b343ceff1adca1f5cb42c67fac4e4be93c6e5610771c0c36b05"
+      "source_digest": "a551bc9ae42c060b547831b982e89c3e7c1743dfd8b7f08b020713a12c88bf92"
     },
     {
       "evidence_status": "pending",
       "id": "INV-IDLE-PROGRESS-IS-PUBLISHED-NOT-INFERRED-INFORMATIONAL",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "e5cf651841fca0412f96bf031236c7530b28bc2258ce23d794878cf0a0c71c8f"
+      "source_digest": "d41d823db4f1273df5f2d9037de3281b807cc5d23e68b63576bddab79d092bc0"
     },
     {
       "evidence_status": "pending",
       "id": "INV-JOURNAL-ORDER-IS-NOT-SOURCE-ORDER-JOURNALSEQ",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "061aba097c3bb53c520546b45cf96523312824fdc37123d6053ce277761982cf"
+      "source_digest": "1e96f9309e5a1907f2b9d99c40ecbb5a664d4dd5e04d6c898343da121244ba67"
     },
     {
       "evidence_status": "pending",
       "id": "INV-NO-REQUIRED-KAFKA-KAFKA-CONNECT-SCHEMA-REGISTRY",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/PLAN.md",
-      "source_digest": "6662bea74127c09ea0ae4761d7b6baacff294a3bec51b563ef272e9d4249f7b5"
+      "source_digest": "291f152b5a604a976fe0e856efe2e008e5be8c7db9e209ab45903ad883447706"
     },
     {
       "evidence_status": "pending",
       "id": "INV-ONE-ACTIVE-RUNTIME-THE-LOCAL-RUNTIME-AND",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/PLAN.md",
-      "source_digest": "45a6eae7e37078fc8c1408bc812c586d1adc7a53c413445de7141854f85721a0"
+      "source_digest": "9af981e1b0f152ddc2c1f7737d95ac5b4ef02c17e108c1622253a899ebf66b4e"
     },
     {
       "evidence_status": "pending",
       "id": "INV-ONE-ARCHIVE-MATERIALIZER-CAPABLE-OF-SCHEDULED-JSONL",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "ae9078e26292505d448bc5bdc294af42a7c65d61310b199934e0d339ca9e9089"
+      "source_digest": "e1e353312ddf8c9c9f509eea5f36a0c22a61184ed53be4d03bff8d5542260eb0"
     },
     {
       "evidence_status": "pending",
       "id": "INV-ONE-CAPTURE-EPOCH-IS-ONE-CONTINUITY-CLAIM",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/PLAN.md",
-      "source_digest": "d5246601c01b6c8f3dded2c9cc1033ec8a4843a0e5ed9f5c6bc8fbac10d4aa2d"
+      "source_digest": "fc1b6a684465d9e0e87de1461b21476a229577deba8527d24771c5ff8bf9839f"
     },
     {
       "evidence_status": "pending",
       "id": "INV-ONE-POSTGRESQL-DATABASE",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/PLAN.md",
-      "source_digest": "7665cc8df5f1c3c7fdb07eeee30a83688fc99bd6838ff85be20052317df03094"
+      "source_digest": "675d92f9d4ae040ba427c742aa334d90a337922ee071f7ae49ebc3d49b80aa20"
     },
     {
       "evidence_status": "pending",
       "id": "INV-ONE-PUBLICATION-AND-ONE-LOGICAL-REPLICATION-SLOT",
       "owner_bead": "boring-cdc-m1-control-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "03b7e35bf270e503556c9613a3b70fa4f05447632b929f321b2035924e90d900"
+      "source_digest": "8df3be07491b96991bffc6e63688205e3bcf6a788d21462284baf4935b1e232c"
     },
     {
       "evidence_status": "pending",
       "id": "INV-ONE-SQLITE-DATABASE-JOURNALEVENTS-IS-THE-LOGICAL",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "585836e60c486d6ed1f6a614206349eb84056a2dd925c2d0a3c481cf6c4e1d24"
+      "source_digest": "315517d143025628d0ca8f3e5ca69c25c99a306f6abf4b5015cc03b9eac3c174"
     },
     {
       "evidence_status": "pending",
       "id": "INV-ONE-TOKIO-BASED-RUST-BINARY-CONTAINING-CLI",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "54f0036fc1ea889babea1bd28c4b86dc86b3e54319550c1801f3e9f82b060cbd"
+      "source_digest": "f06f6fb17bcefb20b4ac7029d0ef5f401c9b0d16ddba680150172a2cffe757ff"
     },
     {
       "evidence_status": "pending",
       "id": "INV-RE-SEED-MEANS-FRESH-DESTINATION-GENERATIONS-A",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "1fe3cb1bc290986fa1f4d340a17625c143924f3c6496e907d25830d2373a5208"
+      "source_digest": "777d27eff2f6dca846c262214c781a960e0ecf20b840d62a8d6b5a0be03dd45d"
     },
     {
       "evidence_status": "pending",
       "id": "INV-TWO-INDEPENDENTLY-CHECKPOINTED-DESTINATIONS",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/PLAN.md",
-      "source_digest": "43aed05a7110d86ae7bf7d43c795de99ccb833437ca96d16cb4f7082447e8279"
+      "source_digest": "c72b4ea8bcb86f08801ea0e569c8c6481b6cfab81b9535870ef67fdb01418b46"
     },
     {
       "evidence_status": "pending",
       "id": "INV-UNSUPPORTED-MEANS-BLOCKED-NO-STATE-CHANGING-PROTOCOL",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/PLAN.md",
-      "source_digest": "6aa28f5b6cf1fa4b76bb9dd4a84c562993a1ede5a6b73c824cc1bc666e54f7e8"
+      "source_digest": "bcadc350730ebd7ec1fcab51d4a4b227217b52868e7d01ed36a4ecae226e21d9"
     },
     {
       "evidence_status": "pending",
       "id": "REL-ALL-REQUIRED-FAULT-TESTS-PASS-REPEATEDLY-FROM",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "86cf490ffbee4409f759a4d11b41c649f00ec418c4a8b6f7e275e74354af015c"
+      "source_digest": "134eef764eb23dc71a5b890107d3bdfa174bec8474ac8f820c2822b97cac39c6"
     },
     {
       "evidence_status": "pending",
       "id": "REL-APPROVED-ROBUSTNESS-FIXTURES-PROVE-BUSY-RUNTIME-ACTION",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "00d5733e6a44f81241a93913a8fa2d36ba693bfd5a255e5105050e12095496bb"
+      "source_digest": "a62e82373ab024f5250d9fee7a5dfaedb1c947532f3b44e8098bcb3b69cf2b45"
     },
     {
       "evidence_status": "pending",
       "id": "REL-ARCHIVE-READERS-RESOLVE-THE-GREATEST-VALID-IMMUTABLE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "152e366b770246cc1e0599583c35b104d9daf0fa804347847b47a0b185240252"
+      "source_digest": "41f71b15e92dfaea6663936a16f2fb72da2edab584c868638229fd55ad27a076"
     },
     {
       "evidence_status": "pending",
       "id": "REL-BENCHMARK-PROFILES-SEED-DOWNSTREAM-MATERIALIZED-SOURCE-LEDGER",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "9bcc79c57aaaaf60bb920e172356a62fbe16821b2061ae615ffa5c9e33e08f6f"
+      "source_digest": "511a869b63e9c4aa865f8cf4a1f1a7e37d8df8ff00e02136df1ff6e109e176cc"
     },
     {
       "evidence_status": "pending",
       "id": "REL-BORING-CDC-M7-RELEASE-IS-CLOSED-WITH",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "ec73c132f57255fc7b5b84904d3de32f6ef15dc2374e6a5013b866b4c5f09b5e"
+      "source_digest": "9fffd9eada2ff9fed2577e8fe887cdc872a72b76099b4049a600613bfa2597ee"
     },
     {
       "evidence_status": "pending",
       "id": "REL-BOTH-PUBLISHED-CONTROL-RELATIONS-RETAIN-EXACTLY-ONE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "9b35a34b4261da39a59b77ba640d94560e8532eef76b803405b083b923f2a5f6"
+      "source_digest": "4dce04b1088d4199af031550afb8a7c224ff8e5920820b168c60a1c5f2c9c1dd"
     },
     {
       "evidence_status": "pending",
       "id": "REL-BOUNDED-WIRE-TRANSACTION-PER-FILESYSTEM-LOCAL-ARCHIVE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "ab7c604d73f7fd9326609e98cac0e9b6b7b69db613fb6279d8ef660636f1a87b"
+      "source_digest": "96852cd6dcbd0998904ad1a4f591a9ccf61e00891334488917dc2794481d2b3f"
     },
     {
       "evidence_status": "pending",
       "id": "REL-CANONICAL-REQUIREMENT-DECISION-COMMAND-CONDITION-TRANSITION-SCENARIO",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "336d2ed219791a0aa28bea3089c5782267e92d8418b4fb827bca1471483010ff"
+      "source_digest": "ae74cda17f07f13db28cf26148978383b6c0466798c2a1cce15280e2c018b173"
     },
     {
       "evidence_status": "pending",
       "id": "REL-CLICKHOUSE-CURRENT-STATE-AND-ARCHIVE-RECONSTRUCTION-CONVERGE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "6781a53083c96ce2c545de387b8614b10855b79a453104891b487d410ac8eb31"
+      "source_digest": "59df54e9018ccdf7cbd86db09e10185e4c8fb7a760b01d8b3e40193103780a03"
     },
     {
       "evidence_status": "pending",
       "id": "REL-DESTINATION-OUTAGES-AND-DETERMINISTIC-POISON-FAILURES-DO",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "4264d5d711af1bc4c99489dc1dbbd8cbf47070e17e91386ac6203fc0132a510e"
+      "source_digest": "0ac45505cfc3193c915e0a48b9cd0a337dac1618e48478a3642230a1b8da8e71"
     },
     {
       "evidence_status": "pending",
       "id": "REL-DUPLICATE-ATTEMPTS-ARE-OBSERVABLE-WHILE-CONNECTOR-IDENTITIES",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "cd511badb35eab87e9181fe4057357c305d0c8e8553609e75c98cd42f233ad94"
+      "source_digest": "41ed783ae300d4de6f4886f13162d8ef1f99c4c1ec628086e8aa9366e8839adc"
     },
     {
       "evidence_status": "pending",
       "id": "REL-EVERY-DURABILITY-BEARING-SQLITE-CONNECTION-READS-BACK",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "90534cd4a50f3002ca6e01b625e7f8ca94a276e8eb637930f1d5b6ce41a6a03a"
+      "source_digest": "b62420febdc6e22c43aa94609d99f22b69f6496100572abb64568a34c77d26d6"
     },
     {
       "evidence_status": "pending",
       "id": "REL-EVERY-PROMOTABLE-DESTINATION-GENERATION-NEW-REPLAYED-REBUILT",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "a967435fe55bd8534a2b1b65f5402a3d2455a03ccfe4ef66d8eb869d018bcf69"
+      "source_digest": "6e974ff68f157cb083fe7fd62c311ba8981ecca7386cf32f3a7651ba0397fc95"
     },
     {
       "evidence_status": "pending",
       "id": "REL-INCREMENTAL-DESTINATION-AUDITS-STAY-WITHIN-PER-PASS",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "e8655d3d6dc2ae66c19844e70f519049863fc7a1e39557daf52e6082f2e26ac8"
+      "source_digest": "99b6d33236e0f687e2c0031796d5fe68c6d0b1f8fe82164f1b68c243f1ab3dcd"
     },
     {
       "evidence_status": "pending",
       "id": "REL-INITIAL-BOOTSTRAP-PERSISTS-CONSISTENTPOINT-STARTSEQ-EXISTING-BACKFILLS",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "4b2dc7fb46eea8f6761faf3874ce4b4bcb65708140a6098251b10d7b705b678c"
+      "source_digest": "3743952c3adbd7b7e4b1ae1f4b19ced8b87880d4f4027495602bf8a5e7db5a4f"
     },
     {
       "evidence_status": "pending",
       "id": "REL-INTERRUPTED-BACKFILLS-WITH-CONCURRENT-MUTATIONS-CONVERGE-AT",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "48e6670a0507559be2cf39b1c3d572c66e7a52ac994c7d9f40da3fa52a9873c1"
+      "source_digest": "82f4ba36060afa967402de6e410143a321ddc191eca4b044a61b74c4c599c5b0"
     },
     {
       "evidence_status": "pending",
       "id": "REL-M0-EXIT",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/PLAN.md",
-      "source_digest": "75fdf4f4e987a2b8c8a5e587925fe458f27f83eb971990e421e6fee5fafe4718"
+      "source_digest": "9d84ad2fe2290856c0397df4d1b729ea6063659ba414eaf6c4db40ac5b4dd7f6"
     },
     {
       "evidence_status": "pending",
       "id": "REL-M1-EXIT",
       "owner_bead": "boring-cdc-m1-complete",
       "source": "docs/PLAN.md",
-      "source_digest": "6dff923020cb094d6249771f9153cd0a7036c0572af57f05325e3dc914be2ca2"
+      "source_digest": "1ffa1dcab916aef8139e231506fa6f4b585708e6888bdef4a4c717c650c8ccbf"
     },
     {
       "evidence_status": "pending",
       "id": "REL-M2-EXIT",
       "owner_bead": "boring-cdc-m2-complete",
       "source": "docs/PLAN.md",
-      "source_digest": "c882162219be1a510ccd0a744582e23402b33edbee8b605fdeb34b02fb1bac89"
+      "source_digest": "0570de11e744ca5aa39fe6e9c6bb8bde792b57f2202e59806887d4f36ad88a33"
     },
     {
       "evidence_status": "pending",
       "id": "REL-M3-EXIT",
       "owner_bead": "boring-cdc-m3-complete",
       "source": "docs/PLAN.md",
-      "source_digest": "0c4ff902a3e76bcc349e49543300723a61d5aad1919a4f765c8dc3bbf16fce42"
+      "source_digest": "145e7dda154479cdda628f8b85c8309e8e749381046e984b25e6085f19b62412"
     },
     {
       "evidence_status": "pending",
       "id": "REL-M4-EXIT",
       "owner_bead": "boring-cdc-m4-complete",
       "source": "docs/PLAN.md",
-      "source_digest": "471d145c809fc0529967ec0837866423058b4f8466723f753d59daa0cfba5678"
+      "source_digest": "87a57a9cd5c0372121574938a40038e629f6c7918bcec6f5c64e0f4a7c244afb"
     },
     {
       "evidence_status": "pending",
       "id": "REL-M5-EXIT",
       "owner_bead": "boring-cdc-m5-complete",
       "source": "docs/PLAN.md",
-      "source_digest": "e97e25679be546a7080f59307234dd16fd174181822c5160dfd8f06fc74e3533"
+      "source_digest": "7094bf4cde701fd7e6f7f306bffab6a98423adce4ed6b9ec0e2dfa7701b93978"
     },
     {
       "evidence_status": "pending",
       "id": "REL-M6-EXIT",
       "owner_bead": "boring-cdc-m6-complete",
       "source": "docs/PLAN.md",
-      "source_digest": "1861279554ee1d05289748d111e48b0fd3787d6cdc0414ecca1368d4087ac9a8"
+      "source_digest": "83a75d6be679efa852d82aef87cdf6efab0608e3e1f83b3192c6979ef59340a1"
     },
     {
       "evidence_status": "pending",
       "id": "REL-M7-EXIT",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "17189697d8f909a6853c1185604238210d9ba3614b38c9b7c6c7a3cc6baa8029"
+      "source_digest": "d0dfcf77e61cef3c2f35a750c7dbbe459484325d378117e0b9f142629e9b902f"
     },
     {
       "evidence_status": "pending",
       "id": "REL-NO-EXPECTED-COMMITTED-EVENT-IS-MISSING-AFTER",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "553d87fb683a2645cf14bb30aa2f91209b54e208e949fa5676e4078428977955"
+      "source_digest": "0fa30357ce522c2d99271fc092cdb507a794e8fdb6af7486f2bc6fb3ef1ac53f"
     },
     {
       "evidence_status": "pending",
       "id": "REL-POSTGRESQL-FEEDBACK-NEVER-EXCEEDS-THE-LOCALLY-DURABLE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "5b336644224de346840df48b6086a87bf0ef4cfe7881a39b81ef9a1a6ddf366b"
+      "source_digest": "6afe15ae5c0ae360f9499554647eee8e36d2ac182fd074e3b23b2f6fb8fd9805"
     },
     {
       "evidence_status": "pending",
       "id": "REL-PUBLICATION-OWNERSHIP-PREVENTS-ORDINARY-LIVE-DRIFT-FORCED",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "7f1e70b92d8649205bc6d94e5b51fa977b00f2b712f9579e691b0868982c6785"
+      "source_digest": "719c6780fd3a648a0fde6398824a0dcc23febfcbdf9febce4c3bc0771fe9a9ce"
     },
     {
       "evidence_status": "pending",
       "id": "REL-ROUTINE-MUTATING-CLI-OPERATIONS-EXECUTE-EXACTLY-ONCE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "14b2d69e40963ec5bb3ba2decafb02ac97c3e9104330db3d623a33ca6b5577f4"
+      "source_digest": "b87aed08395e920c5ea3d8107712bb028c6a6aad146cb3b22d641e6b5672cf6b"
     },
     {
       "evidence_status": "pending",
       "id": "REL-SCHEMA-DELETE-TOAST-BEHAVIOR-FULL-RELATION-CONTRACT",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "d121280c49b89f46908736d8fa2b939adc63903023e1e137eb4df7ddf1e24dd2"
+      "source_digest": "b8d59f2aaa114a305440014367dac08eb33caabd089c9eafca6e6dbd59b63276"
     },
     {
       "evidence_status": "pending",
       "id": "REL-STARTUP-REJECTS-SOURCE-SLOT-TIMELINE-LOCAL-STATE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "136cd4f8ea9c2a351a9b1eb4625e33abb9b658c7435e06c67a03609041565790"
+      "source_digest": "6c7cdde66d8fb44b58c7b4090f83a4acc307a982e1f4342ecaa4d23a77c374bf"
     },
     {
       "evidence_status": "pending",
       "id": "REL-STATUS-METRICS-SECURITY-DEFAULTS-COMMAND-SOCKET-PERMISSIONS",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "30d44dabac25fe441ad5f02c13c6390f7931aec34efe0ccaacc75cd1f9b7c521"
+      "source_digest": "cec51ddfebb57183183f9122ff0f4ddd2d4c24d8bc01278daf4a7b72d8b2be50"
     },
     {
       "evidence_status": "pending",
       "id": "REL-THE-M0-DECISION-REGISTER-IS-CLOSED-WITH",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "567293e45c8527788961beb8664e0fe6e8adeece8d39d71bfb7f2c53ed42de46"
+      "source_digest": "4d3700e38f987599e7617c7d628c832b93a0662aad66c4c5e7fc314c21c85351"
     },
     {
       "evidence_status": "pending",
       "id": "REL-UNSUPPORTED-SCHEMA-PROTOCOL-VALUE-CASES-NEVER-ADVANCE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/PLAN.md",
-      "source_digest": "499cd7d1f3336b21c52e0b170324772c2863ab8cf84929429b6a3e8c7f368cc6"
+      "source_digest": "cfcf64e89a662e53ecbdb6216da934c4ae4d252be58fe430149bc1c334f0adef"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-AGENT-ACCRETION",
       "owner_bead": "boring-cdc-m0.3",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "6088dd366f8628866eeb240f6dc11869e821cba7355aa2a2c17047fbf0777ca0"
+      "source_digest": "7b2c36f0baba7b76040d5a9e80b7a39dd0a06ce517a3da6f5b99b4ac6b21b420"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-AGENT-AUTHORITY",
       "owner_bead": "boring-cdc-m0.2",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "4633c2d57b7e3a889b03cf6097e09308dbecfdb0903f1a4262ba1c2ed36d3245"
+      "source_digest": "7e2ddb38308b44621570f172d70288688d5e3a18bb2b38d88b573526087d668c"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-AGENT-CONTEXT",
       "owner_bead": "boring-cdc-m0.2",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "67bb3197845c1b4c070212ecf16f7ade13d42f26a66ab6fcd13abe435ccc0db1"
+      "source_digest": "73e01d048caba28929683fbd1b4f61a3e22ec54f54a6b37f48161ea52a3b0581"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-AGENT-CONTROL",
       "owner_bead": "boring-cdc-m1-cli-contract",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "5e824d8c180a18149878a2198a78eee4292721968af312b906dd50bb6ab9e6e6"
+      "source_digest": "0b636318782a12318862ee96a99abccc2cee161dfe6ca82d50eb6523bf1ad795"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-AGENT-ECONOMY",
       "owner_bead": "boring-cdc-m0.2",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "2ca9e5659364407191e85b2fe7821d1fa215ae8ee9ea42a499f44748fab2b7a0"
+      "source_digest": "d9a5a241a54b5e23514920c599af905ff05edfcd8da28d1757aca7a0be288042"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-AGENT-EVIDENCE",
       "owner_bead": "boring-cdc-m0.3",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "8737de400942387b90c5ea4a3eddc5130d5a096a8e7b1110fd4eb019662049ec"
+      "source_digest": "5f6d01b00acdebd31aac90ccdac2ab458507c5ac67f94b49a222dd7d84a46b3e"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-AGENT-HANDOFF",
       "owner_bead": "boring-cdc-m0.3",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "29bdc36f75e4605cb5ed6eb2a2bb26cef9cf2948396c2949cfc3be8ffb74550b"
+      "source_digest": "042aa4035655661cac310139912033ed51af1310b5d8f425049c1c775f749ee5"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-AGENT-SNAPSHOT",
       "owner_bead": "boring-cdc-m0.2",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "d109e0beedda978edd78773ffb02d0eb70c7c615bd72d49e61d09898984cb03f"
+      "source_digest": "aae05a9585d005774c7376fbc75b69028d88c5f1598e571bf82cf193ef0e7ffa"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-AGENT-TRACEABILITY",
       "owner_bead": "boring-cdc-m0.2",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "bcde8c03e6c9684d01f8b49ba85f4e5af49127c1326a0794741899224e438948"
+      "source_digest": "a546f014f45ef1ffab2db3097bec5e2ac7dd113f33cac6b1830282c466a786f4"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-APPLICATION-LATENCY",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "4afa071e90135b48ef995943b416cb0a323b471a325ecf3c653a21e247a467b4"
+      "source_digest": "1df377fc256418c41fb9fda9fcaf6cd2089935fc5a26ecbaea96fa49fa083fac"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-CONNECTOR-DESTINATION-LAG",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "13dac536848507b0baaca9ac001ccb4800b5c8d45ddf8b25cf2bcec8a7801f64"
+      "source_digest": "441600d363ed9ce687852d0a2969a1ae69b70211c965139491f462337742c07a"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-CONTINUOUS-INSERTS-UPDATES-AND-DELETES",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "73f1c35172d5ddb66f3b067b4383e8a12bebb5f0103abefcab6107ca10488ff5"
+      "source_digest": "1ec20b70c45d3702711ff06afbf0baba8da7997caf0c71889841c4b6460514ba"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-CORRUPTION-REMOVAL-OF-ALREADY-CHECKPOINTED-DESTINATION-DATA",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "8c7d50b010cfbccbcda052454eee0f8a0d35fa056ac92911ffdbc190fbf1eaa8"
+      "source_digest": "658f4aa947d7839871803e11f8d8436fbd152999387ca7df3c968fe1971bfcac"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-CRASH-AFTER-DESTINATION-WRITE-BUT-BEFORE-DESTINATION",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "f5b3672f04fcce855e4501b421f75ca9e134f3c6230fe4489abce6055d4a1336"
+      "source_digest": "7c5cc5578360fe09a24ee6c0d3cdef597e7bcf4d6ce045c6ac694d5f0cd49005"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-CRASH-BEFORE-AND-AFTER-JOURNAL-COMMIT",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "8a95b7b452c3526417af8174d3d58f80cc9eec814ef1f42ccc48720d26d0fcb6"
+      "source_digest": "a66d7784ddc766b961938dfecc75c0311901dc5ff7dadf6e179c8ffd4b1e88da"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-CRASH-BEFORE-AND-AFTER-POSTGRES-LSN-ACKNOWLEDGEMENT",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "edd7f40a9ededd949b6ff653f3dec243f5dfa50ae6b38a79641dee69764f7d26"
+      "source_digest": "92f3f7f3479483ccbc17a751fa9c4fabb8abb84e5395e5a261802f2022b724f2"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-DESTINATION-FALLING-OUTSIDE-JOURNAL-RETENTION",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "a66742bc5e2e4a64c57b4be81b5feb458a1904f9c96cc0b5445466459f0854d4"
+      "source_digest": "4b21fd0985ba4647619f857577e4ddc1ed6adc57daf414f696d24e12a33b29e2"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-DESTINATION-OUTAGE-WHILE-POSTGRES-CONTINUES-CHANGING",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "7be8d4484627366dbc013f21b61366c5c3493d634f4847a148a24919afcd6895"
+      "source_digest": "9cb11478142c75f9bd3e95c50c880914bbb2124705427c37e0ca56c4eef61ddf"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-ENOUGH-HISTORY-TO-EXERCISE-BACKFILLS",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "a207a91db663f216d62d9ca5ef28dad21d477a8ac44afa19ad18bed0529a30fa"
+      "source_digest": "ed786ed06562ad83243de81291c5310749b0fec168dd4d6a164046f18aabeeba"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-EVENT-LOSS-AND-DUPLICATES",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "aa54fc345e45b9ddaef355879ea47b461d50999370950fed267ff7cd343ddc43"
+      "source_digest": "1d9ac49e6bffc3edf56b5d9f0c6fd95c9eff6dd4f471b4c2a4c9711a31d1fa8b"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-FINAL-DESTINATION-CORRECTNESS",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "174d6ed87615e0c2ca757a966d9b6de7bc23ec4f730256f092072be402265110"
+      "source_digest": "87938c82255176173b4df8ce0ca2a6f2ca17efcfce24e8515d137e9a18c56248"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-INTERRUPTED-SNAPSHOT",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "fa29200957338a5482e9ae8bdc6e8e8b583f0e580d99cd0784f1e50355c58695"
+      "source_digest": "13a714c6c3eb874df391bac497803f81c9b0f44a98f3444207d481baadea3bac"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-NETWORK-INTERRUPTION",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "cc7983f5ab0f9a0cc9e4e29b02c553fb7711e39b8bfd7414ddf174b5b51ecf33"
+      "source_digest": "ec411bd4df7172b350d1974dbf34158b25c1aa1c66a44bb0f56a60f44e81f5e9"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-ONE-DESTINATION-STOPPED-WHILE-THE-OTHER-CONTINUES",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "c085f1ccc1381634e0c6225e600cce3373925e5b9b10105a1752a68f7b008560"
+      "source_digest": "6230a98978da8ed050d7f12b5cb700cd7b1543c9f00d05fd58d0b70e0b1fe3e1"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-OVERSIZED-COMMIT-BURST-SOURCE-TRANSACTION-WITH-LOGICAL",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "99558f0fb0ebdb33284b0a2f3b9f5f742142fe44150cae0469cf3a7a767ea283"
+      "source_digest": "c95f611a46815dfac8668b023aec078de3fda903c539f5db30a65dc65726d2af"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-PUBLISHED-SCALE-PROFILES",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "c7bffd011a6203619dc00ffd591c74764c77f5ad69adf9e2fdff61ecc340afc8"
+      "source_digest": "1e73a507c3aff2ecab16d562540d3e98573fa249c2fef4a7e481d2c8cf79d191"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-QUERIES-AROUND-CLICKHOUSE-MERGES",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "be2a355d3ad5ec379611a4149638d7b3b2a7ecc07104f394fd4d6a25004323ff"
+      "source_digest": "672d13f455863b16aa5957f69aec268886fbe3af2e0727696aec8f6194cbfe5d"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-RECOVERY-TIME-AND-REQUIRED-OPERATOR-STEPS",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "b313081db639e0e9cec3917104fdabdd84ebd52f0255afdf4dfdd53ea249b754"
+      "source_digest": "9f2a73d725a5d125435dd60c6d39d12f079944b9a179db729e74534bbd6cd9b1"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-RELEVANT-STORAGE-COST-METRICS",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "7bb768d1b6f94538f1b9c2c9732d436ebbc247f3c4670b2cdafec83290244234"
+      "source_digest": "c4dc5e4898368b27ce67649672dcc5edfdc13cd900706aac46e24fcb1f7c658c"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-SECOND-DESTINATION-ADDED-AFTER-CAPTURE-STARTS",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "3d4583072f68f6b33760ca982e896d9e5d790a4798cfc41a9f9b7d07ee738d86"
+      "source_digest": "9667393eb80bd950a489e82338bad2b6ecdf67883751fcdc7c92892fc4d4c97a"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-SOURCE-CPU-AND-I-O",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "c9fc7870d982e92c375a1bc76b6a52c42350acca4d0805523057ce2c84d961e9"
+      "source_digest": "c25d2dcc4c61e177c27a299b941e5b6bfedcdb286c59e115cf0d8b4c42bbeb2d"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-SUPPORTED-AND-UNSUPPORTED-SCHEMA-CHANGES",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "9bce5f97ae74185f5f73a8031d2a1b48b57f0c745d42c3916aa9aeb1f55a89db"
+      "source_digest": "95e2bbefbddb0168143427c71f68f2fe6323677070e2dd467afac44a4dc29f3f"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-TRANSACTIONAL-WRITES-AND-CONCURRENT-APPLICATION-READS-DURING",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "aa3f9fef2c1ca7f114c3b1f84196d54c2260c36a107bf6f49d00e71a0ea96f8b"
+      "source_digest": "30a0e0ec750be3893688d08b93f2e8d04a86b4c97ea809f493876cf8734755f1"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-TRANSIENT-DESTINATION-RETRY-VERSUS-DETERMINISTIC-POISON-EVENT",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "e83a59357c4d7f305961ebf5c7d58afeb99c00635eb1ef348499dc903f64ffdb"
+      "source_digest": "9743f78b51763339c414cc73a5ba4be81d200ea6e3bcf29ab807ad8d5dd4a0ec"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-UPDATE-HEAVY-AND-DELETE-HEAVY-CLICKHOUSE-WORKLOADS",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "411672821644184dc89da453849ea99f005211493aa88326dc9aa68d2ee70b82"
+      "source_digest": "333ce521dbeee2f8a31e54f49f82075cd4bce584eae795ea2202f511a20c8747"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-UPDATES-DELETES-DURING-SNAPSHOT-COPYING",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "d1de56cec8bf4ed5bfbde7d373bbefe2836353f3cd67a181f74f20a7a83ad7a7"
+      "source_digest": "2cb7a25a3d906821d326d873566701896ed2ad5d4c25e6a061a5637c7cc54ac7"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-WAL-GROWTH-AND-SLOT-LAG",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "12f271e26ddcfa711e71499fd2c472be617484fce007fd490d82cabda50ca319"
+      "source_digest": "a6711c34fe018d9db111452a89c7a21b238d3544b2c68c23e0bec7391c08bd0a"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-BENCHMARK-AND-CORRECTNESS-HARNESS-WAL-SLOT-RISK-AND-SLOT-INVALIDATION-RECOVERY",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "7bda761d4db09cfdc4eca3ea8cb7f79af2a29a3fe7b7b8539ee75878279911f8"
+      "source_digest": "656de9900b8b794fdd6e94561c1f0fd3474a204995d05d954485c1effd160a39"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPACITY-BOUNDARIES-JOURNAL-DISK-BUDGET-AND-REPLAY-DURATION",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "3fdb195d432bef91d12765e29422a315c85cdf3d5e93a94a08f1e99566198bb9"
+      "source_digest": "c84d516211fad34e80b5e7543b20f766f2f15ef8d164e4f6dc2bb5e2720ca066"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPACITY-BOUNDARIES-MEASURED-RECOVERY-CAPACITY-UNDER-CONTINUING-WRITES-AND",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "c1a425f0e6ff4697692c61429a21bee21e7971f8c25f881f37ea3cea52a7384a"
+      "source_digest": "c3bbb8a4ea4d41df7265ce3dba3b2aef3826de0b1069c0d0efbec9956d224e28"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPACITY-BOUNDARIES-ROW-EVENT-TRANSACTION-SIZE-INCLUDING-LARGE-TOASTED",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "8222085a3f13fc9289ffc9cf0af71d75839bd521804a0020b28c2dbe67936c17"
+      "source_digest": "6928086cae934d936394bd3e54e998ab4de06d3e06f5c96ef8575bcb79ecd6ed"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPACITY-BOUNDARIES-SELECTED-TABLES",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "4d9d7ae361f331b457a4423768e8019dc1d2658f18974da2d2764081163a494d"
+      "source_digest": "aa3ad39a229f1c60a0d0651cbb49b937cbb34ff285229255e765278a4a21723f"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPACITY-BOUNDARIES-SUPPORTED-OUTAGE-DURATION-UNDER-THE-TESTED-WORKLOAD",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "c0ec90a98b6de5e496da180dd9ac464c4de56addb7a81ca480da03f748e9ca6d"
+      "source_digest": "680cf85db7f72a9c323304f23a0d439a33c87c0bfa9bce7e852a9110a57e1916"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPACITY-BOUNDARIES-TRANSACTIONS-EVENTS-PER-SECOND",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "895560437f9d2722a4a20a624e37d3066d0e1f69b010155b2125e76868de6f0e"
+      "source_digest": "d02e30e666d0653609131a1c94fe910a2662c3802373a303b35057bc90511862"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-ACKNOWLEDGE-POSTGRES-ONLY-AFTER-THE-JOURNAL-APPEND",
       "owner_bead": "boring-cdc-m1-decoder",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "7addab7afed83f02fb07fc060d3b119af60c76e5c22af1ca7568b20222414754"
+      "source_digest": "46d151ab43c8acf5d002cb2d398f3f59f367d519c8c4c4fd852fbbf5df7de720"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-DECODE-PGOUTPUT-INSERTS-UPDATES-AND-DELETES",
       "owner_bead": "boring-cdc-m1-decoder",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "815813462aa7a6eb99569630f3f0cfc7bba3b135498d290d5a56c3f1be197866"
+      "source_digest": "01aa240c9deaec71caf406c7002ef758e2a44cf35f02235f58d9c22da339adc3"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-DISTINGUISH-TRANSIENT-ENVIRONMENTAL-FAILURES-FROM-DETERMINISTIC-PROTOCOL",
       "owner_bead": "boring-cdc-m1-decoder",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "cc9f42c0b90df232152f8a2d2848c943a9d4af7c4339a1bd8394658432769a4d"
+      "source_digest": "4aa94271bf850ecc1973ea5cb71e42f2aaa9b3af5713de612c8d56029db09112"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-PRESERVE-TRANSACTION-BOUNDARIES-AND-SOURCE-ORDERING-INFORMATION",
       "owner_bead": "boring-cdc-m1-decoder",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "561e1ca9b9a12a7886346baa3f75fae749723b1d145e4ce050c5db94a0f47832"
+      "source_digest": "af6a2e633e61a506194ea296d4ff5d582998a18d05da810e675dc7cff751ea8c"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-RECORD-SOURCE-RELATION-SCHEMA-METADATA-REQUIRED-TO",
       "owner_bead": "boring-cdc-m1-decoder",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "d62b702026db9cb7ca1a25c5e6ffd9210adef4250639197ef3b160c229898c2e"
+      "source_digest": "6521843d0179c68ca307a86076070d7930d13cf922acc5c6a955256352918d14"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-RESUME-AFTER-PROCESS-OR-NETWORK-FAILURE-WITHOUT",
       "owner_bead": "boring-cdc-m1-decoder",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "5c5420645ca017a018182fb1b5dea0abeb441b0c6468c65f5b0644e82c742b56"
+      "source_digest": "a7e8d188d2edc1f6f3556a71ad09fce39e887172ebe932c837f0f999f82db4ed"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-SURFACE-UNSUPPORTED-PAYLOAD-SCHEMA-CASES-RATHER-THAN",
       "owner_bead": "boring-cdc-m1-decoder",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "70bcd7ea578d28b5404afab857a4ed2fcb2728dd6c486430361f84b4f18f4799"
+      "source_digest": "9dac0ef5507500bab4db98721a62a613f533f2868501c671c1f85d18bac07a9b"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-TOLERATE-DUPLICATE-DELIVERY-AFTER-AMBIGUOUS-CRASHES",
       "owner_bead": "boring-cdc-m1-decoder",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "b9fb951386dbf691c841164a6f25afe770b018a0eb2a21ef55b6566ee7fd1d44"
+      "source_digest": "a12916554bb0a07c73165520ad9e0b348ac12874bf318bbe25f76ed3ff3fa6eb"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-TRACK-LSN-PROGRESS-DURABLY",
       "owner_bead": "boring-cdc-m1-decoder",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "a8007d95c3a190424eea602ae1fb2282263462a452c00247f05321fbfd5377c9"
+      "source_digest": "9eb3de068da00ea0313ca932459cb6adc8d259ead6972091e6777cacc144ce0b"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CLICKHOUSE-MATERIALIZER-A-DOCUMENTED-DISTINCTION-BETWEEN-NORMAL-QUERIES-AND",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "8ae19b868d3155cb1c64de14898972bbc966a03c78d12e84b29aef7b6efc0367"
+      "source_digest": "961dde0ab8c599ab9aa68cd0b4a1eba40fe1c570b5d5501949021e7386e932db"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CLICKHOUSE-MATERIALIZER-A-DOCUMENTED-TOMBSTONE-OR-HARD-DELETE-STRATEGY",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "188941c050ddc07b2a3ae7758c5a058e0a484d63205a8a5a167a75324c75d8b9"
+      "source_digest": "7df46a7472adb83767e75cedfe1a153ec5ae96effad2c6e9658ba247c822468b"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CLICKHOUSE-MATERIALIZER-A-TESTED-RE-BACKFILL-PATH-FOR-INCOMPATIBLE",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "2b62c287b1ca9d3da72af4042a763cf575c5e47ee093537c2d038cd1d398a25c"
+      "source_digest": "3f8119741cb5f5f2616a9c9d33aeba686f5e91c81ab63b12c6abb9147a386179"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CLICKHOUSE-MATERIALIZER-BASIC-SCHEMA-COMPATIBILITY-CHECKS",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "66133ccf14220e38d3c528674eb2b326f38f3cd24d38e6544b0668f96452d9a4"
+      "source_digest": "abaf1345dee75eb2b4bbce85570fb2d1989782c8b0b716bb6bc6fb017962e142"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CLICKHOUSE-MATERIALIZER-CORRECTNESS-RULES-FOR-QUERIES-BEFORE-DURING-AND",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "e02453f4881773f51d4fae1bccf7c3fd5fd3b71ecdaa4d78440c46e17209c79c"
+      "source_digest": "ff95433efca4190203ad06b2a818b9bc918fdc325a6c21bef99bb3321fb98510"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CLICKHOUSE-MATERIALIZER-EXPLICIT-VERSIONING-AND-A-DOCUMENTED-ORDERING-SORT",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "bc5122d2cadb9a527269f5982344019094794b3d36c6e0454cd8cd175537a119"
+      "source_digest": "f0679afd39c9efd2d089ddaedc19c3522655b85c2141c2a988054cb2f6cc6920"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CLICKHOUSE-MATERIALIZER-IDEMPOTENT-REPLAY-UPSERT-BEHAVIOR",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "4eb0b684cd4b9694373a52951b97e2698dedf3345ec34c5d3fa6172f6b2acdbb"
+      "source_digest": "4097847cbc2b27f3a9d8af8a589f84097a4c53cf36b116b71d490b1dd233e78d"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CLICKHOUSE-MATERIALIZER-INDEPENDENT-CHECKPOINTING-RETRIES-LAG-REPORTING-AND-RESTART",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "babfacfeb58bed669d7ef7ed561272913122ca167d768c9bf7c38c640855f715"
+      "source_digest": "90c4d989ee177bc06b65a566fa3cb51e80b29e1e38663153bdb6cd86abfc756c"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CLICKHOUSE-MATERIALIZER-PERSIST-BOUNDED-RETRY-BACKOFF-STATE-STOP-RETRYING",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "83a3d3d05c0173396b86557741a0074041e305fe96bba693e64546249476ba27"
+      "source_digest": "adfe6071a6e02a3014265858899f6906ca0ebe30e58f6a1de21237e4126ffbb9"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-CLICKHOUSE-MATERIALIZER-PROVIDE-AN-INCREMENTAL-READ-ONLY-INTEGRITY-AUDIT",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "ca7c48f823eec644743c016cb1276a28574ea35337ad24f9500778f6df4c1a62"
+      "source_digest": "815c1077e896427ec89dc2a7711815fa8ecb68a8739cc6c44c023188f20a52dc"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-BE-APPEND-ONLY-FOR-CAPTURED-EVENTS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "3d0eee6bf798b86cb074c067fbd99d09b805d6cf0098839fb1d17efa7725e928"
+      "source_digest": "2dfcbcb84bf7da0f18b5387f37c0498de48a0f81200624e2295b7af2fa0fb3a4"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-BOUND-SQLITE-READER-LIFETIMES-AND-RANGE-SIZES",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "7798a1a63b8d5c57307d566ddaa54abd9bff9576f45b671e66126dc4034654d7"
+      "source_digest": "88e6d26d72333ff1dd3e749b0f8d4a03a05070eed7243f1f3d0e62b298f8b0a3"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-COMMIT-EVENTS-AND-SOURCE-CHECKPOINT-CONSISTENTLY",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "fb3bde1ae9cc4e42c1030d0b2bf4b3c3c239226899af2dedb0f377747b29321b"
+      "source_digest": "238edd3681ebf5995b8364dba44c9e46c8a7dab5d8249349677305e121dd5c2b"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-DEFINE-WHAT-HAPPENS-WHEN-A-DESTINATION-FALLS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "89ac97ee2a1711f7905ae8ce3dbfdcba98e57f728e87e23716cd8493c99bfa1e"
+      "source_digest": "fe0aea0a86f8c12be8f45bb79431d25a00038fd2a1c10a01b90cb7244964ad0b"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-DETECT-JOURNAL-CORRUPTION-AND-UNAVAILABLE-REPLAY-POSITIONS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "101f93281aabdf8bf82d9120fe802939eb91a35f49f7d0af4469285db390de1f"
+      "source_digest": "9bb8f6a6aaedbab88cbd46fbdd39b2eb691c3e24b5ce6967218920db17fd8c47"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-DISTINGUISH-PERSISTENT-DATABASE-SETTINGS-FROM-ACTUAL-WRITER",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "28a2c8515f045bd7d9615a7fa0a7acf4e1b2946aea117f28bc28c751cbb20114"
+      "source_digest": "e4f06b00aa0c068b60b1ddbe317e1f9c528ac2a13d9f6a75eee95b85e2608d42"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-ENFORCE-AN-EXPLICIT-DISK-BUDGET-AND-REPLAY",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "737194049f5586b1f31c12c7c8c8f069e8aa5805440f470002c5812d937b558f"
+      "source_digest": "e5497ee8a6c4fc62c3d22d4f220ce8dc1f2bf3d09b1a2a9092141e5a5bf206cd"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-ENTER-A-DOCUMENTED-SAFE-STOP-FAIL-LOUD",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "7ecc1f4ee87f8b3ca09f70f35937dd8cc42b019997af983c1043426dd10824f5"
+      "source_digest": "1a21a3c4a5f157ec24c8e24f9035b3a017e626e857b90260f058e9f8f8ff7529"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-EXPOSE-LOCAL-BYTES-USED-OLDEST-NEWEST-REPLAY",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "e5e4fe269139a94e23e77827aa843b00d28a526f78469fabba8a7cd47cc3880d"
+      "source_digest": "ef3038ce65ad49bcf76e3f1aa175a5a0fc8d2dc18bd1583b3ca35d3c6042d07c"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-STORE-INDEPENDENT-DESTINATION-CHECKPOINTS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "3e152494aa1b60946d8c5e792b5b7d2b4f227b470cd6efeb6f0c91de6a8d97a8"
+      "source_digest": "d8b1345548b83cc7a7f172e8a21e8e88d362798c160678166d3716ee97b6a2d0"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-SUPPORT-ORDERED-REPLAY-FROM-A-STABLE-JOURNAL",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "34b127bb00dedbdc4a17a9bfd4becec92994226a6d843917ba08b16c39657c92"
+      "source_digest": "8e83557d72577eb764067531edf92fcce756ccdbead4511238078e66be6d4048"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-INITIAL-SNAPSHOT-BACKFILL-CONTINUE-OR-COORDINATE-WAL-CAPTURE-SO-SNAPSHOT",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "745308fba68419d95d061910f558628a5cb0585db2782fd04d61a6035f47b4ae"
+      "source_digest": "9753cccbc13d10c71c8ae8824b3eeeea7d7100fcaf5380f749d6bbeb7d3c94a7"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-INITIAL-SNAPSHOT-BACKFILL-COPY-TABLES-IN-CHUNKS-WITH-CONFIGURABLE-THROTTLING",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "2e629713482b7b03ce51fa2f6abac7e842a6c8618f89e98792e0760de9bc83fc"
+      "source_digest": "32efc0fed29bf1ad937c021a3d78096e8570904ef1c7a33191ac07a6e5509ac1"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-INITIAL-SNAPSHOT-BACKFILL-CREATE-AN-EXPORTED-SNAPSHOT-AND-RECORD-ITS",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "b49863ebc3134633f092197314b4e87a95d601cf563f7bd4cf4896a79cf26c18"
+      "source_digest": "8a6248ce64eff153b3b84e11e01f7d30a738f1bc74173171ed7956e3879fd17f"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-INITIAL-SNAPSHOT-BACKFILL-DEFINE-SAFE-PAUSE-INTERRUPTION-AND-RESTART-BEHAVIOR",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "d06baf07b83051f4fac4605e8cc87d21be3d391a4a9967fccee85c8eef94c0b5"
+      "source_digest": "af4eb6c181a161fd6a53ca37ea155e0432081f3834e2a651423812c9a5fce56b"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-INITIAL-SNAPSHOT-BACKFILL-EXPOSE-PROGRESS-ETA-SOURCE-CPU-I-O",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "828b1823aa52ffe5190d3ed24612a83ee0f5c20d7de267c9920306938e3115b5"
+      "source_digest": "c63775ae82f8d9606d76f4c70f240c5dedc4049d97b4e053558cb84536e00311"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-INITIAL-SNAPSHOT-BACKFILL-HANDLE-UPDATES-AND-DELETES-TO-ROWS-WHILE",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "810b2bff3f5d2cf384a7874989e7b6d5dc012cdc0fc2571d37af429f38107710"
+      "source_digest": "8694c13f72e921f756cb0823835add605192a4b13341c0a0b540898d91c145b3"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-INITIAL-SNAPSHOT-BACKFILL-PERSIST-TABLE-CHUNK-PROGRESS",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "98861c7b652d5615550525a47f05288c670992d8afafa514993a71c3bdd75376"
+      "source_digest": "c05bfc3b19bac63e212b50eac76e65d0e2daa58b51d998407b144f5d0caaa8f8"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-INITIAL-SNAPSHOT-BACKFILL-PRODUCE-FINAL-KEYED-COUNTS-CHECKSUMS-AGAINST-THE",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "22ad80e0b19c680b615ebf1f4c1f99d4eb0a62cc9ac0bc27c30c6fd65bfc1d47"
+      "source_digest": "21ce7e4cc91a0716d0281302417d11bd8dde7a05c49b56cfccc27d546de72d6a"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-JSONL-PARQUET-ARCHIVE-MATERIALIZER-BOOTSTRAP-FROM-RETAINED-JOURNAL-HISTORY-WHEN-ADDED",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "8108809d76127706ab06af48a54529c89162ff6f665c49ff8cea2ca6b1f41d7c"
+      "source_digest": "4a378a82d0dc8137737b3640328544fc90ef10c485f982d3f22b64ec94032932"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-JSONL-PARQUET-ARCHIVE-MATERIALIZER-FAIL-WITH-AN-EXPLICIT-RECOVERY-PATH-WHEN",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "bb0ca0096485a28b7229872454d6a2272208b7790b3716ea295f9b782b5f9886"
+      "source_digest": "c33426178580c271bdf7e4c06365263a2f0b9529d3d065ed7bcda5ee53836d96"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-JSONL-PARQUET-ARCHIVE-MATERIALIZER-INCREMENTALLY-AUDIT-CHECKPOINTED-SELECTORS-MANIFESTS-READINESS-MARKERS",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "73e15b7f0eb1da0354f7483d4bcfffaeba58da0144947f2ccb137d21e644115b"
+      "source_digest": "a0023a7dfcebd13aef86bb0b61b67283e08350aff87a47b044c9c1115df42d40"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-JSONL-PARQUET-ARCHIVE-MATERIALIZER-KEEP-ITS-OWN-CHECKPOINT-PERSISTED-CAPPED-RETRY",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "75d58cf9b35269555e266e37964675d31d3a3054c297a8d0938a8cbdc5cb1b75"
+      "source_digest": "72caa9499644011e994c2a1c0dba8bb26c5b74570bd78da1fa63526958043877"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-JSONL-PARQUET-ARCHIVE-MATERIALIZER-NEVER-HOT-LOOP-OR-SKIP-A-FAILED",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "b4a537e05273a0836730fd960472a8d172f86a173db98c9f46aa9952e7e68033"
+      "source_digest": "6e88e4a713c5313fc7c7c43c01d3da0914f658c7c5b5ec73c12d83d03aa65693"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-JSONL-PARQUET-ARCHIVE-MATERIALIZER-READ-FROM-THE-SAME-JOURNAL-NEVER-CREATE",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "f3b33670a6b5625df25ed072a449ddf0a688db447f0b9767db372bdbdd89db2a"
+      "source_digest": "4b3650cc291cc7e7627d1d4676662983182b1d5cb7b6a2aa2774b2a19ec1d505"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-JSONL-PARQUET-ARCHIVE-MATERIALIZER-RUN-ON-A-DECLARED-SCHEDULE",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "8f910e5f6b2333d54ca51cb0adf443ba394561afe92ee7ef8e51595b24beb439"
+      "source_digest": "bb1b0b4a54094592387700aba350c1c1c97891b4ee2a1ca82824f59e8f936a02"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-JSONL-PARQUET-ARCHIVE-MATERIALIZER-WRITE-DETERMINISTIC-REPLAY-SAFE-ARCHIVE-OUTPUT-WITH",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "5729b5538fdcb95aa42ba761d1359d961f765fd07c9e68f319df3223f2fa0111"
+      "source_digest": "592a18a48225d50a593074a735d69e9437ddc9aff78eb1c32819569f595e235d"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-OUT-OF-SCOPE-A-BROAD-VENDOR-LEADERBOARD",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "2a29a4f5da5e1ec90e357cb9aa6c45a8f2bd8a712730418cebed403f6e613b00"
+      "source_digest": "dd0ece3b7058ec7eaf308e11abf2077916864081825f05c454ca5506f0eae847"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-OUT-OF-SCOPE-A-DISTRIBUTED-CONTROL-PLANE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "be3a78d3a2f4b7b15a30ac8b6bdfbdc03d349677937f1934cb03f3896059b0eb"
+      "source_digest": "33f5acdd46dd9c30eefb8fe54a0bbb67552c7cc761db24ddb968e5d9b0fbb107"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-OUT-OF-SCOPE-ARBITRARY-SINK-PLUGINS-OR-A-GENERALIZED-CONNECTOR",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "02edafbab25a3eefdea43eb9f21f99179d92cce39ef7f4ab209d101362b7b7bc"
+      "source_digest": "a3574f80b861177210bb8d3f7a22ea783b16207850e876624301b8cc777b0afc"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-OUT-OF-SCOPE-GLOBAL-EXACTLY-ONCE-SEMANTICS",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "6a67cb82866414916273d1a30523757946095711b8d7f604a00536ce970265df"
+      "source_digest": "dd279987c86bd3beb272f93a9fe68a83c0f6f237fd9c89a1f7cf5a6c79c6c419"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-OUT-OF-SCOPE-KAFKA-KAFKA-CONNECT-AS-A-REQUIRED-DEPENDENCY",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "1629332df6590f71de52dd4c3351b2e87c2e90007184a8c5631393dc505abfcc"
+      "source_digest": "b3c491df530968ba086b1ed75c233e50be0a18eee443046795e4f39c9e6bb58c"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-OUT-OF-SCOPE-MULTIPLE-SOURCE-SLOTS-PUBLICATIONS-OR-DISTRIBUTED-CAPTURE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "d2f34f78f7a157fe726bbc74ea49b8aade38bdbd8a31d9da731b1d4f7bb17b37"
+      "source_digest": "361610d39d7893599f6dc4d0b2e8802285a8987d77270f6515a6da88dfc3636e"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-OUT-OF-SCOPE-SOURCES-OTHER-THAN-POSTGRES",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "46a361bfcea4b726b9bb3e5836a190055eef1f6ae31f5b69746e79dd3c597b95"
+      "source_digest": "3999b10a3adbe1a5896336fc93a0a4c132c22b52bb8b9076a530176c4d4a9f35"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-OUT-OF-SCOPE-UNIVERSAL-DDL-MIGRATION",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "18cbfaa935faf0989c4c0d521544bd6ab9451230e5de35ed304ab6dc5d8e6356"
+      "source_digest": "f5e2e2aeb5c03b63632b2ca3bf06d2bc44efa0e77b73f1cb3629d030f4323c0c"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-OUT-OF-SCOPE-UNLIMITED-REPLAY-HISTORY",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "d661f5ff206646a4b859c987e17ad96babe5ce9b67baf5237420e329b86aebba"
+      "source_digest": "7d3a65938166dfaf48bbef44c7ff0f12eb57ef99262b06dce5cc5e47d5dfe168"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-PRODUCT-CONTRACT-AT-LEAST-ONCE-CAPTURE-CRASHES-MAY-REPLAY",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "a802561512f5b75c6448f569a96eb30b3f739a7acc1eee54f0f9e58103e4fa9d"
+      "source_digest": "8f001471cfb669a5e33857ea174845d5c8b3d74aa35313cb14bf06d8930e01da"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-PRODUCT-CONTRACT-DURABLE-BEFORE-ACK-POSTGRES-PROGRESS-IS-ACKNOWLEDGED",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "d41fcbdc1f08c9fb77ed925545c57684d3fedd570cc98df4e87c1f1b49b1686b"
+      "source_digest": "fa397030e749a33e9e4f6d9d5317b934b912a7bfd09c0ea77453f74798407285"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-PRODUCT-CONTRACT-IDEMPOTENT-CONVERGENCE-REPLAYED-EVENTS-MUST-NOT-PREVENT",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "3c9c43114fc4b5b5ae1f1fe9c8a6dd5facf79c6372337e30bcb051cbc3c74684"
+      "source_digest": "ce2ea1f5378ad3115b38288c2c1f72f037954e59717207a4929d53d9f01c82fa"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-PRODUCT-CONTRACT-INDEPENDENT-REPLAY-EACH-DESTINATION-HAS-ITS-OWN",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "d4df5d747ac48ae9f4e647396f225540ccde6f677edf53c3a9b77cea8c6d901a"
+      "source_digest": "a571c2f354112e37d75d8d0296db8466949750bd78c9b63a25e16649a116bd61"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-PRODUCT-CONTRACT-NO-GLOBAL-EXACTLY-ONCE-CLAIM",
       "owner_bead": "boring-cdc-m0-gate",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "299b8a338cb9349cb39d46def34cac59289aed8f83555689690cef02f5388548"
+      "source_digest": "701e7497537b0eaf17d9f35987b55c876205f3a514a8441a39833b674c3ef8b8"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-REQUIRED-TOPOLOGY-AND-DEPLOYMENT-A-BOUNDED-MEMORY-CAPTURE-PATH-ONE-TRANSACTION",
       "owner_bead": "boring-cdc-m0-scaffold",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "21d5f73dd2f02664e22da6b2138f2a83038c5863b88f888e380bf31c2a6e5d08"
+      "source_digest": "9311643e6fd4562c113a3dd346caf75c5ce7471c842ea4e72af253db4f62daae"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-REQUIRED-TOPOLOGY-AND-DEPLOYMENT-A-SCHEDULED-JSONL-PARQUET-ARCHIVE",
       "owner_bead": "boring-cdc-m0-scaffold",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "f817319e512a0474218f20a7d140f3e2285673a8dee40ae22ce22bdab63c02e3"
+      "source_digest": "18bcf376eb41fff53eaf4affb383d1f4a1009b4933cb31aa9c672632d6e64aff"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-REQUIRED-TOPOLOGY-AND-DEPLOYMENT-AN-APPEND-ONLY-EVENT-JOURNAL-FOR-PAYLOADS",
       "owner_bead": "boring-cdc-m0-scaffold",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "7361858460a56f4da56eee640066abcb72b90ca50d25330d00bc8ebae0955a90"
+      "source_digest": "f4a288bd92b01bbc77429cc3700949e50f9fe6c3c0fa9aba44ca40328cf78958"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-REQUIRED-TOPOLOGY-AND-DEPLOYMENT-CLICKHOUSE-FOR-MUTABLE-SERVING-ANALYTICS-STATE",
       "owner_bead": "boring-cdc-m0-scaffold",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "aa05819554d6eb48afcc1df6f2cd86011c35c9d3d2b590fa267bb8bd4d8a708d"
+      "source_digest": "bfe5afec8a6f334a62b075a28db9098c621c86c867669569d2888ffa955b4322"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-REQUIRED-TOPOLOGY-AND-DEPLOYMENT-DOCKER-COMPOSE-FOR-A-REPRODUCIBLE-LOCAL-SOURCE",
       "owner_bead": "boring-cdc-m0-scaffold",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "5c78e484bff500fe993666fcde920d61c73459d42f8543dfb4b2e5fcca77975f"
+      "source_digest": "4d0b0515786b1994162e06d8274977d1705d82d6ce1b6fcaec880f8a34cd9ec6"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-REQUIRED-TOPOLOGY-AND-DEPLOYMENT-NO-REQUIRED-KAFKA-KAFKA-CONNECT-KUBERNETES-SCHEMA",
       "owner_bead": "boring-cdc-m0-scaffold",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "e1a8dacf6bd03cb3a1d3c561d7315015c3a7b6b989933e361bddbdae1663dd0e"
+      "source_digest": "d4aeb2ab624b1527cadc76681aa46fa29060ab9d97297c8028efe0eef4593318"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-REQUIRED-TOPOLOGY-AND-DEPLOYMENT-ONE-POSTGRES-SOURCE-USING-LOGICAL-REPLICATION-AND",
       "owner_bead": "boring-cdc-m0-scaffold",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "c16d918cfc82e2eed50111976dd11e7c627ba5d22beddcad1ee314e1577e30c3"
+      "source_digest": "2fb91075b7201b172e17fb54d603d8368bcb158f609e46f1ef83c25efd3ef7ae"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-REQUIRED-TOPOLOGY-AND-DEPLOYMENT-ONE-PUBLICATION-AND-ONE-REPLICATION-SLOT",
       "owner_bead": "boring-cdc-m0-scaffold",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "bb85f4d8d94028b8622a0e8e553131cdc42706c4d0a42637f3a2a9b1240c6049"
+      "source_digest": "836ccd7e47f77c23fdf329f7ddda0795ed487893c33a2dbd687687d6ada2fc58"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-REQUIRED-TOPOLOGY-AND-DEPLOYMENT-ONE-RUST-BINARY-CONTAINING-CAPTURE-JOURNAL-MATERIALIZERS",
       "owner_bead": "boring-cdc-m0-scaffold",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "ce7e17b1d56357815847d893e00df666198803e35de05667271d128c21ad1a6a"
+      "source_digest": "4d3350a85db9b7375546503daef0f3e201e3dc3d40bd413e2ac7b50a89bb48ea"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-REQUIRED-TOPOLOGY-AND-DEPLOYMENT-TWO-DESTINATIONS",
       "owner_bead": "boring-cdc-m0-scaffold",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "54ce68a1b5acd1c00f1597eddb696f852d96cb230ac1f04e400020ab9524dbec"
+      "source_digest": "d12404d51875f74f3ec5e6ca57b944aec13c503d53d7dd62b82e965ee3560fe1"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-CHANGE-A-COLUMN-TYPE",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "50c42ad2da1d39226daaaf34a32c1370c59187e37abc360d201d86d61d721496"
+      "source_digest": "03894e7baf2680876814f74ef6fce1f18785b9cfb209c43fbdb69745c8e30c9a"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-DELETE-SUPPORT-AND-DESTINATION-SPECIFIC-DELETE-SEMANTICS",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "0b2ac23ac3b5eb64a314e2977573089de2bfdd1f40c0f57f147cc0b72083df57"
+      "source_digest": "3f942c536fa4691ebeed3e9d9365a6e8917a31dab50de18ec5ac4dba358c4468"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-PRIMARY-UNIQUE-KEYS-AND-POSTGRES-REPLICA-IDENTITY",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "b9aa53df86b16f91cdcd8fbfefad3744a8b2ef97ce6c621570d1367d09684902"
+      "source_digest": "a1efca44085ded0cad629f582c37c64035c7c2f18cbf6f8ed92157a970bfa374"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-REMOVE-USABLE-REPLICA-IDENTITY",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "ba75123502a35849a74d2c00fd6496781f4d079b6c3625aeed73b343adebe536"
+      "source_digest": "bde53f40d7a9cd6e7694ee5a9ed15bc6604ca19d5f97bafe34a19e734cc428f1"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-SELECTED-TABLE-AND-COLUMN-TYPES",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "52129436e72b00e333f8810ca2fce37b43af3ade19d71940c82a7b211d2066d3"
+      "source_digest": "352390af9a51465f461dc55eda74cb190c7373b8c253e3deafb1c65e9dfefb90"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-SOURCE-TO-DESTINATION-SCHEMA-COMPATIBILITY",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "1253c1f67f58d6e120638c19550ac56a21e497b42a9c0eb668afd5d5e5287835"
+      "source_digest": "115b10965d21c46c7e377278e30f0ec0d843eb9796a68728499085c2959391e3"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-BACKFILL-PROGRESS-AND-ETA",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "9c4f055b2b1ea72542875ef5513fe0d74cb563040f8d60e283aedb28808dc791"
+      "source_digest": "d0ff04ca67bf515cef2edce76124e313f1efc23c35f6cee778d3b1520aa4e39a"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-BACKFILL-START-STATUS-PAUSE-RESUME",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "94e857c38d03ef2310180dd93efb6427e5d819a3414f1cc9e19be78b0c2dcba8"
+      "source_digest": "d58fe1112eacc12bca7a507646633a11b0901f9cd7f18c7c2a73f04b7edcc21e"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-BOUNDED-READ-ONLY-EVENT-EXPLANATION-SEPARATING-LOCALLY",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "22b3e9788f545a91fd1749a129be0be638140873347074501e8e17a2255688ca"
+      "source_digest": "65d32bba76d5b7c851eef35f61b60d59825e830864761960c65d6709b708a8c7"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-CAPTURE-AND-DESTINATION-LAG",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "654a43f3aceb29538f28d47d2ab733ac4ded48ee9fdf45256fa651eb59d76672"
+      "source_digest": "9ebb2cb621f01ded787f8da49b0e2db6dd2d0fa3e870239e0fda2d5472fce000"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-CONNECTOR-JOURNAL-DISK-USE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "d7f4fedfddebe718f3bc2cb8de0df8bcf976b54aff8d549ffc76097835679de9"
+      "source_digest": "cf52bfab10385cf53392b3036b0eeaa25e99c27b128dd08933022db5cb3b50e8"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-DESTINATION-INTEGRITY-AUDIT-CURSORS-PER-PASS-BUDGET",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "f0d248cd04a61e150559555b8f7704b34fe7f65c4e924c9157475710e3dc4e8c"
+      "source_digest": "39727deab0d1863b7700dece16dd72567d8e64258821562a688913ada62377bf"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-DESTINATION-REPLAY-BOOTSTRAP",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "e19c0c022947279050fde85eefb7b09ae4518d16ad91f78465fedf57be3f789d"
+      "source_digest": "489e8ee0f45bd2a9ff37061ebb72a16d1739db6c30ac3f1bf5ad404fb571e090"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-DESTINATION-RETRY-FAILURE-STATE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "fbb179aeec9dfc3135866c5347684b9128b4a1d8ee6c895ea83100086ab51a2a"
+      "source_digest": "23840edf0c27057c9999db2e677c3ed8625bec52bc81032fd300065abc602c65"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-RECOVERY-RE-SEED-GUIDANCE-OR-COMMANDS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "da8737b737cbe780874b4797936eb69fd825e5cf19189c51483e730312b44ed0"
+      "source_digest": "1e4d981b7385d4ba106807fd90b2ed8c95186f546f961981765ed4ed3ff223bc"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-RETAINED-WAL-AND-SLOT-LAG",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "157f96b86f2ff9bdb2eb9b5d9332ad0f264c7c4df54b4d85096ee2abb42842e5"
+      "source_digest": "93a1f470db67cdac940bc263dc57721d777d52bbb7ff412f898ebc404ebfd38e"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-RETRY-CLASS-FINGERPRINT-ATTEMPTS-NEXT-RETRY-FAILED",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "3b38b034c8fd6c8329c4576cf6600edf4279e74f7f7174d68f2071ef32645cdd"
+      "source_digest": "30229df1d64e4e438d1a8b673645632c2f7313022e67219394052674ae7cab3d"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-SOURCE-CPU-I-O-CONNECTIONS-AND-APPLICATION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "4e7e090e70339d36ec812f4aa347261741b17992fb468ec0718b6828a8706b87"
+      "source_digest": "4b39b59ad94e3e8010ca6803a99815d85d707c77fcc2d629acd673979c2cd084"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-SOURCE-FREE-DISK-HEADROOM",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "677546e7a4bb7506f4b541d2f402ead9455d96899bc47bbd9014c4bbc69b693c"
+      "source_digest": "3cda91051fe839e9eb32d245863c9d3c01bd017714bc8f331337c736e180de97"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-SOURCE-SAFETY-AND-OPERATIONS-WALSTATUS-AND-SAFEWALSIZE-WHEN-AVAILABLE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "9641284c0e6cf8d681aabac6eb5bf80ac2e77ab6d6618c28fe2175e484549ff1"
+      "source_digest": "73ee04f9f3aca56037de181b34141c9b1aa3180d74a8071fa6e1b9815118fa52"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-V0-1-RELEASE-ACCEPTANCE-A-BACKFILL-PLUS-CONCURRENT-WAL-STREAM-CONVERGES",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "4dac1c86062396eaeaf29b979d83d44959bf7c70438fc9b8316c292e8449e37a"
+      "source_digest": "d73c0903b41bf06366c1e14a42a5f3cb1c61b545d2ca141f869b1b021396fdad"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-V0-1-RELEASE-ACCEPTANCE-ALL-REQUIRED-CRASH-OUTAGE-SCENARIOS-PRODUCE-NO",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "835a03bc4231b3a36de9767de4d09704c0b321e177967b56f0110092f34f2cb2"
+      "source_digest": "4bfa0cc907b3a6feab315f3c975f3a8c7b225353d970b967da9e7d86c6f12f26"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-V0-1-RELEASE-ACCEPTANCE-BENCHMARK-COMMANDS-FIXED-SEEDS-RAW-RESULTS-AND",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "8cb289199c433d6bc04eee3d7e435ef956aad41b5444a15f37314e91f36e6d60"
+      "source_digest": "6f296ac91faf3082d13af71ee05d946cd17c26faf80a9d6812056af4b080551f"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-V0-1-RELEASE-ACCEPTANCE-DESTINATIONS-RECOVER-INDEPENDENTLY-WITHOUT-RE-READING-POSTGRES",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "49cc5104bc37b27fc8b301a4a77b7215d72efd52921ec9dfb09ebfcc53066b7b"
+      "source_digest": "75620a1138adc77d4b8e439162bd4aba0c74d28f86b4f5ebaeba7070523f5d5b"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-V0-1-RELEASE-ACCEPTANCE-DETERMINISTIC-CAPTURE-DESTINATION-FAILURES-CANNOT-HOT-LOOP",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "85c9defa24a09b178b3608db98e98bc8d4f2c15c6e96a415843e6a9d2451cab5"
+      "source_digest": "10a2e04c37b9a228e5136373b52d9660b7f315158aade9e896646efe1e18c70a"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-V0-1-RELEASE-ACCEPTANCE-INCREMENTAL-DESTINATION-AUDITS-STAY-WITHIN-BYTE-EVENT",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "409d0e08beb77dbb07987cf48ef46927b8d05d6a25bafa1b52e97ae3420123e4"
+      "source_digest": "5c86fe676e14a1bff2d0527fc9841af532460f9eee262821fff15715291cf199"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-V0-1-RELEASE-ACCEPTANCE-POSTGRES-IS-NEVER-ACKNOWLEDGED-AHEAD-OF-DURABLE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "c3c4d682b854d05ce76119fdb8141f07b674e7b59ebe88617f655e6faf06ffeb"
+      "source_digest": "c17427d7683f711b3a72edc2dacdbc5ee00fc6493ab458848d9135305815c170"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-V0-1-RELEASE-ACCEPTANCE-SCHEMA-DELETE-LIMITATIONS-AND-ALL-TESTED-CAPACITY",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "8a002f5373566afbbe985955123b4b74472e7bd0c8cced8c404e5d677e739795"
+      "source_digest": "d47d661b495d2a89c3fa972c16cee42db81b6f3330d3a19f42bb5efe78a8895d"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-V0-1-RELEASE-ACCEPTANCE-SOURCE-RISK-AND-BOUNDED-STORAGE-CONTROLS-ARE",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "9c2619140174067a5db18cacc35994dec3d9caa8e460945632e9e1f79acda88d"
+      "source_digest": "4f7cdbbfb086d86df8e2f469cae384583e2de114e96e16609285c4be4571e4ac"
     },
     {
       "evidence_status": "pending",
       "id": "REQ-V0-1-RELEASE-ACCEPTANCE-THE-DOCUMENTED-DOCKER-COMPOSE-ENVIRONMENT-STARTS-REPRODUCIBLY",
       "owner_bead": "boring-cdc-m7-release",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "3e5b716f9dc30cc3cc3ec635721a458d729b189c200c2b89bffb41c222151395"
+      "source_digest": "9324f54b3375250746b87a762361bee0ceb3f706455cf86a70c7d7cc540e7844"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-ADDED-TABLE-REQUIRES-FULL-RE-SEED",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "e1cada3d933a8f9ef3ea6d7a22772540bff38fb744926e6a4ff15507c2575a70"
+      "source_digest": "675a9415002249fe153e46b60324849ef76d9757bd5b663899e0eaa18008e245"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-ADVISORY-LOCK-OR-UNEXPECTED-COPYBOTH-SESSION-LOSS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "32120a574bf7ef8cce0b4a2cea67c32a1597d569e9944fa7ef032cbd73cdf8c6"
+      "source_digest": "3dbb0788d2e6feae9b9a7542809ade985438b55e7074571d7be3d9189a1d3054"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-AGENT-ERGONOMICS-GROWS-INTO-A-SECOND-PLATFORM",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "ba646b366ecea8b7f5766a0ee257a5b58840128c51f5a217b592e236b4d114cb"
+      "source_digest": "2524e4ec5ba2c02e13fc1c29194585e66e83427f62c2eb7ff69e73c69488e171"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-APPEND-ONLY-CLICKHOUSE-HISTORY-GROWS-WITHOUT-BOUND",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "faf949eaeb6c8e6a1864e3c23f583f7dbaf0b85cfebcb2d55aa43f10d028f095"
+      "source_digest": "3b32fd27099e271bca51c9c48d58a8b44bb1b5fe29c65c399b93d9d5f8a8bf20"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-ARCHIVE-CRASH-HOSTILE-IDENTIFIER-OR-PATH-RACE",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "76a3ea811cecbad09a10d10792d84542eb625f6bf581c38c5ad99507f86d6166"
+      "source_digest": "a7d4ef4ddf2e38b8ddc0c6cf45f675f5e2e8dc08c41bffde95c33b35f8e668ae"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-CACHED-EVIDENCE-IS-REUSED-AFTER-A-RELEVANT",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "f421c17b6933acc9541c0418cbdc201eac5b2dc9b4380090d7e99f91ecc2d6a7"
+      "source_digest": "dd56e0cc2bc451f3f9d7a69c37354347218e2888bf6c1f0b26a7856c547c7ad5"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-CANONICAL-CONTRACT-IS-COPIED-INTO-PLAN-BEADS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "48247d45155fdf9e521a57f3d1afefdf1bc3b97d13f91a01bf88191be1d1abd1"
+      "source_digest": "dfad1588316666d95cf425e51856348cada4f4110d45f5d06d2eafcfe066a940"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-CLICKHOUSE-ACKNOWLEDGEMENT-IS-NOT-DURABLE",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "3e8009a8c158c3198439c86586cf012b0511ab07936e4e78c37de909ff15d63a"
+      "source_digest": "6bb06d1f97251e8026b91d6c7e10f805315866406d3ee36508541c1f635184d9"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-CLICKHOUSE-MERGE-BEHAVIOR-HIDES-NEEDED-HISTORY",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "40677afa9fee685f259a1c445e5db9d5d55ed519f8f8f2ce6b497999492b0b4e"
+      "source_digest": "25024f73397c17bb4ea9ade6d2c424beb0d865d068c9db6dac6a86ea40f164df"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-CONTEXT-GENERATION-HIDES-AN-OMITTED-SAFETY-CLAUSE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "c8effdd4718c7da047f734d1026c2e04fb3d4320e16853c57395ec05b540f295"
+      "source_digest": "4a0828e623a644acb29f0c1a10a6626ffb9f78c1ef0673f996f7550a8435a638"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-CONTRACT-CHANGING-DDL-RACES-OR-WAITS-BEHIND",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "1cedb9882b554d8df231c20e2349b6625253d30a043a46e6b19899ac7c8d6462"
+      "source_digest": "f8263030cfc1562f2bf5e6a792e1f91a60d8b0ece7a87ea08df9cfd9bdc45c6e"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-CRASH-AFTER-REMOTE-SLOT-CREATION-BUT-BEFORE",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "096d6ca7347a2d11c992dfaee6cd30506feb826ce456c71d6999905fe4831278"
+      "source_digest": "0b39a572bc2f457cd0ce124d065c0e768a622e23d975518cd42fa702fd189985"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-DELAYED-STALE-WORKER-PROMOTION-OR-LOCAL-STATE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "0566144b4a0d46ac7550b177079c2bb53bd196a9b5b6a2cb883dc4b477487d44"
+      "source_digest": "aab79a9fe26eee625e0567f2728c73e002f8256dbf6787c23b489205adf75638"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-EXACT-SET-VERIFICATION-IS-EXPENSIVE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "b3b8c694042f502ea503a026f349cbaeea8e01dd21207d99ae4dbbb67931202a"
+      "source_digest": "65c9c7d6eac7800b13e939aac6de35d26f73763daaeedca0e913c53148c07a54"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-EXPORTED-SNAPSHOT-HELD-TOO-LONG",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "9ad5701eba7bef0bbb1c85e8ddd916164ef40fd50c29cb86217f084184320133"
+      "source_digest": "e99806bff0479633de4446f1e8243f2bb40233e39e8e800841203347bcb8c3e3"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-EXPORTER-IMPORTER-LIFECYCLE-IS-CONFUSED",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "bb4c9696b6f18c7718c5795e8a0e1b9b9c522933f81b9fa4ce1a25d7a43cb940"
+      "source_digest": "04afcd202ce305a1777b933ca38e102a24ae2c76bb590015cce1c29482641acb"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-IDLE-SOURCE-RECEIVES-UNRELATED-WAL",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "60af646dba2bffd188f87d80b0e30f1fcebba3dd4f0f68bf5f252f9b7e632bab"
+      "source_digest": "73326b3e9d0c7544ac030c4674078a6a95b832eb96053af6a20439bfb283bc95"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-INTERRUPTED-AGENT-WORK-LEAVES-AMBIGUOUS-LOCAL-OR",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "9f69fe86eb8103984a76a62333fc4fbaba4892e6b7faf82e260a20f847ddc9de"
+      "source_digest": "ba5ee124176042d31e8da552342e54c41fdd42d9b68667b7a6e3262852abad13"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-LEDGER-AND-FINAL-STATE-CHECKS-HIDE-A",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "18abeb4dc1f0bd0c0f744bdb548a1d565dfc35f2e7e20e5ebbb8b403b4969a2c"
+      "source_digest": "11c47126ff8b7767c4a64d6e249ffad05a39913f188e77d492308eeb73b44c90"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-MANAGED-ESTUARY-COMPARISON-NEEDS-ACCESS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "d5be825c038ba7cf639d5ad3d74ca5f810a6d5f1fb69b071ee3d8be871892a20"
+      "source_digest": "795ff73712185ed8a14557e1337ebb76fe3feaf8420d02de1a84643a5f371a94"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-ORPHAN-SPOOLS-CONSUME-BOUNDED-DISK",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "1df34f58466e16889a84c2a69ef1c7d50534d0d3556cb0984d1f1cffe4ecd14e"
+      "source_digest": "1207351a5d4134c66123d6277c96f0c362a3f6da3affa378274509807e24502d"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-PARQUET-SCHEMA-EVOLUTION-RETRY-IS-NON-REPRODUCIBLE",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "9e9528c50ac5cd2f621d29d02fa13702c778e7faee74b1e6dd95c695fe1e471c"
+      "source_digest": "d4ec7c00acf7818906a597001052706a99734750d7049872dfc34175b526e409"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-PAUSED-DESTINATION-PINS-ALL-HISTORY",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "9ce0bab0e9d8d80e24acabe525b7e759e62c611aba26e4bfea8465f37d01a0a3"
+      "source_digest": "447080880f7eeff15be569424b3019929bda1082c7aa1b749ace44e2b9dab3dd"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-PUBLICATION-DRIFT-REMOVES-DATA-FROM-THE-STREAM",
       "owner_bead": "boring-cdc-m1-control-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "a4f541ed135dbdd58cad9b5a2af856aac9f768d33eb975d2296dbb42327d69c4"
+      "source_digest": "c9a970fc669c31c85003256e34e157f5710d96c947cea9028986b180e4916fdd"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-REMOTE-SOURCE-METRICS-UNAVAILABLE",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "a6b30dcbf3c9bf3115438b04bf7b1141b72b63376876ebe2b19d3eaa6536a9b6"
+      "source_digest": "d915518684e5c1cc10a1944164d23adfa1b9ecec84abf5ddaf86c588c8774daa"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-RETAINED-SUFFIX-OR-UNFENCED-SNAPSHOT-LACKS-A",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "a253684c6bf871f59e557e69811e2e30c4d00a13e0835eb86f1698fc7997363f"
+      "source_digest": "5b1d529fae62485f0267a0c78469a049f0c8a54524bf157d0e5391c00bd1a913"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-ROUTINE-CLI-OPENS-A-SECOND-SQLITE-WRITER",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "8caf363fdc14d800a8a99637f07a694395578b8c3f5e131f31d2ce743402a7b1"
+      "source_digest": "e2585628a676c4b70e387a2991e5ff2f111b0232e43f0231ed1a0627aaf6949f"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-SAMPLED-OR-POST-EXPORT-LSN-IS-USED",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "6c0053cceb4a566720afd31da109765129540c0b2b54b735c264abac6df7f3e6"
+      "source_digest": "447012ab2bac6695135650bc33be6ef0c4c83d67e47736cc576cd05345ebb30f"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-SEPARATE-STATE-ARCHIVE-FILESYSTEMS-DEFEAT-A-SINGLE",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "f0ea67682eb948fb3c46d9fdf4eb2397834d15692521a08b7b930ebe8fd9f9d9"
+      "source_digest": "4679ff58e162b3995c90675481727cf2b9654307f779db26e236740a3b9f2575"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-SLOT-CREATION-FLOOR-IS-MISTAKEN-FOR-A",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "d81b2f4729afc651a7c606bfec8ff5a3ea1ee2f65095a616fb0586f0dbc194a1"
+      "source_digest": "ae0e64f110f09b281ca70096119672efe681bb62b62ce41735366c23048c1923"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-SLOT-INVALIDATION-OR-SOURCE-TIMELINE-CHANGE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "ba4d95e832611187ca0e6bc1404edbef5c48d0f1db1a240f6ee7e5b9a154ba37"
+      "source_digest": "def6bfb7991277a7954dfff8ec78091af6d2fd39c6f1521e26d3185ebc23fe2b"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-SNAPSHOT-AND-WAL-APPEND-IN-DIFFERENT-LOCAL",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "30a78cb86b97e95c7fda64b8f092dd41b3e1b4e2f68c5ea3e547ea76812dff59"
+      "source_digest": "8ea3129fdc0658fa326907b30bbeb5bcf14c382cbeddb456b638c1fd4d7cd749"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-SQLITE-CORRUPTION-LOCAL-RESTORE-DIVERGENCE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "7da9197bc1a2fdc0338f8002de4024237a0e01e183c0b5786cbb8daa6a545689"
+      "source_digest": "fea47943903e12761e0a7bda7ad58e827ccd9e11dcddeb79f7e396913056a17e"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-SQLITE-SETTINGS-STORAGE-DO-NOT-HONOR-SYNC",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "cf3d7ab0c124c0dbb64a48d7a2bc02086a2ccb137f6c9c579669dba2d645594d"
+      "source_digest": "e6b92faf8c85815eb23db395449e291f299767b8f55541c9befa7af5123cbcda"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-SQLITE-WRITER-BOTTLENECKS-BEFORE-DECODING",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "e4361d228ea1932155c090aadf20289dcb473ef488b06f4a7c445ea41a21cbde"
+      "source_digest": "bf2364f3ad1a2f712d03e5bdaa91ff961b081e6188a038cedad1077e3bccf29e"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-TOAST-PATCHES-LOSE-PRIOR-EXPLICIT-VALUES",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "7d95f27f138d547e2acce5271048b97e8ca54d9a1009919cb2c38df77b00e066"
+      "source_digest": "1716915efadde699c5c7197e87dc90ccc2788c15369d96e3688051a140e034b3"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-UNAUTHENTICATED-LISTENER-UNSAFE-LOCAL-COMMAND-PATH-STALE",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "a9e190495382b84cefdde6c307be5f3c9918809b3693a5b21b954e0313ea5a6c"
+      "source_digest": "8b85be8682a18b125f8ef6f2df24ce9733bb39106e114d786a75f4e77f95b3c6"
     },
     {
       "evidence_status": "pending",
       "id": "RISK-VERY-LARGE-SOURCE-TRANSACTION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "07cace6469e9cc555827905ab9349eb7e1a76a5fcf36e7f2dc3fddf75b4da03e"
+      "source_digest": "95e23309d4fec7f98a962042843732d3adb2b4972faeee9ac9c61fde258f400e"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-ABRUPT-HOST-VM-TERMINATION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "e2f3ff2541f7790dc420eeccbd60f8aea119cc91aa2b1b22ccfc4407d57ab863"
+      "source_digest": "73437e1b6e38c8a2c8c1bab238759956bec3993f2a4c0a67b84255eef3f27ed8"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-ADD-SECOND-DESTINATION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "4df88de66233a82c8c6cda454c6a886ee872bb8c018516c5795c09447b5ce4ad"
+      "source_digest": "f19cc2226ff540a67b0d1215c424af9d28ff4afca061eddc12ce38a8bc327090"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-ADDED-SELECTED-TABLE",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "9d6eada73a4a7723db30791007800a9fc5525a95fb0d1a5c14928edc1983cfcf"
+      "source_digest": "125db0d24e372c30f6ddd3f252e53cb966571dcc66c2ac0467ce2b2d6247d8eb"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-ADVISORY-LOCK-BACKEND-LOSS-WITH-OTHER-CONNECTIONS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "9c318c4042d228581ce4bd16a5b8fb0699a9f0a0ff53f552a92b1bfcca5b9ae0"
+      "source_digest": "75970d2e1cb9ae72afb201a8fb92b806ade284021af855fd6d8cfddd81266d83"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-ARCHIVE-CONFIGURATION-GENERATION-CHANGE",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "de50361bf095de931cc3b54439373ad71ce8d975c48598b1041e87e91cdd7247"
+      "source_digest": "f9697578daefc2e54e33deee867aea06b0e10181bc08fbe717d0a8bb63a061fa"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-ARCHIVE-CRASH-AT-EVERY-FILE-MANIFEST-FSYNC",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "e0f171f7fa923d63d8342c0147d28d854f85624debaf4a29f22e32493665dc7a"
+      "source_digest": "4fecbb430b632c032fc60e1d6b822494518423d7caac109aa93e5fee55850c62"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-ARCHIVE-CRASH-BEFORE-AFTER-INTENT",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "4bafb61d0920af8ecce9f6e1c3259115cc698dd9bed95dd9067ef8d27b35cfce"
+      "source_digest": "f5a5c4d6902794435e54c75e878a00e3ad5286f305d99900521b049045d3dcb7"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-AUDIT-PROGRESS-FRESHNESS-AND-OVERSIZED-UNITS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "ca0ec8a3fd83047632abf1e2e84d2cf0922a2de0e434b6fbe6061d84c9459315"
+      "source_digest": "08da2c482a67e7fdadef0f2528c2aecc75960c6b28d201086c8bd92607913b6b"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-AUTOMATIC-PIN-SAFE-GC",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "80b153e5b87d4e002c806e376048526ff219f0d8cff153e6b14fdadc84473976"
+      "source_digest": "9ee5cb25745733efe49e0e6f2a45eedf5bf875f2ee6cf0a3ef013125ca754ca6"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-BACKFILL-WITH-CONCURRENT-WRITES",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "5939e16ac3cfd90054567333f040a19c7992653cc5ca181a3f6b620d786a9d1a"
+      "source_digest": "730f255c312f9dfcf20228c3570d1e1b65d75e62abb9ee7365aca8438e64eeb6"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-BOOTSTRAP-CRASH-AFTER-TOKEN-PERSISTENCE-EACH-IMPORTER",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "75dd011cc59937da9aa75851818c0d11720443e46f82b308701d3abcb96e0ef1"
+      "source_digest": "0ff914b2d6d0ddb61ffc7eb0a21cdf44c435c3d88322151e99a60c224f76d030"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-BOOTSTRAP-CRASH-BEFORE-AFTER-SLOT-RESPONSE-AND",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "02cb63ec5e4b13d08858d29e468fcfa170ebd69ae2801d0f49a983d4a6661b9c"
+      "source_digest": "f037424468939e1c89ac54efe0b53c41340ad8c21356f9aa79d609aebd40cc4c"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CANDIDATE-ARCHIVE-SEGMENT-READINESS",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "8d83749b5b30d01629d234660484dac25ed593356db7e7a8a184f9f94e5703ca"
+      "source_digest": "e83882c9195ca759375ac04f08af9121886f89e39b6b0ad60da9afb8883c14ef"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CANONICAL-IDENTITY-REPLICA-IDENTITY",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "a13ea7cb19837cb3d71e0435022e68b8e91f186c3310da2a647d9697c7c9ff29"
+      "source_digest": "5c1d6d42773836db1e3d2f4d3c571bac30b04020934905ad17b1d096de2ccb5a"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CANONICAL-KEY-CHANGING-UPDATE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "c34d5b2595c3caa3cc74beadaa4b13957b3142cdf31c37da86d78d1ce5a0cd55"
+      "source_digest": "e46770162058b64f7d0beac3fc62e6b3d5817504a34286a58df076e71cf1f4a6"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CAPTURE-EPOCH-CHANGE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "fa0467224536c17a213afc3e07432bbc9b0320b674c1c86c795487214721819f"
+      "source_digest": "de7bf55a343fc65a7dccaba31a20750fe924b0982b0d6578e169a39ba733ef09"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CHANGED-RELATION-IMMEDIATELY-FOLLOWED-BY-DML",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "fc2b904331e365208a2e9e05d46e8fe0b73d84e5b1d0dfa7fdb784e0219c791a"
+      "source_digest": "cf07c10f169b9b88eb49c4c2de672e2bab10ea0eabefa8194ab5a07f46cf4c3e"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CHECKPOINTED-ARCHIVE-ARTIFACT-CORRUPTED-OR-REMOVED",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "3921d82c6a5b8b8f23cca9039aae7dfea9f37f85e75e81a0cc132641c3b7bb03"
+      "source_digest": "6a3735c8ba6050f9c69e556555522a21a4ba1baf8f1d7a2a81721365148d9e96"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CHECKPOINTED-CLICKHOUSE-ROW-MARKER-OR-CONTRACT-MODIFIED",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "5fe2b2f305174d5ea9c5a9c7d79baf6529e0eef42b4ed20a4a47ea3d60b7f2ce"
+      "source_digest": "ba3d401cc1774706942d7185db30c89d2637bc81800e7685e3d2d69ceb9ee9aa"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CLICKHOUSE-CRASH-AFTER-ACKNOWLEDGED-BATCH",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "0960bccb2abd6e9729af3f20677603864d9fd85cec80589eac23c7c0f4fb6198"
+      "source_digest": "0897d225e017d43b880fa2510f1ff6ede11ea2db78d4fcbe24ae67502cb06e5d"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CLICKHOUSE-DUPLICATE-BATCH-AFTER-WRITE-BEFORE-CHECKPOINT",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "67cd179a395a1ec025269a0a941aefbb4045152a1af2bc74751c17440e558bc3"
+      "source_digest": "fd154eded0a78b3d03c73570a8429a4dd022160d0743e96729572bdb4b5cf51f"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CLICKHOUSE-HISTORY-QUOTA-RETIRED-GENERATION",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "c5a3a550d31ec5785b933298deb7219490ca1ee06b3217dbc186caefae15a8f1"
+      "source_digest": "e0496d1a113266a31aa4c5209e27e2c701e8a8a0255cc027b0a2b01cb65f0698"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CLICKHOUSE-UPDATE-DELETE-LOAD",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "2df7e25b5f34d4ac827188f5e9026485b758993fb48915e474e2c13774da10a7"
+      "source_digest": "47e8321a306971ac40a6e4d335ad480006f57365942bda9cdb414334ddfc218b"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CLICKHOUSE-VERSION-TOMBSTONE-PROTECTION",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "2f55141109c43c59a059efb0960477a46a811b5e54c24f3359b3d2d3f2b20a35"
+      "source_digest": "a6d6e22be75f55049dc60582975c4f4c974d65a75aa705d3987e33e49310bae7"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CONCURRENT-HEALTH-CONDITIONS-STALE-METRICS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "1816a1eeff6a36fe4e5a2d9692cef0d74e8085859554617b984fd63f5b317a23"
+      "source_digest": "c705594e1812011cda0df3897e61d1949584ea7469609dbd837a02666ea49a0a"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CONFIRMATION-DURING-NORMAL-PROGRESS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "399db0c4c3cd80e25d936263bcd276282fea704e3cc594fa92d3ee07cb091140"
+      "source_digest": "df888b8d7eadc61f2e0fb15383577e5483f9f0910446c11900ebd932451caeb2"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-COPYBOTH-RESTART-POSITION-MATRIX",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "093fb9806a378984acd0b1d2c1c1efea139b2a862bde9f16b95b75e9caa1a187"
+      "source_digest": "fc62d3d3096f106bf02892be882a504ad6da9a8c879b40c7da09264d7883cf33"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CRASH-AFTER-DESTINATION-WRITE-BEFORE-CHECKPOINT",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "4e4a7c05381bbac3537015e7158d3149a5ea7ca8e17232ccfa1704a61894f792"
+      "source_digest": "cb00e81daef5c17c5bf4df365d4a97a38cadbaeacd2f15eb2eeb304943f7b11b"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CRASH-AFTER-POSTGRESQL-FEEDBACK-CONFIRMED-FLUSH",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "7b4d8e95d4b3ccce4de4611999975846ae02673072043b34e4c9e48c224f5e44"
+      "source_digest": "f231ff06ad1d4902fc4cf1e9455510c4238b39dcd81718fd643b29e2a6699130"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CRASH-AFTER-SQLITE-COMMIT-BEFORE-POSTGRESQL-FEEDBACK",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "39666268011b78beb4785e0b775bc927b04a5eeb4dd6405d5f0632c69a418d65"
+      "source_digest": "5b693e2ab4d2ba1112e3fb6b047a2cf33da45d7b58e3fe64e9ea3844f66e0d9e"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CRASH-BEFORE-SQLITE-COMMIT",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "966e3621f986d399eb477ac707e588b39a684a7463a6e9056b25889b34075964"
+      "source_digest": "3f2a5fd9f32b296dd43ef14e7221d34c2f44fe8b708d525f3469ec8c508ebc5e"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CRASH-DURING-BACKFILL",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "e90feff45d04c110a4b534501f5e9de9501a8479adae5815558ae4ec6c79919e"
+      "source_digest": "3ab9d99c7a9b7d932ae76a7b2b76145122fde40c8e6570ff3cca75a56f38cd1d"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CRASH-DURING-TABLE-ADD-RE-SEED",
       "owner_bead": "boring-cdc-m1-control-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "57a60307d34198d71e4e66346cada2b42660cd497bb24fa694cc07de6551afe0"
+      "source_digest": "6a8968b56e6ff9a1200a4c89cf49cfe85a23ac1a47b8c5e7d34a34de5b2d9826"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-DDL-DURING-ACTIVE-BACKFILL",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "c320d22b5b6bcc8ba821799c50a463c45bf1050dcc094f8a8827fef4d164120c"
+      "source_digest": "993f85fa2936e7934baffd64b22c5cf274c1543686e9c36bfd2ef47ab8248717"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-DDL-IMMEDIATELY-BEFORE-AFTER-COPY-FENCE",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "fcb31e4b30ef79ad420dc12d5df7a4324974ed05585df567aec43510dbb82414"
+      "source_digest": "2e7d2189249a235f4dc861781a5bb4829ca776ed22a141b2d7fa945822ce9d50"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-DECODER-POSITIONAL-IDENTITY-CONFLICT-FIXTURE",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "1f48f4447fb9827a00330a51675432e09433e74331114befb5ab89c8188ffab3"
+      "source_digest": "89d0873667203932a31f38d274a45f770c49828cb65ea33c4f2d34b1b8c9e1e7"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-DEFAULTED-GENERATED-NON-NULL-COLUMN-ADDITION",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "1c445e6a493f1907439366943d5290ba06018809c42b706045766c949e97086a"
+      "source_digest": "6e1c91c68b1c3b1d0233137adef5154524a8157b64718f5143282ce848eaed0f"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-DELAYED-STALE-PROMOTION-AFTER-NEWER-SWITCH",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "a2f86fc3627c0708ec920144b7c925f0230b1f83b66347131a6ab896974fd3ac"
+      "source_digest": "9d59855a6eee6583d4a149906c915f0084af19e0298b3dac1b474f388bb7aa1b"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-DESTINATION-BEYOND-RETENTION-NO-ANCHOR",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "1426461c8f1f69026b65ad08e8b21dad89efb0c1e92421922b68f9449b8a246a"
+      "source_digest": "7d2ab20f61d8966e32f1985bef26c28fa299e739df4bc7849ff37bb7462c3083"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-DESTINATION-OFFLINE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "1dff48f6affcd9890cf2b36097516b659dedeb747222aa364cd3de3c3dd03025"
+      "source_digest": "4d0361f97075316a76fdc3475b3fabcb0f04780881e1e7e069b49170639c648e"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-DETERMINISTIC-CROSS-DOMAIN-SCHEDULES",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "5e1bdb0a38726e2ababe3f9837c9b2953324b4def31da84412c1457e1fcbf4d5"
+      "source_digest": "aaa0955ea968fc60237e37f69f39abca050f2bff210a2a982639c6a4e0a03b0a"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-DETERMINISTIC-DESTINATION-POISON-RETRY-EXHAUSTION",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "d8f26fc8512542f868df21904ed67054618863b2fde39afd85ce78f27196b7aa"
+      "source_digest": "e1ae43f982373faa2827245bb32637ebe1b9d6a36ff8dffa06181ad48322061b"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-EMPTY-DESTINATION-FROM-ARBITRARY-RETAINED-SUFFIX",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "76f98f282c35c5a9e7947e7cbe4535fa732002fdcf6cb718d794bb6695e75dd2"
+      "source_digest": "2e2b26ba91b7ceba751c0f192f61580e7fad9f1faddf5b0612aed54d7acd7b2f"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-ESTABLISHED-DESTINATION-REPLAY",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "58c5af7c2cd6bfbeaf498c7893856d4ff1385251e58cfcb4303c8e712bc5ca34"
+      "source_digest": "00e1e76692539ff974b10437df87ea69606237ec7d74684b1c50347017996c6c"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-ESTABLISHED-REPLAY-CANDIDATE-WITHOUT-ANCHOR",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "92bf8316ebb2f97afe6e79bc7d80247e4f1b3f35d06a7a16c3f1d751596de8b7"
+      "source_digest": "d6101dcfaa10a91b97c3ef6eb2387c6d6388b3e9d49405a0c0d00572a7543003"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-EXISTING-SLOT-LOWER-STITCH-PROOF",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "52668b4d9fd066efefcba0af5852681e33cb49b7bd6e76643f64b5068d1ee84a"
+      "source_digest": "5eabe4171b5dc487fb13cf5e02119e614f8665e5ed25936453731469ce017e01"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-EXPANDED-TABLE-ANCHOR",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "2b49ee14edb4a7509b3f584fe0902a11a44a6fea4fa3dab9d9ac006b8319922b"
+      "source_digest": "a40c8eed5cd4bf250cf893cf67ec4add5decd490bc60c4b40a80f349c5cc4d55"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-EXPLICIT-NULL-VS-UNCHANGED-TOAST",
       "owner_bead": "boring-cdc-m4-toast",
       "source": "docs/PLAN.md",
-      "source_digest": "7c0556bd99e3a5034de82ba2739be3f1ec7b29b658bdee00f862f3ece3f44119"
+      "source_digest": "1416c37a5d47765e00ebffdb33f7281785921d8a97655c67a082df925fa1ce73"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-EXPOSED-LISTENER-INSECURE-TLS-PERMISSION-DRIVER-ERROR",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "65a88830ba2ddb7f92e5797b857977b03ee3dc6b2cefa7057e7991d752b8f66d"
+      "source_digest": "2ceeafef2f527e36df7bd569408296756e4701f8d14a0722a0fed8d241520a3c"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-EXTERNAL-LIVE-PUBLICATION-MUTATION",
       "owner_bead": "boring-cdc-m1-control-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "a0e771a9550a2cf2ad889992e973fa14943c25d00e21607950ae1a719fa333b5"
+      "source_digest": "eece872b88391f5eb5863f50a90ec14d37809d0bcd6fca6476cb4006490944c3"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-FIXED-CONTROL-ROW-CARDINALITY-AND-PRIVILEGE-ABUSE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "ae131163ebe0d022199cfba91ac41897c5750eed6c4506e93f0d0cb0eb6a63b1"
+      "source_digest": "38cd860a1d2237a0ca3d38ce920271cae1a2d537ae949bd73f5c3125463e374d"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-HEARTBEAT-PERMISSION-OUTAGE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "977ae82c68bceab675608989fdde4b8b2f6254fe97043d7fc78b6c437df602ab"
+      "source_digest": "2c93cd90fde4cc901b449d8dee78de0636c61a14e8ed8185bf2c871c76e167f1"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-HOSTILE-ARCHIVE-IDENTIFIERS-AND-PATH-RACES",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "444340f2e45ec6ef0255951975fc3744c0aaa399b819c7f7ff37cc327f249a4b"
+      "source_digest": "9489bfce208d5f33b62548e38c587e06966648a7eb1c9b646a48f859784fc3ce"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-IDLE-NO-ROW-DDL",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "ae29cc8f6f520dd0b73200d6a1cf005e991d2d1dc5d9581ae0ad45727158c37e"
+      "source_digest": "7ed50437a3a329516d7a4339255f4e54eedeb52b5404844cf7876303f802a73a"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "2a0161db3d78d46a0e0592364730f1b5d17f4c2bb14370d6bb5c858ab3ca690f"
+      "source_digest": "1c5c37e000f7d0d916a985c61d7d37911d73e85b0e1218607b5f49614b859070"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-IMPORTER-DDL-GUARD-LOSS",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "1e7b1988bad3aca4e21c5f5679f62426b9077f88bd50e2a72ef710339bb7c375"
+      "source_digest": "ea5e369cb19f18c4fd19a6350933abeb4554c4848f8fab1e78662b94151bfc79"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-INCOMPATIBLE-TYPE-CHANGE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "8b3d82d0e1388e403b1c9f671f48be22d7d03d9710d7466b31935d17e530fb78"
+      "source_digest": "dd407bde78b25df08d3a56de9df53849e68a1467bbb8bb0692454e9e24cc8a03"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-INITIAL-EXPORTED-SNAPSHOT-BOOTSTRAP",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "b2090d93b2edabbc7c988f9acc736396782c2dbf7d3908bf26497914a9ae1b78"
+      "source_digest": "3e9861dad597556a1ae651bb8860a034dae76e82d0d91fde03ecb4d535fb36f6"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-INITIAL-SLOT-CREATION-FLOOR",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "43ceeaeee488973bb611789e09a3f5d360f86d43c869f1acaeaa13937c4598e2"
+      "source_digest": "b56b36b7dd6a8bcfe77a82b37a578e02a44b02c2d047610f59b16b1916fd072b"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-INSERT-UPDATE-DELETE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "8270f91962e47e33f0f698c6b48b86ec92317d75c2320988f447128ada9626eb"
+      "source_digest": "1bd4caad452665ef8496f8037d6c2b99355dcf95bfd13fee1a317a380ad86ad5"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-INTENTIONAL-SAFE-STOP-TRANSPORT-CLOSURE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "6b11e602a2eca6a7e5a769826ddc704d61b2c32eec3032ad3d2c9d204b130933"
+      "source_digest": "1b7919dfe36fe07478024e2997ed55ed6388e6942efee1e1c25fd99346dbf8f1"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-INTERNAL-CONTROL-EVENT-ROUTING",
       "owner_bead": "boring-cdc-m6-endurance",
       "source": "docs/PLAN.md",
-      "source_digest": "e6a6d7063238c8633032653c4309860d45b66d2ed7cedfdad3dd813cd999610b"
+      "source_digest": "16120883a249d8af64ff51dd3beb1c86b1c4c2af9bfba9f033a0e3695d387952"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-JOURNAL-CORRUPTION-MISSING-SEQUENCE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "2463c018556e17f1adf8d7ab4a9a521c51dc3adab9cb2126f8364cc3e54cda3c"
+      "source_digest": "7a40c47f0f5a1e8519ee61dec2a6ed3859152a9576f8f23fbb9196ee29a65d89"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-JOURNAL-PRESSURE-TRANSITIONS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "14c5660f8b983c3e01ccc8863570b96b9365437cff2acd1c68407e7814265036"
+      "source_digest": "8e6b70e5ba3b6e776e0926001513f0e01410a50fc71508cadfbc88483c348c07"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-JSONL-PARQUET-PARTIAL-PUBLICATION",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "e9eaa0c7c6fd8adb55b62ec4c24c32a303d66fc07ef7a3be9bb85069bcd589e9"
+      "source_digest": "a5d01748378217c63b3128827390774c96699cc3c688f5ad84ee5331b51e74d1"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-KEY-CHANGE-WITH-UNCHANGED-TOAST",
       "owner_bead": "boring-cdc-m4-toast",
       "source": "docs/PLAN.md",
-      "source_digest": "30dc38f7ca7268fdcaabc8c1afda187b55aa6c66cc830b02ea4605c39bc73713"
+      "source_digest": "3dd317243f9061551ce1826eb4e30965d9fc185ddc9b1f1b0fb1aa509be4ef26"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-LATE-SNAPSHOT-GC-NEW-DESTINATION",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "5b9dba4aecc38a1f5324c1466c36298a60aecfd0c43c2291eb43e97246a8b461"
+      "source_digest": "f3522391a27584fe4a2ffa016505926a5e2a3b001cf720db599992ef679f0f15"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-LOGICAL-DECODING-SPILL-COMMIT-BURST",
       "owner_bead": "boring-cdc-m1-decoder",
       "source": "docs/PLAN.md",
-      "source_digest": "6bf00eeea87b4c0b32600f57ace282949f89a14ce8fdfd895ebb7295e851a1a6"
+      "source_digest": "31a6691573e2258c61f65746f59598dcaade12459a9e144615aaed41bc649bfb"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-LOST-CREATION-SNAPSHOT-PLUS-TRANSIENT-INSERT-DELETE",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "5aa83d52cad6ed664b6942d7748e692709842483a4336f13bdad9c592ff7fc21"
+      "source_digest": "bfeb5729332f0fd7ed30749ba26fc1bfeff76adc9c1c1acbff358f1837cf5b83"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-MIXED-COMPATIBLE-INCOMPATIBLE-TABLES-IN-ONE-TRANSACTION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "6c905ac00f929c8dcabcacc644e839f9cb539d1a336a3cc80430ba5ed15ecde3"
+      "source_digest": "0634b693343cd538b72acb1aad40e2a991c69a925abff9009a9ac236131e714d"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-MULTI-TABLE-TRANSACTION",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "843263d9e824806439ceb07e5a493a00f94414a162ecfe1504372930b49ec61f"
+      "source_digest": "c5f453379ea239bd347788cfeb8223a05e980389189d22ec6d235b1690e90e2a"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-MUTATING-CLI-LOST-RESPONSE-AND-REPLAY",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "161eb80d131a37153096e5dc7363ad1ff92476ff77b9f98f3bddc3f7f734d1de"
+      "source_digest": "3526347b34abc66da39f4966ddc61629bfc21c729fcb595d675263b0b22ad718"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-NEAR-LIMIT-ADMISSION-ACCOUNTING",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "2aa380fe2ff465e3b4865b4a24701a5ba2baeafc86fe287aa2003b1a44a58e6d"
+      "source_digest": "d077547ec45728194efec97863f243cedbc16d08517e9e7b8be00dbc65a0b7f5"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-NETWORK-LOSS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "a40fe71beacc9d6edc8243cf5efc7ef0ab3256a18a08482f0697033a6f1d31d3"
+      "source_digest": "ab18faca99f3a14a71913fb399c0cda92331a05faae861c6b6350f93f7ac88de"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-NULLABLE-NO-DEFAULT-COLUMN-ADDED-OUTSIDE-BACKFILL",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "4cc25446e87a04e62a776af491c787899088691ed321830b519e1e12d407aa9c"
+      "source_digest": "5b394349208a215cd5211cdb227b732a0d3ba5d20b6f3cc42945eaef64f5722e"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-OFFLINE-MUTATION-AND-STATUS-LISTENER-ABUSE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "cf5c06db0fc54075a3a732146faf369112088a19a61c292c1efffebf2fd3c57a"
+      "source_digest": "f3a51774cef4b2de8b692ccc22083600f12acf479581df37bf224a149fb6e482"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-ORIGIN-AND-STANDBY-STATUS-PROTOCOL",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "41a46e2399d524bbd87394d7701f809d54e6f4691557e84ba881cc5f79eb1edf"
+      "source_digest": "c965200657b748d884dee1d473515678895b108eaae1b7cbb322e4a0d988c826"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-OVERSIZED-SOURCE-TRANSACTION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "48fa481405ab0f942c084e85968e639ef0272d004aa5a927009d48022d3de845"
+      "source_digest": "01f277436f4e0cefdff0c966f9195a323865a0d64b29fb1d56b03c6a962c9b40"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-PARQUET-JSONL-DETERMINISTIC-RETRY",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "59eaf52764c0c313e80b59c239b3be26af98a000e1ca518090f13f3c4f20507b"
+      "source_digest": "020443664908a0972a0de76a66f932471d5fc04f09e6182cdb8cfb28f0156ea6"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-PAUSED-DESTINATION-PINS-RETENTION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "05ad11dae72e1e8b1e810aaf6106252dfe1349d074dffeb79380c6f6666cc8e9"
+      "source_digest": "c22f8cf8a8d368540c6cc196961dee7904980294d94960b355a3f3d5c309c1fa"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-PRE-IMPORT-EXPORTER-LOSS-CANCELLED-INCOMPLETE-GENERATION",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "bc8dd68902a85a4866f95944633c1eadffe178aa6c21d344aca48af6d7472795"
+      "source_digest": "3174a4546709feebb5846afefc9bba716087fb172c3a85d8c444e52abf1fba55"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-PROCESS-JOURNAL-UPGRADE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "2ae27a91b23e3e24cc8ad4152f802de5004e801ccd5157304fe9e7f441167aaf"
+      "source_digest": "4a614b35e474bbf98674a984203027ffb082fcdf2181b21bdca1d1aa4603b628"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-PROMOTION-RECOVERY-AFTER-LOCAL-STATE-LOSS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "fc33303836f529e0548bd3cad9c0bef2d5f3b98715c424903226e5a35b3c7d35"
+      "source_digest": "e9de06be96e055015830d3838a48f0c024767226ec228d3356e6faed7d329180"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-PROVIDER-NEUTRAL-OMITTED-INTERMEDIATE-MUTATION",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "5ae18c9fde8e6ba89c7efa1cb4f6919985d44d3ca151866cd5bd3268c8f4f030"
+      "source_digest": "0127b6fb5797e11eb6ad8943bcdb25cb87d3fb3ffdc5aaac4bc7a21549fb6dab"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-PROVIDER-NEUTRAL-SEQUENCE-GAP",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "3b0216e5e727c8da3d10d6cebf68b037485c8eda1ff3587ab36f40d1435c4168"
+      "source_digest": "33510b1601f411302e32464e3e3b428637e5680720c0696285ca4804cf53a8d9"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-QUERY-BEFORE-AFTER-MERGE-AND-FINAL",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "1cce5c5dd1c2114bc8701b3b2897b4d2adaf0d3b8c9b9f7684081e99a80da9f1"
+      "source_digest": "b3d2f9894cbde83024f9f2743405c9a003a34210bd7c8d1e21beb0988b00bb95"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-RE-SEED-ADMINISTRATION-CREDENTIAL-LIFETIME",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "2592c3b58ed2d4e23889fdcc475e41f3df1da2d96d2944a620db30b1f0cb0386"
+      "source_digest": "82f209344621d5b92b848158035c374ad68e159a08a80756efd55c188b0b9b44"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-RE-SEED-WITH-HISTORICALLY-DELETED-ROW",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "1b4d09c6654ba4ae03be4da090cd5b73b5a93b31d45e739c3935ac15f8fd1615"
+      "source_digest": "3e7b68164a400352b01ac3fb4d8805f1de0ebc419704b0f44368f9a5b9343560"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-READ-ONLY-CHECK",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "341e80893364a4f0d345a76cbdd135ab84b9d08a1b915cfe85ceb13d17f388f3"
+      "source_digest": "075f5d0b4c8e121f12067bd0a946200d5a77b31011ff3cc1934e321c72f99926"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-READ-ONLY-EVENT-EXPLANATION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "e009e29204cd69e1cea09107b06e6d3bc73a86551367657599c550be515b345d"
+      "source_digest": "30db53a52f22a8d94f7de69c284f342568a358e630a1571bec600b3974d482c0"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-REAL-SQL-TRUNCATE-ON-A-PUBLISHED-TABLE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "27b9dc43c5136cc8d39ab755140f54bd28b2e7ffb51b77fbb51554c23eb11d81"
+      "source_digest": "68db35fd3ba5c92add8c95aadafc8f88c98835a5ed2cd3b43bec67e7d3857da4"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-RECOVERY-CAPACITY-VERSUS-PEAK-THROUGHPUT",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "86098123bb3ff6aa0b4adb93c5c7e067a40963b956f5175ca8b5e6e09d3f73d2"
+      "source_digest": "608f033fb7f510fc366573394661c58416112789db6a02c4d6afb40eb07948ab"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-REMOVED-REPLICA-IDENTITY",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "5bc48b20cf124e9144c8f04287e847ba524a0a0d6af0ff4981d9fbb13a16ae34"
+      "source_digest": "bb13273fa2760fe6c491d8a8e0c199d0db6cd1725c08cdb62a22fa9fb23a949d"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-REPEATED-CRASH-WHILE-TRANSACTION-SPOOLS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "8d4120b5d8c1d1a819653dcaa21c00de8ceaf113a14f57ac30a161bf1e8c5310"
+      "source_digest": "8f15e3ce09cc8c928ec8a20106fb5249afa43310d34795fb4b375abd5585bed2"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-REPEATED-SAME-KEY-CHANGES-IN-ONE-TRANSACTION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "ed843350f545a5e8a5b97b8b7162eb0381fdbe3b0e7c5a24026a47fcb64293cb"
+      "source_digest": "3890a9f83b9a5babc7b3b78309293181131cedad1784e99866ada192124643cf"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-SATURATED-WRITER-AND-SLOW-STORAGE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "be65bc41fe3075e86982720496812a487602b116527025f8944b9cb5fa4ab02d"
+      "source_digest": "8540c3507b8d4e2a8f01aff77605e356c55becdcb85c118e7941032905a4a82c"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-SEPARATE-STATE-ARCHIVE-FILESYSTEMS",
       "owner_bead": "boring-cdc-m5-segment-set",
       "source": "docs/PLAN.md",
-      "source_digest": "a789c3edfcb922102a1717700e2000992604b0826f301cfda7d051b25b6916f5"
+      "source_digest": "04392bfef5bbfefe8ef32a2e9448d1f7a7614530295653e8235d10e2f30f5241"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-SLOT-AHEAD-OF-RESTORED-SQLITE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "8249e938669e7a0d4c6361f1fc00e6ba961167343a77926de7ad8f6871e96b49"
+      "source_digest": "94d4eb93c26c24c0f4ef83c95baeb6e73420a68a0b342c77bd76625152b88786"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-SLOT-INVALIDATION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "d5ed2d230f2fa0c2dde5413b49eee4298a59113f0380b3cd2ee229f0a7b886df"
+      "source_digest": "457ff3e06efc7c741c008d7ffe07f0628e4e12134d12c776ba1a4b96f297bb80"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-SNAPSHOT-AGE-SOURCE-IMPACT-LIMIT",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "5d2b4d3c0b7b72d4c3aba75cd65063ad51104e22c0ebd44e83c73b8914a975d9"
+      "source_digest": "cfe5e7626a11b51d14311c037b0dee84eaee1bdc7b95ae44f1a9bd368947990b"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-SNAPSHOT-COMPLETION-BEFORE-CAPTURE-FENCE",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "c66d6d94978273e24dcee62bf9f0a1c1faa4658b40c1a52a5039b0c6f5f1d70f"
+      "source_digest": "349c095117b26864c02fcc3423066e2dee228fd9a91abdc4e53536b0f675cd7d"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-SNAPSHOT-EVENT-BEFORE-ANCHOR-COMPLETION",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "065c00cf4ca5c7b0f647ed8c2f37c458c82285db297f7aa8af851c27cb12f31b"
+      "source_digest": "738b97ac033f8d4a582e06f218508abadad38d3eabd4a3e0bc6e501f779515ac"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-SPOOL-SQLITE-ENOSPC",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "9166387671909e67cd601057cea6dd05bc88124f033ecd29489b70179d0233c9"
+      "source_digest": "2dfe50cec9242680b497ff9e34086fcd34d10e5ff4a49fc02161130b6117a556"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-SQLITE-VACUUM-CHECKPOINT-LIFECYCLE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "df8c7d20e9d0e8a562bffee06df4117a2071c70d2cac1052a31be7b8aa9d6385"
+      "source_digest": "e6268199faa0d9df90c3c2de9acacf595ff77f14fc7f5f208e840f541e258a6f"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-STABLE-IDENTITY-HASH-GOLDEN-VECTORS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "481e0eca45c47f3c19d7ea9d38500e224c35abc39e5a2f6758e6d11afcc4a3e8"
+      "source_digest": "fdb34eb4aa1c3f2c43e0ce7bf3613f4f2da166cafedd74191af01efdce3f7429"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-STALE-DESTINATION-BACKFILL-WORKER",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "82bb82d9e81b69a354100ffe8081d1ad1ae4516ab5eb30a6c3729e3aec7a1599"
+      "source_digest": "513d8329bd6c21239950d430f222ee90dd9991a4022e9fa91ddf33f892d7953d"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-STALE-EXTERNAL-WRITE-AND-PROMOTION-CRASH",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "3db38c500b5e0b69bbd971bb43f68c80939e2b7d7e1847ee691026e3924ace28"
+      "source_digest": "035bbdba02bb2b9a1aef909b209960cc26fed700e9bc3202db0e591ca740518b"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-STALLED-SQLITE-READER-DURING-SUSTAINED-CAPTURE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "badf26ff5cc91e3ae93b6b09467a9f2c2b68ce53346c5d6825665951de286e3f"
+      "source_digest": "83c3ce91ed01d5974fdd278bad31cffb8b6c79a0e04654d123a93735baa1b582"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-TABLE-ADD-FULL-GENERATION-PROMOTION",
       "owner_bead": "boring-cdc-m4-durability",
       "source": "docs/PLAN.md",
-      "source_digest": "1cadce7df4b11bf57aeccc19fd7cedaa25637e412cd1453a593f31f6948404a8"
+      "source_digest": "e59a20856896d42ef9ccc91abf0cf3bf2a69980a84f77ff124d462d35fad7e8c"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-TIMELINE-SOURCE-PUBLICATION-SLOT-MISMATCH",
       "owner_bead": "boring-cdc-m1-control-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "62f9d28482604a2fe7f6c9c123e5e53927245f1094ce62a5bec879f2ee4f7610"
+      "source_digest": "ba18e2a381b1b11f17a75cbb64f9b62f0a93d9dd2f25a890b7e0132b684386de"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-TOAST-PATCH-BEFORE-DURING-BASELINE",
       "owner_bead": "boring-cdc-m4-toast",
       "source": "docs/PLAN.md",
-      "source_digest": "cf74166437d6a27455ba608e1ee7c30c972a451c61259ca62a201d25076ba39b"
+      "source_digest": "9986a5c5a941f594b4d5d982a6d994755ee2e11b751018cb309d893bb39dbcb5"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-TRANSACTIONS-BEFORE-DURING-AFTER-SNAPSHOT-CREATION",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "4df00c45175c350f449d298be07ca9d6d8d6e8ddca86f83da0caa7e70693b894"
+      "source_digest": "0e4465a6d6da10549ce81fa7b7f86af359bf7d289ec359519f145c8361c30ddb"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-TRANSIENT-DESTINATION-FAILURE",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "f7a084e141acc19d1472517d7e28657e80f08ebd4d5ecca328321ad0e61b1151"
+      "source_digest": "af93598848ff0fe5b30d56d4d094f15b9853edfbbbfd60715289f42c1e42ac9b"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-TWO-RUNTIME-INSTANCES-SAME-SQLITE-PATH",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "359dd8ca0cd1569340a1ae1de966c6b9a27dc376590b59871e015619ba066c34"
+      "source_digest": "3927ccdb3447a5cf50a41c251347b6e1add74a4e1a6d9dcf3cecc0f1a59bba48"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-TWO-RUNTIMES-DIFFERENT-SQLITE-PATHS-SAME-SOURCE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "c7f96d199152c38d9fdd8d6ed642a734995fdd79c9478a8d39f4a6a52d95053e"
+      "source_digest": "b6be14ee3b57b29c4cc2186545d51f25d7b9d7796f01d626c5e96c8a0571c0c9"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-UNEXPECTED-COPYBOTH-LOSS-WHILE-ADVISORY-LOCK-REMAINS",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "40a2853720d929eada48bd4b5b9662e1c6ccf327e0fff79f6419ae1abf293e83"
+      "source_digest": "89afc3bd4815ab5ec4bbbef13e0282a4303c5727ea401bccfcd9c69a983058e3"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-UNSUPPORTED-SQLITE-SETTINGS-FILESYSTEM",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "7ac9347d623aa3cfde579a763091e9675de6ecf9ed7c58941b79ca4bd5f0fd31"
+      "source_digest": "0f2c38885ca27494824cb7f10e5dd086339a6cdd3882df45f9cedb02b0e75862"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-UPDATE-DELETE-DURING-CHUNK-COPY",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
-      "source_digest": "68bae938ed9723781493ffdcf20f15f5fe0ba1708ec06a19ff822bf55d1947a8"
+      "source_digest": "49aec8691043cbe0bf1681b6a2fa933659e9669d6868fb34f17c4a9497998f56"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-WAL-JOURNALED-BEFORE-DELAYED-SNAPSHOT-ROW",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "2cfec8674ab0b07f7051817cc5b3447cd2a58226e29dea4d627b2708a3396c30"
+      "source_digest": "c4958bf06facff55548c1fa91ec508baed1cc4efadf8d27f21da4537abe11007"
     },
     {
       "evidence_status": "pending",
       "id": "SCN-WRITER-VERSUS-OBSERVER-SQLITE-SETTINGS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "da23d2f8b7727e7caa92327e9bf5eb401c7abdd8b2e44218828eca125651cb30"
+      "source_digest": "1ec10a2675f5f9e43f50349850d18ac46579abd77c15565dea3196e3350e1cff"
     },
     {
       "evidence_status": "pending",
       "id": "TRANS-ABORTED-BY-RESTART",
       "owner_bead": "boring-cdc-m2-ownership",
       "source": "docs/PLAN.md",
-      "source_digest": "d89d12753bc1529376ef0add0a9f394203acfa1511c633981e1413ef95f8adba"
+      "source_digest": "963dfa7c817d962b2f9c0ba0aba0053bf4fb5520c4a5d51d26a3bb7fce95daaa"
     },
     {
       "evidence_status": "pending",
       "id": "TRANS-BOOTSTRAP-AMBIGUOUS-REQUIRES-RESTART",
       "owner_bead": "boring-cdc-m3-bootstrap",
       "source": "docs/PLAN.md",
-      "source_digest": "9d95f5bde4ad9a863aaab5fbf4e5618cee093d90a5ec7fc9d0127fecab5dd333"
+      "source_digest": "d30a24d22cc21a3a3dd6148a739d9931fa98a90f94538afd0acdca175b6f9d23"
     },
     {
       "evidence_status": "pending",
       "id": "TRANS-CAPTURE-SAFE-STOPPED",
       "owner_bead": "boring-cdc-m2-capture-runtime",
       "source": "docs/PLAN.md",
-      "source_digest": "22bdc7a318d4700c8cac6b4d8413cc589cc2270b7b9021728a19d268edf39576"
+      "source_digest": "d7813e4a55336bc5cb12e711ed35de8aa73fb4170323a4fe2fd15f4fffb2fd87"
     },
     {
       "evidence_status": "pending",
       "id": "TRANS-JOURNAL-CORRUPT-REQUIRES-RESEED",
       "owner_bead": "boring-cdc-m2-reconcile",
       "source": "docs/PLAN.md",
-      "source_digest": "8043b7393a5cfa6a6613f0355ae9d733ffb7e695c4ec968d2f7fd32109650332"
+      "source_digest": "cd0e59d50b2dd3a581411fb820801ecfe861250d5430b116ea0807a6e8f87c19"
     },
     {
       "evidence_status": "pending",
       "id": "TRANS-PROMOTION-RECOVERY-REQUIRED",
       "owner_bead": "boring-cdc-m4-promotion",
       "source": "docs/PLAN.md",
-      "source_digest": "6d42005fb49c88ab3437c50352ff3cbb8e4d1835a3c6f7d9a2f31ca670211f17"
+      "source_digest": "524e543d77f5829ad8ff93d456694cb6241eafba2e9afa1b60de7bb1d58b79a0"
     },
     {
       "evidence_status": "pending",
       "id": "TRANS-PUBLICATION-DRIFT-REQUIRES-RESEED",
       "owner_bead": "boring-cdc-m1-control-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "973757136e01e4be861667856b08e5f6396ac4be55a6bfeb2578967e81d3189b"
+      "source_digest": "d4e0fcdea6502f52f2646527f0d0dc4d10dea9fa4a8bbdd594fe719278e9621d"
     }
   ],
   "schema_version": "plan-to-beads/v1"

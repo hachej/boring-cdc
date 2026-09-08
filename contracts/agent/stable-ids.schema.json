@@ -38,6 +38,10 @@
             "minLength": 1,
             "type": "string"
           },
+          "source_anchor": {
+            "minLength": 1,
+            "type": "string"
+          },
           "source_digest": {
             "pattern": "^[0-9a-f]{64}$",
             "type": "string"
@@ -64,11 +68,15 @@
           "source_digest",
           "evidence_status",
           "summary",
-          "source_excerpt"
+          "source_excerpt",
+          "source_anchor"
         ],
         "type": "object"
       },
       "type": "array"
+    },
+    "inventory_digest": {
+      "const": "bff336a00cbdb57bbc9d6e1f6e068c5231ef2664faab426c2a4f49b35825e9f9"
     },
     "schema_version": {
       "const": "stable-registry/v1"
@@ -85,7 +93,8 @@
   "required": [
     "schema_version",
     "source_files",
-    "entries"
+    "entries",
+    "inventory_digest"
   ],
   "title": "Canonical stable ID registry",
   "type": "object"

@@ -1,1 +1,79 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://boring-cdc.dev/contracts/agent/impact.schema.json","title":"Source impact and staleness projection","type":"object","additionalProperties":false,"required":["schema_version","target","source_digest","affected_ids","stale_open_or_in_progress","historical_closed","conflicts","remediation"],"properties":{"schema_version":{"const":"impact/v1"},"target":{"type":"string"},"source_digest":{"type":"string"},"affected_ids":{"type":"array"},"stale_open_or_in_progress":{"type":"array"},"historical_closed":{"type":"array"},"conflicts":{"type":"array"},"remediation":{"type":"string"}}}
+{
+  "$id": "https://boring-cdc.dev/contracts/agent/impact.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "affected_ids": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "conflicts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "actual": {
+            "type": "string"
+          },
+          "expected": {
+            "type": "string"
+          },
+          "owner_bead": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "expected",
+          "actual",
+          "owner_bead"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "historical_closed": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "remediation": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "impact/v1"
+    },
+    "source_digest": {
+      "type": "string"
+    },
+    "stale_open_or_in_progress": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "target": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "target",
+    "source_digest",
+    "affected_ids",
+    "stale_open_or_in_progress",
+    "historical_closed",
+    "conflicts",
+    "remediation"
+  ],
+  "title": "Source impact and staleness projection",
+  "type": "object"
+}
