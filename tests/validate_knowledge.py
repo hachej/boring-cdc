@@ -6,7 +6,7 @@ def codes(cp):return [x['code'] for x in json.loads(cp.stdout)['findings']]
 class Knowledge(unittest.TestCase):
  def assertCode(self,cp,code):self.assertNotEqual(cp.returncode,0,cp.stdout+cp.stderr);self.assertIn(code,codes(cp));self.assertFalse(cp.stderr)
  def claim(self,actual='actual-exact.json',index=True,compat=True):
-  a=['--actual',F/actual,'--index',F/'claim-index.json','--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--observed-at','2026-01-01T00:00:00Z']
+  a=['--actual',F/actual,'--index',F/'claim-index.json','--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-EXACT','--observed-at','2026-01-01T00:00:00Z']
   if not index:
    del a[a.index('--index'):a.index('--index')+2]
   if compat:a+=['--compatibility',F/'compatibility.json']
@@ -18,22 +18,26 @@ class Knowledge(unittest.TestCase):
    p=Path(td)/'one.json';idx=json.loads((F/'claim-index.json').read_text())
    for n,actual in ((0,'actual-exact.json'),(1,'actual-compatible.json')):
     p.write_text(json.dumps({'schema_version':'claims/v1','claims':[d['claims'][n]]}));ip=Path(td)/'idx.json';ip.write_text(json.dumps({'schema_version':'claim-index/v1','entries':[idx['entries'][n]]}))
-    cp=run('claims',p,'--index',ip,'--baseline-index',ip,'--owners',F/'owners.json','--actual',F/actual,'--compatibility',F/'compatibility.json');self.assertEqual(cp.returncode,0,cp.stdout)
+    cp=run('claims',p,'--index',ip,'--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id',d['claims'][n]['claim_id'],'--actual',F/actual,'--compatibility',F/'compatibility.json');self.assertEqual(cp.returncode,0,cp.stdout)
  def test_absent_index_and_exact_mismatch(self):
   self.assertCode(self.claim(index=False),'E_CLAIM_INDEX_REQUIRED');self.assertCode(self.claim('actual-compatible.json'),'E_CLAIM_INPUT_MISMATCH')
  def test_forged_owner_unowned_range_hash_and_provenance(self):
   doc=json.loads((F/'claims.json').read_text());idx=json.loads((F/'claim-index.json').read_text());comp=json.loads((F/'compatibility.json').read_text())
   with tempfile.TemporaryDirectory(dir=R/'tests') as td:
    p=Path(td)/'x.json';q=Path(td)/'i.json';k=Path(td)/'c.json'
-   idx['entries'][0]['owner_bead']='boring-cdc-forged';q.write_text(json.dumps(idx));self.assertCode(run('claims',F/'claims.json','--index',q,'--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_CLAIM_OWNER_FORGED')
-   comp['predicates']=[];k.write_text(json.dumps(comp));self.assertCode(run('claims',F/'claims.json','--index',F/'claim-index.json','--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',F/'actual-compatible.json','--compatibility',k),'E_COMPATIBILITY_UNOWNED')
-   doc['claims'][0]['bindings'].pop('artifact_digest');p.write_text(json.dumps(doc));self.assertCode(run('claims',p,'--index',F/'claim-index.json','--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_REQUIRED')
+   idx['entries'][0]['owner_bead']='boring-cdc-forged';q.write_text(json.dumps(idx));self.assertCode(run('claims',F/'claims.json','--index',q,'--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-EXACT','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_CLAIM_OWNER_FORGED')
+   comp['predicates']=[];k.write_text(json.dumps(comp));self.assertCode(run('claims',F/'claims.json','--index',F/'claim-index.json','--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-COMPATIBLE','--actual',F/'actual-compatible.json','--compatibility',k),'E_COMPATIBILITY_UNOWNED')
+   doc['claims'][0]['bindings'].pop('artifact_digest');p.write_text(json.dumps(doc));self.assertCode(run('claims',p,'--index',F/'claim-index.json','--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-EXACT','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_REQUIRED')
  def test_superseded_freshness_and_rewritten_history(self):
   doc=json.loads((F/'claims.json').read_text());doc['claims'][1]['supersedes']=['CLAIM-M0-KNOWLEDGE-EXACT'];doc['claims'][0]['applicability']={'mode':'exact','freshness':'fresh_until','fresh_until':'2025-01-01T00:00:00Z'}
-  actual=json.loads((F/'actual-exact.json').read_text());actual['git_ancestry']=False
+  idx=json.loads((F/'claim-index.json').read_text());idx['entries'][0]['status']='superseded'
+  for i,row in enumerate(doc['claims']):idx['entries'][i]['claim_sha256']=hashlib.sha256(json.dumps(row,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+  actual=json.loads((F/'actual-compatible.json').read_text())
   with tempfile.TemporaryDirectory(dir=R/'tests') as td:
-   p=Path(td)/'x.json';a=Path(td)/'a.json';p.write_text(json.dumps(doc));a.write_text(json.dumps(actual));cp=run('claims',p,'--index',F/'claim-index.json','--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',a,'--compatibility',F/'compatibility.json','--observed-at','2026-01-01T00:00:00Z','--claim-id','CLAIM-M0-KNOWLEDGE-EXACT')
-   for c in ('E_CLAIM_SUPERSEDED','E_CLAIM_STALE','E_HISTORY_REWRITTEN'):self.assertCode(cp,c)
+   p=Path(td)/'x.json';a=Path(td)/'a.json';ip=Path(td)/'index.json';p.write_text(json.dumps(doc));a.write_text(json.dumps(actual));ip.write_text(json.dumps(idx))
+   successor=run('claims',p,'--index',ip,'--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-COMPATIBLE','--actual',a,'--compatibility',F/'compatibility.json','--observed-at','2026-01-01T00:00:00Z');self.assertEqual(successor.returncode,0,successor.stdout)
+   old=run('claims',p,'--index',ip,'--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-EXACT','--actual',a,'--compatibility',F/'compatibility.json','--observed-at','2026-01-01T00:00:00Z');self.assertCode(old,'E_CLAIM_SUPERSEDED');self.assertCode(old,'E_CLAIM_STALE')
+   actual['git_ancestry']=False;a.write_text(json.dumps(actual));self.assertCode(run('claims',p,'--index',ip,'--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-COMPATIBLE','--actual',a,'--compatibility',F/'compatibility.json'),'E_HISTORY_REWRITTEN')
  def test_findings_append_only_and_hypothesis_separation(self):
   self.assertEqual(run('findings',F/'findings.jsonl','--baseline',F/'findings.jsonl').returncode,0)
   row=json.loads((F/'findings.jsonl').read_text());row['kind']='hypothesis';row['hypothesis']='guess';row['observation']='promoted guess'
@@ -50,12 +54,12 @@ class Knowledge(unittest.TestCase):
   with tempfile.TemporaryDirectory(dir=R/'tests') as td:
    p=Path(td)/'actual.json'
    for field in ('capture_epoch_digest','fixture_digest','config_digest','image_digest','environment_digest'):
-    bad=dict(actual);bad[field]='0'*64;p.write_text(json.dumps(bad));cp=run('claims',F/'claims.json','--index',F/'claim-index.json','--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',p,'--compatibility',F/'compatibility.json');self.assertCode(cp,'E_CLAIM_INPUT_MISMATCH');self.assertTrue(any(x['pointer'].endswith('/bindings/'+field) for x in json.loads(cp.stdout)['findings']))
+    bad=dict(actual);bad[field]='0'*64;p.write_text(json.dumps(bad));cp=run('claims',F/'claims.json','--index',F/'claim-index.json','--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-EXACT','--actual',p,'--compatibility',F/'compatibility.json');self.assertCode(cp,'E_CLAIM_INPUT_MISMATCH');self.assertTrue(any(x['pointer'].endswith('/bindings/'+field) for x in json.loads(cp.stdout)['findings']))
  def test_index_and_finding_baseline_rewrites(self):
   idx=json.loads((F/'claim-index.json').read_text());idx['entries'][0]['claim_sha256']='0'*64
   row=json.loads((F/'findings.jsonl').read_text());row['observation']='rewritten history'
   with tempfile.TemporaryDirectory(dir=R/'tests') as td:
-   i=Path(td)/'index.json';i.write_text(json.dumps(idx));self.assertCode(run('claims',F/'claims.json','--index',i,'--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_INDEX_REWRITTEN')
+   i=Path(td)/'index.json';i.write_text(json.dumps(idx));self.assertCode(run('claims',F/'claims.json','--index',i,'--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-EXACT','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_INDEX_REWRITTEN')
    f=Path(td)/'findings.jsonl';f.write_text(json.dumps(row)+'\n');self.assertCode(run('findings',f,'--baseline',F/'findings.jsonl'),'E_FINDING_REWRITE')
  def test_malformed_check_buckets_and_redaction_bypasses(self):
   base=json.loads((F/'handoff.json').read_text())
@@ -63,7 +67,7 @@ class Knowledge(unittest.TestCase):
    p=Path(td)/'handoff.json'
    for bucket,result in (('completed','fail'),('failed','pass'),('stale','pass')):
     h=copy.deepcopy(base);h['checks'][bucket]=[{'command':'x','result':result,'digest':'1'*64}];p.write_text(json.dumps(h));self.assertCode(run('handoff',p),'E_CHECK_BUCKET')
-   for leak in ('/etc/boring/config','mysql://host/db','raw payload bytes','driver error detail'):
+   for leak in ('/etc/boring/config','config=/etc/boring/private.json','mysql://host/db','raw payload bytes','driver error detail'):
     h=copy.deepcopy(base);h['observations']=[leak];p.write_text(json.dumps(h));self.assertCode(run('handoff',p),'E_SECRET')
  def test_hostile_paths_and_determinism(self):
   for kind,name in (('handoff','handoff.json'),('findings','findings.jsonl')):

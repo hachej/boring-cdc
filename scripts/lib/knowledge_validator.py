@@ -4,10 +4,11 @@ from __future__ import annotations
 import argparse, hashlib, json, re, subprocess, sys
 from datetime import datetime, timezone
 from pathlib import Path
+from core_validator import validate_schema_instance
 
 ROOT=Path(__file__).resolve().parents[2]; VERSION="knowledge-validators/1.0.0"; OWNER="boring-cdc-m0.3"
 SHA=re.compile(r"^[0-9a-f]{64}$"); GIT=re.compile(r"^[0-9a-f]{40}$"); BEAD=re.compile(r"^boring-cdc-[A-Za-z0-9.-]+$"); SID=re.compile(r"^(CLAIM|FINDING|SCN|REQ|INV|DEC|CMD|COND|TRANS|REL|RISK|RUNBOOK|ART)-[A-Z0-9-]+$")
-SECRET=re.compile(r'(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|[a-z][a-z0-9+.-]*://|-----BEGIN .*PRIVATE KEY-----|(?:^|[\s"])/(?:[A-Za-z0-9._-]+/)+|raw[_ -]?payload|driver[_ -]?error)')
+SECRET=re.compile(r'(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|[a-z][a-z0-9+.-]*://|-----BEGIN .*PRIVATE KEY-----|(?:^|[=:\s"])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+|raw[_ -]?payload|driver[_ -]?error)')
 BINDINGS=("git_commit","graph_digest","effective_contract_digest","capture_epoch_digest","code_digest","binary_digest","fixture_digest","image_digest","config_digest","profile_digest","seed_digest","environment_digest","command_digest","result_digest","artifact_digest","redaction_digest")
 class DuplicateKey(ValueError):pass
 def unique(pairs):
@@ -65,7 +66,7 @@ def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs
   entries=index.get("entries",[]);idx={e.get("claim_id"):e for e in entries if isinstance(e,dict) and isinstance(e.get("claim_id"),str)}
   if len(idx)!=len(entries):add(fs,"E_INDEX_DUPLICATE","/index/entries","index claim IDs must be unique scalar strings")
  if baseline is None:add(fs,"E_INDEX_BASELINE_REQUIRED","/index","trusted immutable index baseline is required")
- elif index != baseline:add(fs,"E_INDEX_REWRITTEN","/index","claim index differs from trusted baseline")
+ elif not isinstance(index,dict) or not isinstance(baseline,dict) or index.get("schema_version")!=baseline.get("schema_version") or index.get("entries",[])[:len(baseline.get("entries",[]))]!=baseline.get("entries",[]):add(fs,"E_INDEX_REWRITTEN","/index","claim index must preserve trusted baseline entries as an exact prefix")
  claim_owners=owners.get("claim_owners",{}) if isinstance(owners,dict) else {}
  predicate_owners=owners.get("predicate_owners",{}) if isinstance(owners,dict) else {}
  if owners is None:add(fs,"E_OWNER_REGISTRY_REQUIRED","/owners","canonical owner registry is required")
@@ -75,6 +76,8 @@ def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs
   if compat.get("schema_version")!="claim-compatibility/v1":add(fs,"E_SCHEMA_VERSION","/compatibility/schema_version","expected claim-compatibility/v1")
   predicates={x.get("predicate_id"):x for x in compat.get("predicates",[]) if isinstance(x,dict) and isinstance(x.get("predicate_id"),str)}
  seen=set();superseded=set()
+ if not selected:add(fs,"E_CLAIM_SELECTION_REQUIRED","/claim_id","verification requires an explicit selected claim")
+ elif not any(isinstance(r,dict) and r.get("claim_id")==selected for r in rows):add(fs,"E_CLAIM_SELECTION_UNKNOWN","/claim_id","selected claim is absent")
  for r in rows:
   if isinstance(r,dict):superseded.update(x for x in r.get("supersedes",[]) if isinstance(x,str))
  for i,r in enumerate(rows):
@@ -101,7 +104,10 @@ def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs
    if not canonical or canonical!=r.get("owner_bead") or entry.get("owner_bead")!=canonical:add(fs,"E_CLAIM_OWNER_FORGED",p+"/owner_bead","claim owner differs from canonical owner registry",canonical or OWNER)
    if entry.get("claim_sha256")!=expected:add(fs,"E_CLAIM_HASH",p+"/claim_id","claim content differs from immutable index",entry.get("owner_bead",OWNER))
    if entry.get("status") not in ("current","superseded"):add(fs,"E_INDEX_STATUS",p+"/claim_id","index status must be current or superseded")
+   elif (cid in superseded)!=(entry.get("status")=="superseded"):add(fs,"E_INDEX_SUPERSESSION",p+"/claim_id","index status must match retained supersession history")
+   if selected==cid and entry.get("status")!="current":add(fs,"E_CLAIM_SUPERSEDED",p+"/claim_id","selected index entry is superseded",r.get("owner_bead",OWNER))
   app=r.get("applicability");req(app,["mode","freshness"],fs,p+"/applicability")
+  if selected!=cid:continue
   if isinstance(app,dict):
    mode=app.get("mode");fresh=app.get("freshness")
    if fresh=="fresh_until":
@@ -154,6 +160,8 @@ def validate_findings(rows,baseline,fs):
  secret_check(rows,fs)
 
 def validate_handoff(o,fs):
+ schema=json.loads((ROOT/"contracts/agent/handoff.schema.json").read_text())
+ validate_schema_instance(o,schema,fs,base=ROOT/"contracts/agent")
  names=["schema_version","bead_id","world_state_digest","base_sha","head_sha","dirty","changed_paths","touched_ids","checks","facts","observations","hypotheses","intents","risks","unsafe_repeats","next_safe_command","log_references","redaction"]
  req(o,names,fs);closed(o,names,fs)
  if not isinstance(o,dict):return
