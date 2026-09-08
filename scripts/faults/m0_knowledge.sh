@@ -14,5 +14,6 @@ for round in 1 2; do python3 -m unittest -q \
  tests.validate_knowledge.Knowledge.test_index_and_finding_baseline_rewrites \
  tests.validate_knowledge.Knowledge.test_malformed_check_buckets_and_redaction_bypasses \
  tests.validate_knowledge.Knowledge.test_malformed_owned_documents_never_crash \
+ tests.validate_knowledge.Knowledge.test_canonical_schema_hostile_inputs \
  tests.validate_knowledge.Knowledge.test_hostile_paths_and_determinism >/dev/null 2>&1;done
 printf 'm0 knowledge hostile corpus pass seed=%s repeated=2 product_faults=fault_not_applicable\n' "$seed"

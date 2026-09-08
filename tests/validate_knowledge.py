@@ -76,6 +76,18 @@ class Knowledge(unittest.TestCase):
     cp=run(*args);self.assertNotEqual(cp.returncode,0);json.loads(cp.stdout);self.assertFalse(cp.stderr)
    for field,value in (("hypotheses",7),("facts",7),("log_references",{}),("intents",[])):
     h=json.loads((F/'handoff.json').read_text());h[field]=value;p.write_text(json.dumps(h));cp=run('handoff',p);self.assertNotEqual(cp.returncode,0);json.loads(cp.stdout);self.assertFalse(cp.stderr)
+ def test_canonical_schema_hostile_inputs(self):
+  with tempfile.TemporaryDirectory(dir=R/'tests') as td:
+   p=Path(td)/'hostile.json'
+   cases=[]
+   idx=json.loads((F/'claim-index.json').read_text());idx['entries'][0]['status']='current';cases.append(('claims',idx,'--index'))
+   baseline=json.loads((F/'claim-index-baseline.json').read_text());baseline['entries']=7;cases.append(('baseline',baseline,'--baseline-index'))
+   compat=json.loads((F/'compatibility.json').read_text());compat['predicates'][0]['status']='current';cases.append(('compatibility-field',compat,'--compatibility'))
+   compat_empty=json.loads((F/'compatibility.json').read_text());compat_empty['predicates'][0]['allowed_values']['git_commit']=[];cases.append(('allowed-values',compat_empty,'--compatibility'))
+   for name,document,option in cases:
+    p.write_text(json.dumps(document));args=['claims',F/'claims.json','--index',F/'claim-index.json','--baseline-index',F/'claim-index-baseline.json','--owners',F/'owners.json','--claim-id','CLAIM-M0-KNOWLEDGE-COMPATIBLE','--actual',F/'actual-compatible.json','--compatibility',F/'compatibility.json'];args[args.index(option)+1]=p
+    cp=run(*args);self.assertNotEqual(cp.returncode,0,name);json.loads(cp.stdout);self.assertFalse(cp.stderr,name);self.assertTrue(any(c.startswith('E_SCHEMA_') for c in codes(cp)),cp.stdout)
+   finding=json.loads((F/'findings.jsonl').read_text());finding['owner_bead']='not/a/bead';p.write_text(json.dumps(finding)+'\n');cp=run('findings',p,'--baseline',p);self.assertCode(cp,'E_SCHEMA_PATTERN')
  def test_hostile_paths_and_determinism(self):
   for kind,name in (('handoff','handoff.json'),('findings','findings.jsonl')):
    raw=(F/name).read_text().replace('synthetic validator','/home/alice/private') if kind=='handoff' else (F/name).read_text().replace('Validator fails','token=abc Validator fails')

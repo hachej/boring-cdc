@@ -60,6 +60,10 @@ def parse_time(v):
  try:return datetime.fromisoformat(v.replace("Z","+00:00"))
  except (ValueError,AttributeError):return None
 
+def schema_validate(doc,path,pointer,fs):
+ schema=json.loads((ROOT/path).read_text())
+ validate_schema_instance(doc,schema,fs,pointer=pointer,base=(ROOT/path).parent)
+
 def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs):
  fields=["schema_version","claims"];req(doc,fields,fs);closed(doc,fields,fs)
  if not isinstance(doc,dict) or doc.get("schema_version")!="claims/v1":add(fs,"E_SCHEMA_VERSION","/schema_version","expected claims/v1");return
@@ -67,6 +71,7 @@ def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs
  if not isinstance(rows,list):add(fs,"E_TYPE","/claims","expected array");return
  if index is None:add(fs,"E_CLAIM_INDEX_REQUIRED","/","absent claim index cannot imply verified evidence");idx={}
  else:
+  schema_validate(index,"contracts/agent/claim-index.schema.json","/index",fs)
   if not isinstance(index,dict):add(fs,"E_TYPE","/index","claim index must be an object");index={}
   req(index,["schema_version","entries"],fs,"/index");closed(index,["schema_version","entries"],fs,"/index")
   if index.get("schema_version")!="claim-index/v1":add(fs,"E_SCHEMA_VERSION","/index/schema_version","expected claim-index/v1")
@@ -75,12 +80,17 @@ def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs
   idx={e.get("claim_id"):e for e in entries if isinstance(e,dict) and isinstance(e.get("claim_id"),str)}
   if len(idx)!=len(entries):add(fs,"E_INDEX_DUPLICATE","/index/entries","index claim IDs must be unique scalar strings")
  if baseline is None:add(fs,"E_INDEX_BASELINE_REQUIRED","/index","trusted immutable index baseline is required")
- elif not isinstance(index,dict) or not isinstance(baseline,dict) or index.get("schema_version")!=baseline.get("schema_version") or index.get("entries",[])[:len(baseline.get("entries",[]))]!=baseline.get("entries",[]):add(fs,"E_INDEX_REWRITTEN","/index","claim index must preserve trusted baseline entries as an exact prefix")
+ else:
+  schema_validate(baseline,"contracts/agent/claim-index.schema.json","/baseline-index",fs)
+  index_entries=index.get("entries") if isinstance(index,dict) else None
+  baseline_entries=baseline.get("entries") if isinstance(baseline,dict) else None
+  if not isinstance(index_entries,list) or not isinstance(baseline_entries,list) or index.get("schema_version")!=baseline.get("schema_version") or index_entries[:len(baseline_entries)]!=baseline_entries:add(fs,"E_INDEX_REWRITTEN","/index","claim index must preserve trusted baseline entries as an exact prefix")
  claim_owners=owners.get("claim_owners",{}) if isinstance(owners,dict) else {}
  predicate_owners=owners.get("predicate_owners",{}) if isinstance(owners,dict) else {}
  if owners is None:add(fs,"E_OWNER_REGISTRY_REQUIRED","/owners","canonical owner registry is required")
  predicates={}
  if compat is not None:
+  schema_validate(compat,"contracts/agent/claim-compatibility.schema.json","/compatibility",fs)
   if not isinstance(compat,dict):add(fs,"E_TYPE","/compatibility","compatibility registry must be an object");compat={}
   req(compat,["schema_version","predicates"],fs,"/compatibility")
   if compat.get("schema_version")!="claim-compatibility/v1":add(fs,"E_SCHEMA_VERSION","/compatibility/schema_version","expected claim-compatibility/v1")
@@ -136,8 +146,11 @@ def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs
     elif actual is None:add(fs,"E_ACTUAL_INPUT_REQUIRED",p+"/bindings","compatibility requires actual inputs")
     else:
      allowed=pred.get("allowed_values",{})
+     if not isinstance(allowed,dict):allowed={}
      for n in BINDINGS:
-      if actual.get(n)!=b.get(n) and actual.get(n) not in allowed.get(n,[]):add(fs,"E_CLAIM_INPUT_MISMATCH",p+f"/bindings/{n}",f"invalidating input {n}; rerun owner {r.get('owner_bead')}",r.get("owner_bead",OWNER))
+      admitted=allowed.get(n,[])
+      if not isinstance(admitted,list):admitted=[]
+      if actual.get(n)!=b.get(n) and actual.get(n) not in admitted:add(fs,"E_CLAIM_INPUT_MISMATCH",p+f"/bindings/{n}",f"invalidating input {n}; rerun owner {r.get('owner_bead')}",r.get("owner_bead",OWNER))
    else:add(fs,"E_APPLICABILITY_MODE",p+"/applicability/mode","expected exact or compatible")
  if actual is not None and actual.get("git_ancestry") is False:add(fs,"E_HISTORY_REWRITTEN","/actual/git_ancestry","claim Git history is not ancestral")
  secret_check(doc,fs)
@@ -149,7 +162,7 @@ def validate_findings(rows,baseline,fs):
  for r in rows if isinstance(rows,list) else []:
   if isinstance(r,dict):superseded.update(x for x in r.get("supersedes",[]) if isinstance(x,str))
  for i,r in enumerate(rows if isinstance(rows,list) else []):
-  p=f"/lines/{i}";names=["schema_version","finding_id","kind","observation","hypothesis","affected_ids","environment_digest","input_digest","failed_approach","owner_bead","status","resolution","invalidation_trigger","supersedes"]
+  p=f"/lines/{i}";schema_validate(r,"contracts/knowledge/findings.schema.json",p,fs);names=["schema_version","finding_id","kind","observation","hypothesis","affected_ids","environment_digest","input_digest","failed_approach","owner_bead","status","resolution","invalidation_trigger","supersedes"]
   if not req(r,names,fs,p):continue
   closed(r,names,fs,p)
   if r.get("schema_version")!="finding/v1":add(fs,"E_SCHEMA_VERSION",p+"/schema_version","expected finding/v1")
