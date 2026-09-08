@@ -10,7 +10,7 @@
       "stderr_path": "tests/fixtures/m0-context/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-1.log",
-      "stdout_sha256": "acdf59ed6dbdb792e911ac0ed7491468e6160bb93b30e78a3c4cfe4b92620c72",
+      "stdout_sha256": "09e9abf19fb5d77a57a95c4d33ac16384ff92a24f8f91668e12c742e0671647a",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     },
     {
@@ -37,7 +37,7 @@
       "stderr_path": "tests/fixtures/m0-context/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-4.log",
-      "stdout_sha256": "acdf59ed6dbdb792e911ac0ed7491468e6160bb93b30e78a3c4cfe4b92620c72",
+      "stdout_sha256": "09e9abf19fb5d77a57a95c4d33ac16384ff92a24f8f91668e12c742e0671647a",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     },
     {
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "component",
-  "git_commit": "a66c1f4fc88ad4ff93ebc51e565a207d33ceb543",
+  "git_commit": "585b06aed79541634857d5c471baf8ef9e915f5f",
   "owner_bead": "boring-cdc-m0.2",
   "redaction": {
     "checked": true,
@@ -76,7 +76,7 @@
       "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-5.log",
       "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-6.log"
     ],
-    "digest": "a3c70b6b727089303998ab0905daeae2e3b670b3363c51ca19b6a7bb5a2eb861",
+    "digest": "957565ec66443432c5863632b1ab7203b17c4b12d4de985fe531fe32b8cf6fbe",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -85,8 +85,8 @@
   "schema_version": "evidence/v1",
   "seed": "m0-context-v1",
   "source_preservation": {
-    "after_sha256": "d495e63b012fde0ee1e155ebd387f07046dce13fbdade1fdb8b9ea907db0ba32",
-    "before_sha256": "d495e63b012fde0ee1e155ebd387f07046dce13fbdade1fdb8b9ea907db0ba32",
+    "after_sha256": "a63904ee889e5cef5ae3610de7dac01d217918fcb9710e58de1f5d96557f3297",
+    "before_sha256": "a63904ee889e5cef5ae3610de7dac01d217918fcb9710e58de1f5d96557f3297",
     "preserved": true
   },
   "tier_proof": {
