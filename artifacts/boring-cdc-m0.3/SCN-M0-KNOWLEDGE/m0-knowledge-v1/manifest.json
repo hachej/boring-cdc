@@ -10,7 +10,7 @@
       "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-1.log",
-      "stdout_sha256": "2dfbad7199a751cb12f9c670e34c17753caf94ad344907c9bebbed36430d1606",
+      "stdout_sha256": "23314c1f2dd945c2f36532ca396ca7cafdfdd7bab822e54758a1aab694dbb458",
       "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
     },
     {
@@ -19,7 +19,7 @@
       "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-2.log",
-      "stdout_sha256": "e36e812cfeda7c4e02cd77eccbcb48f41b8161ed3199131bdffe44688fe257d7",
+      "stdout_sha256": "8c9f41843816bcd9543bb2d9903c2e2af2df21d66292a91f39e56c5b34adff47",
       "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
     },
     {
@@ -28,7 +28,7 @@
       "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-3.log",
-      "stdout_sha256": "ee456e99298a0b35d2498f177742d2c8786acd8cba8006f13c6a2c14eef8f6ab",
+      "stdout_sha256": "f99e87af43899db80c722bb1cfd4fec6684cece3a233659aac1e8c52c76d83ed",
       "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
     },
     {
@@ -37,7 +37,7 @@
       "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-4.log",
-      "stdout_sha256": "5b3ead908dcaa46415ac0183a3edb64c4eaaf49a7823339d9a29da836dbcf03b",
+      "stdout_sha256": "ba3eb2a772a7ec21a619938588794dade33eb3b40ede2dc8741f2bb5269c24fe",
       "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
     },
     {
@@ -46,7 +46,7 @@
       "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-5.log",
-      "stdout_sha256": "e36e812cfeda7c4e02cd77eccbcb48f41b8161ed3199131bdffe44688fe257d7",
+      "stdout_sha256": "8c9f41843816bcd9543bb2d9903c2e2af2df21d66292a91f39e56c5b34adff47",
       "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
     },
     {
@@ -55,13 +55,13 @@
       "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-6.log",
-      "stdout_sha256": "13aa62cd13bc6e8b3132d3b1ae92dd55c97e7c14e0522ca7a8aae4d8597df001",
+      "stdout_sha256": "9c5e6ddd9fb0f7cd1001f0a1054fe0d41f45105836f292c7d9f3cbd98bac94bc",
       "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "component",
-  "git_commit": "061fca39b455683f9194fb08884dd07724aa0284",
+  "git_commit": "182055bd8c8cf410fcdc70636b9da92a4a4720e3",
   "owner_bead": "boring-cdc-m0.3",
   "redaction": {
     "checked": true,
@@ -76,7 +76,7 @@
       "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-5.log",
       "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-6.log"
     ],
-    "digest": "492cc059986939c4db997019799c740a72d4162cfa666dcd7f034013d675b68b",
+    "digest": "8dae4b1e67ab320ecf0318f0c3a0df92a60c6c5b2c33bb39a98fa1c27a66d26a",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -85,8 +85,8 @@
   "schema_version": "evidence/v1",
   "seed": "m0-knowledge-v1",
   "source_preservation": {
-    "after_sha256": "3e9178e99af710ec2806776c73e6671a673662eaa8cacbbfa7bd7e0c27e4dcf5",
-    "before_sha256": "3e9178e99af710ec2806776c73e6671a673662eaa8cacbbfa7bd7e0c27e4dcf5",
+    "after_sha256": "fcc18d81feb7d1f2a869e110a9f638916f4373870620231a80443d7db25658c2",
+    "before_sha256": "fcc18d81feb7d1f2a869e110a9f638916f4373870620231a80443d7db25658c2",
     "preserved": true
   },
   "tier_proof": {

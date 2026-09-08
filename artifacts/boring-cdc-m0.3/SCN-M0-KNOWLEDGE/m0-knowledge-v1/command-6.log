@@ -1,9 +1,9 @@
 ----------------------------------------------------------------------
-Ran 9 tests in 3.274s
+Ran 9 tests in 4.282s
 
 OK
 ----------------------------------------------------------------------
-Ran 9 tests in 3.430s
+Ran 9 tests in 3.963s
 
 OK
 m0 knowledge hostile corpus pass seed=m0-knowledge-v1 repeated=2 product_faults=fault_not_applicable

@@ -10,6 +10,6 @@ test_superseded_freshness_and_rewritten_history (tests.validate_knowledge.Knowle
 test_valid_exact_and_compatible (tests.validate_knowledge.Knowledge.test_valid_exact_and_compatible) ... ok
 
 ----------------------------------------------------------------------
-Ran 10 tests in 3.562s
+Ran 10 tests in 4.104s
 
 OK
