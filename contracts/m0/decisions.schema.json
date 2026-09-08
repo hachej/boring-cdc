@@ -4,6 +4,26 @@
       "additionalProperties": false,
       "properties": {
         "approval": {
+          "additionalProperties": false,
+          "properties": {
+            "approved_at": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "approved_by": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "value_digest": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "approved_by",
+            "approved_at",
+            "value_digest"
+          ],
           "type": "object"
         },
         "executor_beads": {
@@ -14,6 +34,10 @@
           "minItems": 1,
           "type": "array",
           "uniqueItems": true
+        },
+        "fixture_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
         },
         "fixture_spec": {
           "minLength": 1,
@@ -45,6 +69,7 @@
         "status",
         "proposed_value",
         "fixture_spec",
+        "fixture_sha256",
         "executor_beads"
       ],
       "type": "object"

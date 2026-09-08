@@ -5,11 +5,37 @@
   "properties": {
     "findings": {
       "items": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "pattern": "^E_[A-Z0-9_]+$",
+            "type": "string"
+          },
+          "message": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "owner_bead": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "pointer": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "pointer",
+          "owner_bead",
+          "message"
+        ],
         "type": "object"
       },
       "type": "array"
     },
     "git_commit": {
+      "pattern": "^[0-9a-f]{40}$",
       "type": "string"
     },
     "input_sha256": {

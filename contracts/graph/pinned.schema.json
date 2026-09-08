@@ -5,12 +5,195 @@
   "properties": {
     "edges": {
       "items": {
+        "additionalProperties": false,
+        "properties": {
+          "depends_on_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "issue_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "blocks",
+              "parent-child",
+              "related",
+              "discovered-from"
+            ]
+          }
+        },
+        "required": [
+          "issue_id",
+          "depends_on_id",
+          "type"
+        ],
         "type": "object"
       },
       "type": "array"
     },
     "issues": {
       "items": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptance_criteria": {
+            "type": "string"
+          },
+          "assignee": {
+            "type": "string"
+          },
+          "close_reason": {
+            "type": "string"
+          },
+          "closed_at": {
+            "type": "string"
+          },
+          "closed_by_session": {
+            "type": "string"
+          },
+          "comments": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "author": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "integer"
+                },
+                "issue_id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "issue_id",
+                "author",
+                "text",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "compaction_level": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "dependencies": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "created_at": {
+                  "type": "string"
+                },
+                "created_by": {
+                  "type": "string"
+                },
+                "depends_on_id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "issue_id": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "metadata": {
+                  "type": "string"
+                },
+                "thread_id": {
+                  "type": "string"
+                },
+                "type": {
+                  "enum": [
+                    "blocks",
+                    "parent-child",
+                    "related",
+                    "discovered-from"
+                  ]
+                }
+              },
+              "required": [
+                "issue_id",
+                "depends_on_id",
+                "type"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "description": {
+            "type": "string"
+          },
+          "design": {
+            "type": "string"
+          },
+          "estimated_minutes": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "string"
+          },
+          "issue_type": {
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "notes": {
+            "type": "string"
+          },
+          "original_size": {
+            "type": "integer"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "source_repo": {
+            "type": "string"
+          },
+          "source_repo_path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "priority",
+          "issue_type",
+          "created_at",
+          "updated_at",
+          "dependencies"
+        ],
         "type": "object"
       },
       "type": "array"

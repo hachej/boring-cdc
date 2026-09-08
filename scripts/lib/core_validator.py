@@ -33,11 +33,18 @@ def safe_path(value: object, pointer: str, findings: list, *, must_exist=False):
     p = Path(value)
     if p.is_absolute() or ".." in p.parts or any(part in ("", ".") for part in p.parts):
         add(findings, "E_PATH_TRAVERSAL", pointer, "absolute, dot, and parent path components are forbidden"); return None
-    resolved = ROOT / p
-    if resolved.is_symlink():
-        add(findings, "E_PATH_SYMLINK", pointer, "symlink inputs are forbidden"); return None
-    if must_exist and not resolved.is_file(): add(findings, "E_REFERENCE_MISSING", pointer, f"referenced file does not exist: {value}")
-    return resolved
+    candidate = ROOT / p
+    current = ROOT
+    for part in p.parts:
+        current /= part
+        if current.is_symlink():
+            add(findings, "E_PATH_SYMLINK", pointer, "symlink path components are forbidden"); return None
+    try:
+        candidate.resolve(strict=False).relative_to(ROOT.resolve())
+    except (OSError, ValueError):
+        add(findings, "E_PATH_TRAVERSAL", pointer, "resolved path must remain inside the repository"); return None
+    if must_exist and not candidate.is_file(): add(findings, "E_REFERENCE_MISSING", pointer, f"referenced file does not exist: {value}")
+    return candidate
 
 def add(findings, code, pointer, message, owner=OWNER):
     findings.append({"code":code,"pointer":pointer,"owner_bead":owner,"message":message})
@@ -84,7 +91,12 @@ def inventory(path, findings, kind):
     if not path: return None
     obj,_=load(Path(path),findings)
     if not isinstance(obj,list): add(findings,"E_INVENTORY_TYPE",f"/{kind}","inventory must be a JSON array"); return set()
-    return {x for x in obj if isinstance(x,str)}
+    result=set()
+    for index,value in enumerate(obj):
+        if not isinstance(value,str) or not value: add(findings,"E_INVENTORY_ITEM",f"/{kind}/{index}","inventory entries must be nonempty strings"); continue
+        if value in result: add(findings,"E_DUPLICATE_OWNER" if kind=="owners" else "E_DUPLICATE_INVENTORY",f"/{kind}/{index}",f"duplicate {kind} entry: {value}")
+        result.add(value)
+    return result
 
 def validate_decisions(obj, findings, args):
     if not req_obj(obj,["schema_version","decisions"],findings): return
@@ -92,10 +104,10 @@ def validate_decisions(obj, findings, args):
     rows=obj.get("decisions",[])
     if not isinstance(rows,list): add(findings,"E_TYPE","/decisions","expected array"); return
     duplicates(rows,"id",findings,"/decisions"); owners=inventory(args.owners,findings,"owners"); fixtures=inventory(args.fixtures,findings,"fixtures"); executors=inventory(args.executors,findings,"executors")
-    allowed=["id","owner_bead","status","proposed_value","approval","fixture_spec","executor_beads"]
+    allowed=["id","owner_bead","status","proposed_value","approval","fixture_spec","fixture_sha256","executor_beads"]
     for i,r in enumerate(rows):
         p=f"/decisions/{i}";
-        if not req_obj(r,["id","owner_bead","status","proposed_value","fixture_spec","executor_beads"],findings,p): continue
+        if not req_obj(r,["id","owner_bead","status","proposed_value","fixture_spec","fixture_sha256","executor_beads"],findings,p): continue
         check_unknown(r,allowed,findings,p); check_id(r.get("id"),p+"/id",findings,"DEC-"); check_owner(r.get("owner_bead"),p+"/owner_bead",findings); check_unresolved(r.get("proposed_value"),p+"/proposed_value",findings)
         if owners is not None and r.get("owner_bead") not in owners: add(findings,"E_OWNER_UNKNOWN",p+"/owner_bead","owner absent from supplied inventory")
         if r.get("status") not in ("open","approved","rejected"): add(findings,"E_STATUS",p+"/status","invalid decision status")
@@ -103,8 +115,12 @@ def validate_decisions(obj, findings, args):
             a=r.get("approval")
             if not req_obj(a,["approved_by","approved_at","value_digest"],findings,p+"/approval"): pass
             elif not SHA256.fullmatch(str(a.get("value_digest",""))): add(findings,"E_DIGEST",p+"/approval/value_digest","expected lowercase sha256")
+            elif a.get("value_digest") != digest(r.get("proposed_value","").encode()): add(findings,"E_APPROVAL_DIGEST",p+"/approval/value_digest","approval digest must bind the proposed value")
         elif "approval" in r: add(findings,"E_APPROVAL_STATE",p+"/approval","approval is allowed only for approved rows")
-        fp=r.get("fixture_spec"); safe_path(fp,p+"/fixture_spec",findings)
+        fp=r.get("fixture_spec"); target=safe_path(fp,p+"/fixture_spec",findings)
+        expected_hash=r.get("fixture_sha256")
+        if not SHA256.fullmatch(str(expected_hash or "")): add(findings,"E_DIGEST",p+"/fixture_sha256","expected lowercase sha256")
+        elif target and target.is_file() and digest(target.read_bytes()) != expected_hash: add(findings,"E_HASH_MISMATCH",p+"/fixture_sha256","fixture content hash mismatch")
         if fixtures is not None and fp not in fixtures: add(findings,"E_FIXTURE_UNKNOWN",p+"/fixture_spec","fixture absent from supplied inventory")
         ex=r.get("executor_beads")
         if not isinstance(ex,list) or not ex: add(findings,"E_EXECUTOR_REQUIRED",p+"/executor_beads","at least one later executor is required")
@@ -115,8 +131,11 @@ def validate_decisions(obj, findings, args):
                 if executors is not None and x not in executors: add(findings,"E_EXECUTOR_UNKNOWN",f"{p}/executor_beads/{j}","executor absent from supplied inventory")
     if args.complete:
         if not rows: add(findings,"E_DECISIONS_EMPTY","/decisions","empty skeleton cannot satisfy aggregate completeness")
+        for option in ("owners", "fixtures", "executors"):
+            if not getattr(args, option): add(findings,"E_INVENTORY_REQUIRED",f"/{option}",f"--complete requires --{option} inventory")
         for i,r in enumerate(rows):
             if isinstance(r,dict) and r.get("status")!="approved": add(findings,"E_DECISION_OPEN",f"/decisions/{i}/status","real closure requires every decision approved")
+            if isinstance(r,dict): safe_path(r.get("fixture_spec"),f"/decisions/{i}/fixture_spec",findings,must_exist=True)
 
 def validate_artifacts(obj, findings, args):
     if not req_obj(obj,["schema_version","artifacts"],findings): return
@@ -131,10 +150,13 @@ def validate_artifacts(obj, findings, args):
         if not SHA256.fullmatch(str(r.get("sha256",""))): add(findings,"E_DIGEST",p+"/sha256","expected lowercase sha256")
         elif target and target.is_file() and digest(target.read_bytes())!=r.get("sha256"): add(findings,"E_HASH_MISMATCH",p+"/sha256","artifact content hash mismatch")
         if r.get("status") not in ("declared","complete"): add(findings,"E_STATUS",p+"/status","invalid artifact status")
-    if args.complete and not rows: add(findings,"E_ARTIFACTS_EMPTY","/artifacts","empty skeleton cannot satisfy aggregate completeness")
+    if args.complete:
+        if not rows: add(findings,"E_ARTIFACTS_EMPTY","/artifacts","empty skeleton cannot satisfy aggregate completeness")
+        for i,r in enumerate(rows):
+            if isinstance(r,dict) and r.get("status") != "complete": add(findings,"E_ARTIFACT_INCOMPLETE",f"/artifacts/{i}/status","aggregate completeness requires every artifact complete")
 
 def validate_evidence(obj, findings, args):
-    fields=["schema_version","owner_bead","scenario_id","evidence_profile","evidence_tier","seed","git_commit","commands","source_preservation","cleanup","redaction","result"]
+    fields=["schema_version","owner_bead","scenario_id","evidence_profile","evidence_tier","seed","git_commit","commands","source_preservation","cleanup","redaction","tier_proof","result"]
     if not req_obj(obj,fields,findings): return
     check_version(obj,"evidence/v1",findings); check_unknown(obj,fields,findings); check_owner(obj.get("owner_bead"),"/owner_bead",findings); check_id(obj.get("scenario_id"),"/scenario_id",findings,"SCN-"); check_unresolved(obj.get("seed"),"/seed",findings)
     profile=obj.get("evidence_profile"); tier=obj.get("evidence_tier")
@@ -145,30 +167,54 @@ def validate_evidence(obj, findings, args):
     if not isinstance(cmds,list) or not cmds: add(findings,"E_COMMANDS_REQUIRED","/commands","at least one command record is required")
     else:
         for i,c in enumerate(cmds):
-            p=f"/commands/{i}"; req_obj(c,["argv","version","exit_code","stdout_sha256","stderr_sha256"],findings,p)
+            p=f"/commands/{i}"; required=["argv","version","exit_code","stdout_sha256","stderr_sha256"]; req_obj(c,required,findings,p)
             if isinstance(c,dict):
-                check_unknown(c,["argv","version","exit_code","stdout_sha256","stderr_sha256"],findings,p)
-                check_unresolved(c.get("argv"),p+"/argv",findings); check_unresolved(c.get("version"),p+"/version",findings)
+                check_unknown(c,required,findings,p); check_unresolved(c.get("argv"),p+"/argv",findings); check_unresolved(c.get("version"),p+"/version",findings)
+                if type(c.get("exit_code")) is not int: add(findings,"E_EXIT_CODE",p+"/exit_code","exit_code must be an integer")
                 for k in ("stdout_sha256","stderr_sha256"):
                     if not SHA256.fullmatch(str(c.get(k,""))): add(findings,"E_DIGEST",p+"/"+k,"expected lowercase sha256")
-    sp=obj.get("source_preservation"); req_obj(sp,["before_sha256","after_sha256","preserved"],findings,"/source_preservation")
-    if isinstance(sp,dict) and (sp.get("preserved") is not True or sp.get("before_sha256")!=sp.get("after_sha256")): add(findings,"E_SOURCE_MUTATED","/source_preservation","before/after source hashes must match and preserved must be true")
-    cl=obj.get("cleanup"); req_obj(cl,["complete","remaining_paths"],findings,"/cleanup")
-    if isinstance(cl,dict) and (cl.get("complete") is not True or cl.get("remaining_paths")!=[]): add(findings,"E_CLEANUP_INCOMPLETE","/cleanup","cleanup must be complete with no remaining paths")
-    rd=obj.get("redaction"); req_obj(rd,["checked","secrets_found"],findings,"/redaction")
-    if isinstance(rd,dict) and (rd.get("checked") is not True or rd.get("secrets_found")!=0): add(findings,"E_REDACTION","/redaction","redaction must be checked with zero secrets")
-    result=obj.get("result"); req_obj(result,["status","digest","product_faults"],findings,"/result")
+    sp=obj.get("source_preservation"); sp_fields=["before_sha256","after_sha256","preserved"]; req_obj(sp,sp_fields,findings,"/source_preservation")
+    if isinstance(sp,dict):
+        check_unknown(sp,sp_fields,findings,"/source_preservation")
+        for k in ("before_sha256","after_sha256"):
+            if not SHA256.fullmatch(str(sp.get(k,""))): add(findings,"E_DIGEST",f"/source_preservation/{k}","expected lowercase sha256")
+        if sp.get("preserved") is not True or sp.get("before_sha256")!=sp.get("after_sha256"): add(findings,"E_SOURCE_MUTATED","/source_preservation","before/after source hashes must match and preserved must be true")
+    cl=obj.get("cleanup"); cl_fields=["complete","remaining_paths"]; req_obj(cl,cl_fields,findings,"/cleanup")
+    if isinstance(cl,dict):
+        check_unknown(cl,cl_fields,findings,"/cleanup")
+        if cl.get("complete") is not True or cl.get("remaining_paths")!=[]: add(findings,"E_CLEANUP_INCOMPLETE","/cleanup","cleanup must be complete with no remaining paths")
+    rd=obj.get("redaction"); rd_fields=["checked","secrets_found"]; req_obj(rd,rd_fields,findings,"/redaction")
+    if isinstance(rd,dict):
+        check_unknown(rd,rd_fields,findings,"/redaction")
+        if rd.get("checked") is not True or rd.get("secrets_found")!=0: add(findings,"E_REDACTION","/redaction","redaction must be checked with zero secrets")
+    proof_fields=["targeted_checks","boundary_e2e","fault_suite","deterministic_rerun","consumed_contract_vectors","workspace_tests","integration","clean_environment","exit_assertions","endurance","full_failure_matrix","clean_clone"]
+    proof=obj.get("tier_proof"); req_obj(proof,proof_fields,findings,"/tier_proof")
+    if isinstance(proof,dict):
+        check_unknown(proof,proof_fields,findings,"/tier_proof")
+        required_by_tier={"leaf":["targeted_checks"],"component":["targeted_checks","boundary_e2e","fault_suite","deterministic_rerun","consumed_contract_vectors"],"milestone":["targeted_checks","workspace_tests","integration","clean_environment","exit_assertions"],"release":["targeted_checks","workspace_tests","integration","clean_environment","exit_assertions","endurance","full_failure_matrix","clean_clone"]}
+        for name in required_by_tier.get(tier,[]):
+            if proof.get(name) is not True: add(findings,"E_TIER_PROOF",f"/tier_proof/{name}",f"{tier} evidence requires {name}")
+        for name in proof_fields:
+            if name in proof and type(proof[name]) is not bool: add(findings,"E_TYPE",f"/tier_proof/{name}","tier proof values must be booleans")
+    result=obj.get("result"); result_fields=["status","digest","product_faults","runtime_observed","attempts"]; req_obj(result,["status","digest","product_faults","runtime_observed"],findings,"/result")
     if isinstance(result,dict):
+        check_unknown(result,result_fields,findings,"/result")
+        if result.get("status") not in ("pass","fail","unavailable","unsupported"): add(findings,"E_RESULT_STATUS","/result/status","unknown evidence result status")
         if not SHA256.fullmatch(str(result.get("digest",""))): add(findings,"E_DIGEST","/result/digest","expected lowercase sha256")
-        if profile=="documentation" and result.get("product_faults")!="fault_not_applicable": add(findings,"E_FORWARD_RUNTIME_EVIDENCE","/result/product_faults","documentation evidence cannot claim product runtime faults")
-        if profile=="external_managed" and result.get("status") in ("unavailable","unsupported") and not result.get("attempts"): add(findings,"E_EXTERNAL_PROVENANCE","/result/attempts","managed unavailability requires exact attempts")
-        if tier in ("component","milestone","release") and len(cmds or [])<2: add(findings,"E_TIER_PROOF","/commands",f"{tier} evidence requires at least two command records")
+        if type(result.get("runtime_observed")) is not bool: add(findings,"E_TYPE","/result/runtime_observed","runtime_observed must be boolean")
+        if profile=="documentation" and (result.get("product_faults")!="fault_not_applicable" or result.get("runtime_observed") is not False): add(findings,"E_FORWARD_RUNTIME_EVIDENCE","/result","documentation evidence cannot claim product runtime evidence")
+        if profile=="runtime" and result.get("runtime_observed") is not True: add(findings,"E_RUNTIME_PROVENANCE","/result/runtime_observed","runtime profile requires direct runtime observation")
+        if profile=="external_managed" and not result.get("attempts"): add(findings,"E_EXTERNAL_PROVENANCE","/result/attempts","managed evidence requires exact attempts/provenance")
     text=json.dumps(obj,sort_keys=True)
     if SECRET.search(text): add(findings,"E_SECRET","/","secret-like content is forbidden")
 
 def validate_runbooks(obj, findings, args):
     if not req_obj(obj,["schema_version","stage","runbooks"],findings): return
-    check_version(obj,"runbooks-index/v1",findings); check_unknown(obj,["schema_version","stage","runbooks"],findings); rows=obj.get("runbooks",[]); duplicates(rows,"id",findings,"/runbooks")
+    check_version(obj,"runbooks-index/v1",findings); check_unknown(obj,["schema_version","stage","runbooks"],findings)
+    if obj.get("stage") not in ("declared","complete"): add(findings,"E_STAGE","/stage","stage must be declared or complete")
+    rows=obj.get("runbooks",[])
+    if not isinstance(rows,list): add(findings,"E_TYPE","/runbooks","expected array"); return
+    duplicates(rows,"id",findings,"/runbooks")
     conditions=set(); actions=set()
     for i,r in enumerate(rows if isinstance(rows,list) else []):
         p=f"/runbooks/{i}"; fields=["id","condition_id","action_id","condition_owner","action_owner","procedure_owner","procedure"]
@@ -183,7 +229,10 @@ def validate_runbooks(obj, findings, args):
     if args.release and obj.get("stage")!="complete": add(findings,"E_RELEASE_DECLARED_RUNBOOK","/stage","release rejects declared-only runbooks")
 
 def parse_jsonl(path, findings):
-    raw=path.read_bytes(); rows=[]
+    try: raw=path.read_bytes()
+    except FileNotFoundError: add(findings,"E_INPUT_MISSING","/",f"input not found: {path}"); return [],b""
+    except OSError as e: add(findings,"E_INPUT_UNREADABLE","/",f"input cannot be read: {type(e).__name__}"); return [],b""
+    rows=[]
     for i,line in enumerate(raw.splitlines()):
         try: rows.append(json.loads(line,object_pairs_hook=unique))
         except DuplicateKey as e: add(findings,"E_DUPLICATE_KEY",f"/lines/{i}",f"duplicate JSON key: {e}")
@@ -192,8 +241,9 @@ def parse_jsonl(path, findings):
 
 def witness(path,findings):
     try:
+        raw=path.read_bytes()
         with tempfile.TemporaryDirectory(prefix="boring-cdc-witness-") as td:
-            beads=Path(td)/".beads"; beads.mkdir(); (beads/"issues.jsonl").write_bytes(path.read_bytes())
+            beads=Path(td)/".beads"; beads.mkdir(); (beads/"issues.jsonl").write_bytes(raw)
             cp=subprocess.run(["br","sync","--witness","--json","--no-db"],cwd=td,text=True,capture_output=True,timeout=30)
             if cp.returncode:
                 detail=(cp.stderr or cp.stdout).strip().replace(str(ROOT),"<repo>").replace(td,"<tmp>")
@@ -215,8 +265,11 @@ def validate_graph(path, findings, args):
             if by[stale] != baseline[stale]: add(findings,"E_GRAPH_STALE",f"/issues/{stale}","record differs from baseline across one or more fields")
     edges=[]
     for issue,r in by.items():
-        for j,d in enumerate(r.get("dependencies",[])):
+        dependencies=r.get("dependencies",[])
+        if not isinstance(dependencies,list): add(findings,"E_TYPE",f"/issues/{issue}/dependencies","dependencies must be an array"); continue
+        for j,d in enumerate(dependencies):
             p=f"/issues/{issue}/dependencies/{j}"
+            if not isinstance(d,dict): add(findings,"E_EDGE_RECORD",p,"dependency must be an object"); continue
             if d.get("issue_id")!=issue: add(findings,"E_EDGE_OWNER",p+"/issue_id","dependency issue_id differs from containing issue")
             target=d.get("depends_on_id"); typ=d.get("type")
             if target not in by: add(findings,"E_EDGE_DANGLING",p+"/depends_on_id",f"missing issue: {target}")
@@ -241,10 +294,10 @@ def validate_graph(path, findings, args):
                 if b==issue and t=="parent-child" and by.get(a,{}).get("status")!="closed": add(findings,"E_PREMATURE_PARENT_CLOSE",f"/issues/{issue}/status",f"closed parent has open child {a}")
     if args.expect_root:
         expected=set(json.loads(Path(args.expect_root).read_text()))
-        leaves={x for x in by if not any(a==x and t=="parent-child" for a,b,t in edges)}
+        leaves={x for x in by if not any(b==x and t=="parent-child" for a,b,t in edges)}
         if leaves!=expected: add(findings,"E_LEAF_SET","/","graph leaf set differs from expected inventory")
     captured_sha=digest(raw)
-    root=witness(path,findings)
+    root=witness(path,findings) if raw else "0"*64
     if args.witness_root and root != args.witness_root: add(findings,"E_WITNESS_MISMATCH","/witness_root","captured witness does not match expected immutable root")
     try:
         if digest(path.read_bytes()) != captured_sha: add(findings,"E_INPUT_MOVED","/","graph input changed during captured operation")
@@ -258,7 +311,10 @@ def parser():
 
 def main():
     args=parser().parse_args(); path=Path(args.input); findings=[]; raw=b""
-    if args.kind=="graph": validate_graph(path,findings,args); raw=path.read_bytes() if path.exists() else b""
+    if args.kind=="graph":
+        validate_graph(path,findings,args)
+        try: raw=path.read_bytes()
+        except OSError: raw=b""
     elif args.kind=="evidence" and path.is_dir():
         manifests=sorted(path.rglob("manifest.json"))
         if not manifests: add(findings,"E_INPUT_MISSING","/","artifact root contains no manifest.json")

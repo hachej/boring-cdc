@@ -8,6 +8,7 @@
         "additionalProperties": false,
         "properties": {
           "action_id": {
+            "pattern": "^CMD-[A-Z0-9-]+$",
             "type": "string"
           },
           "action_owner": {
@@ -15,6 +16,7 @@
             "type": "string"
           },
           "condition_id": {
+            "pattern": "^COND-[A-Z0-9-]+$",
             "type": "string"
           },
           "condition_owner": {
@@ -22,6 +24,7 @@
             "type": "string"
           },
           "id": {
+            "pattern": "^RUNBOOK-[A-Z0-9-]+$",
             "type": "string"
           },
           "procedure": {
