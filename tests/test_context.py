@@ -9,12 +9,12 @@ class ContextTests(unittest.TestCase):
   if ok:self.assertEqual(p.returncode,0,p.stderr)
   return p,json.loads(p.stdout)
  def test_registry_complete_unique_pending_and_owned(self):
-  reg=json.load(open(ROOT/'contracts/agent/stable-ids.json')); es=reg['entries']; ids=[e['id'] for e in es]
+  reg=json.loads((ROOT/'contracts/agent/stable-ids.json').read_text()); es=reg['entries']; ids=[e['id'] for e in es]
   self.assertEqual(len(ids),len(set(ids))); self.assertEqual(ac.validate(),[])
   counts={n:sum(e['namespace']==n for e in es) for n in set(e['namespace'] for e in es)}
   self.assertEqual(counts,{'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':120,'REL':33,'RISK':38})
   self.assertTrue(all(e['evidence_status']=='pending' for e in es));self.assertNotIn('pass_digest',json.dumps(reg))
-  self.assertTrue({'RUNBOOK','CLAIM','FINDING'} <= set(json.load(open(ROOT/'contracts/agent/stable-ids.schema.json'))['properties']['entries']['items']['properties']['namespace']['enum']))
+  self.assertTrue({'RUNBOOK','CLAIM','FINDING'} <= set(json.loads((ROOT/'contracts/agent/stable-ids.schema.json').read_text())['properties']['entries']['items']['properties']['namespace']['enum']))
  def test_all_interfaces_help_and_read_only(self):
   before={p:hashlib.sha256(p.read_bytes()).hexdigest() for p in [ROOT/'.beads/issues.jsonl',ROOT/'docs/PLAN.md',ROOT/'docs/REQUIREMENTS.md']}
   for tool,args in [('doctor',[]),('next',[]),('context',['boring-cdc-m0.2']),('impact',['docs/PLAN.md'])]:
