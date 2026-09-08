@@ -10,7 +10,7 @@
       "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-1.log",
-      "stdout_sha256": "9769dd4f74e30670f8786917febb51dbe5e474bef8285bf859b6334522a4667b",
+      "stdout_sha256": "d26e6d8cf5a3decad71cd61f9d6e20b2c21b381da41261e8ea10ab4cd85ab38b",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     },
     {
@@ -28,7 +28,7 @@
       "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-3.log",
-      "stdout_sha256": "e1fee1f11765b4cc71a26056e23de362da37033db1497ac30000b4542caff986",
+      "stdout_sha256": "8eff3d238d5ea701d1a830df69792200a386d0b95b5c0914b36aafd7b9231a36",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     },
     {
@@ -37,7 +37,7 @@
       "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-4.log",
-      "stdout_sha256": "5cbee88dec049cedb722df07d84e4fa80bd6503a125a3224be7bc5e8c5ca5550",
+      "stdout_sha256": "7c5ed374f96c2e627fd57668e63083f29307ed3e3c8c473872eb57984c8ba5bf",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     },
     {
@@ -55,13 +55,13 @@
       "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-6.log",
-      "stdout_sha256": "3ccd11a63a664cbced430c7cd81bf33b906b39db8e1a5455a6ad9945456e3770",
+      "stdout_sha256": "180f77407ece02e0d34d81eb1b34062b76290db78bc32bd91f04fadcf935a341",
       "version": "python=Python 3.13.3; br=br 0.2.16"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "component",
-  "git_commit": "0b034abb0bd02144df8785305ec63caacd655c2a",
+  "git_commit": "876889d07bdc5470bed2a92a0c43d392a6ca095e",
   "owner_bead": "boring-cdc-m0.1",
   "redaction": {
     "checked": true,
@@ -76,7 +76,7 @@
       "artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-5.log",
       "artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-6.log"
     ],
-    "digest": "7ec68de9cb53ebe193c22feb8a3ca3c4392dfbfaf085ed6c34ade4762cd0148e",
+    "digest": "72487fde68cc4e3d5424f28447fa8dc598d8d0e7fbe41807a69f048ac0969645",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"

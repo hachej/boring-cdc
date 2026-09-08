@@ -4,12 +4,15 @@ test_empty_skeletons_valid_but_not_complete (tests.validate_core_validators.Core
 test_evidence_profiles_tiers_redaction_cleanup_and_types (tests.validate_core_validators.Core.test_evidence_profiles_tiers_redaction_cleanup_and_types) ... ok
 test_graph_baseline_witness_and_source_isolation (tests.validate_core_validators.Core.test_graph_baseline_witness_and_source_isolation) ... ok
 test_invalid_reason_codes_and_determinism (tests.validate_core_validators.Core.test_invalid_reason_codes_and_determinism) ... ok
+test_non_scalar_graph_dependency_ids_fail_as_stable_json (tests.validate_core_validators.Core.test_non_scalar_graph_dependency_ids_fail_as_stable_json) ... ok
+test_non_scalar_ids_and_inventory_entries_fail_as_stable_json (tests.validate_core_validators.Core.test_non_scalar_ids_and_inventory_entries_fail_as_stable_json) ... ok
 test_owned_schemas_close_nested_object_shapes (tests.validate_core_validators.Core.test_owned_schemas_close_nested_object_shapes) ... ok
 test_runbook_unknown_stage_and_graph_leaf_orientation (tests.validate_core_validators.Core.test_runbook_unknown_stage_and_graph_leaf_orientation) ... ok
+test_safety_schemas_require_transition_ownership_and_log_correlation (tests.validate_core_validators.Core.test_safety_schemas_require_transition_ownership_and_log_correlation) ... ok
 test_symlink_parent_escape_and_missing_graph_are_stable_failures (tests.validate_core_validators.Core.test_symlink_parent_escape_and_missing_graph_are_stable_failures) ... ok
 test_valid_contracts (tests.validate_core_validators.Core.test_valid_contracts) ... ok
 
 ----------------------------------------------------------------------
-Ran 10 tests in 7.131s
+Ran 13 tests in 14.334s
 
 OK
