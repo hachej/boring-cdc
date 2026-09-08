@@ -54,10 +54,10 @@
       "namespace": "CMD",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_anchor": "\nCheck in:\n",
-      "source_digest": "f452dc9ea7c9c8d2c89513325af3ba74cb7ddb63cfc0dcf03ae22d9964cc4dc5",
-      "source_excerpt": "Check in:",
-      "source_locator": "12.1 Commands#f452dc9ea7c9",
+      "source_anchor": "```text\nboring-cdc check\nboring-cdc init",
+      "source_digest": "9cac8786fb178bebf66178680958f1f2607066c105993f19056b6fd09906c20c",
+      "source_excerpt": "boring-cdc check",
+      "source_locator": "12.1 Commands#9cac8786fb17",
       "summary": "check"
     },
     {
@@ -282,10 +282,10 @@
       "namespace": "CMD",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_anchor": "```text\nrun_id\nmutation_seq",
-      "source_digest": "94b78dde235d6030661bbc66b63a114ea01579077e358657c8be09f8bc6b2187",
-      "source_excerpt": "run_id",
-      "source_locator": "12.1 Commands#94b78dde235d",
+      "source_anchor": "boring-cdc init\nboring-cdc run\nboring-cdc run --bootstrap",
+      "source_digest": "858e59425e00db060252ba939586effc9334364754fd1c2671c1c2b604dfefed",
+      "source_excerpt": "boring-cdc run",
+      "source_locator": "12.1 Commands#858e59425e00",
       "summary": "run"
     },
     {
@@ -342,10 +342,10 @@
       "namespace": "COND",
       "owner_bead": "boring-cdc-m2-pressure",
       "source": "docs/PLAN.md",
-      "source_anchor": "| Paused destination pins retention | Pressure identifies the pin; no unconsumed event is silently removed |\n| Journal pressure transitions | Warning/action/critical/hard actions occur in order |\n| Journal corruption/missing sequence | Startup blocks and requires verified restore or re-seed |",
-      "source_digest": "8e6b70e5ba3b6e776e0926001513f0e01410a50fc71508cadfbc88483c348c07",
-      "source_excerpt": "| Journal pressure transitions | Warning/action/critical/hard actions occur in order |",
-      "source_locator": "external conditions#8e6b70e5ba3b",
+      "source_anchor": "Pressure states:\n\n| State | Required behavior |",
+      "source_digest": "ffa1418d18bc7c5d7dec22cd34a135a00c9903249c86f079a83835ddac65cb23",
+      "source_excerpt": "Pressure states:\n\n| State | Required behavior |",
+      "source_locator": "external conditions#ffa1418d18bc",
       "summary": "journal_pressure"
     },
     {
@@ -4266,10 +4266,10 @@
       "namespace": "SCN",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_anchor": "| Paused destination pins retention | Pressure identifies the pin; no unconsumed event is silently removed |\n| Journal pressure transitions | Warning/action/critical/hard actions occur in order |\n| Journal corruption/missing sequence | Startup blocks and requires verified restore or re-seed |",
-      "source_digest": "8e6b70e5ba3b6e776e0926001513f0e01410a50fc71508cadfbc88483c348c07",
+      "source_anchor": "| Journal pressure transitions | Warning/action/critical/hard actions occur in order |",
+      "source_digest": "14c5660f8b983c3e01ccc8863570b96b9365437cff2acd1c68407e7814265036",
       "source_excerpt": "| Journal pressure transitions | Warning/action/critical/hard actions occur in order |",
-      "source_locator": "15 Required test matrix#8e6b70e5ba3b",
+      "source_locator": "15 Required test matrix#14c5660f8b98",
       "summary": "Journal pressure transitions: Warning/action/critical/hard actions occur in order"
     },
     {
@@ -4974,10 +4974,10 @@
       "namespace": "TRANS",
       "owner_bead": "boring-cdc-m2-capture-runtime",
       "source": "docs/PLAN.md",
-      "source_anchor": "schema_blocked\ncapture_safe_stopped\nslot_invalid_requires_reseed",
-      "source_digest": "d7813e4a55336bc5cb12e711ed35de8aa73fb4170323a4fe2fd15f4fffb2fd87",
-      "source_excerpt": "capture_safe_stopped",
-      "source_locator": "named transitions#d7813e4a5533",
+      "source_anchor": "First stop capture dispatch, durably record `capture_safe_stopped` and its unchanged failed boundary/fingerprint, and bind an expected-close token to the current run and capture-connection generation",
+      "source_digest": "4ebd7ba44b50d7008f759e32a6a4f40d5bdeed3c2d967746746b135e3cdad1ca",
+      "source_excerpt": "First stop capture dispatch, durably record `capture_safe_stopped` and its unchanged failed boundary/fingerprint, and bind an expected-close token to the current run and capture-connection generation",
+      "source_locator": "named transitions#4ebd7ba44b50",
       "summary": "capture_safe_stopped"
     },
     {
@@ -5010,14 +5010,14 @@
       "namespace": "TRANS",
       "owner_bead": "boring-cdc-m1-control-fixtures",
       "source": "docs/PLAN.md",
-      "source_anchor": "journal_corrupt_requires_reseed\npublication_drift_requires_reseed\nbootstrap_ambiguous_requires_restart",
-      "source_digest": "d4e0fcdea6502f52f2646527f0d0dc4d10dea9fa4a8bbdd594fe719278e9621d",
-      "source_excerpt": "publication_drift_requires_reseed",
-      "source_locator": "named transitions#d4e0fcdea650",
+      "source_anchor": "once detected, feedback stops before any newly decoded transaction is acknowledged and state transitions to `publication_drift_requires_reseed`",
+      "source_digest": "a7af1a28a299ee65255c6b76f6e2289f8f9ab80822e5111094017910c64c5c1e",
+      "source_excerpt": "once detected, feedback stops before any newly decoded transaction is acknowledged and state transitions to `publication_drift_requires_reseed`",
+      "source_locator": "named transitions#a7af1a28a299",
       "summary": "publication_drift_requires_reseed"
     }
   ],
-  "inventory_digest": "bff336a00cbdb57bbc9d6e1f6e068c5231ef2664faab426c2a4f49b35825e9f9",
+  "inventory_digest": "38be11068a8b2ec6761c80c74d6efe570d16b4933af79fdc2e46958efcb9389a",
   "schema_version": "stable-registry/v1",
   "source_files": {
     "docs/PLAN.md": "0e4ebaa072453ea24f0dfc3f22a025b919970fe556eb0d90f026235e8029af4d",

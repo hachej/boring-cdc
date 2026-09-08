@@ -127,6 +127,15 @@ class Core(unittest.TestCase):
                     first=invoke(); second=invoke()
                     self.assertCode(first,"E_ID_INVALID"); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
 
+    def test_agent_schema_keyword_corpus_rejects_malformed_instances(self):
+        schema=ROOT/"contracts/agent/context-pack.schema.json"
+        emitted=subprocess.run([str(ROOT/"scripts/agent/context"),"boring-cdc-m0.2","--profile","review","--observed-at","2026-01-01T00:00:00Z"],cwd=ROOT,text=True,capture_output=True,check=True)
+        with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
+            p=Path(td)/"pack.json";valid=json.loads(emitted.stdout);p.write_text(json.dumps(valid));self.assertEqual(run("schema",p,"--schema",schema).returncode,0)
+            mutations=[("E_SCHEMA_MINIMUM",lambda x:x.update(summary_bytes=-1)),("E_SCHEMA_MIN_PROPERTIES",lambda x:x.update(source_digests={})),("E_SCHEMA_UNIQUE_ITEMS",lambda x:x.update(included_ids=["REQ-X","REQ-X"])),("E_SCHEMA_ONE_OF",lambda x:x.update(profile="handoff")),("E_SCHEMA_ADDITIONAL_PROPERTY",lambda x:x["effective_contract"]["task"].update(unknown="x"))]
+            for code,mutate in mutations:
+                bad=json.loads(json.dumps(valid));mutate(bad);p.write_text(json.dumps(bad));self.assertCode(run("schema",p,"--schema",schema),code)
+
     def test_safety_schemas_require_transition_ownership_and_log_correlation(self):
         cases = [
             ({"schema_version":"plan-to-beads/v1","assignments":[{"id":"TRANS-SYNTHETIC","source":"synthetic","source_digest":"0000000000000000000000000000000000000000000000000000000000000000","evidence_status":"pending"}]}, ROOT/"contracts/coverage/plan-to-beads.schema.json", "/assignments/0/owner_bead"),

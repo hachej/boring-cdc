@@ -47,6 +47,12 @@ class ContextTests(unittest.TestCase):
   for profile in ['orient','implement','review','handoff']:
    _,x=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--profile',profile,'--observed-at','2026-01-01T00:00:00Z');names[profile]={a['name'] for a in x['attachments']};self.assertEqual(x['total_bytes'],len(ac.canonical(x).encode()));self.assertEqual(x['token_estimate'],(x['total_bytes']+3)//4)
   self.assertIn('orientation',names['orient']);self.assertIn('dependency_outputs',names['implement']);self.assertIn('review_diff',names['review']);self.assertIn('handoff_state',names['handoff'])
+ def test_review_and_handoff_bind_full_selected_bead_range(self):
+  _,review=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--profile','review','--observed-at','2026-01-01T00:00:00Z')
+  content=next(a['content'] for a in review['attachments'] if a['name']=='review_diff');state=content['implementation_range']
+  self.assertEqual(state['base_sha'],'ce9f307de4db6adf8a485d6ca07009d70017f8bb');self.assertGreater(len(state['commits']),1);self.assertIn('scripts/agent/context',content['patch'])
+  paths={p for c in state['changes'] for p in c['paths']};self.assertFalse(any(p.startswith('docs/issues/') for p in paths));self.assertEqual(state['patch_sha256'],ac.digest_bytes(content['patch'].encode()))
+  _,handoff=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--profile','handoff','--observed-at','2026-01-01T00:00:00Z');h=next(a['content'] for a in handoff['attachments'] if a['name']=='handoff_state');self.assertEqual(h['implementation_range'],state);self.assertEqual(h['changed_paths'],sorted(paths))
  def test_world_state_binds_dirty_content_and_impact_rejects_escape(self):
   with tempfile.TemporaryDirectory(dir=ROOT/'tests') as td:
    p=Path(td)/'dirty';p.write_text('one');a=ac.world()['working_tree_digest'];p.write_text('two');b=ac.world()['working_tree_digest'];self.assertNotEqual(a,b)
@@ -60,9 +66,24 @@ class ContextTests(unittest.TestCase):
   ac.REG=old
   ns=type('N',(),{'bead':'boring-cdc-m0.2','profile':'implement','expand':'REQ-NOT-REAL','observed_at':'2026-01-01T00:00:00Z'})()
   with self.assertRaisesRegex(SystemExit,'E_EXPANSION_UNKNOWN'):ac.cmd_context(ns)
- def test_every_source_fragment_is_digest_bound_and_present(self):
-  for e in ac.registry()['entries']:
-   self.assertEqual(ac.digest_bytes(e['source_anchor'].encode()),e['source_digest']);self.assertIn(e['source_excerpt'],(ROOT/e['source']).read_text())
+ def test_every_source_fragment_is_digest_bound_unique_and_exactly_stale(self):
+  entries=ac.registry()['entries'];pairs=[(e['source'],e['source_anchor']) for e in entries];self.assertEqual(len(pairs),len(set(pairs)))
+  for e in entries:
+   self.assertEqual(ac.digest_bytes(e['source_anchor'].encode()),e['source_digest']);self.assertEqual((ROOT/e['source']).read_text().count(e['source_anchor']),1)
+  ids=['CMD-CHECK','CMD-RUN','COND-CAPTURE-SAFE-STOPPED','TRANS-CAPTURE-SAFE-STOPPED','COND-JOURNAL-PRESSURE','SCN-JOURNAL-PRESSURE-TRANSITIONS','COND-PUBLICATION-DRIFT','TRANS-PUBLICATION-DRIFT-REQUIRES-RESEED']
+  with tempfile.TemporaryDirectory(dir=ROOT/'tests') as td:
+   for ident in ids:
+    e=dict(next(x for x in entries if x['id']==ident));source=(ROOT/e['source']).read_text();p=Path(td)/f'{ident}.txt';p.write_text(source.replace(e['source_anchor'],'stale',1));e['source']=str(p.relative_to(ROOT));self.assertEqual(ac.changed_rows(ac.registry(),[e]),{ident})
+ def test_published_schema_keywords_and_malformed_profiles_fail_closed(self):
+  malformed=[(0,{'type':'integer','minimum':1},'minimum'),({}, {'type':'object','minProperties':1},'minProperties'),([],{'type':'array','minItems':1},'minItems'),([1,1],{'type':'array','uniqueItems':True},'uniqueItems'),([],{'type':'array','contains':{'const':1}},'contains'),(1,{'oneOf':[{'const':1},{'type':'integer'}]},'oneOf')]
+  for value,schema,keyword in malformed:self.assertTrue(any(keyword in e for e in ac.schema_errors(value,schema)))
+  _,pack=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--profile','review','--observed-at','2026-01-01T00:00:00Z')
+  bad=json.loads(json.dumps(pack));bad['profile']='handoff'
+  with self.assertRaisesRegex(SystemExit,'E_CONTEXT_SCHEMA'):ac.validate_pack(bad)
+  bad=json.loads(json.dumps(pack));bad['effective_contract']['task']['unknown']='x'
+  with self.assertRaisesRegex(SystemExit,'E_CONTEXT_SCHEMA'):ac.validate_pack(bad)
+  bad=json.loads(json.dumps(pack));next(a for a in bad['attachments'] if a['name']=='review_diff')['content']['implementation_range']['base_sha']='short'
+  with self.assertRaisesRegex(SystemExit,'E_CONTEXT_SCHEMA'):ac.validate_pack(bad)
  def test_generated_view_drift_rejected(self):
   p,x=self.cli(str(ROOT/'scripts/validate/plan_coverage.sh'));self.assertTrue(x['valid'])
  def test_above_and_below_16k_beads_are_complete(self):

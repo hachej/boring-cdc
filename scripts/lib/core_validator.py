@@ -248,10 +248,24 @@ def validate_evidence(obj, findings, args):
     text=json.dumps(obj,sort_keys=True)
     if SECRET.search(text): add(findings,"E_SECRET","/","secret-like content is forbidden")
 
-def validate_schema_instance(instance, schema, findings, pointer=""):
-    """Validate the JSON Schema subset used by the two bootstrap safety schemas."""
+def validate_schema_instance(instance, schema, findings, pointer="", base=None, root=None):
+    """Validate every assertion keyword published by repository-owned schemas."""
     if not isinstance(schema, dict):
         add(findings, "E_SCHEMA_DEFINITION", pointer or "/", "schema node must be an object")
+        return
+    root = schema if root is None else root
+    if "$ref" in schema:
+        try:
+            name, _, fragment = schema["$ref"].partition("#")
+            document = root if not name else json.loads((base / name).read_text())
+            target = document
+            if fragment:
+                if not fragment.startswith("/"): raise ValueError("invalid fragment")
+                for token in fragment[1:].split("/"):
+                    target = target[token.replace("~1", "/").replace("~0", "~")]
+            validate_schema_instance(instance, target, findings, pointer, base, document)
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+            add(findings, "E_SCHEMA_REF", pointer or "/", "schema reference cannot be resolved")
         return
     expected = schema.get("type")
     types = expected if isinstance(expected, list) else [expected] if expected is not None else []
@@ -271,15 +285,42 @@ def validate_schema_instance(instance, schema, findings, pointer=""):
         add(findings, "E_SCHEMA_CONST", pointer or "/", "instance does not match required constant")
     if "enum" in schema and instance not in schema["enum"]:
         add(findings, "E_SCHEMA_ENUM", pointer or "/", "instance is not an allowed value")
+    for keyword in ("allOf", "anyOf", "oneOf"):
+        if keyword in schema:
+            branch_findings=[]
+            for branch in schema[keyword]:
+                local=[]; validate_schema_instance(instance, branch, local, pointer, base, root); branch_findings.append(local)
+            passed=sum(not local for local in branch_findings)
+            if keyword == "allOf":
+                for local in branch_findings: findings.extend(local)
+            elif keyword == "anyOf" and passed == 0: add(findings,"E_SCHEMA_ANY_OF",pointer or "/","instance matches no anyOf branch")
+            elif keyword == "oneOf" and passed != 1: add(findings,"E_SCHEMA_ONE_OF",pointer or "/","instance must match exactly one oneOf branch")
     if isinstance(instance, str):
         if isinstance(schema.get("minLength"), int) and len(instance) < schema["minLength"]:
             add(findings, "E_SCHEMA_MIN_LENGTH", pointer or "/", "string is shorter than minLength")
+        if isinstance(schema.get("maxLength"), int) and len(instance) > schema["maxLength"]:
+            add(findings, "E_SCHEMA_MAX_LENGTH", pointer or "/", "string is longer than maxLength")
         if isinstance(schema.get("pattern"), str) and re.search(schema["pattern"], instance) is None:
             add(findings, "E_SCHEMA_PATTERN", pointer or "/", "string does not match required pattern")
-    if isinstance(instance, list) and isinstance(schema.get("items"), dict):
-        for index, value in enumerate(instance):
-            validate_schema_instance(value, schema["items"], findings, f"{pointer}/{index}")
+    if type(instance) in (int,float):
+        if type(schema.get("minimum")) in (int,float) and instance < schema["minimum"]: add(findings,"E_SCHEMA_MINIMUM",pointer or "/","number is below minimum")
+        if type(schema.get("maximum")) in (int,float) and instance > schema["maximum"]: add(findings,"E_SCHEMA_MAXIMUM",pointer or "/","number is above maximum")
+    if isinstance(instance, list):
+        if isinstance(schema.get("minItems"),int) and len(instance)<schema["minItems"]: add(findings,"E_SCHEMA_MIN_ITEMS",pointer or "/","array has fewer than minItems")
+        if isinstance(schema.get("maxItems"),int) and len(instance)>schema["maxItems"]: add(findings,"E_SCHEMA_MAX_ITEMS",pointer or "/","array has more than maxItems")
+        if schema.get("uniqueItems") is True and len({json.dumps(x,sort_keys=True,separators=(",",":")) for x in instance}) != len(instance): add(findings,"E_SCHEMA_UNIQUE_ITEMS",pointer or "/","array items are not unique")
+        if isinstance(schema.get("items"), dict):
+            for index, value in enumerate(instance):
+                validate_schema_instance(value, schema["items"], findings, f"{pointer}/{index}", base, root)
+        if isinstance(schema.get("contains"),dict):
+            matches_contains=False
+            for index,value in enumerate(instance):
+                local=[];validate_schema_instance(value,schema["contains"],local,f"{pointer}/{index}",base,root)
+                if not local:matches_contains=True;break
+            if not matches_contains:add(findings,"E_SCHEMA_CONTAINS",pointer or "/","array has no matching item")
     if isinstance(instance, dict):
+        if isinstance(schema.get("minProperties"),int) and len(instance)<schema["minProperties"]: add(findings,"E_SCHEMA_MIN_PROPERTIES",pointer or "/","object has fewer than minProperties")
+        if isinstance(schema.get("maxProperties"),int) and len(instance)>schema["maxProperties"]: add(findings,"E_SCHEMA_MAX_PROPERTIES",pointer or "/","object has more than maxProperties")
         properties = schema.get("properties", {})
         required = schema.get("required", [])
         for key in required if isinstance(required, list) else []:
@@ -289,11 +330,11 @@ def validate_schema_instance(instance, schema, findings, pointer=""):
             for key, value in instance.items():
                 child = f"{pointer}/{key}"
                 if key in properties:
-                    validate_schema_instance(value, properties[key], findings, child)
+                    validate_schema_instance(value, properties[key], findings, child, base, root)
                 elif schema.get("additionalProperties") is False:
                     add(findings, "E_SCHEMA_ADDITIONAL_PROPERTY", child, "additional property is forbidden")
                 elif isinstance(schema.get("additionalProperties"), dict):
-                    validate_schema_instance(value, schema["additionalProperties"], findings, child)
+                    validate_schema_instance(value, schema["additionalProperties"], findings, child, base, root)
         names = schema.get("propertyNames")
         if isinstance(names, dict) and isinstance(names.get("pattern"), str):
             for key in instance:
@@ -441,7 +482,7 @@ def main():
                     add(findings,"E_SCHEMA_REQUIRED_OPTION","/schema","schema validation requires --schema")
                 else:
                     schema,schema_raw=load(Path(args.schema),findings)
-                    if schema is not None: validate_schema_instance(obj,schema,findings)
+                    if schema is not None: validate_schema_instance(obj,schema,findings,base=Path(args.schema).parent)
                     raw += b"\n" + schema_raw
             else: validate_runbooks(obj,findings,args)
     findings.sort(key=lambda x:(x["pointer"],x["code"],x["message"]))

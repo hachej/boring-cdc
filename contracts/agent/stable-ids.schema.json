@@ -76,7 +76,7 @@
       "type": "array"
     },
     "inventory_digest": {
-      "const": "bff336a00cbdb57bbc9d6e1f6e068c5231ef2664faab426c2a4f49b35825e9f9"
+      "const": "38be11068a8b2ec6761c80c74d6efe570d16b4933af79fdc2e46958efcb9389a"
     },
     "schema_version": {
       "const": "stable-registry/v1"

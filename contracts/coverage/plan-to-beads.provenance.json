@@ -1,10 +1,10 @@
 {
   "editable": false,
-  "generated_digest": "c29e4a852bea2659aa8144460403889797c90c8e2d9c259bb9def35ebdc707f5",
+  "generated_digest": "b44180ffd3ee10f6898e926d8a3b2754ab093e9f7f63b4240aae9651d3cd8e09",
   "generator": "boring-cdc-m0.2",
   "schema_version": "generated-view/v1",
   "source_digests": {
-    "contracts/agent/stable-ids.json": "4a2adc3e05eee141f80f8580ea48eddf11c5a51168a3c7dcc5dd670c617bc6f8"
+    "contracts/agent/stable-ids.json": "82b710a72ea5507b0b3f855d42c8c78736f983396804cbafd4c858c660e561f8"
   },
   "sources": [
     "contracts/agent/stable-ids.json"

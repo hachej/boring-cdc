@@ -33,7 +33,7 @@
       "id": "CMD-CHECK",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "f452dc9ea7c9c8d2c89513325af3ba74cb7ddb63cfc0dcf03ae22d9964cc4dc5"
+      "source_digest": "9cac8786fb178bebf66178680958f1f2607066c105993f19056b6fd09906c20c"
     },
     {
       "evidence_status": "pending",
@@ -166,7 +166,7 @@
       "id": "CMD-RUN",
       "owner_bead": "boring-cdc-m5-ops-cli",
       "source": "docs/PLAN.md",
-      "source_digest": "94b78dde235d6030661bbc66b63a114ea01579077e358657c8be09f8bc6b2187"
+      "source_digest": "858e59425e00db060252ba939586effc9334364754fd1c2671c1c2b604dfefed"
     },
     {
       "evidence_status": "pending",
@@ -201,7 +201,7 @@
       "id": "COND-JOURNAL-PRESSURE",
       "owner_bead": "boring-cdc-m2-pressure",
       "source": "docs/PLAN.md",
-      "source_digest": "8e6b70e5ba3b6e776e0926001513f0e01410a50fc71508cadfbc88483c348c07"
+      "source_digest": "ffa1418d18bc7c5d7dec22cd34a135a00c9903249c86f079a83835ddac65cb23"
     },
     {
       "evidence_status": "pending",
@@ -2490,7 +2490,7 @@
       "id": "SCN-JOURNAL-PRESSURE-TRANSITIONS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "8e6b70e5ba3b6e776e0926001513f0e01410a50fc71508cadfbc88483c348c07"
+      "source_digest": "14c5660f8b983c3e01ccc8863570b96b9365437cff2acd1c68407e7814265036"
     },
     {
       "evidence_status": "pending",
@@ -2903,7 +2903,7 @@
       "id": "TRANS-CAPTURE-SAFE-STOPPED",
       "owner_bead": "boring-cdc-m2-capture-runtime",
       "source": "docs/PLAN.md",
-      "source_digest": "d7813e4a55336bc5cb12e711ed35de8aa73fb4170323a4fe2fd15f4fffb2fd87"
+      "source_digest": "4ebd7ba44b50d7008f759e32a6a4f40d5bdeed3c2d967746746b135e3cdad1ca"
     },
     {
       "evidence_status": "pending",
@@ -2924,7 +2924,7 @@
       "id": "TRANS-PUBLICATION-DRIFT-REQUIRES-RESEED",
       "owner_bead": "boring-cdc-m1-control-fixtures",
       "source": "docs/PLAN.md",
-      "source_digest": "d4e0fcdea6502f52f2646527f0d0dc4d10dea9fa4a8bbdd594fe719278e9621d"
+      "source_digest": "a7af1a28a299ee65255c6b76f6e2289f8f9ab80822e5111094017910c64c5c1e"
     }
   ],
   "schema_version": "plan-to-beads/v1"

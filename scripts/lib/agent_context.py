@@ -103,40 +103,88 @@ def cmd_next(a):
   if blocked:continue
   score=100-int(r.get('priority',4))*10+(20 if 'epic:boring-cdc-m0' in r.get('labels',[]) else 0);cs.append({'id':r['id'],'title':r['title'],'priority':r.get('priority'),'score':score,'ranking_reason':'unassigned; all blocking dependencies closed; priority then active epic label; lexical tie-break'})
  cs.sort(key=lambda x:(-x['score'],x['id']));print(canonical({'schema_version':'agent-next/v1','read_only':True,'ranking_formula':'100 - priority*10 + active_epic_label*20; tie=id','candidates':cs,'world_state':world(None,a.observed_at)}));return False
+def implementation_range(bead):
+ marker=f'(br-{bead})';records=[]
+ cp=run('git','log','--reverse','--format=%H%x00%P%x00%s','HEAD')
+ if cp.returncode:raise SystemExit('E_GIT_RANGE')
+ for line in cp.stdout.splitlines():
+  parts=line.split('\0',2)
+  if len(parts)==3 and parts[2].endswith(marker):records.append({'sha':parts[0],'parents':parts[1].split(),'subject':parts[2]})
+ head=records[-1]['sha'] if records else run('git','rev-parse','HEAD').stdout.strip()
+ base=(records[0]['parents'][0] if records and records[0]['parents'] else head)
+ patch=run('git','diff','--binary',base,head);names=run('git','diff','--name-status','-z',base,head)
+ if patch.returncode or names.returncode:raise SystemExit('E_GIT_RANGE')
+ fields=list(filter(None,names.stdout.split('\0')));changes=[];i=0
+ while i<len(fields):
+  status=fields[i];i+=1;paths=[fields[i]];i+=1
+  if status.startswith(('R','C')):paths.append(fields[i]);i+=1
+  changes.append({'status':status,'paths':paths})
+ state={'base_sha':base,'head_sha':head,'commits':[r['sha'] for r in records],'changes':changes,'patch_sha256':digest_bytes(patch.stdout.encode())}
+ return state,patch.stdout
+
 def profile_attachments(profile,bead,by,reg):
  direct=sorted({d['depends_on_id'] for d in by[bead].get('dependencies',[]) if d.get('depends_on_id') in by});reverse=sorted(r['id'] for r in by.values() if any(d.get('depends_on_id')==bead for d in r.get('dependencies',[])))
  base=[{'name':'dependency_outputs','complete':True,'content':[by[x] for x in direct]},{'name':'consumed_canonical_rows','complete':True,'content':[e for e in reg['entries'] if e['owner_bead'] in direct]}]
  if profile=='orient':return [{'name':'charter','complete':True,'content':(ROOT/'README.md').read_text()},{'name':'agent_rules','complete':True,'content':(ROOT/'AGENTS.md').read_text()},{'name':'orientation','complete':True,'content':{'health':'authority validation passed','current_milestone':'M0','blockers':direct,'status':by[bead].get('status'),'ready_candidates':[r['id'] for r in by.values() if r.get('status')=='open' and not r.get('assignee') and all(by.get(d.get('depends_on_id'),{}).get('status')=='closed' for d in r.get('dependencies',[]) if d.get('type')=='blocks')] }}]
  if profile=='implement':return base
- if profile=='review':return base+[{'name':'review_diff','complete':True,'content':run('git','show','--format=','--binary','HEAD').stdout},{'name':'impacted_consumers','complete':True,'content':reverse},{'name':'invalidated_claims','complete':True,'content':{'status':'pending_unavailable','reusable':False}}]
- return base+[{'name':'handoff_state','complete':True,'content':{'base_sha':run('git','rev-parse','HEAD^').stdout.strip(),'head_sha':run('git','rev-parse','HEAD').stdout.strip(),'changed_paths':dirty_state()[0],'stable_ids_touched':[e['id'] for e in reg['entries'] if e['owner_bead']==bead],'checks':{'completed':['authority','schema','source-linkage'],'failed':[],'stale':['claim-index unavailable']},'evidence':{'status':'pending','reuse':False},'decisions':[],'facts':['pack derived from captured Git/Beads sources'],'observations':[],'hypotheses':[],'active_external_intents':[],'blockers':direct,'redaction':{'checked':True,'secrets_found':0},'risks':['revalidate world-state before mutation'],'unsafe_repeats':['do not claim, commit, push, or mutate from this reader'],'next_safe_command':f'scripts/agent/context {bead} --profile implement','consumers':reverse}}]
-def schema_errors(instance,schema,base=ROOT/'contracts/agent',pointer=''):
+ state,patch=implementation_range(bead)
+ if profile=='review':return base+[{'name':'review_diff','complete':True,'content':{'implementation_range':state,'patch':patch}},{'name':'impacted_consumers','complete':True,'content':reverse},{'name':'invalidated_claims','complete':True,'content':{'status':'pending_unavailable','reusable':False}}]
+ return base+[{'name':'handoff_state','complete':True,'content':{'implementation_range':state,'changed_paths':sorted({p for c in state['changes'] for p in c['paths']}),'stable_ids_touched':[e['id'] for e in reg['entries'] if e['owner_bead']==bead],'checks':{'completed':['authority','schema','source-linkage'],'failed':[],'stale':['claim-index unavailable']},'evidence':{'status':'pending','reuse':False},'decisions':[],'facts':['pack derived from captured Git/Beads sources'],'observations':[],'hypotheses':[],'active_external_intents':[],'blockers':direct,'redaction':{'checked':True,'secrets_found':0},'risks':['revalidate world-state before mutation'],'unsafe_repeats':['do not claim, commit, push, or mutate from this reader'],'next_safe_command':f'scripts/agent/context {bead} --profile implement','consumers':reverse}}]
+
+def _resolve_ref(ref,base,root):
+ if '://' in ref:raise ValueError('external ref forbidden')
+ name,_,fragment=ref.partition('#');document=root if not name else json.loads((base/name).read_text())
+ node=document
+ if fragment:
+  if not fragment.startswith('/'):raise ValueError('invalid ref fragment')
+  for token in fragment[1:].split('/'):
+   node=node[token.replace('~1','/').replace('~0','~')]
+ return node,document
+
+def schema_errors(instance,schema,base=ROOT/'contracts/agent',pointer='',root=None):
+ root=schema if root is None else root
  if '$ref' in schema:
-  ref=schema['$ref']
-  if '://' in ref: return ['external ref forbidden']
-  return schema_errors(instance,json.loads((base/ref).read_text()),base,pointer)
- errors=[];kind=schema.get('type');ok={'object':lambda x:isinstance(x,dict),'array':lambda x:isinstance(x,list),'string':lambda x:isinstance(x,str),'integer':lambda x:type(x)is int,'boolean':lambda x:type(x)is bool,'null':lambda x:x is None}
+  try:target,target_root=_resolve_ref(schema['$ref'],base,root)
+  except (OSError,KeyError,TypeError,ValueError,json.JSONDecodeError):return [pointer+':ref']
+  return schema_errors(instance,target,base,pointer,target_root)
+ errors=[];kind=schema.get('type');ok={'object':lambda x:isinstance(x,dict),'array':lambda x:isinstance(x,list),'string':lambda x:isinstance(x,str),'integer':lambda x:type(x)is int,'number':lambda x:type(x) in (int,float),'boolean':lambda x:type(x)is bool,'null':lambda x:x is None}
  kinds=kind if isinstance(kind,list) else [kind] if kind else []
  if kinds and not any(k in ok and ok[k](instance) for k in kinds):return [pointer+':type']
  if 'const' in schema and instance!=schema['const']:errors.append(pointer+':const')
  if 'enum' in schema and instance not in schema['enum']:errors.append(pointer+':enum')
+ for keyword in ('allOf','anyOf','oneOf'):
+  if keyword in schema:
+   results=[schema_errors(instance,s,base,pointer,root) for s in schema[keyword]];passed=sum(not x for x in results)
+   if keyword=='allOf':errors += [e for result in results for e in result]
+   elif keyword=='anyOf' and passed==0:errors.append(pointer+':anyOf')
+   elif keyword=='oneOf' and passed!=1:errors.append(pointer+':oneOf')
  if isinstance(instance,str):
   if schema.get('minLength',0)>len(instance):errors.append(pointer+':minLength')
+  if schema.get('maxLength',len(instance))<len(instance):errors.append(pointer+':maxLength')
   if schema.get('pattern') and not re.search(schema['pattern'],instance):errors.append(pointer+':pattern')
- if isinstance(instance,int) and 'maximum' in schema and instance>schema['maximum']:errors.append(pointer+':maximum')
+ if type(instance) in (int,float):
+  if 'minimum' in schema and instance<schema['minimum']:errors.append(pointer+':minimum')
+  if 'maximum' in schema and instance>schema['maximum']:errors.append(pointer+':maximum')
  if isinstance(instance,dict):
+  if len(instance)<schema.get('minProperties',0):errors.append(pointer+':minProperties')
+  if len(instance)>schema.get('maxProperties',len(instance)):errors.append(pointer+':maxProperties')
   props=schema.get('properties',{})
   for k in schema.get('required',[]):
    if k not in instance:errors.append(pointer+'/'+k+':required')
   for k,v in instance.items():
-   if k in props:errors+=schema_errors(v,props[k],base,pointer+'/'+k)
+   if k in props:errors+=schema_errors(v,props[k],base,pointer+'/'+k,root)
    elif schema.get('additionalProperties') is False:errors.append(pointer+'/'+k+':additional')
-   elif isinstance(schema.get('additionalProperties'),dict):errors+=schema_errors(v,schema['additionalProperties'],base,pointer+'/'+k)
+   elif isinstance(schema.get('additionalProperties'),dict):errors+=schema_errors(v,schema['additionalProperties'],base,pointer+'/'+k,root)
+  names=schema.get('propertyNames')
+  if isinstance(names,dict):
+   for k in instance:errors+=schema_errors(k,names,base,pointer+'/'+k,root)
  if isinstance(instance,list):
   if len(instance)<schema.get('minItems',0):errors.append(pointer+':minItems')
+  if len(instance)>schema.get('maxItems',len(instance)):errors.append(pointer+':maxItems')
   if schema.get('uniqueItems') and len({canonical(x) for x in instance})!=len(instance):errors.append(pointer+':uniqueItems')
   if isinstance(schema.get('items'),dict):
-   for i,v in enumerate(instance):errors+=schema_errors(v,schema['items'],base,pointer+'/'+str(i))
+   for i,v in enumerate(instance):errors+=schema_errors(v,schema['items'],base,pointer+'/'+str(i),root)
+  if isinstance(schema.get('contains'),dict) and not any(not schema_errors(v,schema['contains'],base,pointer+'/'+str(i),root) for i,v in enumerate(instance)):errors.append(pointer+':contains')
  return errors
 def validate_pack(pack):
  schema=json.loads((ROOT/'contracts/agent/context-pack.schema.json').read_text());errors=schema_errors(pack,schema)

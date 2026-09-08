@@ -1,57 +1,284 @@
 {
+  "$defs": {
+    "assignment": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_status": {
+          "const": "pending"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "namespace": {
+          "enum": [
+            "REQ",
+            "INV",
+            "DEC",
+            "CMD",
+            "COND",
+            "TRANS",
+            "SCN",
+            "REL",
+            "RISK",
+            "RUNBOOK",
+            "CLAIM",
+            "FINDING"
+          ]
+        },
+        "owner_bead": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_anchor": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "source_excerpt": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_locator": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "summary": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "namespace",
+        "owner_bead",
+        "source",
+        "source_locator",
+        "source_digest",
+        "source_excerpt",
+        "source_anchor",
+        "evidence_status",
+        "summary"
+      ],
+      "type": "object"
+    },
+    "task": {
+      "additionalProperties": false,
+      "properties": {
+        "acceptance_criteria": {
+          "type": "string"
+        },
+        "assignee": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "close_reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "closed_at": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "closed_by_session": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "comments": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "author": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "created_at": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "id": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "issue_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "issue_id",
+              "author",
+              "text",
+              "created_at"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "compaction_level": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "created_at": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "created_by": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "dependencies": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "created_at": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "created_by": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "depends_on_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "issue_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "metadata": {
+                "type": "string"
+              },
+              "thread_id": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "blocks",
+                  "parent-child",
+                  "related",
+                  "discovered-from"
+                ]
+              }
+            },
+            "required": [
+              "issue_id",
+              "depends_on_id",
+              "type",
+              "created_at",
+              "created_by",
+              "metadata",
+              "thread_id"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "description": {
+          "type": "string"
+        },
+        "design": {
+          "type": "string"
+        },
+        "estimated_minutes": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "issue_type": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "notes": {
+          "type": "string"
+        },
+        "original_size": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "owner": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "priority": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_repo": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "source_repo_path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "in_progress",
+            "blocked",
+            "deferred",
+            "closed"
+          ]
+        },
+        "title": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "updated_at": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "status",
+        "priority",
+        "issue_type",
+        "owner",
+        "created_at",
+        "created_by",
+        "updated_at",
+        "source_repo",
+        "compaction_level",
+        "original_size",
+        "labels",
+        "dependencies"
+      ],
+      "type": "object"
+    }
+  },
   "$id": "https://boring-cdc.dev/contracts/agent/effective-contract.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
     "assignments": {
       "items": {
-        "additionalProperties": false,
-        "properties": {
-          "evidence_status": {
-            "const": "pending"
-          },
-          "id": {
-            "type": "string"
-          },
-          "namespace": {
-            "type": "string"
-          },
-          "owner_bead": {
-            "type": "string"
-          },
-          "source": {
-            "type": "string"
-          },
-          "source_anchor": {
-            "type": "string"
-          },
-          "source_digest": {
-            "pattern": "^[0-9a-f]{64}$",
-            "type": "string"
-          },
-          "source_excerpt": {
-            "type": "string"
-          },
-          "source_locator": {
-            "type": "string"
-          },
-          "summary": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "id",
-          "namespace",
-          "owner_bead",
-          "source",
-          "source_locator",
-          "source_digest",
-          "source_excerpt",
-          "source_anchor",
-          "evidence_status",
-          "summary"
-        ],
-        "type": "object"
+        "$ref": "#/$defs/assignment"
       },
       "type": "array"
     },
@@ -63,9 +290,11 @@
           "type": "string"
         },
         "owner": {
+          "minLength": 1,
           "type": "string"
         },
         "source": {
+          "minLength": 1,
           "type": "string"
         },
         "version": {
@@ -89,6 +318,7 @@
       "type": "string"
     },
     "owner_bead": {
+      "minLength": 1,
       "type": "string"
     },
     "schema_version": {
@@ -103,8 +333,7 @@
       "type": "object"
     },
     "task": {
-      "minProperties": 3,
-      "type": "object"
+      "$ref": "#/$defs/task"
     }
   },
   "required": [
