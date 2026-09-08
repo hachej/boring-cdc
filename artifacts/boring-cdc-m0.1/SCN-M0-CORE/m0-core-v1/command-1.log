@@ -10,6 +10,6 @@ test_symlink_parent_escape_and_missing_graph_are_stable_failures (tests.validate
 test_valid_contracts (tests.validate_core_validators.Core.test_valid_contracts) ... ok
 
 ----------------------------------------------------------------------
-Ran 10 tests in 6.446s
+Ran 10 tests in 7.131s
 
 OK
