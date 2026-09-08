@@ -7,8 +7,8 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[2]; VERSION="knowledge-validators/1.0.0"; OWNER="boring-cdc-m0.3"
 SHA=re.compile(r"^[0-9a-f]{64}$"); GIT=re.compile(r"^[0-9a-f]{40}$"); BEAD=re.compile(r"^boring-cdc-[A-Za-z0-9.-]+$"); SID=re.compile(r"^(CLAIM|FINDING|SCN|REQ|INV|DEC|CMD|COND|TRANS|REL|RISK|RUNBOOK|ART)-[A-Z0-9-]+$")
-SECRET=re.compile(r"(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|postgres(?:ql)?://|clickhouse://|-----BEGIN .*PRIVATE KEY-----|/(?:home|Users|tmp)/)")
-BINDINGS=("git_commit","graph_digest","effective_contract_digest","code_digest","binary_digest","fixture_digest","image_digest","config_digest","profile_digest","seed_digest","environment_digest","command_digest","result_digest","artifact_digest","redaction_digest")
+SECRET=re.compile(r'(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|[a-z][a-z0-9+.-]*://|-----BEGIN .*PRIVATE KEY-----|(?:^|[\s"])/(?:[A-Za-z0-9._-]+/)+|raw[_ -]?payload|driver[_ -]?error)')
+BINDINGS=("git_commit","graph_digest","effective_contract_digest","capture_epoch_digest","code_digest","binary_digest","fixture_digest","image_digest","config_digest","profile_digest","seed_digest","environment_digest","command_digest","result_digest","artifact_digest","redaction_digest")
 class DuplicateKey(ValueError):pass
 def unique(pairs):
  out={}
@@ -53,7 +53,7 @@ def parse_time(v):
  try:return datetime.fromisoformat(v.replace("Z","+00:00"))
  except (ValueError,AttributeError):return None
 
-def validate_claims(doc,index,actual,compat,observed,fs):
+def validate_claims(doc,index,baseline,owners,actual,compat,observed,selected,fs):
  fields=["schema_version","claims"];req(doc,fields,fs);closed(doc,fields,fs)
  if not isinstance(doc,dict) or doc.get("schema_version")!="claims/v1":add(fs,"E_SCHEMA_VERSION","/schema_version","expected claims/v1");return
  rows=doc.get("claims");
@@ -64,6 +64,11 @@ def validate_claims(doc,index,actual,compat,observed,fs):
   if index.get("schema_version")!="claim-index/v1":add(fs,"E_SCHEMA_VERSION","/index/schema_version","expected claim-index/v1")
   entries=index.get("entries",[]);idx={e.get("claim_id"):e for e in entries if isinstance(e,dict) and isinstance(e.get("claim_id"),str)}
   if len(idx)!=len(entries):add(fs,"E_INDEX_DUPLICATE","/index/entries","index claim IDs must be unique scalar strings")
+ if baseline is None:add(fs,"E_INDEX_BASELINE_REQUIRED","/index","trusted immutable index baseline is required")
+ elif index != baseline:add(fs,"E_INDEX_REWRITTEN","/index","claim index differs from trusted baseline")
+ claim_owners=owners.get("claim_owners",{}) if isinstance(owners,dict) else {}
+ predicate_owners=owners.get("predicate_owners",{}) if isinstance(owners,dict) else {}
+ if owners is None:add(fs,"E_OWNER_REGISTRY_REQUIRED","/owners","canonical owner registry is required")
  predicates={}
  if compat is not None:
   req(compat,["schema_version","predicates"],fs,"/compatibility")
@@ -83,13 +88,19 @@ def validate_claims(doc,index,actual,compat,observed,fs):
   ids(r.get("scenario_ids"),fs,p+"/scenario_ids","SCN-");b=r.get("bindings");req(b,BINDINGS,fs,p+"/bindings");closed(b,BINDINGS,fs,p+"/bindings");digest_fields(b,BINDINGS,fs,p+"/bindings")
   ids(r.get("supersedes"),fs,p+"/supersedes","CLAIM-",False);rr=r.get("rerun");req(rr,["owner_bead","command"],fs,p+"/rerun");closed(rr,["owner_bead","command"],fs,p+"/rerun")
   if isinstance(rr,dict) and rr.get("owner_bead")!=r.get("owner_bead"):add(fs,"E_RERUN_OWNER",p+"/rerun/owner_bead","rerun owner must be claim owner")
-  if cid in superseded:add(fs,"E_CLAIM_SUPERSEDED",p+"/claim_id","superseded evidence cannot prove current semantics",r.get("owner_bead",OWNER))
+  for old in r.get("supersedes",[]) if isinstance(r.get("supersedes"),list) else []:
+   prior=next((x for x in rows if isinstance(x,dict) and x.get("claim_id")==old),None)
+   if not prior:add(fs,"E_SUPERSESSION_MISSING",p+"/supersedes","superseded claim must remain in immutable history")
+   elif prior.get("owner_bead")!=r.get("owner_bead"):add(fs,"E_SUPERSESSION_OWNER",p+"/supersedes","supersession must retain canonical owner")
+  if selected==cid and cid in superseded:add(fs,"E_CLAIM_SUPERSEDED",p+"/claim_id","selected superseded evidence cannot prove current semantics",r.get("owner_bead",OWNER))
   entry=idx.get(cid)
   if not entry:add(fs,"E_CLAIM_UNINDEXED",p+"/claim_id","claim absent from immutable index",r.get("owner_bead",OWNER))
   else:
    expected=dg(json.dumps(r,sort_keys=True,separators=(",",":")).encode())
-   if entry.get("owner_bead")!=r.get("owner_bead"):add(fs,"E_CLAIM_OWNER_FORGED",p+"/owner_bead","claim owner differs from canonical index",entry.get("owner_bead",OWNER))
+   canonical=claim_owners.get(cid)
+   if not canonical or canonical!=r.get("owner_bead") or entry.get("owner_bead")!=canonical:add(fs,"E_CLAIM_OWNER_FORGED",p+"/owner_bead","claim owner differs from canonical owner registry",canonical or OWNER)
    if entry.get("claim_sha256")!=expected:add(fs,"E_CLAIM_HASH",p+"/claim_id","claim content differs from immutable index",entry.get("owner_bead",OWNER))
+   if entry.get("status") not in ("current","superseded"):add(fs,"E_INDEX_STATUS",p+"/claim_id","index status must be current or superseded")
   app=r.get("applicability");req(app,["mode","freshness"],fs,p+"/applicability")
   if isinstance(app,dict):
    mode=app.get("mode");fresh=app.get("freshness")
@@ -105,7 +116,7 @@ def validate_claims(doc,index,actual,compat,observed,fs):
       if b.get(n)!=actual.get(n):add(fs,"E_CLAIM_INPUT_MISMATCH",p+f"/bindings/{n}",f"invalidating input {n}; rerun owner {r.get('owner_bead')}",r.get("owner_bead",OWNER))
    elif mode=="compatible":
     pred=predicates.get(app.get("predicate_id"))
-    if not pred:add(fs,"E_COMPATIBILITY_UNOWNED",p+"/applicability/predicate_id","compatible range lacks canonical predicate owner")
+    if not pred or predicate_owners.get(app.get("predicate_id"))!=pred.get("owner_bead"):add(fs,"E_COMPATIBILITY_UNOWNED",p+"/applicability/predicate_id","compatible range lacks canonical predicate owner")
     elif pred.get("owner_bead")!=r.get("owner_bead"):add(fs,"E_COMPATIBILITY_OWNER",p+"/applicability/predicate_id","predicate owner differs from claim owner",pred.get("owner_bead",OWNER))
     elif actual is None:add(fs,"E_ACTUAL_INPUT_REQUIRED",p+"/bindings","compatibility requires actual inputs")
     else:
@@ -116,7 +127,9 @@ def validate_claims(doc,index,actual,compat,observed,fs):
  if actual is not None and actual.get("git_ancestry") is False:add(fs,"E_HISTORY_REWRITTEN","/actual/git_ancestry","claim Git history is not ancestral")
  secret_check(doc,fs)
 
-def validate_findings(rows,fs):
+def validate_findings(rows,baseline,fs):
+ if baseline is None:add(fs,"E_FINDING_BASELINE_REQUIRED","/","trusted append-only baseline is required")
+ elif not isinstance(rows,list) or rows[:len(baseline)]!=baseline:add(fs,"E_FINDING_REWRITE","/","candidate findings must preserve the trusted baseline as an exact prefix")
  seen=set();superseded=set()
  for r in rows if isinstance(rows,list) else []:
   if isinstance(r,dict):superseded.update(x for x in r.get("supersedes",[]) if isinstance(x,str))
@@ -131,6 +144,7 @@ def validate_findings(rows,fs):
   else:seen.add(fid)
   if r.get("kind") not in ("verified_observation","hypothesis"):add(fs,"E_FINDING_KIND",p+"/kind","kind must distinguish observation from hypothesis")
   if r.get("kind")=="hypothesis" and r.get("observation"):add(fs,"E_HYPOTHESIS_PROMOTION",p+"/observation","hypothesis cannot be recorded as verified observation")
+  if r.get("kind")=="verified_observation" and r.get("hypothesis"):add(fs,"E_OBSERVATION_MIXED",p+"/hypothesis","verified observation cannot contain a hypothesis")
   ids(r.get("affected_ids"),fs,p+"/affected_ids",nonempty=False);ids(r.get("supersedes"),fs,p+"/supersedes","FINDING-",False)
   digest_fields(r,["environment_digest","input_digest"],fs,p)
   if r.get("status") not in ("open","resolved","invalidated"):add(fs,"E_STATUS",p+"/status","invalid finding status")
@@ -150,6 +164,16 @@ def validate_handoff(o,fs):
  dirty=o.get("dirty");req(dirty,["is_dirty","paths"],fs,"/dirty");closed(dirty,["is_dirty","paths"],fs,"/dirty")
  if isinstance(dirty,dict) and bool(dirty.get("paths"))!=bool(dirty.get("is_dirty")):add(fs,"E_DIRTY_STATE","/dirty","dirty flag and paths disagree")
  checks=o.get("checks");req(checks,["completed","failed","stale"],fs,"/checks");closed(checks,["completed","failed","stale"],fs,"/checks")
+ if isinstance(checks,dict):
+  expected={"completed":"pass","failed":"fail","stale":"stale"}
+  for bucket,want in expected.items():
+   values=checks.get(bucket)
+   if not isinstance(values,list):add(fs,"E_TYPE",f"/checks/{bucket}","expected array");continue
+   for i,item in enumerate(values):
+    cp=f"/checks/{bucket}/{i}";req(item,["command","result","digest"],fs,cp);closed(item,["command","result","digest"],fs,cp)
+    if isinstance(item,dict):
+     if item.get("result")!=want:add(fs,"E_CHECK_BUCKET",cp+"/result",f"{bucket} check must have result {want}")
+     digest_fields(item,["digest"],fs,cp)
  for n in ("facts","observations","hypotheses","risks","unsafe_repeats","changed_paths"):
   if not isinstance(o.get(n),list):add(fs,"E_TYPE","/"+n,"expected array")
  ids(o.get("touched_ids"),fs,"/touched_ids",nonempty=False)
@@ -164,12 +188,13 @@ def validate_handoff(o,fs):
  secret_check(o,fs)
 
 def main():
- p=argparse.ArgumentParser();p.add_argument("kind",choices=["claims","findings","handoff"]);p.add_argument("input");p.add_argument("--index");p.add_argument("--actual");p.add_argument("--compatibility");p.add_argument("--observed-at",default="2026-01-01T00:00:00Z");a=p.parse_args();fs=[]
+ p=argparse.ArgumentParser();p.add_argument("kind",choices=["claims","findings","handoff"]);p.add_argument("input");p.add_argument("--index");p.add_argument("--baseline-index");p.add_argument("--owners");p.add_argument("--claim-id");p.add_argument("--baseline");p.add_argument("--actual");p.add_argument("--compatibility");p.add_argument("--observed-at",default="2026-01-01T00:00:00Z");a=p.parse_args();fs=[]
  doc,raw=load(a.input,fs,a.kind=="findings")
  if doc is not None:
   if a.kind=="claims":
-   idx,ir=load(a.index,fs) if a.index else (None,b"");act,ar=load(a.actual,fs) if a.actual else (None,b"");comp,cr=load(a.compatibility,fs) if a.compatibility else (None,b"");raw+=ir+ar+cr;validate_claims(doc,idx,act,comp,a.observed_at,fs)
-  elif a.kind=="findings":validate_findings(doc,fs)
+   idx,ir=load(a.index,fs) if a.index else (None,b"");base,br=load(a.baseline_index,fs) if a.baseline_index else (None,b"");owners,orr=load(a.owners,fs) if a.owners else (None,b"");act,ar=load(a.actual,fs) if a.actual else (None,b"");comp,cr=load(a.compatibility,fs) if a.compatibility else (None,b"");raw+=ir+br+orr+ar+cr;validate_claims(doc,idx,base,owners,act,comp,a.observed_at,a.claim_id,fs)
+  elif a.kind=="findings":
+   baseline,br=load(a.baseline,fs,True) if a.baseline else (None,b"");raw+=br;validate_findings(doc,baseline,fs)
   else:validate_handoff(doc,fs)
  fs.sort(key=lambda x:(x["pointer"],x["code"],x["message"]));out={"schema_version":"validation-result/v1","validator_version":VERSION,"owner_bead":OWNER,"status":"fail" if fs else "pass","input_sha256":dg(raw),"git_commit":subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT,text=True,capture_output=True).stdout.strip(),"findings":fs};print(json.dumps(out,sort_keys=True,separators=(",",":")));return bool(fs)
 if __name__=="__main__":raise SystemExit(main())

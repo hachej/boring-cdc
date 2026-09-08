@@ -8,6 +8,7 @@
       "bindings": {
         "artifact_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "binary_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "capture_epoch_digest": "6666666666666666666666666666666666666666666666666666666666666666",
         "code_digest": "4444444444444444444444444444444444444444444444444444444444444444",
         "command_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "config_digest": "8888888888888888888888888888888888888888888888888888888888888888",
@@ -42,6 +43,7 @@
       "bindings": {
         "artifact_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "binary_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "capture_epoch_digest": "6666666666666666666666666666666666666666666666666666666666666666",
         "code_digest": "4444444444444444444444444444444444444444444444444444444444444444",
         "command_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "config_digest": "8888888888888888888888888888888888888888888888888888888888888888",

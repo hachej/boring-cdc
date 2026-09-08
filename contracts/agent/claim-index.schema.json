@@ -17,12 +17,19 @@
           "owner_bead": {
             "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
             "type": "string"
+          },
+          "status": {
+            "enum": [
+              "current",
+              "superseded"
+            ]
           }
         },
         "required": [
           "claim_id",
           "owner_bead",
-          "claim_sha256"
+          "claim_sha256",
+          "status"
         ],
         "type": "object"
       },

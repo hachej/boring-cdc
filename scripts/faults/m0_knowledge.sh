@@ -10,5 +10,8 @@ for round in 1 2; do python3 -m unittest -q \
  tests.validate_knowledge.Knowledge.test_superseded_freshness_and_rewritten_history \
  tests.validate_knowledge.Knowledge.test_findings_append_only_and_hypothesis_separation \
  tests.validate_knowledge.Knowledge.test_handoff_redaction_ambiguity_and_separation \
+ tests.validate_knowledge.Knowledge.test_cross_input_mismatch_matrix \
+ tests.validate_knowledge.Knowledge.test_index_and_finding_baseline_rewrites \
+ tests.validate_knowledge.Knowledge.test_malformed_check_buckets_and_redaction_bypasses \
  tests.validate_knowledge.Knowledge.test_hostile_paths_and_determinism >/dev/null;done
 printf 'm0 knowledge hostile corpus pass seed=%s repeated=2 product_faults=fault_not_applicable\n' "$seed"

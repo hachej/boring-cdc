@@ -46,6 +46,10 @@
                 "pattern": "^[0-9a-f]{64}$",
                 "type": "string"
               },
+              "capture_epoch_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
               "code_digest": {
                 "pattern": "^[0-9a-f]{64}$",
                 "type": "string"
@@ -114,7 +118,8 @@
               "command_digest",
               "result_digest",
               "artifact_digest",
-              "redaction_digest"
+              "redaction_digest",
+              "capture_epoch_digest"
             ],
             "type": "object"
           },

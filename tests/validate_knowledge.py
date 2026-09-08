@@ -6,8 +6,9 @@ def codes(cp):return [x['code'] for x in json.loads(cp.stdout)['findings']]
 class Knowledge(unittest.TestCase):
  def assertCode(self,cp,code):self.assertNotEqual(cp.returncode,0,cp.stdout+cp.stderr);self.assertIn(code,codes(cp));self.assertFalse(cp.stderr)
  def claim(self,actual='actual-exact.json',index=True,compat=True):
-  a=['--actual',F/actual,'--observed-at','2026-01-01T00:00:00Z']
-  if index:a+=['--index',F/'claim-index.json']
+  a=['--actual',F/actual,'--index',F/'claim-index.json','--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--observed-at','2026-01-01T00:00:00Z']
+  if not index:
+   del a[a.index('--index'):a.index('--index')+2]
   if compat:a+=['--compatibility',F/'compatibility.json']
   return run('claims',F/'claims.json',*a)
  def test_valid_exact_and_compatible(self):
@@ -17,36 +18,56 @@ class Knowledge(unittest.TestCase):
    p=Path(td)/'one.json';idx=json.loads((F/'claim-index.json').read_text())
    for n,actual in ((0,'actual-exact.json'),(1,'actual-compatible.json')):
     p.write_text(json.dumps({'schema_version':'claims/v1','claims':[d['claims'][n]]}));ip=Path(td)/'idx.json';ip.write_text(json.dumps({'schema_version':'claim-index/v1','entries':[idx['entries'][n]]}))
-    cp=run('claims',p,'--index',ip,'--actual',F/actual,'--compatibility',F/'compatibility.json');self.assertEqual(cp.returncode,0,cp.stdout)
+    cp=run('claims',p,'--index',ip,'--baseline-index',ip,'--owners',F/'owners.json','--actual',F/actual,'--compatibility',F/'compatibility.json');self.assertEqual(cp.returncode,0,cp.stdout)
  def test_absent_index_and_exact_mismatch(self):
   self.assertCode(self.claim(index=False),'E_CLAIM_INDEX_REQUIRED');self.assertCode(self.claim('actual-compatible.json'),'E_CLAIM_INPUT_MISMATCH')
  def test_forged_owner_unowned_range_hash_and_provenance(self):
   doc=json.loads((F/'claims.json').read_text());idx=json.loads((F/'claim-index.json').read_text());comp=json.loads((F/'compatibility.json').read_text())
   with tempfile.TemporaryDirectory(dir=R/'tests') as td:
    p=Path(td)/'x.json';q=Path(td)/'i.json';k=Path(td)/'c.json'
-   idx['entries'][0]['owner_bead']='boring-cdc-forged';q.write_text(json.dumps(idx));self.assertCode(run('claims',F/'claims.json','--index',q,'--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_CLAIM_OWNER_FORGED')
-   comp['predicates']=[];k.write_text(json.dumps(comp));self.assertCode(run('claims',F/'claims.json','--index',F/'claim-index.json','--actual',F/'actual-compatible.json','--compatibility',k),'E_COMPATIBILITY_UNOWNED')
-   doc['claims'][0]['bindings'].pop('artifact_digest');p.write_text(json.dumps(doc));self.assertCode(run('claims',p,'--index',F/'claim-index.json','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_REQUIRED')
+   idx['entries'][0]['owner_bead']='boring-cdc-forged';q.write_text(json.dumps(idx));self.assertCode(run('claims',F/'claims.json','--index',q,'--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_CLAIM_OWNER_FORGED')
+   comp['predicates']=[];k.write_text(json.dumps(comp));self.assertCode(run('claims',F/'claims.json','--index',F/'claim-index.json','--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',F/'actual-compatible.json','--compatibility',k),'E_COMPATIBILITY_UNOWNED')
+   doc['claims'][0]['bindings'].pop('artifact_digest');p.write_text(json.dumps(doc));self.assertCode(run('claims',p,'--index',F/'claim-index.json','--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_REQUIRED')
  def test_superseded_freshness_and_rewritten_history(self):
   doc=json.loads((F/'claims.json').read_text());doc['claims'][1]['supersedes']=['CLAIM-M0-KNOWLEDGE-EXACT'];doc['claims'][0]['applicability']={'mode':'exact','freshness':'fresh_until','fresh_until':'2025-01-01T00:00:00Z'}
   actual=json.loads((F/'actual-exact.json').read_text());actual['git_ancestry']=False
   with tempfile.TemporaryDirectory(dir=R/'tests') as td:
-   p=Path(td)/'x.json';a=Path(td)/'a.json';p.write_text(json.dumps(doc));a.write_text(json.dumps(actual));cp=run('claims',p,'--index',F/'claim-index.json','--actual',a,'--compatibility',F/'compatibility.json','--observed-at','2026-01-01T00:00:00Z')
+   p=Path(td)/'x.json';a=Path(td)/'a.json';p.write_text(json.dumps(doc));a.write_text(json.dumps(actual));cp=run('claims',p,'--index',F/'claim-index.json','--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',a,'--compatibility',F/'compatibility.json','--observed-at','2026-01-01T00:00:00Z','--claim-id','CLAIM-M0-KNOWLEDGE-EXACT')
    for c in ('E_CLAIM_SUPERSEDED','E_CLAIM_STALE','E_HISTORY_REWRITTEN'):self.assertCode(cp,c)
  def test_findings_append_only_and_hypothesis_separation(self):
-  self.assertEqual(run('findings',F/'findings.jsonl').returncode,0)
+  self.assertEqual(run('findings',F/'findings.jsonl','--baseline',F/'findings.jsonl').returncode,0)
   row=json.loads((F/'findings.jsonl').read_text());row['kind']='hypothesis';row['hypothesis']='guess';row['observation']='promoted guess'
   with tempfile.TemporaryDirectory(dir=R/'tests') as td:
-   p=Path(td)/'x.jsonl';p.write_text(json.dumps(row)+'\n'+json.dumps(row)+'\n');cp=run('findings',p);self.assertCode(cp,'E_HYPOTHESIS_PROMOTION');self.assertCode(cp,'E_FINDING_REWRITE')
+   p=Path(td)/'x.jsonl';p.write_text(json.dumps(row)+'\n'+json.dumps(row)+'\n');cp=run('findings',p,'--baseline',F/'findings.jsonl');self.assertCode(cp,'E_HYPOTHESIS_PROMOTION');self.assertCode(cp,'E_FINDING_REWRITE')
  def test_handoff_redaction_ambiguity_and_separation(self):
   self.assertEqual(run('handoff',F/'handoff.json').returncode,0)
   h=json.loads((F/'handoff.json').read_text());h['facts']=h['hypotheses'];h['intents']['ambiguous']=['external write unknown'];h['unsafe_repeats']=[];h['observations']=['postgresql://user:pw@host/db']
   with tempfile.TemporaryDirectory(dir=R/'tests') as td:
    p=Path(td)/'x.json';p.write_text(json.dumps(h));cp=run('handoff',p)
    for c in ('E_HYPOTHESIS_PROMOTION','E_UNSAFE_REPEAT_REQUIRED','E_SECRET'):self.assertCode(cp,c)
+ def test_cross_input_mismatch_matrix(self):
+  actual=json.loads((F/'actual-exact.json').read_text())
+  with tempfile.TemporaryDirectory(dir=R/'tests') as td:
+   p=Path(td)/'actual.json'
+   for field in ('capture_epoch_digest','fixture_digest','config_digest','image_digest','environment_digest'):
+    bad=dict(actual);bad[field]='0'*64;p.write_text(json.dumps(bad));cp=run('claims',F/'claims.json','--index',F/'claim-index.json','--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',p,'--compatibility',F/'compatibility.json');self.assertCode(cp,'E_CLAIM_INPUT_MISMATCH');self.assertTrue(any(x['pointer'].endswith('/bindings/'+field) for x in json.loads(cp.stdout)['findings']))
+ def test_index_and_finding_baseline_rewrites(self):
+  idx=json.loads((F/'claim-index.json').read_text());idx['entries'][0]['claim_sha256']='0'*64
+  row=json.loads((F/'findings.jsonl').read_text());row['observation']='rewritten history'
+  with tempfile.TemporaryDirectory(dir=R/'tests') as td:
+   i=Path(td)/'index.json';i.write_text(json.dumps(idx));self.assertCode(run('claims',F/'claims.json','--index',i,'--baseline-index',F/'claim-index.json','--owners',F/'owners.json','--actual',F/'actual-exact.json','--compatibility',F/'compatibility.json'),'E_INDEX_REWRITTEN')
+   f=Path(td)/'findings.jsonl';f.write_text(json.dumps(row)+'\n');self.assertCode(run('findings',f,'--baseline',F/'findings.jsonl'),'E_FINDING_REWRITE')
+ def test_malformed_check_buckets_and_redaction_bypasses(self):
+  base=json.loads((F/'handoff.json').read_text())
+  with tempfile.TemporaryDirectory(dir=R/'tests') as td:
+   p=Path(td)/'handoff.json'
+   for bucket,result in (('completed','fail'),('failed','pass'),('stale','pass')):
+    h=copy.deepcopy(base);h['checks'][bucket]=[{'command':'x','result':result,'digest':'1'*64}];p.write_text(json.dumps(h));self.assertCode(run('handoff',p),'E_CHECK_BUCKET')
+   for leak in ('/etc/boring/config','mysql://host/db','raw payload bytes','driver error detail'):
+    h=copy.deepcopy(base);h['observations']=[leak];p.write_text(json.dumps(h));self.assertCode(run('handoff',p),'E_SECRET')
  def test_hostile_paths_and_determinism(self):
   for kind,name in (('handoff','handoff.json'),('findings','findings.jsonl')):
    raw=(F/name).read_text().replace('synthetic validator','/home/alice/private') if kind=='handoff' else (F/name).read_text().replace('Validator fails','token=abc Validator fails')
    with tempfile.TemporaryDirectory(dir=R/'tests') as td:
-    p=Path(td)/name;p.write_text(raw);a=run(kind,p);b=run(kind,p);self.assertCode(a,'E_SECRET');self.assertEqual(a.stdout,b.stdout);self.assertEqual(hashlib.sha256(raw.encode()).hexdigest(),hashlib.sha256(p.read_bytes()).hexdigest())
+    p=Path(td)/name;p.write_text(raw);a=run(kind,p,*(['--baseline',F/'findings.jsonl'] if kind=='findings' else []));b=run(kind,p,*(['--baseline',F/'findings.jsonl'] if kind=='findings' else []));self.assertCode(a,'E_SECRET');self.assertEqual(a.stdout,b.stdout);self.assertEqual(hashlib.sha256(raw.encode()).hexdigest(),hashlib.sha256(p.read_bytes()).hexdigest())
 if __name__=='__main__':unittest.main()

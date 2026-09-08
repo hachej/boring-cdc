@@ -1,0 +1,9 @@
+{
+  "claim_owners": {
+    "CLAIM-M0-KNOWLEDGE-COMPATIBLE": "boring-cdc-m0.3",
+    "CLAIM-M0-KNOWLEDGE-EXACT": "boring-cdc-m0.3"
+  },
+  "predicate_owners": {
+    "PRED-PROFILE-COMPATIBLE": "boring-cdc-m0.3"
+  }
+}
