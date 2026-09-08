@@ -73,12 +73,12 @@ def check_unresolved(value,pointer,findings):
     if not isinstance(value,str) or not value.strip() or UNRESOLVED.fullmatch(value): add(findings,"E_UNRESOLVED",pointer,"value is empty or unresolved")
 
 def duplicates(rows,key,findings,pointer,code="E_DUPLICATE_ID"):
-    seen={}
+    seen=set()
     for i,row in enumerate(rows if isinstance(rows,list) else []):
-        if isinstance(row,dict) and key in row:
+        if isinstance(row,dict) and isinstance(row.get(key),str):
             val=row[key]
             if val in seen: add(findings,code,f"{pointer}/{i}/{key}",f"duplicate {key}: {val}")
-            seen[val]=i
+            seen.add(val)
 
 def load(path: Path, findings):
     try: return read_strict(path)
@@ -109,7 +109,7 @@ def validate_decisions(obj, findings, args):
         p=f"/decisions/{i}";
         if not req_obj(r,["id","owner_bead","status","proposed_value","fixture_spec","fixture_sha256","executor_beads"],findings,p): continue
         check_unknown(r,allowed,findings,p); check_id(r.get("id"),p+"/id",findings,"DEC-"); check_owner(r.get("owner_bead"),p+"/owner_bead",findings); check_unresolved(r.get("proposed_value"),p+"/proposed_value",findings)
-        if owners is not None and r.get("owner_bead") not in owners: add(findings,"E_OWNER_UNKNOWN",p+"/owner_bead","owner absent from supplied inventory")
+        if owners is not None and isinstance(r.get("owner_bead"),str) and r.get("owner_bead") not in owners: add(findings,"E_OWNER_UNKNOWN",p+"/owner_bead","owner absent from supplied inventory")
         if r.get("status") not in ("open","approved","rejected"): add(findings,"E_STATUS",p+"/status","invalid decision status")
         if r.get("status")=="approved":
             a=r.get("approval")
@@ -125,14 +125,14 @@ def validate_decisions(obj, findings, args):
         expected_hash=r.get("fixture_sha256")
         if not SHA256.fullmatch(str(expected_hash or "")): add(findings,"E_DIGEST",p+"/fixture_sha256","expected lowercase sha256")
         elif target and target.is_file() and digest(target.read_bytes()) != expected_hash: add(findings,"E_HASH_MISMATCH",p+"/fixture_sha256","fixture content hash mismatch")
-        if fixtures is not None and fp not in fixtures: add(findings,"E_FIXTURE_UNKNOWN",p+"/fixture_spec","fixture absent from supplied inventory")
+        if fixtures is not None and isinstance(fp,str) and fp not in fixtures: add(findings,"E_FIXTURE_UNKNOWN",p+"/fixture_spec","fixture absent from supplied inventory")
         ex=r.get("executor_beads")
         if not isinstance(ex,list) or not ex: add(findings,"E_EXECUTOR_REQUIRED",p+"/executor_beads","at least one later executor is required")
         else:
             if len(set(map(str,ex)))!=len(ex): add(findings,"E_DUPLICATE_EXECUTOR",p+"/executor_beads","duplicate executor")
             for j,x in enumerate(ex):
                 check_owner(x,f"{p}/executor_beads/{j}",findings)
-                if executors is not None and x not in executors: add(findings,"E_EXECUTOR_UNKNOWN",f"{p}/executor_beads/{j}","executor absent from supplied inventory")
+                if executors is not None and isinstance(x,str) and x not in executors: add(findings,"E_EXECUTOR_UNKNOWN",f"{p}/executor_beads/{j}","executor absent from supplied inventory")
     if args.complete:
         if not rows: add(findings,"E_DECISIONS_EMPTY","/decisions","empty skeleton cannot satisfy aggregate completeness")
         for option in ("owners", "fixtures", "executors", "expected_decisions"):
@@ -260,8 +260,10 @@ def validate_runbooks(obj, findings, args):
         check_unknown(r,fields,findings,p); check_id(r.get("id"),p+"/id",findings,"RUNBOOK-"); check_id(r.get("condition_id"),p+"/condition_id",findings,"COND-"); check_id(r.get("action_id"),p+"/action_id",findings,"CMD-")
         for k in ("condition_owner","action_owner","procedure_owner"): check_owner(r.get(k),p+"/"+k,findings)
         for k,bucket,code in (("condition_id",conditions,"E_DUPLICATE_CONDITION"),("action_id",actions,"E_DUPLICATE_ACTION")):
-            if r.get(k) in bucket: add(findings,code,p+"/"+k,"registry mapping must be unique")
-            bucket.add(r.get(k))
+            value=r.get(k)
+            if isinstance(value,str):
+                if value in bucket: add(findings,code,p+"/"+k,"registry mapping must be unique")
+                bucket.add(value)
         if obj.get("stage")=="complete" and not r.get("procedure"): add(findings,"E_PROCEDURE_GAP",p+"/procedure","complete registry requires procedure")
         if obj.get("stage")=="declared" and r.get("procedure") not in (None,""): add(findings,"E_STAGE_INCOMPATIBLE",p+"/procedure","declared rows must not claim completed procedures")
     if args.release and obj.get("stage")!="complete": add(findings,"E_RELEASE_DECLARED_RUNBOOK","/stage","release rejects declared-only runbooks")

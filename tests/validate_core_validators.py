@@ -84,6 +84,39 @@ class Core(unittest.TestCase):
             before=hashlib.sha256(Path(argv[1]).read_bytes()).hexdigest(); a=run(*argv); b=run(*argv)
             self.assertCode(a,code); self.assertEqual(a.stdout,b.stdout); self.assertEqual(before,hashlib.sha256(Path(argv[1]).read_bytes()).hexdigest())
 
+    def test_non_scalar_ids_and_inventory_entries_fail_as_stable_json(self):
+        valid=F/"valid"
+        decision_args=("--complete","--owners",valid/"owners.json","--fixtures",valid/"fixtures.json","--executors",valid/"executors.json","--expected-decisions",valid/"expected-decisions.json")
+        with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
+            p=Path(td)/"hostile.json"
+            for value in ([], {}):
+                decisions=json.loads((valid/"decisions.json").read_text()); decisions["decisions"][0]["id"]=value; p.write_text(json.dumps(decisions))
+                first=run("decisions",p,*decision_args); second=run("decisions",p,*decision_args)
+                self.assertCode(first,"E_ID_INVALID"); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
+                for field,code in (("owner_bead","E_OWNER_INVALID"),("fixture_spec","E_PATH_INVALID")):
+                    hostile=json.loads((valid/"decisions.json").read_text()); hostile["decisions"][0][field]=value; p.write_text(json.dumps(hostile))
+                    first=run("decisions",p,*decision_args); second=run("decisions",p,*decision_args)
+                    self.assertCode(first,code); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
+                hostile=json.loads((valid/"decisions.json").read_text()); hostile["decisions"][0]["executor_beads"]=[value]; p.write_text(json.dumps(hostile))
+                first=run("decisions",p,*decision_args); second=run("decisions",p,*decision_args)
+                self.assertCode(first,"E_OWNER_INVALID"); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
+
+                artifacts=json.loads((valid/"artifacts.json").read_text()); artifacts["artifacts"][0]["id"]=value; p.write_text(json.dumps(artifacts))
+                first=run("artifacts",p,"--complete","--expected-artifacts",valid/"expected-artifacts.json"); second=run("artifacts",p,"--complete","--expected-artifacts",valid/"expected-artifacts.json")
+                self.assertCode(first,"E_ID_INVALID"); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
+
+                runbooks=json.loads((valid/"runbooks.json").read_text())
+                for field in ("id","condition_id","action_id"):
+                    hostile=json.loads(json.dumps(runbooks)); hostile["runbooks"][0][field]=value; p.write_text(json.dumps(hostile))
+                    first=run("runbooks",p,"--release"); second=run("runbooks",p,"--release")
+                    self.assertCode(first,"E_ID_INVALID"); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
+
+            for option in ("owners","fixtures","executors","expected-decisions"):
+                p.write_text(json.dumps([[],{}]))
+                args=list(decision_args); args[args.index("--"+option.replace("_","-"))+1]=p
+                first=run("decisions",valid/"decisions.json",*args); second=run("decisions",valid/"decisions.json",*args)
+                self.assertCode(first,"E_INVENTORY_ITEM"); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
+
     def test_symlink_parent_escape_and_missing_graph_are_stable_failures(self):
         with tempfile.TemporaryDirectory() as outside, tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
             outside_file=Path(outside)/"secret"; outside_file.write_text("secret")
