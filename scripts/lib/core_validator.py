@@ -248,6 +248,58 @@ def validate_evidence(obj, findings, args):
     text=json.dumps(obj,sort_keys=True)
     if SECRET.search(text): add(findings,"E_SECRET","/","secret-like content is forbidden")
 
+def validate_schema_instance(instance, schema, findings, pointer=""):
+    """Validate the JSON Schema subset used by the two bootstrap safety schemas."""
+    if not isinstance(schema, dict):
+        add(findings, "E_SCHEMA_DEFINITION", pointer or "/", "schema node must be an object")
+        return
+    expected = schema.get("type")
+    types = expected if isinstance(expected, list) else [expected] if expected is not None else []
+    matches = {
+        "object": lambda value: isinstance(value, dict),
+        "array": lambda value: isinstance(value, list),
+        "string": lambda value: isinstance(value, str),
+        "integer": lambda value: type(value) is int,
+        "number": lambda value: type(value) in (int, float),
+        "boolean": lambda value: type(value) is bool,
+        "null": lambda value: value is None,
+    }
+    if types and not any(kind in matches and matches[kind](instance) for kind in types):
+        add(findings, "E_SCHEMA_TYPE", pointer or "/", "instance type does not match schema")
+        return
+    if "const" in schema and instance != schema["const"]:
+        add(findings, "E_SCHEMA_CONST", pointer or "/", "instance does not match required constant")
+    if "enum" in schema and instance not in schema["enum"]:
+        add(findings, "E_SCHEMA_ENUM", pointer or "/", "instance is not an allowed value")
+    if isinstance(instance, str):
+        if isinstance(schema.get("minLength"), int) and len(instance) < schema["minLength"]:
+            add(findings, "E_SCHEMA_MIN_LENGTH", pointer or "/", "string is shorter than minLength")
+        if isinstance(schema.get("pattern"), str) and re.search(schema["pattern"], instance) is None:
+            add(findings, "E_SCHEMA_PATTERN", pointer or "/", "string does not match required pattern")
+    if isinstance(instance, list) and isinstance(schema.get("items"), dict):
+        for index, value in enumerate(instance):
+            validate_schema_instance(value, schema["items"], findings, f"{pointer}/{index}")
+    if isinstance(instance, dict):
+        properties = schema.get("properties", {})
+        required = schema.get("required", [])
+        for key in required if isinstance(required, list) else []:
+            if key not in instance:
+                add(findings, "E_SCHEMA_REQUIRED", f"{pointer}/{key}", "required field is absent")
+        if isinstance(properties, dict):
+            for key, value in instance.items():
+                child = f"{pointer}/{key}"
+                if key in properties:
+                    validate_schema_instance(value, properties[key], findings, child)
+                elif schema.get("additionalProperties") is False:
+                    add(findings, "E_SCHEMA_ADDITIONAL_PROPERTY", child, "additional property is forbidden")
+                elif isinstance(schema.get("additionalProperties"), dict):
+                    validate_schema_instance(value, schema["additionalProperties"], findings, child)
+        names = schema.get("propertyNames")
+        if isinstance(names, dict) and isinstance(names.get("pattern"), str):
+            for key in instance:
+                if re.search(names["pattern"], key) is None:
+                    add(findings, "E_SCHEMA_PROPERTY_NAME", f"{pointer}/{key}", "property name does not match required pattern")
+
 def validate_runbooks(obj, findings, args):
     if not req_obj(obj,["schema_version","stage","runbooks"],findings): return
     check_version(obj,"runbooks-index/v1",findings); check_unknown(obj,["schema_version","stage","runbooks"],findings)
@@ -355,7 +407,7 @@ def validate_graph(path, findings, args):
 
 def parser():
     p=argparse.ArgumentParser(description="Validate Boring CDC M0 bootstrap contracts with deterministic JSON diagnostics.")
-    p.add_argument("kind",choices=["decisions","decision","artifacts","artifact","evidence","runbooks","graph"]); p.add_argument("input"); p.add_argument("--complete",action="store_true"); p.add_argument("--release",action="store_true"); p.add_argument("--owners"); p.add_argument("--fixtures"); p.add_argument("--executors"); p.add_argument("--expected-decisions"); p.add_argument("--expected-artifacts"); p.add_argument("--expect-root"); p.add_argument("--baseline"); p.add_argument("--witness-root"); p.add_argument("--output"); return p
+    p.add_argument("kind",choices=["decisions","decision","artifacts","artifact","evidence","runbooks","graph","schema"]); p.add_argument("input"); p.add_argument("--schema"); p.add_argument("--complete",action="store_true"); p.add_argument("--release",action="store_true"); p.add_argument("--owners"); p.add_argument("--fixtures"); p.add_argument("--executors"); p.add_argument("--expected-decisions"); p.add_argument("--expected-artifacts"); p.add_argument("--expect-root"); p.add_argument("--baseline"); p.add_argument("--witness-root"); p.add_argument("--output"); return p
 
 def main():
     args=parser().parse_args(); path=Path(args.input); findings=[]; raw=b""
@@ -384,6 +436,13 @@ def main():
                 if args.kind=="artifact" and isinstance(obj,dict) and "artifacts" not in obj: obj={"schema_version":"m0-artifacts/v1","artifacts":[obj]}
                 validate_artifacts(obj,findings,args)
             elif args.kind=="evidence": validate_evidence(obj,findings,args)
+            elif args.kind=="schema":
+                if not args.schema:
+                    add(findings,"E_SCHEMA_REQUIRED_OPTION","/schema","schema validation requires --schema")
+                else:
+                    schema,schema_raw=load(Path(args.schema),findings)
+                    if schema is not None: validate_schema_instance(obj,schema,findings)
+                    raw += b"\n" + schema_raw
             else: validate_runbooks(obj,findings,args)
     findings.sort(key=lambda x:(x["pointer"],x["code"],x["message"]))
     result={"schema_version":"validation-result/v1","validator_version":VERSION,"owner_bead":OWNER,"status":"fail" if findings else "pass","input_sha256":digest(raw),"git_commit":subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT,text=True,capture_output=True).stdout.strip(),"findings":findings}

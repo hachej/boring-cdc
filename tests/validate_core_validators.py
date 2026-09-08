@@ -128,16 +128,18 @@ class Core(unittest.TestCase):
                     self.assertCode(first,"E_ID_INVALID"); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
 
     def test_safety_schemas_require_transition_ownership_and_log_correlation(self):
-        coverage=json.loads((ROOT/"contracts/coverage/plan-to-beads.schema.json").read_text())
-        assignment=coverage["properties"]["assignments"]["items"]
-        transition={"id":"TRANS-SYNTHETIC","source":"synthetic","evidence_status":"pending"}
-        self.assertTrue(transition["id"].startswith("TRANS-"))
-        self.assertIn("owner_bead",assignment["required"])
-        self.assertNotIn("owner_bead",transition)  # hostile unowned expected transition
-        log_schema=json.loads((ROOT/"contracts/common/structured-log.schema.json").read_text())
-        log={"schema_version":"structured-log/v1","level":"error","code":"E_SYNTHETIC","message":"redacted"}
-        self.assertIn("correlation_id",log_schema["required"])
-        self.assertNotIn("correlation_id",log)  # hostile correlation omission
+        cases = [
+            ({"schema_version":"plan-to-beads/v1","assignments":[{"id":"TRANS-SYNTHETIC","source":"synthetic","evidence_status":"pending"}]}, ROOT/"contracts/coverage/plan-to-beads.schema.json", "/assignments/0/owner_bead"),
+            ({"schema_version":"structured-log/v1","level":"error","code":"E_SYNTHETIC","message":"redacted"}, ROOT/"contracts/common/structured-log.schema.json", "/correlation_id"),
+        ]
+        with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
+            instance=Path(td)/"hostile.json"
+            for document,schema,pointer in cases:
+                instance.write_text(json.dumps(document))
+                first=run("schema",instance,"--schema",schema); second=run("schema",instance,"--schema",schema)
+                self.assertCode(first,"E_SCHEMA_REQUIRED"); self.assertEqual(first.stdout,second.stdout); self.assertFalse(first.stderr)
+                findings=json.loads(first.stdout)["findings"]
+                self.assertEqual([(item["code"],item["pointer"]) for item in findings], [("E_SCHEMA_REQUIRED",pointer)])
 
     def test_symlink_parent_escape_and_missing_graph_are_stable_failures(self):
         with tempfile.TemporaryDirectory() as outside, tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
