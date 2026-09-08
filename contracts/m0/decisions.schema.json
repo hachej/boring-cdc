@@ -1,0 +1,73 @@
+{
+  "$defs": {
+    "decision": {
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "type": "object"
+        },
+        "executor_beads": {
+          "items": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
+        "fixture_spec": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^DEC-[A-Z0-9-]+$",
+          "type": "string"
+        },
+        "owner_bead": {
+          "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+          "type": "string"
+        },
+        "proposed_value": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "approved",
+            "rejected"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "owner_bead",
+        "status",
+        "proposed_value",
+        "fixture_spec",
+        "executor_beads"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://boring-cdc.dev/contracts/m0/decisions.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "decisions": {
+      "items": {
+        "$ref": "#/$defs/decision"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "m0-decisions/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "decisions"
+  ],
+  "title": "M0 decisions",
+  "type": "object"
+}

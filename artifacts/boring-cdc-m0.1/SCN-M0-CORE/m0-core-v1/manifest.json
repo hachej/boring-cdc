@@ -1,0 +1,71 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/validate/test_core_validators.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-1.log 2>&1",
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "4f2afc2d8c8d03dc9ed2259ccfab4838bf0d747fe5209fc9738263ea39c85355",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    },
+    {
+      "argv": "scripts/e2e/m0_validation_core.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-2.log 2>&1",
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "9f714fdea258db73312e97af5d64e7e13376781abe64fe04f0bb57b7a847bfc1",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    },
+    {
+      "argv": "scripts/faults/m0_validation_core.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-3.log 2>&1",
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "b9364da3a99a8a1d64feed344fe87f89f3dfd8bb759e54299e87348eecbc1ae5",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    },
+    {
+      "argv": "scripts/validate/test_core_validators.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-4.log 2>&1",
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "704a96566c9d1f310bf9172a016d7fbba2a6343cec5bea1a72c3a22f0ffe6b30",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    },
+    {
+      "argv": "scripts/e2e/m0_validation_core.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-5.log 2>&1",
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "9f714fdea258db73312e97af5d64e7e13376781abe64fe04f0bb57b7a847bfc1",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    },
+    {
+      "argv": "scripts/faults/m0_validation_core.sh m0-core-v1 > artifacts/boring-cdc-m0.1/SCN-M0-CORE/m0-core-v1/command-6.log 2>&1",
+      "exit_code": 0,
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "b9364da3a99a8a1d64feed344fe87f89f3dfd8bb759e54299e87348eecbc1ae5",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "component",
+  "git_commit": "63304e1dc20e8814a5a93c0f7f10fa22bf2d76ec",
+  "owner_bead": "boring-cdc-m0.1",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "digest": "066cfc754a067f61385160bb0582512f04c6f6f284f75a2649c3213f34bc304b",
+    "product_faults": "fault_not_applicable",
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M0-CORE",
+  "schema_version": "evidence/v1",
+  "seed": "m0-core-v1",
+  "source_preservation": {
+    "after_sha256": "dfcd5ec4ee0ab74fa0c04feeee31a3dbb80f194f2889847d3b5e5fef72e6e655",
+    "before_sha256": "dfcd5ec4ee0ab74fa0c04feeee31a3dbb80f194f2889847d3b5e5fef72e6e655",
+    "preserved": true
+  }
+}

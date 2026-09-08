@@ -1,0 +1,68 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/runbooks/index.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "runbooks": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "action_id": {
+            "type": "string"
+          },
+          "action_owner": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "condition_id": {
+            "type": "string"
+          },
+          "condition_owner": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "procedure": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "procedure_owner": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "condition_id",
+          "action_id",
+          "condition_owner",
+          "action_owner",
+          "procedure_owner",
+          "procedure"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "runbooks-index/v1"
+    },
+    "stage": {
+      "enum": [
+        "declared",
+        "complete"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "stage",
+    "runbooks"
+  ],
+  "title": "Runbook registry",
+  "type": "object"
+}

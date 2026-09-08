@@ -1,0 +1,11 @@
+test_empty_skeletons_valid_but_not_complete (tests.validate_core_validators.Core.test_empty_skeletons_valid_but_not_complete) ... ok
+test_evidence_profiles_tiers_redaction_and_cleanup (tests.validate_core_validators.Core.test_evidence_profiles_tiers_redaction_and_cleanup) ... ok
+test_graph_baseline_and_witness_mismatch (tests.validate_core_validators.Core.test_graph_baseline_and_witness_mismatch) ... ok
+test_invalid_reason_codes_and_determinism (tests.validate_core_validators.Core.test_invalid_reason_codes_and_determinism) ... ok
+test_real_decision_closure_fails_without_approvals (tests.validate_core_validators.Core.test_real_decision_closure_fails_without_approvals) ... ok
+test_valid_contracts (tests.validate_core_validators.Core.test_valid_contracts) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 4.502s
+
+OK

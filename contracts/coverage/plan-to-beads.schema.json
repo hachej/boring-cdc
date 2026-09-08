@@ -1,0 +1,50 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/coverage/plan-to-beads.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assignments": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_status": {
+            "enum": [
+              "pending",
+              "verified",
+              "failed"
+            ]
+          },
+          "id": {
+            "pattern": "^(REQ|INV|DEC|CMD|COND|TRANS|SCN|REL|RISK|RUNBOOK|CLAIM|FINDING)-[A-Z0-9-]+$",
+            "type": "string"
+          },
+          "owner_bead": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "source": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "owner_bead",
+          "source",
+          "evidence_status"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "plan-to-beads/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "assignments"
+  ],
+  "title": "Plan coverage",
+  "type": "object"
+}

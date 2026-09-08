@@ -1,0 +1,76 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/evidence.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cleanup": {
+      "type": "object"
+    },
+    "commands": {
+      "items": {
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "evidence_profile": {
+      "enum": [
+        "runtime",
+        "external_managed",
+        "documentation"
+      ]
+    },
+    "evidence_tier": {
+      "enum": [
+        "leaf",
+        "component",
+        "milestone",
+        "release"
+      ]
+    },
+    "git_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "owner_bead": {
+      "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+      "type": "string"
+    },
+    "redaction": {
+      "type": "object"
+    },
+    "result": {
+      "type": "object"
+    },
+    "scenario_id": {
+      "pattern": "^SCN-[A-Z0-9-]+$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "evidence/v1"
+    },
+    "seed": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "source_preservation": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "owner_bead",
+    "scenario_id",
+    "evidence_profile",
+    "evidence_tier",
+    "seed",
+    "git_commit",
+    "commands",
+    "source_preservation",
+    "cleanup",
+    "redaction",
+    "result"
+  ],
+  "title": "Evidence manifest",
+  "type": "object"
+}

@@ -1,0 +1,50 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/common/validation-result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "findings": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "git_commit": {
+      "type": "string"
+    },
+    "input_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "output_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "owner_bead": {
+      "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "validation-result/v1"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail"
+      ]
+    },
+    "validator_version": {
+      "const": "core-validators/1.0.0"
+    }
+  },
+  "required": [
+    "schema_version",
+    "validator_version",
+    "owner_bead",
+    "status",
+    "input_sha256",
+    "findings"
+  ],
+  "title": "Validation result",
+  "type": "object"
+}

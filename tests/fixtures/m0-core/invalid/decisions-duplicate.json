@@ -1,0 +1,1 @@
+{"schema_version":"m0-decisions/v1","decisions":[{"id":"DEC-X","owner_bead":"boring-cdc-x","status":"open","proposed_value":"x","fixture_spec":"x","executor_beads":["boring-cdc-y"]},{"id":"DEC-X","owner_bead":"boring-cdc-x","status":"open","proposed_value":"x","fixture_spec":"x","executor_beads":["boring-cdc-y"]}]}

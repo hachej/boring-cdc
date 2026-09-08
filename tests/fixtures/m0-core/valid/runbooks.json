@@ -1,0 +1,1 @@
+{"schema_version":"runbooks-index/v1","stage":"complete","runbooks":[{"id":"RUNBOOK-SYNTHETIC","condition_id":"COND-SYNTHETIC","action_id":"CMD-SYNTHETIC","condition_owner":"boring-cdc-m2-synthetic","action_owner":"boring-cdc-m1-synthetic","procedure_owner":"boring-cdc-m6-synthetic","procedure":"docs/runbooks/synthetic.md"}]}

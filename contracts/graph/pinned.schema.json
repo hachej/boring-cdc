@@ -1,0 +1,39 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/graph/pinned.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "edges": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "issues": {
+      "items": {
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "pinned-graph/v1"
+    },
+    "source_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "witness_root": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "source_sha256",
+    "witness_root",
+    "issues",
+    "edges"
+  ],
+  "title": "Pinned graph",
+  "type": "object"
+}

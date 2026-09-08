@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+"""Deterministic, dependency-free validators for the M0 bootstrap contracts."""
+from __future__ import annotations
+import argparse, hashlib, json, os, re, subprocess, sys, tempfile
+from pathlib import Path
+
+VERSION = "core-validators/1.0.0"
+OWNER = "boring-cdc-m0.1"
+ROOT = Path(__file__).resolve().parents[2]
+SHA256 = re.compile(r"^[0-9a-f]{64}$")
+BEAD = re.compile(r"^boring-cdc-[A-Za-z0-9.-]+$")
+ID = re.compile(r"^(REQ|INV|DEC|CMD|COND|TRANS|SCN|REL|RISK|RUNBOOK|CLAIM|FINDING|ART)-[A-Z0-9-]+$")
+SECRET = re.compile(r"(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|postgres(?:ql)?://[^\s:@]+:[^\s@]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----)")
+UNRESOLVED = re.compile(r"(?i)^\s*(tbd|todo|unknown|owner[- ]?pending)\s*$")
+
+class DuplicateKey(ValueError): pass
+
+def unique(pairs):
+    out = {}
+    for k, v in pairs:
+        if k in out: raise DuplicateKey(k)
+        out[k] = v
+    return out
+
+def digest(data: bytes) -> str: return hashlib.sha256(data).hexdigest()
+def read_strict(path: Path):
+    raw = path.read_bytes()
+    return json.loads(raw, object_pairs_hook=unique), raw
+
+def safe_path(value: object, pointer: str, findings: list, *, must_exist=False):
+    if not isinstance(value, str) or not value:
+        add(findings, "E_PATH_INVALID", pointer, "path must be a nonempty relative repository path"); return None
+    p = Path(value)
+    if p.is_absolute() or ".." in p.parts or any(part in ("", ".") for part in p.parts):
+        add(findings, "E_PATH_TRAVERSAL", pointer, "absolute, dot, and parent path components are forbidden"); return None
+    resolved = ROOT / p
+    if resolved.is_symlink():
+        add(findings, "E_PATH_SYMLINK", pointer, "symlink inputs are forbidden"); return None
+    if must_exist and not resolved.is_file(): add(findings, "E_REFERENCE_MISSING", pointer, f"referenced file does not exist: {value}")
+    return resolved
+
+def add(findings, code, pointer, message, owner=OWNER):
+    findings.append({"code":code,"pointer":pointer,"owner_bead":owner,"message":message})
+
+def req_obj(obj, fields, findings, pointer=""):
+    if not isinstance(obj, dict): add(findings,"E_TYPE",pointer or "/","expected object"); return False
+    for k in fields:
+        if k not in obj: add(findings,"E_REQUIRED",f"{pointer}/{k}","required field is absent")
+    return True
+
+def check_unknown(obj, allowed, findings, pointer=""):
+    if isinstance(obj, dict):
+        for k in set(obj)-set(allowed): add(findings,"E_UNKNOWN_FIELD",f"{pointer}/{k}","unknown field")
+
+def check_version(obj, expected, findings):
+    if obj.get("schema_version") != expected: add(findings,"E_SCHEMA_VERSION","/schema_version",f"expected {expected}")
+
+def check_id(value, pointer, findings, prefix=None):
+    if not isinstance(value,str) or not ID.fullmatch(value) or (prefix and not value.startswith(prefix)):
+        add(findings,"E_ID_INVALID",pointer,f"invalid {prefix or 'stable '}ID")
+
+def check_owner(value,pointer,findings):
+    if not isinstance(value,str) or not BEAD.fullmatch(value): add(findings,"E_OWNER_INVALID",pointer,"owner must be a canonical Bead ID")
+
+def check_unresolved(value,pointer,findings):
+    if not isinstance(value,str) or not value.strip() or UNRESOLVED.fullmatch(value): add(findings,"E_UNRESOLVED",pointer,"value is empty or unresolved")
+
+def duplicates(rows,key,findings,pointer,code="E_DUPLICATE_ID"):
+    seen={}
+    for i,row in enumerate(rows if isinstance(rows,list) else []):
+        if isinstance(row,dict) and key in row:
+            val=row[key]
+            if val in seen: add(findings,code,f"{pointer}/{i}/{key}",f"duplicate {key}: {val}")
+            seen[val]=i
+
+def load(path: Path, findings):
+    try: return read_strict(path)
+    except FileNotFoundError: add(findings,"E_INPUT_MISSING","/",f"input not found: {path}")
+    except DuplicateKey as e: add(findings,"E_DUPLICATE_KEY","/",f"duplicate JSON key: {e}")
+    except (json.JSONDecodeError,UnicodeDecodeError) as e: add(findings,"E_JSON_MALFORMED","/",f"malformed JSON: {e}")
+    return None,b""
+
+def inventory(path, findings, kind):
+    if not path: return None
+    obj,_=load(Path(path),findings)
+    if not isinstance(obj,list): add(findings,"E_INVENTORY_TYPE",f"/{kind}","inventory must be a JSON array"); return set()
+    return {x for x in obj if isinstance(x,str)}
+
+def validate_decisions(obj, findings, args):
+    if not req_obj(obj,["schema_version","decisions"],findings): return
+    check_version(obj,"m0-decisions/v1",findings); check_unknown(obj,["schema_version","decisions"],findings)
+    rows=obj.get("decisions",[])
+    if not isinstance(rows,list): add(findings,"E_TYPE","/decisions","expected array"); return
+    duplicates(rows,"id",findings,"/decisions"); owners=inventory(args.owners,findings,"owners"); fixtures=inventory(args.fixtures,findings,"fixtures"); executors=inventory(args.executors,findings,"executors")
+    allowed=["id","owner_bead","status","proposed_value","approval","fixture_spec","executor_beads"]
+    for i,r in enumerate(rows):
+        p=f"/decisions/{i}";
+        if not req_obj(r,["id","owner_bead","status","proposed_value","fixture_spec","executor_beads"],findings,p): continue
+        check_unknown(r,allowed,findings,p); check_id(r.get("id"),p+"/id",findings,"DEC-"); check_owner(r.get("owner_bead"),p+"/owner_bead",findings); check_unresolved(r.get("proposed_value"),p+"/proposed_value",findings)
+        if owners is not None and r.get("owner_bead") not in owners: add(findings,"E_OWNER_UNKNOWN",p+"/owner_bead","owner absent from supplied inventory")
+        if r.get("status") not in ("open","approved","rejected"): add(findings,"E_STATUS",p+"/status","invalid decision status")
+        if r.get("status")=="approved":
+            a=r.get("approval")
+            if not req_obj(a,["approved_by","approved_at","value_digest"],findings,p+"/approval"): pass
+            elif not SHA256.fullmatch(str(a.get("value_digest",""))): add(findings,"E_DIGEST",p+"/approval/value_digest","expected lowercase sha256")
+        elif "approval" in r: add(findings,"E_APPROVAL_STATE",p+"/approval","approval is allowed only for approved rows")
+        fp=r.get("fixture_spec"); safe_path(fp,p+"/fixture_spec",findings)
+        if fixtures is not None and fp not in fixtures: add(findings,"E_FIXTURE_UNKNOWN",p+"/fixture_spec","fixture absent from supplied inventory")
+        ex=r.get("executor_beads")
+        if not isinstance(ex,list) or not ex: add(findings,"E_EXECUTOR_REQUIRED",p+"/executor_beads","at least one later executor is required")
+        else:
+            if len(set(map(str,ex)))!=len(ex): add(findings,"E_DUPLICATE_EXECUTOR",p+"/executor_beads","duplicate executor")
+            for j,x in enumerate(ex):
+                check_owner(x,f"{p}/executor_beads/{j}",findings)
+                if executors is not None and x not in executors: add(findings,"E_EXECUTOR_UNKNOWN",f"{p}/executor_beads/{j}","executor absent from supplied inventory")
+    if args.complete:
+        if not rows: add(findings,"E_DECISIONS_EMPTY","/decisions","empty skeleton cannot satisfy aggregate completeness")
+        for i,r in enumerate(rows):
+            if isinstance(r,dict) and r.get("status")!="approved": add(findings,"E_DECISION_OPEN",f"/decisions/{i}/status","real closure requires every decision approved")
+
+def validate_artifacts(obj, findings, args):
+    if not req_obj(obj,["schema_version","artifacts"],findings): return
+    check_version(obj,"m0-artifacts/v1",findings); check_unknown(obj,["schema_version","artifacts"],findings); rows=obj.get("artifacts",[])
+    if not isinstance(rows,list): add(findings,"E_TYPE","/artifacts","expected array"); return
+    duplicates(rows,"id",findings,"/artifacts")
+    for i,r in enumerate(rows):
+        p=f"/artifacts/{i}"
+        if not req_obj(r,["id","owner_bead","path","sha256","status"],findings,p): continue
+        check_unknown(r,["id","owner_bead","path","sha256","status"],findings,p); check_id(r.get("id"),p+"/id",findings,"ART-"); check_owner(r.get("owner_bead"),p+"/owner_bead",findings)
+        target=safe_path(r.get("path"),p+"/path",findings,must_exist=r.get("status")=="complete")
+        if not SHA256.fullmatch(str(r.get("sha256",""))): add(findings,"E_DIGEST",p+"/sha256","expected lowercase sha256")
+        elif target and target.is_file() and digest(target.read_bytes())!=r.get("sha256"): add(findings,"E_HASH_MISMATCH",p+"/sha256","artifact content hash mismatch")
+        if r.get("status") not in ("declared","complete"): add(findings,"E_STATUS",p+"/status","invalid artifact status")
+    if args.complete and not rows: add(findings,"E_ARTIFACTS_EMPTY","/artifacts","empty skeleton cannot satisfy aggregate completeness")
+
+def validate_evidence(obj, findings, args):
+    fields=["schema_version","owner_bead","scenario_id","evidence_profile","evidence_tier","seed","git_commit","commands","source_preservation","cleanup","redaction","result"]
+    if not req_obj(obj,fields,findings): return
+    check_version(obj,"evidence/v1",findings); check_unknown(obj,fields,findings); check_owner(obj.get("owner_bead"),"/owner_bead",findings); check_id(obj.get("scenario_id"),"/scenario_id",findings,"SCN-"); check_unresolved(obj.get("seed"),"/seed",findings)
+    profile=obj.get("evidence_profile"); tier=obj.get("evidence_tier")
+    if profile not in ("runtime","external_managed","documentation"): add(findings,"E_EVIDENCE_PROFILE","/evidence_profile","unknown evidence profile")
+    if tier not in ("leaf","component","milestone","release"): add(findings,"E_EVIDENCE_TIER","/evidence_tier","unknown evidence tier")
+    if not re.fullmatch(r"[0-9a-f]{40}",str(obj.get("git_commit",""))): add(findings,"E_GIT_SHA","/git_commit","expected full Git SHA")
+    cmds=obj.get("commands")
+    if not isinstance(cmds,list) or not cmds: add(findings,"E_COMMANDS_REQUIRED","/commands","at least one command record is required")
+    else:
+        for i,c in enumerate(cmds):
+            p=f"/commands/{i}"; req_obj(c,["argv","version","exit_code","stdout_sha256","stderr_sha256"],findings,p)
+            if isinstance(c,dict):
+                check_unknown(c,["argv","version","exit_code","stdout_sha256","stderr_sha256"],findings,p)
+                check_unresolved(c.get("argv"),p+"/argv",findings); check_unresolved(c.get("version"),p+"/version",findings)
+                for k in ("stdout_sha256","stderr_sha256"):
+                    if not SHA256.fullmatch(str(c.get(k,""))): add(findings,"E_DIGEST",p+"/"+k,"expected lowercase sha256")
+    sp=obj.get("source_preservation"); req_obj(sp,["before_sha256","after_sha256","preserved"],findings,"/source_preservation")
+    if isinstance(sp,dict) and (sp.get("preserved") is not True or sp.get("before_sha256")!=sp.get("after_sha256")): add(findings,"E_SOURCE_MUTATED","/source_preservation","before/after source hashes must match and preserved must be true")
+    cl=obj.get("cleanup"); req_obj(cl,["complete","remaining_paths"],findings,"/cleanup")
+    if isinstance(cl,dict) and (cl.get("complete") is not True or cl.get("remaining_paths")!=[]): add(findings,"E_CLEANUP_INCOMPLETE","/cleanup","cleanup must be complete with no remaining paths")
+    rd=obj.get("redaction"); req_obj(rd,["checked","secrets_found"],findings,"/redaction")
+    if isinstance(rd,dict) and (rd.get("checked") is not True or rd.get("secrets_found")!=0): add(findings,"E_REDACTION","/redaction","redaction must be checked with zero secrets")
+    result=obj.get("result"); req_obj(result,["status","digest","product_faults"],findings,"/result")
+    if isinstance(result,dict):
+        if not SHA256.fullmatch(str(result.get("digest",""))): add(findings,"E_DIGEST","/result/digest","expected lowercase sha256")
+        if profile=="documentation" and result.get("product_faults")!="fault_not_applicable": add(findings,"E_FORWARD_RUNTIME_EVIDENCE","/result/product_faults","documentation evidence cannot claim product runtime faults")
+        if profile=="external_managed" and result.get("status") in ("unavailable","unsupported") and not result.get("attempts"): add(findings,"E_EXTERNAL_PROVENANCE","/result/attempts","managed unavailability requires exact attempts")
+        if tier in ("component","milestone","release") and len(cmds or [])<2: add(findings,"E_TIER_PROOF","/commands",f"{tier} evidence requires at least two command records")
+    text=json.dumps(obj,sort_keys=True)
+    if SECRET.search(text): add(findings,"E_SECRET","/","secret-like content is forbidden")
+
+def validate_runbooks(obj, findings, args):
+    if not req_obj(obj,["schema_version","stage","runbooks"],findings): return
+    check_version(obj,"runbooks-index/v1",findings); check_unknown(obj,["schema_version","stage","runbooks"],findings); rows=obj.get("runbooks",[]); duplicates(rows,"id",findings,"/runbooks")
+    conditions=set(); actions=set()
+    for i,r in enumerate(rows if isinstance(rows,list) else []):
+        p=f"/runbooks/{i}"; fields=["id","condition_id","action_id","condition_owner","action_owner","procedure_owner","procedure"]
+        if not req_obj(r,fields,findings,p): continue
+        check_unknown(r,fields,findings,p); check_id(r.get("id"),p+"/id",findings,"RUNBOOK-"); check_id(r.get("condition_id"),p+"/condition_id",findings,"COND-"); check_id(r.get("action_id"),p+"/action_id",findings,"CMD-")
+        for k in ("condition_owner","action_owner","procedure_owner"): check_owner(r.get(k),p+"/"+k,findings)
+        for k,bucket,code in (("condition_id",conditions,"E_DUPLICATE_CONDITION"),("action_id",actions,"E_DUPLICATE_ACTION")):
+            if r.get(k) in bucket: add(findings,code,p+"/"+k,"registry mapping must be unique")
+            bucket.add(r.get(k))
+        if obj.get("stage")=="complete" and not r.get("procedure"): add(findings,"E_PROCEDURE_GAP",p+"/procedure","complete registry requires procedure")
+        if obj.get("stage")=="declared" and r.get("procedure") not in (None,""): add(findings,"E_STAGE_INCOMPATIBLE",p+"/procedure","declared rows must not claim completed procedures")
+    if args.release and obj.get("stage")!="complete": add(findings,"E_RELEASE_DECLARED_RUNBOOK","/stage","release rejects declared-only runbooks")
+
+def parse_jsonl(path, findings):
+    raw=path.read_bytes(); rows=[]
+    for i,line in enumerate(raw.splitlines()):
+        try: rows.append(json.loads(line,object_pairs_hook=unique))
+        except DuplicateKey as e: add(findings,"E_DUPLICATE_KEY",f"/lines/{i}",f"duplicate JSON key: {e}")
+        except (json.JSONDecodeError,UnicodeDecodeError) as e: add(findings,"E_JSONL_MALFORMED",f"/lines/{i}",f"malformed JSONL: {e}")
+    return rows,raw
+
+def witness(path,findings):
+    try:
+        with tempfile.TemporaryDirectory(prefix="boring-cdc-witness-") as td:
+            beads=Path(td)/".beads"; beads.mkdir(); (beads/"issues.jsonl").write_bytes(path.read_bytes())
+            cp=subprocess.run(["br","sync","--witness","--json","--no-db"],cwd=td,text=True,capture_output=True,timeout=30)
+            if cp.returncode:
+                detail=(cp.stderr or cp.stdout).strip().replace(str(ROOT),"<repo>").replace(td,"<tmp>")
+                add(findings,"E_WITNESS", "/", "br witness failed: "+detail); return "0"*64
+            return json.loads(cp.stdout)["witness"]["root_hash"]
+    except Exception as e: add(findings,"E_WITNESS","/",f"br witness unavailable: {type(e).__name__}"); return "0"*64
+
+def validate_graph(path, findings, args):
+    rows,raw=parse_jsonl(path,findings); by={}
+    for i,r in enumerate(rows):
+        if not isinstance(r,dict) or not isinstance(r.get("id"),str): add(findings,"E_GRAPH_RECORD",f"/lines/{i}","issue object with ID required"); continue
+        if r["id"] in by: add(findings,"E_DUPLICATE_ID",f"/lines/{i}/id",f"duplicate issue: {r['id']}")
+        by[r["id"]]=r
+    if args.baseline:
+        baseline_rows,_=parse_jsonl(Path(args.baseline),findings); baseline={r.get("id"):r for r in baseline_rows if isinstance(r,dict) and isinstance(r.get("id"),str)}
+        for missing in sorted(set(baseline)-set(by)): add(findings,"E_GRAPH_MISSING",f"/issues/{missing}","record missing from captured graph")
+        for extra in sorted(set(by)-set(baseline)): add(findings,"E_GRAPH_EXTRA",f"/issues/{extra}","unexpected record in captured graph")
+        for stale in sorted(set(by)&set(baseline)):
+            if by[stale] != baseline[stale]: add(findings,"E_GRAPH_STALE",f"/issues/{stale}","record differs from baseline across one or more fields")
+    edges=[]
+    for issue,r in by.items():
+        for j,d in enumerate(r.get("dependencies",[])):
+            p=f"/issues/{issue}/dependencies/{j}"
+            if d.get("issue_id")!=issue: add(findings,"E_EDGE_OWNER",p+"/issue_id","dependency issue_id differs from containing issue")
+            target=d.get("depends_on_id"); typ=d.get("type")
+            if target not in by: add(findings,"E_EDGE_DANGLING",p+"/depends_on_id",f"missing issue: {target}")
+            if typ not in ("blocks","parent-child","related","discovered-from"): add(findings,"E_EDGE_TYPE",p+"/type","unknown dependency type")
+            edges.append((issue,target,typ))
+    for kind in ("blocks","parent-child"):
+        graph={x:[] for x in by}
+        for a,b,t in edges:
+            if t==kind and b in by: graph[a].append(b)
+        visiting=set(); done=set()
+        def walk(n):
+            if n in visiting: add(findings,"E_GRAPH_CYCLE",f"/issues/{n}",f"{kind} cycle"); return
+            if n in done:return
+            visiting.add(n)
+            for nxt in graph[n]: walk(nxt)
+            visiting.remove(n); done.add(n)
+        for n in sorted(graph): walk(n)
+    for issue,r in by.items():
+        if r.get("status")=="closed":
+            for a,b,t in edges:
+                if a==issue and t=="blocks" and by.get(b,{}).get("status")!="closed": add(findings,"E_PREMATURE_CLOSE",f"/issues/{issue}/status",f"closed with open prerequisite {b}")
+                if b==issue and t=="parent-child" and by.get(a,{}).get("status")!="closed": add(findings,"E_PREMATURE_PARENT_CLOSE",f"/issues/{issue}/status",f"closed parent has open child {a}")
+    if args.expect_root:
+        expected=set(json.loads(Path(args.expect_root).read_text()))
+        leaves={x for x in by if not any(a==x and t=="parent-child" for a,b,t in edges)}
+        if leaves!=expected: add(findings,"E_LEAF_SET","/","graph leaf set differs from expected inventory")
+    captured_sha=digest(raw)
+    root=witness(path,findings)
+    if args.witness_root and root != args.witness_root: add(findings,"E_WITNESS_MISMATCH","/witness_root","captured witness does not match expected immutable root")
+    try:
+        if digest(path.read_bytes()) != captured_sha: add(findings,"E_INPUT_MOVED","/","graph input changed during captured operation")
+    except FileNotFoundError: add(findings,"E_INPUT_MOVED","/","graph input disappeared during captured operation")
+    normalized={"schema_version":"pinned-graph/v1","source_sha256":captured_sha,"witness_root":root,"issues":[by[x] for x in sorted(by)],"edges":[{"issue_id":a,"depends_on_id":b,"type":t} for a,b,t in sorted(edges)]}
+    if args.output: Path(args.output).write_text(json.dumps(normalized,sort_keys=True,separators=(",",":"))+"\n")
+
+def parser():
+    p=argparse.ArgumentParser(description="Validate Boring CDC M0 bootstrap contracts with deterministic JSON diagnostics.")
+    p.add_argument("kind",choices=["decisions","decision","artifacts","artifact","evidence","runbooks","graph"]); p.add_argument("input"); p.add_argument("--complete",action="store_true"); p.add_argument("--release",action="store_true"); p.add_argument("--owners"); p.add_argument("--fixtures"); p.add_argument("--executors"); p.add_argument("--expect-root"); p.add_argument("--baseline"); p.add_argument("--witness-root"); p.add_argument("--output"); return p
+
+def main():
+    args=parser().parse_args(); path=Path(args.input); findings=[]; raw=b""
+    if args.kind=="graph": validate_graph(path,findings,args); raw=path.read_bytes() if path.exists() else b""
+    elif args.kind=="evidence" and path.is_dir():
+        manifests=sorted(path.rglob("manifest.json"))
+        if not manifests: add(findings,"E_INPUT_MISSING","/","artifact root contains no manifest.json")
+        chunks=[]
+        for manifest in manifests:
+            local=[]; obj,part=load(manifest,local); chunks.append(part)
+            if obj is not None: validate_evidence(obj,local,args)
+            prefix="/"+manifest.relative_to(path).as_posix()
+            for finding in local: finding["pointer"]=prefix+finding["pointer"]
+            findings.extend(local)
+        raw=b"\n".join(chunks)
+    else:
+        obj,raw=load(path,findings)
+        if obj is not None:
+            if args.kind in ("decisions","decision"):
+                if args.kind=="decision" and isinstance(obj,dict) and "decisions" not in obj: obj={"schema_version":"m0-decisions/v1","decisions":[obj]}
+                validate_decisions(obj,findings,args)
+            elif args.kind in ("artifacts","artifact"):
+                if args.kind=="artifact" and isinstance(obj,dict) and "artifacts" not in obj: obj={"schema_version":"m0-artifacts/v1","artifacts":[obj]}
+                validate_artifacts(obj,findings,args)
+            elif args.kind=="evidence": validate_evidence(obj,findings,args)
+            else: validate_runbooks(obj,findings,args)
+    findings.sort(key=lambda x:(x["pointer"],x["code"],x["message"]))
+    result={"schema_version":"validation-result/v1","validator_version":VERSION,"owner_bead":OWNER,"status":"fail" if findings else "pass","input_sha256":digest(raw),"git_commit":subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT,text=True,capture_output=True).stdout.strip(),"findings":findings}
+    print(json.dumps(result,sort_keys=True,separators=(",",":"))); return 1 if findings else 0
+if __name__=="__main__": raise SystemExit(main())
