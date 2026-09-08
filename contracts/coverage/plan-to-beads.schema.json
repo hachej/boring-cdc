@@ -25,17 +25,23 @@
           "source": {
             "minLength": 1,
             "type": "string"
+          },
+          "source_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
           }
         },
         "required": [
           "id",
           "owner_bead",
           "source",
+          "source_digest",
           "evidence_status"
         ],
         "type": "object"
       },
-      "type": "array"
+      "type": "array",
+      "uniqueItems": true
     },
     "schema_version": {
       "const": "plan-to-beads/v1"
