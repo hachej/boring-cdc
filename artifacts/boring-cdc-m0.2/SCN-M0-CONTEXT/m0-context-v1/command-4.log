@@ -1,0 +1,2 @@
+context unit corpus: 10 passed; seed=m0-context-v1
+{"findings":[],"git_commit":"6d603702d7ec9ef943c443aa986eb7d4a8ab0576","schema_version":"validation-result/v1","valid":true,"validator":"plan-coverage/v1"}
