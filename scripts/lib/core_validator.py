@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic, dependency-free validators for the M0 bootstrap contracts."""
 from __future__ import annotations
-import argparse, hashlib, json, os, re, subprocess, sys, tempfile
+import argparse, hashlib, json, os, re, shutil, subprocess, sys, tempfile
 from pathlib import Path
 
 VERSION = "core-validators/1.0.0"
@@ -113,9 +113,13 @@ def validate_decisions(obj, findings, args):
         if r.get("status") not in ("open","approved","rejected"): add(findings,"E_STATUS",p+"/status","invalid decision status")
         if r.get("status")=="approved":
             a=r.get("approval")
-            if not req_obj(a,["approved_by","approved_at","value_digest"],findings,p+"/approval"): pass
-            elif not SHA256.fullmatch(str(a.get("value_digest",""))): add(findings,"E_DIGEST",p+"/approval/value_digest","expected lowercase sha256")
-            elif a.get("value_digest") != digest(r.get("proposed_value","").encode()): add(findings,"E_APPROVAL_DIGEST",p+"/approval/value_digest","approval digest must bind the proposed value")
+            approval_fields=["approved_by","approved_at","value_digest"]
+            if not req_obj(a,approval_fields,findings,p+"/approval"): pass
+            else:
+                check_unknown(a,approval_fields,findings,p+"/approval")
+                check_unresolved(a.get("approved_by"),p+"/approval/approved_by",findings); check_unresolved(a.get("approved_at"),p+"/approval/approved_at",findings)
+                if not SHA256.fullmatch(str(a.get("value_digest",""))): add(findings,"E_DIGEST",p+"/approval/value_digest","expected lowercase sha256")
+                elif a.get("value_digest") != digest(r.get("proposed_value","").encode()): add(findings,"E_APPROVAL_DIGEST",p+"/approval/value_digest","approval digest must bind the proposed value")
         elif "approval" in r: add(findings,"E_APPROVAL_STATE",p+"/approval","approval is allowed only for approved rows")
         fp=r.get("fixture_spec"); target=safe_path(fp,p+"/fixture_spec",findings)
         expected_hash=r.get("fixture_sha256")
@@ -131,8 +135,12 @@ def validate_decisions(obj, findings, args):
                 if executors is not None and x not in executors: add(findings,"E_EXECUTOR_UNKNOWN",f"{p}/executor_beads/{j}","executor absent from supplied inventory")
     if args.complete:
         if not rows: add(findings,"E_DECISIONS_EMPTY","/decisions","empty skeleton cannot satisfy aggregate completeness")
-        for option in ("owners", "fixtures", "executors"):
-            if not getattr(args, option): add(findings,"E_INVENTORY_REQUIRED",f"/{option}",f"--complete requires --{option} inventory")
+        for option in ("owners", "fixtures", "executors", "expected_decisions"):
+            if not getattr(args, option): add(findings,"E_INVENTORY_REQUIRED",f"/{option}",f"--complete requires --{option.replace('_','-')} inventory")
+        expected=inventory(args.expected_decisions,findings,"expected_decisions") if args.expected_decisions else set()
+        actual={r.get("id") for r in rows if isinstance(r,dict)}
+        for missing in sorted(expected-actual): add(findings,"E_DECISION_MISSING",f"/decisions/{missing}","required decision is absent")
+        for extra in sorted(actual-expected): add(findings,"E_DECISION_EXTRA",f"/decisions/{extra}","decision is absent from expected inventory")
         for i,r in enumerate(rows):
             if isinstance(r,dict) and r.get("status")!="approved": add(findings,"E_DECISION_OPEN",f"/decisions/{i}/status","real closure requires every decision approved")
             if isinstance(r,dict): safe_path(r.get("fixture_spec"),f"/decisions/{i}/fixture_spec",findings,must_exist=True)
@@ -152,6 +160,11 @@ def validate_artifacts(obj, findings, args):
         if r.get("status") not in ("declared","complete"): add(findings,"E_STATUS",p+"/status","invalid artifact status")
     if args.complete:
         if not rows: add(findings,"E_ARTIFACTS_EMPTY","/artifacts","empty skeleton cannot satisfy aggregate completeness")
+        if not args.expected_artifacts: add(findings,"E_INVENTORY_REQUIRED","/expected_artifacts","--complete requires --expected-artifacts inventory")
+        expected=inventory(args.expected_artifacts,findings,"expected_artifacts") if args.expected_artifacts else set()
+        actual={r.get("id") for r in rows if isinstance(r,dict)}
+        for missing in sorted(expected-actual): add(findings,"E_ARTIFACT_MISSING",f"/artifacts/{missing}","required artifact is absent")
+        for extra in sorted(actual-expected): add(findings,"E_ARTIFACT_EXTRA",f"/artifacts/{extra}","artifact is absent from expected inventory")
         for i,r in enumerate(rows):
             if isinstance(r,dict) and r.get("status") != "complete": add(findings,"E_ARTIFACT_INCOMPLETE",f"/artifacts/{i}/status","aggregate completeness requires every artifact complete")
 
@@ -162,17 +175,27 @@ def validate_evidence(obj, findings, args):
     profile=obj.get("evidence_profile"); tier=obj.get("evidence_tier")
     if profile not in ("runtime","external_managed","documentation"): add(findings,"E_EVIDENCE_PROFILE","/evidence_profile","unknown evidence profile")
     if tier not in ("leaf","component","milestone","release"): add(findings,"E_EVIDENCE_TIER","/evidence_tier","unknown evidence tier")
-    if not re.fullmatch(r"[0-9a-f]{40}",str(obj.get("git_commit",""))): add(findings,"E_GIT_SHA","/git_commit","expected full Git SHA")
+    commit=str(obj.get("git_commit",""))
+    if not re.fullmatch(r"[0-9a-f]{40}",commit): add(findings,"E_GIT_SHA","/git_commit","expected full Git SHA")
+    else:
+        exists=subprocess.run(["git","cat-file","-e",commit+"^{commit}"],cwd=ROOT,capture_output=True).returncode==0
+        ancestor=exists and subprocess.run(["git","merge-base","--is-ancestor",commit,"HEAD"],cwd=ROOT,capture_output=True).returncode==0
+        if not exists or not ancestor: add(findings,"E_GIT_OBJECT","/git_commit","commit must exist and be an ancestor of the validating checkout")
     cmds=obj.get("commands")
     if not isinstance(cmds,list) or not cmds: add(findings,"E_COMMANDS_REQUIRED","/commands","at least one command record is required")
     else:
         for i,c in enumerate(cmds):
-            p=f"/commands/{i}"; required=["argv","version","exit_code","stdout_sha256","stderr_sha256"]; req_obj(c,required,findings,p)
+            p=f"/commands/{i}"; required=["argv","version","exit_code","stdout_path","stdout_sha256","stderr_path","stderr_sha256"]; req_obj(c,required,findings,p)
             if isinstance(c,dict):
                 check_unknown(c,required,findings,p); check_unresolved(c.get("argv"),p+"/argv",findings); check_unresolved(c.get("version"),p+"/version",findings)
                 if type(c.get("exit_code")) is not int: add(findings,"E_EXIT_CODE",p+"/exit_code","exit_code must be an integer")
-                for k in ("stdout_sha256","stderr_sha256"):
-                    if not SHA256.fullmatch(str(c.get(k,""))): add(findings,"E_DIGEST",p+"/"+k,"expected lowercase sha256")
+                executable=str(c.get("argv","")).split()[0] if str(c.get("argv","")).split() else ""
+                if "/" in executable: safe_path(executable,p+"/argv",findings,must_exist=True)
+                elif executable and shutil.which(executable) is None: add(findings,"E_COMMAND_MISSING",p+"/argv",f"command executable not found: {executable}")
+                for stream in ("stdout","stderr"):
+                    key=stream+"_sha256"; target=safe_path(c.get(stream+"_path"),p+"/"+stream+"_path",findings,must_exist=True)
+                    if not SHA256.fullmatch(str(c.get(key,""))): add(findings,"E_DIGEST",p+"/"+key,"expected lowercase sha256")
+                    elif target and target.is_file() and digest(target.read_bytes()) != c.get(key): add(findings,"E_HASH_MISMATCH",p+"/"+key,f"{stream} content hash mismatch")
     sp=obj.get("source_preservation"); sp_fields=["before_sha256","after_sha256","preserved"]; req_obj(sp,sp_fields,findings,"/source_preservation")
     if isinstance(sp,dict):
         check_unknown(sp,sp_fields,findings,"/source_preservation")
@@ -191,15 +214,25 @@ def validate_evidence(obj, findings, args):
     proof=obj.get("tier_proof"); req_obj(proof,proof_fields,findings,"/tier_proof")
     if isinstance(proof,dict):
         check_unknown(proof,proof_fields,findings,"/tier_proof")
-        required_by_tier={"leaf":["targeted_checks"],"component":["targeted_checks","boundary_e2e","fault_suite","deterministic_rerun","consumed_contract_vectors"],"milestone":["targeted_checks","workspace_tests","integration","clean_environment","exit_assertions"],"release":["targeted_checks","workspace_tests","integration","clean_environment","exit_assertions","endurance","full_failure_matrix","clean_clone"]}
+        component=["targeted_checks","boundary_e2e","fault_suite","deterministic_rerun","consumed_contract_vectors"]
+        milestone=component+["workspace_tests","integration","clean_environment","exit_assertions"]
+        required_by_tier={"leaf":["targeted_checks"],"component":component,"milestone":milestone,"release":milestone+["endurance","full_failure_matrix","clean_clone"]}
         for name in required_by_tier.get(tier,[]):
             if proof.get(name) is not True: add(findings,"E_TIER_PROOF",f"/tier_proof/{name}",f"{tier} evidence requires {name}")
         for name in proof_fields:
             if name in proof and type(proof[name]) is not bool: add(findings,"E_TYPE",f"/tier_proof/{name}","tier proof values must be booleans")
-    result=obj.get("result"); result_fields=["status","digest","product_faults","runtime_observed","attempts"]; req_obj(result,["status","digest","product_faults","runtime_observed"],findings,"/result")
+    result=obj.get("result"); result_fields=["status","digest","artifacts","product_faults","runtime_observed","attempts"]; req_obj(result,["status","digest","artifacts","product_faults","runtime_observed"],findings,"/result")
     if isinstance(result,dict):
         check_unknown(result,result_fields,findings,"/result")
         if result.get("status") not in ("pass","fail","unavailable","unsupported"): add(findings,"E_RESULT_STATUS","/result/status","unknown evidence result status")
+        artifacts=result.get("artifacts")
+        if not isinstance(artifacts,list) or not artifacts: add(findings,"E_RESULT_ARTIFACTS","/result/artifacts","result must name content-bound artifacts")
+        else:
+            chunks=[]
+            for index,value in enumerate(artifacts):
+                target=safe_path(value,f"/result/artifacts/{index}",findings,must_exist=True)
+                if target and target.is_file(): chunks.append(target.read_bytes())
+            if SHA256.fullmatch(str(result.get("digest",""))) and len(chunks)==len(artifacts) and digest(b"".join(chunks)) != result.get("digest"): add(findings,"E_RESULT_DIGEST","/result/digest","result digest must bind listed artifacts in order")
         if not SHA256.fullmatch(str(result.get("digest",""))): add(findings,"E_DIGEST","/result/digest","expected lowercase sha256")
         if type(result.get("runtime_observed")) is not bool: add(findings,"E_TYPE","/result/runtime_observed","runtime_observed must be boolean")
         if profile=="documentation" and (result.get("product_faults")!="fault_not_applicable" or result.get("runtime_observed") is not False): add(findings,"E_FORWARD_RUNTIME_EVIDENCE","/result","documentation evidence cannot claim product runtime evidence")
@@ -307,7 +340,7 @@ def validate_graph(path, findings, args):
 
 def parser():
     p=argparse.ArgumentParser(description="Validate Boring CDC M0 bootstrap contracts with deterministic JSON diagnostics.")
-    p.add_argument("kind",choices=["decisions","decision","artifacts","artifact","evidence","runbooks","graph"]); p.add_argument("input"); p.add_argument("--complete",action="store_true"); p.add_argument("--release",action="store_true"); p.add_argument("--owners"); p.add_argument("--fixtures"); p.add_argument("--executors"); p.add_argument("--expect-root"); p.add_argument("--baseline"); p.add_argument("--witness-root"); p.add_argument("--output"); return p
+    p.add_argument("kind",choices=["decisions","decision","artifacts","artifact","evidence","runbooks","graph"]); p.add_argument("input"); p.add_argument("--complete",action="store_true"); p.add_argument("--release",action="store_true"); p.add_argument("--owners"); p.add_argument("--fixtures"); p.add_argument("--executors"); p.add_argument("--expected-decisions"); p.add_argument("--expected-artifacts"); p.add_argument("--expect-root"); p.add_argument("--baseline"); p.add_argument("--witness-root"); p.add_argument("--output"); return p
 
 def main():
     args=parser().parse_args(); path=Path(args.input); findings=[]; raw=b""

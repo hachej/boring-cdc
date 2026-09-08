@@ -6,6 +6,7 @@ CLI = ROOT / "scripts/lib/core_validator.py"
 CLOSE = ROOT / "scripts/validate/close_guard.sh"
 F = ROOT / "tests/fixtures/m0-core"
 ZERO = hashlib.sha256(b"").hexdigest()
+HEAD = subprocess.run(["git","rev-parse","HEAD"],cwd=ROOT,text=True,capture_output=True,check=True).stdout.strip()
 PROOF_FIELDS = ["targeted_checks","boundary_e2e","fault_suite","deterministic_rerun","consumed_contract_vectors","workspace_tests","integration","clean_environment","exit_assertions","endurance","full_failure_matrix","clean_clone"]
 
 def run(*args):
@@ -19,12 +20,12 @@ def evidence(**overrides):
     for name in ("targeted_checks","boundary_e2e","fault_suite","deterministic_rerun","consumed_contract_vectors"): proof[name] = True
     doc = {
         "schema_version":"evidence/v1", "owner_bead":"boring-cdc-m0.1", "scenario_id":"SCN-M0-CORE",
-        "evidence_profile":"documentation", "evidence_tier":"component", "seed":"m0-core-v1", "git_commit":"a"*40,
-        "commands":[{"argv":"one","version":"1","exit_code":0,"stdout_sha256":ZERO,"stderr_sha256":ZERO},{"argv":"two","version":"1","exit_code":0,"stdout_sha256":ZERO,"stderr_sha256":ZERO}],
+        "evidence_profile":"documentation", "evidence_tier":"component", "seed":"m0-core-v1", "git_commit":HEAD,
+        "commands":[{"argv":"python3 --version","version":"1","exit_code":0,"stdout_path":"tests/fixtures/m0-core/valid/empty.txt","stdout_sha256":ZERO,"stderr_path":"tests/fixtures/m0-core/valid/empty.txt","stderr_sha256":ZERO},{"argv":"br --version","version":"1","exit_code":0,"stdout_path":"tests/fixtures/m0-core/valid/empty.txt","stdout_sha256":ZERO,"stderr_path":"tests/fixtures/m0-core/valid/empty.txt","stderr_sha256":ZERO}],
         "source_preservation":{"before_sha256":"b"*64,"after_sha256":"b"*64,"preserved":True},
         "cleanup":{"complete":True,"remaining_paths":[]}, "redaction":{"checked":True,"secrets_found":0},
         "tier_proof":proof,
-        "result":{"status":"pass","digest":"c"*64,"product_faults":"fault_not_applicable","runtime_observed":False},
+        "result":{"status":"pass","digest":ZERO,"artifacts":["tests/fixtures/m0-core/valid/empty.txt"],"product_faults":"fault_not_applicable","runtime_observed":False},
     }
     doc.update(overrides); return doc
 
@@ -37,8 +38,8 @@ class Core(unittest.TestCase):
     def test_valid_contracts(self):
         valid = F / "valid"
         cases = [
-            ("decisions",valid/"decisions.json","--complete","--owners",valid/"owners.json","--fixtures",valid/"fixtures.json","--executors",valid/"executors.json"),
-            ("artifacts",valid/"artifacts.json","--complete"), ("runbooks",valid/"runbooks.json","--release"),
+            ("decisions",valid/"decisions.json","--complete","--owners",valid/"owners.json","--fixtures",valid/"fixtures.json","--executors",valid/"executors.json","--expected-decisions",valid/"expected-decisions.json"),
+            ("artifacts",valid/"artifacts.json","--complete","--expected-artifacts",valid/"expected-artifacts.json"), ("runbooks",valid/"runbooks.json","--release"),
             ("graph",valid/"graph.jsonl","--output",valid/"normalized.tmp.json"),
         ]
         try:
@@ -65,6 +66,11 @@ class Core(unittest.TestCase):
             self.assertCode(run("decisions",valid/"decisions.json","--owners",p,"--fixtures",valid/"fixtures.json","--executors",valid/"executors.json"), "E_DUPLICATE_OWNER")
             p.write_text('[]')
             self.assertCode(run("decisions",valid/"decisions.json","--owners",valid/"owners.json","--fixtures",valid/"fixtures.json","--executors",p), "E_EXECUTOR_UNKNOWN")
+            p.write_text('["DEC-SYNTHETIC","DEC-OMITTED"]')
+            self.assertCode(run("decisions",valid/"decisions.json","--complete","--owners",valid/"owners.json","--fixtures",valid/"fixtures.json","--executors",valid/"executors.json","--expected-decisions",p), "E_DECISION_MISSING")
+            approval=json.loads((valid/"decisions.json").read_text()); approval["decisions"][0]["approval"].update({"approved_by":"","approved_at":"","extra":"x"}); p.write_text(json.dumps(approval))
+            cp=run("decisions",p,"--owners",valid/"owners.json","--fixtures",valid/"fixtures.json","--executors",valid/"executors.json")
+            self.assertCode(cp,"E_UNRESOLVED"); self.assertCode(cp,"E_UNKNOWN_FIELD")
 
     def test_invalid_reason_codes_and_determinism(self):
         bad=F/"invalid"; cases=[(("decisions",bad/"decisions-duplicate.json"),"E_DUPLICATE_ID"),(("artifacts",bad/"artifact-traversal.json"),"E_PATH_TRAVERSAL"),(("runbooks",bad/"runbook-gap.json"),"E_PROCEDURE_GAP"),(("graph",bad/"graph-cycle.jsonl"),"E_GRAPH_CYCLE"),(("artifacts",bad/"duplicate-key.json"),"E_DUPLICATE_KEY")]
@@ -87,10 +93,12 @@ class Core(unittest.TestCase):
             cases=[(evidence(evidence_profile="future"),"E_EVIDENCE_PROFILE"),(evidence(cleanup={"complete":False,"remaining_paths":["x"]}),"E_CLEANUP_INCOMPLETE"),(evidence(result={"status":"pass","digest":"c"*64,"product_faults":"tested","runtime_observed":True}),"E_FORWARD_RUNTIME_EVIDENCE"),(evidence(seed="password=bad"),"E_SECRET")]
             for doc,code in cases: p.write_text(json.dumps(doc)); self.assertCode(run("evidence",p),code)
             bogus=evidence(evidence_profile="runtime", evidence_tier="release")
-            bogus["commands"][0]["exit_code"]="0"; bogus["source_preservation"]={"before_sha256":"bogus","after_sha256":"bogus","preserved":True}; bogus["result"]={"status":"invented","digest":"c"*64,"product_faults":"pass","runtime_observed":False}
+            bogus["commands"][0]["exit_code"]="0"; bogus["commands"][0]["argv"]="definitely-not-a-command"; bogus["git_commit"]="a"*40; bogus["source_preservation"]={"before_sha256":"bogus","after_sha256":"bogus","preserved":True}; bogus["result"]={"status":"invented","digest":"c"*64,"artifacts":["tests/fixtures/m0-core/valid/empty.txt"],"product_faults":"pass","runtime_observed":False}
             p.write_text(json.dumps(bogus)); cp=run("evidence",p)
-            for code in ("E_EXIT_CODE","E_DIGEST","E_RESULT_STATUS","E_RUNTIME_PROVENANCE","E_TIER_PROOF"): self.assertCode(cp,code)
+            for code in ("E_EXIT_CODE","E_COMMAND_MISSING","E_GIT_OBJECT","E_DIGEST","E_RESULT_STATUS","E_RESULT_DIGEST","E_RUNTIME_PROVENANCE","E_TIER_PROOF"): self.assertCode(cp,code)
             external=evidence(evidence_profile="external_managed"); p.write_text(json.dumps(external)); self.assertCode(run("evidence",p),"E_EXTERNAL_PROVENANCE")
+            release=evidence(evidence_tier="release"); release["tier_proof"].update({name:True for name in PROOF_FIELDS}); release["tier_proof"]["boundary_e2e"]=False
+            p.write_text(json.dumps(release)); self.assertCode(run("evidence",p),"E_TIER_PROOF")
 
     def test_runbook_unknown_stage_and_graph_leaf_orientation(self):
         with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
@@ -105,6 +113,7 @@ class Core(unittest.TestCase):
             rows=[{"id":"root","status":"closed","dependencies":[]},{"id":"child","status":"open","dependencies":[{"issue_id":"child","depends_on_id":"root","type":"parent-child"}]}]
             p.write_text("\n".join(map(json.dumps,rows))+"\n"); self.assertCode(close("root",p),"E_CLOSE_BLOCKED")
             rows[1]["status"]="closed"; p.write_text("\n".join(map(json.dumps,rows))+"\n"); self.assertEqual(close("root",p).returncode,0)
+            p.write_text('{"id":"root","status":"open","status":"closed","dependencies":[]}\n'); self.assertCode(close("root",p),"E_DUPLICATE_KEY")
 
     def test_graph_baseline_witness_and_source_isolation(self):
         self.assertCode(run("graph",F/"invalid/graph-stale.jsonl","--baseline",F/"valid/graph.jsonl"),"E_GRAPH_MISSING")

@@ -5,6 +5,15 @@ from pathlib import Path
 
 OWNER = "boring-cdc-m0.1"
 
+class DuplicateKey(ValueError): pass
+
+def unique(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result: raise DuplicateKey(key)
+        result[key] = value
+    return result
+
 def finding(code, pointer, message, owner=OWNER):
     return {"code": code, "pointer": pointer, "owner_bead": owner, "message": message}
 
@@ -21,12 +30,14 @@ def main():
         findings.append(finding("E_INPUT_UNREADABLE", "/", f"input cannot be read: {type(exc).__name__}"))
     for number, line in enumerate(raw.splitlines()):
         try:
-            row = json.loads(line)
+            row = json.loads(line, object_pairs_hook=unique)
             if not isinstance(row, dict) or not isinstance(row.get("id"), str):
                 findings.append(finding("E_GRAPH_RECORD", f"/lines/{number}", "issue object with ID required")); continue
             if row["id"] in seen_ids:
                 findings.append(finding("E_DUPLICATE_ID", f"/lines/{number}/id", f"duplicate issue: {row['id']}")); continue
             seen_ids.add(row["id"]); rows.append(row)
+        except DuplicateKey as exc:
+            findings.append(finding("E_DUPLICATE_KEY", f"/lines/{number}", f"duplicate JSON key: {exc}"))
         except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             findings.append(finding("E_JSONL_MALFORMED", f"/lines/{number}", f"malformed JSONL: {exc}"))
     by = {row["id"]: row for row in rows}

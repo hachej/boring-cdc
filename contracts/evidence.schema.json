@@ -34,8 +34,16 @@
           "exit_code": {
             "type": "integer"
           },
+          "stderr_path": {
+            "minLength": 1,
+            "type": "string"
+          },
           "stderr_sha256": {
             "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "stdout_path": {
+            "minLength": 1,
             "type": "string"
           },
           "stdout_sha256": {
@@ -51,7 +59,9 @@
           "argv",
           "version",
           "exit_code",
+          "stdout_path",
           "stdout_sha256",
+          "stderr_path",
           "stderr_sha256"
         ],
         "type": "object"
@@ -101,6 +111,14 @@
     "result": {
       "additionalProperties": false,
       "properties": {
+        "artifacts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
         "attempts": {
           "items": {
             "minLength": 1,
@@ -132,6 +150,7 @@
       "required": [
         "status",
         "digest",
+        "artifacts",
         "product_faults",
         "runtime_observed"
       ],

@@ -5,9 +5,9 @@ seed=${1:-m0-core-v1}; [ "$seed" = m0-core-v1 ] || { echo 'E_SEED: expected m0-c
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd); cd "$root"
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/boring-cdc-m0-core.XXXXXX"); trap 'rm -rf "$tmp"' EXIT HUP INT TERM
 before=$(sha256sum tests/fixtures/m0-core/valid/* contracts/m0/*.json | sha256sum | cut -d' ' -f1)
-scripts/validate/m0_decision.sh tests/fixtures/m0-core/valid/decisions.json --complete --owners tests/fixtures/m0-core/valid/owners.json --fixtures tests/fixtures/m0-core/valid/fixtures.json --executors tests/fixtures/m0-core/valid/executors.json >/dev/null
-scripts/validate/m0_artifact.sh tests/fixtures/m0-core/valid/artifacts.json --complete >/dev/null
-scripts/validate/m0_decisions.sh tests/fixtures/m0-core/valid/decisions.json --complete --owners tests/fixtures/m0-core/valid/owners.json --fixtures tests/fixtures/m0-core/valid/fixtures.json --executors tests/fixtures/m0-core/valid/executors.json >/dev/null
+scripts/validate/m0_decision.sh tests/fixtures/m0-core/valid/decisions.json --complete --owners tests/fixtures/m0-core/valid/owners.json --fixtures tests/fixtures/m0-core/valid/fixtures.json --executors tests/fixtures/m0-core/valid/executors.json --expected-decisions tests/fixtures/m0-core/valid/expected-decisions.json >/dev/null
+scripts/validate/m0_artifact.sh tests/fixtures/m0-core/valid/artifacts.json --complete --expected-artifacts tests/fixtures/m0-core/valid/expected-artifacts.json >/dev/null
+scripts/validate/m0_decisions.sh tests/fixtures/m0-core/valid/decisions.json --complete --owners tests/fixtures/m0-core/valid/owners.json --fixtures tests/fixtures/m0-core/valid/fixtures.json --executors tests/fixtures/m0-core/valid/executors.json --expected-decisions tests/fixtures/m0-core/valid/expected-decisions.json >/dev/null
 scripts/validate/runbook_registry.sh tests/fixtures/m0-core/valid/runbooks.json --release >/dev/null
 scripts/validate/beads_snapshot.sh .beads/issues.jsonl --output "$tmp/normalized.json" >/dev/null
 # A DB-free captured JSONL round-trips through an isolated br store with exact
