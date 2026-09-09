@@ -2529,6 +2529,13 @@
     },
     {
       "evidence_status": "pending",
+      "id": "SCN-M0-PUBLIC-OWNER-IDENTITY",
+      "owner_bead": "boring-cdc-d-owner",
+      "source": "fixtures/m0/decisions/boring-cdc-d-owner.json",
+      "source_digest": "a2d354fb12d6328aa81d0ed91fab0ee2f344aa524f2c380dcf5636137e14fb75"
+    },
+    {
+      "evidence_status": "pending",
       "id": "SCN-MIXED-COMPATIBLE-INCOMPATIBLE-TABLES-IN-ONE-TRANSACTION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",

@@ -12,7 +12,7 @@ class ContextTests(unittest.TestCase):
   reg=json.loads((ROOT/'contracts/agent/stable-ids.json').read_text()); es=reg['entries']; ids=[e['id'] for e in es]
   self.assertEqual(len(ids),len(set(ids))); self.assertEqual(ac.validate(),[])
   counts={n:sum(e['namespace']==n for e in es) for n in set(e['namespace'] for e in es)}
-  self.assertEqual(counts,{'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':120,'REL':33,'RISK':38})
+  self.assertEqual(counts,{'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':121,'REL':33,'RISK':38})
   self.assertTrue(all(e['evidence_status']=='pending' for e in es));self.assertNotIn('pass_digest',json.dumps(reg))
   self.assertTrue({'RUNBOOK','CLAIM','FINDING'} <= set(json.loads((ROOT/'contracts/agent/stable-ids.schema.json').read_text())['properties']['entries']['items']['properties']['namespace']['enum']))
  def test_all_interfaces_help_and_read_only(self):
@@ -26,7 +26,7 @@ class ContextTests(unittest.TestCase):
   self.assertLessEqual(x['summary_bytes'],16384);self.assertGreater(x['total_bytes'],x['summary_bytes']);self.assertTrue(x['attachments'][0]['complete']);self.assertIn('acceptance_criteria',x['attachments'][0]['content']);self.assertEqual(len(x['omitted_ids']),len(x['expansion_plan']))
   _,y=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--expand','all','--observed-at','2026-01-01T00:00:00Z');self.assertEqual(y['attachments'][-1]['name'],'expansion')
  def test_no_decisions_closed_and_claim_index_absent(self):
-  rows=ac.rows();dec=[r for r in rows if r.get('issue_type')=='decision'];self.assertEqual(len(dec),25);self.assertTrue(all(r['status']=='open' for r in dec))
+  rows=ac.rows();dec=[r for r in rows if r.get('issue_type')=='decision'];self.assertEqual(len(dec),25);self.assertTrue(all(r['status'] in ('open','in_progress') for r in dec))
   _,x=self.cli(str(ROOT/'scripts/agent/doctor'),'--observed-at','2026-01-01T00:00:00Z');self.assertEqual(x['claim_index'],'pending_unavailable');self.assertFalse(x['claim_reuse'])
  def test_source_change_reports_exact_stale_owner_without_rewriting_closed(self):
   old=ac.REG;self.addCleanup(setattr,ac,'REG',old)

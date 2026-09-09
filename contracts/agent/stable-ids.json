@@ -4334,6 +4334,18 @@
     },
     {
       "evidence_status": "pending",
+      "id": "SCN-M0-PUBLIC-OWNER-IDENTITY",
+      "namespace": "SCN",
+      "owner_bead": "boring-cdc-d-owner",
+      "source": "fixtures/m0/decisions/boring-cdc-d-owner.json",
+      "source_anchor": "\"fixture_id\":\"SCN-M0-PUBLIC-OWNER-IDENTITY\"",
+      "source_digest": "a2d354fb12d6328aa81d0ed91fab0ee2f344aa524f2c380dcf5636137e14fb75",
+      "source_excerpt": "\"fixture_id\":\"SCN-M0-PUBLIC-OWNER-IDENTITY\"",
+      "source_locator": "fixture_id#a2d354fb12d6",
+      "summary": "Validate the approved public GitHub owner/name/visibility identity and fail closed on drift."
+    },
+    {
+      "evidence_status": "pending",
       "id": "SCN-MIXED-COMPATIBLE-INCOMPATIBLE-TABLES-IN-ONE-TRANSACTION",
       "namespace": "SCN",
       "owner_bead": "boring-cdc-m6-failure-matrix",
@@ -5017,10 +5029,11 @@
       "summary": "publication_drift_requires_reseed"
     }
   ],
-  "inventory_digest": "38be11068a8b2ec6761c80c74d6efe570d16b4933af79fdc2e46958efcb9389a",
+  "inventory_digest": "45f66c59261e3489c38d211400cab66218e14060e524ae746bdb31b94793bc2c",
   "schema_version": "stable-registry/v1",
   "source_files": {
     "docs/PLAN.md": "0e4ebaa072453ea24f0dfc3f22a025b919970fe556eb0d90f026235e8029af4d",
-    "docs/REQUIREMENTS.md": "ebf333dcd571169c1e71d7c5cdd94af2d72fd65dffe0e58b91c407f38f78aa22"
+    "docs/REQUIREMENTS.md": "ebf333dcd571169c1e71d7c5cdd94af2d72fd65dffe0e58b91c407f38f78aa22",
+    "fixtures/m0/decisions/boring-cdc-d-owner.json": "4fda204d4ce36ef312b42d6f65562451d59d1e46e3a09aa2f08945d667d6c66d"
   }
 }

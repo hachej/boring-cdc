@@ -68,7 +68,7 @@ def validate():
  raw='\n'.join(f"{e.get('id')}\0{e.get('owner_bead')}\0{e.get('source')}\0{e.get('source_digest')}" for e in reg.get('entries',[])).encode()
  expected_inventory=json.loads((ROOT/'contracts/agent/stable-ids.schema.json').read_text())['properties']['inventory_digest']['const']
  if digest_bytes(raw)!=reg.get('inventory_digest') or reg.get('inventory_digest')!=expected_inventory:f.append(['E_INVENTORY_DIGEST','/inventory_digest'])
- expected={'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':120,'REL':33,'RISK':38,'RUNBOOK':0,'CLAIM':0,'FINDING':0}
+ expected={'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':121,'REL':33,'RISK':38,'RUNBOOK':0,'CLAIM':0,'FINDING':0}
  counts={k:sum(e.get('namespace')==k for e in reg.get('entries',[])) for k in expected}
  for k,want in expected.items():
   if counts[k]!=want:f.append(['E_COVERAGE_INCOMPLETE',f'/{k}:{counts[k]}!={want}'])
