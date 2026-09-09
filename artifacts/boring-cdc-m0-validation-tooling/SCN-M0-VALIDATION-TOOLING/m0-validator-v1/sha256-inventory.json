@@ -3,7 +3,7 @@
     {
       "bytes": 357,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/before-after-tree.json",
-      "sha256": "538944af54cc1e0b094b65a0086aab3317578858ed095b3340390124ab117dcb"
+      "sha256": "3b67052f605a698f42f2814c0c668e3110588308e98e442f0880ce04c45688e6"
     },
     {
       "bytes": 95,
@@ -18,7 +18,7 @@
     {
       "bytes": 198,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log",
-      "sha256": "7a4699b69105f1eab43ae32e59c8cf8971c9f526d67cebc2afe705b36a7c9fee"
+      "sha256": "2bff8bfa64180135eb7f404a4fa1c097feca3922118634ac47a57ded8d054c50"
     },
     {
       "bytes": 0,
@@ -48,7 +48,7 @@
     {
       "bytes": 198,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log",
-      "sha256": "7a4699b69105f1eab43ae32e59c8cf8971c9f526d67cebc2afe705b36a7c9fee"
+      "sha256": "2bff8bfa64180135eb7f404a4fa1c097feca3922118634ac47a57ded8d054c50"
     },
     {
       "bytes": 0,
@@ -78,12 +78,12 @@
     {
       "bytes": 4644,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/structured-log.jsonl",
-      "sha256": "736b348c92285279d13ab2fcf0c681964b3545b12cc2547dfc477280974e5c05"
+      "sha256": "6cf47ea22103a0640ce33c3f40e1617cda85ec458f6f3722ec7f009a94212d24"
     },
     {
       "bytes": 188,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/versions.json",
-      "sha256": "98db6089610397c0ddee2b8c267ddd5d755cf6356c4d303cdab359990845bc48"
+      "sha256": "33ac463a56b0aa2364db14a967b7b2a65257dbce7d1436dde5b22b7558421603"
     }
   ],
   "schema_version": "sha256-inventory/v1"

@@ -19,7 +19,7 @@
       "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log",
-      "stdout_sha256": "7a4699b69105f1eab43ae32e59c8cf8971c9f526d67cebc2afe705b36a7c9fee",
+      "stdout_sha256": "2bff8bfa64180135eb7f404a4fa1c097feca3922118634ac47a57ded8d054c50",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     },
     {
@@ -46,7 +46,7 @@
       "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log",
-      "stdout_sha256": "7a4699b69105f1eab43ae32e59c8cf8971c9f526d67cebc2afe705b36a7c9fee",
+      "stdout_sha256": "2bff8bfa64180135eb7f404a4fa1c097feca3922118634ac47a57ded8d054c50",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     },
     {
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "component",
-  "git_commit": "90dc4510828ae84eac4ba036ecab07cd9ebc4848",
+  "git_commit": "ecbb08fc028566a0d68d57e95b791f06d28bb4b8",
   "owner_bead": "boring-cdc-m0.9",
   "redaction": {
     "checked": true,
@@ -88,7 +88,7 @@
       "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/structured-log.jsonl",
       "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/versions.json"
     ],
-    "digest": "e22c7f16ad513e1fa45b8cecea13591541f7d1cc10c2fc2dfb15b2b02bebb2a0",
+    "digest": "29d2149b77ae0505b1fb52f692e43b6f005e2a32660ca718d8f4a2d540694c86",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -97,8 +97,8 @@
   "schema_version": "evidence/v1",
   "seed": "m0-validator-v1",
   "source_preservation": {
-    "after_sha256": "e82e953192344d890af5fd4d77491ee3d3a44465590f022250328b3900664fa4",
-    "before_sha256": "e82e953192344d890af5fd4d77491ee3d3a44465590f022250328b3900664fa4",
+    "after_sha256": "79cb3d9554d0ee20f42de426fefeb71eeeb29dc03152e2b47c71556078d55591",
+    "before_sha256": "79cb3d9554d0ee20f42de426fefeb71eeeb29dc03152e2b47c71556078d55591",
     "preserved": true
   },
   "tier_proof": {
