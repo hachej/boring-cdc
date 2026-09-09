@@ -566,6 +566,10 @@ fn tuple_text(values: &[PgoutputTupleValue], index: usize) -> Result<&str, Proto
 }
 
 fn valid_pg_timestamptz(value: &str) -> bool {
+    fn ascii_digits(value: &str, width: usize) -> bool {
+        value.len() == width && value.bytes().all(|byte| byte.is_ascii_digit())
+    }
+
     if !value.is_ascii() {
         return false;
     }
@@ -574,11 +578,12 @@ fn valid_pg_timestamptz(value: &str) -> bool {
     };
     let date_parts: Vec<_> = date.split('-').collect();
     let valid_date = date_parts.len() == 3
-        && date_parts[0].len() == 4
-        && date_parts[0].bytes().all(|byte| byte.is_ascii_digit())
+        && ascii_digits(date_parts[0], 4)
+        && ascii_digits(date_parts[1], 2)
         && date_parts[1]
             .parse::<u8>()
             .is_ok_and(|month| (1..=12).contains(&month))
+        && ascii_digits(date_parts[2], 2)
         && date_parts[2]
             .parse::<u8>()
             .is_ok_and(|day| (1..=31).contains(&day));
@@ -587,30 +592,46 @@ fn valid_pg_timestamptz(value: &str) -> bool {
     }
     let Some(zone_at) = time_and_zone
         .bytes()
-        .enumerate()
-        .skip(1)
-        .filter(|(_, byte)| matches!(byte, b'+' | b'-'))
-        .map(|(index, _)| index)
-        .next_back()
+        .position(|byte| matches!(byte, b'+' | b'-'))
     else {
         return false;
     };
     let (time, zone) = time_and_zone.split_at(zone_at);
     let fields: Vec<_> = time.split(':').collect();
+    if fields.len() != 3
+        || !ascii_digits(fields[0], 2)
+        || !fields[0].parse::<u8>().is_ok_and(|hour| hour < 24)
+        || !ascii_digits(fields[1], 2)
+        || !fields[1].parse::<u8>().is_ok_and(|minute| minute < 60)
+    {
+        return false;
+    }
+
+    let mut second_parts = fields[2].split('.');
+    let Some(seconds) = second_parts.next() else {
+        return false;
+    };
+    let fraction = second_parts.next();
+    // M0-PROVISIONAL: boring-cdc-m1.6 (PostgreSQL timestamp fractional precision is 0..=6).
+    if second_parts.next().is_some()
+        || !ascii_digits(seconds, 2)
+        || !seconds.parse::<u8>().is_ok_and(|second| second < 60)
+        || fraction.is_some_and(|digits| {
+            digits.is_empty()
+                || digits.len() > 6
+                || !digits.bytes().all(|byte| byte.is_ascii_digit())
+        })
+    {
+        return false;
+    }
+
     let zone_fields: Vec<_> = zone[1..].split(':').collect();
-    fields.len() == 3
-        && fields[0].len() == 2
-        && fields[0].parse::<u8>().is_ok_and(|hour| hour < 24)
-        && fields[1].len() == 2
-        && fields[1].parse::<u8>().is_ok_and(|minute| minute < 60)
-        && fields[2]
-            .parse::<f64>()
-            .is_ok_and(|second| (0.0..60.0).contains(&second))
+    matches!(zone.as_bytes().first(), Some(b'+') | Some(b'-'))
         && matches!(zone_fields.len(), 1 | 2)
-        && zone_fields[0].len() == 2
+        && ascii_digits(zone_fields[0], 2)
         && zone_fields[0].parse::<u8>().is_ok_and(|hour| hour <= 15)
         && (zone_fields.len() == 1
-            || (zone_fields[1].len() == 2
+            || (ascii_digits(zone_fields[1], 2)
                 && zone_fields[1].parse::<u8>().is_ok_and(|minute| minute < 60)))
 }
 
@@ -1028,13 +1049,36 @@ pub mod tests {
         assert_eq!(state.fence_proof_count(), 1);
     }
     #[test]
-    fn timestamp_shape_is_validated_not_just_nonempty() {
-        assert!(valid_pg_timestamptz("2026-09-09 21:08:28.927+00"));
-        assert!(!valid_pg_timestamptz("not-a-timestamp"));
-        assert!(!valid_pg_timestamptz("2026-09-09 99:08:28+00"));
-        assert!(!valid_pg_timestamptz("2026-99-99 12:34:-1+0"));
-        assert!(!valid_pg_timestamptz(""));
-        assert!(!valid_pg_timestamptz("é"));
+    fn timestamp_shape_is_validated_before_ranges() {
+        for valid in [
+            "2026-09-09 21:08:28+00",
+            "2026-09-09 21:08:28.9+00",
+            "2026-09-09 21:08:28.927123-07:30",
+        ] {
+            assert!(valid_pg_timestamptz(valid), "rejected {valid:?}");
+        }
+
+        for invalid in [
+            "2026-9-09 21:08:28+00",
+            "2026-09-9 21:08:28+00",
+            "2026-09-09 1:08:28+00",
+            "2026-09-09 21:8:28+00",
+            "2026-09-09 21:08:8+00",
+            "2026-09-09 12:34:1e1+00",
+            "2026-09-09 21:08:28.+00",
+            "2026-09-09 21:08:28.1234567+00",
+            "2026-09-09 21:08:28+0",
+            "2026-09-09 21:08:28+00:0",
+            "2026-09-09 21:08:28Z",
+            "2026-09-09T21:08:28+00",
+            "2026-09-09 99:08:28+00",
+            "2026-99-99 12:34:28+00",
+            "not-a-timestamp",
+            "",
+            "é",
+        ] {
+            assert!(!valid_pg_timestamptz(invalid), "accepted {invalid:?}");
+        }
     }
     #[test]
     fn unbound_fence_fails_closed() {
