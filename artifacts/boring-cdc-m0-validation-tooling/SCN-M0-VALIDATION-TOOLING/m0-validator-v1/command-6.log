@@ -1,1 +1,1 @@
-m0 aggregate hostile corpus pass seed=m0-validator-v1 repeated=2 cross_stage=5 product_faults=fault_not_applicable
+m0 aggregate hostile corpus pass seed=m0-validator-v1 repeated=2 official_cross_stage=2 product_faults=fault_not_applicable

@@ -1,1 +1,1 @@
-m0 aggregate validator corpus pass seed=m0-validator-v1 leaves=3 decisions=open evidence=pending
+m0 aggregate validator corpus pass seed=m0-validator-v1 leaves=3 state=neutral assignments=418

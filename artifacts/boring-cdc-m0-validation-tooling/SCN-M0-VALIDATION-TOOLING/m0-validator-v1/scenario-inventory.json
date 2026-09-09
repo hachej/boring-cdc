@@ -1,0 +1,16 @@
+{
+  "fault_not_applicable": "product faults do not apply; hostile repository inputs are exercised",
+  "fixed_seed": "m0-validator-v1",
+  "product_runtime": false,
+  "scenarios": [
+    "aggregate-unit",
+    "context-claim-handoff",
+    "isolated-br-staged-readiness",
+    "hostile-core",
+    "hostile-context",
+    "hostile-knowledge",
+    "stale-claim",
+    "malformed-handoff-provenance"
+  ],
+  "schema_version": "m0-validation-scenarios/v1"
+}

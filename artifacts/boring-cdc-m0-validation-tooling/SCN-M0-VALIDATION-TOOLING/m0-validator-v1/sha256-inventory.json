@@ -1,0 +1,90 @@
+{
+  "files": [
+    {
+      "bytes": 357,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/before-after-tree.json",
+      "sha256": "dd1f65cccb60a7ca95643cd7a4a0b32b6d72f6347e5deb851e72f2b64d45a6bc"
+    },
+    {
+      "bytes": 95,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.log",
+      "sha256": "625cce12ff515774f928c2157b7721e959d1b4d1c9d2f865c36881b52e5d3d65"
+    },
+    {
+      "bytes": 0,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 198,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log",
+      "sha256": "fea24427bc43266737f074439bfb7c3dee7edcd95602aefb471ef5e23b4c27b1"
+    },
+    {
+      "bytes": 0,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 124,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.log",
+      "sha256": "0b0df8b4820d845c476f0fbd573d725f2f8ffe311020885dff66d6e7f2027893"
+    },
+    {
+      "bytes": 0,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 95,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.log",
+      "sha256": "625cce12ff515774f928c2157b7721e959d1b4d1c9d2f865c36881b52e5d3d65"
+    },
+    {
+      "bytes": 0,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 198,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log",
+      "sha256": "fea24427bc43266737f074439bfb7c3dee7edcd95602aefb471ef5e23b4c27b1"
+    },
+    {
+      "bytes": 0,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 124,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log",
+      "sha256": "0b0df8b4820d845c476f0fbd573d725f2f8ffe311020885dff66d6e7f2027893"
+    },
+    {
+      "bytes": 0,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 4409,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/fixture-digests.json",
+      "sha256": "796380f52e3397b940882dc70cc377765e208bc98fb2fb785631360f49e06771"
+    },
+    {
+      "bytes": 445,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/scenario-inventory.json",
+      "sha256": "a480f58f349d35bf57b9bcbf5b86a795c758041d8536acedc0e2a6bfeda2d509"
+    },
+    {
+      "bytes": 4746,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/structured-log.jsonl",
+      "sha256": "0b9172e5f548835b859f33debe2e3c0760a2f8d3df818f50c5fff79dc44aacb8"
+    },
+    {
+      "bytes": 188,
+      "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/versions.json",
+      "sha256": "1a295a9860083110e0652f817cd3ec8bee86d46862d23b64ddde41842c992f82"
+    }
+  ],
+  "schema_version": "sha256-inventory/v1"
+}

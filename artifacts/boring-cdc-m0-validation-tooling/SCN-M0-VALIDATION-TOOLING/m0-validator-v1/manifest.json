@@ -5,63 +5,63 @@
   },
   "commands": [
     {
-      "argv": "scripts/validate/test_validators.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.log 2>&1",
+      "argv": "scripts/validate/test_validators.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.stderr",
       "exit_code": 0,
-      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.log",
-      "stdout_sha256": "4917504bea29cb0ae224df0364262543ac0e74a5ce0a1a2eb9d6a9e072c9eacc",
+      "stdout_sha256": "625cce12ff515774f928c2157b7721e959d1b4d1c9d2f865c36881b52e5d3d65",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     },
     {
-      "argv": "scripts/e2e/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log 2>&1",
+      "argv": "scripts/e2e/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.stderr",
       "exit_code": 0,
-      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log",
-      "stdout_sha256": "774089cad6a517f3d648a6e43c13818095490e0e9e0bf6798fe189abfa6719b9",
+      "stdout_sha256": "fea24427bc43266737f074439bfb7c3dee7edcd95602aefb471ef5e23b4c27b1",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     },
     {
-      "argv": "scripts/faults/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.log 2>&1",
+      "argv": "scripts/faults/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.stderr",
       "exit_code": 0,
-      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.log",
-      "stdout_sha256": "497d3c4807bd764cc483f673e651d64c8172e00428761063b7f7fc6a05f3f93c",
+      "stdout_sha256": "0b0df8b4820d845c476f0fbd573d725f2f8ffe311020885dff66d6e7f2027893",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     },
     {
-      "argv": "scripts/validate/test_validators.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.log 2>&1",
+      "argv": "scripts/validate/test_validators.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.stderr",
       "exit_code": 0,
-      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.log",
-      "stdout_sha256": "4917504bea29cb0ae224df0364262543ac0e74a5ce0a1a2eb9d6a9e072c9eacc",
+      "stdout_sha256": "625cce12ff515774f928c2157b7721e959d1b4d1c9d2f865c36881b52e5d3d65",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     },
     {
-      "argv": "scripts/e2e/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log 2>&1",
+      "argv": "scripts/e2e/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.stderr",
       "exit_code": 0,
-      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log",
-      "stdout_sha256": "774089cad6a517f3d648a6e43c13818095490e0e9e0bf6798fe189abfa6719b9",
+      "stdout_sha256": "fea24427bc43266737f074439bfb7c3dee7edcd95602aefb471ef5e23b4c27b1",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     },
     {
-      "argv": "scripts/faults/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log 2>&1",
+      "argv": "scripts/faults/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.stderr",
       "exit_code": 0,
-      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log",
-      "stdout_sha256": "497d3c4807bd764cc483f673e651d64c8172e00428761063b7f7fc6a05f3f93c",
+      "stdout_sha256": "0b0df8b4820d845c476f0fbd573d725f2f8ffe311020885dff66d6e7f2027893",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "component",
-  "git_commit": "a51f09d4e9a4aa065026cafb397f5eb3c467090e",
+  "git_commit": "f4e80d48893e71fc47a3a8fe99d861d97ecbd2ec",
   "owner_bead": "boring-cdc-m0-validation-tooling",
   "redaction": {
     "checked": true,
@@ -69,14 +69,26 @@
   },
   "result": {
     "artifacts": [
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/before-after-tree.json",
       "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.stderr",
       "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.stderr",
       "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.stderr",
       "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.stderr",
       "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log",
-      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log"
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.stderr",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.stderr",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/fixture-digests.json",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/scenario-inventory.json",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/sha256-inventory.json",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/structured-log.jsonl",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/versions.json"
     ],
-    "digest": "4b2294bb5207699994b8d15a530ae2f31990c11eccbec852f1112576ec54546b",
+    "digest": "0acebde345500ccf64b3bf12b6066f517196f344e9ad89e6c856d9a8b78fcb3f",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -85,8 +97,8 @@
   "schema_version": "evidence/v1",
   "seed": "m0-validator-v1",
   "source_preservation": {
-    "after_sha256": "88486d867e6d0ceeb5f12fd69076b989cd4a1b269d254545c5ebfb1878117af2",
-    "before_sha256": "88486d867e6d0ceeb5f12fd69076b989cd4a1b269d254545c5ebfb1878117af2",
+    "after_sha256": "dd6abe1b19339ff4581a2eedef2c4a8c6b0166f099de18d9ed1b5bb521d65fd2",
+    "before_sha256": "dd6abe1b19339ff4581a2eedef2c4a8c6b0166f099de18d9ed1b5bb521d65fd2",
     "preserved": true
   },
   "tier_proof": {

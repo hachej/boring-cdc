@@ -1,0 +1,13 @@
+{
+  "after_sha256": "dd6abe1b19339ff4581a2eedef2c4a8c6b0166f099de18d9ed1b5bb521d65fd2",
+  "before_sha256": "dd6abe1b19339ff4581a2eedef2c4a8c6b0166f099de18d9ed1b5bb521d65fd2",
+  "preserved": true,
+  "schema_version": "source-preservation/v1",
+  "scope": [
+    "contracts",
+    "scripts",
+    "tests/fixtures",
+    "evidence",
+    ".beads/issues.jsonl"
+  ]
+}
