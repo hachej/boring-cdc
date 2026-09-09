@@ -1,4 +1,0 @@
-PASS pg=15 live-relation/tuple/nonce/cardinality/truncate/catalog-operations-owner-membership
-PASS pg=16 live-relation/tuple/nonce/cardinality/truncate/catalog-operations-owner-membership
-PASS pg=17 live-relation/tuple/nonce/cardinality/truncate/catalog-operations-owner-membership
-m1 control e2e pass seed=m1-control-v1 cleanup=trap

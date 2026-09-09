@@ -1,0 +1,1 @@
+E_POSTGRES_HEALTH major=15
