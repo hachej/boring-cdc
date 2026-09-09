@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const HEARTBEAT_RELATION: &str = "boring_cdc_control.heartbeat";
 pub const FENCE_RELATION: &str = "boring_cdc_control.capture_fences";
@@ -76,6 +76,13 @@ pub enum RowOperation {
     Delete,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct FenceIdentity {
+    pub capture_epoch: u64,
+    pub generation: u64,
+    pub table_set_fingerprint: String,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ObservedControlUpdate {
     pub kind: ControlKind,
@@ -85,6 +92,7 @@ pub struct ObservedControlUpdate {
     pub changed_columns: BTreeSet<String>,
     pub affected_rows: u64,
     pub nonce: u64,
+    pub fence_identity: Option<FenceIdentity>,
 }
 
 impl ObservedControlUpdate {
@@ -100,9 +108,10 @@ impl ObservedControlUpdate {
                 .collect(),
             affected_rows: 1,
             nonce,
+            fence_identity: None,
         }
     }
-    pub fn fence(nonce: u64) -> Self {
+    pub fn fence(nonce: u64, identity: FenceIdentity) -> Self {
         Self {
             kind: ControlKind::CaptureFence,
             operation: RowOperation::Update,
@@ -119,6 +128,7 @@ impl ObservedControlUpdate {
             .collect(),
             affected_rows: 1,
             nonce,
+            fence_identity: Some(identity),
         }
     }
 }
@@ -171,23 +181,24 @@ fn committed_for_fixture() -> JournalCommitProof {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ControlHistorySnapshot {
     pub last_heartbeat_nonce: Option<u64>,
-    pub intended_fence_nonces: BTreeSet<u64>,
+    pub intended_fences: BTreeMap<u64, FenceIdentity>,
     pub observed_fence_nonces: BTreeSet<u64>,
 }
 
 #[derive(Default)]
 pub struct ControlWriterState {
     last_heartbeat_nonce: Option<u64>,
-    intended_fence_nonces: BTreeSet<u64>,
+    intended_fences: BTreeMap<u64, FenceIdentity>,
     observed_fence_nonces: BTreeSet<u64>,
 }
 impl ControlWriterState {
     /// Reconstructs writer state from the SQLite transaction owner's durable snapshot.
     pub fn from_persisted(snapshot: ControlHistorySnapshot) -> Result<Self, ProtocolFailure> {
-        if snapshot.intended_fence_nonces.contains(&0)
+        if snapshot.intended_fences.contains_key(&0)
             || !snapshot
                 .observed_fence_nonces
-                .is_subset(&snapshot.intended_fence_nonces)
+                .iter()
+                .all(|nonce| snapshot.intended_fences.contains_key(nonce))
         {
             return Err(ProtocolFailure::blocked(
                 "CONTROL_HISTORY_INVALID",
@@ -196,13 +207,17 @@ impl ControlWriterState {
         }
         Ok(Self {
             last_heartbeat_nonce: snapshot.last_heartbeat_nonce,
-            intended_fence_nonces: snapshot.intended_fence_nonces,
+            intended_fences: snapshot.intended_fences,
             observed_fence_nonces: snapshot.observed_fence_nonces,
         })
     }
 
-    pub fn intend_fence(&mut self, nonce: u64) -> Result<(), ProtocolFailure> {
-        if nonce == 0 || !self.intended_fence_nonces.insert(nonce) {
+    pub fn intend_fence(
+        &mut self,
+        nonce: u64,
+        identity: FenceIdentity,
+    ) -> Result<(), ProtocolFailure> {
+        if nonce == 0 || self.intended_fences.insert(nonce, identity).is_some() {
             return Err(ProtocolFailure::blocked(
                 "FENCE_NONCE_NOT_UNIQUE",
                 "before_control_dispatch",
@@ -272,9 +287,12 @@ impl ControlWriterState {
                 }
             }
             ControlKind::CaptureFence => {
-                if !self.intended_fence_nonces.contains(&update.nonce) {
+                let intended = self.intended_fences.get(&update.nonce).ok_or_else(|| {
+                    ProtocolFailure::blocked("FENCE_NONCE_UNBOUND", "before_feedback")
+                })?;
+                if update.fence_identity.as_ref() != Some(intended) {
                     return Err(ProtocolFailure::blocked(
-                        "FENCE_NONCE_UNBOUND",
+                        "FENCE_IDENTITY_MISMATCH",
                         "before_feedback",
                     ));
                 }
@@ -538,6 +556,28 @@ fn tuple_text(values: &[PgoutputTupleValue], index: usize) -> Result<&str, Proto
     }
 }
 
+fn valid_pg_timestamptz(value: &str) -> bool {
+    let Some((date, time_and_zone)) = value.split_once(' ') else {
+        return false;
+    };
+    let date_parts: Vec<_> = date.split('-').collect();
+    if date_parts.len() != 3
+        || date_parts[0].len() != 4
+        || date_parts.iter().any(|part| part.parse::<u32>().is_err())
+    {
+        return false;
+    }
+    let zone_at = time_and_zone[1..].rfind(['+', '-']).map(|index| index + 1);
+    let Some(zone_at) = zone_at else { return false };
+    let (time, zone) = time_and_zone.split_at(zone_at);
+    let fields: Vec<_> = time.split(':').collect();
+    fields.len() == 3
+        && fields[0].parse::<u8>().is_ok_and(|hour| hour < 24)
+        && fields[1].parse::<u8>().is_ok_and(|minute| minute < 60)
+        && fields[2].parse::<f64>().is_ok_and(|second| second < 60.0)
+        && zone[1..].parse::<u8>().is_ok_and(|hour| hour <= 15)
+}
+
 fn expected_relation(kind: ControlKind) -> (&'static str, &'static [(bool, &'static str, u32)]) {
     match kind {
         ControlKind::Heartbeat => (
@@ -600,6 +640,9 @@ pub fn decode_control_update(
                 let old = match marker {
                     b'K' | b'O' => {
                         let old = decode_tuple(&mut cursor)?;
+                        if old.len() != 1 || !matches!(old[0], PgoutputTupleValue::Text(_)) {
+                            return Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"));
+                        }
                         if cursor.u8()? != b'N' {
                             return Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"));
                         }
@@ -623,19 +666,20 @@ pub fn decode_control_update(
                 } else {
                     tuple_text(&old, 0)?.to_owned()
                 };
-                let nonce_index = match expected_kind {
+                let fence_identity = match expected_kind {
                     ControlKind::Heartbeat => {
-                        if tuple_text(&new, 2)?.is_empty() {
+                        if !valid_pg_timestamptz(tuple_text(&new, 2)?) {
                             return Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"));
                         }
-                        1
+                        None
                     }
                     ControlKind::CaptureFence => {
-                        for index in [1, 2] {
-                            tuple_text(&new, index)?.parse::<u64>().map_err(|_| {
-                                ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID")
-                            })?;
-                        }
+                        let capture_epoch = tuple_text(&new, 1)?
+                            .parse::<u64>()
+                            .map_err(|_| ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"))?;
+                        let generation = tuple_text(&new, 2)?
+                            .parse::<u64>()
+                            .map_err(|_| ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"))?;
                         let fingerprint = tuple_text(&new, 3)?;
                         if fingerprint.len() != 64
                             || !fingerprint
@@ -644,8 +688,17 @@ pub fn decode_control_update(
                         {
                             return Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"));
                         }
-                        4
+                        Some(FenceIdentity {
+                            capture_epoch,
+                            generation,
+                            table_set_fingerprint: fingerprint.to_owned(),
+                        })
                     }
+                };
+                let nonce_index = if expected_kind == ControlKind::Heartbeat {
+                    1
+                } else {
+                    4
                 };
                 let nonce = tuple_text(&new, nonce_index)?
                     .parse::<u64>()
@@ -664,6 +717,7 @@ pub fn decode_control_update(
                         .collect(),
                     affected_rows: 1,
                     nonce,
+                    fence_identity,
                 });
             }
             Some(b'T') => return Err(ProtocolFailure::wire("TRUNCATE_REQUIRES_RESEED")),
@@ -786,6 +840,13 @@ pub const ROLE_GRANTS: &[(&str, &[&str], &[&str])] = &[
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    fn fence_identity() -> FenceIdentity {
+        FenceIdentity {
+            capture_epoch: 1,
+            generation: 1,
+            table_set_fingerprint: "a".repeat(64),
+        }
+    }
     fn slot<'a>(
         ownership: &'a OwnershipLocks,
         intent: &'a PersistedSlotIntent,
@@ -864,29 +925,53 @@ pub mod tests {
     #[test]
     fn repeated_fence_keeps_one_proof() {
         let mut s = ControlWriterState::default();
-        s.intend_fence(7).unwrap();
+        s.intend_fence(7, fence_identity()).unwrap();
         s.observe(
-            &ObservedControlUpdate::fence(7),
+            &ObservedControlUpdate::fence(7, fence_identity()),
             Some(&committed_for_fixture()),
         )
         .unwrap();
         s.observe(
-            &ObservedControlUpdate::fence(7),
+            &ObservedControlUpdate::fence(7, fence_identity()),
             Some(&committed_for_fixture()),
         )
         .unwrap();
         assert_eq!(s.fence_proof_count(), 1);
         assert_eq!(
-            s.intend_fence(7).unwrap_err().fingerprint,
+            s.intend_fence(7, fence_identity()).unwrap_err().fingerprint,
             "FENCE_NONCE_NOT_UNIQUE"
         );
+    }
+    #[test]
+    fn fence_identity_must_match_persisted_intent() {
+        let mut state = ControlWriterState::default();
+        state.intend_fence(7, fence_identity()).unwrap();
+        let mut wrong = fence_identity();
+        wrong.generation = 2;
+        assert_eq!(
+            state
+                .observe(
+                    &ObservedControlUpdate::fence(7, wrong),
+                    Some(&committed_for_fixture()),
+                )
+                .unwrap_err()
+                .fingerprint,
+            "FENCE_IDENTITY_MISMATCH"
+        );
+        assert_eq!(state.fence_proof_count(), 0);
+    }
+    #[test]
+    fn timestamp_shape_is_validated_not_just_nonempty() {
+        assert!(valid_pg_timestamptz("2026-09-09 21:08:28.927+00"));
+        assert!(!valid_pg_timestamptz("not-a-timestamp"));
+        assert!(!valid_pg_timestamptz("2026-09-09 99:08:28+00"));
     }
     #[test]
     fn unbound_fence_fails_closed() {
         let mut s = ControlWriterState::default();
         assert_eq!(
             s.observe(
-                &ObservedControlUpdate::fence(8),
+                &ObservedControlUpdate::fence(8, fence_identity()),
                 Some(&committed_for_fixture())
             )
             .unwrap_err()
@@ -996,13 +1081,16 @@ pub mod tests {
     fn persisted_control_history_survives_restart() {
         let snapshot = ControlHistorySnapshot {
             last_heartbeat_nonce: Some(9),
-            intended_fence_nonces: [7].into_iter().collect(),
+            intended_fences: [(7, fence_identity())].into_iter().collect(),
             observed_fence_nonces: [7].into_iter().collect(),
         };
         let mut restored = ControlWriterState::from_persisted(snapshot).unwrap();
         assert_eq!(restored.fence_proof_count(), 1);
         assert_eq!(
-            restored.intend_fence(7).unwrap_err().fingerprint,
+            restored
+                .intend_fence(7, fence_identity())
+                .unwrap_err()
+                .fingerprint,
             "FENCE_NONCE_NOT_UNIQUE"
         );
         let proof = committed_for_fixture();

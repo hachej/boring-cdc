@@ -45,7 +45,9 @@ fn main() {
             let update = decode_control_update(&messages, kind, nonce).unwrap();
             let mut writer = ControlWriterState::default();
             if kind == ControlKind::CaptureFence {
-                writer.intend_fence(nonce).unwrap();
+                writer
+                    .intend_fence(nonce, update.fence_identity.clone().unwrap())
+                    .unwrap();
             }
             let event = writer.observe(&update, None).unwrap();
             assert!(!event.writes_user_row && !event.writes_benchmark_mutation);
