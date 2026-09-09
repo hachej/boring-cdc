@@ -1,6 +1,6 @@
 {
   "manifest_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
-  "manifest_sha256": "bbb88c85c25f61a63802a980866e6ff5dbf44a6fd0c9c22650e3f4a50b96df9f",
+  "manifest_sha256": "67efaf459708f4068942d7fff17f0dce4a6e9086aee2b0345bcf6eded2d40bf1",
   "owner_bead": "boring-cdc-m1.4",
   "schema_version": "m1-control-command-evidence/v1",
   "validators": [
@@ -10,7 +10,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/validator-generic.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/validator-generic.txt",
-      "stdout_sha256": "e759fb47856e2f57df457a48183b1c4545a46ba45841e0fd8d41b75ebedad0e9",
+      "stdout_sha256": "38c403f1784934299b30393eba5bab461dccb10c3a45a5469e543f2ddd573576",
       "version": "core-validators/1.0.0"
     },
     {

@@ -1,6 +1,6 @@
 {
   "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
-  "git": "204a928f66fe2e41c53b8da100e938735b49399a",
+  "git": "65604827b4a38a1124a98e0800807ebe98252e65",
   "postgres_images": {
     "15": "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
     "16": "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
