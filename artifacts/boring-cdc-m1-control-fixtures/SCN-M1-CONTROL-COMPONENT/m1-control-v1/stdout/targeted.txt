@@ -1,22 +1,24 @@
 
-running 15 tests
+running 17 tests
 test m1_control_fixtures::tests::administration_credential_is_gone_before_exporter ... ok
-test m1_control_fixtures::tests::heartbeat_cannot_feedback_before_durable_commit ... ok
 test m1_control_fixtures::tests::heartbeat_outage_degrades_without_feedback ... ok
 test m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop ... ok
-test m1_control_fixtures::tests::forbidden_control_shapes_block ... ok
+test m1_control_fixtures::tests::fence_identity_must_match_persisted_intent ... ok
 test m1_control_fixtures::tests::persisted_control_history_survives_restart ... ok
-test m1_control_fixtures::tests::repeated_fence_keeps_one_proof ... ok
 test m1_control_fixtures::tests::role_matrix_has_no_capture_slot_drop ... ok
-test m1_control_fixtures::tests::source_timeline_publication_slot_mismatch_blocks_startup ... ok
+test m1_control_fixtures::tests::repeated_fence_keeps_one_proof ... ok
 test m1_control_fixtures::tests::slot_guard_accepts_only_bound_configured_export ... ok
 test m1_control_fixtures::tests::publication_fingerprint_is_exact_and_order_independent ... ok
-test m1_control_fixtures::tests::truncate_is_detection_only ... ok
-test m1_control_fixtures::tests::unbound_fence_fails_closed ... ok
+test m1_control_fixtures::tests::source_timeline_publication_slot_mismatch_blocks_startup ... ok
 test m1_control_fixtures::tests::table_membership_change_has_no_live_path ... ok
+test m1_control_fixtures::tests::truncate_is_detection_only ... ok
 test m1_control_fixtures::tests::zero_or_multiple_control_rows_block ... ok
+test m1_control_fixtures::tests::forbidden_control_shapes_block ... ok
+test m1_control_fixtures::tests::unbound_fence_fails_closed ... ok
+test m1_control_fixtures::tests::heartbeat_cannot_feedback_before_durable_commit ... ok
+test m1_control_fixtures::tests::timestamp_shape_is_validated_not_just_nonempty ... ok
 
-test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 37 filtered out; finished in 0.00s
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 37 filtered out; finished in 0.01s
 
 
 running 0 tests

@@ -8,18 +8,18 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/workspace.txt",
-      "stderr_sha256": "4be729a441057f4179af432deb660082e4b7a54b41d27d7fb426209522bb6586",
+      "stderr_sha256": "4614ff941370077fc539d0212fe91f316518bd600cdef78d4aab1082a36d98e2",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/workspace.txt",
-      "stdout_sha256": "ae42c95aa89d3e6efa4caf1ec3d6f7467205f5a4ba3c6424a4125ed2a8806f87",
+      "stdout_sha256": "8b6a2befeaaf664296edff65b6e73369b9ca7a42eea171391ee11c7da7167d10",
       "version": "cargo"
     },
     {
       "argv": "cargo test --locked m1_control_fixtures::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/targeted.txt",
-      "stderr_sha256": "625b726366f8ad0b616ac3632105ec8c5967d312c104d374df9b52838e408101",
+      "stderr_sha256": "738aa66cd2e06da589305767e891c00ca24a2e3880c05d21b78c196e6d692d95",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/targeted.txt",
-      "stdout_sha256": "f063412f9e6cb2b8d6012a0c8d871476a682bb761493dec5c24abca97bf3824c",
+      "stdout_sha256": "9824c4a16da5a58023fd320c314e1e8ff7b9cf431ed474f52438d46fe0707219",
       "version": "cargo"
     },
     {
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "b6983a004128ed69790d5809a704bc4bd6345db1",
+  "git_commit": "afeb29f275e8ff6e885d5bca86fe6a93b321a32e",
   "owner_bead": "boring-cdc-m1-control-fixtures",
   "redaction": {
     "checked": true,
@@ -75,8 +75,8 @@
       "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/fault-timeline.json",
       "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/sha256.txt"
     ],
-    "digest": "a7c1699447ecc90d836db93046acc0415bbf3b4f5f6528ddb3cd11998b7f2428",
-    "product_faults": "Live PG 15/16/17 Relation/Update/Truncate tuple decoding and observed catalog operation/owner/membership drift; M2 adapters are not claimed",
+    "digest": "f9186cc7467a7f6556ddccfa571b24978e5d3888f22c5936a85fd05a174f26d2",
+    "product_faults": "Live PG 15/16/17 Relation/Update/Truncate tuple decoding, complete fence-identity binding, and observed catalog operation/owner/membership drift; M2 adapters are not claimed",
     "runtime_observed": true,
     "status": "pass"
   },

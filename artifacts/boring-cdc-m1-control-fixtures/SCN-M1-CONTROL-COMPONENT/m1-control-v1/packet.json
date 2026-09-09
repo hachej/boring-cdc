@@ -14,10 +14,10 @@
     "SCN-CRASH-DURING-TABLE-ADD-RE-SEED"
   ],
   "bead_id": "boring-cdc-m1-control-fixtures",
-  "binary_sha256": "0b492ebfea3c7be9272f66718fa5fd89dce80d65246fe657d63f65dfaa8d6c97",
+  "binary_sha256": "9a753039fe5fae52d66c64bdc82b4cebc0c47f5c0cb602963053563684041099",
   "configuration_fingerprint": "5dd9ffc68d78649321593ddfdab927f1b9153b7a7ef0667315737efad908de69",
   "failure_fingerprint": null,
-  "git_commit": "b6983a004128ed69790d5809a704bc4bd6345db1",
+  "git_commit": "afeb29f275e8ff6e885d5bca86fe6a93b321a32e",
   "image_digests": {
     "15": "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
     "16": "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
