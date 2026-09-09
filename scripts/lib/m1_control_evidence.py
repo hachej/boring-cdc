@@ -9,7 +9,7 @@ VERSION = "m1-control-evidence/1.1.0"
 SCHEMA = "m1-control-command-evidence/v1"
 CANONICAL = Path("artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1")
 EXPECTED_VALIDATORS = {
-    "scripts/validate/evidence.sh artifacts/boring-cdc-m1-control-fixtures | scripts/validate/capture_validation_result.py": "core-validators/1.0.0",
+    "scripts/validate/capture_validation_result.py -- scripts/validate/evidence.sh artifacts/boring-cdc-m1-control-fixtures": "core-validators/1.0.0",
     "scripts/validate/m1_control_fixtures.py": "m1-control-fixtures/1.0.0",
 }
 FORBIDDEN = ("TBD", "TODO", "FIXME", "<unresolved>", "postgresql://", "capture_fixture_only", "control_fixture_only", "application_fixture_only", "/home/")
@@ -38,6 +38,15 @@ def validate_payload(artifact):
     fail = lambda code, detail: findings.append({"code": code, "detail": detail})
     manifest = _load(artifact, "manifest.json", findings)
     try:
+        resolved_root = artifact.resolve(strict=True)
+        for path in artifact.rglob("*"):
+            if path.is_symlink():
+                fail("E_PATH_SYMLINK", str(path.relative_to(artifact)))
+            else:
+                path.resolve(strict=True).relative_to(resolved_root)
+    except (OSError, ValueError):
+        fail("E_PATH_CONTAINMENT", "artifact payload")
+    try:
         inventory = {}
         for line in (artifact / "sha256.txt").read_text().splitlines():
             digest, name = line.split("  ", 1)
@@ -47,7 +56,7 @@ def validate_payload(artifact):
         expected = {
             str(path.relative_to(artifact)): sha(path)
             for path in artifact.rglob("*")
-            if path.is_file()
+            if path.is_file() and not path.is_symlink()
             and path.name not in {"manifest.json", "sha256.txt", "validator-evidence.json"}
             and not path.name.startswith("validator-")
         }
@@ -139,7 +148,9 @@ def validate(artifact):
     try:
         generic = json.loads((artifact / "stdout/validator-generic.txt").read_text())
         expected = {"schema_version": "validation-result/v1", "validator_version": "core-validators/1.0.0", "owner_bead": "boring-cdc-m0.1", "status": "pass", "input_sha256": manifest_sha, "findings": []}
-        if generic != expected: fail("E_GENERIC_RESULT", "normalized generic validator output")
+        canonical = json.dumps(expected, sort_keys=True, separators=(",", ":")) + "\n"
+        if generic != expected or (artifact / "stdout/validator-generic.txt").read_text() != canonical:
+            fail("E_GENERIC_RESULT", "canonical normalized generic validator output")
     except (OSError, ValueError, TypeError): fail("E_GENERIC_RESULT", "malformed generic validator output")
     for name in ("stderr/validator-generic.txt", "stderr/validator-specific.txt"):
         try:

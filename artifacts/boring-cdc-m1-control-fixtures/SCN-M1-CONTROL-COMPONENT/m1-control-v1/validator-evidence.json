@@ -5,7 +5,7 @@
   "schema_version": "m1-control-command-evidence/v1",
   "validators": [
     {
-      "argv": "scripts/validate/evidence.sh artifacts/boring-cdc-m1-control-fixtures | scripts/validate/capture_validation_result.py",
+      "argv": "scripts/validate/capture_validation_result.py -- scripts/validate/evidence.sh artifacts/boring-cdc-m1-control-fixtures",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/validator-generic.txt",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",

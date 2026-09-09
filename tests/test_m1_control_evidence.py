@@ -59,13 +59,23 @@ class ControlCommandEvidence(unittest.TestCase):
 
         def coordinated(root):
             transcript = root / "stdout/validator-generic.txt"
-            transcript.write_text('{"status":"pass"}\n')
+            original = transcript.read_text()
+            transcript.write_text("  " + original)
             path = root / "validator-evidence.json"
             data = json.loads(path.read_text())
             import hashlib
             data["validators"][0]["stdout_sha256"] = hashlib.sha256(transcript.read_bytes()).hexdigest()
             path.write_text(json.dumps(data))
         self.assert_fails(coordinated, "E_GENERIC_RESULT")
+
+        def symlink_payload(root):
+            target = root / "config.json"
+            content = target.read_bytes()
+            external = root.parent / "external-config.json"
+            external.write_bytes(content)
+            target.unlink()
+            target.symlink_to(external)
+        self.assert_fails(symlink_payload, "E_PATH_SYMLINK")
 
     def test_inventory_log_rerun_unresolved_cleanup_and_redaction_tampering_fail(self):
         self.assert_fails(lambda root: (root / "sha256.txt").write_text("0" * 64 + "  commands.txt\n"), "E_INVENTORY")
