@@ -35,16 +35,15 @@ base=json.loads((valid/'handoff.json').read_text())
 state=next(a['content'] for a in pack['attachments'] if a['name']=='handoff_state')
 base.update({'bead_id':'boring-cdc-m0-validation-tooling','world_state_digest':world,'base_sha':state['implementation_range']['base_sha'],'head_sha':state['implementation_range']['head_sha'],'changed_paths':state['changed_paths']})
 
-def reject(code,document,expected_world=world):
- if document.get('world_state_digest') != expected_world: actual='E_WORLD_STATE_MISMATCH'
- elif document.get('head_sha') != pack['world_state']['git_commit']: actual='E_HANDOFF_HEAD_MISMATCH'
- elif set(document.get('changed_paths',[])) != set(state['changed_paths']): actual='E_HANDOFF_PATH_MISMATCH'
- else: actual='pass'
- if actual != code: raise SystemExit(f'{code}: got {actual}')
-
-bad=copy.deepcopy(base);bad['world_state_digest']='0'*64;reject('E_WORLD_STATE_MISMATCH',bad)
-bad=copy.deepcopy(base);bad['head_sha']='0'*40;reject('E_HANDOFF_HEAD_MISMATCH',bad)
-bad=copy.deepcopy(base);bad['changed_paths']=['contracts/forged.json'];reject('E_HANDOFF_PATH_MISMATCH',bad)
+# Submit the actual-context handoff through the official validator; malformed
+# provenance must fail with its stable schema pointer, never a shadow rule.
+bad=copy.deepcopy(base);bad['world_state_digest']='0'*63
+p=tmp/'bad-handoff.json';p.write_text(canon(bad)+'\n')
+cp=subprocess.run([str(root/'scripts/validate/handoff.sh'),str(p)],text=True,capture_output=True)
+if cp.returncode==0 or cp.stderr:raise SystemExit('E_HANDOFF_PROVENANCE_NOT_REJECTED')
+result=json.loads(cp.stdout)
+hits=[f for f in result['findings'] if f['code']=='E_DIGEST' and f['pointer']=='/world_state_digest' and f.get('owner_bead')=='boring-cdc-m0.3']
+if len(hits)!=1:raise SystemExit('E_HANDOFF_PROVENANCE_DIAGNOSTIC')
 
 # A stale claim must identify the changed binding and cannot be promoted by a handoff.
 claims=json.loads((valid/'claims.json').read_text()); claim=copy.deepcopy(claims['claims'][0]);actual=json.loads((valid/'actual-exact.json').read_text());actual['graph_digest']='0'*64
@@ -55,8 +54,5 @@ if cp.returncode == 0 or cp.stderr: raise SystemExit('E_STALE_CLAIM_NOT_REJECTED
 result=json.loads(cp.stdout);hits=[f for f in result['findings'] if f['code']=='E_CLAIM_INPUT_MISMATCH' and f['pointer'].endswith('/bindings/graph_digest')]
 if len(hits)!=1 or hits[0].get('owner_bead')!='boring-cdc-m0.3': raise SystemExit('E_STALE_CLAIM_DIAGNOSTIC')
 
-# Authority conflicts fail before generated views can be treated as canonical.
-bad_pack=copy.deepcopy(pack);bad_pack['effective_contract']['owner_bead']='boring-cdc-forged'
-if bad_pack['effective_contract']['owner_bead']==bad_pack['world_state']['selected_bead']: raise SystemExit('E_AUTHORITY_CONFLICT_NOT_REJECTED')
 PY
-printf 'm0 aggregate hostile corpus pass seed=%s repeated=2 cross_stage=5 product_faults=fault_not_applicable\n' "$seed"
+printf 'm0 aggregate hostile corpus pass seed=%s repeated=2 official_cross_stage=2 product_faults=fault_not_applicable\n' "$seed"

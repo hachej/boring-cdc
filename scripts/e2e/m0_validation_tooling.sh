@@ -55,19 +55,32 @@ handoff.update({'bead_id':'boring-cdc-m0-validation-tooling','world_state_digest
 cp=subprocess.run([str(root/'scripts/validate/handoff.sh'),str(tmp/'handoff.json')],text=True,capture_output=True)
 if cp.returncode: raise SystemExit('E_CONTEXT_HANDOFF:'+cp.stdout+cp.stderr)
 
-# A+B unblock decisions; C and this aggregate remain independent blockers of M0 completion.
-rows={
- 'A':{'status':'closed','deps':[]},'B':{'status':'closed','deps':[]},
- 'C':{'status':'open','deps':[]},'aggregate':{'status':'open','deps':['A','B','C']},
- 'decision':{'status':'open','deps':['A','B']},
- 'complete':{'status':'open','deps':['A','B','C','aggregate']},
-}
-ready=lambda key: rows[key]['status']=='open' and all(rows[d]['status']=='closed' for d in rows[key]['deps'])
-if not ready('decision') or ready('aggregate') or ready('complete'): raise SystemExit('E_STAGED_READINESS')
-rows['C']['status']='closed'
-if not ready('aggregate') or ready('complete'): raise SystemExit('E_AGGREGATE_BARRIER')
-rows['aggregate']['status']='closed'
-if not ready('complete'): raise SystemExit('E_COMPLETION_BARRIER')
+# Exercise actual br readiness over an isolated imported graph. Parent-child
+# edges stay non-blocking; decisions need A+B, while completion needs A+B+C+gate.
+ids={'root':'boring-cdc-m0','A':'boring-cdc-m0.1','B':'boring-cdc-m0.2','C':'boring-cdc-m0.3','gate':'boring-cdc-m0-validation-tooling','decision':'boring-cdc-d-license','complete':'boring-cdc-m0-complete'}
+graph=[]
+for key,ident in ids.items():
+ graph.append({'id':ident,'title':key,'description':'synthetic staged readiness','status':'closed' if key in ('A','B') else 'open','priority':0,'issue_type':'task','created_at':'2026-01-01T00:00:00Z','updated_at':'2026-01-01T00:00:00Z','dependencies':[]})
+by={r['id']:r for r in graph}
+def deps(key,blockers):
+ ident=ids[key]; by[ident]['dependencies']=[{'issue_id':ident,'depends_on_id':ids[b],'type':'blocks','created_at':'2026-01-01T00:00:00Z','created_by':'aggregate','metadata':'{}','thread_id':''} for b in blockers]
+ by[ident]['dependencies'].append({'issue_id':ident,'depends_on_id':ids['root'],'type':'parent-child','created_at':'2026-01-01T00:00:00Z','created_by':'aggregate','metadata':'{}','thread_id':''})
+deps('decision',['A','B']); deps('gate',['A','B','C']); deps('complete',['A','B','C','gate'])
+store=tmp/'readiness'; (store/'.beads').mkdir(parents=True)
+subprocess.run(['br','init','--prefix','synthetic','--db','.beads/beads.db','--force'],cwd=store,check=True,stdout=subprocess.DEVNULL)
+(store/'.beads/issues.jsonl').write_text(''.join(canon(r)+'\n' for r in graph))
+subprocess.run(['br','sync','--import-only','--db','.beads/beads.db'],cwd=store,check=True,stdout=subprocess.DEVNULL)
+def ready_ids():
+ cp=subprocess.run(['br','ready','--json','--db','.beads/beads.db'],cwd=store,text=True,capture_output=True,check=True)
+ doc=json.loads(cp.stdout); rows=doc if isinstance(doc,list) else doc.get('issues',doc.get('ready',[]))
+ return {r['id'] for r in rows}
+ready=ready_ids()
+if ids['decision'] not in ready or ids['gate'] in ready or ids['complete'] in ready: raise SystemExit('E_STAGED_READINESS')
+subprocess.run(['br','close',ids['C'],'--bypass-policy','--bypass-reason','synthetic readiness transition','--db','.beads/beads.db'],cwd=store,check=True,stdout=subprocess.DEVNULL)
+ready=ready_ids()
+if ids['gate'] not in ready or ids['complete'] in ready: raise SystemExit('E_AGGREGATE_BARRIER')
+subprocess.run(['br','close',ids['gate'],'--bypass-policy','--bypass-reason','synthetic readiness transition','--db','.beads/beads.db'],cwd=store,check=True,stdout=subprocess.DEVNULL)
+if ids['complete'] not in ready_ids(): raise SystemExit('E_COMPLETION_BARRIER')
 PY
 
 after=$(source_digest)

@@ -28,13 +28,15 @@ for name,needles in required.items():
 # The aggregate owns composition only: all leaf CLIs remain the executors.
 for rel in ('scripts/validate/test_core_validators.sh','scripts/validate/test_context.sh','scripts/validate/test_knowledge.sh'):
  if not (root/rel).is_file(): raise SystemExit('E_LEAF_EXECUTOR:'+rel)
-# Decisions remain open; this gate must not project approval or runtime proof.
+# Stay state-neutral: decisions may legitimately close or attach evidence after
+# A+B while this independent aggregate gate is running.
 rows=[json.loads(line) for line in (root/'.beads/issues.jsonl').read_text().splitlines() if line]
-decisions=[row for row in rows if row.get('issue_type')=='decision']
-if len(decisions)!=25 or any(row.get('status')!='open' for row in decisions):
- raise SystemExit('E_DECISION_BOUNDARY')
-coverage=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text())
-if any(row.get('evidence_status')!='pending' for row in coverage['assignments']):
- raise SystemExit('E_FORWARD_EVIDENCE')
+if len([row for row in rows if row.get('issue_type')=='decision']) < 25:
+ raise SystemExit('E_DECISION_INVENTORY')
+assignments=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text())['assignments']
+if len(assignments)!=418 or len({row.get('id') for row in assignments})!=418:
+ raise SystemExit('E_ASSIGNMENT_INVENTORY')
+if not all(isinstance(row.get('owner_bead'),str) for row in assignments):
+ raise SystemExit('E_ASSIGNMENT_OWNER')
 PY
-printf 'm0 aggregate validator corpus pass seed=%s leaves=3 decisions=open evidence=pending\n' "$seed"
+printf 'm0 aggregate validator corpus pass seed=%s leaves=3 state=neutral assignments=418\n' "$seed"
