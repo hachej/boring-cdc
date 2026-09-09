@@ -1,0 +1,4 @@
+PASS pg=15 publication/grants/cardinality/slot/truncate
+PASS pg=16 publication/grants/cardinality/slot/truncate
+PASS pg=17 publication/grants/cardinality/slot/truncate
+m1 control e2e pass seed=m1-control-v1 cleanup=trap

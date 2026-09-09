@@ -1,0 +1,12 @@
+{
+  "config_fingerprint": "92e72684109f0933329f45fc573871852b7753b933babd051047ab0385d39524",
+  "credentials": "redacted",
+  "postgresql_majors": [
+    15,
+    16,
+    17
+  ],
+  "profile": "component",
+  "schema_version": "m1-control-fixture-config/v1",
+  "seed": "m1-control-v1"
+}
