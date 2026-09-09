@@ -14,10 +14,10 @@
     "SCN-CRASH-DURING-TABLE-ADD-RE-SEED"
   ],
   "bead_id": "boring-cdc-m1-control-fixtures",
-  "binary_sha256": "3b1de1b4af88cf26ed20b0335bf5db3b75cc66907f34753784fc8cb8dee604c0",
+  "binary_sha256": "ea38f7bfa407b802bc01092c1a0cc155736ab06bd50086ab33589de7181a30b2",
   "configuration_fingerprint": "5dd9ffc68d78649321593ddfdab927f1b9153b7a7ef0667315737efad908de69",
   "failure_fingerprint": null,
-  "git_commit": "6f4597d3fb93ab7a4c0cece34b27688589c1ca86",
+  "git_commit": "572560ddf22b6392f3fd00eb816334d6b4af0576",
   "image_digests": {
     "15": "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
     "16": "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
@@ -26,7 +26,7 @@
   "outcome": "pass",
   "profile": "component",
   "schema_version": "m1-control-packet/v1",
-  "scope": "M1 PostgreSQL and pure protocol fixture; M2 SQLite/runtime adapters are not claimed",
+  "scope": "M1 live PostgreSQL wire/catalog observations and pure control kernel; M2 SQLite/runtime adapters are not claimed",
   "seed": "m1-control-v1",
   "source_fingerprint": "7ddda6d3ebe677ceb7c342e915966043411e3bfe55a35bad8e995cb6cad09e87",
   "table_fingerprint_assertion": "exact canonical set including both control relations"
