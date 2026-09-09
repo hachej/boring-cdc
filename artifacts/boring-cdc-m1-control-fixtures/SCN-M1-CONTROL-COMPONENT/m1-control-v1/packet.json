@@ -16,7 +16,7 @@
   "bead_id": "boring-cdc-m1-control-fixtures",
   "configuration_fingerprint": "5dd9ffc68d78649321593ddfdab927f1b9153b7a7ef0667315737efad908de69",
   "failure_fingerprint": null,
-  "git_commit": "2189f11511f4588026b77d32d006df7a2490d7bf",
+  "git_commit": "7116687fae9a79a1fd774252b030768647081c30",
   "image_digests": {
     "15": "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
     "16": "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
