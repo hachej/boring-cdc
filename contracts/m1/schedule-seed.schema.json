@@ -1,15 +1,35 @@
 {
   "$id": "https://boring-cdc.dev/contracts/m1/schedule-seed.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Boring CDC deterministic schedule seed",
-  "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "algorithm", "seed", "fair_scheduler_assumed", "restored_resources_assumed"],
   "properties": {
-    "schema_version": {"const": "boring-cdc/schedule-seed/v1"},
-    "algorithm": {"const": "splitmix64-v1"},
-    "seed": {"type": "integer", "minimum": 0},
-    "fair_scheduler_assumed": {"type": "boolean"},
-    "restored_resources_assumed": {"type": "boolean"}
-  }
+    "algorithm": {
+      "const": "splitmix64-v1",
+      "maxLength": 64
+    },
+    "fair_scheduler_assumed": {
+      "type": "boolean"
+    },
+    "restored_resources_assumed": {
+      "type": "boolean"
+    },
+    "schema_version": {
+      "const": "boring-cdc/schedule-seed/v1",
+      "maxLength": 64
+    },
+    "seed": {
+      "maximum": 18446744073709551615,
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "schema_version",
+    "algorithm",
+    "seed",
+    "fair_scheduler_assumed",
+    "restored_resources_assumed"
+  ],
+  "title": "Boring CDC deterministic schedule seed",
+  "type": "object"
 }

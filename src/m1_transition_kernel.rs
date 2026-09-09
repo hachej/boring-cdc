@@ -148,13 +148,11 @@ impl DurableSourceBoundary {
     }
 }
 
-/// Production modules call this only after their owned commit/reconciliation validation.
-/// It is crate-private so external inputs cannot mint production evidence.
-#[allow(
-    dead_code,
-    reason = "called by later crate-internal persistence owners"
-)]
-pub(crate) fn validated_production_commit(
+/// Test-only stand-in for a future production validator owned inside this module.
+/// Production persistence owners must add their checked construction path here rather than
+/// receiving a crate-wide raw-value minting function.
+#[cfg(test)]
+fn validated_production_commit(
     received_lsn: ReceivedLsn,
     journal_cursor: JournalCursor,
 ) -> ValidatedCommit<evidence_kind::Production> {
@@ -282,12 +280,19 @@ pub trait TransitionSystem {
     /// Returns a stable, redacted invariant fingerprint on failure.
     fn invariant_violation(&self, facts: &Self::Facts) -> Option<String>;
 
-    /// Must contain only bounded, non-secret diagnostic state.
+    /// Must contain only non-secret diagnostic state; the harness enforces its byte budget.
     fn redacted_state(&self, facts: &Self::Facts) -> String;
+
+    /// Conservative owned-memory accounting supplied by the domain owner.
+    fn facts_size_bytes(&self, facts: &Self::Facts) -> usize;
+
+    /// Conservative scheduled-payload accounting supplied by the domain owner.
+    fn event_size_bytes(&self, event: &Self::Event) -> usize;
+    fn completion_size_bytes(&self, completion: &Self::Completion) -> usize;
 }
 
 #[derive(Clone, Debug)]
-pub enum ScheduledStep<Event, Completion> {
+pub enum ScheduledAction<Event, Completion> {
     Event(Event),
     Completion(Completion),
     AdvanceClock(u64),
@@ -296,12 +301,47 @@ pub enum ScheduledStep<Event, Completion> {
     CrashRestart,
 }
 
+impl<Event, Completion> ScheduledAction<Event, Completion> {
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::Event(_) => "event",
+            Self::Completion(_) => "completion",
+            Self::AdvanceClock(_) => "advance_clock",
+            Self::Expire => "expiry",
+            Self::Cancel => "cancel",
+            Self::CrashRestart => "crash_restart",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ScheduledStep<Event, Completion> {
+    pub fixture_ref: String,
+    pub action: ScheduledAction<Event, Completion>,
+}
+
+impl<Event, Completion> ScheduledStep<Event, Completion> {
+    #[must_use]
+    pub fn new(fixture_ref: impl Into<String>, action: ScheduledAction<Event, Completion>) -> Self {
+        Self {
+            fixture_ref: fixture_ref.into(),
+            action,
+        }
+    }
+
+    fn kind(&self) -> &'static str {
+        self.action.kind()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct HarnessBudget {
     pub max_steps: usize,
     pub max_trace_entries: usize,
     pub max_minimizer_runs: usize,
     pub max_redacted_bytes: usize,
+    pub max_state_bytes: usize,
+    pub max_scheduled_payload_bytes: usize,
 }
 
 impl HarnessBudget {
@@ -309,12 +349,17 @@ impl HarnessBudget {
     pub const MAX_TRACE_ENTRIES: usize = 4_096;
     pub const MAX_MINIMIZER_RUNS: usize = 4_096;
     pub const MAX_REDACTED_BYTES: usize = 16_384;
+    pub const MAX_STATE_BYTES: usize = 16 * 1024 * 1024;
+    pub const MAX_SCHEDULED_PAYLOAD_BYTES: usize = 16 * 1024 * 1024;
+    pub const MAX_FIXTURE_REF_BYTES: usize = 256;
 
     pub fn validate(self) -> Result<Self, HarnessError> {
         if self.max_steps == 0
             || self.max_trace_entries == 0
             || self.max_minimizer_runs == 0
             || self.max_redacted_bytes == 0
+            || self.max_state_bytes == 0
+            || self.max_scheduled_payload_bytes == 0
         {
             return Err(HarnessError::ZeroBudget);
         }
@@ -322,6 +367,8 @@ impl HarnessBudget {
             || self.max_trace_entries > Self::MAX_TRACE_ENTRIES
             || self.max_minimizer_runs > Self::MAX_MINIMIZER_RUNS
             || self.max_redacted_bytes > Self::MAX_REDACTED_BYTES
+            || self.max_state_bytes > Self::MAX_STATE_BYTES
+            || self.max_scheduled_payload_bytes > Self::MAX_SCHEDULED_PAYLOAD_BYTES
         {
             return Err(HarnessError::BudgetAboveKernelLimit);
         }
@@ -354,6 +401,7 @@ impl ScheduleSeed {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TraceEntry {
     pub step: usize,
+    pub fixture_ref: String,
     pub action: String,
     pub redacted_state: String,
     pub emitted_effects: usize,
@@ -367,6 +415,8 @@ pub struct ExecutionTrace {
     pub seed: ScheduleSeed,
     pub entries: Vec<TraceEntry>,
     pub violation: Option<String>,
+    #[serde(skip)]
+    violation_identity: Option<String>,
 }
 
 impl ExecutionTrace {
@@ -381,6 +431,12 @@ pub enum HarnessError {
     BudgetAboveKernelLimit,
     StepBudgetExceeded { supplied: usize, maximum: usize },
     TraceBudgetExceeded,
+    FixtureReferenceTooLarge,
+    FixtureResolutionFailed,
+    FixtureKindMismatch,
+    ScheduledPayloadBudgetExceeded,
+    StateBudgetExceeded,
+    DiagnosticBudgetExceeded,
     ClockOverflow,
     ViolationNotReproduced,
 }
@@ -396,6 +452,71 @@ impl std::error::Error for HarnessError {}
 pub struct MinimizedTrace<Event, Completion> {
     pub steps: Vec<ScheduledStep<Event, Completion>>,
     pub trace: ExecutionTrace,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct FixtureStep {
+    pub kind: String,
+    pub fixture_ref: String,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct TransitionFixture {
+    pub schema_version: String,
+    pub scenario_id: String,
+    pub synthetic: bool,
+    pub seed: ScheduleSeed,
+    pub budget: HarnessBudget,
+    pub steps: Vec<FixtureStep>,
+    pub expected_violation: Option<String>,
+}
+
+impl TransitionFixture {
+    /// Resolves redacted fixture references through the domain-owned fixture corpus.
+    /// Payloads are intentionally not copied into the shared trace contract.
+    pub fn resolve<Event, Completion, Resolve>(
+        &self,
+        mut resolve: Resolve,
+    ) -> Result<Vec<ScheduledStep<Event, Completion>>, HarnessError>
+    where
+        Resolve: FnMut(&str) -> Option<ScheduledAction<Event, Completion>>,
+    {
+        let mut resolved = Vec::with_capacity(self.steps.len());
+        for step in &self.steps {
+            let action = resolve(&step.fixture_ref).ok_or(HarnessError::FixtureResolutionFailed)?;
+            if action.kind() != step.kind {
+                return Err(HarnessError::FixtureKindMismatch);
+            }
+            resolved.push(ScheduledStep::new(step.fixture_ref.clone(), action));
+        }
+        Ok(resolved)
+    }
+}
+
+impl<Event, Completion> MinimizedTrace<Event, Completion> {
+    #[must_use]
+    pub fn to_fixture(
+        &self,
+        scenario_id: impl Into<String>,
+        budget: HarnessBudget,
+    ) -> TransitionFixture {
+        TransitionFixture {
+            schema_version: "boring-cdc/transition-fixture/v1".into(),
+            scenario_id: scenario_id.into(),
+            synthetic: true,
+            seed: self.trace.seed.clone(),
+            budget,
+            steps: self
+                .steps
+                .iter()
+                .map(|step| FixtureStep {
+                    kind: step.kind().into(),
+                    fixture_ref: step.fixture_ref.clone(),
+                })
+                .collect(),
+            expected_violation: self.trace.violation.clone(),
+        }
+    }
 }
 
 pub struct Harness {
@@ -427,8 +548,32 @@ impl Harness {
                 maximum: self.budget.max_steps,
             });
         }
+        let mut scheduled_bytes = 0usize;
+        for step in steps {
+            if step.fixture_ref.len() > HarnessBudget::MAX_FIXTURE_REF_BYTES {
+                return Err(HarnessError::FixtureReferenceTooLarge);
+            }
+            let payload_bytes = match &step.action {
+                ScheduledAction::Event(event) => domain.event_size_bytes(event),
+                ScheduledAction::Completion(completion) => domain.completion_size_bytes(completion),
+                ScheduledAction::AdvanceClock(_) => std::mem::size_of::<u64>(),
+                ScheduledAction::Expire
+                | ScheduledAction::Cancel
+                | ScheduledAction::CrashRestart => 0,
+            };
+            scheduled_bytes = scheduled_bytes
+                .checked_add(step.fixture_ref.len())
+                .and_then(|value| value.checked_add(payload_bytes))
+                .ok_or(HarnessError::ScheduledPayloadBudgetExceeded)?;
+        }
+        if scheduled_bytes > self.budget.max_scheduled_payload_bytes {
+            return Err(HarnessError::ScheduledPayloadBudgetExceeded);
+        }
 
         let mut facts = initial_facts;
+        if domain.facts_size_bytes(&facts) > self.budget.max_state_bytes {
+            return Err(HarnessError::StateBudgetExceeded);
+        }
         let mut clock = VirtualClock::new(0);
         let mut scheduler_rng = SplitMix64::new(seed.seed);
         let mut domain_rng = SplitMix64::new(seed.seed ^ 0xd0a1_5eed_5eed_d0a1);
@@ -442,49 +587,56 @@ impl Harness {
             }
             let index = (scheduler_rng.next_u64() as usize) % remaining.len();
             let scheduled = remaining.remove(index);
+            let fixture_ref = scheduled.fixture_ref;
             let (action, effects) = {
                 let mut context = TransitionContext {
                     clock: &clock,
                     randomness: &mut domain_rng,
                 };
-                match scheduled {
-                    ScheduledStep::Event(event) => (
+                match scheduled.action {
+                    ScheduledAction::Event(event) => (
                         "event",
                         domain.on_event(&mut facts, event, &mut context).len(),
                     ),
-                    ScheduledStep::Completion(completion) => (
+                    ScheduledAction::Completion(completion) => (
                         "completion",
                         domain
                             .on_completion(&mut facts, completion, &mut context)
                             .len(),
                     ),
-                    ScheduledStep::AdvanceClock(ticks) => {
+                    ScheduledAction::AdvanceClock(ticks) => {
                         clock.advance(ticks)?;
                         ("advance_clock", 0)
                     }
-                    ScheduledStep::Expire => {
+                    ScheduledAction::Expire => {
                         domain.on_expiry(&mut facts, &mut context);
                         ("expiry", 0)
                     }
-                    ScheduledStep::Cancel => {
+                    ScheduledAction::Cancel => {
                         domain.on_cancel(&mut facts, &mut context);
                         ("cancel", 0)
                     }
-                    ScheduledStep::CrashRestart => {
+                    ScheduledAction::CrashRestart => {
                         domain.on_crash_restart(&mut facts, &mut context);
                         ("crash_restart", 0)
                     }
                 }
             };
-            let violation = domain
-                .invariant_violation(&facts)
-                .map(|value| truncate_redacted(value, self.budget.max_redacted_bytes));
-            let redacted_state = truncate_redacted(
-                domain.redacted_state(&facts),
-                self.budget.max_redacted_bytes,
-            );
+            if domain.facts_size_bytes(&facts) > self.budget.max_state_bytes {
+                return Err(HarnessError::StateBudgetExceeded);
+            }
+            let violation = domain.invariant_violation(&facts);
+            let redacted_state = domain.redacted_state(&facts);
+            if redacted_state.len() > self.budget.max_redacted_bytes
+                || violation
+                    .as_ref()
+                    .is_some_and(|value| value.len() > self.budget.max_redacted_bytes)
+            {
+                return Err(HarnessError::DiagnosticBudgetExceeded);
+            }
             entries.push(TraceEntry {
                 step: entries.len(),
+                fixture_ref,
                 action: action.into(),
                 redacted_state,
                 emitted_effects: effects,
@@ -501,7 +653,8 @@ impl Harness {
             synthetic: true,
             seed,
             entries,
-            violation: final_violation,
+            violation: final_violation.clone(),
+            violation_identity: final_violation,
         })
     }
 
@@ -521,7 +674,7 @@ impl Harness {
     {
         let baseline = self.execute(domain, initial_facts(), steps, seed.clone())?;
         let expected = baseline
-            .violation
+            .violation_identity
             .as_ref()
             .ok_or(HarnessError::ViolationNotReproduced)?
             .clone();
@@ -534,7 +687,7 @@ impl Harness {
             candidate.remove(index);
             let trace = self.execute(domain, initial_facts(), &candidate, seed.clone())?;
             runs += 1;
-            if trace.violation.as_deref() == Some(expected.as_str()) {
+            if trace.violation_identity.as_deref() == Some(expected.as_str()) {
                 minimized = candidate;
             } else {
                 index += 1;
@@ -542,7 +695,7 @@ impl Harness {
         }
 
         let trace = self.execute(domain, initial_facts(), &minimized, seed.clone())?;
-        if trace.violation.as_deref() != Some(expected.as_str()) {
+        if trace.violation_identity.as_deref() != Some(expected.as_str()) {
             return Err(HarnessError::ViolationNotReproduced);
         }
         Ok(MinimizedTrace {
@@ -550,18 +703,6 @@ impl Harness {
             trace,
         })
     }
-}
-
-fn truncate_redacted(mut value: String, maximum: usize) -> String {
-    if value.len() <= maximum {
-        return value;
-    }
-    let mut boundary = maximum;
-    while !value.is_char_boundary(boundary) {
-        boundary -= 1;
-    }
-    value.truncate(boundary);
-    value
 }
 
 #[cfg(test)]
@@ -648,6 +789,18 @@ pub(crate) mod tests {
                 facts.total, facts.broken, facts.restarts
             )
         }
+
+        fn facts_size_bytes(&self, _facts: &Facts) -> usize {
+            std::mem::size_of::<Facts>()
+        }
+
+        fn event_size_bytes(&self, _event: &Event) -> usize {
+            std::mem::size_of::<Event>()
+        }
+
+        fn completion_size_bytes(&self, _completion: &Completion) -> usize {
+            std::mem::size_of::<Completion>()
+        }
     }
 
     fn budget() -> HarnessBudget {
@@ -656,18 +809,20 @@ pub(crate) mod tests {
             max_trace_entries: 32,
             max_minimizer_runs: 64,
             max_redacted_bytes: 128,
+            max_state_bytes: 1_024,
+            max_scheduled_payload_bytes: 1_024,
         }
     }
 
     fn scenario() -> Vec<ScheduledStep<Event, Completion>> {
         vec![
-            ScheduledStep::Event(Event::Add(2)),
-            ScheduledStep::Completion(Completion(3)),
-            ScheduledStep::AdvanceClock(5),
-            ScheduledStep::Expire,
-            ScheduledStep::CrashRestart,
-            ScheduledStep::Event(Event::BreakInvariant),
-            ScheduledStep::Cancel,
+            ScheduledStep::new("event-add", ScheduledAction::Event(Event::Add(2))),
+            ScheduledStep::new("completion-add", ScheduledAction::Completion(Completion(3))),
+            ScheduledStep::new("clock-5", ScheduledAction::AdvanceClock(5)),
+            ScheduledStep::new("expiry", ScheduledAction::Expire),
+            ScheduledStep::new("restart", ScheduledAction::CrashRestart),
+            ScheduledStep::new("break", ScheduledAction::Event(Event::BreakInvariant)),
+            ScheduledStep::new("cancel", ScheduledAction::Cancel),
         ]
     }
 
@@ -714,6 +869,66 @@ pub(crate) mod tests {
                 .all(|entry| entry.redacted_state.len() <= 128)
         );
         assert!(minimized.trace.to_json().unwrap().len() < 4096);
+        let fixture = minimized.to_fixture("SCN-M1-INJECTED-VIOLATION", budget());
+        let fixture_json = serde_json::to_string_pretty(&fixture).unwrap();
+        assert!(fixture_json.contains("event-add") || fixture_json.contains("break"));
+        assert!(fixture_json.len() < 4096);
+        let restored: TransitionFixture = serde_json::from_str(&fixture_json).unwrap();
+        let corpus = scenario();
+        let resolved = restored
+            .resolve(|reference| {
+                corpus
+                    .iter()
+                    .find(|step| step.fixture_ref == reference)
+                    .map(|step| step.action.clone())
+            })
+            .unwrap();
+        let replay = harness
+            .execute(
+                &SyntheticDomain,
+                Facts::default(),
+                &resolved,
+                restored.seed.clone(),
+            )
+            .unwrap();
+        assert_eq!(replay.violation, restored.expected_violation);
+    }
+
+    #[test]
+    fn state_payload_and_diagnostic_budgets_fail_closed() {
+        let tiny_payload = Harness::new(HarnessBudget {
+            max_scheduled_payload_bytes: 1,
+            ..budget()
+        })
+        .unwrap();
+        assert_eq!(
+            tiny_payload
+                .execute(
+                    &SyntheticDomain,
+                    Facts::default(),
+                    &scenario(),
+                    ScheduleSeed::splitmix64(1),
+                )
+                .unwrap_err(),
+            HarnessError::ScheduledPayloadBudgetExceeded
+        );
+
+        let tiny_state = Harness::new(HarnessBudget {
+            max_state_bytes: 1,
+            ..budget()
+        })
+        .unwrap();
+        assert_eq!(
+            tiny_state
+                .execute(
+                    &SyntheticDomain,
+                    Facts::default(),
+                    &[],
+                    ScheduleSeed::splitmix64(1),
+                )
+                .unwrap_err(),
+            HarnessError::StateBudgetExceeded
+        );
     }
 
     #[test]
