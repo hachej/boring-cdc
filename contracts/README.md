@@ -2,7 +2,7 @@
 
 These strict JSON contracts are repository tooling, not product-runtime evidence or decision approval.
 
-- `m0/decisions.json` and `m0/artifacts.json` are intentionally empty, schema-valid skeletons. Aggregate `--complete` validation rejects them.
+- `m0/decisions.json` and `m0/artifacts.json` begin as schema-valid skeletons and accrue rows only from each owning decision/artifact Bead. Aggregate `--complete` validation rejects empty or incomplete inventories.
 - `coverage/plan-to-beads.json` is assignment-only and intentionally empty until `boring-cdc-m0.2` populates it.
 - `runbooks/index.json` permits declared ownership before M6; `--release` requires complete procedures.
 - `graph/pinned.schema.json` describes normalized output from `scripts/validate/beads_snapshot.sh`, whose witness is obtained with `br sync --witness --json`.

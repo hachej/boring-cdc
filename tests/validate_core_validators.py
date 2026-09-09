@@ -48,10 +48,16 @@ class Core(unittest.TestCase):
         finally: (valid/"normalized.tmp.json").unlink(missing_ok=True)
 
     def test_empty_skeletons_valid_but_not_complete(self):
-        self.assertEqual(run("decisions",ROOT/"contracts/m0/decisions.json").returncode, 0)
-        self.assertCode(run("decisions",ROOT/"contracts/m0/decisions.json","--complete"), "E_DECISIONS_EMPTY")
-        self.assertEqual(run("artifacts",ROOT/"contracts/m0/artifacts.json").returncode, 0)
-        self.assertCode(run("artifacts",ROOT/"contracts/m0/artifacts.json","--complete"), "E_ARTIFACTS_EMPTY")
+        with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
+            root = Path(td)
+            decisions = root/"decisions.json"
+            artifacts = root/"artifacts.json"
+            decisions.write_text('{"schema_version":"m0-decisions/v1","decisions":[]}')
+            artifacts.write_text('{"schema_version":"m0-artifacts/v1","artifacts":[]}')
+            self.assertEqual(run("decisions",decisions).returncode, 0)
+            self.assertCode(run("decisions",decisions,"--complete"), "E_DECISIONS_EMPTY")
+            self.assertEqual(run("artifacts",artifacts).returncode, 0)
+            self.assertCode(run("artifacts",artifacts,"--complete"), "E_ARTIFACTS_EMPTY")
 
     def test_complete_rejects_missing_inventories_declared_artifacts_and_hash_mismatch(self):
         valid = F/"valid"
