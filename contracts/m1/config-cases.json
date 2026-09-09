@@ -1,44 +1,95 @@
 {
   "boundary_scenarios": [
     {
-      "accepted_vector": "approved status-listener override supersedes TOML",
       "clause": "precedence",
-      "expected_error_code": "CONFIG_UNAPPROVED_ENV_OVERRIDE",
       "id": "SCN-M1-CONFIG-BOUNDARY-PRECEDENCE",
-      "rejected_vector": "unapproved BORING_CDC override",
-      "unit_target": "m1_config::tests::executable_boundary_scenarios_match_loader"
+      "unit_target": "m1_config::tests::executable_boundary_scenarios_match_loader",
+      "vectors": {
+        "accepted": {
+          "expected_status_listen_addr": "127.0.0.1:9999",
+          "mutation": "approved_status_listener_override"
+        },
+        "rejected": {
+          "expected_error_code": "CONFIG_UNAPPROVED_ENV_OVERRIDE",
+          "mutation": "unapproved_boring_cdc_override"
+        }
+      }
     },
     {
-      "accepted_vector": "nonempty approved log-level override",
       "clause": "approved_environment_overrides",
-      "expected_error_code": "CONFIG_EMPTY_OVERRIDE",
       "id": "SCN-M1-CONFIG-BOUNDARY-APPROVED-ENVIRONMENT-OVERRIDES",
-      "rejected_vector": "empty approved log-level override",
-      "unit_target": "m1_config::tests::executable_boundary_scenarios_match_loader"
+      "unit_target": "m1_config::tests::executable_boundary_scenarios_match_loader",
+      "vectors": {
+        "accepted": {
+          "expected_log_level": "debug",
+          "mutation": "nonempty_approved_log_level_override"
+        },
+        "rejected": {
+          "expected_error_code": "CONFIG_EMPTY_OVERRIDE",
+          "mutation": "empty_approved_log_level_override"
+        }
+      }
     },
     {
-      "accepted_vector": "status purpose validates references without resolving secret values",
       "clause": "purpose_scoped_secrets",
-      "expected_error_code": "CONFIG_INVALID_SECRET_REFERENCE",
       "id": "SCN-M1-CONFIG-BOUNDARY-PURPOSE-SCOPED-SECRETS",
-      "rejected_vector": "malformed secret reference",
-      "unit_target": "m1_config::tests::executable_boundary_scenarios_match_loader"
+      "unit_target": "m1_config::tests::executable_boundary_scenarios_match_loader",
+      "vectors": {
+        "accepted": {
+          "expected_secret_status": "[REDACTED:not-loaded]",
+          "mutation": "status_load_without_secret_values"
+        },
+        "rejected": {
+          "expected_error_code": "CONFIG_INVALID_SECRET_REFERENCE",
+          "mutation": "malformed_secret_reference"
+        }
+      }
     },
     {
-      "accepted_vector": "identical canonical inputs produce identical fingerprints",
       "clause": "canonical_fingerprints",
-      "expected_error_code": "CONFIG_CASE_ASSERTION_FAILED",
       "id": "SCN-M1-CONFIG-BOUNDARY-CANONICAL-FINGERPRINTS",
-      "rejected_vector": "semantic log-level change must not retain runtime fingerprint",
-      "unit_target": "m1_config::tests::executable_boundary_scenarios_match_loader"
+      "unit_target": "m1_config::tests::executable_boundary_scenarios_match_loader",
+      "vectors": {
+        "accepted": {
+          "expected_equal": true,
+          "mutation": "identical_canonical_inputs"
+        },
+        "rejected": {
+          "expected_changed": [
+            "runtime"
+          ],
+          "mutation": "semantic_log_level_change"
+        }
+      }
     },
     {
-      "accepted_vector": "Debug and diagnostics omit all secret names and values",
       "clause": "redacted_diagnostics",
-      "expected_error_code": "CONFIG_CASE_ASSERTION_FAILED",
       "id": "SCN-M1-CONFIG-BOUNDARY-REDACTED-DIAGNOSTICS",
-      "rejected_vector": "any secret token in Debug or diagnostics",
-      "unit_target": "m1_config::tests::executable_boundary_scenarios_match_loader"
+      "unit_target": "m1_config::tests::executable_boundary_scenarios_match_loader",
+      "vectors": {
+        "accepted": {
+          "expected_secret_statuses": {
+            "administration": "[REDACTED:not-loaded]",
+            "clickhouse_maintenance": "[REDACTED:not-loaded]",
+            "clickhouse_runtime": "[REDACTED:available]",
+            "control_writer": "[REDACTED:available]",
+            "runtime_capture": "[REDACTED:available]"
+          },
+          "mutation": "render_debug_and_redacted_diagnostics"
+        },
+        "rejected": {
+          "expected_absent": [
+            "PG_RUNTIME",
+            "PG_CONTROL",
+            "PG_ADMIN",
+            "CH_RUNTIME",
+            "CH_MAINT",
+            "postgres://runtime:secret@source/db",
+            "https://runtime:secret@clickhouse"
+          ],
+          "mutation": "scan_diagnostic_surfaces_for_secret_tokens"
+        }
+      }
     }
   ],
   "cases": [

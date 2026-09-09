@@ -2227,6 +2227,7 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                 "stale type metadata for {group}.{field}"
             );
             assert_eq!(case["vectors"]["accepted"]["mutation"], "fixture");
+            assert_eq!(case["vectors"]["accepted"]["expected"], "accepted");
             let accepted = load_str(&fixture(), &env()).unwrap();
             let observed_changed = changed_fingerprint_domains(
                 accepted.fingerprints(),
@@ -2345,12 +2346,32 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
             serde_json::from_str(include_str!("../contracts/m1/config-cases.json")).unwrap();
         let scenarios = inventory["boundary_scenarios"].as_array().unwrap();
         assert_eq!(scenarios.len(), 5);
-        let by_clause: BTreeMap<_, _> = scenarios
+        let by_id: BTreeMap<_, _> = scenarios
             .iter()
-            .map(|scenario| (scenario["clause"].as_str().unwrap(), scenario))
+            .map(|scenario| (scenario["id"].as_str().unwrap(), scenario))
             .collect();
-        assert_eq!(by_clause.len(), scenarios.len());
+        assert_eq!(by_id.len(), scenarios.len());
+        let unit_target = "m1_config::tests::executable_boundary_scenarios_match_loader";
 
+        let precedence = by_id["SCN-M1-CONFIG-BOUNDARY-PRECEDENCE"];
+        assert_eq!(
+            precedence,
+            &serde_json::json!({
+                "id": "SCN-M1-CONFIG-BOUNDARY-PRECEDENCE",
+                "clause": "precedence",
+                "vectors": {
+                    "accepted": {
+                        "mutation": "approved_status_listener_override",
+                        "expected_status_listen_addr": "127.0.0.1:9999"
+                    },
+                    "rejected": {
+                        "mutation": "unapproved_boring_cdc_override",
+                        "expected_error_code": "CONFIG_UNAPPROVED_ENV_OVERRIDE"
+                    }
+                },
+                "unit_target": unit_target
+            })
+        );
         let mut approved = env();
         approved.0.insert(
             "BORING_CDC_STATUS_LISTEN_ADDR".into(),
@@ -2362,7 +2383,7 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                 .public()
                 .observability
                 .status_listen_addr,
-            "127.0.0.1:9999"
+            precedence["vectors"]["accepted"]["expected_status_listen_addr"]
         );
         let mut unapproved = env();
         unapproved
@@ -2370,9 +2391,28 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
             .insert("BORING_CDC_NOT_APPROVED".into(), "x".into());
         assert_eq!(
             load_str(&fixture(), &unapproved).unwrap_err().code,
-            by_clause["precedence"]["expected_error_code"]
+            precedence["vectors"]["rejected"]["expected_error_code"]
         );
 
+        let overrides = by_id["SCN-M1-CONFIG-BOUNDARY-APPROVED-ENVIRONMENT-OVERRIDES"];
+        assert_eq!(
+            overrides,
+            &serde_json::json!({
+                "id": "SCN-M1-CONFIG-BOUNDARY-APPROVED-ENVIRONMENT-OVERRIDES",
+                "clause": "approved_environment_overrides",
+                "vectors": {
+                    "accepted": {
+                        "mutation": "nonempty_approved_log_level_override",
+                        "expected_log_level": "debug"
+                    },
+                    "rejected": {
+                        "mutation": "empty_approved_log_level_override",
+                        "expected_error_code": "CONFIG_EMPTY_OVERRIDE"
+                    }
+                },
+                "unit_target": unit_target
+            })
+        );
         let mut approved_log = env();
         approved_log
             .0
@@ -2383,17 +2423,46 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                 .public()
                 .observability
                 .log_level,
-            "debug"
+            overrides["vectors"]["accepted"]["expected_log_level"]
         );
         approved_log
             .0
             .insert("BORING_CDC_LOG_LEVEL".into(), String::new());
         assert_eq!(
             load_str(&fixture(), &approved_log).unwrap_err().code,
-            by_clause["approved_environment_overrides"]["expected_error_code"]
+            overrides["vectors"]["rejected"]["expected_error_code"]
         );
 
-        load_str_for(&fixture(), &Env::default(), LoadPurpose::Status).unwrap();
+        let purpose = by_id["SCN-M1-CONFIG-BOUNDARY-PURPOSE-SCOPED-SECRETS"];
+        assert_eq!(
+            purpose,
+            &serde_json::json!({
+                "id": "SCN-M1-CONFIG-BOUNDARY-PURPOSE-SCOPED-SECRETS",
+                "clause": "purpose_scoped_secrets",
+                "vectors": {
+                    "accepted": {
+                        "mutation": "status_load_without_secret_values",
+                        "expected_secret_status": "[REDACTED:not-loaded]"
+                    },
+                    "rejected": {
+                        "mutation": "malformed_secret_reference",
+                        "expected_error_code": "CONFIG_INVALID_SECRET_REFERENCE"
+                    }
+                },
+                "unit_target": unit_target
+            })
+        );
+        let status = load_str_for(&fixture(), &Env::default(), LoadPurpose::Status).unwrap();
+        for secret_status in status.redacted_diagnostics()["secrets"]
+            .as_object()
+            .unwrap()
+            .values()
+        {
+            assert_eq!(
+                secret_status,
+                &purpose["vectors"]["accepted"]["expected_secret_status"]
+            );
+        }
         let malformed = fixture().replace(
             "administration_dsn_env = \"PG_ADMIN\"",
             "administration_dsn_env = \"bad-name\"",
@@ -2402,37 +2471,90 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
             load_str_for(&malformed, &Env::default(), LoadPurpose::Status)
                 .unwrap_err()
                 .code,
-            by_clause["purpose_scoped_secrets"]["expected_error_code"]
+            purpose["vectors"]["rejected"]["expected_error_code"]
         );
 
+        let canonical = by_id["SCN-M1-CONFIG-BOUNDARY-CANONICAL-FINGERPRINTS"];
+        assert_eq!(
+            canonical,
+            &serde_json::json!({
+                "id": "SCN-M1-CONFIG-BOUNDARY-CANONICAL-FINGERPRINTS",
+                "clause": "canonical_fingerprints",
+                "vectors": {
+                    "accepted": {
+                        "mutation": "identical_canonical_inputs",
+                        "expected_equal": true
+                    },
+                    "rejected": {
+                        "mutation": "semantic_log_level_change",
+                        "expected_changed": ["runtime"]
+                    }
+                },
+                "unit_target": unit_target
+            })
+        );
         let first = load_str(&fixture(), &env()).unwrap();
         let second = load_str(&fixture(), &env()).unwrap();
-        assert_eq!(first.fingerprints(), second.fingerprints());
+        assert_eq!(
+            first.fingerprints() == second.fingerprints(),
+            canonical["vectors"]["accepted"]["expected_equal"]
+        );
         let changed = load_str(
             &fixture().replace("log_level = \"info\"", "log_level = \"debug\""),
             &env(),
         )
         .unwrap();
-        assert_ne!(first.fingerprints().runtime, changed.fingerprints().runtime);
-        assert_eq!(first.fingerprints().source, changed.fingerprints().source);
+        assert_eq!(
+            serde_json::json!(changed_fingerprint_domains(
+                first.fingerprints(),
+                changed.fingerprints()
+            )),
+            canonical["vectors"]["rejected"]["expected_changed"]
+        );
 
-        let debug = format!("{first:?}");
-        for token in [
-            "PG_RUNTIME",
-            "PG_CONTROL",
-            "PG_ADMIN",
-            "CH_RUNTIME",
-            "CH_MAINT",
-            "postgres://runtime:secret@source/db",
-            "https://runtime:secret@clickhouse",
-        ] {
-            assert!(!debug.contains(token), "diagnostic leaked {token}");
-        }
-        for scenario in scenarios {
-            assert_eq!(
-                scenario["unit_target"],
-                "m1_config::tests::executable_boundary_scenarios_match_loader"
-            );
+        let redaction = by_id["SCN-M1-CONFIG-BOUNDARY-REDACTED-DIAGNOSTICS"];
+        assert_eq!(
+            redaction,
+            &serde_json::json!({
+                "id": "SCN-M1-CONFIG-BOUNDARY-REDACTED-DIAGNOSTICS",
+                "clause": "redacted_diagnostics",
+                "vectors": {
+                    "accepted": {
+                        "mutation": "render_debug_and_redacted_diagnostics",
+                        "expected_secret_statuses": {
+                            "runtime_capture": "[REDACTED:available]",
+                            "control_writer": "[REDACTED:available]",
+                            "administration": "[REDACTED:not-loaded]",
+                            "clickhouse_runtime": "[REDACTED:available]",
+                            "clickhouse_maintenance": "[REDACTED:not-loaded]"
+                        }
+                    },
+                    "rejected": {
+                        "mutation": "scan_diagnostic_surfaces_for_secret_tokens",
+                        "expected_absent": [
+                            "PG_RUNTIME", "PG_CONTROL", "PG_ADMIN", "CH_RUNTIME", "CH_MAINT",
+                            "postgres://runtime:secret@source/db",
+                            "https://runtime:secret@clickhouse"
+                        ]
+                    }
+                },
+                "unit_target": unit_target
+            })
+        );
+        let diagnostics = first.redacted_diagnostics();
+        assert_eq!(
+            diagnostics["secrets"],
+            redaction["vectors"]["accepted"]["expected_secret_statuses"]
+        );
+        let surfaces = [format!("{first:?}"), diagnostics.to_string()];
+        for token in redaction["vectors"]["rejected"]["expected_absent"]
+            .as_array()
+            .unwrap()
+        {
+            let token = token.as_str().unwrap();
+            for surface in &surfaces {
+                assert!(!surface.contains(token), "diagnostic leaked {token}");
+            }
         }
     }
 }
