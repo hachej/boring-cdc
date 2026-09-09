@@ -49,7 +49,7 @@
     },
     "expected_violation": {
       "maxLength": 16384,
-      "pattern": "^[\\u0020-\\u007e]+$",
+      "pattern": "^(?![\\s\\S]*[^\\u0020-\\u007e])[\\s\\S]+$",
       "type": [
         "string",
         "null"
@@ -73,7 +73,7 @@
           "fixture_ref": {
             "maxLength": 256,
             "minLength": 1,
-            "pattern": "^[\\u0020-\\u007e]+$",
+            "pattern": "^(?![\\s\\S]*[^\\u0020-\\u007e])[\\s\\S]+$",
             "type": "string"
           },
           "kind": {

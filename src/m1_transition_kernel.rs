@@ -1017,6 +1017,12 @@ pub(crate) mod tests {
         .unwrap();
         assert_eq!(unicode.validate(), Err(HarnessError::InvalidFixture));
 
+        let control: TransitionFixture = serde_json::from_str(include_str!(
+            "../tests/fixtures/m1-transition/invalid/control-reference.json"
+        ))
+        .unwrap();
+        assert_eq!(control.validate(), Err(HarnessError::InvalidFixture));
+
         let mut expected_boundary = fixture;
         expected_boundary.expected_violation = Some("v".repeat(HarnessBudget::MAX_REDACTED_BYTES));
         expected_boundary.validate().unwrap();
