@@ -74,9 +74,9 @@ if cp.returncode: raise SystemExit('E_CONTEXT_HANDOFF:'+cp.stdout+cp.stderr)
 # owns only the cross-document join to the generated context operation.
 cp=subprocess.run([str(root/'scripts/e2e/m0_validation_tooling.sh'),'--check-handoff',str(tmp/'pack.1'),str(tmp/'handoff.json')],text=True,capture_output=True)
 if cp.returncode:raise SystemExit('E_CONTEXT_HANDOFF_COMPATIBILITY:'+cp.stdout+cp.stderr)
-result=json.loads(cp.stdout)
-import jsonschema
-jsonschema.validate(result,json.loads((root/'contracts/common/validation-result.schema.json').read_text()))
+result=json.loads(cp.stdout); result_path=tmp/'handoff-result.json'; result_path.write_text(canon(result)+'\n')
+schema_cp=subprocess.run([sys.executable,str(root/'scripts/lib/core_validator.py'),'schema',str(result_path),'--schema',str(root/'contracts/common/validation-result.schema.json')],text=True,capture_output=True)
+if schema_cp.returncode:raise SystemExit('E_CONTEXT_HANDOFF_RESULT_SCHEMA:'+schema_cp.stdout+schema_cp.stderr)
 if result.get('status')!='pass':raise SystemExit('E_CONTEXT_HANDOFF_COMPATIBILITY:'+cp.stdout+cp.stderr)
 
 # Exercise actual br readiness over an isolated imported graph. Parent-child

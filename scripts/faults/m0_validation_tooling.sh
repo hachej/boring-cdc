@@ -47,9 +47,9 @@ for code,pointer,field,value in (
  if cp.returncode or cp.stderr:raise SystemExit('E_HANDOFF_SHAPE_UNEXPECTED:'+cp.stdout+cp.stderr)
  cp=subprocess.run([str(root/'scripts/e2e/m0_validation_tooling.sh'),'--check-handoff',str(pack_path),str(p)],text=True,capture_output=True)
  if cp.returncode==0 or cp.stderr:raise SystemExit('E_HANDOFF_COMPATIBILITY_NOT_REJECTED:'+code)
- result=json.loads(cp.stdout)
- import jsonschema
- jsonschema.validate(result,json.loads((root/'contracts/common/validation-result.schema.json').read_text()))
+ result=json.loads(cp.stdout); result_path=tmp/'handoff-result.json'; result_path.write_text(canon(result)+'\n')
+ schema_cp=subprocess.run([sys.executable,str(root/'scripts/lib/core_validator.py'),'schema',str(result_path),'--schema',str(root/'contracts/common/validation-result.schema.json')],text=True,capture_output=True)
+ if schema_cp.returncode:raise SystemExit('E_HANDOFF_RESULT_SCHEMA:'+schema_cp.stdout+schema_cp.stderr)
  hits=[f for f in result['findings'] if f=={'code':code,'pointer':pointer,'owner_bead':'boring-cdc-m0-validation-tooling','message':'handoff provenance does not match generated context operation'}]
  if len(hits)!=1 or result.get('status')!='fail' or result.get('owner_bead')!='boring-cdc-m0-validation-tooling':raise SystemExit('E_HANDOFF_COMPATIBILITY_DIAGNOSTIC:'+code)
 
