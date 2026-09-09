@@ -510,6 +510,18 @@ impl fmt::Display for ConfigError {
 }
 impl std::error::Error for ConfigError {}
 
+impl ConfigError {
+    /// Stable status projection used by every configuration rejection.
+    pub const fn status_code(&self) -> &'static str {
+        "configuration_rejected"
+    }
+
+    /// Stable redacted structured-log event used by every configuration rejection.
+    pub const fn log_code(&self) -> &'static str {
+        "CONFIG_REDACTED_VALIDATION"
+    }
+}
+
 /// Parse, apply the closed override list, resolve secrets and validate without I/O beyond env reads.
 pub fn load_str(input: &str, env: &dyn Environment) -> Result<LoadedConfig, ConfigError> {
     load_str_for(input, env, LoadPurpose::Run)
@@ -1732,21 +1744,7 @@ archive_segment_bytes = 0
             ),
         ];
         for (from, to, code) in cases {
-            let candidate = if from.starts_with("origin_policy") || from.starts_with("socket_mode")
-            {
-                let mut text = fixture();
-                if from.starts_with("origin_policy") {
-                    text = text.replace(
-                        "advisory_lock_derivation =",
-                        "origin_policy = \"none\"\nadvisory_lock_derivation =",
-                    );
-                } else {
-                    text.push_str("\n[operator]\nsocket_mode = 420\n");
-                }
-                text
-            } else {
-                fixture().replace(from, to)
-            };
+            let candidate = fixture().replace(from, to);
             assert_eq!(
                 load_str(&candidate, &env()).unwrap_err().code,
                 code,
@@ -1971,8 +1969,8 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
 "#,
         ] {
             let candidate = fixture().replace(
-                "advisory_lock_derivation =",
-                &format!("{options}advisory_lock_derivation ="),
+                "start_replication_options = [\"proto_version=1\", \"streaming=false\", \"two_phase=false\", \"binary=false\"]\n",
+                options,
             );
             assert_eq!(
                 load_str(&candidate, &env()).unwrap_err().code,
@@ -1989,7 +1987,10 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
             "run/operator",
             "../run/operator.sock",
         ] {
-            let candidate = format!("{}\n[operator]\nsocket_path = {:?}\n", fixture(), path);
+            let candidate = fixture().replace(
+                "socket_path = \"run/boring-cdc/operator.sock\"",
+                &format!("socket_path = {path:?}"),
+            );
             let code = load_str(&candidate, &env()).unwrap_err().code;
             assert!(matches!(
                 code,
@@ -1998,69 +1999,230 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
         }
     }
 
+    fn inventory_value_mutation(group: &str, field: &str, mutation: &str) -> String {
+        let mut document: toml::Value = toml::from_str(&fixture()).unwrap();
+        let target = if group == "boundary" {
+            document.get_mut(field).unwrap()
+        } else {
+            let group_value = document.get_mut(group).unwrap();
+            let table = match group_value {
+                toml::Value::Array(values) => values[0].as_table_mut().unwrap(),
+                toml::Value::Table(table) => table,
+                _ => panic!("{group} is not a configuration group"),
+            };
+            table.get_mut(field).unwrap()
+        };
+        match mutation {
+            "wrong_type" => {
+                *target = match target {
+                    toml::Value::String(_) => toml::Value::Integer(1),
+                    toml::Value::Integer(_) => toml::Value::String("wrong-type".into()),
+                    toml::Value::Boolean(_) => toml::Value::String("wrong-type".into()),
+                    toml::Value::Array(_) | toml::Value::Table(_) => {
+                        toml::Value::String("wrong-type".into())
+                    }
+                    value => panic!("unsupported inventory value type: {value:?}"),
+                }
+            }
+            "empty_string" => *target = toml::Value::String(String::new()),
+            "unsupported_schema" => *target = toml::Value::Integer(2),
+            value => panic!("unknown inventory mutation {value}"),
+        }
+        toml::to_string(&document).unwrap()
+    }
+
+    fn inventory_type(value: &toml::Value) -> &'static str {
+        match value {
+            toml::Value::String(_) => "string",
+            toml::Value::Integer(_) => "integer",
+            toml::Value::Boolean(_) => "boolean",
+            toml::Value::Array(_) => "array",
+            toml::Value::Table(_) => "table",
+            value => panic!("unsupported inventory type: {value:?}"),
+        }
+    }
+
+    fn fixture_value<'a>(document: &'a toml::Value, group: &str, field: &str) -> &'a toml::Value {
+        if group == "boundary" {
+            return document.get(field).unwrap();
+        }
+        let group_value = document.get(group).unwrap();
+        let table = match group_value {
+            toml::Value::Array(values) => values[0].as_table().unwrap(),
+            toml::Value::Table(table) => table,
+            _ => panic!("{group} is not a configuration group"),
+        };
+        table.get(field).unwrap()
+    }
+
     #[test]
-    fn exhaustive_case_inventory_covers_every_configuration_group() {
+    fn executable_case_inventory_matches_loader() {
         let inventory: serde_json::Value =
             serde_json::from_str(include_str!("../contracts/m1/config-cases.json")).unwrap();
-        assert_eq!(inventory["schema_version"], "m1-config-cases/v1");
+        assert_eq!(inventory["schema_version"], "m1-config-cases/v2");
         assert_eq!(inventory["owner_bead"], "boring-cdc-m1-config");
         let cases = inventory["cases"].as_array().unwrap();
+        assert_eq!(cases.len(), 127);
+        let document: toml::Value = toml::from_str(&fixture()).unwrap();
+        let mut ids = BTreeSet::new();
+        let mut owners = BTreeSet::new();
+
+        for case in cases {
+            let id = case["id"].as_str().unwrap();
+            let group = case["group"].as_str().unwrap();
+            let field = case["field"].as_str().unwrap();
+            assert!(ids.insert(id), "duplicate case ID {id}");
+            assert!(
+                owners.insert(format!("{group}.{field}")),
+                "duplicate field owner"
+            );
+            assert_eq!(
+                case["expected_type"],
+                inventory_type(fixture_value(&document, group, field)),
+                "stale type metadata for {group}.{field}"
+            );
+            assert!(!case["constraint"].as_str().unwrap().is_empty());
+            assert!(
+                !case["fingerprint_impact"].as_array().unwrap().is_empty()
+                    || field.ends_with("_dsn_env")
+            );
+            assert_eq!(case["vectors"]["accepted"]["mutation"], "fixture");
+            load_str(&fixture(), &env()).unwrap();
+
+            let mutation = case["vectors"]["rejected"]["mutation"].as_str().unwrap();
+            let expected = case["vectors"]["rejected"]["expected_error_code"]
+                .as_str()
+                .unwrap();
+            let error =
+                load_str(&inventory_value_mutation(group, field, mutation), &env()).expect_err(id);
+            assert_eq!(error.code, expected, "stale error metadata for {id}");
+            assert_eq!(case["error_codes"], serde_json::json!([error.code]));
+            assert_eq!(case["status_code"], error.status_code());
+            assert_eq!(case["log_code"], error.log_code());
+            assert_eq!(
+                case["unit_target"],
+                "m1_config::tests::executable_case_inventory_matches_loader"
+            );
+        }
+
         let groups: BTreeSet<_> = cases
             .iter()
             .map(|case| case["group"].as_str().unwrap())
             .collect();
-        let expected = BTreeSet::from([
-            "source",
-            "tables",
-            "storage",
-            "limits",
-            "budgets",
-            "retention",
-            "wal",
-            "backfill",
-            "clickhouse",
-            "archive",
-            "conditions",
-            "observability",
-            "operator",
-            "boundary",
-        ]);
-        assert_eq!(groups, expected);
-        let ids: BTreeSet<_> = cases
+        assert_eq!(
+            groups,
+            BTreeSet::from([
+                "source",
+                "tables",
+                "storage",
+                "limits",
+                "budgets",
+                "retention",
+                "wal",
+                "backfill",
+                "clickhouse",
+                "archive",
+                "conditions",
+                "observability",
+                "operator",
+                "boundary",
+            ])
+        );
+    }
+
+    #[test]
+    fn executable_boundary_scenarios_match_loader() {
+        let inventory: serde_json::Value =
+            serde_json::from_str(include_str!("../contracts/m1/config-cases.json")).unwrap();
+        let scenarios = inventory["boundary_scenarios"].as_array().unwrap();
+        assert_eq!(scenarios.len(), 5);
+        let by_clause: BTreeMap<_, _> = scenarios
             .iter()
-            .map(|case| case["id"].as_str().unwrap())
+            .map(|scenario| (scenario["clause"].as_str().unwrap(), scenario))
             .collect();
-        assert_eq!(ids.len(), cases.len());
-        assert_eq!(cases.len(), 132);
-        let field_owners: BTreeSet<_> = cases
-            .iter()
-            .map(|case| {
-                format!(
-                    "{}.{}",
-                    case["group"].as_str().unwrap(),
-                    case["field"].as_str().unwrap()
-                )
-            })
-            .collect();
-        assert_eq!(field_owners.len(), cases.len());
-        for case in cases {
-            assert!(case["id"].as_str().unwrap().starts_with("SCN-M1-CONFIG-"));
-            for field in [
-                "accepted_examples",
-                "rejected_examples",
-                "fingerprint_impact",
-                "error_codes",
-            ] {
-                assert!(!case[field].as_array().unwrap().is_empty(), "{field}");
-            }
-            assert!(!case["expected_type"].as_str().unwrap().is_empty());
-            assert!(!case["constraint"].as_str().unwrap().is_empty());
-            assert_eq!(case["unit_target"], "m1_config::tests");
-            assert_eq!(case["status_code"], "configuration_rejected");
-            assert_eq!(case["log_code"], "CONFIG_REDACTED_VALIDATION");
+        assert_eq!(by_clause.len(), scenarios.len());
+
+        let mut approved = env();
+        approved.0.insert(
+            "BORING_CDC_STATUS_LISTEN_ADDR".into(),
+            "127.0.0.1:9999".into(),
+        );
+        assert_eq!(
+            load_str(&fixture(), &approved)
+                .unwrap()
+                .public()
+                .observability
+                .status_listen_addr,
+            "127.0.0.1:9999"
+        );
+        let mut unapproved = env();
+        unapproved
+            .0
+            .insert("BORING_CDC_NOT_APPROVED".into(), "x".into());
+        assert_eq!(
+            load_str(&fixture(), &unapproved).unwrap_err().code,
+            by_clause["precedence"]["expected_error_code"]
+        );
+
+        let mut approved_log = env();
+        approved_log
+            .0
+            .insert("BORING_CDC_LOG_LEVEL".into(), "debug".into());
+        assert_eq!(
+            load_str(&fixture(), &approved_log)
+                .unwrap()
+                .public()
+                .observability
+                .log_level,
+            "debug"
+        );
+        approved_log
+            .0
+            .insert("BORING_CDC_LOG_LEVEL".into(), String::new());
+        assert_eq!(
+            load_str(&fixture(), &approved_log).unwrap_err().code,
+            by_clause["approved_environment_overrides"]["expected_error_code"]
+        );
+
+        load_str_for(&fixture(), &Env::default(), LoadPurpose::Status).unwrap();
+        let malformed = fixture().replace(
+            "administration_dsn_env = \"PG_ADMIN\"",
+            "administration_dsn_env = \"bad-name\"",
+        );
+        assert_eq!(
+            load_str_for(&malformed, &Env::default(), LoadPurpose::Status)
+                .unwrap_err()
+                .code,
+            by_clause["purpose_scoped_secrets"]["expected_error_code"]
+        );
+
+        let first = load_str(&fixture(), &env()).unwrap();
+        let second = load_str(&fixture(), &env()).unwrap();
+        assert_eq!(first.fingerprints(), second.fingerprints());
+        let changed = load_str(
+            &fixture().replace("log_level = \"info\"", "log_level = \"debug\""),
+            &env(),
+        )
+        .unwrap();
+        assert_ne!(first.fingerprints().runtime, changed.fingerprints().runtime);
+        assert_eq!(first.fingerprints().source, changed.fingerprints().source);
+
+        let debug = format!("{first:?}");
+        for token in [
+            "PG_RUNTIME",
+            "PG_CONTROL",
+            "PG_ADMIN",
+            "CH_RUNTIME",
+            "CH_MAINT",
+            "postgres://runtime:secret@source/db",
+            "https://runtime:secret@clickhouse",
+        ] {
+            assert!(!debug.contains(token), "diagnostic leaked {token}");
+        }
+        for scenario in scenarios {
             assert_eq!(
-                case["executable_scenario"],
-                "cargo test --locked m1_config::tests"
+                scenario["unit_target"],
+                "m1_config::tests::executable_boundary_scenarios_match_loader"
             );
         }
     }

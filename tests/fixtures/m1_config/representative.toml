@@ -7,6 +7,8 @@ administration_dsn_env = "PG_ADMIN"
 publication = "boring_publication"
 slot = "boring_slot"
 copy_both_transport = "postgres-replication-copyboth-v1"
+start_replication_options = ["proto_version=1", "streaming=false", "two_phase=false", "binary=false"]
+origin_policy = "any"
 advisory_lock_derivation = "sha256-system-database-publication-slot-v1"
 lock_probe_interval_ms = 1000
 ownership_deadline_ms = 5000
@@ -131,3 +133,21 @@ critical = 90
 hard = 100
 freshness_ms = 30000
 hysteresis_ms = 5000
+
+[observability]
+log_level = "info"
+status_listen_addr = "127.0.0.1:8787"
+prometheus_listen_addr = "127.0.0.1:8788"
+authentication = false
+tls = false
+
+[operator]
+socket_path = "run/boring-cdc/operator.sock"
+directory_mode = 448
+socket_mode = 384
+peer_credentials = true
+max_request_bytes = 65536
+max_response_bytes = 65536
+timeout_ms = 5000
+result_retention_ms = 86400000
+confirmation_expiry_ms = 300000
