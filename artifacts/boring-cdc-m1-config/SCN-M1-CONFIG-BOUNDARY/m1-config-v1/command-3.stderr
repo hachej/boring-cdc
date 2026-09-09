@@ -1,4 +1,2 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s
-     Running unittests src/lib.rs (target/debug/deps/boring_cdc-b604efced9ff1882)
-     Running unittests src/main.rs (target/debug/deps/boring_cdc-a5120d6777913092)
-     Running tests/compile_fail.rs (target/debug/deps/compile_fail-643486a7c948e1a6)
+    Checking boring-cdc v0.1.0 (/home/ubuntu/projects/boring-cdc/.worktrees/epic-boring-cdc-m1)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.87s

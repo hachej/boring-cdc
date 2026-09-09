@@ -1,21 +1,23 @@
 {
   "assertions": [
-    "one deny-unknown-fields TOML loader is shared by check/status/run purposes",
+    "one deny-unknown-fields TOML loader is shared by check/status/run and scoped maintenance purposes",
     "defaults < TOML < closed approved environment overrides",
-    "secrets are purpose-scoped and absent from serialization, diagnostics and fingerprints",
+    "secrets are operation-scoped and absent from serialization, diagnostics and fingerprints",
     "canonical domain fingerprints are deterministic and change only for applicable semantic fields",
-    "all embedded configuration groups have stable accepted/rejected case inventory and targeted tests",
-    "malformed, truncated, overflow, unsafe path, TLS/listener and durability combinations fail closed"
+    "all embedded configuration groups enumerate every field with stable accepted/rejected case metadata and targeted execution",
+    "malformed, truncated, overflow, zero, unsafe path/socket, protocol-option, TLS/listener and durability combinations fail closed"
   ],
   "contract_digests": {
-    "contracts/m1/config-cases.json": "69f456e37bad48d4aa8444f0bccd1d4315165492c07278961491270abda83299"
+    "contracts/m1/config-cases.json": "29d48011f43b42d5573b21e3d209854c979c9ae37e2eff3327b472660b7aff86"
   },
-  "git_commit": "855a578c181bcaf58438652c18b7f5c210ca92ad",
+  "git_commit": "b363cea5816679cdb5d695474fe1d843672fbd29",
   "outcome": "pass",
   "owner_bead": "boring-cdc-m1-config",
   "provisional_constants": [
-    "boring-cdc-d-security: loopback listener defaults and 0700/0600 operator endpoint",
-    "boring-cdc-d-pg-protocol: origin any and non-streamed pgoutput options"
+    "boring-cdc-d-security: loopback 127.0.0.1:8787/8788; 0700/0600 operator endpoint; 65536-byte request/response; 5s timeout; 24h result retention; 5m confirmation expiry",
+    "boring-cdc-d-pg-protocol: postgres-replication-copyboth-v1; origin any; proto_version=1; streaming/two_phase/binary=false",
+    "boring-cdc-d-ch-accept: server 25.8.2.29; client 0.2.0; clickhouse-v1; greatest-valid-fence; end-and-wait",
+    "boring-cdc-d-archive-durability: parquet 57.0.0; zstd:3; ext4/XFS; opaque/no-follow policy"
   ],
   "scenario_id": "SCN-M1-CONFIG-BOUNDARY",
   "schema_version": "boring-cdc/m1-config-proof/v1"

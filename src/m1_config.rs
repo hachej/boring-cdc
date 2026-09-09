@@ -312,7 +312,8 @@ pub enum LoadPurpose {
     Check,
     Status,
     Run,
-    Maintenance,
+    PostgresAdmin,
+    ClickHouseMaintenance,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -534,12 +535,9 @@ pub fn load_str_for(
     apply_overrides(&mut raw, env)?;
     validate(&mut raw)?;
     let secrets = Secrets {
-        runtime: matches!(
-            purpose,
-            LoadPurpose::Check | LoadPurpose::Run | LoadPurpose::Maintenance
-        )
-        .then(|| resolve_secret(env, &raw.source.runtime_dsn_env, "source.runtime_dsn_env"))
-        .transpose()?,
+        runtime: matches!(purpose, LoadPurpose::Check | LoadPurpose::Run)
+            .then(|| resolve_secret(env, &raw.source.runtime_dsn_env, "source.runtime_dsn_env"))
+            .transpose()?,
         control_writer: matches!(purpose, LoadPurpose::Check | LoadPurpose::Run)
             .then(|| {
                 resolve_secret(
@@ -549,7 +547,7 @@ pub fn load_str_for(
                 )
             })
             .transpose()?,
-        administration: matches!(purpose, LoadPurpose::Maintenance)
+        administration: matches!(purpose, LoadPurpose::PostgresAdmin)
             .then(|| {
                 resolve_secret(
                     env,
@@ -567,7 +565,7 @@ pub fn load_str_for(
                 )
             })
             .transpose()?,
-        clickhouse_maintenance: matches!(purpose, LoadPurpose::Maintenance)
+        clickhouse_maintenance: matches!(purpose, LoadPurpose::ClickHouseMaintenance)
             .then(|| {
                 resolve_secret(
                     env,
@@ -662,6 +660,7 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     if raw.tables.is_empty() {
         return err("CONFIG_EMPTY_TABLE_SET", "tables");
     }
+    raw.source.start_replication_options.sort();
     raw.tables.sort_by(|a, b| a.logical_id.cmp(&b.logical_id));
     unique(
         raw.tables.iter().map(|t| t.logical_id.as_str()),
@@ -669,18 +668,29 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     )?;
     for table in &raw.tables {
         if table.logical_id.is_empty()
+            || table.source_relation.is_empty()
             || table.replica_key.is_empty()
             || table.replica_key.iter().any(|k| k.is_empty())
+            || table.relation_contract.is_empty()
+            || table.key_type_policy != "canonical-v1"
         {
             return err("CONFIG_INVALID_TABLE_IDENTITY", "tables");
         }
     }
     if raw.source.publication.is_empty()
         || raw.source.slot.is_empty()
-        || raw.source.copy_both_transport.is_empty()
-        || raw.source.advisory_lock_derivation.is_empty()
+        || raw.source.copy_both_transport != "postgres-replication-copyboth-v1"
+        || raw.source.advisory_lock_derivation != "sha256-system-database-publication-slot-v1"
     {
         return err("CONFIG_EMPTY_SOURCE_IDENTITY", "source");
+    }
+    if raw.source.lock_probe_interval_ms.0 == 0
+        || raw.source.ownership_deadline_ms.0 == 0
+        || raw.source.maximum_operation_ms.0 == 0
+        || raw.source.stale_owner_takeover_ms.0 == 0
+        || raw.source.heartbeat_cadence_ms.0 == 0
+    {
+        return err("CONFIG_ZERO_BOUND", "source");
     }
     raw.budgets.sort_by(|a, b| a.name.cmp(&b.name));
     unique(raw.budgets.iter().map(|b| b.name.as_str()), "budgets.name")?;
@@ -716,13 +726,56 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     {
         return err("CONFIG_INCOMPATIBLE_LIMITS", "limits");
     }
+    if raw.conditions.freshness_ms.0 == 0 || raw.conditions.hysteresis_ms.0 == 0 {
+        return err("CONFIG_ZERO_BOUND", "conditions");
+    }
+    if raw.operator.max_request_bytes.0 == 0
+        || raw.operator.max_response_bytes.0 == 0
+        || raw.operator.timeout_ms.0 == 0
+        || raw.operator.result_retention_ms.0 == 0
+        || raw.operator.confirmation_expiry_ms.0 == 0
+    {
+        return err("CONFIG_ZERO_BOUND", "operator");
+    }
+    if !matches!(
+        raw.observability.log_level.as_str(),
+        "error" | "warn" | "info" | "debug"
+    ) {
+        return err("CONFIG_UNSUPPORTED_LOG_LEVEL", "observability.log_level");
+    }
     if !(raw.conditions.warning < raw.conditions.action
         && raw.conditions.action < raw.conditions.critical
         && raw.conditions.critical < raw.conditions.hard)
     {
         return err("CONFIG_INVALID_THRESHOLDS", "conditions");
     }
+    if raw.retention.replay_window_ms.0 == 0
+        || raw.retention.usable_anchor_count == 0
+        || raw.retention.invalid_generation_ms.0 == 0
+        || raw.retention.metadata_gc_ms.0 == 0
+    {
+        return err("CONFIG_ZERO_BOUND", "retention");
+    }
+    if raw.wal.max_slot_wal_keep_bytes.0 == 0
+        || raw.wal.source_free_bytes.0 == 0
+        || raw.wal.production_bytes_per_second.0 == 0
+        || raw.wal.monitor_delay_ms.0 == 0
+        || raw.wal.reaction_reserve_bytes.0 == 0
+        || raw.wal.missing_metric_policy != "block_new_bootstrap"
+    {
+        return err("CONFIG_UNSUPPORTED_WAL_POLICY", "wal");
+    }
     if raw.backfill.concurrency == 0
+        || raw.backfill.chunk_rows == 0
+        || raw.backfill.chunk_bytes.0 == 0
+        || raw.backfill.chunk_duration_ms.0 == 0
+        || raw.backfill.exporter_lifetime_ms.0 == 0
+        || raw.backfill.importer_lifetime_ms.0 == 0
+        || raw.backfill.guard_lifetime_ms.0 == 0
+        || raw.backfill.guard_keepalive_ms.0 == 0
+        || raw.backfill.session_timeout_ms.0 == 0
+        || raw.backfill.ddl_waiter_bound_ms.0 == 0
+        || raw.backfill.source_impact_bytes.0 == 0
         || raw.backfill.guard_keepalive_ms.0 >= raw.backfill.session_timeout_ms.0
     {
         return err("CONFIG_INVALID_BACKFILL_BOUNDS", "backfill");
@@ -733,12 +786,19 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     {
         return err("CONFIG_INVALID_OWNERSHIP_BOUNDS", "source");
     }
+    let expected_replication_options = [
+        "binary=false",
+        "proto_version=1",
+        "streaming=false",
+        "two_phase=false",
+    ];
     if raw.source.origin_policy != "any"
-        || !raw
+        || raw
             .source
             .start_replication_options
             .iter()
-            .any(|v| v == "streaming=false")
+            .map(String::as_str)
+            .ne(expected_replication_options)
     {
         return err("CONFIG_UNSUPPORTED_REPLICATION_OPTIONS", "source");
     }
@@ -750,6 +810,13 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
         &raw.operator.socket_path,
     ] {
         safe_path(path, "path")?;
+    }
+    safe_operator_path(&raw.operator.socket_path)?;
+    if !matches!(raw.storage.filesystem.as_str(), "ext4" | "xfs")
+        || raw.storage.checkpoint_pages == 0
+        || raw.storage.vacuum_pages == 0
+    {
+        return err("CONFIG_UNSUPPORTED_STORAGE_POLICY", "storage");
     }
     if raw.storage.journal_mode != "WAL"
         || raw.storage.synchronous != "FULL"
@@ -773,6 +840,25 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
         &raw.observability.prometheus_listen_addr,
         &raw.observability,
     )?;
+    // M0-PROVISIONAL: boring-cdc-d-ch-accept recommended concrete pins pending approval.
+    if raw.clickhouse.server_version != "25.8.2.29"
+        || raw.clickhouse.client_version != "0.2.0"
+        || raw.clickhouse.contract_id != "clickhouse-v1"
+        || raw.clickhouse.selector_policy != "greatest-valid-fence"
+        || raw.clickhouse.rust_insert_finalization != "end-and-wait"
+        || raw.clickhouse.history_object.is_empty()
+        || raw.clickhouse.selector_object.is_empty()
+        || raw.clickhouse.history_quota_bytes.0 == 0
+        || raw.clickhouse.destination_generation == 0
+        || raw.clickhouse.retirement_grace_ms.0 == 0
+        || raw.clickhouse.audit_bytes.0 == 0
+        || raw.clickhouse.audit_events == 0
+        || raw.clickhouse.audit_time_ms.0 == 0
+        || raw.clickhouse.audit_cadence_ms.0 == 0
+        || raw.clickhouse.audit_freshness_ms.0 == 0
+    {
+        return err("CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY", "clickhouse");
+    }
     if !raw.clickhouse.endpoint.starts_with("https://")
         || raw.clickhouse.endpoint.contains('@')
         || raw.clickhouse.endpoint.contains('?')
@@ -781,6 +867,24 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     }
     if !raw.clickhouse.synchronous_insert || !raw.clickhouse.fsync_after_insert {
         return err("CONFIG_UNSAFE_CLICKHOUSE_DURABILITY", "clickhouse");
+    }
+    // M0-PROVISIONAL: boring-cdc-d-archive-durability recommended concrete writer pins.
+    if !matches!(raw.archive.filesystem.as_str(), "ext4" | "xfs")
+        || raw.archive.budget_bytes.0 == 0
+        || raw.archive.schedule_ms.0 == 0
+        || raw.archive.writer_crate != "parquet"
+        || raw.archive.writer_version != "57.0.0"
+        || raw.archive.compression != "zstd:3"
+        || raw.archive.segment_bytes.0 == 0
+        || raw.archive.selector_policy != "immutable_promotion_fence"
+        || raw.archive.continuity_break_policy != "new_destination_identity"
+        || raw.archive.audit_bytes.0 == 0
+        || raw.archive.audit_events == 0
+        || raw.archive.audit_time_ms.0 == 0
+        || raw.archive.audit_cadence_ms.0 == 0
+        || raw.archive.audit_freshness_ms.0 == 0
+    {
+        return err("CONFIG_UNSUPPORTED_ARCHIVE_POLICY", "archive");
     }
     if raw.archive.formats != BTreeSet::from(["jsonl".into(), "parquet".into()])
         || raw.archive.ready_marker != "SEGMENT_READY"
@@ -799,6 +903,22 @@ fn validate_listener(value: &str, config: &Observability) -> Result<(), ConfigEr
     })?;
     if !address.ip().is_loopback() && (!config.authentication || !config.tls) {
         return err("CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS", "observability");
+    }
+    Ok(())
+}
+
+fn safe_operator_path(value: &str) -> Result<(), ConfigError> {
+    let path = Path::new(value);
+    safe_path(value, "operator.socket_path")?;
+    let normal_components = path
+        .components()
+        .filter(|part| matches!(part, Component::Normal(_)))
+        .count();
+    if path.is_absolute()
+        || normal_components < 3
+        || path.extension().and_then(|v| v.to_str()) != Some("sock")
+    {
+        return err("CONFIG_UNSAFE_OPERATOR_ENDPOINT", "operator.socket_path");
     }
     Ok(())
 }
@@ -1100,9 +1220,17 @@ pub mod tests {
         assert!(run.administration_dsn().is_none());
         assert!(run.clickhouse_maintenance_dsn().is_none());
 
-        let maintenance = load_str_for(&fixture(), &env(), LoadPurpose::Maintenance).unwrap();
-        assert!(maintenance.administration_dsn().is_some());
-        assert!(maintenance.control_writer_dsn().is_none());
+        let postgres_admin = load_str_for(&fixture(), &env(), LoadPurpose::PostgresAdmin).unwrap();
+        assert!(postgres_admin.administration_dsn().is_some());
+        assert!(postgres_admin.runtime_dsn().is_none());
+        assert!(postgres_admin.control_writer_dsn().is_none());
+        assert!(postgres_admin.clickhouse_maintenance_dsn().is_none());
+
+        let clickhouse =
+            load_str_for(&fixture(), &env(), LoadPurpose::ClickHouseMaintenance).unwrap();
+        assert!(clickhouse.clickhouse_maintenance_dsn().is_some());
+        assert!(clickhouse.administration_dsn().is_none());
+        assert!(clickhouse.runtime_dsn().is_none());
     }
 
     #[test]
@@ -1191,6 +1319,44 @@ pub mod tests {
     }
 
     #[test]
+    fn replication_options_are_an_exact_canonical_set() {
+        for options in [
+            r#"start_replication_options = ["streaming=false"]
+"#,
+            r#"start_replication_options = ["proto_version=1", "streaming=false", "two_phase=false", "binary=false", "messages=true"]
+"#,
+            r#"start_replication_options = ["proto_version=1", "streaming=false", "streaming=true", "two_phase=false", "binary=false"]
+"#,
+        ] {
+            let candidate = fixture().replace(
+                "advisory_lock_derivation =",
+                &format!("{options}advisory_lock_derivation ="),
+            );
+            assert_eq!(
+                load_str(&candidate, &env()).unwrap_err().code,
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS"
+            );
+        }
+    }
+
+    #[test]
+    fn operator_socket_must_be_nested_relative_and_sock_typed() {
+        for path in [
+            "/tmp/operator.sock",
+            "operator.sock",
+            "run/operator",
+            "../run/operator.sock",
+        ] {
+            let candidate = format!("{}\n[operator]\nsocket_path = {:?}\n", fixture(), path);
+            let code = load_str(&candidate, &env()).unwrap_err().code;
+            assert!(matches!(
+                code,
+                "CONFIG_UNSAFE_OPERATOR_ENDPOINT" | "CONFIG_UNSAFE_PATH"
+            ));
+        }
+    }
+
+    #[test]
     fn exhaustive_case_inventory_covers_every_configuration_group() {
         let inventory: serde_json::Value =
             serde_json::from_str(include_str!("../contracts/m1/config-cases.json")).unwrap();
@@ -1230,10 +1396,17 @@ pub mod tests {
                 "rejected_examples",
                 "fingerprint_impact",
                 "error_codes",
+                "fields",
             ] {
                 assert!(!case[field].as_array().unwrap().is_empty(), "{field}");
             }
             assert_eq!(case["unit_target"], "m1_config::tests");
+            assert_eq!(case["status_code"], "configuration_rejected");
+            assert_eq!(case["log_code"], "CONFIG_REDACTED_VALIDATION");
+            assert_eq!(
+                case["executable_scenario"],
+                "cargo test --locked m1_config::tests"
+            );
         }
     }
 }

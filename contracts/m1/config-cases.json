@@ -1,20 +1,507 @@
 {
-  "schema_version": "m1-config-cases/v1",
-  "owner_bead": "boring-cdc-m1-config",
   "cases": [
-    {"id":"SCN-M1-CONFIG-SOURCE","group":"source","accepted_examples":["pinned CopyBoth with origin any and bounded ownership"],"rejected_examples":["streaming enabled","invalid ownership ordering","missing runtime secret"],"fingerprint_impact":["source","runtime"],"error_codes":["CONFIG_UNSUPPORTED_REPLICATION_OPTIONS","CONFIG_INVALID_OWNERSHIP_BOUNDS","CONFIG_MISSING_SECRET"],"redaction":"secret names and values absent","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-TABLES","group":"tables","accepted_examples":["Unicode source relation with stable opaque logical ID"],"rejected_examples":["empty table set","duplicate logical ID","empty replica key"],"fingerprint_impact":["source","table_set","runtime"],"error_codes":["CONFIG_EMPTY_TABLE_SET","CONFIG_DUPLICATE_ID","CONFIG_INVALID_TABLE_IDENTITY"],"redaction":"payload and key values absent","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-STORAGE","group":"storage","accepted_examples":["WAL FULL INCREMENTAL on named filesystem"],"rejected_examples":["parent traversal","weaker SQLite policy"],"fingerprint_impact":["runtime"],"error_codes":["CONFIG_UNSAFE_PATH","CONFIG_UNSAFE_SQLITE_POLICY"],"redaction":"unapproved absolute paths absent from errors","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-LIMITS","group":"limits","accepted_examples":["row <= event <= transaction and frame <= memory"],"rejected_examples":["zero event count","incompatible byte bounds"],"fingerprint_impact":["runtime"],"error_codes":["CONFIG_INCOMPATIBLE_LIMITS"],"redaction":"no payload samples","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-BUDGETS","group":"budgets","accepted_examples":["per-filesystem reservations below total"],"rejected_examples":["arithmetic overflow","reservation overcommit","duplicate filesystem ID"],"fingerprint_impact":["backfill","runtime"],"error_codes":["CONFIG_NUMERIC_OVERFLOW","CONFIG_BUDGET_EXCEEDED","CONFIG_DUPLICATE_ID"],"redaction":"paths represented only in public config projection","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-RETENTION","group":"retention","accepted_examples":["finite replay, anchor, invalid-generation and metadata retention"],"rejected_examples":["unknown retention field"],"fingerprint_impact":["backfill","runtime"],"error_codes":["CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"],"redaction":"no journal content","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-WAL","group":"wal","accepted_examples":["finite cap, free space, rate, delay and reserve"],"rejected_examples":["unknown missing-metric policy field"],"fingerprint_impact":["runtime"],"error_codes":["CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"],"redaction":"metrics contain units only","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-BACKFILL","group":"backfill","accepted_examples":["nonzero concurrency and guard keepalive below timeout"],"rejected_examples":["zero concurrency","keepalive not below timeout"],"fingerprint_impact":["backfill","runtime"],"error_codes":["CONFIG_INVALID_BACKFILL_BOUNDS"],"redaction":"snapshot token absent","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-CLICKHOUSE","group":"clickhouse","accepted_examples":["verified TLS and synchronous durable insert"],"rejected_examples":["missing runtime secret","insecure TLS","non-durable insert policy"],"fingerprint_impact":["destination","runtime"],"error_codes":["CONFIG_MISSING_SECRET","CONFIG_TLS_REQUIRED","CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"],"redaction":"DSNs and driver strings absent","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-ARCHIVE","group":"archive","accepted_examples":["JSONL and Parquet with opaque no-follow directory commit"],"rejected_examples":["missing format","unsafe path policy","wrong ready marker"],"fingerprint_impact":["destination","runtime"],"error_codes":["CONFIG_UNSUPPORTED_ARCHIVE_POLICY"],"redaction":"production payload absent","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-CONDITIONS","group":"conditions","accepted_examples":["warning < action < critical < hard"],"rejected_examples":["unordered thresholds"],"fingerprint_impact":["runtime"],"error_codes":["CONFIG_INVALID_THRESHOLDS"],"redaction":"metrics contain units only","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-OBSERVABILITY","group":"observability","accepted_examples":["loopback default","authenticated TLS non-loopback"],"rejected_examples":["plaintext or unauthenticated non-loopback","empty override"],"fingerprint_impact":["runtime"],"error_codes":["CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS","CONFIG_EMPTY_OVERRIDE","CONFIG_INVALID_LISTENER"],"redaction":"fixed secret role labels only","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-OPERATOR","group":"operator","accepted_examples":["Unix socket under safe path with 0700/0600 and peer credentials"],"rejected_examples":["weak mode","disabled peer credentials","parent traversal"],"fingerprint_impact":["runtime"],"error_codes":["CONFIG_UNSAFE_OPERATOR_ENDPOINT","CONFIG_UNSAFE_PATH"],"redaction":"confirmation nonce absent","unit_target":"m1_config::tests"},
-    {"id":"SCN-M1-CONFIG-BOUNDARY","group":"boundary","accepted_examples":["defaults then TOML then closed environment overrides","secret rotation leaves fingerprints stable","check status run use one parser"],"rejected_examples":["unknown or deprecated TOML key","unapproved BORING_CDC override","malformed or truncated TOML"],"fingerprint_impact":["source","table_set","destination","backfill","runtime"],"error_codes":["CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD","CONFIG_UNAPPROVED_ENV_OVERRIDE","CONFIG_CANONICALIZATION_FAILED"],"redaction":"all secret references and values absent","unit_target":"m1_config::tests"}
-  ]
+    {
+      "accepted_examples": [
+        "pinned CopyBoth with origin any and bounded ownership"
+      ],
+      "error_codes": [
+        "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+        "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+        "CONFIG_MISSING_SECRET"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "runtime_dsn_env",
+        "control_writer_dsn_env",
+        "administration_dsn_env",
+        "publication",
+        "slot",
+        "copy_both_transport",
+        "start_replication_options",
+        "origin_policy",
+        "advisory_lock_derivation",
+        "lock_probe_interval_ms",
+        "ownership_deadline_ms",
+        "maximum_operation_ms",
+        "stale_owner_takeover_ms",
+        "heartbeat_cadence_ms",
+        "verify_tls"
+      ],
+      "fingerprint_impact": [
+        "source",
+        "runtime"
+      ],
+      "group": "source",
+      "id": "SCN-M1-CONFIG-SOURCE",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "secret names and values absent",
+      "rejected_examples": [
+        "streaming enabled",
+        "invalid ownership ordering",
+        "missing runtime secret"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "Unicode source relation with stable opaque logical ID"
+      ],
+      "error_codes": [
+        "CONFIG_EMPTY_TABLE_SET",
+        "CONFIG_DUPLICATE_ID",
+        "CONFIG_INVALID_TABLE_IDENTITY"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "logical_id",
+        "source_relation",
+        "replica_key",
+        "key_type_policy",
+        "relation_contract"
+      ],
+      "fingerprint_impact": [
+        "source",
+        "table_set",
+        "runtime"
+      ],
+      "group": "tables",
+      "id": "SCN-M1-CONFIG-TABLES",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "payload and key values absent",
+      "rejected_examples": [
+        "empty table set",
+        "duplicate logical ID",
+        "empty replica key"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "WAL FULL INCREMENTAL on named filesystem"
+      ],
+      "error_codes": [
+        "CONFIG_UNSAFE_PATH",
+        "CONFIG_UNSAFE_SQLITE_POLICY"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "sqlite_path",
+        "sqlite_temp_path",
+        "spool_path",
+        "filesystem",
+        "journal_mode",
+        "synchronous",
+        "auto_vacuum",
+        "checkpoint_pages",
+        "vacuum_pages",
+        "unsafe_local_experiment"
+      ],
+      "fingerprint_impact": [
+        "runtime"
+      ],
+      "group": "storage",
+      "id": "SCN-M1-CONFIG-STORAGE",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "unapproved absolute paths absent from errors",
+      "rejected_examples": [
+        "parent traversal",
+        "weaker SQLite policy"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "row <= event <= transaction and frame <= memory"
+      ],
+      "error_codes": [
+        "CONFIG_INCOMPATIBLE_LIMITS"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "max_wire_frame_bytes",
+        "max_event_bytes",
+        "max_row_bytes",
+        "max_transaction_bytes",
+        "max_transaction_events",
+        "process_memory_bytes"
+      ],
+      "fingerprint_impact": [
+        "runtime"
+      ],
+      "group": "limits",
+      "id": "SCN-M1-CONFIG-LIMITS",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "no payload samples",
+      "rejected_examples": [
+        "zero event count",
+        "incompatible byte bounds"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "per-filesystem reservations below total"
+      ],
+      "error_codes": [
+        "CONFIG_NUMERIC_OVERFLOW",
+        "CONFIG_BUDGET_EXCEEDED",
+        "CONFIG_DUPLICATE_ID"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "name",
+        "root",
+        "total_bytes",
+        "reserved_free_bytes",
+        "sqlite_wal_temp_bytes",
+        "capture_spool_bytes",
+        "concurrent_backfill_bytes",
+        "archive_segment_bytes"
+      ],
+      "fingerprint_impact": [
+        "backfill",
+        "runtime"
+      ],
+      "group": "budgets",
+      "id": "SCN-M1-CONFIG-BUDGETS",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "paths represented only in public config projection",
+      "rejected_examples": [
+        "arithmetic overflow",
+        "reservation overcommit",
+        "duplicate filesystem ID"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "finite replay, anchor, invalid-generation and metadata retention"
+      ],
+      "error_codes": [
+        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "replay_window_ms",
+        "usable_anchor_count",
+        "invalid_generation_ms",
+        "metadata_gc_ms"
+      ],
+      "fingerprint_impact": [
+        "backfill",
+        "runtime"
+      ],
+      "group": "retention",
+      "id": "SCN-M1-CONFIG-RETENTION",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "no journal content",
+      "rejected_examples": [
+        "unknown retention field"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "finite cap, free space, rate, delay and reserve"
+      ],
+      "error_codes": [
+        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "max_slot_wal_keep_bytes",
+        "source_free_bytes",
+        "production_bytes_per_second",
+        "monitor_delay_ms",
+        "reaction_reserve_bytes",
+        "missing_metric_policy"
+      ],
+      "fingerprint_impact": [
+        "runtime"
+      ],
+      "group": "wal",
+      "id": "SCN-M1-CONFIG-WAL",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "metrics contain units only",
+      "rejected_examples": [
+        "unknown missing-metric policy field"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "nonzero concurrency and guard keepalive below timeout"
+      ],
+      "error_codes": [
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "chunk_rows",
+        "chunk_bytes",
+        "chunk_duration_ms",
+        "concurrency",
+        "exporter_lifetime_ms",
+        "importer_lifetime_ms",
+        "guard_lifetime_ms",
+        "guard_keepalive_ms",
+        "session_timeout_ms",
+        "ddl_waiter_bound_ms",
+        "source_impact_bytes"
+      ],
+      "fingerprint_impact": [
+        "backfill",
+        "runtime"
+      ],
+      "group": "backfill",
+      "id": "SCN-M1-CONFIG-BACKFILL",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "snapshot token absent",
+      "rejected_examples": [
+        "zero concurrency",
+        "keepalive not below timeout"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "verified TLS and synchronous durable insert"
+      ],
+      "error_codes": [
+        "CONFIG_MISSING_SECRET",
+        "CONFIG_TLS_REQUIRED",
+        "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "endpoint",
+        "server_version",
+        "client_version",
+        "runtime_dsn_env",
+        "maintenance_dsn_env",
+        "contract_id",
+        "history_object",
+        "selector_object",
+        "history_quota_bytes",
+        "synchronous_insert",
+        "fsync_after_insert",
+        "rust_insert_finalization",
+        "destination_generation",
+        "selector_policy",
+        "adopted_external_fence",
+        "retirement_grace_ms",
+        "audit_bytes",
+        "audit_events",
+        "audit_time_ms",
+        "audit_cadence_ms",
+        "audit_freshness_ms",
+        "verify_tls"
+      ],
+      "fingerprint_impact": [
+        "destination",
+        "runtime"
+      ],
+      "group": "clickhouse",
+      "id": "SCN-M1-CONFIG-CLICKHOUSE",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "DSNs and driver strings absent",
+      "rejected_examples": [
+        "missing runtime secret",
+        "insecure TLS",
+        "non-durable insert policy"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "JSONL and Parquet with opaque no-follow directory commit"
+      ],
+      "error_codes": [
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "root",
+        "filesystem",
+        "budget_bytes",
+        "schedule_ms",
+        "formats",
+        "writer_crate",
+        "writer_version",
+        "compression",
+        "segment_bytes",
+        "path_encoding",
+        "filesystem_policy",
+        "ready_marker",
+        "selector_policy",
+        "continuity_break_policy",
+        "audit_bytes",
+        "audit_events",
+        "audit_time_ms",
+        "audit_cadence_ms",
+        "audit_freshness_ms"
+      ],
+      "fingerprint_impact": [
+        "destination",
+        "runtime"
+      ],
+      "group": "archive",
+      "id": "SCN-M1-CONFIG-ARCHIVE",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "production payload absent",
+      "rejected_examples": [
+        "missing format",
+        "unsafe path policy",
+        "wrong ready marker"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "warning < action < critical < hard"
+      ],
+      "error_codes": [
+        "CONFIG_INVALID_THRESHOLDS"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "warning",
+        "action",
+        "critical",
+        "hard",
+        "freshness_ms",
+        "hysteresis_ms"
+      ],
+      "fingerprint_impact": [
+        "runtime"
+      ],
+      "group": "conditions",
+      "id": "SCN-M1-CONFIG-CONDITIONS",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "metrics contain units only",
+      "rejected_examples": [
+        "unordered thresholds"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "loopback default",
+        "authenticated TLS non-loopback"
+      ],
+      "error_codes": [
+        "CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS",
+        "CONFIG_EMPTY_OVERRIDE",
+        "CONFIG_INVALID_LISTENER"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "log_level",
+        "status_listen_addr",
+        "prometheus_listen_addr",
+        "authentication",
+        "tls"
+      ],
+      "fingerprint_impact": [
+        "runtime"
+      ],
+      "group": "observability",
+      "id": "SCN-M1-CONFIG-OBSERVABILITY",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "fixed secret role labels only",
+      "rejected_examples": [
+        "plaintext or unauthenticated non-loopback",
+        "empty override"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "Unix socket under safe path with 0700/0600 and peer credentials"
+      ],
+      "error_codes": [
+        "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+        "CONFIG_UNSAFE_PATH"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "socket_path",
+        "directory_mode",
+        "socket_mode",
+        "peer_credentials",
+        "max_request_bytes",
+        "max_response_bytes",
+        "timeout_ms",
+        "result_retention_ms",
+        "confirmation_expiry_ms"
+      ],
+      "fingerprint_impact": [
+        "runtime"
+      ],
+      "group": "operator",
+      "id": "SCN-M1-CONFIG-OPERATOR",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "confirmation nonce absent",
+      "rejected_examples": [
+        "weak mode",
+        "disabled peer credentials",
+        "parent traversal"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "accepted_examples": [
+        "defaults then TOML then closed environment overrides",
+        "secret rotation leaves fingerprints stable",
+        "check status run use one parser"
+      ],
+      "error_codes": [
+        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+        "CONFIG_UNAPPROVED_ENV_OVERRIDE",
+        "CONFIG_CANONICALIZATION_FAILED"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests",
+      "fields": [
+        "schema_version",
+        "precedence",
+        "approved_environment_overrides",
+        "purpose_scoped_secrets",
+        "canonical_fingerprints",
+        "redacted_diagnostics"
+      ],
+      "fingerprint_impact": [
+        "source",
+        "table_set",
+        "destination",
+        "backfill",
+        "runtime"
+      ],
+      "group": "boundary",
+      "id": "SCN-M1-CONFIG-BOUNDARY",
+      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "redaction": "all secret references and values absent",
+      "rejected_examples": [
+        "unknown or deprecated TOML key",
+        "unapproved BORING_CDC override",
+        "malformed or truncated TOML"
+      ],
+      "status_code": "configuration_rejected",
+      "unit_target": "m1_config::tests"
+    }
+  ],
+  "owner_bead": "boring-cdc-m1-config",
+  "schema_version": "m1-config-cases/v1"
 }
