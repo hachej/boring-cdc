@@ -49,6 +49,7 @@
     },
     "expected_violation": {
       "maxLength": 16384,
+      "pattern": "^[\\u0020-\\u007e]+$",
       "type": [
         "string",
         "null"

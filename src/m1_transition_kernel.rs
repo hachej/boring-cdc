@@ -496,7 +496,7 @@ impl TransitionFixture {
             || self
                 .expected_violation
                 .as_ref()
-                .is_some_and(|value| value.len() > self.budget.max_redacted_bytes)
+                .is_some_and(|value| !valid_bounded_ascii(value, HarnessBudget::MAX_REDACTED_BYTES))
         {
             return Err(HarnessError::InvalidFixture);
         }
@@ -566,10 +566,14 @@ impl<Event, Completion> MinimizedTrace<Event, Completion> {
     }
 }
 
-fn valid_fixture_ref(value: &str) -> bool {
+fn valid_bounded_ascii(value: &str, maximum: usize) -> bool {
     !value.is_empty()
-        && value.len() <= HarnessBudget::MAX_FIXTURE_REF_BYTES
+        && value.len() <= maximum
         && value.bytes().all(|byte| (b' '..=b'~').contains(&byte))
+}
+
+fn valid_fixture_ref(value: &str) -> bool {
+    valid_bounded_ascii(value, HarnessBudget::MAX_FIXTURE_REF_BYTES)
 }
 
 fn valid_scenario_id(value: &str) -> bool {
@@ -973,7 +977,12 @@ pub(crate) mod tests {
             .unwrap();
         let trace = Harness::new(fixture.budget)
             .unwrap()
-            .execute(&SyntheticDomain, Facts::default(), &resolved, fixture.seed)
+            .execute(
+                &SyntheticDomain,
+                Facts::default(),
+                &resolved,
+                fixture.seed.clone(),
+            )
             .unwrap();
         assert_eq!(trace.violation, fixture.expected_violation);
     }
@@ -993,7 +1002,12 @@ pub(crate) mod tests {
             .unwrap();
         let trace = Harness::new(fixture.budget)
             .unwrap()
-            .execute(&SyntheticDomain, Facts::default(), &resolved, fixture.seed)
+            .execute(
+                &SyntheticDomain,
+                Facts::default(),
+                &resolved,
+                fixture.seed.clone(),
+            )
             .unwrap();
         assert_eq!(trace.violation, fixture.expected_violation);
 
@@ -1002,6 +1016,15 @@ pub(crate) mod tests {
         ))
         .unwrap();
         assert_eq!(unicode.validate(), Err(HarnessError::InvalidFixture));
+
+        let mut expected_boundary = fixture;
+        expected_boundary.expected_violation = Some("v".repeat(HarnessBudget::MAX_REDACTED_BYTES));
+        expected_boundary.validate().unwrap();
+        expected_boundary.expected_violation = Some("é".repeat(128));
+        assert_eq!(
+            expected_boundary.validate(),
+            Err(HarnessError::InvalidFixture)
+        );
     }
 
     #[test]
