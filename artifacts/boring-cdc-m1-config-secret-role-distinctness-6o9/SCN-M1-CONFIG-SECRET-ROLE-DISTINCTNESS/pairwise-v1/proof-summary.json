@@ -1,0 +1,17 @@
+{
+  "artifact_digests": {
+    "src/m1_config.rs": "0d03c7d2f0615867e0ddc7f1db68b05ac56b76f203482aa44a0b25d6c4a3d52f",
+    "tests/fixtures/m1_config/representative.toml": "31ba3519b025458bb20b78840b113dbb40642ddd759ae087d947c7b110bbda7f"
+  },
+  "assertions": [
+    "the five role-specific secret environment references are pairwise distinct before any purpose-scoped secret resolution",
+    "all ten unordered role pairs fail with CONFIG_ALIASED_SECRET_REFERENCE at the redacted secret_reference field",
+    "cross-PostgreSQL/ClickHouse aliases fail identically to within-system aliases",
+    "secret reference names and resolved values remain absent from diagnostics and every configuration fingerprint"
+  ],
+  "git_commit": "56cb0feb97fc410e2a821f47b889c7168a287379",
+  "outcome": "pass",
+  "owner_bead": "boring-cdc-m1-config-secret-role-distinctness-6o9",
+  "scenario_id": "SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS",
+  "schema_version": "boring-cdc/m1-config-secret-role-distinctness-proof/v1"
+}
