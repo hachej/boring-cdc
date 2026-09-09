@@ -48,7 +48,7 @@
       ],
       "constraint": "valid uppercase environment name, unique across secret roles, and not an approved override name",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_SECRET_REFERENCE"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -56,12 +56,12 @@
       "fingerprint_impact": [],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-RUNTIME-DSN-ENV",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.runtime_dsn_env returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.runtime_dsn_env returns exact code CONFIG_INVALID_SECRET_REFERENCE"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -69,8 +69,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_SECRET_REFERENCE",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -80,7 +80,7 @@
       ],
       "constraint": "valid uppercase environment name, unique across secret roles, and not an approved override name",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_SECRET_REFERENCE"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -88,12 +88,12 @@
       "fingerprint_impact": [],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-CONTROL-WRITER-DSN-ENV",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.control_writer_dsn_env returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.control_writer_dsn_env returns exact code CONFIG_INVALID_SECRET_REFERENCE"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -101,8 +101,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_SECRET_REFERENCE",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -112,7 +112,7 @@
       ],
       "constraint": "valid uppercase environment name, unique across secret roles, and not an approved override name",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_SECRET_REFERENCE"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -120,12 +120,12 @@
       "fingerprint_impact": [],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-ADMINISTRATION-DSN-ENV",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.administration_dsn_env returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.administration_dsn_env returns exact code CONFIG_INVALID_SECRET_REFERENCE"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -133,8 +133,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_SECRET_REFERENCE",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -155,12 +155,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-PUBLICATION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "empty_string mutation of source.publication returns exact code CONFIG_EMPTY_SOURCE_IDENTITY"
+        "constraint_violation vector for source.publication returns exact code CONFIG_EMPTY_SOURCE_IDENTITY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -169,7 +169,7 @@
         },
         "rejected": {
           "expected_error_code": "CONFIG_EMPTY_SOURCE_IDENTITY",
-          "mutation": "empty_string"
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -179,7 +179,7 @@
       ],
       "constraint": "nonempty logical replication slot identifier",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_EMPTY_SOURCE_IDENTITY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -190,12 +190,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-SLOT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.slot returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.slot returns exact code CONFIG_EMPTY_SOURCE_IDENTITY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -203,8 +203,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_EMPTY_SOURCE_IDENTITY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -214,7 +214,7 @@
       ],
       "constraint": "exact provisional transport postgres-replication-copyboth-v1",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_EMPTY_SOURCE_IDENTITY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -225,12 +225,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-COPY-BOTH-TRANSPORT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.copy_both_transport returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.copy_both_transport returns exact code CONFIG_EMPTY_SOURCE_IDENTITY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -238,8 +238,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_EMPTY_SOURCE_IDENTITY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -249,7 +249,7 @@
       ],
       "constraint": "exact canonical set proto_version=1, streaming=false, two_phase=false, binary=false",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "array",
@@ -260,12 +260,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-START-REPLICATION-OPTIONS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.start_replication_options returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.start_replication_options returns exact code CONFIG_UNSUPPORTED_REPLICATION_OPTIONS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -273,8 +273,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -284,7 +284,7 @@
       ],
       "constraint": "exact provisional origin policy any",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -295,12 +295,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-ORIGIN-POLICY",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.origin_policy returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.origin_policy returns exact code CONFIG_UNSUPPORTED_REPLICATION_OPTIONS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -308,8 +308,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -319,7 +319,7 @@
       ],
       "constraint": "exact sha256-system-database-publication-slot-v1",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_EMPTY_SOURCE_IDENTITY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -330,12 +330,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-ADVISORY-LOCK-DERIVATION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.advisory_lock_derivation returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.advisory_lock_derivation returns exact code CONFIG_EMPTY_SOURCE_IDENTITY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -343,8 +343,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_EMPTY_SOURCE_IDENTITY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -354,7 +354,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -365,12 +365,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-LOCK-PROBE-INTERVAL-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.lock_probe_interval_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.lock_probe_interval_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -378,8 +378,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -389,7 +389,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -400,12 +400,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-OWNERSHIP-DEADLINE-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.ownership_deadline_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.ownership_deadline_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -413,8 +413,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -424,7 +424,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -435,12 +435,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-MAXIMUM-OPERATION-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.maximum_operation_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.maximum_operation_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -448,8 +448,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -459,7 +459,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -470,12 +470,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-STALE-OWNER-TAKEOVER-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.stale_owner_takeover_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.stale_owner_takeover_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -483,8 +483,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -494,7 +494,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -505,12 +505,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-HEARTBEAT-CADENCE-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.heartbeat_cadence_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.heartbeat_cadence_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -518,8 +518,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -529,7 +529,7 @@
       ],
       "constraint": "true unless storage.unsafe_local_experiment is true",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_TLS_REQUIRED"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "boolean",
@@ -540,12 +540,12 @@
       ],
       "group": "source",
       "id": "SCN-M1-CONFIG-SOURCE-VERIFY-TLS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "secret names and values absent",
       "rejected_examples": [
-        "wrong_type mutation of source.verify_tls returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for source.verify_tls returns exact code CONFIG_TLS_REQUIRED"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -553,8 +553,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_TLS_REQUIRED",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -564,7 +564,7 @@
       ],
       "constraint": "nonempty and unique stable logical ID",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_TABLE_IDENTITY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -576,12 +576,12 @@
       ],
       "group": "tables",
       "id": "SCN-M1-CONFIG-TABLES-LOGICAL-ID",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "payload and key values absent",
       "rejected_examples": [
-        "wrong_type mutation of tables.logical_id returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for tables.logical_id returns exact code CONFIG_INVALID_TABLE_IDENTITY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -589,8 +589,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_TABLE_IDENTITY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -600,7 +600,7 @@
       ],
       "constraint": "nonempty source relation",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_TABLE_IDENTITY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -612,12 +612,12 @@
       ],
       "group": "tables",
       "id": "SCN-M1-CONFIG-TABLES-SOURCE-RELATION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "payload and key values absent",
       "rejected_examples": [
-        "wrong_type mutation of tables.source_relation returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for tables.source_relation returns exact code CONFIG_INVALID_TABLE_IDENTITY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -625,8 +625,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_TABLE_IDENTITY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -636,7 +636,7 @@
       ],
       "constraint": "nonempty unique components present as not-null relation-contract columns",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_EMPTY_REPLICA_KEY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "array",
@@ -648,12 +648,12 @@
       ],
       "group": "tables",
       "id": "SCN-M1-CONFIG-TABLES-REPLICA-KEY",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "payload and key values absent",
       "rejected_examples": [
-        "wrong_type mutation of tables.replica_key returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for tables.replica_key returns exact code CONFIG_EMPTY_REPLICA_KEY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -661,8 +661,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_EMPTY_REPLICA_KEY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -672,7 +672,7 @@
       ],
       "constraint": "exact canonical-v1",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_TABLE_IDENTITY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -684,12 +684,12 @@
       ],
       "group": "tables",
       "id": "SCN-M1-CONFIG-TABLES-KEY-TYPE-POLICY",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "payload and key values absent",
       "rejected_examples": [
-        "wrong_type mutation of tables.key_type_policy returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for tables.key_type_policy returns exact code CONFIG_INVALID_TABLE_IDENTITY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -697,8 +697,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_TABLE_IDENTITY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -708,7 +708,7 @@
       ],
       "constraint": "nonempty map covering every replica-key component as not-null",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_TABLE_IDENTITY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "table",
@@ -720,12 +720,12 @@
       ],
       "group": "tables",
       "id": "SCN-M1-CONFIG-TABLES-RELATION-CONTRACT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "payload and key values absent",
       "rejected_examples": [
-        "wrong_type mutation of tables.relation_contract returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for tables.relation_contract returns exact code CONFIG_INVALID_TABLE_IDENTITY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -733,8 +733,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_TABLE_IDENTITY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -744,7 +744,7 @@
       ],
       "constraint": "nonempty safe path without parent traversal; covered by exactly the most-specific filesystem budget",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_PATH"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -754,12 +754,12 @@
       ],
       "group": "storage",
       "id": "SCN-M1-CONFIG-STORAGE-SQLITE-PATH",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "unapproved absolute paths absent from errors",
       "rejected_examples": [
-        "wrong_type mutation of storage.sqlite_path returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for storage.sqlite_path returns exact code CONFIG_UNSAFE_PATH"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -767,8 +767,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_PATH",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -778,7 +778,7 @@
       ],
       "constraint": "nonempty safe path without parent traversal; covered by exactly the most-specific filesystem budget",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_PATH"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -788,12 +788,12 @@
       ],
       "group": "storage",
       "id": "SCN-M1-CONFIG-STORAGE-SQLITE-TEMP-PATH",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "unapproved absolute paths absent from errors",
       "rejected_examples": [
-        "wrong_type mutation of storage.sqlite_temp_path returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for storage.sqlite_temp_path returns exact code CONFIG_UNSAFE_PATH"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -801,8 +801,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_PATH",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -812,7 +812,7 @@
       ],
       "constraint": "nonempty safe path without parent traversal; covered by exactly the most-specific filesystem budget",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_PATH"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -822,12 +822,12 @@
       ],
       "group": "storage",
       "id": "SCN-M1-CONFIG-STORAGE-SPOOL-PATH",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "unapproved absolute paths absent from errors",
       "rejected_examples": [
-        "wrong_type mutation of storage.spool_path returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for storage.spool_path returns exact code CONFIG_UNSAFE_PATH"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -835,8 +835,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_PATH",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -846,7 +846,7 @@
       ],
       "constraint": "ext4 or xfs and consistent with archive when paths share a budget",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_FILESYSTEM_ASSOCIATION_MISMATCH"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -856,12 +856,12 @@
       ],
       "group": "storage",
       "id": "SCN-M1-CONFIG-STORAGE-FILESYSTEM",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "unapproved absolute paths absent from errors",
       "rejected_examples": [
-        "wrong_type mutation of storage.filesystem returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for storage.filesystem returns exact code CONFIG_FILESYSTEM_ASSOCIATION_MISMATCH"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -869,8 +869,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_FILESYSTEM_ASSOCIATION_MISMATCH",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -880,7 +880,7 @@
       ],
       "constraint": "exact WAL",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_SQLITE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -890,12 +890,12 @@
       ],
       "group": "storage",
       "id": "SCN-M1-CONFIG-STORAGE-JOURNAL-MODE",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "unapproved absolute paths absent from errors",
       "rejected_examples": [
-        "wrong_type mutation of storage.journal_mode returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for storage.journal_mode returns exact code CONFIG_UNSAFE_SQLITE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -903,8 +903,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_SQLITE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -914,7 +914,7 @@
       ],
       "constraint": "exact FULL",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_SQLITE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -924,12 +924,12 @@
       ],
       "group": "storage",
       "id": "SCN-M1-CONFIG-STORAGE-SYNCHRONOUS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "unapproved absolute paths absent from errors",
       "rejected_examples": [
-        "wrong_type mutation of storage.synchronous returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for storage.synchronous returns exact code CONFIG_UNSAFE_SQLITE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -937,8 +937,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_SQLITE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -948,7 +948,7 @@
       ],
       "constraint": "exact INCREMENTAL",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_SQLITE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -958,12 +958,12 @@
       ],
       "group": "storage",
       "id": "SCN-M1-CONFIG-STORAGE-AUTO-VACUUM",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "unapproved absolute paths absent from errors",
       "rejected_examples": [
-        "wrong_type mutation of storage.auto_vacuum returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for storage.auto_vacuum returns exact code CONFIG_UNSAFE_SQLITE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -971,8 +971,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_SQLITE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -982,7 +982,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_STORAGE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -992,12 +992,12 @@
       ],
       "group": "storage",
       "id": "SCN-M1-CONFIG-STORAGE-CHECKPOINT-PAGES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "unapproved absolute paths absent from errors",
       "rejected_examples": [
-        "wrong_type mutation of storage.checkpoint_pages returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for storage.checkpoint_pages returns exact code CONFIG_UNSUPPORTED_STORAGE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1005,8 +1005,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_STORAGE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1016,7 +1016,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_STORAGE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1026,12 +1026,12 @@
       ],
       "group": "storage",
       "id": "SCN-M1-CONFIG-STORAGE-VACUUM-PAGES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "unapproved absolute paths absent from errors",
       "rejected_examples": [
-        "wrong_type mutation of storage.vacuum_pages returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for storage.vacuum_pages returns exact code CONFIG_UNSUPPORTED_STORAGE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1039,8 +1039,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_STORAGE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1060,12 +1060,12 @@
       ],
       "group": "storage",
       "id": "SCN-M1-CONFIG-STORAGE-UNSAFE-LOCAL-EXPERIMENT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "unapproved absolute paths absent from errors",
       "rejected_examples": [
-        "wrong_type mutation of storage.unsafe_local_experiment returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "wrong_type vector for storage.unsafe_local_experiment returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1084,7 +1084,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1094,12 +1094,12 @@
       ],
       "group": "limits",
       "id": "SCN-M1-CONFIG-LIMITS-MAX-WIRE-FRAME-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "no payload samples",
       "rejected_examples": [
-        "wrong_type mutation of limits.max_wire_frame_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for limits.max_wire_frame_bytes returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1107,8 +1107,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1118,7 +1118,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1128,12 +1128,12 @@
       ],
       "group": "limits",
       "id": "SCN-M1-CONFIG-LIMITS-MAX-EVENT-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "no payload samples",
       "rejected_examples": [
-        "wrong_type mutation of limits.max_event_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for limits.max_event_bytes returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1141,8 +1141,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1152,7 +1152,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1162,12 +1162,12 @@
       ],
       "group": "limits",
       "id": "SCN-M1-CONFIG-LIMITS-MAX-ROW-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "no payload samples",
       "rejected_examples": [
-        "wrong_type mutation of limits.max_row_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for limits.max_row_bytes returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1175,8 +1175,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1186,7 +1186,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1196,12 +1196,12 @@
       ],
       "group": "limits",
       "id": "SCN-M1-CONFIG-LIMITS-MAX-TRANSACTION-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "no payload samples",
       "rejected_examples": [
-        "wrong_type mutation of limits.max_transaction_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for limits.max_transaction_bytes returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1209,8 +1209,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1220,7 +1220,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INCOMPATIBLE_LIMITS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1230,12 +1230,12 @@
       ],
       "group": "limits",
       "id": "SCN-M1-CONFIG-LIMITS-MAX-TRANSACTION-EVENTS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "no payload samples",
       "rejected_examples": [
-        "wrong_type mutation of limits.max_transaction_events returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for limits.max_transaction_events returns exact code CONFIG_INCOMPATIBLE_LIMITS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1243,8 +1243,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INCOMPATIBLE_LIMITS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1254,7 +1254,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1264,12 +1264,12 @@
       ],
       "group": "limits",
       "id": "SCN-M1-CONFIG-LIMITS-PROCESS-MEMORY-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "no payload samples",
       "rejected_examples": [
-        "wrong_type mutation of limits.process_memory_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for limits.process_memory_bytes returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1277,8 +1277,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1288,7 +1288,7 @@
       ],
       "constraint": "nonempty unique filesystem budget name",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_FILESYSTEM_BUDGET"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -1300,12 +1300,12 @@
       ],
       "group": "budgets",
       "id": "SCN-M1-CONFIG-BUDGETS-NAME",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong_type mutation of budgets.name returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for budgets.name returns exact code CONFIG_INVALID_FILESYSTEM_BUDGET"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1313,8 +1313,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_FILESYSTEM_BUDGET",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1324,7 +1324,7 @@
       ],
       "constraint": "nonempty safe path without parent traversal; covered by exactly the most-specific filesystem budget",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_PATH"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -1336,12 +1336,12 @@
       ],
       "group": "budgets",
       "id": "SCN-M1-CONFIG-BUDGETS-ROOT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong_type mutation of budgets.root returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for budgets.root returns exact code CONFIG_UNSAFE_PATH"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1349,8 +1349,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_PATH",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1360,7 +1360,7 @@
       ],
       "constraint": "reservation participates in checked non-overflowing sum not exceeding total; required path reservations are nonzero",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_FILESYSTEM_BUDGET"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1372,12 +1372,12 @@
       ],
       "group": "budgets",
       "id": "SCN-M1-CONFIG-BUDGETS-TOTAL-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong_type mutation of budgets.total_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for budgets.total_bytes returns exact code CONFIG_INVALID_FILESYSTEM_BUDGET"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1385,8 +1385,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_FILESYSTEM_BUDGET",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1396,7 +1396,7 @@
       ],
       "constraint": "reservation participates in checked non-overflowing sum not exceeding total; required path reservations are nonzero",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_FILESYSTEM_BUDGET"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1408,12 +1408,12 @@
       ],
       "group": "budgets",
       "id": "SCN-M1-CONFIG-BUDGETS-RESERVED-FREE-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong_type mutation of budgets.reserved_free_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for budgets.reserved_free_bytes returns exact code CONFIG_INVALID_FILESYSTEM_BUDGET"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1421,8 +1421,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_FILESYSTEM_BUDGET",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1432,7 +1432,7 @@
       ],
       "constraint": "reservation participates in checked non-overflowing sum not exceeding total; required path reservations are nonzero",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_FILESYSTEM_RESERVATION"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1444,12 +1444,12 @@
       ],
       "group": "budgets",
       "id": "SCN-M1-CONFIG-BUDGETS-SQLITE-WAL-TEMP-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong_type mutation of budgets.sqlite_wal_temp_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for budgets.sqlite_wal_temp_bytes returns exact code CONFIG_ZERO_FILESYSTEM_RESERVATION"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1457,8 +1457,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1468,7 +1468,7 @@
       ],
       "constraint": "reservation participates in checked non-overflowing sum not exceeding total; required path reservations are nonzero",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_FILESYSTEM_RESERVATION"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1480,12 +1480,12 @@
       ],
       "group": "budgets",
       "id": "SCN-M1-CONFIG-BUDGETS-CAPTURE-SPOOL-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong_type mutation of budgets.capture_spool_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for budgets.capture_spool_bytes returns exact code CONFIG_ZERO_FILESYSTEM_RESERVATION"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1493,8 +1493,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1504,7 +1504,7 @@
       ],
       "constraint": "reservation participates in checked non-overflowing sum not exceeding total; required path reservations are nonzero",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_FILESYSTEM_RESERVATION"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1516,12 +1516,12 @@
       ],
       "group": "budgets",
       "id": "SCN-M1-CONFIG-BUDGETS-CONCURRENT-BACKFILL-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong_type mutation of budgets.concurrent_backfill_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for budgets.concurrent_backfill_bytes returns exact code CONFIG_ZERO_FILESYSTEM_RESERVATION"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1529,8 +1529,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1540,7 +1540,7 @@
       ],
       "constraint": "reservation participates in checked non-overflowing sum not exceeding total; required path reservations are nonzero",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_FILESYSTEM_RESERVATION"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1552,12 +1552,12 @@
       ],
       "group": "budgets",
       "id": "SCN-M1-CONFIG-BUDGETS-ARCHIVE-SEGMENT-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong_type mutation of budgets.archive_segment_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for budgets.archive_segment_bytes returns exact code CONFIG_ZERO_FILESYSTEM_RESERVATION"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1565,8 +1565,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1576,7 +1576,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1587,12 +1587,12 @@
       ],
       "group": "retention",
       "id": "SCN-M1-CONFIG-RETENTION-REPLAY-WINDOW-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "no journal content",
       "rejected_examples": [
-        "wrong_type mutation of retention.replay_window_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for retention.replay_window_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1600,8 +1600,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1611,7 +1611,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1622,12 +1622,12 @@
       ],
       "group": "retention",
       "id": "SCN-M1-CONFIG-RETENTION-USABLE-ANCHOR-COUNT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "no journal content",
       "rejected_examples": [
-        "wrong_type mutation of retention.usable_anchor_count returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for retention.usable_anchor_count returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1635,8 +1635,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1646,7 +1646,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1657,12 +1657,12 @@
       ],
       "group": "retention",
       "id": "SCN-M1-CONFIG-RETENTION-INVALID-GENERATION-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "no journal content",
       "rejected_examples": [
-        "wrong_type mutation of retention.invalid_generation_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for retention.invalid_generation_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1670,8 +1670,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1681,7 +1681,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1692,12 +1692,12 @@
       ],
       "group": "retention",
       "id": "SCN-M1-CONFIG-RETENTION-METADATA-GC-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "no journal content",
       "rejected_examples": [
-        "wrong_type mutation of retention.metadata_gc_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for retention.metadata_gc_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1705,8 +1705,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1716,7 +1716,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1726,12 +1726,12 @@
       ],
       "group": "wal",
       "id": "SCN-M1-CONFIG-WAL-MAX-SLOT-WAL-KEEP-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of wal.max_slot_wal_keep_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for wal.max_slot_wal_keep_bytes returns exact code CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1739,8 +1739,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_WAL_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1750,7 +1750,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1760,12 +1760,12 @@
       ],
       "group": "wal",
       "id": "SCN-M1-CONFIG-WAL-SOURCE-FREE-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of wal.source_free_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for wal.source_free_bytes returns exact code CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1773,8 +1773,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_WAL_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1784,7 +1784,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1794,12 +1794,12 @@
       ],
       "group": "wal",
       "id": "SCN-M1-CONFIG-WAL-PRODUCTION-BYTES-PER-SECOND",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of wal.production_bytes_per_second returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for wal.production_bytes_per_second returns exact code CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1807,8 +1807,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_WAL_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1818,7 +1818,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1828,12 +1828,12 @@
       ],
       "group": "wal",
       "id": "SCN-M1-CONFIG-WAL-MONITOR-DELAY-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of wal.monitor_delay_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for wal.monitor_delay_ms returns exact code CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1841,8 +1841,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_WAL_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1852,7 +1852,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1862,12 +1862,12 @@
       ],
       "group": "wal",
       "id": "SCN-M1-CONFIG-WAL-REACTION-RESERVE-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of wal.reaction_reserve_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for wal.reaction_reserve_bytes returns exact code CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1875,8 +1875,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_WAL_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1886,7 +1886,7 @@
       ],
       "constraint": "exact block_new_bootstrap",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -1896,12 +1896,12 @@
       ],
       "group": "wal",
       "id": "SCN-M1-CONFIG-WAL-MISSING-METRIC-POLICY",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of wal.missing_metric_policy returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for wal.missing_metric_policy returns exact code CONFIG_UNSUPPORTED_WAL_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1909,8 +1909,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_WAL_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1920,7 +1920,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1931,12 +1931,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-CHUNK-ROWS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.chunk_rows returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.chunk_rows returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1944,8 +1944,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1955,7 +1955,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -1966,12 +1966,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-CHUNK-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.chunk_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.chunk_bytes returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -1979,8 +1979,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -1990,7 +1990,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2001,12 +2001,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-CHUNK-DURATION-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.chunk_duration_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.chunk_duration_ms returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2014,8 +2014,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2025,7 +2025,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2036,12 +2036,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-CONCURRENCY",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.concurrency returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.concurrency returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2049,8 +2049,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2060,7 +2060,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2071,12 +2071,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-EXPORTER-LIFETIME-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.exporter_lifetime_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.exporter_lifetime_ms returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2084,8 +2084,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2095,7 +2095,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2106,12 +2106,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-IMPORTER-LIFETIME-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.importer_lifetime_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.importer_lifetime_ms returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2119,8 +2119,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2130,7 +2130,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2141,12 +2141,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-GUARD-LIFETIME-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.guard_lifetime_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.guard_lifetime_ms returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2154,8 +2154,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2165,7 +2165,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2176,12 +2176,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-GUARD-KEEPALIVE-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.guard_keepalive_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.guard_keepalive_ms returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2189,8 +2189,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2200,7 +2200,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2211,12 +2211,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-SESSION-TIMEOUT-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.session_timeout_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.session_timeout_ms returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2224,8 +2224,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2235,7 +2235,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2246,12 +2246,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-DDL-WAITER-BOUND-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.ddl_waiter_bound_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.ddl_waiter_bound_ms returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2259,8 +2259,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2270,7 +2270,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2281,12 +2281,12 @@
       ],
       "group": "backfill",
       "id": "SCN-M1-CONFIG-BACKFILL-SOURCE-IMPACT-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "snapshot token absent",
       "rejected_examples": [
-        "wrong_type mutation of backfill.source_impact_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for backfill.source_impact_bytes returns exact code CONFIG_INVALID_BACKFILL_BOUNDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2294,8 +2294,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_BACKFILL_BOUNDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2305,7 +2305,7 @@
       ],
       "constraint": "HTTPS URL without userinfo or query string",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_CLICKHOUSE_ENDPOINT"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -2316,12 +2316,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-ENDPOINT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.endpoint returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.endpoint returns exact code CONFIG_UNSAFE_CLICKHOUSE_ENDPOINT"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2329,8 +2329,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_CLICKHOUSE_ENDPOINT",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2340,7 +2340,7 @@
       ],
       "constraint": "exact provisional 25.8.2.29",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -2351,12 +2351,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-SERVER-VERSION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.server_version returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.server_version returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2364,8 +2364,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2375,7 +2375,7 @@
       ],
       "constraint": "exact provisional 0.2.0",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -2386,12 +2386,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-CLIENT-VERSION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.client_version returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.client_version returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2399,8 +2399,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2410,7 +2410,7 @@
       ],
       "constraint": "valid uppercase environment name, unique across secret roles, and not an approved override name",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_SECRET_REFERENCE"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -2418,12 +2418,12 @@
       "fingerprint_impact": [],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-RUNTIME-DSN-ENV",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.runtime_dsn_env returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.runtime_dsn_env returns exact code CONFIG_INVALID_SECRET_REFERENCE"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2431,8 +2431,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_SECRET_REFERENCE",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2442,7 +2442,7 @@
       ],
       "constraint": "valid uppercase environment name, unique across secret roles, and not an approved override name",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_SECRET_REFERENCE"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -2450,12 +2450,12 @@
       "fingerprint_impact": [],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-MAINTENANCE-DSN-ENV",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.maintenance_dsn_env returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.maintenance_dsn_env returns exact code CONFIG_INVALID_SECRET_REFERENCE"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2463,8 +2463,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_SECRET_REFERENCE",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2474,7 +2474,7 @@
       ],
       "constraint": "exact provisional clickhouse-v1",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -2485,12 +2485,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-CONTRACT-ID",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.contract_id returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.contract_id returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2498,8 +2498,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2509,7 +2509,7 @@
       ],
       "constraint": "nonempty pre-created object identifier",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -2520,12 +2520,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-HISTORY-OBJECT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.history_object returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.history_object returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2533,8 +2533,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2544,7 +2544,7 @@
       ],
       "constraint": "nonempty pre-created object identifier",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -2555,12 +2555,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-SELECTOR-OBJECT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.selector_object returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.selector_object returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2568,8 +2568,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2579,7 +2579,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2590,12 +2590,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-HISTORY-QUOTA-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.history_quota_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.history_quota_bytes returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2603,8 +2603,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2614,7 +2614,7 @@
       ],
       "constraint": "must be true",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "boolean",
@@ -2625,12 +2625,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-SYNCHRONOUS-INSERT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.synchronous_insert returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.synchronous_insert returns exact code CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2638,8 +2638,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2649,7 +2649,7 @@
       ],
       "constraint": "must be true",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "boolean",
@@ -2660,12 +2660,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-FSYNC-AFTER-INSERT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.fsync_after_insert returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.fsync_after_insert returns exact code CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2673,8 +2673,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2684,7 +2684,7 @@
       ],
       "constraint": "exact provisional end-and-wait",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -2695,12 +2695,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-RUST-INSERT-FINALIZATION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.rust_insert_finalization returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.rust_insert_finalization returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2708,8 +2708,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2719,7 +2719,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2731,12 +2731,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-DESTINATION-GENERATION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.destination_generation returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.destination_generation returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2744,8 +2744,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2755,7 +2755,7 @@
       ],
       "constraint": "exact greatest-valid-fence",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -2767,12 +2767,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-SELECTOR-POLICY",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.selector_policy returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.selector_policy returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2780,8 +2780,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2789,7 +2789,7 @@
       "accepted_examples": [
         "representative fixture value for clickhouse.adopted_external_fence loads successfully"
       ],
-      "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
+      "constraint": "any unsigned fence value, including zero; included in destination, promotion, and runtime fingerprints",
       "error_codes": [
         "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
       ],
@@ -2803,12 +2803,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-ADOPTED-EXTERNAL-FENCE",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.adopted_external_fence returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "wrong_type vector for clickhouse.adopted_external_fence returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2827,7 +2827,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2839,12 +2839,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-RETIREMENT-GRACE-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.retirement_grace_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.retirement_grace_ms returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2852,8 +2852,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2863,7 +2863,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2874,12 +2874,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-AUDIT-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.audit_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.audit_bytes returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2887,8 +2887,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2898,7 +2898,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2909,12 +2909,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-AUDIT-EVENTS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.audit_events returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.audit_events returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2922,8 +2922,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2933,7 +2933,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2944,12 +2944,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-AUDIT-TIME-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.audit_time_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.audit_time_ms returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2957,8 +2957,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -2968,7 +2968,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -2979,12 +2979,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-AUDIT-CADENCE-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.audit_cadence_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.audit_cadence_ms returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -2992,8 +2992,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3003,7 +3003,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3014,12 +3014,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-AUDIT-FRESHNESS-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.audit_freshness_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.audit_freshness_ms returns exact code CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3027,8 +3027,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_CLICKHOUSE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3038,7 +3038,7 @@
       ],
       "constraint": "true unless storage.unsafe_local_experiment is true",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_TLS_REQUIRED"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "boolean",
@@ -3049,12 +3049,12 @@
       ],
       "group": "clickhouse",
       "id": "SCN-M1-CONFIG-CLICKHOUSE-VERIFY-TLS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "DSNs and driver strings absent",
       "rejected_examples": [
-        "wrong_type mutation of clickhouse.verify_tls returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for clickhouse.verify_tls returns exact code CONFIG_TLS_REQUIRED"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3062,8 +3062,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_TLS_REQUIRED",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3073,7 +3073,7 @@
       ],
       "constraint": "nonempty safe path without parent traversal; covered by exactly the most-specific filesystem budget",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_PATH"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3084,12 +3084,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-ROOT",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.root returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.root returns exact code CONFIG_UNSAFE_PATH"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3097,8 +3097,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_PATH",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3108,7 +3108,7 @@
       ],
       "constraint": "ext4 or xfs and consistent with storage when paths share a budget",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_FILESYSTEM_ASSOCIATION_MISMATCH"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3119,12 +3119,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-FILESYSTEM",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.filesystem returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.filesystem returns exact code CONFIG_FILESYSTEM_ASSOCIATION_MISMATCH"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3132,8 +3132,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_FILESYSTEM_ASSOCIATION_MISMATCH",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3143,7 +3143,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3154,12 +3154,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-BUDGET-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.budget_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.budget_bytes returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3167,8 +3167,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3178,7 +3178,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3189,12 +3189,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-SCHEDULE-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.schedule_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.schedule_ms returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3202,8 +3202,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3213,7 +3213,7 @@
       ],
       "constraint": "exact set jsonl and parquet",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "array",
@@ -3224,12 +3224,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-FORMATS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.formats returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.formats returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3237,8 +3237,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3248,7 +3248,7 @@
       ],
       "constraint": "exact parquet",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3259,12 +3259,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-WRITER-CRATE",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.writer_crate returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.writer_crate returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3272,8 +3272,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3283,7 +3283,7 @@
       ],
       "constraint": "exact provisional 57.0.0",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3294,12 +3294,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-WRITER-VERSION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.writer_version returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.writer_version returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3307,8 +3307,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3318,7 +3318,7 @@
       ],
       "constraint": "exact provisional zstd:3",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3329,12 +3329,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-COMPRESSION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.compression returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.compression returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3342,8 +3342,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3353,7 +3353,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3364,12 +3364,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-SEGMENT-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.segment_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.segment_bytes returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3377,8 +3377,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3388,7 +3388,7 @@
       ],
       "constraint": "exact opaque_ascii",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3399,12 +3399,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-PATH-ENCODING",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.path_encoding returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.path_encoding returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3412,8 +3412,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3423,7 +3423,7 @@
       ],
       "constraint": "exact descriptor_relative_no_follow_exclusive",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3434,12 +3434,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-FILESYSTEM-POLICY",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.filesystem_policy returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.filesystem_policy returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3447,8 +3447,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3458,7 +3458,7 @@
       ],
       "constraint": "exact SEGMENT_READY",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3469,12 +3469,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-READY-MARKER",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.ready_marker returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.ready_marker returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3482,8 +3482,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3493,7 +3493,7 @@
       ],
       "constraint": "exact immutable_promotion_fence",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3505,12 +3505,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-SELECTOR-POLICY",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.selector_policy returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.selector_policy returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3518,8 +3518,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3529,7 +3529,7 @@
       ],
       "constraint": "exact new_destination_identity",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3541,12 +3541,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-CONTINUITY-BREAK-POLICY",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.continuity_break_policy returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.continuity_break_policy returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3554,8 +3554,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3565,7 +3565,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3576,12 +3576,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-AUDIT-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.audit_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.audit_bytes returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3589,8 +3589,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3600,7 +3600,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3611,12 +3611,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-AUDIT-EVENTS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.audit_events returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.audit_events returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3624,8 +3624,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3635,7 +3635,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3646,12 +3646,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-AUDIT-TIME-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.audit_time_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.audit_time_ms returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3659,8 +3659,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3670,7 +3670,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3681,12 +3681,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-AUDIT-CADENCE-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.audit_cadence_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.audit_cadence_ms returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3694,8 +3694,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3705,7 +3705,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3716,12 +3716,12 @@
       ],
       "group": "archive",
       "id": "SCN-M1-CONFIG-ARCHIVE-AUDIT-FRESHNESS-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "production payload absent",
       "rejected_examples": [
-        "wrong_type mutation of archive.audit_freshness_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for archive.audit_freshness_ms returns exact code CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3729,8 +3729,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_ARCHIVE_POLICY",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3740,7 +3740,7 @@
       ],
       "constraint": "strictly less than conditions.action",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_THRESHOLDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3750,12 +3750,12 @@
       ],
       "group": "conditions",
       "id": "SCN-M1-CONFIG-CONDITIONS-WARNING",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of conditions.warning returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for conditions.warning returns exact code CONFIG_INVALID_THRESHOLDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3763,8 +3763,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_THRESHOLDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3774,7 +3774,7 @@
       ],
       "constraint": "between warning and critical",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_THRESHOLDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3784,12 +3784,12 @@
       ],
       "group": "conditions",
       "id": "SCN-M1-CONFIG-CONDITIONS-ACTION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of conditions.action returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for conditions.action returns exact code CONFIG_INVALID_THRESHOLDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3797,8 +3797,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_THRESHOLDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3808,7 +3808,7 @@
       ],
       "constraint": "between action and hard",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_THRESHOLDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3818,12 +3818,12 @@
       ],
       "group": "conditions",
       "id": "SCN-M1-CONFIG-CONDITIONS-CRITICAL",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of conditions.critical returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for conditions.critical returns exact code CONFIG_INVALID_THRESHOLDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3831,8 +3831,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_THRESHOLDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3842,7 +3842,7 @@
       ],
       "constraint": "strictly greater than conditions.critical",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_THRESHOLDS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3852,12 +3852,12 @@
       ],
       "group": "conditions",
       "id": "SCN-M1-CONFIG-CONDITIONS-HARD",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of conditions.hard returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for conditions.hard returns exact code CONFIG_INVALID_THRESHOLDS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3865,8 +3865,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_THRESHOLDS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3876,7 +3876,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3886,12 +3886,12 @@
       ],
       "group": "conditions",
       "id": "SCN-M1-CONFIG-CONDITIONS-FRESHNESS-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of conditions.freshness_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for conditions.freshness_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3899,8 +3899,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3910,7 +3910,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -3920,12 +3920,12 @@
       ],
       "group": "conditions",
       "id": "SCN-M1-CONFIG-CONDITIONS-HYSTERESIS-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "metrics contain units only",
       "rejected_examples": [
-        "wrong_type mutation of conditions.hysteresis_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for conditions.hysteresis_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3933,8 +3933,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3944,7 +3944,7 @@
       ],
       "constraint": "one of error, warn, info, debug",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSUPPORTED_LOG_LEVEL"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3954,12 +3954,12 @@
       ],
       "group": "observability",
       "id": "SCN-M1-CONFIG-OBSERVABILITY-LOG-LEVEL",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "fixed secret role labels only",
       "rejected_examples": [
-        "wrong_type mutation of observability.log_level returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for observability.log_level returns exact code CONFIG_UNSUPPORTED_LOG_LEVEL"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -3967,8 +3967,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSUPPORTED_LOG_LEVEL",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -3978,7 +3978,7 @@
       ],
       "constraint": "valid socket address; non-loopback requires authentication and TLS",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_LISTENER"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -3988,12 +3988,12 @@
       ],
       "group": "observability",
       "id": "SCN-M1-CONFIG-OBSERVABILITY-STATUS-LISTEN-ADDR",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "fixed secret role labels only",
       "rejected_examples": [
-        "wrong_type mutation of observability.status_listen_addr returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for observability.status_listen_addr returns exact code CONFIG_INVALID_LISTENER"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4001,8 +4001,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_LISTENER",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4012,7 +4012,7 @@
       ],
       "constraint": "valid socket address; non-loopback requires authentication and TLS",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_INVALID_LISTENER"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -4022,12 +4022,12 @@
       ],
       "group": "observability",
       "id": "SCN-M1-CONFIG-OBSERVABILITY-PROMETHEUS-LISTEN-ADDR",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "fixed secret role labels only",
       "rejected_examples": [
-        "wrong_type mutation of observability.prometheus_listen_addr returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for observability.prometheus_listen_addr returns exact code CONFIG_INVALID_LISTENER"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4035,8 +4035,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_INVALID_LISTENER",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4046,7 +4046,7 @@
       ],
       "constraint": "must be true with any non-loopback listener",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "boolean",
@@ -4056,12 +4056,12 @@
       ],
       "group": "observability",
       "id": "SCN-M1-CONFIG-OBSERVABILITY-AUTHENTICATION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "fixed secret role labels only",
       "rejected_examples": [
-        "wrong_type mutation of observability.authentication returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for observability.authentication returns exact code CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4069,8 +4069,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4080,7 +4080,7 @@
       ],
       "constraint": "must be true with any non-loopback listener",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "boolean",
@@ -4090,12 +4090,12 @@
       ],
       "group": "observability",
       "id": "SCN-M1-CONFIG-OBSERVABILITY-TLS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "fixed secret role labels only",
       "rejected_examples": [
-        "wrong_type mutation of observability.tls returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for observability.tls returns exact code CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4103,8 +4103,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4114,7 +4114,7 @@
       ],
       "constraint": "safe relative path nested at least three components with .sock suffix",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_PATH"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "string",
@@ -4124,12 +4124,12 @@
       ],
       "group": "operator",
       "id": "SCN-M1-CONFIG-OPERATOR-SOCKET-PATH",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "confirmation nonce absent",
       "rejected_examples": [
-        "wrong_type mutation of operator.socket_path returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for operator.socket_path returns exact code CONFIG_UNSAFE_PATH"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4137,8 +4137,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_PATH",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4148,7 +4148,7 @@
       ],
       "constraint": "exact provisional mode 0700 (TOML decimal 448)",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_OPERATOR_ENDPOINT"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -4158,12 +4158,12 @@
       ],
       "group": "operator",
       "id": "SCN-M1-CONFIG-OPERATOR-DIRECTORY-MODE",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "confirmation nonce absent",
       "rejected_examples": [
-        "wrong_type mutation of operator.directory_mode returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for operator.directory_mode returns exact code CONFIG_UNSAFE_OPERATOR_ENDPOINT"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4171,8 +4171,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4182,7 +4182,7 @@
       ],
       "constraint": "exact provisional mode 0600 (TOML decimal 384)",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_OPERATOR_ENDPOINT"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -4192,12 +4192,12 @@
       ],
       "group": "operator",
       "id": "SCN-M1-CONFIG-OPERATOR-SOCKET-MODE",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "confirmation nonce absent",
       "rejected_examples": [
-        "wrong_type mutation of operator.socket_mode returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for operator.socket_mode returns exact code CONFIG_UNSAFE_OPERATOR_ENDPOINT"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4205,8 +4205,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4216,7 +4216,7 @@
       ],
       "constraint": "must be true",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_UNSAFE_OPERATOR_ENDPOINT"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "boolean",
@@ -4226,12 +4226,12 @@
       ],
       "group": "operator",
       "id": "SCN-M1-CONFIG-OPERATOR-PEER-CREDENTIALS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "confirmation nonce absent",
       "rejected_examples": [
-        "wrong_type mutation of operator.peer_credentials returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for operator.peer_credentials returns exact code CONFIG_UNSAFE_OPERATOR_ENDPOINT"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4239,8 +4239,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4250,7 +4250,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -4260,12 +4260,12 @@
       ],
       "group": "operator",
       "id": "SCN-M1-CONFIG-OPERATOR-MAX-REQUEST-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "confirmation nonce absent",
       "rejected_examples": [
-        "wrong_type mutation of operator.max_request_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for operator.max_request_bytes returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4273,8 +4273,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4284,7 +4284,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -4294,12 +4294,12 @@
       ],
       "group": "operator",
       "id": "SCN-M1-CONFIG-OPERATOR-MAX-RESPONSE-BYTES",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "confirmation nonce absent",
       "rejected_examples": [
-        "wrong_type mutation of operator.max_response_bytes returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for operator.max_response_bytes returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4307,8 +4307,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4318,7 +4318,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -4328,12 +4328,12 @@
       ],
       "group": "operator",
       "id": "SCN-M1-CONFIG-OPERATOR-TIMEOUT-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "confirmation nonce absent",
       "rejected_examples": [
-        "wrong_type mutation of operator.timeout_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for operator.timeout_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4341,8 +4341,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4352,7 +4352,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -4362,12 +4362,12 @@
       ],
       "group": "operator",
       "id": "SCN-M1-CONFIG-OPERATOR-RESULT-RETENTION-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "confirmation nonce absent",
       "rejected_examples": [
-        "wrong_type mutation of operator.result_retention_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for operator.result_retention_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4375,8 +4375,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4386,7 +4386,7 @@
       ],
       "constraint": "nonzero integer bound with explicit units where named; must satisfy its group ordering/budget relationship",
       "error_codes": [
-        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "CONFIG_ZERO_BOUND"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
@@ -4396,12 +4396,12 @@
       ],
       "group": "operator",
       "id": "SCN-M1-CONFIG-OPERATOR-CONFIRMATION-EXPIRY-MS",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "confirmation nonce absent",
       "rejected_examples": [
-        "wrong_type mutation of operator.confirmation_expiry_ms returns exact code CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+        "constraint_violation vector for operator.confirmation_expiry_ms returns exact code CONFIG_ZERO_BOUND"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4409,8 +4409,8 @@
           "mutation": "fixture"
         },
         "rejected": {
-          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
-          "mutation": "wrong_type"
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
         }
       }
     },
@@ -4430,12 +4430,12 @@
       ],
       "group": "boundary",
       "id": "SCN-M1-CONFIG-BOUNDARY-SCHEMA-VERSION",
-      "log_code": "CONFIG_REDACTED_VALIDATION",
+      "log_code": null,
       "redaction": "all secret references and values absent",
       "rejected_examples": [
-        "unsupported_schema mutation of boundary.schema_version returns exact code CONFIG_UNSUPPORTED_SCHEMA"
+        "unsupported_schema vector for boundary.schema_version returns exact code CONFIG_UNSUPPORTED_SCHEMA"
       ],
-      "status_code": "configuration_rejected",
+      "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
       "vectors": {
         "accepted": {
@@ -4450,5 +4450,10 @@
     }
   ],
   "owner_bead": "boring-cdc-m1-config",
-  "schema_version": "m1-config-cases/v2"
+  "schema_version": "m1-config-cases/v2",
+  "status_log_projection": {
+    "log_code": null,
+    "reason": "M1 loader returns ConfigError only; status and structured-log projection belongs to later CLI/runtime owners and is not fabricated here",
+    "status_code": null
+  }
 }

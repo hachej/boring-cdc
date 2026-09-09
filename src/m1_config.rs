@@ -510,18 +510,6 @@ impl fmt::Display for ConfigError {
 }
 impl std::error::Error for ConfigError {}
 
-impl ConfigError {
-    /// Stable status projection used by every configuration rejection.
-    pub const fn status_code(&self) -> &'static str {
-        "configuration_rejected"
-    }
-
-    /// Stable redacted structured-log event used by every configuration rejection.
-    pub const fn log_code(&self) -> &'static str {
-        "CONFIG_REDACTED_VALIDATION"
-    }
-}
-
 /// Parse, apply the closed override list, resolve secrets and validate without I/O beyond env reads.
 pub fn load_str(input: &str, env: &dyn Environment) -> Result<LoadedConfig, ConfigError> {
     load_str_for(input, env, LoadPurpose::Run)
@@ -2024,7 +2012,33 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                     value => panic!("unsupported inventory value type: {value:?}"),
                 }
             }
-            "empty_string" => *target = toml::Value::String(String::new()),
+            "constraint_violation" => match (group, field) {
+                ("conditions", "warning") => *target = toml::Value::Integer(75),
+                ("conditions", "action") => *target = toml::Value::Integer(60),
+                ("conditions", "critical") => *target = toml::Value::Integer(75),
+                ("conditions", "hard") => *target = toml::Value::Integer(90),
+                ("observability", "authentication" | "tls") => {
+                    let observability = document
+                        .get_mut("observability")
+                        .unwrap()
+                        .as_table_mut()
+                        .unwrap();
+                    observability.insert(
+                        "status_listen_addr".into(),
+                        toml::Value::String("0.0.0.0:8787".into()),
+                    );
+                }
+                _ => {
+                    *target = match target {
+                        toml::Value::String(_) => toml::Value::String(String::new()),
+                        toml::Value::Integer(_) => toml::Value::Integer(0),
+                        toml::Value::Boolean(_) => toml::Value::Boolean(false),
+                        toml::Value::Array(_) => toml::Value::Array(Vec::new()),
+                        toml::Value::Table(_) => toml::Value::Table(Default::default()),
+                        value => panic!("unsupported constraint value type: {value:?}"),
+                    }
+                }
+            },
             "unsupported_schema" => *target = toml::Value::Integer(2),
             value => panic!("unknown inventory mutation {value}"),
         }
@@ -2039,6 +2053,36 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
             toml::Value::Array(_) => "array",
             toml::Value::Table(_) => "table",
             value => panic!("unsupported inventory type: {value:?}"),
+        }
+    }
+
+    fn expected_fingerprint_impacts(group: &str, field: &str) -> Vec<&'static str> {
+        match group {
+            "source" if field.ends_with("_dsn_env") => vec![],
+            "source" => vec!["source", "runtime"],
+            "tables" => vec!["source", "table_set", "runtime"],
+            "storage" | "limits" | "wal" | "conditions" | "observability" | "operator"
+            | "boundary" => vec!["runtime"],
+            "budgets" => vec!["archive", "backfill", "runtime"],
+            "retention" | "backfill" => vec!["backfill", "runtime"],
+            "clickhouse" if field.ends_with("_dsn_env") => vec![],
+            "clickhouse"
+                if matches!(
+                    field,
+                    "destination_generation"
+                        | "selector_policy"
+                        | "adopted_external_fence"
+                        | "retirement_grace_ms"
+                ) =>
+            {
+                vec!["destination", "promotion", "runtime"]
+            }
+            "clickhouse" => vec!["destination", "runtime"],
+            "archive" if matches!(field, "selector_policy" | "continuity_break_policy") => {
+                vec!["archive", "promotion", "runtime"]
+            }
+            "archive" => vec!["archive", "runtime"],
+            value => panic!("unknown inventory fingerprint owner {value}.{field}"),
         }
     }
 
@@ -2063,6 +2107,14 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
         assert_eq!(inventory["owner_bead"], "boring-cdc-m1-config");
         let cases = inventory["cases"].as_array().unwrap();
         assert_eq!(cases.len(), 127);
+        assert!(inventory["status_log_projection"]["status_code"].is_null());
+        assert!(inventory["status_log_projection"]["log_code"].is_null());
+        assert!(
+            inventory["status_log_projection"]["reason"]
+                .as_str()
+                .unwrap()
+                .contains("later CLI/runtime owners")
+        );
         let document: toml::Value = toml::from_str(&fixture()).unwrap();
         let mut ids = BTreeSet::new();
         let mut owners = BTreeSet::new();
@@ -2082,9 +2134,10 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                 "stale type metadata for {group}.{field}"
             );
             assert!(!case["constraint"].as_str().unwrap().is_empty());
-            assert!(
-                !case["fingerprint_impact"].as_array().unwrap().is_empty()
-                    || field.ends_with("_dsn_env")
+            assert_eq!(
+                case["fingerprint_impact"],
+                serde_json::json!(expected_fingerprint_impacts(group, field)),
+                "stale fingerprint metadata for {group}.{field}"
             );
             assert_eq!(case["vectors"]["accepted"]["mutation"], "fixture");
             load_str(&fixture(), &env()).unwrap();
@@ -2097,8 +2150,8 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                 load_str(&inventory_value_mutation(group, field, mutation), &env()).expect_err(id);
             assert_eq!(error.code, expected, "stale error metadata for {id}");
             assert_eq!(case["error_codes"], serde_json::json!([error.code]));
-            assert_eq!(case["status_code"], error.status_code());
-            assert_eq!(case["log_code"], error.log_code());
+            assert!(case["status_code"].is_null());
+            assert!(case["log_code"].is_null());
             assert_eq!(
                 case["unit_target"],
                 "m1_config::tests::executable_case_inventory_matches_loader"
