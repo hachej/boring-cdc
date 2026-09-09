@@ -142,6 +142,9 @@ impl ProtocolFailure {
     const fn publication_drift() -> Self {
         Self::blocked("PUBLICATION_DRIFT", "before_stream_or_feedback")
     }
+    const fn wire(fingerprint: &'static str) -> Self {
+        Self::blocked(fingerprint, "before_feedback")
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -407,6 +410,274 @@ pub fn heartbeat_outage(wal_headroom_bytes: u64) -> HeartbeatDegraded {
         wal_headroom_bytes,
         feedback_advanced: false,
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct PgoutputRelation {
+    namespace: String,
+    name: String,
+    columns: Vec<(String, u32)>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum PgoutputTupleValue {
+    Null,
+    UnchangedToast,
+    Text(Vec<u8>),
+    Binary(Vec<u8>),
+}
+
+struct WireCursor<'a> {
+    bytes: &'a [u8],
+    at: usize,
+}
+impl<'a> WireCursor<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        Self { bytes, at: 0 }
+    }
+    fn take(&mut self, count: usize) -> Result<&'a [u8], ProtocolFailure> {
+        let end = self
+            .at
+            .checked_add(count)
+            .filter(|end| *end <= self.bytes.len())
+            .ok_or_else(|| ProtocolFailure::wire("PGOUTPUT_FRAME_INVALID"))?;
+        let value = &self.bytes[self.at..end];
+        self.at = end;
+        Ok(value)
+    }
+    fn u8(&mut self) -> Result<u8, ProtocolFailure> {
+        Ok(self.take(1)?[0])
+    }
+    fn u16(&mut self) -> Result<u16, ProtocolFailure> {
+        Ok(u16::from_be_bytes(self.take(2)?.try_into().unwrap()))
+    }
+    fn u32(&mut self) -> Result<u32, ProtocolFailure> {
+        Ok(u32::from_be_bytes(self.take(4)?.try_into().unwrap()))
+    }
+    fn cstr(&mut self) -> Result<String, ProtocolFailure> {
+        let tail = &self.bytes[self.at..];
+        let length = tail
+            .iter()
+            .position(|byte| *byte == 0)
+            .ok_or_else(|| ProtocolFailure::wire("PGOUTPUT_FRAME_INVALID"))?;
+        let value = std::str::from_utf8(self.take(length)?)
+            .map_err(|_| ProtocolFailure::wire("PGOUTPUT_TEXT_INVALID"))?
+            .to_owned();
+        self.take(1)?;
+        Ok(value)
+    }
+    fn finish(self) -> Result<(), ProtocolFailure> {
+        if self.at == self.bytes.len() {
+            Ok(())
+        } else {
+            Err(ProtocolFailure::wire("PGOUTPUT_FRAME_INVALID"))
+        }
+    }
+}
+
+fn decode_relation(bytes: &[u8]) -> Result<(u32, PgoutputRelation), ProtocolFailure> {
+    let mut cursor = WireCursor::new(bytes);
+    if cursor.u8()? != b'R' {
+        return Err(ProtocolFailure::wire("PGOUTPUT_MESSAGE_TYPE_INVALID"));
+    }
+    let relation_id = cursor.u32()?;
+    let namespace = cursor.cstr()?;
+    let name = cursor.cstr()?;
+    cursor.u8()?;
+    let count = usize::from(cursor.u16()?);
+    let mut columns = Vec::with_capacity(count);
+    for _ in 0..count {
+        cursor.u8()?;
+        columns.push((cursor.cstr()?, cursor.u32()?));
+        cursor.u32()?;
+    }
+    cursor.finish()?;
+    Ok((
+        relation_id,
+        PgoutputRelation {
+            namespace,
+            name,
+            columns,
+        },
+    ))
+}
+
+fn decode_tuple(cursor: &mut WireCursor<'_>) -> Result<Vec<PgoutputTupleValue>, ProtocolFailure> {
+    let count = usize::from(cursor.u16()?);
+    let mut values = Vec::with_capacity(count);
+    for _ in 0..count {
+        values.push(match cursor.u8()? {
+            b'n' => PgoutputTupleValue::Null,
+            b'u' => PgoutputTupleValue::UnchangedToast,
+            kind @ (b't' | b'b') => {
+                let length = cursor.u32()? as usize;
+                let value = cursor.take(length)?.to_vec();
+                if kind == b't' {
+                    PgoutputTupleValue::Text(value)
+                } else {
+                    PgoutputTupleValue::Binary(value)
+                }
+            }
+            _ => return Err(ProtocolFailure::wire("PGOUTPUT_TUPLE_KIND_INVALID")),
+        });
+    }
+    Ok(values)
+}
+
+fn tuple_text(values: &[PgoutputTupleValue], index: usize) -> Result<&str, ProtocolFailure> {
+    match values.get(index) {
+        Some(PgoutputTupleValue::Text(value)) => {
+            std::str::from_utf8(value).map_err(|_| ProtocolFailure::wire("PGOUTPUT_TEXT_INVALID"))
+        }
+        _ => Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID")),
+    }
+}
+
+fn expected_relation(kind: ControlKind) -> (&'static str, &'static [(&'static str, u32)]) {
+    match kind {
+        ControlKind::Heartbeat => (
+            HEARTBEAT_RELATION,
+            &[("id", 25), ("nonce", 20), ("updated_at", 1184)],
+        ),
+        ControlKind::CaptureFence => (
+            FENCE_RELATION,
+            &[
+                ("id", 25),
+                ("capture_epoch", 20),
+                ("generation", 20),
+                ("table_set_fingerprint", 25),
+                ("unique_nonce", 20),
+            ],
+        ),
+    }
+}
+
+/// Decodes live pgoutput Relation/Update frames into the typed control-kernel observation.
+/// Exactly one matching update is admitted; zero or multiple frames fail before feedback.
+pub fn decode_control_update(
+    messages: &[Vec<u8>],
+    expected_kind: ControlKind,
+    expected_nonce: u64,
+) -> Result<ObservedControlUpdate, ProtocolFailure> {
+    let (expected_name, expected_columns) = expected_relation(expected_kind);
+    let mut relations = std::collections::BTreeMap::new();
+    let mut updates = Vec::new();
+    for message in messages {
+        match message.first().copied() {
+            Some(b'R') => {
+                let (id, relation) = decode_relation(message)?;
+                relations.insert(id, relation);
+            }
+            Some(b'U') => {
+                let mut cursor = WireCursor::new(message);
+                cursor.u8()?;
+                let relation_id = cursor.u32()?;
+                let relation = relations
+                    .get(&relation_id)
+                    .ok_or_else(|| ProtocolFailure::wire("CONTROL_RELATION_UNKNOWN"))?;
+                let qualified = format!("{}.{}", relation.namespace, relation.name);
+                if qualified != expected_name
+                    || relation.columns.len() != expected_columns.len()
+                    || !relation
+                        .columns
+                        .iter()
+                        .zip(expected_columns)
+                        .all(|((name, oid), expected)| name == expected.0 && oid == &expected.1)
+                {
+                    return Err(ProtocolFailure::wire("CONTROL_RELATION_SHAPE_INVALID"));
+                }
+                let marker = cursor.u8()?;
+                let old = match marker {
+                    b'K' | b'O' => {
+                        let old = decode_tuple(&mut cursor)?;
+                        if cursor.u8()? != b'N' {
+                            return Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"));
+                        }
+                        old
+                    }
+                    b'N' => Vec::new(),
+                    _ => return Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID")),
+                };
+                let new = decode_tuple(&mut cursor)?;
+                cursor.finish()?;
+                if new.len() != expected_columns.len() {
+                    return Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"));
+                }
+                let new_key = tuple_text(&new, 0)?.to_owned();
+                let old_key = if old.is_empty() {
+                    new_key.clone()
+                } else {
+                    tuple_text(&old, 0)?.to_owned()
+                };
+                let nonce_index = match expected_kind {
+                    ControlKind::Heartbeat => 1,
+                    ControlKind::CaptureFence => 4,
+                };
+                let nonce = tuple_text(&new, nonce_index)?
+                    .parse::<u64>()
+                    .map_err(|_| ProtocolFailure::wire("CONTROL_NONCE_INVALID"))?;
+                if nonce != expected_nonce {
+                    return Err(ProtocolFailure::wire("CONTROL_NONCE_MISMATCH"));
+                }
+                updates.push(ObservedControlUpdate {
+                    kind: expected_kind,
+                    operation: RowOperation::Update,
+                    old_key,
+                    new_key,
+                    changed_columns: expected_columns[1..]
+                        .iter()
+                        .map(|(name, _)| (*name).to_owned())
+                        .collect(),
+                    affected_rows: 1,
+                    nonce,
+                });
+            }
+            Some(b'T') => return Err(ProtocolFailure::wire("TRUNCATE_REQUIRES_RESEED")),
+            Some(_) => {}
+            None => return Err(ProtocolFailure::wire("PGOUTPUT_FRAME_INVALID")),
+        }
+    }
+    if updates.len() != 1 {
+        return Err(ProtocolFailure::wire("CONTROL_CARDINALITY_INVALID"));
+    }
+    Ok(updates.pop().unwrap())
+}
+
+/// Decodes a live pgoutput Truncate and blocks it before feedback. Relation frames from the same
+/// observation batch are required so relation identity cannot be reconstructed by the fixture.
+pub fn decode_truncate(messages: &[Vec<u8>]) -> Result<(), ProtocolFailure> {
+    let mut relations = std::collections::BTreeMap::new();
+    for message in messages {
+        match message.first().copied() {
+            Some(b'R') => {
+                let (id, relation) = decode_relation(message)?;
+                relations.insert(id, relation);
+            }
+            Some(b'T') => {
+                let mut cursor = WireCursor::new(message);
+                cursor.u8()?;
+                let count = cursor.u32()? as usize;
+                cursor.u8()?;
+                if count == 0 {
+                    return Err(ProtocolFailure::wire("PGOUTPUT_TRUNCATE_INVALID"));
+                }
+                for _ in 0..count {
+                    let id = cursor.u32()?;
+                    let relation = relations
+                        .get(&id)
+                        .ok_or_else(|| ProtocolFailure::wire("CONTROL_RELATION_UNKNOWN"))?;
+                    if relation.namespace == "boring_cdc_control" {
+                        return Err(ProtocolFailure::wire("CONTROL_RELATION_SHAPE_INVALID"));
+                    }
+                }
+                cursor.finish()?;
+                return observe_truncate(PublicationOperation::Truncate);
+            }
+            Some(_) => {}
+            None => return Err(ProtocolFailure::wire("PGOUTPUT_FRAME_INVALID")),
+        }
+    }
+    Err(ProtocolFailure::wire("PGOUTPUT_TRUNCATE_MISSING"))
 }
 
 pub fn observe_truncate(operation: PublicationOperation) -> Result<(), ProtocolFailure> {

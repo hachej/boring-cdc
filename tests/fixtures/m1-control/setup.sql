@@ -2,6 +2,7 @@
 CREATE ROLE boring_cdc_capture_bootstrap LOGIN REPLICATION PASSWORD 'capture_fixture_only';
 CREATE ROLE boring_cdc_control_writer LOGIN PASSWORD 'control_fixture_only';
 CREATE ROLE boring_cdc_application LOGIN PASSWORD 'application_fixture_only';
+CREATE ROLE boring_cdc_admin NOLOGIN;
 CREATE SCHEMA boring_cdc_control;
 CREATE TABLE public.accounts(id bigint PRIMARY KEY, value text);
 CREATE TABLE boring_cdc_control.heartbeat(id text PRIMARY KEY CHECK (id = 'singleton'), nonce bigint NOT NULL, updated_at timestamptz NOT NULL);
@@ -13,3 +14,4 @@ GRANT SELECT(id), UPDATE(nonce, updated_at) ON boring_cdc_control.heartbeat TO b
 GRANT SELECT(id), UPDATE(capture_epoch, generation, table_set_fingerprint, unique_nonce) ON boring_cdc_control.capture_fences TO boring_cdc_control_writer;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.accounts TO boring_cdc_application;
 CREATE PUBLICATION boring_cdc_publication FOR TABLE public.accounts, boring_cdc_control.heartbeat, boring_cdc_control.capture_fences WITH (publish='insert,update,delete,truncate');
+ALTER PUBLICATION boring_cdc_publication OWNER TO boring_cdc_admin;
