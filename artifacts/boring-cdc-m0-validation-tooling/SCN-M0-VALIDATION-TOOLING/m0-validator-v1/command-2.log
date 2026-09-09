@@ -1,1 +1,1 @@
-m0 aggregate e2e pass seed=m0-validator-v1 reruns=2 leaf_set=A+B+C claim_index=validated readiness=staged source_sha256=4f268731c412bd59833ea1b3197197b4d45c71d461778e094bb64e1f78105e2a cleanup=trap
+m0 aggregate e2e pass seed=m0-validator-v1 reruns=2 leaf_set=A+B+C claim_index=validated readiness=staged source_sha256=e82e953192344d890af5fd4d77491ee3d3a44465590f022250328b3900664fa4 cleanup=trap
