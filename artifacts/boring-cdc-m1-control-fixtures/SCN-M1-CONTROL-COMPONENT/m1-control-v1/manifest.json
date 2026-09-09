@@ -8,9 +8,9 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/workspace.txt",
-      "stderr_sha256": "ccd836f8ba2cd162ad06c0fe9621a9c3fc30fffb1298949ebe7b4c35674b2926",
+      "stderr_sha256": "8079ed2d6eb75d2abc2610bfe0758b6c0210cc192ca6ea4f3e5cec8664e887b7",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/workspace.txt",
-      "stdout_sha256": "df540fd596a82414d569d440f528bacc335fbad868ec77176b1103e6ec4ade62",
+      "stdout_sha256": "a96a7d879e7d3260975ec41014b22e3881005f2301f951242a7bd09d9843c1ba",
       "version": "cargo"
     },
     {
@@ -19,7 +19,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/targeted.txt",
       "stderr_sha256": "01a54c2297d535053904aa31b3ce782e8d166bda75f82d9cff7253650479b038",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/targeted.txt",
-      "stdout_sha256": "30378ef3f0adad5bf824d052d2a48234ff0c0043961c27b3cd1d2d55ac56eb54",
+      "stdout_sha256": "f808d9bff17c145620cbcdcdef0ce07203b254615bd5fd8a3e743d4053f7748f",
       "version": "cargo"
     },
     {
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "23780ac390d393b04dcd69b1e36a8aa761bd4986",
+  "git_commit": "6f4597d3fb93ab7a4c0cece34b27688589c1ca86",
   "owner_bead": "boring-cdc-m1-control-fixtures",
   "redaction": {
     "checked": true,
@@ -75,8 +75,8 @@
       "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/fault-timeline.json",
       "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/sha256.txt"
     ],
-    "digest": "8491595a100e5383752d0de85d1b1e446223c70525c14c3a7147898dc62ab57a",
-    "product_faults": "publication drift, privilege/cardinality abuse, outage, truncate, slot guard, and reseed boundaries injected",
+    "digest": "1a0dccd177b8296466c1ffa165af2c118cf3ee882cf51693f84df7cf894b1f07",
+    "product_faults": "M1 fixture observations: pgoutput update/truncate, publication drift, grants/cardinality, slot EXPORT_SNAPSHOT, and pure intent/ownership/durability guards; no M2 adapter claim",
     "runtime_observed": true,
     "status": "pass"
   },

@@ -5,3 +5,4 @@ scripts/e2e/m1_control_fixtures.sh (run 2)
 scripts/faults/m1_control_fixtures.sh (run 1)
 scripts/faults/m1_control_fixtures.sh (run 2)
 scripts/validate/evidence.sh artifacts/boring-cdc-m1-control-fixtures
+scripts/validate/m1_control_fixtures.py
