@@ -71,10 +71,8 @@
         "properties": {
           "fixture_ref": {
             "maxLength": 256,
-            "type": [
-              "string",
-              "null"
-            ]
+            "minLength": 1,
+            "type": "string"
           },
           "kind": {
             "enum": [

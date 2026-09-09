@@ -121,7 +121,7 @@ impl<K: EvidenceKind> ValidatedCommit<K> {
 }
 
 /// Durable progress validated at a complete transaction/reconciliation boundary.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Serialize)]
 pub struct DurableSourceBoundary {
     commit_lsn: ReceivedLsn,
     journal_cursor: JournalCursor,
@@ -396,6 +396,14 @@ impl ScheduleSeed {
             restored_resources_assumed: false,
         }
     }
+
+    pub fn validate(&self) -> Result<(), HarnessError> {
+        if self.schema_version != "boring-cdc/schedule-seed/v1" || self.algorithm != "splitmix64-v1"
+        {
+            return Err(HarnessError::UnsupportedSeedContract);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -434,6 +442,9 @@ pub enum HarnessError {
     FixtureReferenceTooLarge,
     FixtureResolutionFailed,
     FixtureKindMismatch,
+    UnsupportedSeedContract,
+    UnsupportedFixtureContract,
+    InvalidFixture,
     ScheduledPayloadBudgetExceeded,
     StateBudgetExceeded,
     DiagnosticBudgetExceeded,
@@ -472,6 +483,41 @@ pub struct TransitionFixture {
 }
 
 impl TransitionFixture {
+    pub fn validate(&self) -> Result<(), HarnessError> {
+        if self.schema_version != "boring-cdc/transition-fixture/v1" || !self.synthetic {
+            return Err(HarnessError::UnsupportedFixtureContract);
+        }
+        self.seed.validate()?;
+        self.budget.validate()?;
+        if !valid_scenario_id(&self.scenario_id)
+            || self.steps.len() > self.budget.max_steps
+            || self.steps.len() > HarnessBudget::MAX_STEPS
+            || self
+                .expected_violation
+                .as_ref()
+                .is_some_and(|value| value.len() > self.budget.max_redacted_bytes)
+        {
+            return Err(HarnessError::InvalidFixture);
+        }
+        for step in &self.steps {
+            if step.fixture_ref.is_empty()
+                || step.fixture_ref.len() > HarnessBudget::MAX_FIXTURE_REF_BYTES
+                || !matches!(
+                    step.kind.as_str(),
+                    "event"
+                        | "completion"
+                        | "advance_clock"
+                        | "expiry"
+                        | "cancel"
+                        | "crash_restart"
+                )
+            {
+                return Err(HarnessError::InvalidFixture);
+            }
+        }
+        Ok(())
+    }
+
     /// Resolves redacted fixture references through the domain-owned fixture corpus.
     /// Payloads are intentionally not copied into the shared trace contract.
     pub fn resolve<Event, Completion, Resolve>(
@@ -481,6 +527,7 @@ impl TransitionFixture {
     where
         Resolve: FnMut(&str) -> Option<ScheduledAction<Event, Completion>>,
     {
+        self.validate()?;
         let mut resolved = Vec::with_capacity(self.steps.len());
         for step in &self.steps {
             let action = resolve(&step.fixture_ref).ok_or(HarnessError::FixtureResolutionFailed)?;
@@ -519,6 +566,15 @@ impl<Event, Completion> MinimizedTrace<Event, Completion> {
     }
 }
 
+fn valid_scenario_id(value: &str) -> bool {
+    value.starts_with("SCN-")
+        && value.len() <= 128
+        && value.len() > 4
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'-')
+}
+
 pub struct Harness {
     budget: HarnessBudget,
 }
@@ -542,6 +598,7 @@ impl Harness {
         D::Event: Clone,
         D::Completion: Clone,
     {
+        seed.validate()?;
         if steps.len() > self.budget.max_steps {
             return Err(HarnessError::StepBudgetExceeded {
                 supplied: steps.len(),
@@ -892,6 +949,50 @@ pub(crate) mod tests {
             )
             .unwrap();
         assert_eq!(replay.violation, restored.expected_violation);
+    }
+
+    #[test]
+    fn published_fixture_deserializes_and_validates() {
+        let fixture: TransitionFixture = serde_json::from_str(include_str!(
+            "../tests/fixtures/m1-transition/valid/minimized.json"
+        ))
+        .unwrap();
+        fixture.validate().unwrap();
+        let resolved = fixture
+            .resolve(|reference| match reference {
+                "break" => Some(ScheduledAction::Event(Event::BreakInvariant)),
+                _ => None,
+            })
+            .unwrap();
+        let trace = Harness::new(fixture.budget)
+            .unwrap()
+            .execute(&SyntheticDomain, Facts::default(), &resolved, fixture.seed)
+            .unwrap();
+        assert_eq!(trace.violation, fixture.expected_violation);
+    }
+
+    #[test]
+    fn unsupported_seed_and_fixture_contracts_fail_closed() {
+        let harness = Harness::new(budget()).unwrap();
+        let mut seed = ScheduleSeed::splitmix64(1);
+        seed.algorithm = "unknown".into();
+        assert_eq!(
+            harness
+                .execute(&SyntheticDomain, Facts::default(), &scenario(), seed)
+                .unwrap_err(),
+            HarnessError::UnsupportedSeedContract
+        );
+
+        let invalid = TransitionFixture {
+            schema_version: "boring-cdc/transition-fixture/v1".into(),
+            scenario_id: "invalid".into(),
+            synthetic: true,
+            seed: ScheduleSeed::splitmix64(1),
+            budget: budget(),
+            steps: vec![],
+            expected_violation: None,
+        };
+        assert_eq!(invalid.validate(), Err(HarnessError::InvalidFixture));
     }
 
     #[test]
