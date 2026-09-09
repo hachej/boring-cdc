@@ -656,17 +656,13 @@ fn valid_env_name(value: &str) -> bool {
 }
 
 fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
-    for reference in [
+    validate_secret_references([
         &raw.source.runtime_dsn_env,
         &raw.source.control_writer_dsn_env,
         &raw.source.administration_dsn_env,
         &raw.clickhouse.runtime_dsn_env,
         &raw.clickhouse.maintenance_dsn_env,
-    ] {
-        if !valid_env_name(reference) {
-            return err("CONFIG_INVALID_SECRET_REFERENCE", "secret_reference");
-        }
-    }
+    ])?;
     if raw.schema_version != SCHEMA_VERSION {
         return err("CONFIG_UNSUPPORTED_SCHEMA", "schema_version");
     }
@@ -905,6 +901,19 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
         || raw.archive.filesystem_policy != "descriptor_relative_no_follow_exclusive"
     {
         return err("CONFIG_UNSUPPORTED_ARCHIVE_POLICY", "archive");
+    }
+    Ok(())
+}
+
+fn validate_secret_references(references: [&str; 5]) -> Result<(), ConfigError> {
+    let mut seen = BTreeSet::new();
+    for reference in references {
+        if !valid_env_name(reference) {
+            return err("CONFIG_INVALID_SECRET_REFERENCE", "secret_reference");
+        }
+        if !seen.insert(reference) {
+            return err("CONFIG_ALIASED_SECRET_REFERENCE", "secret_reference");
+        }
     }
     Ok(())
 }
@@ -1379,6 +1388,70 @@ pub mod tests {
                 "{from}"
             );
         }
+    }
+
+    #[test]
+    fn every_pair_of_secret_roles_requires_a_distinct_reference() {
+        let roles = [
+            ("runtime_dsn_env = \"PG_RUNTIME\"", "PG_RUNTIME"),
+            ("control_writer_dsn_env = \"PG_CONTROL\"", "PG_CONTROL"),
+            ("administration_dsn_env = \"PG_ADMIN\"", "PG_ADMIN"),
+            ("runtime_dsn_env = \"CH_RUNTIME\"", "CH_RUNTIME"),
+            ("maintenance_dsn_env = \"CH_MAINT\"", "CH_MAINT"),
+        ];
+
+        let mut tested_pairs = 0;
+        for first in 0..roles.len() {
+            for second in (first + 1)..roles.len() {
+                let candidate = fixture().replacen(
+                    roles[second].0,
+                    &format!(
+                        "{} = \"{}\"",
+                        roles[second].0.split(" = ").next().unwrap(),
+                        roles[first].1
+                    ),
+                    1,
+                );
+                let error =
+                    load_str_for(&candidate, &Env::default(), LoadPurpose::Status).unwrap_err();
+                assert_eq!(error.code, "CONFIG_ALIASED_SECRET_REFERENCE");
+                assert_eq!(error.field, "secret_reference");
+                let rendered = error.to_string();
+                for (_, secret_name) in roles {
+                    assert!(!rendered.contains(secret_name), "leaked {secret_name}");
+                }
+                tested_pairs += 1;
+            }
+        }
+        assert_eq!(tested_pairs, 10);
+    }
+
+    #[test]
+    fn secret_reference_names_and_values_do_not_affect_outputs() {
+        let original = load_str(&fixture(), &env()).unwrap();
+        let replacements = [
+            ("PG_RUNTIME", "ALT_PG_RUNTIME"),
+            ("PG_CONTROL", "ALT_PG_CONTROL"),
+            ("PG_ADMIN", "ALT_PG_ADMIN"),
+            ("CH_RUNTIME", "ALT_CH_RUNTIME"),
+            ("CH_MAINT", "ALT_CH_MAINT"),
+        ];
+        let mut renamed_fixture = fixture();
+        let mut renamed_env = Env::default();
+        for (old_name, new_name) in replacements {
+            renamed_fixture = renamed_fixture.replace(old_name, new_name);
+            renamed_env
+                .0
+                .insert(new_name.into(), format!("secret-value-for-{new_name}"));
+        }
+        let renamed = load_str(&renamed_fixture, &renamed_env).unwrap();
+        assert_eq!(original.fingerprints(), renamed.fingerprints());
+
+        let output = format!("{:?}\n{}", renamed, renamed.redacted_diagnostics());
+        for (_, secret_name) in replacements {
+            assert!(!output.contains(secret_name), "leaked {secret_name}");
+        }
+        assert!(!output.contains("secret-value-for-"));
     }
 
     #[test]
