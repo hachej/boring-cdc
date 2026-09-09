@@ -2226,7 +2226,6 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                 inventory_type(fixture_value(&document, group, field)),
                 "stale type metadata for {group}.{field}"
             );
-            assert!(!case["constraint"]["summary"].as_str().unwrap().is_empty());
             assert_eq!(case["vectors"]["accepted"]["mutation"], "fixture");
             let accepted = load_str(&fixture(), &env()).unwrap();
             let observed_changed = changed_fingerprint_domains(
@@ -2248,11 +2247,11 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                     serde_json::json!(["runtime"])
                 );
                 assert_eq!(
-                    case["fingerprint_impact"]["conditional"]
-                        .as_object()
-                        .unwrap()
-                        .len(),
-                    2
+                    case["fingerprint_impact"]["conditional"],
+                    serde_json::json!({
+                        "archive": "when the budget is selected for archive.root",
+                        "backfill": "when the budget is selected for the SQLite state root"
+                    })
                 );
             } else {
                 assert_eq!(
@@ -2273,8 +2272,13 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                 load_str(&inventory_value_mutation(group, field, mutation), &env()).expect_err(id);
             assert_eq!(error.code, expected, "stale error metadata for {id}");
             assert_eq!(case["error_codes"], serde_json::json!([error.code]));
-            assert_eq!(case["constraint"]["negative_mutation"], mutation);
-            assert_eq!(case["constraint"]["expected_error_code"], error.code);
+            assert_eq!(
+                case["constraint"],
+                serde_json::json!({
+                    "negative_mutation": mutation,
+                    "expected_error_code": error.code
+                })
+            );
             assert_eq!(
                 case["accepted_examples"],
                 serde_json::json!([format!("fixture::{group}.{field}::accepted")])
