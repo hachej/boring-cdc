@@ -14,7 +14,7 @@ for major in 15 16 17; do
   trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT HUP INT TERM
   docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=postgres -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1::5432 "$image" -c wal_level=logical -c max_replication_slots=4 >/dev/null
   ready=0; i=0
-  while [ "$i" -lt 60 ]; do
+  while [ "$i" -lt 180 ]; do
     # The image briefly starts an initialization server; accept only final PID 1 postgres.
     if [ "$(docker exec "$name" cat /proc/1/comm 2>/dev/null || true)" = postgres ] && docker exec "$name" pg_isready -U postgres >/dev/null 2>&1; then ready=1; break; fi
     i=$((i+1)); sleep 1
