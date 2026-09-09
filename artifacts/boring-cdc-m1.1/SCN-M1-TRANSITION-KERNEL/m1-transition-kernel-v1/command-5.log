@@ -1,4 +1,6 @@
-PASS contracts/m1/execution-trace.schema.json
-PASS contracts/m1/schedule-seed.schema.json
-PASS contracts/m1/transition-fixture.schema.json
+PASS schema contracts/m1/execution-trace.schema.json
+PASS schema contracts/m1/schedule-seed.schema.json
+PASS schema contracts/m1/transition-fixture.schema.json
+PASS valid fixture tests/fixtures/m1-transition/valid/minimized.json
+PASS rejected fixture tests/fixtures/m1-transition/invalid/null-reference.json
 duplicate Bead IDs=0
