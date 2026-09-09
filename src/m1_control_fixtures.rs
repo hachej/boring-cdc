@@ -577,17 +577,32 @@ fn valid_pg_timestamptz(value: &str) -> bool {
         return false;
     };
     let date_parts: Vec<_> = date.split('-').collect();
-    let valid_date = date_parts.len() == 3
-        && ascii_digits(date_parts[0], 4)
-        && ascii_digits(date_parts[1], 2)
-        && date_parts[1]
-            .parse::<u8>()
-            .is_ok_and(|month| (1..=12).contains(&month))
-        && ascii_digits(date_parts[2], 2)
-        && date_parts[2]
-            .parse::<u8>()
-            .is_ok_and(|day| (1..=31).contains(&day));
-    if !valid_date {
+    if date_parts.len() != 3
+        || !ascii_digits(date_parts[0], 4)
+        || !ascii_digits(date_parts[1], 2)
+        || !ascii_digits(date_parts[2], 2)
+    {
+        return false;
+    }
+    let Ok(year) = date_parts[0].parse::<u16>() else {
+        return false;
+    };
+    let Ok(month) = date_parts[1].parse::<u8>() else {
+        return false;
+    };
+    let Ok(day) = date_parts[2].parse::<u8>() else {
+        return false;
+    };
+    let leap_year =
+        year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400));
+    let max_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return false,
+    };
+    if year == 0 || !(1..=max_day).contains(&day) {
         return false;
     }
     let Some(zone_at) = time_and_zone
@@ -1054,6 +1069,7 @@ pub mod tests {
             "2026-09-09 21:08:28+00",
             "2026-09-09 21:08:28.9+00",
             "2026-09-09 21:08:28.927123-07:30",
+            "2024-02-29 00:00:00+00",
         ] {
             assert!(valid_pg_timestamptz(valid), "rejected {valid:?}");
         }
@@ -1071,6 +1087,10 @@ pub mod tests {
             "2026-09-09 21:08:28+00:0",
             "2026-09-09 21:08:28Z",
             "2026-09-09T21:08:28+00",
+            "0000-09-09 21:08:28+00",
+            "2026-02-29 21:08:28+00",
+            "2024-02-30 21:08:28+00",
+            "2026-04-31 21:08:28+00",
             "2026-09-09 99:08:28+00",
             "2026-99-99 12:34:28+00",
             "not-a-timestamp",
