@@ -501,8 +501,7 @@ impl TransitionFixture {
             return Err(HarnessError::InvalidFixture);
         }
         for step in &self.steps {
-            if step.fixture_ref.is_empty()
-                || step.fixture_ref.len() > HarnessBudget::MAX_FIXTURE_REF_BYTES
+            if !valid_fixture_ref(&step.fixture_ref)
                 || !matches!(
                     step.kind.as_str(),
                     "event"
@@ -565,6 +564,12 @@ impl<Event, Completion> MinimizedTrace<Event, Completion> {
         fixture.validate()?;
         Ok(fixture)
     }
+}
+
+fn valid_fixture_ref(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= HarnessBudget::MAX_FIXTURE_REF_BYTES
+        && value.bytes().all(|byte| (b' '..=b'~').contains(&byte))
 }
 
 fn valid_scenario_id(value: &str) -> bool {
@@ -971,6 +976,32 @@ pub(crate) mod tests {
             .execute(&SyntheticDomain, Facts::default(), &resolved, fixture.seed)
             .unwrap();
         assert_eq!(trace.violation, fixture.expected_violation);
+    }
+
+    #[test]
+    fn fixture_reference_ascii_boundary_matches_published_schema() {
+        let fixture: TransitionFixture = serde_json::from_str(include_str!(
+            "../tests/fixtures/m1-transition/valid/ascii-reference-boundary.json"
+        ))
+        .unwrap();
+        fixture.validate().unwrap();
+        let resolved = fixture
+            .resolve(|reference| {
+                (reference.len() == HarnessBudget::MAX_FIXTURE_REF_BYTES)
+                    .then_some(ScheduledAction::<Event, Completion>::Expire)
+            })
+            .unwrap();
+        let trace = Harness::new(fixture.budget)
+            .unwrap()
+            .execute(&SyntheticDomain, Facts::default(), &resolved, fixture.seed)
+            .unwrap();
+        assert_eq!(trace.violation, fixture.expected_violation);
+
+        let unicode: TransitionFixture = serde_json::from_str(include_str!(
+            "../tests/fixtures/m1-transition/invalid/unicode-reference.json"
+        ))
+        .unwrap();
+        assert_eq!(unicode.validate(), Err(HarnessError::InvalidFixture));
     }
 
     #[test]

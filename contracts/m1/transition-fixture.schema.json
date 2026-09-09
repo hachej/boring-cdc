@@ -72,6 +72,7 @@
           "fixture_ref": {
             "maxLength": 256,
             "minLength": 1,
+            "pattern": "^[\\u0020-\\u007e]+$",
             "type": "string"
           },
           "kind": {
