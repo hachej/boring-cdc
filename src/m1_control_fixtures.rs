@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 
 pub const HEARTBEAT_RELATION: &str = "boring_cdc_control.heartbeat";
 pub const FENCE_RELATION: &str = "boring_cdc_control.capture_fences";
@@ -217,13 +217,22 @@ impl ControlWriterState {
         nonce: u64,
         identity: FenceIdentity,
     ) -> Result<(), ProtocolFailure> {
-        if nonce == 0 || self.intended_fences.insert(nonce, identity).is_some() {
+        if nonce == 0 {
             return Err(ProtocolFailure::blocked(
                 "FENCE_NONCE_NOT_UNIQUE",
                 "before_control_dispatch",
             ));
         }
-        Ok(())
+        match self.intended_fences.entry(nonce) {
+            Entry::Vacant(entry) => {
+                entry.insert(identity);
+                Ok(())
+            }
+            Entry::Occupied(_) => Err(ProtocolFailure::blocked(
+                "FENCE_NONCE_NOT_UNIQUE",
+                "before_control_dispatch",
+            )),
+        }
     }
 
     pub fn observe(
@@ -986,6 +995,37 @@ pub mod tests {
             "FENCE_IDENTITY_MISMATCH"
         );
         assert_eq!(state.fence_proof_count(), 0);
+    }
+    #[test]
+    fn duplicate_fence_intent_does_not_replace_original_identity() {
+        let mut state = ControlWriterState::default();
+        let original = fence_identity();
+        let mut replacement = original.clone();
+        replacement.generation = 2;
+        state.intend_fence(7, original.clone()).unwrap();
+
+        let duplicate = state.intend_fence(7, replacement.clone()).unwrap_err();
+        assert_eq!(duplicate.fingerprint, "FENCE_NONCE_NOT_UNIQUE");
+        assert_eq!(duplicate.failed_boundary, "before_control_dispatch");
+
+        let mismatch = state
+            .observe(
+                &ObservedControlUpdate::fence(7, replacement),
+                Some(&committed_for_fixture()),
+            )
+            .unwrap_err();
+        assert_eq!(mismatch.fingerprint, "FENCE_IDENTITY_MISMATCH");
+        assert_eq!(mismatch.failed_boundary, "before_feedback");
+        assert_eq!(state.fence_proof_count(), 0);
+
+        let proof = state
+            .observe(
+                &ObservedControlUpdate::fence(7, original),
+                Some(&committed_for_fixture()),
+            )
+            .unwrap();
+        assert!(proof.feedback_eligible);
+        assert_eq!(state.fence_proof_count(), 1);
     }
     #[test]
     fn timestamp_shape_is_validated_not_just_nonempty() {
