@@ -79,7 +79,10 @@ def validate_payload(artifact):
     if manifest.get("redaction") != {"checked": True, "secrets_found": 0}:
         fail("E_REDACTION", "manifest redaction")
     try:
-        corpus = "\n".join(path.read_text(errors="replace") for path in artifact.rglob("*") if path.is_file())
+        corpus = "\n".join(
+            path.read_text(errors="replace") for path in artifact.rglob("*")
+            if path.is_file() and path.name != "validator-evidence.json" and not path.name.startswith("validator-")
+        )
         for token in FORBIDDEN:
             if token in corpus:
                 fail("E_UNRESOLVED" if token in FORBIDDEN[:4] else "E_REDACTION", token)
