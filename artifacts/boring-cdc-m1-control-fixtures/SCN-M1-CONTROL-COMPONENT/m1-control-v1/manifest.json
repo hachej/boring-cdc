@@ -26,7 +26,7 @@
       "argv": "scripts/e2e/m1_control_fixtures.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/e2e-1.txt",
-      "stderr_sha256": "01a54c2297d535053904aa31b3ce782e8d166bda75f82d9cff7253650479b038",
+      "stderr_sha256": "0a994fcf11c3686b94df429e41a6dd241069ebc0dc1ee47f77fbd06ecf674f1c",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/e2e-1.txt",
       "stdout_sha256": "b52c114e5ac0e23b471516a9063373c7decf274b19d16477f1f5767dccc1175a",
       "version": "fixture/v1"
@@ -35,7 +35,7 @@
       "argv": "scripts/e2e/m1_control_fixtures.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/e2e-2.txt",
-      "stderr_sha256": "738aa66cd2e06da589305767e891c00ca24a2e3880c05d21b78c196e6d692d95",
+      "stderr_sha256": "176e6177fd7b6e6f37e87dc1c0c58ca0d71162ecaf71ef338e54bda9c2e85942",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/e2e-2.txt",
       "stdout_sha256": "b52c114e5ac0e23b471516a9063373c7decf274b19d16477f1f5767dccc1175a",
       "version": "fixture/v1"
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "937dd389299171bb145f3e89debbc452284de8fe",
+  "git_commit": "8e0de87d8921f2995d175bdd3c991a69c42e260c",
   "owner_bead": "boring-cdc-m1-control-fixtures",
   "redaction": {
     "checked": true,
@@ -75,7 +75,7 @@
       "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/fault-timeline.json",
       "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/sha256.txt"
     ],
-    "digest": "dc966da3caabf092184e6645a27b9788193832ad03ed524e1fdc24aba2d9df22",
+    "digest": "8056b59394185e89b66d51c2721ab9430d715a9aec88daab61bb6e6376701e11",
     "product_faults": "publication drift, privilege/cardinality abuse, outage, truncate, slot guard, and reseed boundaries injected",
     "runtime_observed": true,
     "status": "pass"

@@ -17,7 +17,7 @@
   "binary_sha256": "3b1de1b4af88cf26ed20b0335bf5db3b75cc66907f34753784fc8cb8dee604c0",
   "configuration_fingerprint": "92e72684109f0933329f45fc573871852b7753b933babd051047ab0385d39524",
   "failure_fingerprint": null,
-  "git_commit": "937dd389299171bb145f3e89debbc452284de8fe",
+  "git_commit": "8e0de87d8921f2995d175bdd3c991a69c42e260c",
   "image_digests": {
     "15": "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
     "16": "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
