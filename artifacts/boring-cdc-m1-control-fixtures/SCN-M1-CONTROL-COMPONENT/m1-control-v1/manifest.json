@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "402ae6edf60c29f8c52d007bc5f5ab3845fd522c",
+  "git_commit": "23ae099520e4e6fb9c88f4306eca7f96a62a324a",
   "owner_bead": "boring-cdc-m1-control-fixtures",
   "redaction": {
     "checked": true,
