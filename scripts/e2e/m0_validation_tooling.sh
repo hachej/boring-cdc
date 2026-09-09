@@ -54,6 +54,13 @@ handoff.update({'bead_id':'boring-cdc-m0-validation-tooling','world_state_digest
 (tmp/'handoff.json').write_text(canon(handoff)+'\n')
 cp=subprocess.run([str(root/'scripts/validate/handoff.sh'),str(tmp/'handoff.json')],text=True,capture_output=True)
 if cp.returncode: raise SystemExit('E_CONTEXT_HANDOFF:'+cp.stdout+cp.stderr)
+# The leaf validates one handoff document; this aggregate owns only the
+# cross-document join against the actual generated context/world state.
+compat=[]
+if handoff['world_state_digest']!=world_digest:compat.append(('E_WORLD_STATE_MISMATCH','/world_state_digest'))
+if handoff['head_sha']!=pack['world_state']['git_commit']:compat.append(('E_HANDOFF_HEAD_MISMATCH','/head_sha'))
+if set(handoff['changed_paths'])!=set(state['changed_paths']):compat.append(('E_HANDOFF_PATH_MISMATCH','/changed_paths'))
+if compat:raise SystemExit('E_CONTEXT_HANDOFF_COMPATIBILITY:'+repr(compat))
 
 # Exercise actual br readiness over an isolated imported graph. Parent-child
 # edges stay non-blocking; decisions need A+B, while completion needs A+B+C+gate.

@@ -35,15 +35,25 @@ base=json.loads((valid/'handoff.json').read_text())
 state=next(a['content'] for a in pack['attachments'] if a['name']=='handoff_state')
 base.update({'bead_id':'boring-cdc-m0-validation-tooling','world_state_digest':world,'base_sha':state['implementation_range']['base_sha'],'head_sha':state['implementation_range']['head_sha'],'changed_paths':state['changed_paths']})
 
-# Submit the actual-context handoff through the official validator; malformed
-# provenance must fail with its stable schema pointer, never a shadow rule.
-bad=copy.deepcopy(base);bad['world_state_digest']='0'*63
-p=tmp/'bad-handoff.json';p.write_text(canon(bad)+'\n')
-cp=subprocess.run([str(root/'scripts/validate/handoff.sh'),str(p)],text=True,capture_output=True)
-if cp.returncode==0 or cp.stderr:raise SystemExit('E_HANDOFF_PROVENANCE_NOT_REJECTED')
-result=json.loads(cp.stdout)
-hits=[f for f in result['findings'] if f['code']=='E_DIGEST' and f['pointer']=='/world_state_digest' and f.get('owner_bead')=='boring-cdc-m0.3']
-if len(hits)!=1:raise SystemExit('E_HANDOFF_PROVENANCE_DIAGNOSTIC')
+# First require each shape-valid hostile handoffRid through the official leaf
+# validator, then exercise the aggregate-owned cross-document join against the
+# actual generated world state and handoff attachment.
+def compatibility_findings(document):
+ findings=[]
+ if document['world_state_digest']!=world:findings.append({'code':'E_WORLD_STATE_MISMATCH','pointer':'/world_state_digest','owner_bead':'boring-cdc-m0-validation-tooling'})
+ if document['head_sha']!=pack['world_state']['git_commit']:findings.append({'code':'E_HANDOFF_HEAD_MISMATCH','pointer':'/head_sha','owner_bead':'boring-cdc-m0-validation-tooling'})
+ if set(document['changed_paths'])!=set(state['changed_paths']):findings.append({'code':'E_HANDOFF_PATH_MISMATCH','pointer':'/changed_paths','owner_bead':'boring-cdc-m0-validation-tooling'})
+ return findings
+for code,pointer,field,value in (
+ ('E_WORLD_STATE_MISMATCH','/world_state_digest','world_state_digest','0'*64),
+ ('E_HANDOFF_HEAD_MISMATCH','/head_sha','head_sha','0'*40),
+ ('E_HANDOFF_PATH_MISMATCH','/changed_paths','changed_paths',['contracts/agent/handoff.schema.json'])):
+ bad=copy.deepcopy(base);bad[field]=value;p=tmp/'bad-handoff.json';p.write_text(canon(bad)+'\n')
+ cp=subprocess.run([str(root/'scripts/validate/handoff.sh'),str(p)],text=True,capture_output=True)
+ if cp.returncode or cp.stderr:raise SystemExit('E_HANDOFF_SHAPE_UNEXPECTED:'+cp.stdout+cp.stderr)
+ findings=compatibility_findings(bad)
+ hits=[f for f in findings if f=={'code':code,'pointer':pointer,'owner_bead':'boring-cdc-m0-validation-tooling'}]
+ if len(hits)!=1:raise SystemExit('E_HANDOFF_COMPATIBILITY_DIAGNOSTIC:'+code)
 
 # A stale claim must identify the changed binding and cannot be promoted by a handoff.
 claims=json.loads((valid/'claims.json').read_text()); claim=copy.deepcopy(claims['claims'][0]);actual=json.loads((valid/'actual-exact.json').read_text());actual['graph_digest']='0'*64
@@ -55,4 +65,4 @@ result=json.loads(cp.stdout);hits=[f for f in result['findings'] if f['code']=='
 if len(hits)!=1 or hits[0].get('owner_bead')!='boring-cdc-m0.3': raise SystemExit('E_STALE_CLAIM_DIAGNOSTIC')
 
 PY
-printf 'm0 aggregate hostile corpus pass seed=%s repeated=2 official_cross_stage=2 product_faults=fault_not_applicable\n' "$seed"
+printf 'm0 aggregate hostile corpus pass seed=%s repeated=2 official_cross_stage=5 product_faults=fault_not_applicable\n' "$seed"
