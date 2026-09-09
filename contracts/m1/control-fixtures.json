@@ -46,7 +46,7 @@
       "plan_scenario_execution": {
         "consumes_component_evidence": {
           "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
-          "evidence_digest": "2f84d270c7f6c3b4f7b5f97aa22b693567671af4add5994ace45df162d3d9f35",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
           "owner_bead": "boring-cdc-m1-control-fixtures",
           "scenario_id": "SCN-M1-CONTROL-COMPONENT"
         },
@@ -67,7 +67,7 @@
       "plan_scenario_execution": {
         "consumes_component_evidence": {
           "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
-          "evidence_digest": "2f84d270c7f6c3b4f7b5f97aa22b693567671af4add5994ace45df162d3d9f35",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
           "owner_bead": "boring-cdc-m1-control-fixtures",
           "scenario_id": "SCN-M1-CONTROL-COMPONENT"
         },
@@ -88,7 +88,7 @@
       "plan_scenario_execution": {
         "consumes_component_evidence": {
           "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
-          "evidence_digest": "2f84d270c7f6c3b4f7b5f97aa22b693567671af4add5994ace45df162d3d9f35",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
           "owner_bead": "boring-cdc-m1-control-fixtures",
           "scenario_id": "SCN-M1-CONTROL-COMPONENT"
         },
@@ -109,7 +109,7 @@
       "plan_scenario_execution": {
         "consumes_component_evidence": {
           "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
-          "evidence_digest": "2f84d270c7f6c3b4f7b5f97aa22b693567671af4add5994ace45df162d3d9f35",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
           "owner_bead": "boring-cdc-m1-control-fixtures",
           "scenario_id": "SCN-M1-CONTROL-COMPONENT"
         },
@@ -130,7 +130,7 @@
       "plan_scenario_execution": {
         "consumes_component_evidence": {
           "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
-          "evidence_digest": "2f84d270c7f6c3b4f7b5f97aa22b693567671af4add5994ace45df162d3d9f35",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
           "owner_bead": "boring-cdc-m1-control-fixtures",
           "scenario_id": "SCN-M1-CONTROL-COMPONENT"
         },
@@ -176,7 +176,7 @@
       "plan_scenario_execution": {
         "consumes_component_evidence": {
           "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
-          "evidence_digest": "2f84d270c7f6c3b4f7b5f97aa22b693567671af4add5994ace45df162d3d9f35",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
           "owner_bead": "boring-cdc-m1-control-fixtures",
           "scenario_id": "SCN-M1-CONTROL-COMPONENT"
         },

@@ -43,6 +43,17 @@ for case in reconciled.values():
     assert citation['artifact_path'].endswith('/manifest.json')
     assert citation['evidence_digest']==manifest['result']['digest']
 assert data['execution_ownership']['non_editable_plan_view_owner']=='boring-cdc-m0.2'
+issues={row['id']:row for row in map(json.loads,Path('.beads/issues.jsonl').read_text().splitlines())}
+expected_consumers={
+ 'boring-cdc-m2-journal':{'SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL'},
+ 'boring-cdc-m6-endurance':{'SCN-INTERNAL-CONTROL-EVENT-ROUTING'},
+ 'boring-cdc-m6-failure-matrix':{
+  'SCN-FIXED-CONTROL-ROW-CARDINALITY-AND-PRIVILEGE-ABUSE','SCN-HEARTBEAT-PERMISSION-OUTAGE',
+  'SCN-REAL-SQL-TRUNCATE-ON-A-PUBLISHED-TABLE','SCN-RE-SEED-ADMINISTRATION-CREDENTIAL-LIFETIME'}}
+for owner,scenario_ids in expected_consumers.items():
+    notes=issues[owner]['notes']
+    assert data['owner_bead'] in notes and manifest['result']['digest'] in notes
+    assert all(scenario_id in notes for scenario_id in scenario_ids)
 for token in ('TBD','TODO','FIXME','<unresolved>'): assert token not in p.read_text()
 print(f"PASS m1 control fixture scenarios={len(scenarios)} pg_majors={len(majors)} unresolved=0")
 artifact=Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1')

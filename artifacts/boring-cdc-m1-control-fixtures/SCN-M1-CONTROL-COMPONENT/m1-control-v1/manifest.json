@@ -69,13 +69,13 @@
   },
   "result": {
     "artifacts": [
-      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/packet.json",
+      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/config.json",
       "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/logs/boring-cdc.jsonl",
+      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/state/before.json",
       "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/state/after.json",
-      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/fault-timeline.json",
-      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/sha256.txt"
+      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/fault-timeline.json"
     ],
-    "digest": "2f84d270c7f6c3b4f7b5f97aa22b693567671af4add5994ace45df162d3d9f35",
+    "digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
     "product_faults": "Live PG 15/16/17 Relation/Update/Truncate tuple decoding, independently intended full fence-identity binding, and observed catalog operation/owner/membership drift; M2 adapters are not claimed",
     "runtime_observed": true,
     "status": "pass"
