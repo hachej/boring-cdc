@@ -11,7 +11,9 @@ for major in $majors; do
   docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=postgres "postgres:$major-alpine" -c wal_level=logical -c max_replication_slots=4 >/dev/null
   ready=0; i=0
   while [ "$i" -lt 60 ]; do
-    if docker exec "$name" pg_isready -U postgres >/dev/null 2>&1; then ready=1; break; fi
+    # The image briefly starts an initialization server; accept only final PID 1 postgres.
+    if [ "$(docker exec "$name" cat /proc/1/comm 2>/dev/null || true)" = postgres ] && \
+       docker exec "$name" pg_isready -U postgres >/dev/null 2>&1; then ready=1; break; fi
     i=$((i+1)); sleep 1
   done
   [ "$ready" -eq 1 ] || { echo "E_POSTGRES_HEALTH major=$major" >&2; exit 1; }
