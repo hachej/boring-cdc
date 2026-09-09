@@ -1,6 +1,6 @@
 {
   "br": "br 0.2.16",
-  "git_commit": "5e3e4faeb1aa60025cb38042ca61cf9b3eb35a94",
+  "git_commit": "e8458eb89b3a9e02e0854d1cc66301fed131d14c",
   "python": "Python 3.13.3",
   "seed": "m0-validator-v1",
   "validator": "m0-validation-tooling/1.0.0"
