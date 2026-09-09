@@ -1492,6 +1492,51 @@ archive_segment_bytes = 100000000
             base.fingerprints().runtime,
             state_changed.fingerprints().runtime
         );
+
+        for name in ["temp", "spool"] {
+            let from = format!(
+                "name = {name:?}\nroot = {root:?}\ntotal_bytes = {total}",
+                root = if name == "temp" {
+                    "state/tmp"
+                } else {
+                    "state/spool"
+                },
+                total = if name == "temp" { 200000000 } else { 300000000 }
+            );
+            let to = from.replace(
+                if name == "temp" {
+                    "200000000"
+                } else {
+                    "300000000"
+                },
+                if name == "temp" {
+                    "200000001"
+                } else {
+                    "300000001"
+                },
+            );
+            let changed =
+                load_str(&separate_filesystem_fixture().replace(&from, &to), &env()).unwrap();
+            assert_eq!(base.fingerprints().source, changed.fingerprints().source);
+            assert_eq!(
+                base.fingerprints().table_set,
+                changed.fingerprints().table_set
+            );
+            assert_eq!(
+                base.fingerprints().destination,
+                changed.fingerprints().destination
+            );
+            assert_eq!(base.fingerprints().archive, changed.fingerprints().archive);
+            assert_eq!(
+                base.fingerprints().promotion,
+                changed.fingerprints().promotion
+            );
+            assert_eq!(
+                base.fingerprints().backfill,
+                changed.fingerprints().backfill
+            );
+            assert_ne!(base.fingerprints().runtime, changed.fingerprints().runtime);
+        }
     }
 
     #[test]
@@ -2056,36 +2101,6 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
         }
     }
 
-    fn expected_fingerprint_impacts(group: &str, field: &str) -> Vec<&'static str> {
-        match group {
-            "source" if field.ends_with("_dsn_env") => vec![],
-            "source" => vec!["source", "runtime"],
-            "tables" => vec!["source", "table_set", "runtime"],
-            "storage" | "limits" | "wal" | "conditions" | "observability" | "operator"
-            | "boundary" => vec!["runtime"],
-            "budgets" => vec!["archive", "backfill", "runtime"],
-            "retention" | "backfill" => vec!["backfill", "runtime"],
-            "clickhouse" if field.ends_with("_dsn_env") => vec![],
-            "clickhouse"
-                if matches!(
-                    field,
-                    "destination_generation"
-                        | "selector_policy"
-                        | "adopted_external_fence"
-                        | "retirement_grace_ms"
-                ) =>
-            {
-                vec!["destination", "promotion", "runtime"]
-            }
-            "clickhouse" => vec!["destination", "runtime"],
-            "archive" if matches!(field, "selector_policy" | "continuity_break_policy") => {
-                vec!["archive", "promotion", "runtime"]
-            }
-            "archive" => vec!["archive", "runtime"],
-            value => panic!("unknown inventory fingerprint owner {value}.{field}"),
-        }
-    }
-
     fn fixture_value<'a>(document: &'a toml::Value, group: &str, field: &str) -> &'a toml::Value {
         if group == "boundary" {
             return document.get(field).unwrap();
@@ -2097,6 +2112,84 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
             _ => panic!("{group} is not a configuration group"),
         };
         table.get(field).unwrap()
+    }
+
+    fn inventory_fingerprint_probe(group: &str, field: &str) -> Fingerprints {
+        let mut document: toml::Value = toml::from_str(&fixture()).unwrap();
+        let target = if group == "boundary" {
+            document.get_mut(field).unwrap()
+        } else {
+            let group_value = document.get_mut(group).unwrap();
+            let table = match group_value {
+                toml::Value::Array(values) => values[0].as_table_mut().unwrap(),
+                toml::Value::Table(table) => table,
+                _ => panic!("{group} is not a configuration group"),
+            };
+            table.get_mut(field).unwrap()
+        };
+        match target {
+            toml::Value::String(value) => value.push_str("-fingerprint-probe"),
+            toml::Value::Integer(value) => *value = value.checked_add(1).unwrap(),
+            toml::Value::Boolean(value) => *value = !*value,
+            toml::Value::Array(values) => {
+                values.push(toml::Value::String("fingerprint-probe".into()))
+            }
+            toml::Value::Table(values) => {
+                values.insert(
+                    "fingerprint_probe".into(),
+                    toml::Value::String("text:nullable".into()),
+                );
+            }
+            value => panic!("unsupported fingerprint probe type: {value:?}"),
+        }
+        if (group, field) == ("budgets", "root") {
+            let storage = document.get_mut("storage").unwrap().as_table_mut().unwrap();
+            storage.insert(
+                "sqlite_path".into(),
+                toml::Value::String(".-fingerprint-probe/state/boring.db".into()),
+            );
+            storage.insert(
+                "sqlite_temp_path".into(),
+                toml::Value::String(".-fingerprint-probe/state/tmp".into()),
+            );
+            storage.insert(
+                "spool_path".into(),
+                toml::Value::String(".-fingerprint-probe/state/spool".into()),
+            );
+            document
+                .get_mut("archive")
+                .unwrap()
+                .as_table_mut()
+                .unwrap()
+                .insert(
+                    "root".into(),
+                    toml::Value::String(".-fingerprint-probe/archive/root".into()),
+                );
+        }
+        let mut raw: RawConfig = toml::from_str(&toml::to_string(&document).unwrap()).unwrap();
+        raw.source.start_replication_options.sort();
+        raw.tables.sort_by(|a, b| a.logical_id.cmp(&b.logical_id));
+        raw.budgets.sort_by(|a, b| a.name.cmp(&b.name));
+        fingerprints(&into_public(raw))
+            .unwrap_or_else(|error| panic!("fingerprint probe failed for {group}.{field}: {error}"))
+    }
+
+    fn changed_fingerprint_domains(
+        before: &Fingerprints,
+        after: &Fingerprints,
+    ) -> Vec<&'static str> {
+        [
+            ("source", before.source != after.source),
+            ("table_set", before.table_set != after.table_set),
+            ("destination", before.destination != after.destination),
+            ("archive", before.archive != after.archive),
+            ("promotion", before.promotion != after.promotion),
+            ("backfill", before.backfill != after.backfill),
+            ("runtime", before.runtime != after.runtime),
+        ]
+        .into_iter()
+        .filter_map(|(domain, changed)| changed.then_some(domain))
+        .collect()
     }
 
     #[test]
@@ -2133,14 +2226,44 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                 inventory_type(fixture_value(&document, group, field)),
                 "stale type metadata for {group}.{field}"
             );
-            assert!(!case["constraint"].as_str().unwrap().is_empty());
+            assert!(!case["constraint"]["summary"].as_str().unwrap().is_empty());
+            assert_eq!(case["vectors"]["accepted"]["mutation"], "fixture");
+            let accepted = load_str(&fixture(), &env()).unwrap();
+            let observed_changed = changed_fingerprint_domains(
+                accepted.fingerprints(),
+                &inventory_fingerprint_probe(group, field),
+            );
             assert_eq!(
-                case["fingerprint_impact"],
-                serde_json::json!(expected_fingerprint_impacts(group, field)),
+                case["fingerprint_probe"]["expected_changed"],
+                serde_json::json!(observed_changed),
                 "stale fingerprint metadata for {group}.{field}"
             );
-            assert_eq!(case["vectors"]["accepted"]["mutation"], "fixture");
-            load_str(&fixture(), &env()).unwrap();
+            assert_eq!(
+                case["fingerprint_probe"]["mutation"],
+                "same_type_change_in_representative_fixture"
+            );
+            if group == "budgets" {
+                assert_eq!(
+                    case["fingerprint_impact"]["always"],
+                    serde_json::json!(["runtime"])
+                );
+                assert_eq!(
+                    case["fingerprint_impact"]["conditional"]
+                        .as_object()
+                        .unwrap()
+                        .len(),
+                    2
+                );
+            } else {
+                assert_eq!(
+                    case["fingerprint_impact"]["always"],
+                    case["fingerprint_probe"]["expected_changed"]
+                );
+                assert_eq!(
+                    case["fingerprint_impact"]["conditional"],
+                    serde_json::json!({})
+                );
+            }
 
             let mutation = case["vectors"]["rejected"]["mutation"].as_str().unwrap();
             let expected = case["vectors"]["rejected"]["expected_error_code"]
@@ -2150,11 +2273,40 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                 load_str(&inventory_value_mutation(group, field, mutation), &env()).expect_err(id);
             assert_eq!(error.code, expected, "stale error metadata for {id}");
             assert_eq!(case["error_codes"], serde_json::json!([error.code]));
+            assert_eq!(case["constraint"]["negative_mutation"], mutation);
+            assert_eq!(case["constraint"]["expected_error_code"], error.code);
+            assert_eq!(
+                case["accepted_examples"],
+                serde_json::json!([format!("fixture::{group}.{field}::accepted")])
+            );
+            assert_eq!(
+                case["rejected_examples"],
+                serde_json::json!([format!("{mutation}::{group}.{field}::{}", error.code)])
+            );
+            assert_eq!(
+                case["redaction"],
+                "shared_config_error_contains_only_stable_code_and_field"
+            );
+            let rendered_error = error.to_string();
+            assert_eq!(rendered_error, format!("{} at {}", error.code, error.field));
+            for secret in [
+                "PG_RUNTIME",
+                "PG_CONTROL",
+                "PG_ADMIN",
+                "CH_RUNTIME",
+                "CH_MAINT",
+            ] {
+                assert!(!rendered_error.contains(secret), "{id} leaked {secret}");
+            }
             assert!(case["status_code"].is_null());
             assert!(case["log_code"].is_null());
             assert_eq!(
                 case["unit_target"],
                 "m1_config::tests::executable_case_inventory_matches_loader"
+            );
+            assert_eq!(
+                case["executable_scenario"],
+                "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader"
             );
         }
 
