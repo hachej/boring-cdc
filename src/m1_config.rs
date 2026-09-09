@@ -734,10 +734,17 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     // Budget roots are the explicit path-to-physical-filesystem association. The
     // most-specific root wins so a nested mount (for example state/tmp) can have
     // an independent budget without double-counting it against state.
-    let sqlite_budget = filesystem_budget_for_path(&raw.budgets, &raw.storage.sqlite_path)?;
-    let temp_budget = filesystem_budget_for_path(&raw.budgets, &raw.storage.sqlite_temp_path)?;
-    let spool_budget = filesystem_budget_for_path(&raw.budgets, &raw.storage.spool_path)?;
-    let archive_budget = filesystem_budget_for_path(&raw.budgets, &raw.archive.root)?;
+    let sqlite_path = Path::new(&raw.storage.sqlite_path);
+    let sqlite_root = sqlite_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let sqlite_budget = filesystem_budget_for_path(&raw.budgets, sqlite_root)?;
+    let temp_budget =
+        filesystem_budget_for_path(&raw.budgets, Path::new(&raw.storage.sqlite_temp_path))?;
+    let spool_budget =
+        filesystem_budget_for_path(&raw.budgets, Path::new(&raw.storage.spool_path))?;
+    let archive_budget = filesystem_budget_for_path(&raw.budgets, Path::new(&raw.archive.root))?;
 
     let associations = [sqlite_budget, temp_budget, spool_budget, archive_budget];
     let associated: BTreeSet<_> = associations.into_iter().collect();
@@ -1012,13 +1019,14 @@ fn safe_path(value: &str, field: &'static str) -> Result<(), ConfigError> {
 
 fn filesystem_budget_for_path(
     budgets: &[FilesystemBudget],
-    value: &str,
+    path: &Path,
 ) -> Result<usize, ConfigError> {
-    let path = Path::new(value);
     budgets
         .iter()
         .enumerate()
-        .filter(|(_, budget)| budget.root == "." || path.starts_with(Path::new(&budget.root)))
+        .filter(|(_, budget)| {
+            (budget.root == "." && !path.is_absolute()) || path.starts_with(Path::new(&budget.root))
+        })
         .max_by_key(|(_, budget)| {
             if budget.root == "." {
                 0
@@ -1103,11 +1111,20 @@ fn into_public(raw: RawConfig) -> PublicConfig {
 }
 
 fn fingerprints(config: &PublicConfig) -> Result<Fingerprints, ConfigError> {
+    let sqlite_path = Path::new(&config.storage.sqlite_path);
+    let sqlite_root = sqlite_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let state_budget = &config.budgets[filesystem_budget_for_path(&config.budgets, sqlite_root)?];
+    let archive_budget = &config.budgets
+        [filesystem_budget_for_path(&config.budgets, Path::new(&config.archive.root))?];
+
     Ok(Fingerprints {
         source: digest(&(&config.source, &config.tables))?,
         table_set: digest(&config.tables)?,
         destination: digest(&config.clickhouse)?,
-        archive: digest(&config.archive)?,
+        archive: digest(&(&config.archive, archive_budget))?,
         promotion: digest(&serde_json::json!({
             "clickhouse_generation": config.clickhouse.destination_generation,
             "clickhouse_selector": config.clickhouse.selector_policy,
@@ -1116,7 +1133,7 @@ fn fingerprints(config: &PublicConfig) -> Result<Fingerprints, ConfigError> {
             "archive_selector": config.archive.selector_policy,
             "archive_continuity": config.archive.continuity_break_policy,
         }))?,
-        backfill: digest(&(&config.backfill, &config.retention, &config.budgets))?,
+        backfill: digest(&(&config.backfill, &config.retention, state_budget))?,
         runtime: digest(config)?,
     })
 }
@@ -1168,6 +1185,63 @@ pub mod tests {
 
     fn fixture() -> String {
         include_str!("../tests/fixtures/m1_config/representative.toml").into()
+    }
+
+    fn separate_filesystem_fixture() -> String {
+        let separate_budgets = r#"[[budgets]]
+name = "state"
+root = "state"
+total_bytes = 500000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 100000000
+capture_spool_bytes = 0
+concurrent_backfill_bytes = 200000000
+archive_segment_bytes = 0
+
+[[budgets]]
+name = "temp"
+root = "state/tmp"
+total_bytes = 200000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 100000000
+capture_spool_bytes = 0
+concurrent_backfill_bytes = 0
+archive_segment_bytes = 0
+
+[[budgets]]
+name = "spool"
+root = "state/spool"
+total_bytes = 300000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 0
+capture_spool_bytes = 200000000
+concurrent_backfill_bytes = 0
+archive_segment_bytes = 0
+
+[[budgets]]
+name = "archive"
+root = "archive/root"
+total_bytes = 200000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 0
+capture_spool_bytes = 0
+concurrent_backfill_bytes = 0
+archive_segment_bytes = 100000000
+"#;
+        fixture().replacen(
+            r#"[[budgets]]
+name = "state"
+root = "."
+total_bytes = 1000000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 100000000
+capture_spool_bytes = 200000000
+concurrent_backfill_bytes = 200000000
+archive_segment_bytes = 100000000
+"#,
+            separate_budgets,
+            1,
+        )
     }
 
     #[test]
@@ -1341,62 +1415,52 @@ pub mod tests {
         let shared = load_str(&fixture(), &env()).unwrap();
         assert_eq!(shared.public().budgets.len(), 1);
 
-        let separate_budgets = r#"[[budgets]]
-name = "state"
-root = "state"
-total_bytes = 500000000
-reserved_free_bytes = 100000000
-sqlite_wal_temp_bytes = 100000000
-capture_spool_bytes = 0
-concurrent_backfill_bytes = 200000000
-archive_segment_bytes = 0
-
-[[budgets]]
-name = "temp"
-root = "state/tmp"
-total_bytes = 200000000
-reserved_free_bytes = 100000000
-sqlite_wal_temp_bytes = 100000000
-capture_spool_bytes = 0
-concurrent_backfill_bytes = 0
-archive_segment_bytes = 0
-
-[[budgets]]
-name = "spool"
-root = "state/spool"
-total_bytes = 300000000
-reserved_free_bytes = 100000000
-sqlite_wal_temp_bytes = 0
-capture_spool_bytes = 200000000
-concurrent_backfill_bytes = 0
-archive_segment_bytes = 0
-
-[[budgets]]
-name = "archive"
-root = "archive/root"
-total_bytes = 200000000
-reserved_free_bytes = 100000000
-sqlite_wal_temp_bytes = 0
-capture_spool_bytes = 0
-concurrent_backfill_bytes = 0
-archive_segment_bytes = 100000000
-"#;
-        let separate = fixture().replacen(
-            r#"[[budgets]]
-name = "state"
-root = "."
-total_bytes = 1000000000
-reserved_free_bytes = 100000000
-sqlite_wal_temp_bytes = 100000000
-capture_spool_bytes = 200000000
-concurrent_backfill_bytes = 200000000
-archive_segment_bytes = 100000000
-"#,
-            separate_budgets,
-            1,
-        );
-        let loaded = load_str(&separate, &env()).unwrap();
+        let loaded = load_str(&separate_filesystem_fixture(), &env()).unwrap();
         assert_eq!(loaded.public().budgets.len(), 4);
+    }
+
+    #[test]
+    fn filesystem_budget_changes_affect_only_applicable_domain_fingerprints() {
+        let base = load_str(&separate_filesystem_fixture(), &env()).unwrap();
+        let archive_changed = load_str(
+            &separate_filesystem_fixture().replace(
+                "total_bytes = 200000000\nreserved_free_bytes = 100000000\nsqlite_wal_temp_bytes = 0",
+                "total_bytes = 200000001\nreserved_free_bytes = 100000000\nsqlite_wal_temp_bytes = 0",
+            ),
+            &env(),
+        )
+        .unwrap();
+        assert_ne!(
+            base.fingerprints().archive,
+            archive_changed.fingerprints().archive
+        );
+        assert_eq!(
+            base.fingerprints().backfill,
+            archive_changed.fingerprints().backfill
+        );
+        assert_ne!(
+            base.fingerprints().runtime,
+            archive_changed.fingerprints().runtime
+        );
+
+        let state_changed = load_str(
+            &separate_filesystem_fixture()
+                .replace("total_bytes = 500000000", "total_bytes = 500000001"),
+            &env(),
+        )
+        .unwrap();
+        assert_eq!(
+            base.fingerprints().archive,
+            state_changed.fingerprints().archive
+        );
+        assert_ne!(
+            base.fingerprints().backfill,
+            state_changed.fingerprints().backfill
+        );
+        assert_ne!(
+            base.fingerprints().runtime,
+            state_changed.fingerprints().runtime
+        );
     }
 
     #[test]
@@ -1487,6 +1551,23 @@ archive_segment_bytes = 100000000
         let uncovered = fixture().replace("root = \".\"", "root = \"state\"");
         assert_eq!(
             load_str(&uncovered, &env()).unwrap_err().code,
+            "CONFIG_UNCOVERED_FILESYSTEM_PATH"
+        );
+
+        let database_file_is_not_a_filesystem_root =
+            fixture().replace("root = \".\"", "root = \"state/boring.db\"");
+        assert_eq!(
+            load_str(&database_file_is_not_a_filesystem_root, &env())
+                .unwrap_err()
+                .code,
+            "CONFIG_UNCOVERED_FILESYSTEM_PATH"
+        );
+        let relative_root_does_not_cover_absolute_paths =
+            fixture().replace("root = \"archive/root\"", "root = \"/archive/root\"");
+        assert_eq!(
+            load_str(&relative_root_does_not_cover_absolute_paths, &env())
+                .unwrap_err()
+                .code,
             "CONFIG_UNCOVERED_FILESYSTEM_PATH"
         );
 
