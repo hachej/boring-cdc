@@ -22,3 +22,22 @@ rust=Path('src/m1_control_fixtures.rs').read_text()
 for case in scenarios: assert case['test'].split('::')[-1] in rust,case['test']
 for token in ('TBD','TODO','FIXME','<unresolved>'): assert token not in p.read_text()
 print(f"PASS m1 control fixture scenarios={len(scenarios)} pg_majors={len(majors)} unresolved=0")
+artifact=Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1')
+if artifact.exists():
+    import hashlib,subprocess
+    subprocess.run(['scripts/validate/evidence.sh','artifacts/boring-cdc-m1-control-fixtures'],check=True,stdout=subprocess.DEVNULL)
+    digest=lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
+    inventory={line.split('  ',1)[1]:line.split('  ',1)[0] for line in (artifact/'sha256.txt').read_text().splitlines()}
+    expected={str(path.relative_to(artifact)):digest(path) for path in artifact.rglob('*') if path.is_file() and path.name not in {'manifest.json','sha256.txt'}}
+    assert inventory==expected, 'SHA-256 inventory mismatch'
+    for stem in ('e2e','faults'):
+        assert (artifact/f'stdout/{stem}-1.txt').read_bytes()==(artifact/f'stdout/{stem}-2.txt').read_bytes()
+        assert (artifact/f'stderr/{stem}-1.txt').read_bytes()==(artifact/f'stderr/{stem}-2.txt').read_bytes()
+    required_log={'schema_version','case_event_seq','bead_id','scenario_id','correlation_id','run_id','capture_epoch','component','phase','outcome','config_fingerprint','evidence_digest'}
+    rows=[json.loads(line) for line in (artifact/'logs/boring-cdc.jsonl').read_text().splitlines()]
+    assert [row['case_event_seq'] for row in rows]==list(range(1,len(rows)+1))
+    assert all(required_log<=row.keys() and row['bead_id']==data['owner_bead'] for row in rows)
+    corpus='\n'.join(path.read_text(errors='replace') for path in artifact.rglob('*') if path.is_file())
+    for forbidden in ('postgresql://','capture_fixture_only','control_fixture_only','application_fixture_only','/home/'):
+        assert forbidden not in corpus, f'redaction failure: {forbidden}'
+    print(f"PASS artifact inventory={len(inventory)} logs={len(rows)} deterministic_rerun=1 redaction=1")

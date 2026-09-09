@@ -12,7 +12,7 @@ for major in 15 16 17; do
   esac
   name="boring-cdc-m1-control-$major-$$"
   trap 'docker rm -f "$name" >/dev/null 2>&1 || true' EXIT HUP INT TERM
-  docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=postgres "$image" -c wal_level=logical -c max_replication_slots=4 >/dev/null
+  docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=postgres -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1::5432 "$image" -c wal_level=logical -c max_replication_slots=4 >/dev/null
   ready=0; i=0
   while [ "$i" -lt 60 ]; do
     # The image briefly starts an initialization server; accept only final PID 1 postgres.
@@ -25,7 +25,8 @@ for major in 15 16 17; do
   capture='postgresql://boring_cdc_capture_bootstrap:capture_fixture_only@127.0.0.1/postgres'
   # PostgreSQL proves the broad REPLICATION privilege; the Rust connector guard narrows name,
   # operation, ownership, intent, and administration-credential lifetime.
-  docker exec "$name" psql "$capture" -Atqc "SELECT (pg_create_logical_replication_slot('boring_cdc_slot','pgoutput')).slot_name" | grep -qx boring_cdc_slot
+  port=$(docker port "$name" 5432/tcp | sed 's/.*://')
+  scripts/fixtures/m1_slot_export.py 127.0.0.1 "$port" >/dev/null
   docker exec "$name" psql "$control" -Atqc "SELECT id FROM boring_cdc_control.heartbeat" | grep -qx singleton
   docker exec "$name" psql "$control" -v ON_ERROR_STOP=1 -qc "UPDATE boring_cdc_control.heartbeat SET nonce=1,updated_at=clock_timestamp() WHERE id='singleton'"
   [ "$(docker exec "$name" psql -U postgres -Atqc "SELECT nonce FROM boring_cdc_control.heartbeat WHERE id='singleton'")" = 1 ]
@@ -34,6 +35,8 @@ for major in 15 16 17; do
   docker exec "$name" psql "$control" -v ON_ERROR_STOP=1 -qc "UPDATE boring_cdc_control.capture_fences SET capture_epoch=1,generation=1,table_set_fingerprint=repeat('a',64),unique_nonce=7 WHERE id='singleton'"
   types=$(docker exec "$name" psql -U postgres -Atqc "SELECT get_byte(data,0) FROM pg_logical_slot_get_binary_changes('boring_cdc_slot',NULL,NULL,'proto_version','1','publication_names','boring_cdc_publication')")
   printf '%s\n' "$types" | grep -qx 85 # pgoutput Update
+  wire=$(printf '%s' "$types" | paste -sd, -); cargo run --quiet --example m1_control_probe -- update "$wire" >/dev/null
+  cargo run --quiet --example m1_control_probe -- zero >/dev/null
   for forbidden in \
     "INSERT INTO boring_cdc_control.heartbeat VALUES ('other',2,now())" \
     "DELETE FROM boring_cdc_control.heartbeat WHERE id='singleton'" \
@@ -48,9 +51,11 @@ for major in 15 16 17; do
   done
   docker exec "$name" psql -U postgres -qc 'TRUNCATE public.accounts'
   types=$(docker exec "$name" psql -U postgres -Atqc "SELECT get_byte(data,0) FROM pg_logical_slot_get_binary_changes('boring_cdc_slot',NULL,NULL,'proto_version','1','publication_names','boring_cdc_publication')")
-  printf '%s\n' "$types" | grep -qx 84 # pgoutput Truncate; Rust fixture asserts fail-closed routing.
+  printf '%s\n' "$types" | grep -qx 84 # pgoutput Truncate
+  wire=$(printf '%s' "$types" | paste -sd, -); cargo run --quiet --example m1_control_probe -- truncate "$wire" >/dev/null
   docker exec "$name" psql -U postgres -qc 'CREATE TABLE public.forced_drift(id bigint PRIMARY KEY); ALTER PUBLICATION boring_cdc_publication ADD TABLE public.forced_drift'
   [ "$(docker exec "$name" psql -U postgres -Atqc "SELECT count(*) FROM pg_publication_tables WHERE pubname='boring_cdc_publication'")" = 4 ]
+  cargo run --quiet --example m1_control_probe -- drift >/dev/null
   docker rm -f "$name" >/dev/null; trap - EXIT HUP INT TERM
   printf 'PASS pg=%s grants/cardinality/slot/pgoutput-update/truncate/drift\n' "$major"
 done
