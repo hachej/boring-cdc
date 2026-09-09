@@ -1,0 +1,29 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/m1/execution-trace.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Boring CDC bounded synthetic transition trace",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "synthetic", "seed", "entries", "violation"],
+  "properties": {
+    "schema_version": {"const": "boring-cdc/execution-trace/v1"},
+    "synthetic": {"const": true},
+    "seed": {"$ref": "schedule-seed.schema.json"},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["step", "action", "redacted_state", "emitted_effects", "violation"],
+        "properties": {
+          "step": {"type": "integer", "minimum": 0},
+          "action": {"enum": ["event", "completion", "advance_clock", "expiry", "cancel", "crash_restart"]},
+          "redacted_state": {"type": "string"},
+          "emitted_effects": {"type": "integer", "minimum": 0},
+          "violation": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "violation": {"type": ["string", "null"]}
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/m1/schedule-seed.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Boring CDC deterministic schedule seed",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "algorithm", "seed", "fair_scheduler_assumed", "restored_resources_assumed"],
+  "properties": {
+    "schema_version": {"const": "boring-cdc/schedule-seed/v1"},
+    "algorithm": {"const": "splitmix64-v1"},
+    "seed": {"type": "integer", "minimum": 0},
+    "fair_scheduler_assumed": {"type": "boolean"},
+    "restored_resources_assumed": {"type": "boolean"}
+  }
+}

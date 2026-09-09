@@ -1,0 +1,38 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/m1/transition-fixture.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Boring CDC synthetic transition fixture",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "scenario_id", "synthetic", "seed", "budget", "steps", "expected_violation"],
+  "properties": {
+    "schema_version": {"const": "boring-cdc/transition-fixture/v1"},
+    "scenario_id": {"pattern": "^SCN-[A-Z0-9-]+$", "type": "string"},
+    "synthetic": {"const": true},
+    "seed": {"$ref": "schedule-seed.schema.json"},
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["max_steps", "max_trace_entries", "max_minimizer_runs", "max_redacted_bytes"],
+      "properties": {
+        "max_steps": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "max_trace_entries": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "max_minimizer_runs": {"type": "integer", "minimum": 1, "maximum": 4096},
+        "max_redacted_bytes": {"type": "integer", "minimum": 1, "maximum": 16384}
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "fixture_ref"],
+        "properties": {
+          "kind": {"enum": ["event", "completion", "advance_clock", "expiry", "cancel", "crash_restart"]},
+          "fixture_ref": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "expected_violation": {"type": ["string", "null"]}
+  }
+}

@@ -1,0 +1,21 @@
+[package]
+name = "boring-cdc"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+[lib]
+name = "boring_cdc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "boring-cdc"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.143"
+
+[dev-dependencies]
+trybuild = "1.0.110"
