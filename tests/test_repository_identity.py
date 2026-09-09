@@ -81,7 +81,11 @@ class RepositoryIdentityClosureTests(unittest.TestCase):
         canonical_write(decisions_path, decisions)
         self.update_artifact_hash("ART-M0-PUBLIC-OWNER-FIXTURE", spec_path)
         self.update_artifact_hash("ART-M0-PUBLIC-OWNER-PROBE", probe_path)
-        self.update_artifact_hash("ART-M0-PUBLIC-OWNER-VALIDATION", self.checkout / OWNER_DIR / "evidence.json")
+        evidence_path = self.checkout / OWNER_DIR / "evidence.json"
+        evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+        evidence["input_sha256"] = digest(decisions_path)
+        canonical_write(evidence_path, evidence)
+        self.update_artifact_hash("ART-M0-PUBLIC-OWNER-VALIDATION", evidence_path)
         self.run_validator()
 
     def test_non_ancestor_evidence_commit_with_identical_tree_is_rejected(self):
