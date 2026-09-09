@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json,re
+import hashlib,json,re,subprocess
 from pathlib import Path
 p=Path('contracts/m1/control-fixtures.json'); data=json.loads(p.read_text())
 assert data['schema_version']=='m1-control-fixtures/v2'
@@ -29,6 +29,12 @@ assert set(reconciled)=={
  'SCN-M1-CONTROL-TRUNCATE-DETECTION','SCN-M1-CONTROL-ADMIN-LIFETIME'}
 component_fixtures=set()
 manifest=json.loads(Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json').read_text())
+implementation_paths=['src','examples','Cargo.toml','Cargo.lock']
+assert subprocess.run(['git','diff','--quiet',manifest['git_commit']+'..HEAD','--',*implementation_paths]).returncode==0, 'component implementation changed after evidence commit'
+packet=json.loads(Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/packet.json').read_text())
+binary=Path('target/debug/examples/m1_control_probe')
+assert binary.is_file(), 'run cargo test --locked --workspace --all-targets before evidence validation'
+assert hashlib.sha256(binary.read_bytes()).hexdigest()==packet['binary_sha256'], 'component binary hash mismatch'
 for case in reconciled.values():
     component=case['component_fixture']; consumer=case['plan_scenario_execution']
     assert component['evidence_owner']==data['owner_bead']
@@ -58,7 +64,6 @@ for token in ('TBD','TODO','FIXME','<unresolved>'): assert token not in p.read_t
 print(f"PASS m1 control fixture scenarios={len(scenarios)} pg_majors={len(majors)} unresolved=0")
 artifact=Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1')
 if artifact.exists():
-    import hashlib,subprocess
     subprocess.run(['scripts/validate/evidence.sh','artifacts/boring-cdc-m1-control-fixtures'],check=True,stdout=subprocess.DEVNULL)
     digest=lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
     inventory={line.split('  ',1)[1]:line.split('  ',1)[0] for line in (artifact/'sha256.txt').read_text().splitlines()}
