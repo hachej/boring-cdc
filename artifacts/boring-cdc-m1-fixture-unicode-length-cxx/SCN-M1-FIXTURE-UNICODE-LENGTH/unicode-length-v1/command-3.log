@@ -5,4 +5,5 @@ PASS valid fixture tests/fixtures/m1-transition/valid/ascii-reference-boundary.j
 PASS valid fixture tests/fixtures/m1-transition/valid/minimized.json
 PASS rejected fixture tests/fixtures/m1-transition/invalid/null-reference.json
 PASS rejected fixture tests/fixtures/m1-transition/invalid/unicode-reference.json
+PASS rejected fixture tests/fixtures/m1-transition/invalid/unicode-violation.json
 duplicate Bead IDs=0

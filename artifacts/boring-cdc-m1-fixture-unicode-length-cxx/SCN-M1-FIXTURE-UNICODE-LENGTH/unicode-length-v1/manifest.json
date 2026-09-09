@@ -28,7 +28,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-fixture-unicode-length-cxx/SCN-M1-FIXTURE-UNICODE-LENGTH/unicode-length-v1/command-3.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-fixture-unicode-length-cxx/SCN-M1-FIXTURE-UNICODE-LENGTH/unicode-length-v1/command-3.log",
-      "stdout_sha256": "c6a6bd7e3e228f7896e49de53692eaf6121c96a2b7c1883e847091575e24b252",
+      "stdout_sha256": "66d6b527fbf706e69e40fcd68029968dfabc56487eb2b9a5319d7d2bfbf07337",
       "version": "Python 3.13.3 / jsonschema 4.26.0"
     },
     {
@@ -52,7 +52,7 @@
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "5b4f2b10b30b4ba0d62c6f0b08dcd44f745639fc",
+  "git_commit": "56760fd541600799e79c1458e8ce0914ac8a8147",
   "owner_bead": "boring-cdc-m1-fixture-unicode-length-cxx",
   "redaction": {
     "checked": true,
@@ -63,17 +63,17 @@
       "artifacts/boring-cdc-m1-fixture-unicode-length-cxx/SCN-M1-FIXTURE-UNICODE-LENGTH/unicode-length-v1/proof-summary.json",
       "artifacts/boring-cdc-m1-fixture-unicode-length-cxx/SCN-M1-FIXTURE-UNICODE-LENGTH/unicode-length-v1/versions.json"
     ],
-    "digest": "7bd30708384b6e15c9089e80ade4058b0653d014e1d87a2c275ab87d47eee39f",
+    "digest": "9f8d2c32de9aa1f707bdd69649d7c3f839747cba63818956ef7e3f9f9061b639",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
   },
   "scenario_id": "SCN-M1-FIXTURE-UNICODE-LENGTH",
   "schema_version": "evidence/v1",
-  "seed": "checked fixtures: 256 ASCII bytes and 256 copies of U+00E9",
+  "seed": "checked fixtures: 256 ASCII bytes, 256 copies of U+00E9 in fixture_ref, and 128 copies in expected_violation",
   "source_preservation": {
-    "after_sha256": "2a736475035371da71615bc6a24341c847893d3763d70b1e30bedb594a952f76",
-    "before_sha256": "2a736475035371da71615bc6a24341c847893d3763d70b1e30bedb594a952f76",
+    "after_sha256": "f5d08ca5bb59004444dd249fb939fa60461317af1910a7933f77cf7f52afe0ec",
+    "before_sha256": "f5d08ca5bb59004444dd249fb939fa60461317af1910a7933f77cf7f52afe0ec",
     "preserved": true
   },
   "tier_proof": {

@@ -1,15 +1,17 @@
 {
   "artifact_digests": {
-    "contracts/m1/transition-fixture.schema.json": "a6839dbe683f6e6e9a6530ea34fd5f3cad1b6e9b2bb5df5f43bb2c93728a668b",
+    "contracts/m1/transition-fixture.schema.json": "930b1ec678763d8f9f90e522e37c56adc273672f62c261ad5fd5c07b10c7f5a9",
     "tests/fixtures/m1-transition/invalid/unicode-reference.json": "9877af7bba26f9db31d58fb3ab080766a7f7204a73e47b298fc8f00a023edfdd",
+    "tests/fixtures/m1-transition/invalid/unicode-violation.json": "258a24543719dec1c96f4b2701ba8b3ec4c4fe0e3559f59ede639b1b02eb1b22",
     "tests/fixtures/m1-transition/valid/ascii-reference-boundary.json": "e0b266f17c04074222efe3dfdf88a5ff60b3ed3582cd32c2f75e5f235642e678"
   },
   "assertions": [
-    "transition fixture references use the same printable-ASCII byte-safe encoding in JSON Schema and Rust",
-    "a schema-valid 256-byte ASCII boundary fixture deserializes, validates, resolves, and replays in Rust",
-    "the reported 256-code-point non-ASCII fixture is rejected by both JSON Schema and Rust validation"
+    "transition fixture references and expected violation identities use the same printable-ASCII byte-safe encoding in JSON Schema and Rust",
+    "a schema-valid 256-byte ASCII reference fixture deserializes, validates, resolves, and replays in Rust",
+    "the reported 256-code-point non-ASCII reference and a non-ASCII expected violation are rejected by both JSON Schema and Rust validation",
+    "a 16,384-byte ASCII expected violation remains valid independent of the lower runtime diagnostic budget because the fixture field is a replay identity, not generated diagnostic output"
   ],
-  "git_commit": "5b4f2b10b30b4ba0d62c6f0b08dcd44f745639fc",
+  "git_commit": "56760fd541600799e79c1458e8ce0914ac8a8147",
   "outcome": "pass",
   "owner_bead": "boring-cdc-m1-fixture-unicode-length-cxx",
   "scenario_id": "SCN-M1-FIXTURE-UNICODE-LENGTH",
