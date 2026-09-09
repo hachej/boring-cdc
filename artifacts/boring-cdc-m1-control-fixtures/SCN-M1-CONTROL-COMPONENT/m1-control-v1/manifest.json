@@ -8,43 +8,43 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/workspace.txt",
-      "stderr_sha256": "c6c6da2f408a26e2f29cbdc6cfc8ead2d5dc4fb6ac4b0393b95c410ffbf9d0db",
+      "stderr_sha256": "ccd836f8ba2cd162ad06c0fe9621a9c3fc30fffb1298949ebe7b4c35674b2926",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/workspace.txt",
-      "stdout_sha256": "2193b4ee3d0d38e65d796c309e184a079c736711d8afbd74cd4cb6e9f06c1133",
+      "stdout_sha256": "df540fd596a82414d569d440f528bacc335fbad868ec77176b1103e6ec4ade62",
       "version": "cargo"
     },
     {
       "argv": "cargo test --locked m1_control_fixtures::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/targeted.txt",
-      "stderr_sha256": "625b726366f8ad0b616ac3632105ec8c5967d312c104d374df9b52838e408101",
+      "stderr_sha256": "01a54c2297d535053904aa31b3ce782e8d166bda75f82d9cff7253650479b038",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/targeted.txt",
-      "stdout_sha256": "ba39a55594636754e27050c722d81afd33f4035f59ae7fd8b65114d789273dad",
+      "stdout_sha256": "30378ef3f0adad5bf824d052d2a48234ff0c0043961c27b3cd1d2d55ac56eb54",
       "version": "cargo"
     },
     {
       "argv": "scripts/e2e/m1_control_fixtures.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/e2e-1.txt",
-      "stderr_sha256": "0a994fcf11c3686b94df429e41a6dd241069ebc0dc1ee47f77fbd06ecf674f1c",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/e2e-1.txt",
-      "stdout_sha256": "b52c114e5ac0e23b471516a9063373c7decf274b19d16477f1f5767dccc1175a",
+      "stdout_sha256": "5abce8d518c5bfc6c6a01be6ec29c008c02db92f2e4529ff13849ff2a08762d8",
       "version": "fixture/v1"
     },
     {
       "argv": "scripts/e2e/m1_control_fixtures.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/e2e-2.txt",
-      "stderr_sha256": "176e6177fd7b6e6f37e87dc1c0c58ca0d71162ecaf71ef338e54bda9c2e85942",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/e2e-2.txt",
-      "stdout_sha256": "b52c114e5ac0e23b471516a9063373c7decf274b19d16477f1f5767dccc1175a",
+      "stdout_sha256": "5abce8d518c5bfc6c6a01be6ec29c008c02db92f2e4529ff13849ff2a08762d8",
       "version": "fixture/v1"
     },
     {
       "argv": "scripts/faults/m1_control_fixtures.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/faults-1.txt",
-      "stderr_sha256": "8f293ae9377bb46bfa377fb3c1ac7c8ab4f20931fe357313fdcb758f4504c6b8",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/faults-1.txt",
       "stdout_sha256": "323433ad31f34e7772cc28363ddbed795e56ca8953aaf574ba20286458295161",
       "version": "fixture/v1"
@@ -53,7 +53,7 @@
       "argv": "scripts/faults/m1_control_fixtures.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/faults-2.txt",
-      "stderr_sha256": "04422de347ef1578ce512205523c8b92b139717c094f5225f9589a290113437d",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/faults-2.txt",
       "stdout_sha256": "323433ad31f34e7772cc28363ddbed795e56ca8953aaf574ba20286458295161",
       "version": "fixture/v1"
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "8e0de87d8921f2995d175bdd3c991a69c42e260c",
+  "git_commit": "23780ac390d393b04dcd69b1e36a8aa761bd4986",
   "owner_bead": "boring-cdc-m1-control-fixtures",
   "redaction": {
     "checked": true,
@@ -75,7 +75,7 @@
       "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/fault-timeline.json",
       "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/sha256.txt"
     ],
-    "digest": "8056b59394185e89b66d51c2721ab9430d715a9aec88daab61bb6e6376701e11",
+    "digest": "8491595a100e5383752d0de85d1b1e446223c70525c14c3a7147898dc62ab57a",
     "product_faults": "publication drift, privilege/cardinality abuse, outage, truncate, slot guard, and reseed boundaries injected",
     "runtime_observed": true,
     "status": "pass"
@@ -84,14 +84,14 @@
   "schema_version": "evidence/v1",
   "seed": "m1-control-v1",
   "source_preservation": {
-    "after_sha256": "92e72684109f0933329f45fc573871852b7753b933babd051047ab0385d39524",
-    "before_sha256": "92e72684109f0933329f45fc573871852b7753b933babd051047ab0385d39524",
+    "after_sha256": "5dd9ffc68d78649321593ddfdab927f1b9153b7a7ef0667315737efad908de69",
+    "before_sha256": "5dd9ffc68d78649321593ddfdab927f1b9153b7a7ef0667315737efad908de69",
     "preserved": true
   },
   "tier_proof": {
     "boundary_e2e": true,
     "clean_clone": false,
-    "clean_environment": false,
+    "clean_environment": true,
     "consumed_contract_vectors": true,
     "deterministic_rerun": true,
     "endurance": false,
