@@ -76,6 +76,9 @@ for major in 15 16 17; do
   docker exec "$name" psql -U postgres -qc 'ALTER TABLE boring_cdc_control.heartbeat ADD COLUMN unexpected text; UPDATE boring_cdc_control.heartbeat SET nonce=4,updated_at=clock_timestamp()'
   cargo run --quiet --example m1_control_probe -- shape "$(changes)" >/dev/null
   docker exec "$name" psql -U postgres -qc 'ALTER TABLE boring_cdc_control.heartbeat DROP COLUMN unexpected'
+  docker exec "$name" psql -U postgres -qc 'ALTER TABLE boring_cdc_control.heartbeat ALTER COLUMN updated_at DROP NOT NULL; UPDATE boring_cdc_control.heartbeat SET nonce=5,updated_at=NULL'
+  cargo run --quiet --example m1_control_probe -- tuple-shape "$(changes)" >/dev/null
+  docker exec "$name" psql -U postgres -qc 'UPDATE boring_cdc_control.heartbeat SET updated_at=clock_timestamp(); ALTER TABLE boring_cdc_control.heartbeat ALTER COLUMN updated_at SET NOT NULL'
 
   docker exec "$name" psql -U postgres -qc 'TRUNCATE public.accounts'
   cargo run --quiet --example m1_control_probe -- truncate "$(changes)" >/dev/null

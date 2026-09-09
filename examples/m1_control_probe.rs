@@ -63,15 +63,21 @@ fn main() {
             assert_eq!(failure.fingerprint, "CONTROL_CARDINALITY_INVALID");
             println!("PASS live_cardinality=block_before_feedback");
         }
-        "nonce" | "shape" => {
+        "nonce" | "shape" | "tuple-shape" => {
             let messages = decode_hex_messages(&std::env::args().nth(2).expect("wire hex"));
-            let expected_nonce = if mode == "nonce" { 999 } else { 4 };
+            let expected_nonce = if mode == "nonce" {
+                999
+            } else if mode == "shape" {
+                4
+            } else {
+                5
+            };
             let failure = decode_control_update(&messages, ControlKind::Heartbeat, expected_nonce)
                 .unwrap_err();
-            let expected = if mode == "nonce" {
-                "CONTROL_NONCE_MISMATCH"
-            } else {
-                "CONTROL_RELATION_SHAPE_INVALID"
+            let expected = match mode.as_str() {
+                "nonce" => "CONTROL_NONCE_MISMATCH",
+                "shape" => "CONTROL_RELATION_SHAPE_INVALID",
+                _ => "CONTROL_TUPLE_SHAPE_INVALID",
             };
             assert_eq!(failure.fingerprint, expected);
             println!("PASS live_{mode}_mismatch=block_before_feedback");

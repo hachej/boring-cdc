@@ -416,7 +416,8 @@ pub fn heartbeat_outage(wal_headroom_bytes: u64) -> HeartbeatDegraded {
 struct PgoutputRelation {
     namespace: String,
     name: String,
-    columns: Vec<(String, u32)>,
+    replica_identity: u8,
+    columns: Vec<(bool, String, u32)>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -483,12 +484,15 @@ fn decode_relation(bytes: &[u8]) -> Result<(u32, PgoutputRelation), ProtocolFail
     let relation_id = cursor.u32()?;
     let namespace = cursor.cstr()?;
     let name = cursor.cstr()?;
-    cursor.u8()?;
+    let replica_identity = cursor.u8()?;
     let count = usize::from(cursor.u16()?);
     let mut columns = Vec::with_capacity(count);
     for _ in 0..count {
-        cursor.u8()?;
-        columns.push((cursor.cstr()?, cursor.u32()?));
+        let flags = cursor.u8()?;
+        if flags & !1 != 0 {
+            return Err(ProtocolFailure::wire("CONTROL_RELATION_SHAPE_INVALID"));
+        }
+        columns.push((flags == 1, cursor.cstr()?, cursor.u32()?));
         cursor.u32()?;
     }
     cursor.finish()?;
@@ -497,6 +501,7 @@ fn decode_relation(bytes: &[u8]) -> Result<(u32, PgoutputRelation), ProtocolFail
         PgoutputRelation {
             namespace,
             name,
+            replica_identity,
             columns,
         },
     ))
@@ -533,20 +538,24 @@ fn tuple_text(values: &[PgoutputTupleValue], index: usize) -> Result<&str, Proto
     }
 }
 
-fn expected_relation(kind: ControlKind) -> (&'static str, &'static [(&'static str, u32)]) {
+fn expected_relation(kind: ControlKind) -> (&'static str, &'static [(bool, &'static str, u32)]) {
     match kind {
         ControlKind::Heartbeat => (
             HEARTBEAT_RELATION,
-            &[("id", 25), ("nonce", 20), ("updated_at", 1184)],
+            &[
+                (true, "id", 25),
+                (false, "nonce", 20),
+                (false, "updated_at", 1184),
+            ],
         ),
         ControlKind::CaptureFence => (
             FENCE_RELATION,
             &[
-                ("id", 25),
-                ("capture_epoch", 20),
-                ("generation", 20),
-                ("table_set_fingerprint", 25),
-                ("unique_nonce", 20),
+                (true, "id", 25),
+                (false, "capture_epoch", 20),
+                (false, "generation", 20),
+                (false, "table_set_fingerprint", 25),
+                (false, "unique_nonce", 20),
             ],
         ),
     }
@@ -577,12 +586,13 @@ pub fn decode_control_update(
                     .ok_or_else(|| ProtocolFailure::wire("CONTROL_RELATION_UNKNOWN"))?;
                 let qualified = format!("{}.{}", relation.namespace, relation.name);
                 if qualified != expected_name
+                    || relation.replica_identity != b'd'
                     || relation.columns.len() != expected_columns.len()
-                    || !relation
-                        .columns
-                        .iter()
-                        .zip(expected_columns)
-                        .all(|((name, oid), expected)| name == expected.0 && oid == &expected.1)
+                    || !relation.columns.iter().zip(expected_columns).all(
+                        |((key, name, oid), expected)| {
+                            key == &expected.0 && name == expected.1 && oid == &expected.2
+                        },
+                    )
                 {
                     return Err(ProtocolFailure::wire("CONTROL_RELATION_SHAPE_INVALID"));
                 }
@@ -600,7 +610,11 @@ pub fn decode_control_update(
                 };
                 let new = decode_tuple(&mut cursor)?;
                 cursor.finish()?;
-                if new.len() != expected_columns.len() {
+                if new.len() != expected_columns.len()
+                    || new
+                        .iter()
+                        .any(|value| !matches!(value, PgoutputTupleValue::Text(_)))
+                {
                     return Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"));
                 }
                 let new_key = tuple_text(&new, 0)?.to_owned();
@@ -610,8 +624,28 @@ pub fn decode_control_update(
                     tuple_text(&old, 0)?.to_owned()
                 };
                 let nonce_index = match expected_kind {
-                    ControlKind::Heartbeat => 1,
-                    ControlKind::CaptureFence => 4,
+                    ControlKind::Heartbeat => {
+                        if tuple_text(&new, 2)?.is_empty() {
+                            return Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"));
+                        }
+                        1
+                    }
+                    ControlKind::CaptureFence => {
+                        for index in [1, 2] {
+                            tuple_text(&new, index)?.parse::<u64>().map_err(|_| {
+                                ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID")
+                            })?;
+                        }
+                        let fingerprint = tuple_text(&new, 3)?;
+                        if fingerprint.len() != 64
+                            || !fingerprint
+                                .bytes()
+                                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+                        {
+                            return Err(ProtocolFailure::wire("CONTROL_TUPLE_SHAPE_INVALID"));
+                        }
+                        4
+                    }
                 };
                 let nonce = tuple_text(&new, nonce_index)?
                     .parse::<u64>()
@@ -626,7 +660,7 @@ pub fn decode_control_update(
                     new_key,
                     changed_columns: expected_columns[1..]
                         .iter()
-                        .map(|(name, _)| (*name).to_owned())
+                        .map(|(_, name, _)| (*name).to_owned())
                         .collect(),
                     affected_rows: 1,
                     nonce,
