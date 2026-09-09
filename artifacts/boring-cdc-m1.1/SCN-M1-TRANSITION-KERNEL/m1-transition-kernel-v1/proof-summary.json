@@ -13,7 +13,7 @@
     "contracts/m1/schedule-seed.schema.json": "3a2643f922cbbfa480aa12c7dea098628aa37ba02cf1db6486dd0a0ea7969b45",
     "contracts/m1/transition-fixture.schema.json": "d7d03e5f3eee2a43c944a0b180eba82d4566fb67155099813995abb4e3c43c67"
   },
-  "git_commit": "3795da1591e484df53286c8eae61310736ee5fe3",
+  "git_commit": "4c75d371a8de480e540eb0bc03c37ee15f3372ec",
   "outcome": "pass",
   "owner_bead": "boring-cdc-m1.1",
   "scenario_id": "SCN-M1-TRANSITION-KERNEL",

@@ -19,16 +19,16 @@
       "stderr_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-2.log",
-      "stdout_sha256": "f4fbd04fc326e00b04000e3e6aa4703c94972466b2d5f3b1da029561415c3134",
+      "stdout_sha256": "0f9a8bafd95873391a60a8fa3f8f786178406f0974c0ca90522ceb09cbf14272",
       "version": "cargo 1.95.0"
     },
     {
       "argv": "cargo test --locked --quiet --test compile_fail",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-3.stderr",
-      "stderr_sha256": "efdc0c65137b3dbba032fb3d59931d6e284505280f455d33e2a8d38fb1644de9",
+      "stderr_sha256": "d40c2ee884fc95957af65c0b1902b36b9b6344828fe9d83b71e23a6b37ad5aa2",
       "stdout_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-3.log",
-      "stdout_sha256": "24599e1f08c9231525adba76c10b2a24a5be5dfcecc8ab17a1bb086acd090065",
+      "stdout_sha256": "517b1ae5c7104d54421bde6447a82dd1f321da3aad379237c0d9d00b20cee3de",
       "version": "cargo 1.95.0"
     },
     {
@@ -55,22 +55,13 @@
       "stderr_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-6.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-6.log",
-      "stdout_sha256": "37e53525d89e9b65c59de53925d57a893e049e06edefab7fa922bb24de8858e2",
+      "stdout_sha256": "81a6f776c83bf1ad7c9e049ad5c018048899a220efd39a665ce7d0cabdf23598",
       "version": "br 0.2.16"
-    },
-    {
-      "argv": "scripts/validate/evidence.sh artifacts/boring-cdc-m1.1",
-      "exit_code": 0,
-      "stderr_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-7.stderr",
-      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-7.log",
-      "stdout_sha256": "0ff72f4d0097bfbdad328e44c37a6e1e67c9d9702b1d4bfa51dc1720a6e758c5",
-      "version": "core-validators/1.0.0"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "3795da1591e484df53286c8eae61310736ee5fe3",
+  "git_commit": "4c75d371a8de480e540eb0bc03c37ee15f3372ec",
   "owner_bead": "boring-cdc-m1.1",
   "redaction": {
     "checked": true,
@@ -81,7 +72,7 @@
       "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/proof-summary.json",
       "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/versions.json"
     ],
-    "digest": "a4e766e226459e758deb5ccfe960370e26b736cc1412775d616d699464e06bd5",
+    "digest": "fd78b74280fe21f386789232e69dde64d1fc2981155e8531b727bbbe660fd638",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
