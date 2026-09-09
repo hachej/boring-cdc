@@ -55,3 +55,7 @@ Planning and M0 contract work. No production-ready connector exists yet. `br rea
 ## Comparisons
 
 The accompanying experiment compares externally visible behavior with Estuary as a managed reference implementation. Debezium may be used to explain capture and offset design. This repository is not a vendor leaderboard.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE) (`Apache-2.0`).
