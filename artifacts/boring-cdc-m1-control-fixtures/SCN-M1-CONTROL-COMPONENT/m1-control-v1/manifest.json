@@ -8,9 +8,9 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/workspace.txt",
-      "stderr_sha256": "949e2ac479c8c577c4f2033de82787e0696c95b4d828a947f8c087673ff7c0f5",
+      "stderr_sha256": "98da438e8cfeec4b6d28b04dda1be5f5b68957cdb0d2a5fb7c95f092c185161c",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/workspace.txt",
-      "stdout_sha256": "fc2f34e05a2c65dba798fcbf0ea67ff21486c4bc5059c94b135a4c936892f692",
+      "stdout_sha256": "0e0efc6a2cd84e90c4858803cb1b40a51cef8d9784b5a72294d8d13f303d5393",
       "version": "cargo"
     },
     {
@@ -19,7 +19,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/targeted.txt",
       "stderr_sha256": "01a54c2297d535053904aa31b3ce782e8d166bda75f82d9cff7253650479b038",
       "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/targeted.txt",
-      "stdout_sha256": "436bcc6534903c3f5e058a31152430f6c49e7a4a0eb1de069d54fd71eb347cf9",
+      "stdout_sha256": "4016fd780e4afeecbd34d88ea6ac8290bf5d503014f3d25efd82362dc26be597",
       "version": "cargo"
     },
     {
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "23ae099520e4e6fb9c88f4306eca7f96a62a324a",
+  "git_commit": "e491ee88d378e8b1c57fe71aff783db1af1b376f",
   "owner_bead": "boring-cdc-m1-control-fixtures",
   "redaction": {
     "checked": true,
