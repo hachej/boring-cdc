@@ -1,0 +1,133 @@
+schema_version = 1
+
+[source]
+runtime_dsn_env = "PG_RUNTIME"
+control_writer_dsn_env = "PG_CONTROL"
+administration_dsn_env = "PG_ADMIN"
+publication = "boring_publication"
+slot = "boring_slot"
+copy_both_transport = "pgwire-copyboth-v1"
+advisory_lock_derivation = "sha256-system-database-publication-slot-v1"
+lock_probe_interval_ms = 1000
+ownership_deadline_ms = 5000
+maximum_operation_ms = 10000
+stale_owner_takeover_ms = 15000
+heartbeat_cadence_ms = 5000
+verify_tls = true
+
+[[tables]]
+logical_id = "orders"
+source_relation = "public.orders"
+replica_key = ["id"]
+key_type_policy = "canonical-v1"
+relation_contract = { id = "int8:not-null", total = "numeric:nullable" }
+
+[storage]
+sqlite_path = "state/boring.db"
+sqlite_temp_path = "state/tmp"
+spool_path = "state/spool"
+filesystem = "ext4"
+journal_mode = "WAL"
+synchronous = "FULL"
+auto_vacuum = "INCREMENTAL"
+checkpoint_pages = 1000
+vacuum_pages = 100
+unsafe_local_experiment = false
+
+[limits]
+max_wire_frame_bytes = 1048576
+max_event_bytes = 4194304
+max_row_bytes = 2097152
+max_transaction_bytes = 67108864
+max_transaction_events = 100000
+process_memory_bytes = 268435456
+
+[[budgets]]
+name = "state"
+root = "state"
+total_bytes = 1000000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 100000000
+capture_spool_bytes = 200000000
+concurrent_backfill_bytes = 200000000
+archive_segment_bytes = 100000000
+
+[retention]
+replay_window_ms = 86400000
+usable_anchor_count = 2
+invalid_generation_ms = 86400000
+metadata_gc_ms = 604800000
+
+[wal]
+max_slot_wal_keep_bytes = 10737418240
+source_free_bytes = 21474836480
+production_bytes_per_second = 1048576
+monitor_delay_ms = 10000
+reaction_reserve_bytes = 1073741824
+missing_metric_policy = "block_new_bootstrap"
+
+[backfill]
+chunk_rows = 1000
+chunk_bytes = 16777216
+chunk_duration_ms = 30000
+concurrency = 2
+exporter_lifetime_ms = 3600000
+importer_lifetime_ms = 3600000
+guard_lifetime_ms = 3600000
+guard_keepalive_ms = 5000
+session_timeout_ms = 30000
+ddl_waiter_bound_ms = 5000
+source_impact_bytes = 1073741824
+
+[clickhouse]
+endpoint = "https://clickhouse.local:8443"
+server_version = "pinned-server"
+client_version = "pinned-client"
+runtime_dsn_env = "CH_RUNTIME"
+maintenance_dsn_env = "CH_MAINT"
+contract_id = "clickhouse-v1"
+history_object = "events_history"
+selector_object = "generation_selector"
+history_quota_bytes = 10737418240
+synchronous_insert = true
+fsync_after_insert = true
+rust_insert_finalization = "end-and-wait"
+destination_generation = 1
+selector_policy = "greatest-valid-fence"
+adopted_external_fence = 0
+retirement_grace_ms = 86400000
+audit_bytes = 1048576
+audit_events = 10000
+audit_time_ms = 10000
+audit_cadence_ms = 60000
+audit_freshness_ms = 300000
+verify_tls = true
+
+[archive]
+root = "archive"
+filesystem = "ext4"
+budget_bytes = 1000000000
+schedule_ms = 60000
+formats = ["jsonl", "parquet"]
+writer_crate = "pinned-parquet"
+writer_version = "pinned-version"
+compression = "zstd-pinned"
+segment_bytes = 67108864
+path_encoding = "opaque_ascii"
+filesystem_policy = "descriptor_relative_no_follow_exclusive"
+ready_marker = "SEGMENT_READY"
+selector_policy = "immutable_promotion_fence"
+continuity_break_policy = "new_destination_identity"
+audit_bytes = 1048576
+audit_events = 10000
+audit_time_ms = 10000
+audit_cadence_ms = 60000
+audit_freshness_ms = 300000
+
+[conditions]
+warning = 60
+action = 75
+critical = 90
+hard = 100
+freshness_ms = 30000
+hysteresis_ms = 5000
