@@ -12,10 +12,10 @@ coverage={x['id']:x['owner_bead'] for x in json.loads(Path('contracts/coverage/p
 owned={x['id'] for x in json.loads(Path('contracts/coverage/plan-to-beads.json').read_text())['assignments'] if x['owner_bead']=='boring-cdc-m1-control-fixtures'}
 assert set(data['owned_plan_ids'])==owned,(set(data['owned_plan_ids'])^owned)
 required={
- 'SCN-FIXED-CONTROL-ROW-CARDINALITY-AND-PRIVILEGE-ABUSE','SCN-HEARTBEAT-PERMISSION-OUTAGE',
- 'SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL','SCN-INTERNAL-CONTROL-EVENT-ROUTING',
- 'SCN-REAL-SQL-TRUNCATE-ON-A-PUBLISHED-TABLE','SCN-EXTERNAL-LIVE-PUBLICATION-MUTATION',
- 'SCN-TIMELINE-SOURCE-PUBLICATION-SLOT-MISMATCH','SCN-RE-SEED-ADMINISTRATION-CREDENTIAL-LIFETIME',
+ 'SCN-M1-CONTROL-FIXED-ROW-ABUSE','SCN-M1-CONTROL-HEARTBEAT-OUTAGE',
+ 'SCN-M1-CONTROL-IDLE-HEARTBEAT','SCN-M1-CONTROL-INTERNAL-NOOP',
+ 'SCN-M1-CONTROL-TRUNCATE-DETECTION','SCN-EXTERNAL-LIVE-PUBLICATION-MUTATION',
+ 'SCN-TIMELINE-SOURCE-PUBLICATION-SLOT-MISMATCH','SCN-M1-CONTROL-ADMIN-LIFETIME',
  'SCN-CRASH-DURING-TABLE-ADD-RE-SEED'}
 assert required <= set(ids)
 rust=Path('src/m1_control_fixtures.rs').read_text()

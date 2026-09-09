@@ -28,28 +28,38 @@
   "scenarios": [
     {
       "expected": "exactly_one_row_and_forbidden_dml_denied",
-      "id": "SCN-FIXED-CONTROL-ROW-CARDINALITY-AND-PRIVILEGE-ABUSE",
-      "test": "m1_control_fixtures::tests::zero_or_multiple_control_rows_block"
+      "id": "SCN-M1-CONTROL-FIXED-ROW-ABUSE",
+      "plan_scenario_owner": "boring-cdc-m6-failure-matrix",
+      "test": "m1_control_fixtures::tests::zero_or_multiple_control_rows_block",
+      "traceability_plan_scenario": "SCN-FIXED-CONTROL-ROW-CARDINALITY-AND-PRIVILEGE-ABUSE"
     },
     {
       "expected": "degraded_no_synthetic_feedback",
-      "id": "SCN-HEARTBEAT-PERMISSION-OUTAGE",
-      "test": "m1_control_fixtures::tests::heartbeat_cannot_feedback_before_durable_commit"
+      "id": "SCN-M1-CONTROL-HEARTBEAT-OUTAGE",
+      "plan_scenario_owner": "boring-cdc-m6-failure-matrix",
+      "test": "m1_control_fixtures::tests::heartbeat_cannot_feedback_before_durable_commit",
+      "traceability_plan_scenario": "SCN-HEARTBEAT-PERMISSION-OUTAGE"
     },
     {
       "expected": "published_heartbeat_only_feedback",
-      "id": "SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL",
-      "test": "m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop"
+      "id": "SCN-M1-CONTROL-IDLE-HEARTBEAT",
+      "plan_scenario_owner": "boring-cdc-m2-journal",
+      "test": "m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop",
+      "traceability_plan_scenario": "SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL"
     },
     {
       "expected": "journal_noop_checkpointable",
-      "id": "SCN-INTERNAL-CONTROL-EVENT-ROUTING",
-      "test": "m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop"
+      "id": "SCN-M1-CONTROL-INTERNAL-NOOP",
+      "plan_scenario_owner": "boring-cdc-m6-endurance",
+      "test": "m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop",
+      "traceability_plan_scenario": "SCN-INTERNAL-CONTROL-EVENT-ROUTING"
     },
     {
       "expected": "block_before_feedback_requires_reseed",
-      "id": "SCN-REAL-SQL-TRUNCATE-ON-A-PUBLISHED-TABLE",
-      "test": "m1_control_fixtures::tests::truncate_is_detection_only"
+      "id": "SCN-M1-CONTROL-TRUNCATE-DETECTION",
+      "plan_scenario_owner": "boring-cdc-m6-failure-matrix",
+      "test": "m1_control_fixtures::tests::truncate_is_detection_only",
+      "traceability_plan_scenario": "SCN-REAL-SQL-TRUNCATE-ON-A-PUBLISHED-TABLE"
     },
     {
       "expected": "ownership_denied_or_drift_requires_reseed",
@@ -78,8 +88,10 @@
     },
     {
       "expected": "admin_absent_before_capture_exporter",
-      "id": "SCN-RE-SEED-ADMINISTRATION-CREDENTIAL-LIFETIME",
-      "test": "m1_control_fixtures::tests::administration_credential_is_gone_before_exporter"
+      "id": "SCN-M1-CONTROL-ADMIN-LIFETIME",
+      "plan_scenario_owner": "boring-cdc-m6-failure-matrix",
+      "test": "m1_control_fixtures::tests::administration_credential_is_gone_before_exporter",
+      "traceability_plan_scenario": "SCN-RE-SEED-ADMINISTRATION-CREDENTIAL-LIFETIME"
     },
     {
       "expected": "full_reseed_required_no_live_alter",
@@ -90,14 +102,17 @@
   "schema_version": "m1-control-fixtures/v1",
   "supported_postgresql_majors": [
     {
+      "image": "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
       "major": 15,
       "provenance": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol"
     },
     {
+      "image": "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
       "major": 16,
       "provenance": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol"
     },
     {
+      "image": "postgres@sha256:c7526c0f6c3f30260a563d7bcf8ad778effac59a44f8ffa86678c35418338609",
       "major": 17,
       "provenance": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol"
     }

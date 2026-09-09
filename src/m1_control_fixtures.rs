@@ -153,8 +153,25 @@ pub struct JournalControlNoOp {
     pub feedback_eligible: bool,
 }
 
-/// State changed only by the capture-priority writer. Adapters persist the returned no-op in the
-/// same journal transaction as the complete source boundary before setting `durable=true`.
+/// Capability emitted only by the journal transaction owner after atomically persisting the
+/// control no-op and complete source boundary. There is intentionally no public constructor.
+pub struct JournalCommitProof {
+    _private: (),
+}
+#[cfg(test)]
+fn committed_for_fixture() -> JournalCommitProof {
+    JournalCommitProof { _private: () }
+}
+
+/// State changed only by the capture-priority writer. Persistent adapters reconstruct this state
+/// from SQLite and can advance it only while presenting a [`JournalCommitProof`].
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct ControlHistorySnapshot {
+    pub last_heartbeat_nonce: Option<u64>,
+    pub intended_fence_nonces: BTreeSet<u64>,
+    pub observed_fence_nonces: BTreeSet<u64>,
+}
+
 #[derive(Default)]
 pub struct ControlWriterState {
     last_heartbeat_nonce: Option<u64>,
@@ -162,6 +179,25 @@ pub struct ControlWriterState {
     observed_fence_nonces: BTreeSet<u64>,
 }
 impl ControlWriterState {
+    /// Reconstructs writer state from the SQLite transaction owner's durable snapshot.
+    pub fn from_persisted(snapshot: ControlHistorySnapshot) -> Result<Self, ProtocolFailure> {
+        if snapshot.intended_fence_nonces.contains(&0)
+            || !snapshot
+                .observed_fence_nonces
+                .is_subset(&snapshot.intended_fence_nonces)
+        {
+            return Err(ProtocolFailure::blocked(
+                "CONTROL_HISTORY_INVALID",
+                "before_control_dispatch",
+            ));
+        }
+        Ok(Self {
+            last_heartbeat_nonce: snapshot.last_heartbeat_nonce,
+            intended_fence_nonces: snapshot.intended_fence_nonces,
+            observed_fence_nonces: snapshot.observed_fence_nonces,
+        })
+    }
+
     pub fn intend_fence(&mut self, nonce: u64) -> Result<(), ProtocolFailure> {
         if nonce == 0 || !self.intended_fence_nonces.insert(nonce) {
             return Err(ProtocolFailure::blocked(
@@ -175,8 +211,9 @@ impl ControlWriterState {
     pub fn observe(
         &mut self,
         update: &ObservedControlUpdate,
-        durable: bool,
+        commit_proof: Option<&JournalCommitProof>,
     ) -> Result<JournalControlNoOp, ProtocolFailure> {
+        let durable = commit_proof.is_some();
         let expected_columns: BTreeSet<String> = match update.kind {
             ControlKind::Heartbeat => ["nonce", "updated_at"]
                 .into_iter()
@@ -263,49 +300,83 @@ pub enum SlotIntent {
     Bootstrap,
     FullReseed,
 }
-#[derive(Clone, Debug, Eq, PartialEq)]
+
+/// Opaque capabilities supplied by the ownership and SQLite intent owners. These types have no
+/// public constructors, so raw configuration or network input cannot mint slot authority.
+pub struct OwnershipLocks {
+    _private: (),
+}
+pub struct PersistedSlotIntent {
+    intent: SlotIntent,
+}
+pub struct AdministrationSession {
+    _private: (),
+}
+pub struct CaptureBootstrapSession {
+    _private: (),
+}
+impl AdministrationSession {
+    /// Consumes the administration session and drops its credential-bearing state.
+    pub fn drop_credential(self) -> CaptureBootstrapSession {
+        CaptureBootstrapSession { _private: () }
+    }
+}
+#[cfg(test)]
+fn fixture_slot_authority(
+    intent: SlotIntent,
+) -> (OwnershipLocks, PersistedSlotIntent, CaptureBootstrapSession) {
+    (
+        OwnershipLocks { _private: () },
+        PersistedSlotIntent { intent },
+        AdministrationSession { _private: () }.drop_credential(),
+    )
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SnapshotMode {
+    ExportSnapshot,
+    NoExport,
+}
 pub struct SlotCreationRequest<'a> {
     pub configured_slot: &'a str,
     pub requested_slot: &'a str,
     pub plugin: &'a str,
-    pub export_snapshot: bool,
-    pub state_lock_held: bool,
-    pub source_lock_held: bool,
-    pub persisted_intent: Option<SlotIntent>,
-    pub administration_credential_loaded: bool,
+    pub snapshot_mode: SnapshotMode,
+    pub ownership: Option<&'a OwnershipLocks>,
+    pub persisted_intent: Option<&'a PersistedSlotIntent>,
+    pub capture_session: Option<&'a CaptureBootstrapSession>,
 }
-pub fn authorize_slot_creation(request: &SlotCreationRequest<'_>) -> Result<(), ProtocolFailure> {
-    if request.administration_credential_loaded {
+pub fn authorize_slot_creation(
+    request: &SlotCreationRequest<'_>,
+) -> Result<SlotIntent, ProtocolFailure> {
+    if request.capture_session.is_none() {
         return Err(ProtocolFailure::blocked(
             "ADMIN_CREDENTIAL_PRESENT",
             "before_exporter_session",
         ));
     }
-    if !request.state_lock_held || !request.source_lock_held {
+    if request.ownership.is_none() {
         return Err(ProtocolFailure::blocked(
             "OWNERSHIP_LOCK_MISSING",
             "before_slot_creation",
         ));
     }
-    if request.persisted_intent.is_none() {
-        return Err(ProtocolFailure::blocked(
-            "SLOT_INTENT_MISSING",
-            "before_slot_creation",
-        ));
-    }
+    let intent = request
+        .persisted_intent
+        .ok_or_else(|| ProtocolFailure::blocked("SLOT_INTENT_MISSING", "before_slot_creation"))?;
     if request.requested_slot != request.configured_slot {
         return Err(ProtocolFailure::blocked(
             "SLOT_NAME_MISMATCH",
             "before_slot_creation",
         ));
     }
-    if request.plugin != "pgoutput" || !request.export_snapshot {
+    if request.plugin != "pgoutput" || request.snapshot_mode != SnapshotMode::ExportSnapshot {
         return Err(ProtocolFailure::blocked(
             "SLOT_PROTOCOL_MISMATCH",
             "before_slot_creation",
         ));
     }
-    Ok(())
+    Ok(intent.intent)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -322,6 +393,22 @@ pub fn authorize_live_publication_change(change: TableSetChange) -> Result<(), P
         )),
     }
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HeartbeatDegraded {
+    pub condition: &'static str,
+    pub failure_fingerprint: &'static str,
+    pub wal_headroom_bytes: u64,
+    pub feedback_advanced: bool,
+}
+pub fn heartbeat_outage(wal_headroom_bytes: u64) -> HeartbeatDegraded {
+    HeartbeatDegraded {
+        condition: "heartbeat_degraded",
+        failure_fingerprint: "HEARTBEAT_WRITE_UNAVAILABLE",
+        wal_headroom_bytes,
+        feedback_advanced: false,
+    }
+}
+
 pub fn observe_truncate(operation: PublicationOperation) -> Result<(), ProtocolFailure> {
     if operation == PublicationOperation::Truncate {
         Err(ProtocolFailure::blocked(
@@ -394,16 +481,19 @@ pub const ROLE_GRANTS: &[(&str, &[&str], &[&str])] = &[
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    fn slot<'a>() -> SlotCreationRequest<'a> {
+    fn slot<'a>(
+        ownership: &'a OwnershipLocks,
+        intent: &'a PersistedSlotIntent,
+        session: &'a CaptureBootstrapSession,
+    ) -> SlotCreationRequest<'a> {
         SlotCreationRequest {
             configured_slot: "boring_cdc",
             requested_slot: "boring_cdc",
             plugin: "pgoutput",
-            export_snapshot: true,
-            state_lock_held: true,
-            source_lock_held: true,
-            persisted_intent: Some(SlotIntent::Bootstrap),
-            administration_credential_loaded: false,
+            snapshot_mode: SnapshotMode::ExportSnapshot,
+            ownership: Some(ownership),
+            persisted_intent: Some(intent),
+            capture_session: Some(session),
         }
     }
 
@@ -432,14 +522,20 @@ pub mod tests {
     fn heartbeat_is_monotonic_durable_noop() {
         let mut s = ControlWriterState::default();
         let e = s
-            .observe(&ObservedControlUpdate::heartbeat(1), true)
+            .observe(
+                &ObservedControlUpdate::heartbeat(1),
+                Some(&committed_for_fixture()),
+            )
             .unwrap();
         assert!(e.feedback_eligible);
         assert!(!e.writes_user_row && !e.writes_benchmark_mutation);
         assert_eq!(
-            s.observe(&ObservedControlUpdate::heartbeat(1), true)
-                .unwrap_err()
-                .fingerprint,
+            s.observe(
+                &ObservedControlUpdate::heartbeat(1),
+                Some(&committed_for_fixture())
+            )
+            .unwrap_err()
+            .fingerprint,
             "HEARTBEAT_NOT_MONOTONIC"
         );
     }
@@ -447,22 +543,33 @@ pub mod tests {
     fn heartbeat_cannot_feedback_before_durable_commit() {
         let mut s = ControlWriterState::default();
         assert!(
-            !s.observe(&ObservedControlUpdate::heartbeat(1), false)
+            !s.observe(&ObservedControlUpdate::heartbeat(1), None)
                 .unwrap()
                 .feedback_eligible
         );
         assert!(
-            s.observe(&ObservedControlUpdate::heartbeat(1), true)
-                .unwrap()
-                .feedback_eligible
+            s.observe(
+                &ObservedControlUpdate::heartbeat(1),
+                Some(&committed_for_fixture())
+            )
+            .unwrap()
+            .feedback_eligible
         );
     }
     #[test]
     fn repeated_fence_keeps_one_proof() {
         let mut s = ControlWriterState::default();
         s.intend_fence(7).unwrap();
-        s.observe(&ObservedControlUpdate::fence(7), true).unwrap();
-        s.observe(&ObservedControlUpdate::fence(7), true).unwrap();
+        s.observe(
+            &ObservedControlUpdate::fence(7),
+            Some(&committed_for_fixture()),
+        )
+        .unwrap();
+        s.observe(
+            &ObservedControlUpdate::fence(7),
+            Some(&committed_for_fixture()),
+        )
+        .unwrap();
         assert_eq!(s.fence_proof_count(), 1);
         assert_eq!(
             s.intend_fence(7).unwrap_err().fingerprint,
@@ -473,9 +580,12 @@ pub mod tests {
     fn unbound_fence_fails_closed() {
         let mut s = ControlWriterState::default();
         assert_eq!(
-            s.observe(&ObservedControlUpdate::fence(8), true)
-                .unwrap_err()
-                .fingerprint,
+            s.observe(
+                &ObservedControlUpdate::fence(8),
+                Some(&committed_for_fixture())
+            )
+            .unwrap_err()
+            .fingerprint,
             "FENCE_NONCE_UNBOUND"
         );
     }
@@ -486,7 +596,7 @@ pub mod tests {
             u.affected_rows = n;
             assert_eq!(
                 ControlWriterState::default()
-                    .observe(&u, true)
+                    .observe(&u, Some(&committed_for_fixture()))
                     .unwrap_err()
                     .fingerprint,
                 "CONTROL_CARDINALITY_INVALID"
@@ -499,7 +609,7 @@ pub mod tests {
         u.operation = RowOperation::Insert;
         assert_eq!(
             ControlWriterState::default()
-                .observe(&u, true)
+                .observe(&u, Some(&committed_for_fixture()))
                 .unwrap_err()
                 .fingerprint,
             "CONTROL_OPERATION_FORBIDDEN"
@@ -508,7 +618,7 @@ pub mod tests {
         u.new_key = "other".into();
         assert_eq!(
             ControlWriterState::default()
-                .observe(&u, true)
+                .observe(&u, Some(&committed_for_fixture()))
                 .unwrap_err()
                 .fingerprint,
             "CONTROL_KEY_CHANGED"
@@ -517,7 +627,7 @@ pub mod tests {
         u.changed_columns.insert("secret".into());
         assert_eq!(
             ControlWriterState::default()
-                .observe(&u, true)
+                .observe(&u, Some(&committed_for_fixture()))
                 .unwrap_err()
                 .fingerprint,
             "CONTROL_COLUMNS_INVALID"
@@ -543,21 +653,25 @@ pub mod tests {
     }
     #[test]
     fn slot_guard_accepts_only_bound_configured_export() {
-        assert!(authorize_slot_creation(&slot()).is_ok());
-        let mut x = slot();
+        let (locks, intent, session) = fixture_slot_authority(SlotIntent::Bootstrap);
+        assert_eq!(
+            authorize_slot_creation(&slot(&locks, &intent, &session)).unwrap(),
+            SlotIntent::Bootstrap
+        );
+        let mut x = slot(&locks, &intent, &session);
         x.requested_slot = "other";
         assert_eq!(
             authorize_slot_creation(&x).unwrap_err().fingerprint,
             "SLOT_NAME_MISMATCH"
         );
-        let mut x = slot();
+        let mut x = slot(&locks, &intent, &session);
         x.persisted_intent = None;
         assert_eq!(
             authorize_slot_creation(&x).unwrap_err().fingerprint,
             "SLOT_INTENT_MISSING"
         );
-        let mut x = slot();
-        x.source_lock_held = false;
+        let mut x = slot(&locks, &intent, &session);
+        x.ownership = None;
         assert_eq!(
             authorize_slot_creation(&x).unwrap_err().fingerprint,
             "OWNERSHIP_LOCK_MISSING"
@@ -565,12 +679,42 @@ pub mod tests {
     }
     #[test]
     fn administration_credential_is_gone_before_exporter() {
-        let mut x = slot();
-        x.administration_credential_loaded = true;
+        let (locks, intent, session) = fixture_slot_authority(SlotIntent::Bootstrap);
+        let mut x = slot(&locks, &intent, &session);
+        x.capture_session = None;
         assert_eq!(
             authorize_slot_creation(&x).unwrap_err().fingerprint,
             "ADMIN_CREDENTIAL_PRESENT"
         );
+    }
+    #[test]
+    fn persisted_control_history_survives_restart() {
+        let snapshot = ControlHistorySnapshot {
+            last_heartbeat_nonce: Some(9),
+            intended_fence_nonces: [7].into_iter().collect(),
+            observed_fence_nonces: [7].into_iter().collect(),
+        };
+        let mut restored = ControlWriterState::from_persisted(snapshot).unwrap();
+        assert_eq!(restored.fence_proof_count(), 1);
+        assert_eq!(
+            restored.intend_fence(7).unwrap_err().fingerprint,
+            "FENCE_NONCE_NOT_UNIQUE"
+        );
+        let proof = committed_for_fixture();
+        assert_eq!(
+            restored
+                .observe(&ObservedControlUpdate::heartbeat(9), Some(&proof))
+                .unwrap_err()
+                .fingerprint,
+            "HEARTBEAT_NOT_MONOTONIC"
+        );
+    }
+    #[test]
+    fn heartbeat_outage_degrades_without_feedback() {
+        let degraded = heartbeat_outage(1_048_576);
+        assert_eq!(degraded.condition, "heartbeat_degraded");
+        assert_eq!(degraded.wal_headroom_bytes, 1_048_576);
+        assert!(!degraded.feedback_advanced);
     }
     #[test]
     fn source_timeline_publication_slot_mismatch_blocks_startup() {
