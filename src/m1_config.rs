@@ -534,6 +534,13 @@ pub fn load_str_for(
             &raw.clickhouse.maintenance_dsn_env,
         ],
     )?;
+    validate_secret_references([
+        &raw.source.runtime_dsn_env,
+        &raw.source.control_writer_dsn_env,
+        &raw.source.administration_dsn_env,
+        &raw.clickhouse.runtime_dsn_env,
+        &raw.clickhouse.maintenance_dsn_env,
+    ])?;
     apply_overrides(&mut raw, env)?;
     validate(&mut raw)?;
     let secrets = Secrets {
@@ -656,13 +663,6 @@ fn valid_env_name(value: &str) -> bool {
 }
 
 fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
-    validate_secret_references([
-        &raw.source.runtime_dsn_env,
-        &raw.source.control_writer_dsn_env,
-        &raw.source.administration_dsn_env,
-        &raw.clickhouse.runtime_dsn_env,
-        &raw.clickhouse.maintenance_dsn_env,
-    ])?;
     if raw.schema_version != SCHEMA_VERSION {
         return err("CONFIG_UNSUPPORTED_SCHEMA", "schema_version");
     }
@@ -906,14 +906,24 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
 }
 
 fn validate_secret_references(references: [&str; 5]) -> Result<(), ConfigError> {
+    if references
+        .iter()
+        .any(|reference| !valid_env_name(reference))
+    {
+        return err("CONFIG_INVALID_SECRET_REFERENCE", "secret_reference");
+    }
     let mut seen = BTreeSet::new();
-    for reference in references {
-        if !valid_env_name(reference) {
-            return err("CONFIG_INVALID_SECRET_REFERENCE", "secret_reference");
-        }
-        if !seen.insert(reference) {
-            return err("CONFIG_ALIASED_SECRET_REFERENCE", "secret_reference");
-        }
+    if references.iter().any(|reference| !seen.insert(*reference)) {
+        return err("CONFIG_ALIASED_SECRET_REFERENCE", "secret_reference");
+    }
+    if references
+        .iter()
+        .any(|reference| APPROVED_OVERRIDES.contains(reference))
+    {
+        return err(
+            "CONFIG_SECRET_REFERENCE_COLLIDES_WITH_OVERRIDE",
+            "secret_reference",
+        );
     }
     Ok(())
 }
@@ -1424,6 +1434,41 @@ pub mod tests {
             }
         }
         assert_eq!(tested_pairs, 10);
+    }
+
+    #[test]
+    fn secret_references_cannot_alias_public_override_names() {
+        for override_name in APPROVED_OVERRIDES {
+            let candidate = fixture().replace(
+                "runtime_dsn_env = \"PG_RUNTIME\"",
+                &format!("runtime_dsn_env = \"{override_name}\""),
+            );
+            let mut candidate_env = env();
+            candidate_env
+                .0
+                .insert((*override_name).into(), "credential-value".into());
+            let error = load_str(&candidate, &candidate_env).unwrap_err();
+            assert_eq!(error.code, "CONFIG_SECRET_REFERENCE_COLLIDES_WITH_OVERRIDE");
+            assert_eq!(error.field, "secret_reference");
+            assert!(!error.to_string().contains(override_name));
+            assert!(!error.to_string().contains("credential-value"));
+        }
+
+        let aliased = fixture()
+            .replace(
+                "runtime_dsn_env = \"PG_RUNTIME\"",
+                "runtime_dsn_env = \"BORING_CDC_LOG_LEVEL\"",
+            )
+            .replace(
+                "control_writer_dsn_env = \"PG_CONTROL\"",
+                "control_writer_dsn_env = \"BORING_CDC_LOG_LEVEL\"",
+            );
+        assert_eq!(
+            load_str_for(&aliased, &Env::default(), LoadPurpose::Status)
+                .unwrap_err()
+                .code,
+            "CONFIG_ALIASED_SECRET_REFERENCE"
+        );
     }
 
     #[test]
