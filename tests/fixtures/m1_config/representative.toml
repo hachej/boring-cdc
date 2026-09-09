@@ -104,7 +104,7 @@ audit_freshness_ms = 300000
 verify_tls = true
 
 [archive]
-root = "archive"
+root = "archive/root"
 filesystem = "ext4"
 budget_bytes = 1000000000
 schedule_ms = 60000

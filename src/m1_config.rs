@@ -382,6 +382,8 @@ pub struct Fingerprints {
     pub source: String,
     pub table_set: String,
     pub destination: String,
+    pub archive: String,
+    pub promotion: String,
     pub backfill: String,
     pub runtime: String,
 }
@@ -395,7 +397,7 @@ pub struct LoadedConfig {
 impl fmt::Debug for LoadedConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("LoadedConfig")
-            .field("public", &self.public)
+            .field("diagnostics", &self.redacted_diagnostics())
             .field("secrets", &"[REDACTED]")
             .field("fingerprints", &self.fingerprints)
             .finish()
@@ -654,6 +656,17 @@ fn valid_env_name(value: &str) -> bool {
 }
 
 fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
+    for reference in [
+        &raw.source.runtime_dsn_env,
+        &raw.source.control_writer_dsn_env,
+        &raw.source.administration_dsn_env,
+        &raw.clickhouse.runtime_dsn_env,
+        &raw.clickhouse.maintenance_dsn_env,
+    ] {
+        if !valid_env_name(reference) {
+            return err("CONFIG_INVALID_SECRET_REFERENCE", "secret_reference");
+        }
+    }
     if raw.schema_version != SCHEMA_VERSION {
         return err("CONFIG_UNSUPPORTED_SCHEMA", "schema_version");
     }
@@ -1011,7 +1024,16 @@ fn fingerprints(config: &PublicConfig) -> Result<Fingerprints, ConfigError> {
     Ok(Fingerprints {
         source: digest(&(&config.source, &config.tables))?,
         table_set: digest(&config.tables)?,
-        destination: digest(&(&config.clickhouse, &config.archive))?,
+        destination: digest(&config.clickhouse)?,
+        archive: digest(&config.archive)?,
+        promotion: digest(&serde_json::json!({
+            "clickhouse_generation": config.clickhouse.destination_generation,
+            "clickhouse_selector": config.clickhouse.selector_policy,
+            "adopted_external_fence": config.clickhouse.adopted_external_fence,
+            "retirement_grace_ms": config.clickhouse.retirement_grace_ms,
+            "archive_selector": config.archive.selector_policy,
+            "archive_continuity": config.archive.continuity_break_policy,
+        }))?,
         backfill: digest(&(&config.backfill, &config.retention, &config.budgets))?,
         runtime: digest(config)?,
     })
@@ -1075,6 +1097,43 @@ pub mod tests {
         );
         let second = load_str(&equivalent, &env()).unwrap();
         assert_eq!(first.fingerprints(), second.fingerprints());
+    }
+
+    #[test]
+    fn archive_and_promotion_have_distinct_compatibility_fingerprints() {
+        let base = load_str(&fixture(), &env()).unwrap();
+        let archive = load_str(
+            &fixture().replace("segment_bytes = 67108864", "segment_bytes = 67108865"),
+            &env(),
+        )
+        .unwrap();
+        assert_ne!(base.fingerprints().archive, archive.fingerprints().archive);
+        assert_eq!(
+            base.fingerprints().promotion,
+            archive.fingerprints().promotion
+        );
+        assert_eq!(
+            base.fingerprints().destination,
+            archive.fingerprints().destination
+        );
+
+        let promotion = load_str(
+            &fixture().replace("adopted_external_fence = 0", "adopted_external_fence = 1"),
+            &env(),
+        )
+        .unwrap();
+        assert_ne!(
+            base.fingerprints().promotion,
+            promotion.fingerprints().promotion
+        );
+        assert_ne!(
+            base.fingerprints().destination,
+            promotion.fingerprints().destination
+        );
+        assert_eq!(
+            base.fingerprints().archive,
+            promotion.fingerprints().archive
+        );
     }
 
     #[test]
@@ -1153,6 +1212,10 @@ pub mod tests {
             "CH_MAINT",
             "runtime:secret",
             "admin:secret",
+            "boring_publication",
+            "public.orders",
+            "state/boring.db",
+            "archive/root",
         ] {
             assert!(!output.contains(forbidden), "leaked {forbidden}");
         }
@@ -1319,6 +1382,23 @@ pub mod tests {
     }
 
     #[test]
+    fn every_secret_reference_is_validated_even_when_not_loaded() {
+        let malformed_admin = fixture().replace(
+            "administration_dsn_env = \"PG_ADMIN\"",
+            "administration_dsn_env = \"bad-name\"",
+        );
+        let error = load_str_for(&malformed_admin, &env(), LoadPurpose::Status).unwrap_err();
+        assert_eq!(error.code, "CONFIG_INVALID_SECRET_REFERENCE");
+
+        let malformed_maintenance = fixture().replace(
+            "maintenance_dsn_env = \"CH_MAINT\"",
+            "maintenance_dsn_env = \"also-bad\"",
+        );
+        let error = load_str_for(&malformed_maintenance, &env(), LoadPurpose::Run).unwrap_err();
+        assert_eq!(error.code, "CONFIG_INVALID_SECRET_REFERENCE");
+    }
+
+    #[test]
     fn replication_options_are_an_exact_canonical_set() {
         for options in [
             r#"start_replication_options = ["streaming=false"]
@@ -1389,6 +1469,18 @@ pub mod tests {
             .map(|case| case["id"].as_str().unwrap())
             .collect();
         assert_eq!(ids.len(), cases.len());
+        assert_eq!(cases.len(), 132);
+        let field_owners: BTreeSet<_> = cases
+            .iter()
+            .map(|case| {
+                format!(
+                    "{}.{}",
+                    case["group"].as_str().unwrap(),
+                    case["field"].as_str().unwrap()
+                )
+            })
+            .collect();
+        assert_eq!(field_owners.len(), cases.len());
         for case in cases {
             assert!(case["id"].as_str().unwrap().starts_with("SCN-M1-CONFIG-"));
             for field in [
@@ -1396,10 +1488,11 @@ pub mod tests {
                 "rejected_examples",
                 "fingerprint_impact",
                 "error_codes",
-                "fields",
             ] {
                 assert!(!case[field].as_array().unwrap().is_empty(), "{field}");
             }
+            assert!(!case["expected_type"].as_str().unwrap().is_empty());
+            assert!(!case["constraint"].as_str().unwrap().is_empty());
             assert_eq!(case["unit_target"], "m1_config::tests");
             assert_eq!(case["status_code"], "configuration_rejected");
             assert_eq!(case["log_code"], "CONFIG_REDACTED_VALIDATION");
