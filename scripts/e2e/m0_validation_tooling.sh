@@ -66,7 +66,7 @@ cp=subprocess.run([str(root/'scripts/validate/claims.sh'),str(tmp/'claims.json')
 if cp.returncode: raise SystemExit('E_CONTEXT_CLAIM:'+cp.stdout+cp.stderr)
 
 handoff=json.loads((valid/'handoff.json').read_text()); state=next(a['content'] for a in pack['attachments'] if a['name']=='handoff_state')
-handoff.update({'bead_id':'boring-cdc-m0-validation-tooling','world_state_digest':world_digest,'base_sha':state['implementation_range']['base_sha'],'head_sha':state['implementation_range']['head_sha'],'changed_paths':state['changed_paths'],'facts':['generated context, immutable claim index, and handoff agree'],'observations':['aggregate composition is deterministic'],'hypotheses':['owner review remains downstream']})
+handoff.update({'bead_id':'boring-cdc-m0-validation-tooling','world_state_digest':world_digest,'base_sha':state['implementation_range']['base_sha'],'head_sha':pack['world_state']['git_commit'],'changed_paths':state['changed_paths'],'facts':['generated context, immutable claim index, and handoff agree'],'observations':['aggregate composition is deterministic'],'hypotheses':['owner review remains downstream']})
 (tmp/'handoff.json').write_text(canon(handoff)+'\n')
 cp=subprocess.run([str(root/'scripts/validate/handoff.sh'),str(tmp/'handoff.json')],text=True,capture_output=True)
 if cp.returncode: raise SystemExit('E_CONTEXT_HANDOFF:'+cp.stdout+cp.stderr)
