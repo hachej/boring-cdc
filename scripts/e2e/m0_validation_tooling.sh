@@ -12,7 +12,8 @@ expected={'/world_state_digest':hashlib.sha256(canon(pack['world_state']).encode
 actual={'/world_state_digest':handoff.get('world_state_digest'),'/head_sha':handoff.get('head_sha'),'/changed_paths':sorted(handoff.get('changed_paths',[])) if isinstance(handoff.get('changed_paths'),list) else handoff.get('changed_paths')}
 codes={'/world_state_digest':'E_WORLD_STATE_MISMATCH','/head_sha':'E_HANDOFF_HEAD_MISMATCH','/changed_paths':'E_HANDOFF_PATH_MISMATCH'}
 findings=[{'code':codes[p],'pointer':p,'owner_bead':'boring-cdc-m0-validation-tooling','message':'handoff provenance does not match generated context operation'} for p in expected if actual[p]!=expected[p]]
-print(canon({'schema_version':'validation-result/v1','validator_version':'m0-validation-tooling/1.0.0','owner_bead':'boring-cdc-m0-validation-tooling','status':'fail' if findings else 'pass','findings':findings}))
+input_sha256=hashlib.sha256(canon({'pack':pack,'handoff':handoff}).encode()).hexdigest()
+print(canon({'schema_version':'validation-result/v1','validator_version':'core-validators/1.0.0','owner_bead':'boring-cdc-m0-validation-tooling','status':'fail' if findings else 'pass','input_sha256':input_sha256,'findings':findings}))
 raise SystemExit(bool(findings))
 PY
  exit $?
@@ -72,7 +73,11 @@ if cp.returncode: raise SystemExit('E_CONTEXT_HANDOFF:'+cp.stdout+cp.stderr)
 # The leaf validates one handoff document; this canonical aggregate operation
 # owns only the cross-document join to the generated context operation.
 cp=subprocess.run([str(root/'scripts/e2e/m0_validation_tooling.sh'),'--check-handoff',str(tmp/'pack.1'),str(tmp/'handoff.json')],text=True,capture_output=True)
-if cp.returncode or json.loads(cp.stdout).get('status')!='pass':raise SystemExit('E_CONTEXT_HANDOFF_COMPATIBILITY:'+cp.stdout+cp.stderr)
+if cp.returncode:raise SystemExit('E_CONTEXT_HANDOFF_COMPATIBILITY:'+cp.stdout+cp.stderr)
+result=json.loads(cp.stdout)
+import jsonschema
+jsonschema.validate(result,json.loads((root/'contracts/common/validation-result.schema.json').read_text()))
+if result.get('status')!='pass':raise SystemExit('E_CONTEXT_HANDOFF_COMPATIBILITY:'+cp.stdout+cp.stderr)
 
 # Exercise actual br readiness over an isolated imported graph. Parent-child
 # edges stay non-blocking; decisions need A+B, while completion needs A+B+C+gate.
