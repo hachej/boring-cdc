@@ -1,0 +1,2 @@
+PASS m1 control fixture scenarios=12 pg_majors=3 unresolved=0
+PASS artifact inventory=24 logs=12 deterministic_rerun=1 redaction=1 command_evidence=m1-control-evidence/1.0.0

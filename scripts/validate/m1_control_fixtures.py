@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
-import hashlib,json,re,subprocess
+import hashlib,json,re,subprocess,sys
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
+from m1_control_evidence import VERSION as EVIDENCE_VERSION, validate as validate_command_evidence
+
+VERSION = "m1-control-fixtures/1.0.0"
+if len(sys.argv) == 2 and sys.argv[1] == "--version":
+    print(VERSION)
+    raise SystemExit(0)
 p=Path('contracts/m1/control-fixtures.json'); data=json.loads(p.read_text())
 assert data['schema_version']=='m1-control-fixtures/v2'
 assert data['owner_bead']=='boring-cdc-m1-control-fixtures'
@@ -67,18 +74,8 @@ print(f"PASS m1 control fixture scenarios={len(scenarios)} pg_majors={len(majors
 artifact=Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1')
 if artifact.exists():
     subprocess.run(['scripts/validate/evidence.sh','artifacts/boring-cdc-m1-control-fixtures'],check=True,stdout=subprocess.DEVNULL)
-    digest=lambda path: hashlib.sha256(path.read_bytes()).hexdigest()
-    inventory={line.split('  ',1)[1]:line.split('  ',1)[0] for line in (artifact/'sha256.txt').read_text().splitlines()}
-    expected={str(path.relative_to(artifact)):digest(path) for path in artifact.rglob('*') if path.is_file() and path.name not in {'manifest.json','sha256.txt'}}
-    assert inventory==expected, 'SHA-256 inventory mismatch'
-    for stem in ('e2e','faults'):
-        assert (artifact/f'stdout/{stem}-1.txt').read_bytes()==(artifact/f'stdout/{stem}-2.txt').read_bytes()
-        assert (artifact/f'stderr/{stem}-1.txt').read_bytes()==(artifact/f'stderr/{stem}-2.txt').read_bytes()
-    required_log={'schema_version','case_event_seq','bead_id','scenario_id','correlation_id','run_id','capture_epoch','component','phase','outcome','config_fingerprint','evidence_digest'}
-    rows=[json.loads(line) for line in (artifact/'logs/boring-cdc.jsonl').read_text().splitlines()]
-    assert [row['case_event_seq'] for row in rows]==list(range(1,len(rows)+1))
-    assert all(required_log<=row.keys() and row['bead_id']==data['owner_bead'] for row in rows)
-    corpus='\n'.join(path.read_text(errors='replace') for path in artifact.rglob('*') if path.is_file())
-    for forbidden in ('postgresql://','capture_fixture_only','control_fixture_only','application_fixture_only','/home/'):
-        assert forbidden not in corpus, f'redaction failure: {forbidden}'
-    print(f"PASS artifact inventory={len(inventory)} logs={len(rows)} deterministic_rerun=1 redaction=1")
+    findings=validate_command_evidence(artifact)
+    assert not findings, json.dumps(findings,sort_keys=True)
+    inventory=(artifact/'sha256.txt').read_text().splitlines()
+    rows=(artifact/'logs/boring-cdc.jsonl').read_text().splitlines()
+    print(f"PASS artifact inventory={len(inventory)} logs={len(rows)} deterministic_rerun=1 redaction=1 command_evidence={EVIDENCE_VERSION}")

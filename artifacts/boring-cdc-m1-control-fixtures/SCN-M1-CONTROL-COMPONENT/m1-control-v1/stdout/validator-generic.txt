@@ -1,0 +1,1 @@
+{"findings":[],"git_commit":"f5d2b79a52b40ff6d7d4c017b376e5bc50d3f4ee","input_sha256":"c0ea823c281311e925f688812da54daf8cd4c7fa5242fc25e19db975b1512441","owner_bead":"boring-cdc-m0.1","schema_version":"validation-result/v1","status":"pass","validator_version":"core-validators/1.0.0"}
