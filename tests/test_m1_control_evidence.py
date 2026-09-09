@@ -91,6 +91,36 @@ class ControlCommandEvidence(unittest.TestCase):
             return path.relative_to(root).as_posix()
         self.assert_fails(coordinated_rerun, "E_PAYLOAD_SEAL")
 
+    def test_each_validator_argv_is_bound_to_its_canonical_transcript_paths(self):
+        def rewrite(root, mutate):
+            path = root / "validator-evidence.json"
+            data = json.loads(path.read_text())
+            mutate(data["validators"])
+            path.write_text(json.dumps(data))
+
+        def swap_stdout(rows):
+            for field in ("stdout_path", "stdout_sha256"):
+                rows[0][field], rows[1][field] = rows[1][field], rows[0][field]
+        self.assert_fails(lambda root: rewrite(root, swap_stdout), "E_VALIDATOR_PATH")
+
+        def redirect_to_payload(rows, index, name):
+            import hashlib
+            target = SOURCE / name
+            rows[index]["stdout_path"] = str(Path(rows[index]["stdout_path"]).parent.parent / name)
+            rows[index]["stdout_sha256"] = hashlib.sha256(target.read_bytes()).hexdigest()
+        self.assert_fails(lambda root: rewrite(root, lambda rows: redirect_to_payload(rows, 0, "config.json")), "E_VALIDATOR_PATH")
+        self.assert_fails(lambda root: rewrite(root, lambda rows: redirect_to_payload(rows, 1, "packet.json")), "E_VALIDATOR_PATH")
+
+        def duplicate_empty_stderr(rows):
+            rows[1]["stderr_path"] = rows[0]["stderr_path"]
+            rows[1]["stderr_sha256"] = rows[0]["stderr_sha256"]
+        self.assert_fails(lambda root: rewrite(root, duplicate_empty_stderr), "E_VALIDATOR_PATH")
+
+        def substitute_other_transcript(rows):
+            rows[0]["stdout_path"] = rows[1]["stdout_path"]
+            rows[0]["stdout_sha256"] = rows[1]["stdout_sha256"]
+        self.assert_fails(lambda root: rewrite(root, substitute_other_transcript), "E_VALIDATOR_PATH")
+
     def test_inventory_log_rerun_unresolved_cleanup_and_redaction_tampering_fail(self):
         self.assert_fails(lambda root: (root / "sha256.txt").write_text("0" * 64 + "  commands.txt\n"), "E_INVENTORY_SEAL")
         self.assert_fails(lambda root: (root / "logs/boring-cdc.jsonl").write_text("{}\n"), "E_PAYLOAD_SEAL")

@@ -9,8 +9,16 @@ VERSION = "m1-control-evidence/1.1.0"
 SCHEMA = "m1-control-command-evidence/v1"
 CANONICAL = Path("artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1")
 EXPECTED_VALIDATORS = {
-    "scripts/validate/capture_validation_result.py -- scripts/validate/evidence.sh artifacts/boring-cdc-m1-control-fixtures": "core-validators/1.0.0",
-    "scripts/validate/m1_control_fixtures.py": "m1-control-fixtures/1.0.0",
+    "scripts/validate/capture_validation_result.py -- scripts/validate/evidence.sh artifacts/boring-cdc-m1-control-fixtures": {
+        "version": "core-validators/1.0.0",
+        "stdout": "stdout/validator-generic.txt",
+        "stderr": "stderr/validator-generic.txt",
+    },
+    "scripts/validate/m1_control_fixtures.py": {
+        "version": "m1-control-fixtures/1.0.0",
+        "stdout": "stdout/validator-specific.txt",
+        "stderr": "stderr/validator-specific.txt",
+    },
 }
 FORBIDDEN = ("TBD", "TODO", "FIXME", "<unresolved>", "postgresql://", "capture_fixture_only", "control_fixture_only", "application_fixture_only", "/home/")
 SHA = re.compile(r"^[0-9a-f]{64}$")
@@ -161,11 +169,13 @@ def validate(artifact):
         if not isinstance(argv, str) or argv in seen or argv not in EXPECTED_VALIDATORS:
             fail("E_VALIDATOR_ARGV", repr(argv)); continue
         seen.add(argv)
-        if row.get("version") != EXPECTED_VALIDATORS[argv]: fail("E_VALIDATOR_VERSION", argv)
+        if row.get("version") != EXPECTED_VALIDATORS[argv]["version"]: fail("E_VALIDATOR_VERSION", argv)
         if type(row.get("exit_code")) is not int or row.get("exit_code") != 0: fail("E_VALIDATOR_EXIT", argv)
         for stream in ("stdout", "stderr"):
             value = row.get(f"{stream}_path")
-            if not isinstance(value, str): fail("E_VALIDATOR_PATH", f"{argv}:{stream}"); continue
+            expected_path = CANONICAL / EXPECTED_VALIDATORS[argv][stream]
+            if not isinstance(value, str) or value != str(expected_path):
+                fail("E_VALIDATOR_PATH", f"{argv}:{stream}"); continue
             stored = Path(value)
             try: relative = stored.relative_to(CANONICAL)
             except ValueError: fail("E_VALIDATOR_PATH", f"{argv}:{stream}"); continue
