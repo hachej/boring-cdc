@@ -3,6 +3,8 @@
 import hashlib
 import json
 import sys
+import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -49,9 +51,16 @@ try:
         fail()
     stable = next(row for row in registry["entries"] if row["id"] == FIXTURE_ID)
     covered = next(row for row in coverage["assignments"] if row["id"] == FIXTURE_ID)
-    if stable["owner_bead"] != OWNER or stable["source"] != SPEC_REL or stable["namespace"] != "SCN":
+    anchor = '"fixture_id":"SCN-M0-PUBLIC-OWNER-IDENTITY"'
+    anchor_digest = hashlib.sha256(anchor.encode()).hexdigest()
+    if stable["owner_bead"] != OWNER or stable["source"] != SPEC_REL or stable["namespace"] != "SCN" or stable["source_anchor"] != anchor or stable["source_excerpt"] != anchor or stable["source_digest"] != anchor_digest:
         fail()
-    if covered != {"evidence_status": stable["evidence_status"], "id": FIXTURE_ID, "owner_bead": OWNER, "source": SPEC_REL, "source_digest": stable["source_digest"]}:
+    if SPEC.read_text(encoding="utf-8").count(anchor) != 1 or covered != {"evidence_status": "pending", "id": FIXTURE_ID, "owner_bead": OWNER, "source": SPEC_REL, "source_digest": anchor_digest}:
+        fail()
+    provenance = json.loads((ROOT / "contracts/coverage/plan-to-beads.provenance.json").read_text(encoding="utf-8"))
+    if provenance["generated_digest"] != sha(ROOT / "contracts/coverage/plan-to-beads.json") or provenance["source_digests"]["contracts/agent/stable-ids.json"] != sha(ROOT / "contracts/agent/stable-ids.json"):
+        fail()
+    if subprocess.run([str(ROOT / "scripts/validate/plan_coverage.sh")], cwd=ROOT, capture_output=True).returncode != 0:
         fail()
     if EXECUTOR not in {row["id"] for row in graph}:
         fail()
@@ -71,13 +80,32 @@ try:
     expected_approval = {"approved_at": APPROVED_AT, "approved_by": f"{APPROVER}, intention {INTENTION}", "value_digest": hashlib.sha256(PROPOSED.encode()).hexdigest()}
     if decision != {"id": "DEC-PUBLIC-OWNER", "owner_bead": OWNER, "status": "approved", "proposed_value": PROPOSED, "approval": expected_approval, "fixture_spec": SPEC_REL, "fixture_sha256": sha(SPEC), "executor_beads": [EXECUTOR]}:
         fail()
-    skip = {"ART-M0-PUBLIC-OWNER-PROBE"} if ACTIVE_RUN else set()
-    manifest = {row["path"]: row for row in artifacts["artifacts"] if row["id"] not in skip}
-    if any(not (ROOT / path).is_file() or sha(ROOT / path) != row["sha256"] for path, row in manifest.items()):
+    expected_artifacts = {
+        "ART-M0-PUBLIC-OWNER-FIXTURE": SPEC_REL,
+        "ART-M0-PUBLIC-OWNER-OBSERVATION": "artifacts/m0/decisions/boring-cdc-d-owner/repository-view.json",
+        "ART-M0-PUBLIC-OWNER-OBSERVATION-RECORD": "artifacts/m0/decisions/boring-cdc-d-owner/observation.json",
+        "ART-M0-PUBLIC-OWNER-PROBE": "artifacts/m0/decisions/boring-cdc-d-owner/fixture-run.jsonl",
+        "ART-M0-PUBLIC-OWNER-VALIDATION": "artifacts/m0/decisions/boring-cdc-d-owner/evidence.json",
+    }
+    owned = {row["id"]: row for row in artifacts["artifacts"] if row.get("owner_bead") == OWNER}
+    if set(owned) != set(expected_artifacts):
         fail()
+    for artifact_id, path in expected_artifacts.items():
+        row = owned[artifact_id]
+        if row != {"id": artifact_id, "owner_bead": OWNER, "path": path, "sha256": row["sha256"], "status": "complete"}:
+            fail()
+        if artifact_id != "ART-M0-PUBLIC-OWNER-PROBE" or not ACTIVE_RUN:
+            if not (ROOT / path).is_file() or sha(ROOT / path) != row["sha256"]:
+                fail()
     if not ACTIVE_RUN:
-        evidence = json.loads((ROOT / "artifacts/m0/decisions/boring-cdc-d-owner/evidence.json").read_text(encoding="utf-8"))
-        if evidence["status"] != "pass" or evidence["findings"] != [] or evidence["input_sha256"] != sha(ROOT / "contracts/m0/decisions.json"):
+        probe = [json.loads(line) for line in (ROOT / expected_artifacts["ART-M0-PUBLIC-OWNER-PROBE"]).read_text(encoding="utf-8").splitlines()]
+        if probe != spec["execution_probe"]["expected_lines"] or spec["execution_probe"]["path"] != expected_artifacts["ART-M0-PUBLIC-OWNER-PROBE"] or spec["execution_probe"]["sha256"] != sha(ROOT / expected_artifacts["ART-M0-PUBLIC-OWNER-PROBE"]):
+            fail()
+        evidence = json.loads((ROOT / expected_artifacts["ART-M0-PUBLIC-OWNER-VALIDATION"]).read_text(encoding="utf-8"))
+        if evidence.get("schema_version") != "validation-result/v1" or evidence.get("validator_version") != "core-validators/1.0.0" or evidence.get("owner_bead") != "boring-cdc-m0.1" or evidence.get("status") != "pass" or evidence.get("findings") != [] or evidence.get("input_sha256") != sha(ROOT / "contracts/m0/decisions.json") or not re.fullmatch(r"[0-9a-f]{40}", evidence.get("git_commit", "")):
+            fail()
+        evidence_sha = evidence["git_commit"]
+        if subprocess.run(["git", "cat-file", "-e", evidence_sha + "^{commit}"], cwd=ROOT, capture_output=True).returncode != 0 or subprocess.run(["git", "diff", "--quiet", evidence_sha + "..HEAD", "--", SPEC_REL, "scripts/fixtures", "contracts/agent", "contracts/coverage", "contracts/m0/decisions.json", "artifacts/m0/decisions/boring-cdc-d-owner/observation.json", "artifacts/m0/decisions/boring-cdc-d-owner/repository-view.json"], cwd=ROOT).returncode != 0:
             fail()
 except (KeyError, ValueError, OSError, json.JSONDecodeError, StopIteration, TypeError):
     fail()

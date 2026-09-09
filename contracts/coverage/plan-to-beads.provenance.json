@@ -4,7 +4,7 @@
   "generator": "boring-cdc-m0.2",
   "schema_version": "generated-view/v1",
   "source_digests": {
-    "contracts/agent/stable-ids.json": "8ee0efd9dd2e58c64ff6d2d6ace06d787923823704ec4905c3e16ce013f2105b"
+    "contracts/agent/stable-ids.json": "80773a8dafc8b91fb83ccc83734bb20ac062011ef55ac8a8252cb05fa5c0530d"
   },
   "sources": [
     "contracts/agent/stable-ids.json"
