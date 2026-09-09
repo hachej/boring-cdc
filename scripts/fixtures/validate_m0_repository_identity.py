@@ -18,6 +18,10 @@ APPROVER = "Julien Hurault (repository owner)"
 APPROVED_AT = "2026-09-09T08:58:19Z"
 PROPOSED = "Public repository identity is hachej/boring-cdc with visibility PUBLIC at https://github.com/hachej/boring-cdc."
 EXPECTED = {"nameWithOwner": "hachej/boring-cdc", "url": "https://github.com/hachej/boring-cdc", "visibility": "PUBLIC"}
+EXPECTED_PROBE = [
+    {"code": "PUBLIC_OWNER_FIXTURE_VALID", "outcome": "pass", "phase": "validate_spec"},
+    {"code": "REPOSITORY_IDENTITY_CONFIRMED", "outcome": "pass", "phase": "observe"},
+]
 COMMAND = "gh repo view hachej/boring-cdc --json nameWithOwner,visibility,url --jq '{nameWithOwner:.nameWithOwner,visibility:.visibility,url:.url}'"
 ACTIVE_RUN = sys.argv[1:] == ["--active-run"]
 
@@ -99,13 +103,13 @@ try:
                 fail()
     if not ACTIVE_RUN:
         probe = [json.loads(line) for line in (ROOT / expected_artifacts["ART-M0-PUBLIC-OWNER-PROBE"]).read_text(encoding="utf-8").splitlines()]
-        if probe != spec["execution_probe"]["expected_lines"] or spec["execution_probe"]["path"] != expected_artifacts["ART-M0-PUBLIC-OWNER-PROBE"] or spec["execution_probe"]["sha256"] != sha(ROOT / expected_artifacts["ART-M0-PUBLIC-OWNER-PROBE"]):
+        if probe != EXPECTED_PROBE or spec["execution_probe"]["expected_lines"] != EXPECTED_PROBE or spec["execution_probe"]["path"] != expected_artifacts["ART-M0-PUBLIC-OWNER-PROBE"] or spec["execution_probe"]["sha256"] != sha(ROOT / expected_artifacts["ART-M0-PUBLIC-OWNER-PROBE"]):
             fail()
         evidence = json.loads((ROOT / expected_artifacts["ART-M0-PUBLIC-OWNER-VALIDATION"]).read_text(encoding="utf-8"))
         if evidence.get("schema_version") != "validation-result/v1" or evidence.get("validator_version") != "core-validators/1.0.0" or evidence.get("owner_bead") != "boring-cdc-m0.1" or evidence.get("status") != "pass" or evidence.get("findings") != [] or evidence.get("input_sha256") != sha(ROOT / "contracts/m0/decisions.json") or not re.fullmatch(r"[0-9a-f]{40}", evidence.get("git_commit", "")):
             fail()
         evidence_sha = evidence["git_commit"]
-        if subprocess.run(["git", "cat-file", "-e", evidence_sha + "^{commit}"], cwd=ROOT, capture_output=True).returncode != 0 or subprocess.run(["git", "diff", "--quiet", evidence_sha + "..HEAD", "--", SPEC_REL, "scripts/fixtures", "contracts/agent", "contracts/coverage", "contracts/m0/decisions.json", "artifacts/m0/decisions/boring-cdc-d-owner/observation.json", "artifacts/m0/decisions/boring-cdc-d-owner/repository-view.json"], cwd=ROOT).returncode != 0:
+        if subprocess.run(["git", "cat-file", "-e", evidence_sha + "^{commit}"], cwd=ROOT, capture_output=True).returncode != 0 or subprocess.run(["git", "merge-base", "--is-ancestor", evidence_sha, "HEAD"], cwd=ROOT, capture_output=True).returncode != 0 or subprocess.run(["git", "diff", "--quiet", evidence_sha + "..HEAD", "--", SPEC_REL, "scripts/fixtures", "contracts/agent", "contracts/coverage", "contracts/m0/decisions.json", "artifacts/m0/decisions/boring-cdc-d-owner/observation.json", "artifacts/m0/decisions/boring-cdc-d-owner/repository-view.json"], cwd=ROOT).returncode != 0:
             fail()
 except (KeyError, ValueError, OSError, json.JSONDecodeError, StopIteration, TypeError):
     fail()
