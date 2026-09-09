@@ -14,6 +14,9 @@ EXPECTED_VALIDATORS = {
 }
 FORBIDDEN = ("TBD", "TODO", "FIXME", "<unresolved>", "postgresql://", "capture_fixture_only", "control_fixture_only", "application_fixture_only", "/home/")
 SHA = re.compile(r"^[0-9a-f]{64}$")
+TRANSCRIPT_PATHS = {"stdout/validator-generic.txt", "stderr/validator-generic.txt", "stdout/validator-specific.txt", "stderr/validator-specific.txt"}
+SEALED_PAYLOAD_ROOT = "dfbcb28574aeb6f97a2ead1876e863ff4dfd2a26a9a26f66ae27d7499fe65ac3"
+SEALED_INVENTORY_ROOT = "7f544e0de2885f0f901e6d0fe18c4412a202b1775066034c31c4199fd51b7cd6"
 
 
 def sha(path):
@@ -57,8 +60,8 @@ def validate_payload(artifact):
             str(path.relative_to(artifact)): sha(path)
             for path in artifact.rglob("*")
             if path.is_file() and not path.is_symlink()
+            and path.relative_to(artifact).as_posix() not in TRANSCRIPT_PATHS
             and path.name not in {"manifest.json", "sha256.txt", "validator-evidence.json"}
-            and not path.name.startswith("validator-")
         }
         if inventory != expected:
             fail("E_INVENTORY", "SHA-256 inventory mismatch")
@@ -77,7 +80,7 @@ def validate_payload(artifact):
     required = {"schema_version", "case_event_seq", "bead_id", "scenario_id", "correlation_id", "run_id", "capture_epoch", "component", "phase", "outcome", "config_fingerprint", "evidence_digest"}
     try:
         rows = [json.loads(line) for line in (artifact / "logs/boring-cdc.jsonl").read_text().splitlines()]
-        if [row.get("case_event_seq") for row in rows] != list(range(1, len(rows) + 1)) or not all(isinstance(row, dict) and required <= row.keys() and row["bead_id"] == "boring-cdc-m1-control-fixtures" for row in rows):
+        if len(rows) != 12 or [row.get("case_event_seq") for row in rows] != list(range(1, 13)) or not all(isinstance(row, dict) and required <= row.keys() and row["bead_id"] == "boring-cdc-m1-control-fixtures" for row in rows):
             fail("E_LOG", "structured log sequence or fields")
     except (OSError, ValueError, TypeError, AttributeError):
         rows = []
@@ -90,7 +93,9 @@ def validate_payload(artifact):
     try:
         corpus = "\n".join(
             path.read_text(errors="replace") for path in artifact.rglob("*")
-            if path.is_file() and path.name != "validator-evidence.json" and not path.name.startswith("validator-")
+            if path.is_file()
+            and path.relative_to(artifact).as_posix() not in TRANSCRIPT_PATHS
+            and path.name != "validator-evidence.json"
         )
         for token in FORBIDDEN:
             if token in corpus:
@@ -103,9 +108,37 @@ def validate_payload(artifact):
 def validate(artifact):
     """Independently validate payload plus captured validator command evidence."""
     artifact = Path(artifact)
-    findings, _, _ = validate_payload(artifact)
+    findings = []
     fail = lambda code, detail: findings.append({"code": code, "detail": detail})
+    if artifact.is_symlink():
+        fail("E_ROOT_SYMLINK", "artifact root")
+    excluded = {"manifest.json", "sha256.txt", "validator-evidence.json", "versions.json"} | TRANSCRIPT_PATHS
+    payload_hash = hashlib.sha256()
+    try:
+        for path in sorted(item for item in artifact.rglob("*") if item.is_file() and item.relative_to(artifact).as_posix() not in excluded):
+            relative = path.relative_to(artifact).as_posix()
+            if path.is_symlink():
+                fail("E_PATH_SYMLINK", relative)
+                continue
+            payload_hash.update(relative.encode() + b"\0" + path.read_bytes())
+        if payload_hash.hexdigest() != SEALED_PAYLOAD_ROOT:
+            fail("E_PAYLOAD_SEAL", "immutable component payload")
+        inventory_rows = []
+        for line in (artifact / "sha256.txt").read_text().splitlines():
+            digest, name = line.split("  ", 1)
+            if name != "versions.json": inventory_rows.append((name, digest))
+        inventory_hash = hashlib.sha256()
+        for name, digest in sorted(inventory_rows):
+            inventory_hash.update(name.encode() + b"\0" + digest.encode())
+        if inventory_hash.hexdigest() != SEALED_INVENTORY_ROOT:
+            fail("E_INVENTORY_SEAL", "immutable SHA-256 inventory")
+    except (OSError, ValueError):
+        fail("E_PAYLOAD_SEAL", "malformed sealed payload")
     manifest = _load(artifact, "manifest.json", findings)
+    if manifest.get("cleanup") != {"complete": True, "remaining_paths": []}:
+        fail("E_CLEANUP", "manifest cleanup")
+    if manifest.get("redaction") != {"checked": True, "secrets_found": 0}:
+        fail("E_REDACTION", "manifest redaction")
     record = _load(artifact, "validator-evidence.json", findings)
     fields = {"schema_version", "owner_bead", "manifest_path", "manifest_sha256", "validators"}
     if set(record) != fields: fail("E_RECORD_FIELDS", "validator-evidence.json")

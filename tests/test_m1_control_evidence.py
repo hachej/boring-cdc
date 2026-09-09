@@ -76,12 +76,26 @@ class ControlCommandEvidence(unittest.TestCase):
             target.unlink()
             target.symlink_to(external)
         self.assert_fails(symlink_payload, "E_PATH_SYMLINK")
+        self.assert_fails(lambda root: (root / "validator-secret.txt").write_text("TODO secret\n"), "E_PAYLOAD_SEAL")
+
+        def coordinated_rerun(root):
+            for name in ("stdout/e2e-1.txt", "stdout/e2e-2.txt"):
+                (root / name).write_text("coordinated rewrite\n")
+            import hashlib
+            inventory = root / "sha256.txt"
+            rows = []
+            for path in sorted(item for item in root.rglob("*") if item.is_file() and item.name not in {"manifest.json", "sha256.txt", "validator-evidence.json"} and path_name(item, root) not in {"stdout/validator-generic.txt", "stderr/validator-generic.txt", "stdout/validator-specific.txt", "stderr/validator-specific.txt"}):
+                rows.append(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(root)}\n")
+            inventory.write_text("".join(rows))
+        def path_name(path, root):
+            return path.relative_to(root).as_posix()
+        self.assert_fails(coordinated_rerun, "E_PAYLOAD_SEAL")
 
     def test_inventory_log_rerun_unresolved_cleanup_and_redaction_tampering_fail(self):
-        self.assert_fails(lambda root: (root / "sha256.txt").write_text("0" * 64 + "  commands.txt\n"), "E_INVENTORY")
-        self.assert_fails(lambda root: (root / "logs/boring-cdc.jsonl").write_text("{}\n"), "E_LOG")
-        self.assert_fails(lambda root: (root / "stdout/e2e-2.txt").write_text("different\n"), "E_RERUN")
-        self.assert_fails(lambda root: (root / "config.json").write_text("TODO\n"), "E_UNRESOLVED")
+        self.assert_fails(lambda root: (root / "sha256.txt").write_text("0" * 64 + "  commands.txt\n"), "E_INVENTORY_SEAL")
+        self.assert_fails(lambda root: (root / "logs/boring-cdc.jsonl").write_text("{}\n"), "E_PAYLOAD_SEAL")
+        self.assert_fails(lambda root: (root / "stdout/e2e-2.txt").write_text("different\n"), "E_PAYLOAD_SEAL")
+        self.assert_fails(lambda root: (root / "config.json").write_text("TODO\n"), "E_PAYLOAD_SEAL")
 
         def manifest_field(root, field, value):
             path = root / "manifest.json"
