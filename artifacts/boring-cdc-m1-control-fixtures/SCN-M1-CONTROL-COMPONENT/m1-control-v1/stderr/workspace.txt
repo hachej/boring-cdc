@@ -3,7 +3,7 @@
      Running unittests src/main.rs (target/debug/deps/boring_cdc-a5120d6777913092)
      Running tests/compile_fail.rs (target/debug/deps/compile_fail-643486a7c948e1a6)
     Checking boring-cdc-tests v0.0.0 (<WORKTREE>/target/tests/trybuild/boring-cdc)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s
 
 
 test [0m[1mtests/ui/creation_floor_is_not_received.rs[0m ... [0m[32mok
