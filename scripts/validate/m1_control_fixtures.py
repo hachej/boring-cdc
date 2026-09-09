@@ -2,7 +2,7 @@
 import json,re
 from pathlib import Path
 p=Path('contracts/m1/control-fixtures.json'); data=json.loads(p.read_text())
-assert data['schema_version']=='m1-control-fixtures/v1'
+assert data['schema_version']=='m1-control-fixtures/v2'
 assert data['owner_bead']=='boring-cdc-m1-control-fixtures'
 majors=data['supported_postgresql_majors']; assert majors and len({x['major'] for x in majors})==len(majors)
 for x in majors: assert x['provenance']=='// M0-PROVISIONAL: boring-cdc-d-pg-protocol'
@@ -20,6 +20,29 @@ required={
 assert required <= set(ids)
 rust=Path('src/m1_control_fixtures.rs').read_text()
 for case in scenarios: assert case['test'].split('::')[-1] in rust,case['test']
+# M1 owns component fixture evidence; canonical integrated/runtime transition execution
+# stays with the single owner in the boring-cdc-m0.2 generated plan view.
+reconciled={case['id']:case for case in scenarios if 'traceability_plan_scenario' in case}
+assert set(reconciled)=={
+ 'SCN-M1-CONTROL-FIXED-ROW-ABUSE','SCN-M1-CONTROL-HEARTBEAT-OUTAGE',
+ 'SCN-M1-CONTROL-IDLE-HEARTBEAT','SCN-M1-CONTROL-INTERNAL-NOOP',
+ 'SCN-M1-CONTROL-TRUNCATE-DETECTION','SCN-M1-CONTROL-ADMIN-LIFETIME'}
+component_fixtures=set()
+manifest=json.loads(Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json').read_text())
+for case in reconciled.values():
+    component=case['component_fixture']; consumer=case['plan_scenario_execution']
+    assert component['evidence_owner']==data['owner_bead']
+    assert component['id']==case['id']
+    assert component['id'] not in component_fixtures; component_fixtures.add(component['id'])
+    assert consumer['id']==case['traceability_plan_scenario']
+    assert consumer['executing_owner']==coverage[consumer['id']]
+    assert consumer['executing_owner']!=component['evidence_owner']
+    citation=consumer['consumes_component_evidence']
+    assert citation['owner_bead']==data['owner_bead']
+    assert citation['scenario_id']==manifest['scenario_id']
+    assert citation['artifact_path'].endswith('/manifest.json')
+    assert citation['evidence_digest']==manifest['result']['digest']
+assert data['execution_ownership']['non_editable_plan_view_owner']=='boring-cdc-m0.2'
 for token in ('TBD','TODO','FIXME','<unresolved>'): assert token not in p.read_text()
 print(f"PASS m1 control fixture scenarios={len(scenarios)} pg_majors={len(majors)} unresolved=0")
 artifact=Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1')
