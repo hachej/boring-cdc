@@ -73,13 +73,13 @@
       "stderr_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-8.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-8.log",
-      "stdout_sha256": "39d5a66efcf3b0898e7d9208ae4393d04f4e199743e172df122e927ee3ae9a42",
+      "stdout_sha256": "a3d2842f6daa28dc0d775586b1e4f478801d6527fe2ce9b874a84b3facf570cf",
       "version": "core-validators/1.0.0"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "b363cea5816679cdb5d695474fe1d843672fbd29",
+  "git_commit": "87c638044f968d96df731ab17d0754e0cede4f85",
   "owner_bead": "boring-cdc-m1-config",
   "redaction": {
     "checked": true,
@@ -90,7 +90,7 @@
       "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/proof-summary.json",
       "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/versions.json"
     ],
-    "digest": "3565af29a05a0b413fca8a792cdb00ce161f1b8b788488c1f6fbc61f6cbe4d53",
+    "digest": "7f1292399159dcb1fc730ec7887d868232a2753035d9e302db4b21013fd13785",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"

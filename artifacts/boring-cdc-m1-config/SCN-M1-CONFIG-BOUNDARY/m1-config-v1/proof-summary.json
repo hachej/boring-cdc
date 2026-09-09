@@ -10,7 +10,7 @@
   "contract_digests": {
     "contracts/m1/config-cases.json": "29d48011f43b42d5573b21e3d209854c979c9ae37e2eff3327b472660b7aff86"
   },
-  "git_commit": "b363cea5816679cdb5d695474fe1d843672fbd29",
+  "git_commit": "87c638044f968d96df731ab17d0754e0cede4f85",
   "outcome": "pass",
   "owner_bead": "boring-cdc-m1-config",
   "provisional_constants": [
