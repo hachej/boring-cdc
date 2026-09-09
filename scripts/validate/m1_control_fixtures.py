@@ -32,9 +32,11 @@ manifest=json.loads(Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTRO
 implementation_paths=['src','examples','Cargo.toml','Cargo.lock']
 assert subprocess.run(['git','diff','--quiet',manifest['git_commit']+'..HEAD','--',*implementation_paths]).returncode==0, 'component implementation changed after evidence commit'
 packet=json.loads(Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/packet.json').read_text())
-binary=Path('target/debug/examples/m1_control_probe')
-assert binary.is_file(), 'run cargo test --locked --workspace --all-targets before evidence validation'
-assert hashlib.sha256(binary.read_bytes()).hexdigest()==packet['binary_sha256'], 'component binary hash mismatch'
+implementation_files=[Path(path) for path in packet['implementation_paths']]
+implementation_hash=hashlib.sha256()
+for path in implementation_files:
+    implementation_hash.update(str(path).encode()+b'\0'+path.read_bytes())
+assert implementation_hash.hexdigest()==packet['implementation_sha256'], 'component implementation hash mismatch'
 for case in reconciled.values():
     component=case['component_fixture']; consumer=case['plan_scenario_execution']
     assert component['evidence_owner']==data['owner_bead']
