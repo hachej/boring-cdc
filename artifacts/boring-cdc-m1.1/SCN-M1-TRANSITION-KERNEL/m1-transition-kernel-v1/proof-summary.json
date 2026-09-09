@@ -1,17 +1,19 @@
 {
   "assertions": [
     "typed boundaries are non-interchangeable at compile time",
+    "no crate-wide raw-value production evidence mint exists",
     "synthetic commit evidence cannot construct a durable source boundary",
-    "same seed replays byte-identical synthetic outcomes",
-    "minimization preserves a stable violation within finite budgets",
+    "same seed and resolved fixture references replay identical synthetic outcomes",
+    "minimization preserves the complete bounded violation identity",
+    "step, trace, state, payload, fixture-reference, and diagnostic budgets fail closed",
     "fixture, seed, and trace schemas are Draft 2020-12 valid"
   ],
   "contract_digests": {
-    "contracts/m1/execution-trace.schema.json": "ab233e7b8ad55ba00e9a4180fed55c24ae7aed102acefa234915bed5a407dc64",
-    "contracts/m1/schedule-seed.schema.json": "c2565386d2b5d966db435af186f87584a28f6cc559791d359c8cf36a40a68ed7",
-    "contracts/m1/transition-fixture.schema.json": "db19da3e1a4c763df6916881379ac6a275798ec0ed9e566a813650a87f7d87d0"
+    "contracts/m1/execution-trace.schema.json": "27d5cbdbdcf14a107d56c4e85a93866fad6b75acb83bcbb0e1bcb4422c0fd370",
+    "contracts/m1/schedule-seed.schema.json": "3a2643f922cbbfa480aa12c7dea098628aa37ba02cf1db6486dd0a0ea7969b45",
+    "contracts/m1/transition-fixture.schema.json": "fc921ce1ed977132654644b4020387652e8326dc25065c43e936be0bac73affd"
   },
-  "git_commit": "dcaafb3bd71e0b4c0deafab627346d692e59ce97",
+  "git_commit": "c6626cb8e288e334f0763a4a5596a20cb1cdb3c6",
   "outcome": "pass",
   "owner_bead": "boring-cdc-m1.1",
   "scenario_id": "SCN-M1-TRANSITION-KERNEL",
