@@ -40,6 +40,33 @@ class ControlCommandEvidence(unittest.TestCase):
         self.assert_fails(exit_code, "E_VALIDATOR_EXIT")
         self.assert_fails(lambda root: (root / "stdout/validator-generic.txt").write_text("forged\n"), "E_VALIDATOR_STREAM")
 
+
+    def test_traversal_malformed_and_coordinated_transcript_tampering_fail(self):
+        def traversal(root):
+            path = root / "validator-evidence.json"
+            data = json.loads(path.read_text())
+            data["validators"][0]["stdout_path"] = str(Path(data["manifest_path"]).parent / ".." / ".." / "Cargo.toml")
+            data["validators"][0]["stdout_sha256"] = "0" * 64
+            path.write_text(json.dumps(data))
+        self.assert_fails(traversal, "E_VALIDATOR_PATH")
+
+        def malformed(root):
+            path = root / "validator-evidence.json"
+            data = json.loads(path.read_text())
+            data["validators"][0]["argv"] = []
+            path.write_text(json.dumps(data))
+        self.assert_fails(malformed, "E_VALIDATOR_ARGV")
+
+        def coordinated(root):
+            transcript = root / "stdout/validator-generic.txt"
+            transcript.write_text('{"status":"pass"}\n')
+            path = root / "validator-evidence.json"
+            data = json.loads(path.read_text())
+            import hashlib
+            data["validators"][0]["stdout_sha256"] = hashlib.sha256(transcript.read_bytes()).hexdigest()
+            path.write_text(json.dumps(data))
+        self.assert_fails(coordinated, "E_GENERIC_RESULT")
+
     def test_inventory_log_rerun_unresolved_cleanup_and_redaction_tampering_fail(self):
         self.assert_fails(lambda root: (root / "sha256.txt").write_text("0" * 64 + "  commands.txt\n"), "E_INVENTORY")
         self.assert_fails(lambda root: (root / "logs/boring-cdc.jsonl").write_text("{}\n"), "E_LOG")

@@ -2,7 +2,7 @@
 import hashlib,json,re,subprocess,sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lib"))
-from m1_control_evidence import VERSION as EVIDENCE_VERSION, validate as validate_command_evidence
+from m1_control_evidence import validate_payload
 
 VERSION = "m1-control-fixtures/1.0.0"
 if len(sys.argv) == 2 and sys.argv[1] == "--version":
@@ -74,8 +74,6 @@ print(f"PASS m1 control fixture scenarios={len(scenarios)} pg_majors={len(majors
 artifact=Path('artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1')
 if artifact.exists():
     subprocess.run(['scripts/validate/evidence.sh','artifacts/boring-cdc-m1-control-fixtures'],check=True,stdout=subprocess.DEVNULL)
-    findings=validate_command_evidence(artifact)
+    findings,inventory_count,log_count=validate_payload(artifact)
     assert not findings, json.dumps(findings,sort_keys=True)
-    inventory=(artifact/'sha256.txt').read_text().splitlines()
-    rows=(artifact/'logs/boring-cdc.jsonl').read_text().splitlines()
-    print(f"PASS artifact inventory={len(inventory)} logs={len(rows)} deterministic_rerun=1 redaction=1 command_evidence={EVIDENCE_VERSION}")
+    print(f"PASS artifact inventory={inventory_count} logs={log_count} deterministic_rerun=1 redaction=1")
