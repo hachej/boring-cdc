@@ -678,13 +678,12 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     for table in &raw.tables {
         if table.logical_id.is_empty()
             || table.source_relation.is_empty()
-            || table.replica_key.is_empty()
-            || table.replica_key.iter().any(|k| k.is_empty())
             || table.relation_contract.is_empty()
             || table.key_type_policy != "canonical-v1"
         {
             return err("CONFIG_INVALID_TABLE_IDENTITY", "tables");
         }
+        validate_replica_key(table)?;
     }
     if raw.source.publication.is_empty()
         || raw.source.slot.is_empty()
@@ -948,6 +947,38 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
         || raw.archive.filesystem_policy != "descriptor_relative_no_follow_exclusive"
     {
         return err("CONFIG_UNSUPPORTED_ARCHIVE_POLICY", "archive");
+    }
+    Ok(())
+}
+
+fn validate_replica_key(table: &Table) -> Result<(), ConfigError> {
+    if table.replica_key.is_empty() {
+        return err("CONFIG_EMPTY_REPLICA_KEY", "tables.replica_key");
+    }
+
+    let mut components = BTreeSet::new();
+    for component in &table.replica_key {
+        if component.trim().is_empty() {
+            return err("CONFIG_EMPTY_REPLICA_KEY_COMPONENT", "tables.replica_key");
+        }
+        if !components.insert(component.as_str()) {
+            return err(
+                "CONFIG_DUPLICATE_REPLICA_KEY_COMPONENT",
+                "tables.replica_key",
+            );
+        }
+        let Some(column_contract) = table.relation_contract.get(component) else {
+            return err(
+                "CONFIG_REPLICA_KEY_COMPONENT_NOT_IN_RELATION_CONTRACT",
+                "tables.replica_key",
+            );
+        };
+        if !column_contract.ends_with(":not-null") {
+            return err(
+                "CONFIG_NULLABLE_REPLICA_KEY_COMPONENT",
+                "tables.replica_key",
+            );
+        }
     }
     Ok(())
 }
@@ -1722,6 +1753,95 @@ archive_segment_bytes = 0
                 "{from}"
             );
         }
+    }
+
+    #[test]
+    fn composite_replica_key_matches_its_relation_contract() {
+        let composite = fixture().replace(
+            "replica_key = [\"id\"]",
+            "replica_key = [\"tenant_id\", \"id\"]",
+        ).replace(
+            "relation_contract = { id = \"int8:not-null\", total = \"numeric:nullable\" }",
+            "relation_contract = { total = \"numeric:nullable\", id = \"int8:not-null\", tenant_id = \"uuid:not-null\" }",
+        );
+        let loaded = load_str(&composite, &env()).unwrap();
+        assert_eq!(loaded.public().tables[0].replica_key, ["tenant_id", "id"]);
+    }
+
+    #[test]
+    fn replica_key_components_fail_closed_with_specific_redacted_codes() {
+        let cases = [
+            (
+                "replica_key = [\"id\"]",
+                "replica_key = []",
+                "CONFIG_EMPTY_REPLICA_KEY",
+            ),
+            (
+                "replica_key = [\"id\"]",
+                "replica_key = [\"id\", \"\"]",
+                "CONFIG_EMPTY_REPLICA_KEY_COMPONENT",
+            ),
+            (
+                "replica_key = [\"id\"]",
+                "replica_key = [\"id\", \"id\"]",
+                "CONFIG_DUPLICATE_REPLICA_KEY_COMPONENT",
+            ),
+            (
+                "replica_key = [\"id\"]",
+                "replica_key = [\"id\", \"tenant_id\"]",
+                "CONFIG_REPLICA_KEY_COMPONENT_NOT_IN_RELATION_CONTRACT",
+            ),
+            (
+                "replica_key = [\"id\"]",
+                "replica_key = [\"total\"]",
+                "CONFIG_NULLABLE_REPLICA_KEY_COMPONENT",
+            ),
+        ];
+
+        for (from, to, code) in cases {
+            let error = load_str(&fixture().replace(from, to), &env()).unwrap_err();
+            assert_eq!(error.code, code);
+            assert_eq!(error.field, "tables.replica_key");
+            let rendered = error.to_string();
+            assert!(!rendered.contains("id"));
+            assert!(!rendered.contains("tenant_id"));
+            assert!(!rendered.contains("total"));
+        }
+    }
+
+    #[test]
+    fn table_canonicalization_preserves_composite_key_order_and_fingerprints() {
+        let first_table = fixture().replace(
+            "replica_key = [\"id\"]",
+            "replica_key = [\"tenant_id\", \"id\"]",
+        ).replace(
+            "relation_contract = { id = \"int8:not-null\", total = \"numeric:nullable\" }",
+            "relation_contract = { tenant_id = \"uuid:not-null\", id = \"int8:not-null\", total = \"numeric:nullable\" }",
+        );
+        let second_table = r#"[[tables]]
+logical_id = "customers"
+source_relation = "public.customers"
+replica_key = ["region", "customer_id"]
+key_type_policy = "canonical-v1"
+relation_contract = { customer_id = "int8:not-null", region = "text:not-null", name = "text:nullable" }
+
+"#;
+        let forward = first_table.replace("[storage]", &format!("{second_table}[storage]"));
+        // Build the reverse order without changing either table's composite-key order.
+        let table_start = first_table.find("[[tables]]").unwrap();
+        let storage_start = first_table.find("[storage]").unwrap();
+        let prefix = &first_table[..table_start];
+        let orders_table = &first_table[table_start..storage_start];
+        let suffix = &first_table[storage_start..];
+        let reverse = format!("{prefix}{second_table}{orders_table}{suffix}");
+
+        let forward_loaded = load_str(&forward, &env()).unwrap();
+        let reverse_loaded = load_str(&reverse, &env()).unwrap();
+        assert_eq!(forward_loaded.fingerprints(), reverse_loaded.fingerprints());
+        assert_eq!(
+            forward_loaded.public().tables[1].replica_key,
+            ["tenant_id", "id"]
+        );
     }
 
     #[test]
