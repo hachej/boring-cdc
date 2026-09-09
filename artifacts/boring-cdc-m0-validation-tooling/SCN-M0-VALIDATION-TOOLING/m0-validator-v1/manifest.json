@@ -19,7 +19,7 @@
       "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log",
-      "stdout_sha256": "fea24427bc43266737f074439bfb7c3dee7edcd95602aefb471ef5e23b4c27b1",
+      "stdout_sha256": "70c7555710947d72252b02ff3c25ed416c7d9f9cdcb2555fc343f2223d8e734d",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     },
     {
@@ -28,7 +28,7 @@
       "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.log",
-      "stdout_sha256": "0b0df8b4820d845c476f0fbd573d725f2f8ffe311020885dff66d6e7f2027893",
+      "stdout_sha256": "67da97dd6a153e279764b0609601479b3746b9fcfbe85c6f7de7998355105eed",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     },
     {
@@ -46,7 +46,7 @@
       "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log",
-      "stdout_sha256": "fea24427bc43266737f074439bfb7c3dee7edcd95602aefb471ef5e23b4c27b1",
+      "stdout_sha256": "70c7555710947d72252b02ff3c25ed416c7d9f9cdcb2555fc343f2223d8e734d",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     },
     {
@@ -55,13 +55,13 @@
       "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log",
-      "stdout_sha256": "0b0df8b4820d845c476f0fbd573d725f2f8ffe311020885dff66d6e7f2027893",
+      "stdout_sha256": "67da97dd6a153e279764b0609601479b3746b9fcfbe85c6f7de7998355105eed",
       "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "component",
-  "git_commit": "f4e80d48893e71fc47a3a8fe99d861d97ecbd2ec",
+  "git_commit": "5e3e4faeb1aa60025cb38042ca61cf9b3eb35a94",
   "owner_bead": "boring-cdc-m0-validation-tooling",
   "redaction": {
     "checked": true,
@@ -88,7 +88,7 @@
       "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/structured-log.jsonl",
       "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/versions.json"
     ],
-    "digest": "0acebde345500ccf64b3bf12b6066f517196f344e9ad89e6c856d9a8b78fcb3f",
+    "digest": "8450b2d28cb9849f20b1861c95c10a89096028c9e7763584adc8860f4cddab41",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -97,8 +97,8 @@
   "schema_version": "evidence/v1",
   "seed": "m0-validator-v1",
   "source_preservation": {
-    "after_sha256": "dd6abe1b19339ff4581a2eedef2c4a8c6b0166f099de18d9ed1b5bb521d65fd2",
-    "before_sha256": "dd6abe1b19339ff4581a2eedef2c4a8c6b0166f099de18d9ed1b5bb521d65fd2",
+    "after_sha256": "14f43980aa5ca446ef3c34072f103780296ccbaff46649631896a2bae8b75c0e",
+    "before_sha256": "14f43980aa5ca446ef3c34072f103780296ccbaff46649631896a2bae8b75c0e",
     "preserved": true
   },
   "tier_proof": {

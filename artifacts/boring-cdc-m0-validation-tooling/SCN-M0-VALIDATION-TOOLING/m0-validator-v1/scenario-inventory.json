@@ -4,13 +4,13 @@
   "product_runtime": false,
   "scenarios": [
     "aggregate-unit",
-    "context-claim-handoff",
+    "context-claim-handoff-world-join",
     "isolated-br-staged-readiness",
     "hostile-core",
     "hostile-context",
     "hostile-knowledge",
     "stale-claim",
-    "malformed-handoff-provenance"
+    "shape-valid-stale-handoff"
   ],
   "schema_version": "m0-validation-scenarios/v1"
 }

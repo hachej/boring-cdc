@@ -3,7 +3,7 @@
     {
       "bytes": 357,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/before-after-tree.json",
-      "sha256": "dd1f65cccb60a7ca95643cd7a4a0b32b6d72f6347e5deb851e72f2b64d45a6bc"
+      "sha256": "5764e21acd02f313458a7d552b7356293d79882dde351c25649911c2b819ea69"
     },
     {
       "bytes": 95,
@@ -18,7 +18,7 @@
     {
       "bytes": 198,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log",
-      "sha256": "fea24427bc43266737f074439bfb7c3dee7edcd95602aefb471ef5e23b4c27b1"
+      "sha256": "70c7555710947d72252b02ff3c25ed416c7d9f9cdcb2555fc343f2223d8e734d"
     },
     {
       "bytes": 0,
@@ -28,7 +28,7 @@
     {
       "bytes": 124,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.log",
-      "sha256": "0b0df8b4820d845c476f0fbd573d725f2f8ffe311020885dff66d6e7f2027893"
+      "sha256": "67da97dd6a153e279764b0609601479b3746b9fcfbe85c6f7de7998355105eed"
     },
     {
       "bytes": 0,
@@ -48,7 +48,7 @@
     {
       "bytes": 198,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log",
-      "sha256": "fea24427bc43266737f074439bfb7c3dee7edcd95602aefb471ef5e23b4c27b1"
+      "sha256": "70c7555710947d72252b02ff3c25ed416c7d9f9cdcb2555fc343f2223d8e734d"
     },
     {
       "bytes": 0,
@@ -58,7 +58,7 @@
     {
       "bytes": 124,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log",
-      "sha256": "0b0df8b4820d845c476f0fbd573d725f2f8ffe311020885dff66d6e7f2027893"
+      "sha256": "67da97dd6a153e279764b0609601479b3746b9fcfbe85c6f7de7998355105eed"
     },
     {
       "bytes": 0,
@@ -71,19 +71,19 @@
       "sha256": "796380f52e3397b940882dc70cc377765e208bc98fb2fb785631360f49e06771"
     },
     {
-      "bytes": 445,
+      "bytes": 453,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/scenario-inventory.json",
-      "sha256": "a480f58f349d35bf57b9bcbf5b86a795c758041d8536acedc0e2a6bfeda2d509"
+      "sha256": "08ab123addd1060768cc8fd1b8b7b53878f780c4d2175d864be8b7ac2ad178c6"
     },
     {
       "bytes": 4746,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/structured-log.jsonl",
-      "sha256": "0b9172e5f548835b859f33debe2e3c0760a2f8d3df818f50c5fff79dc44aacb8"
+      "sha256": "db5429aa5b1e91cd6b4264b3f4a0964b081fdc52acedcf3316ddeb581230f222"
     },
     {
       "bytes": 188,
       "path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/versions.json",
-      "sha256": "1a295a9860083110e0652f817cd3ec8bee86d46862d23b64ddde41842c992f82"
+      "sha256": "0cf4b3ab86574d9e9d5d7a900a67e9bce8c8639473ca6732f8cfa38664a433f3"
     }
   ],
   "schema_version": "sha256-inventory/v1"
