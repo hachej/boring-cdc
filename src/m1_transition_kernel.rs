@@ -463,6 +463,7 @@ impl std::error::Error for HarnessError {}
 pub struct MinimizedTrace<Event, Completion> {
     pub steps: Vec<ScheduledStep<Event, Completion>>,
     pub trace: ExecutionTrace,
+    budget: HarnessBudget,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -541,18 +542,16 @@ impl TransitionFixture {
 }
 
 impl<Event, Completion> MinimizedTrace<Event, Completion> {
-    #[must_use]
     pub fn to_fixture(
         &self,
         scenario_id: impl Into<String>,
-        budget: HarnessBudget,
-    ) -> TransitionFixture {
-        TransitionFixture {
+    ) -> Result<TransitionFixture, HarnessError> {
+        let fixture = TransitionFixture {
             schema_version: "boring-cdc/transition-fixture/v1".into(),
             scenario_id: scenario_id.into(),
             synthetic: true,
             seed: self.trace.seed.clone(),
-            budget,
+            budget: self.budget,
             steps: self
                 .steps
                 .iter()
@@ -562,7 +561,9 @@ impl<Event, Completion> MinimizedTrace<Event, Completion> {
                 })
                 .collect(),
             expected_violation: self.trace.violation.clone(),
-        }
+        };
+        fixture.validate()?;
+        Ok(fixture)
     }
 }
 
@@ -758,6 +759,7 @@ impl Harness {
         Ok(MinimizedTrace {
             steps: minimized,
             trace,
+            budget: self.budget,
         })
     }
 }
@@ -926,7 +928,7 @@ pub(crate) mod tests {
                 .all(|entry| entry.redacted_state.len() <= 128)
         );
         assert!(minimized.trace.to_json().unwrap().len() < 4096);
-        let fixture = minimized.to_fixture("SCN-M1-INJECTED-VIOLATION", budget());
+        let fixture = minimized.to_fixture("SCN-M1-INJECTED-VIOLATION").unwrap();
         let fixture_json = serde_json::to_string_pretty(&fixture).unwrap();
         assert!(fixture_json.contains("event-add") || fixture_json.contains("break"));
         assert!(fixture_json.len() < 4096);
