@@ -1,0 +1,22 @@
+{
+  "assertions": [
+    "one deny-unknown-fields TOML loader is shared by check/status/run purposes",
+    "defaults < TOML < closed approved environment overrides",
+    "secrets are purpose-scoped and absent from serialization, diagnostics and fingerprints",
+    "canonical domain fingerprints are deterministic and change only for applicable semantic fields",
+    "all embedded configuration groups have stable accepted/rejected case inventory and targeted tests",
+    "malformed, truncated, overflow, unsafe path, TLS/listener and durability combinations fail closed"
+  ],
+  "contract_digests": {
+    "contracts/m1/config-cases.json": "69f456e37bad48d4aa8444f0bccd1d4315165492c07278961491270abda83299"
+  },
+  "git_commit": "855a578c181bcaf58438652c18b7f5c210ca92ad",
+  "outcome": "pass",
+  "owner_bead": "boring-cdc-m1-config",
+  "provisional_constants": [
+    "boring-cdc-d-security: loopback listener defaults and 0700/0600 operator endpoint",
+    "boring-cdc-d-pg-protocol: origin any and non-streamed pgoutput options"
+  ],
+  "scenario_id": "SCN-M1-CONFIG-BOUNDARY",
+  "schema_version": "boring-cdc/m1-config-proof/v1"
+}
