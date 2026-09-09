@@ -1,6 +1,7 @@
 //! Executable adapter used only by the M1 PostgreSQL component fixture.
 use boring_cdc::m1_control_fixtures::{
-    ControlKind, ControlWriterState, PublicationSpec, decode_control_update, decode_truncate,
+    ControlKind, ControlWriterState, FenceIdentity, PublicationSpec, decode_control_update,
+    decode_truncate,
 };
 
 fn decode_hex_messages(value: &str) -> Vec<Vec<u8>> {
@@ -19,6 +20,14 @@ fn decode_hex_messages(value: &str) -> Vec<Vec<u8>> {
         .collect()
 }
 
+fn intended_fence() -> FenceIdentity {
+    FenceIdentity {
+        capture_epoch: 1,
+        generation: 1,
+        table_set_fingerprint: "a".repeat(64),
+    }
+}
+
 fn expected_publication() -> PublicationSpec {
     PublicationSpec::new(
         "boring_cdc_publication",
@@ -30,7 +39,7 @@ fn expected_publication() -> PublicationSpec {
 fn main() {
     let mode = std::env::args().nth(1).expect("mode");
     match mode.as_str() {
-        "update" | "fence" => {
+        "update" | "fence" | "fence-mismatch" => {
             let messages = decode_hex_messages(&std::env::args().nth(2).expect("wire hex"));
             let nonce = std::env::args()
                 .nth(3)
@@ -45,14 +54,18 @@ fn main() {
             let update = decode_control_update(&messages, kind, nonce).unwrap();
             let mut writer = ControlWriterState::default();
             if kind == ControlKind::CaptureFence {
-                writer
-                    .intend_fence(nonce, update.fence_identity.clone().unwrap())
-                    .unwrap();
+                writer.intend_fence(nonce, intended_fence()).unwrap();
             }
-            let event = writer.observe(&update, None).unwrap();
-            assert!(!event.writes_user_row && !event.writes_benchmark_mutation);
-            assert!(!event.feedback_eligible);
-            println!("PASS pgoutput_update=decoded_typed_noop feedback=awaits_durable_commit");
+            if mode == "fence-mismatch" {
+                let failure = writer.observe(&update, None).unwrap_err();
+                assert_eq!(failure.fingerprint, "FENCE_IDENTITY_MISMATCH");
+                println!("PASS live_fence_identity_mismatch=block_before_feedback");
+            } else {
+                let event = writer.observe(&update, None).unwrap();
+                assert!(!event.writes_user_row && !event.writes_benchmark_mutation);
+                assert!(!event.feedback_eligible);
+                println!("PASS pgoutput_update=decoded_typed_noop feedback=awaits_durable_commit");
+            }
         }
         "cardinality" => {
             let messages = decode_hex_messages(&std::env::args().nth(2).expect("wire hex"));

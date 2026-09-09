@@ -61,6 +61,8 @@ for major in 15 16 17; do
 
   psql "$control" -v ON_ERROR_STOP=1 -qc "UPDATE boring_cdc_control.capture_fences SET capture_epoch=1,generation=1,table_set_fingerprint=repeat('a',64),unique_nonce=7 WHERE id='singleton'"
   cargo run --quiet --example m1_control_probe -- fence "$(changes)" 7 >/dev/null
+  psql "$control" -v ON_ERROR_STOP=1 -qc "UPDATE boring_cdc_control.capture_fences SET capture_epoch=1,generation=2,table_set_fingerprint=repeat('a',64),unique_nonce=8 WHERE id='singleton'"
+  cargo run --quiet --example m1_control_probe -- fence-mismatch "$(changes)" 8 >/dev/null
   for forbidden in \
     "INSERT INTO boring_cdc_control.heartbeat VALUES ('other',2,now())" \
     "DELETE FROM boring_cdc_control.heartbeat WHERE id='singleton'" \

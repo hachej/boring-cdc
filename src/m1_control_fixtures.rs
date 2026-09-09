@@ -557,25 +557,52 @@ fn tuple_text(values: &[PgoutputTupleValue], index: usize) -> Result<&str, Proto
 }
 
 fn valid_pg_timestamptz(value: &str) -> bool {
+    if !value.is_ascii() {
+        return false;
+    }
     let Some((date, time_and_zone)) = value.split_once(' ') else {
         return false;
     };
     let date_parts: Vec<_> = date.split('-').collect();
-    if date_parts.len() != 3
-        || date_parts[0].len() != 4
-        || date_parts.iter().any(|part| part.parse::<u32>().is_err())
-    {
+    let valid_date = date_parts.len() == 3
+        && date_parts[0].len() == 4
+        && date_parts[0].bytes().all(|byte| byte.is_ascii_digit())
+        && date_parts[1]
+            .parse::<u8>()
+            .is_ok_and(|month| (1..=12).contains(&month))
+        && date_parts[2]
+            .parse::<u8>()
+            .is_ok_and(|day| (1..=31).contains(&day));
+    if !valid_date {
         return false;
     }
-    let zone_at = time_and_zone[1..].rfind(['+', '-']).map(|index| index + 1);
-    let Some(zone_at) = zone_at else { return false };
+    let Some(zone_at) = time_and_zone
+        .bytes()
+        .enumerate()
+        .skip(1)
+        .filter(|(_, byte)| matches!(byte, b'+' | b'-'))
+        .map(|(index, _)| index)
+        .next_back()
+    else {
+        return false;
+    };
     let (time, zone) = time_and_zone.split_at(zone_at);
     let fields: Vec<_> = time.split(':').collect();
+    let zone_fields: Vec<_> = zone[1..].split(':').collect();
     fields.len() == 3
+        && fields[0].len() == 2
         && fields[0].parse::<u8>().is_ok_and(|hour| hour < 24)
+        && fields[1].len() == 2
         && fields[1].parse::<u8>().is_ok_and(|minute| minute < 60)
-        && fields[2].parse::<f64>().is_ok_and(|second| second < 60.0)
-        && zone[1..].parse::<u8>().is_ok_and(|hour| hour <= 15)
+        && fields[2]
+            .parse::<f64>()
+            .is_ok_and(|second| (0.0..60.0).contains(&second))
+        && matches!(zone_fields.len(), 1 | 2)
+        && zone_fields[0].len() == 2
+        && zone_fields[0].parse::<u8>().is_ok_and(|hour| hour <= 15)
+        && (zone_fields.len() == 1
+            || (zone_fields[1].len() == 2
+                && zone_fields[1].parse::<u8>().is_ok_and(|minute| minute < 60)))
 }
 
 fn expected_relation(kind: ControlKind) -> (&'static str, &'static [(bool, &'static str, u32)]) {
@@ -965,6 +992,9 @@ pub mod tests {
         assert!(valid_pg_timestamptz("2026-09-09 21:08:28.927+00"));
         assert!(!valid_pg_timestamptz("not-a-timestamp"));
         assert!(!valid_pg_timestamptz("2026-09-09 99:08:28+00"));
+        assert!(!valid_pg_timestamptz("2026-99-99 12:34:-1+0"));
+        assert!(!valid_pg_timestamptz(""));
+        assert!(!valid_pg_timestamptz("é"));
     }
     #[test]
     fn unbound_fence_fails_closed() {
