@@ -701,9 +701,19 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     {
         return err("CONFIG_ZERO_BOUND", "source");
     }
+    if raw.budgets.is_empty() {
+        return err("CONFIG_EMPTY_FILESYSTEM_BUDGETS", "budgets");
+    }
     raw.budgets.sort_by(|a, b| a.name.cmp(&b.name));
     unique(raw.budgets.iter().map(|b| b.name.as_str()), "budgets.name")?;
+    unique(raw.budgets.iter().map(|b| b.root.as_str()), "budgets.root")?;
     for budget in &raw.budgets {
+        if budget.name.trim().is_empty()
+            || budget.total_bytes.0 == 0
+            || budget.reserved_free_bytes.0 == 0
+        {
+            return err("CONFIG_INVALID_FILESYSTEM_BUDGET", "budgets");
+        }
         let used = budget
             .sqlite_wal_temp_bytes
             .0
@@ -719,6 +729,36 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
             return err("CONFIG_BUDGET_EXCEEDED", "budgets");
         }
         safe_path(&budget.root, "budgets.root")?;
+    }
+
+    // Budget roots are the explicit path-to-physical-filesystem association. The
+    // most-specific root wins so a nested mount (for example state/tmp) can have
+    // an independent budget without double-counting it against state.
+    let sqlite_budget = filesystem_budget_for_path(&raw.budgets, &raw.storage.sqlite_path)?;
+    let temp_budget = filesystem_budget_for_path(&raw.budgets, &raw.storage.sqlite_temp_path)?;
+    let spool_budget = filesystem_budget_for_path(&raw.budgets, &raw.storage.spool_path)?;
+    let archive_budget = filesystem_budget_for_path(&raw.budgets, &raw.archive.root)?;
+
+    let associations = [sqlite_budget, temp_budget, spool_budget, archive_budget];
+    let associated: BTreeSet<_> = associations.into_iter().collect();
+    if associated.len() != raw.budgets.len() {
+        return err("CONFIG_UNASSOCIATED_FILESYSTEM_BUDGET", "budgets.root");
+    }
+    if raw.budgets[sqlite_budget].sqlite_wal_temp_bytes.0 == 0
+        || raw.budgets[temp_budget].sqlite_wal_temp_bytes.0 == 0
+        || raw.budgets[sqlite_budget].concurrent_backfill_bytes.0 == 0
+        || raw.budgets[spool_budget].capture_spool_bytes.0 == 0
+        || raw.budgets[archive_budget].archive_segment_bytes.0 == 0
+    {
+        return err("CONFIG_ZERO_FILESYSTEM_RESERVATION", "budgets");
+    }
+    if [sqlite_budget, temp_budget, spool_budget].contains(&archive_budget)
+        && raw.storage.filesystem != raw.archive.filesystem
+    {
+        return err(
+            "CONFIG_FILESYSTEM_ASSOCIATION_MISMATCH",
+            "archive.filesystem",
+        );
     }
     if raw.limits.max_wire_frame_bytes.0 == 0
         || raw.limits.max_event_bytes.0 == 0
@@ -968,6 +1008,29 @@ fn safe_path(value: &str, field: &'static str) -> Result<(), ConfigError> {
         });
     }
     Ok(())
+}
+
+fn filesystem_budget_for_path(
+    budgets: &[FilesystemBudget],
+    value: &str,
+) -> Result<usize, ConfigError> {
+    let path = Path::new(value);
+    budgets
+        .iter()
+        .enumerate()
+        .filter(|(_, budget)| budget.root == "." || path.starts_with(Path::new(&budget.root)))
+        .max_by_key(|(_, budget)| {
+            if budget.root == "." {
+                0
+            } else {
+                Path::new(&budget.root).components().count()
+            }
+        })
+        .map(|(index, _)| index)
+        .ok_or(ConfigError {
+            code: "CONFIG_UNCOVERED_FILESYSTEM_PATH",
+            field: "budgets.root",
+        })
 }
 
 fn unique<'a>(
@@ -1270,6 +1333,186 @@ pub mod tests {
         assert_eq!(
             load_str(&over, &env()).unwrap_err().code,
             "CONFIG_BUDGET_EXCEEDED"
+        );
+    }
+
+    #[test]
+    fn shared_and_separate_filesystem_budgets_cover_every_configured_path() {
+        let shared = load_str(&fixture(), &env()).unwrap();
+        assert_eq!(shared.public().budgets.len(), 1);
+
+        let separate_budgets = r#"[[budgets]]
+name = "state"
+root = "state"
+total_bytes = 500000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 100000000
+capture_spool_bytes = 0
+concurrent_backfill_bytes = 200000000
+archive_segment_bytes = 0
+
+[[budgets]]
+name = "temp"
+root = "state/tmp"
+total_bytes = 200000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 100000000
+capture_spool_bytes = 0
+concurrent_backfill_bytes = 0
+archive_segment_bytes = 0
+
+[[budgets]]
+name = "spool"
+root = "state/spool"
+total_bytes = 300000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 0
+capture_spool_bytes = 200000000
+concurrent_backfill_bytes = 0
+archive_segment_bytes = 0
+
+[[budgets]]
+name = "archive"
+root = "archive/root"
+total_bytes = 200000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 0
+capture_spool_bytes = 0
+concurrent_backfill_bytes = 0
+archive_segment_bytes = 100000000
+"#;
+        let separate = fixture().replacen(
+            r#"[[budgets]]
+name = "state"
+root = "."
+total_bytes = 1000000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 100000000
+capture_spool_bytes = 200000000
+concurrent_backfill_bytes = 200000000
+archive_segment_bytes = 100000000
+"#,
+            separate_budgets,
+            1,
+        );
+        let loaded = load_str(&separate, &env()).unwrap();
+        assert_eq!(loaded.public().budgets.len(), 4);
+    }
+
+    #[test]
+    fn filesystem_budgets_are_nonempty_named_and_uniquely_rooted() {
+        let budget_block = r#"[[budgets]]
+name = "state"
+root = "."
+total_bytes = 1000000000
+reserved_free_bytes = 100000000
+sqlite_wal_temp_bytes = 100000000
+capture_spool_bytes = 200000000
+concurrent_backfill_bytes = 200000000
+archive_segment_bytes = 100000000
+
+"#;
+        let empty = fixture()
+            .replace("schema_version = 1", "schema_version = 1\nbudgets = []")
+            .replace(budget_block, "");
+        assert_eq!(
+            load_str(&empty, &env()).unwrap_err().code,
+            "CONFIG_EMPTY_FILESYSTEM_BUDGETS"
+        );
+        let unnamed = fixture().replace("name = \"state\"", "name = \"\"");
+        assert_eq!(
+            load_str(&unnamed, &env()).unwrap_err().code,
+            "CONFIG_INVALID_FILESYSTEM_BUDGET"
+        );
+        let zero_total = fixture().replace("total_bytes = 1000000000", "total_bytes = 0");
+        assert_eq!(
+            load_str(&zero_total, &env()).unwrap_err().code,
+            "CONFIG_INVALID_FILESYSTEM_BUDGET"
+        );
+        let duplicate_name =
+            fixture().replace("[retention]", &format!("{}\n[retention]", budget_block));
+        assert_eq!(
+            load_str(&duplicate_name, &env()).unwrap_err().code,
+            "CONFIG_DUPLICATE_ID"
+        );
+        let duplicate_root = fixture().replace(
+            "[retention]",
+            &format!(
+                "{}\n[retention]",
+                budget_block.replace("name = \"state\"", "name = \"other\"")
+            ),
+        );
+        assert_eq!(
+            load_str(&duplicate_root, &env()).unwrap_err().code,
+            "CONFIG_DUPLICATE_ID"
+        );
+    }
+
+    #[test]
+    fn filesystem_budget_reservations_are_nonzero_for_associated_roles() {
+        for (term, code) in [
+            (
+                "reserved_free_bytes = 100000000",
+                "CONFIG_INVALID_FILESYSTEM_BUDGET",
+            ),
+            (
+                "sqlite_wal_temp_bytes = 100000000",
+                "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+            ),
+            (
+                "capture_spool_bytes = 200000000",
+                "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+            ),
+            (
+                "concurrent_backfill_bytes = 200000000",
+                "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+            ),
+            (
+                "archive_segment_bytes = 100000000",
+                "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+            ),
+        ] {
+            let candidate =
+                fixture().replace(term, &format!("{} = 0", term.split(" = ").next().unwrap()));
+            assert_eq!(
+                load_str(&candidate, &env()).unwrap_err().code,
+                code,
+                "{term}"
+            );
+        }
+    }
+
+    #[test]
+    fn uncovered_unassociated_and_mismatched_filesystems_fail_closed() {
+        let uncovered = fixture().replace("root = \".\"", "root = \"state\"");
+        assert_eq!(
+            load_str(&uncovered, &env()).unwrap_err().code,
+            "CONFIG_UNCOVERED_FILESYSTEM_PATH"
+        );
+
+        let unrelated = fixture().replace(
+            "[retention]",
+            r#"[[budgets]]
+name = "unrelated"
+root = "elsewhere"
+total_bytes = 2
+reserved_free_bytes = 1
+sqlite_wal_temp_bytes = 0
+capture_spool_bytes = 0
+concurrent_backfill_bytes = 0
+archive_segment_bytes = 0
+
+[retention]"#,
+        );
+        assert_eq!(
+            load_str(&unrelated, &env()).unwrap_err().code,
+            "CONFIG_UNASSOCIATED_FILESYSTEM_BUDGET"
+        );
+
+        let mismatched = fixture().replacen("filesystem = \"ext4\"", "filesystem = \"xfs\"", 1);
+        assert_eq!(
+            load_str(&mismatched, &env()).unwrap_err().code,
+            "CONFIG_FILESYSTEM_ASSOCIATION_MISMATCH"
         );
     }
 

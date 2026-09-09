@@ -44,7 +44,7 @@ process_memory_bytes = 268435456
 
 [[budgets]]
 name = "state"
-root = "state"
+root = "."
 total_bytes = 1000000000
 reserved_free_bytes = 100000000
 sqlite_wal_temp_bytes = 100000000

@@ -941,13 +941,13 @@
     },
     {
       "accepted_examples": [
-        "valid budgets.name in representative/default fixture"
+        "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.name"
       ],
-      "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+      "constraint": "nonempty unique filesystem-budget identifier; every budget must associate with at least one configured durability path",
       "error_codes": [
-        "CONFIG_NUMERIC_OVERFLOW",
-        "CONFIG_BUDGET_EXCEEDED",
-        "CONFIG_DUPLICATE_ID"
+        "CONFIG_INVALID_FILESYSTEM_BUDGET",
+        "CONFIG_DUPLICATE_ID",
+        "CONFIG_UNASSOCIATED_FILESYSTEM_BUDGET"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests",
       "expected_type": "nonempty_string",
@@ -961,20 +961,22 @@
       "log_code": "CONFIG_REDACTED_VALIDATION",
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong TOML type or contract-violating budgets.name"
+        "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.name as applicable"
       ],
       "status_code": "configuration_rejected",
       "unit_target": "m1_config::tests"
     },
     {
       "accepted_examples": [
-        "valid budgets.root in representative/default fixture"
+        "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.root"
       ],
-      "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+      "constraint": "safe unique root explicitly associating the most-specific configured state, SQLite-temp, spool, or archive path with one physical-filesystem budget",
       "error_codes": [
-        "CONFIG_NUMERIC_OVERFLOW",
-        "CONFIG_BUDGET_EXCEEDED",
-        "CONFIG_DUPLICATE_ID"
+        "CONFIG_UNSAFE_PATH",
+        "CONFIG_DUPLICATE_ID",
+        "CONFIG_UNCOVERED_FILESYSTEM_PATH",
+        "CONFIG_UNASSOCIATED_FILESYSTEM_BUDGET",
+        "CONFIG_FILESYSTEM_ASSOCIATION_MISMATCH"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests",
       "expected_type": "nonempty_string",
@@ -988,20 +990,20 @@
       "log_code": "CONFIG_REDACTED_VALIDATION",
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong TOML type or contract-violating budgets.root"
+        "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.root as applicable"
       ],
       "status_code": "configuration_rejected",
       "unit_target": "m1_config::tests"
     },
     {
       "accepted_examples": [
-        "valid budgets.total_bytes in representative/default fixture"
+        "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.total_bytes"
       ],
-      "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+      "constraint": "nonzero physical-filesystem capacity greater than or equal to the checked sum of reserve terms",
       "error_codes": [
+        "CONFIG_INVALID_FILESYSTEM_BUDGET",
         "CONFIG_NUMERIC_OVERFLOW",
-        "CONFIG_BUDGET_EXCEEDED",
-        "CONFIG_DUPLICATE_ID"
+        "CONFIG_BUDGET_EXCEEDED"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests",
       "expected_type": "integer_with_explicit_units",
@@ -1015,20 +1017,20 @@
       "log_code": "CONFIG_REDACTED_VALIDATION",
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong TOML type or contract-violating budgets.total_bytes"
+        "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.total_bytes as applicable"
       ],
       "status_code": "configuration_rejected",
       "unit_target": "m1_config::tests"
     },
     {
       "accepted_examples": [
-        "valid budgets.reserved_free_bytes in representative/default fixture"
+        "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.reserved_free_bytes"
       ],
-      "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+      "constraint": "nonzero emergency reserve on every configured physical-filesystem budget",
       "error_codes": [
+        "CONFIG_INVALID_FILESYSTEM_BUDGET",
         "CONFIG_NUMERIC_OVERFLOW",
-        "CONFIG_BUDGET_EXCEEDED",
-        "CONFIG_DUPLICATE_ID"
+        "CONFIG_BUDGET_EXCEEDED"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests",
       "expected_type": "integer_with_explicit_units",
@@ -1042,20 +1044,20 @@
       "log_code": "CONFIG_REDACTED_VALIDATION",
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong TOML type or contract-violating budgets.reserved_free_bytes"
+        "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.reserved_free_bytes as applicable"
       ],
       "status_code": "configuration_rejected",
       "unit_target": "m1_config::tests"
     },
     {
       "accepted_examples": [
-        "valid budgets.sqlite_wal_temp_bytes in representative/default fixture"
+        "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.sqlite_wal_temp_bytes"
       ],
-      "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+      "constraint": "nonzero on every budget associated with the SQLite state or SQLite temporary path; zero is allowed only on unrelated separate filesystems",
       "error_codes": [
+        "CONFIG_ZERO_FILESYSTEM_RESERVATION",
         "CONFIG_NUMERIC_OVERFLOW",
-        "CONFIG_BUDGET_EXCEEDED",
-        "CONFIG_DUPLICATE_ID"
+        "CONFIG_BUDGET_EXCEEDED"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests",
       "expected_type": "integer_with_explicit_units",
@@ -1069,20 +1071,20 @@
       "log_code": "CONFIG_REDACTED_VALIDATION",
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong TOML type or contract-violating budgets.sqlite_wal_temp_bytes"
+        "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.sqlite_wal_temp_bytes as applicable"
       ],
       "status_code": "configuration_rejected",
       "unit_target": "m1_config::tests"
     },
     {
       "accepted_examples": [
-        "valid budgets.capture_spool_bytes in representative/default fixture"
+        "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.capture_spool_bytes"
       ],
-      "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+      "constraint": "nonzero on the budget associated with the configured capture spool path; zero is allowed only on unrelated separate filesystems",
       "error_codes": [
+        "CONFIG_ZERO_FILESYSTEM_RESERVATION",
         "CONFIG_NUMERIC_OVERFLOW",
-        "CONFIG_BUDGET_EXCEEDED",
-        "CONFIG_DUPLICATE_ID"
+        "CONFIG_BUDGET_EXCEEDED"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests",
       "expected_type": "integer_with_explicit_units",
@@ -1096,20 +1098,20 @@
       "log_code": "CONFIG_REDACTED_VALIDATION",
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong TOML type or contract-violating budgets.capture_spool_bytes"
+        "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.capture_spool_bytes as applicable"
       ],
       "status_code": "configuration_rejected",
       "unit_target": "m1_config::tests"
     },
     {
       "accepted_examples": [
-        "valid budgets.concurrent_backfill_bytes in representative/default fixture"
+        "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.concurrent_backfill_bytes"
       ],
-      "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+      "constraint": "nonzero on the budget associated with SQLite state; zero is allowed only on unrelated separate filesystems",
       "error_codes": [
+        "CONFIG_ZERO_FILESYSTEM_RESERVATION",
         "CONFIG_NUMERIC_OVERFLOW",
-        "CONFIG_BUDGET_EXCEEDED",
-        "CONFIG_DUPLICATE_ID"
+        "CONFIG_BUDGET_EXCEEDED"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests",
       "expected_type": "integer_with_explicit_units",
@@ -1123,20 +1125,20 @@
       "log_code": "CONFIG_REDACTED_VALIDATION",
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong TOML type or contract-violating budgets.concurrent_backfill_bytes"
+        "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.concurrent_backfill_bytes as applicable"
       ],
       "status_code": "configuration_rejected",
       "unit_target": "m1_config::tests"
     },
     {
       "accepted_examples": [
-        "valid budgets.archive_segment_bytes in representative/default fixture"
+        "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.archive_segment_bytes"
       ],
-      "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+      "constraint": "nonzero on the budget associated with the configured archive root; zero is allowed only on unrelated separate filesystems",
       "error_codes": [
+        "CONFIG_ZERO_FILESYSTEM_RESERVATION",
         "CONFIG_NUMERIC_OVERFLOW",
-        "CONFIG_BUDGET_EXCEEDED",
-        "CONFIG_DUPLICATE_ID"
+        "CONFIG_BUDGET_EXCEEDED"
       ],
       "executable_scenario": "cargo test --locked m1_config::tests",
       "expected_type": "integer_with_explicit_units",
@@ -1150,7 +1152,7 @@
       "log_code": "CONFIG_REDACTED_VALIDATION",
       "redaction": "paths represented only in public config projection",
       "rejected_examples": [
-        "wrong TOML type or contract-violating budgets.archive_segment_bytes"
+        "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.archive_segment_bytes as applicable"
       ],
       "status_code": "configuration_rejected",
       "unit_target": "m1_config::tests"
