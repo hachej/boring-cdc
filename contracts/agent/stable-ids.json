@@ -5034,6 +5034,6 @@
   "source_files": {
     "docs/PLAN.md": "0e4ebaa072453ea24f0dfc3f22a025b919970fe556eb0d90f026235e8029af4d",
     "docs/REQUIREMENTS.md": "ebf333dcd571169c1e71d7c5cdd94af2d72fd65dffe0e58b91c407f38f78aa22",
-    "fixtures/m0/decisions/boring-cdc-d-owner.json": "4fda204d4ce36ef312b42d6f65562451d59d1e46e3a09aa2f08945d667d6c66d"
+    "fixtures/m0/decisions/boring-cdc-d-owner.json": "7dbc0fdfa94cac026c71c76574e4674bad3275315f0797f54219ed4efef946be"
   }
 }

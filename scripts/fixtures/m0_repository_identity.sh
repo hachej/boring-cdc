@@ -7,7 +7,7 @@ mkdir -p "$(dirname "$output_path")"
 tmp="${output_path}.tmp.$$"
 trap 'rm -f "$tmp"' EXIT HUP INT TERM
 
-scripts/fixtures/validate_m0_repository_identity.py
+scripts/fixtures/validate_m0_repository_identity.py --active-run
 if [ -n "$observed_input" ]; then
   if ! cp -f "$observed_input" "$tmp" 2>/dev/null; then
     printf '%s\n' '{"code":"REPOSITORY_IDENTITY_MISMATCH","outcome":"fail","phase":"observe"}'
