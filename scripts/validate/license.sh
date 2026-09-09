@@ -45,11 +45,15 @@ try:
  approval={'approved_at':'2026-09-09T08:58:19Z','approved_by':'Julien Hurault (repository owner), intention d3e8abc3-d2f4-4bc0-8aec-d6ffd7bf2e36','value_digest':hashlib.sha256(PROPOSED.encode()).hexdigest()}
  expected={'approval':approval,'executor_beads':[EXECUTOR],'fixture_sha256':sha(root/FIXTURE),'fixture_spec':FIXTURE,'id':'DEC-LICENSE','owner_bead':OWNER,'proposed_value':PROPOSED,'status':'approved'}
  if row!=expected: fail()
- needed={'ART-M0-LICENSE-TEXT':'LICENSE','ART-M0-LICENSE-FIXTURE':FIXTURE,'ART-M0-LICENSE-PROBE':'artifacts/m0/decisions/boring-cdc-d-license/fixture-run.jsonl'}
+ needed={'ART-M0-LICENSE-TEXT':'LICENSE','ART-M0-LICENSE-FIXTURE':FIXTURE,'ART-M0-LICENSE-PROBE':'artifacts/m0/decisions/boring-cdc-d-license/fixture-run.jsonl','ART-M0-LICENSE-VALIDATION':'artifacts/m0/decisions/boring-cdc-d-license/evidence.json'}
  owned={x['id']:x for x in artifacts['artifacts'] if x.get('owner_bead')==OWNER}
  for ident,path in needed.items():
   item=owned.get(ident)
   if item!={'id':ident,'owner_bead':OWNER,'path':path,'sha256':sha(root/path),'status':'complete'}: fail()
+ evidence=json.loads((root/needed['ART-M0-LICENSE-VALIDATION']).read_text())
+ if evidence.get('schema_version')!='validation-result/v1' or evidence.get('validator_version')!='core-validators/1.0.0' or evidence.get('owner_bead')!='boring-cdc-m0.1' or evidence.get('status')!='pass' or evidence.get('findings')!=[] or evidence.get('input_sha256')!=sha(root/'contracts/m0/decisions.json') or not re.fullmatch(r'[0-9a-f]{40}',evidence.get('git_commit','')): fail()
+ evidence_sha=evidence['git_commit']
+ if subprocess.run(['git','cat-file','-e',evidence_sha+'^{commit}'],cwd=root,capture_output=True).returncode or subprocess.run(['git','merge-base','--is-ancestor',evidence_sha,'HEAD'],cwd=root,capture_output=True).returncode or subprocess.run(['git','diff','--quiet',evidence_sha+'..HEAD','--','LICENSE','README.md',FIXTURE,'scripts/validate/license.sh','contracts/m0/decisions.json'],cwd=root).returncode: fail()
 except (OSError,KeyError,ValueError,TypeError,StopIteration,json.JSONDecodeError,tomllib.TOMLDecodeError): fail()
 print(json.dumps({'code':'LICENSE_FIXTURE_VALID','metadata_state':metadata_state,'outcome':'pass','phase':'validate_spec'},separators=(',',':')))
 PY
