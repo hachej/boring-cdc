@@ -1,15 +1,17 @@
 {
   "artifact_digests": {
-    "src/m1_config.rs": "0d03c7d2f0615867e0ddc7f1db68b05ac56b76f203482aa44a0b25d6c4a3d52f",
+    "src/m1_config.rs": "698c6764f650a9ae1ea11a124599fbf2d66505a0d8645f0914754177e4b4e53e",
     "tests/fixtures/m1_config/representative.toml": "31ba3519b025458bb20b78840b113dbb40642ddd759ae087d947c7b110bbda7f"
   },
   "assertions": [
     "the five role-specific secret environment references are pairwise distinct before any purpose-scoped secret resolution",
     "all ten unordered role pairs fail with CONFIG_ALIASED_SECRET_REFERENCE at the redacted secret_reference field",
     "cross-PostgreSQL/ClickHouse aliases fail identically to within-system aliases",
+    "secret references cannot collide with approved public override names, so credential values cannot enter public configuration or fingerprints",
+    "when an aliased pair also uses a reserved override name, the stable alias code takes precedence independent of environment value",
     "secret reference names and resolved values remain absent from diagnostics and every configuration fingerprint"
   ],
-  "git_commit": "56cb0feb97fc410e2a821f47b889c7168a287379",
+  "git_commit": "23f1dbb4961c7dd3fbe589900d261bd3a5649aa4",
   "outcome": "pass",
   "owner_bead": "boring-cdc-m1-config-secret-role-distinctness-6o9",
   "scenario_id": "SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS",
