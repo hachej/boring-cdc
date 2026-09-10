@@ -11,7 +11,7 @@ trap cleanup EXIT HUP INT TERM
 $compose up -d --wait --wait-timeout 120 postgres clickhouse >/dev/null
 scripts/validate/m1_workload.py execute "$project" "$out" clean
 for mode in business-omission ledger-omission retry-duplicate retry-conflict unavailable; do
-  scripts/validate/m1_workload.py fault "$out" "$mode"
+  scripts/validate/m1_workload.py fault "$project" "$out" "$mode"
 done
 scripts/validate/m1_workload.py evidence "$project" "$out" artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1
 printf 'm1 workload faults PASS business-only=fail ledger-only=fail duplicate=pass conflict=fail unavailable=non-pass final=pass\n'

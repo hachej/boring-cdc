@@ -5,7 +5,7 @@
   },
   "commands": [
     {
-      "argv": "scripts/e2e/m1_workload.sh workload-v1",
+      "argv": "scripts/faults/m1_workload.sh workload-v1",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -16,7 +16,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "96097c8b763ec44322d14be129c9ac10b0675cf8",
+  "git_commit": "9f2f95e46c5b4457adee4201272258a573aec574",
   "owner_bead": "boring-cdc-m1-workload.2",
   "redaction": {
     "checked": true,
@@ -35,7 +35,7 @@
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/state/before.json",
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/versions.json"
     ],
-    "digest": "848c43d602e91b0cb91df1a8c9b334c68b7e03b34e2c627ea378e3981d6c09a5",
+    "digest": "cdcf5d0d76f671175fb28180f1da30df774602264ade9655fca918fe2e179241",
     "product_faults": "independent_ledger_and_business_omissions",
     "runtime_observed": true,
     "status": "pass"
@@ -44,13 +44,13 @@
   "schema_version": "evidence/v1",
   "seed": "workload-v1",
   "source_preservation": {
-    "after_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    "before_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "after_sha256": "dd409233537c04793328b611a10718b3c2c235838d8398edbc8313fb0b5b0653",
+    "before_sha256": "dd409233537c04793328b611a10718b3c2c235838d8398edbc8313fb0b5b0653",
     "preserved": true
   },
   "tier_proof": {
     "boundary_e2e": true,
-    "clean_clone": true,
+    "clean_clone": false,
     "clean_environment": true,
     "consumed_contract_vectors": true,
     "deterministic_rerun": true,
@@ -60,6 +60,6 @@
     "full_failure_matrix": false,
     "integration": true,
     "targeted_checks": true,
-    "workspace_tests": true
+    "workspace_tests": false
   }
 }

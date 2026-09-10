@@ -15,18 +15,27 @@ use std::path::Path;
 const DIGEST_DOMAIN: &[u8] = b"boring-cdc/workload-set/v1";
 const STATE_DOMAIN: &[u8] = b"boring-cdc/workload-state/v1";
 // M0-PROVISIONAL: boring-cdc-d-keys
-const KEYS_CONTRACT: &[u8] = b"key-v1:arity-1-8:length-delimited-oid-type-payload:sortable";
+const KEYS_CONTRACT_DIGEST: [u8; 32] = [
+    0x30, 0xc1, 0x4e, 0x8b, 0x95, 0x3c, 0x11, 0xdf, 0xb9, 0xab, 0x4a, 0xc1, 0x0c, 0xcd, 0xe0, 0xcb,
+    0xad, 0x9c, 0x7a, 0xe4, 0xd2, 0x50, 0x97, 0xd6, 0x22, 0x58, 0xe7, 0xd7, 0x1d, 0x7a, 0x51, 0x0d,
+];
 // M0-PROVISIONAL: boring-cdc-d-values
-const VALUES_CONTRACT: &[u8] = b"value-v1:typed-null-absent-unchanged:lossless";
+const VALUES_CONTRACT_DIGEST: [u8; 32] = [
+    0xb0, 0x3d, 0x04, 0x46, 0x0a, 0x78, 0xc4, 0xcd, 0x0b, 0x02, 0x81, 0x79, 0x52, 0xe6, 0xbc, 0xc2,
+    0x1d, 0x89, 0xc9, 0xb7, 0x12, 0xb0, 0x27, 0xb1, 0xb8, 0x66, 0xcf, 0x5e, 0x62, 0xc7, 0xac, 0xc8,
+];
 // M0-PROVISIONAL: boring-cdc-d-oracle
-const ORACLE_CONTRACT: &[u8] = b"oracle-v1:ledger-business-final:fence-exact-set-sorted-digest";
+const ORACLE_CONTRACT_DIGEST: [u8; 32] = [
+    0x8b, 0x74, 0x5b, 0xab, 0xbe, 0x15, 0x2a, 0xc6, 0x5c, 0xc5, 0x37, 0xc0, 0xe0, 0x1f, 0x3e, 0x18,
+    0x14, 0xb7, 0x85, 0x44, 0x3d, 0x4a, 0x63, 0xaa, 0xdd, 0xc0, 0x8f, 0x56, 0xfb, 0xa8, 0x57, 0x74,
+];
 
 #[must_use]
-pub fn provisional_contract_digests() -> ContractDigests {
+pub const fn provisional_contract_digests() -> ContractDigests {
     ContractDigests {
-        keys: Sha256::digest(KEYS_CONTRACT).into(),
-        values: Sha256::digest(VALUES_CONTRACT).into(),
-        oracle: Sha256::digest(ORACLE_CONTRACT).into(),
+        keys: KEYS_CONTRACT_DIGEST,
+        values: VALUES_CONTRACT_DIGEST,
+        oracle: ORACLE_CONTRACT_DIGEST,
     }
 }
 
@@ -410,15 +419,12 @@ fn ledger_leaf(row: &LedgerEntry) -> [u8; 32] {
         DIGEST_DOMAIN,
         &[
             &row.run_id,
-            &row.mutation_seq.to_be_bytes(),
-            &row.mutation_id,
             &row.transaction_group_id,
             &row.transaction_ordinal.to_be_bytes(),
             &[row.entity_table.tag()],
             &row.key,
             &[row.operation.tag()],
             &after,
-            &row.committed_at_micros.to_be_bytes(),
             &[matches!(row.record_kind, RecordKind::Fence) as u8],
         ],
     )
@@ -775,12 +781,35 @@ pub fn evaluate(
         unexpected: vec![],
     };
 
+    let scratch = std::env::temp_dir().join(format!(
+        "boring-cdc-workload-oracle-{}-{:?}",
+        std::process::id(),
+        std::thread::current().id()
+    ));
+    let ledger_sorted_digest = external_sorted_digest(
+        delivered_ledger.iter().map(ledger_leaf),
+        &scratch,
+        256,
+        limit,
+    )?;
+    let business_sorted_digest = match observed_business {
+        Some(rows) => Some(external_sorted_digest(
+            rows.iter()
+                .map(business_leaf)
+                .collect::<std::collections::BTreeSet<_>>(),
+            &scratch,
+            256,
+            limit * 2,
+        )?),
+        None => business_sorted_digest,
+    };
+    let _ = fs::remove_dir(&scratch);
     Ok(OracleReport {
         ledger_delivery,
         business_event_delivery,
         final_state_convergence,
         sequence: sequence_diagnostics(delivered_ledger),
-        ledger_sorted_digest: sorted_digest(delivered_ledger.iter().map(ledger_leaf), limit)?,
+        ledger_sorted_digest,
         business_sorted_digest,
         final_typed_checksum: observed_checksum,
     })
