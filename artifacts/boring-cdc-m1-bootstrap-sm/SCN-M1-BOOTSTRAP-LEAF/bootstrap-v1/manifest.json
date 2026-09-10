@@ -17,9 +17,9 @@
       "argv": "cargo test --locked m1_bootstrap_sm::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-2.stderr",
-      "stderr_sha256": "a0e9244cf57b9dc9f0b37e4426b8a9e27fc90d118dba7becb5180b50a54f54b0",
+      "stderr_sha256": "176e6177fd7b6e6f37e87dc1c0c58ca0d71162ecaf71ef338e54bda9c2e85942",
       "stdout_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-2.log",
-      "stdout_sha256": "b71d326228d4c140206adff46d9953ea7b1275e9182f4d328f33721ba1c1f635",
+      "stdout_sha256": "027c531a71ce4a83540bdafb85bffed575e93d12c3dfcc64c4392d362bedebe5",
       "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
     },
     {
@@ -28,13 +28,13 @@
       "stderr_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-3.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-3.log",
-      "stdout_sha256": "8d7eaa662b7a8cc2a78442069f715d98d60ca5273306bceb0aec1527d0bc661b",
+      "stdout_sha256": "e0c41838b005f0b322a662a0315e31524cec6f136f134d41b8551c086d33f6e6",
       "version": "3.13.3"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "91a0d57c15dd487463b94c067e671949028e345b",
+  "git_commit": "1e0ab51723153f916d7941bfa8c39ed5ac31ad2c",
   "owner_bead": "boring-cdc-m1-bootstrap-sm",
   "redaction": {
     "checked": true,
@@ -46,7 +46,7 @@
       "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/versions.json",
       "contracts/m1/bootstrap-sm-cases.json"
     ],
-    "digest": "f34f1758bd2292a760ecdfa8bf9492c33914a9231d1b9b211bc970faf0330a57",
+    "digest": "089ad97e671045e80f5c756dbf8f0c54afb251429449e9cb9b757b5ffc2a7823",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -55,8 +55,8 @@
   "schema_version": "evidence/v1",
   "seed": "45063 (0xB007)",
   "source_preservation": {
-    "after_sha256": "a88686577d95e1a915621b2ef6011fa451facc193e53378de86636def51c0275",
-    "before_sha256": "a88686577d95e1a915621b2ef6011fa451facc193e53378de86636def51c0275",
+    "after_sha256": "acb1ba3c4422611ccd7a582911464c7195fd796c927291bf9e8ec4c4e498bbb9",
+    "before_sha256": "acb1ba3c4422611ccd7a582911464c7195fd796c927291bf9e8ec4c4e498bbb9",
     "preserved": true
   },
   "tier_proof": {
