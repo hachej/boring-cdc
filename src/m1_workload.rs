@@ -395,6 +395,19 @@ pub fn deterministic_fixture(
             }
         }
     }
+    ledger.push(LedgerEntry {
+        run_id,
+        mutation_seq: 30,
+        mutation_id: id16(seed, b"fence", 30),
+        transaction_group_id: id16(seed, b"fence-group", 30),
+        transaction_ordinal: 0,
+        entity_table: EntityTable::Customers,
+        key: seeded(seed, b"fence-key", 30),
+        operation: Operation::Insert,
+        expected_after_hash: None,
+        committed_at_micros: 1_700_000_000_000_030,
+        record_kind: RecordKind::Fence,
+    });
     if ledger.len() > profile.max_records() {
         return Err(OracleFailure::new(
             "limit",
@@ -672,10 +685,16 @@ pub fn evaluate(
         .iter()
         .map(|r| (r.mutation_id, ledger_leaf(r)))
         .collect();
-    let delivered_ledger_map: BTreeMap<_, _> = delivered_ledger
-        .iter()
-        .map(|r| (r.mutation_id, ledger_leaf(r)))
-        .collect();
+    let mut delivered_ledger_map = BTreeMap::new();
+    let mut ledger_duplicates = Vec::new();
+    for row in delivered_ledger {
+        if delivered_ledger_map
+            .insert(row.mutation_id, ledger_leaf(row))
+            .is_some()
+        {
+            ledger_duplicates.push(hex16(&row.mutation_id));
+        }
+    }
     let ledger_missing = expected_ledger
         .keys()
         .filter(|k| !delivered_ledger_map.contains_key(*k))
@@ -685,6 +704,7 @@ pub fn evaluate(
         .keys()
         .filter(|k| !expected_ledger.contains_key(*k))
         .map(hex16)
+        .chain(ledger_duplicates)
         .collect::<Vec<_>>();
     let ledger_mismatch = expected_ledger.iter().any(|(k, v)| {
         delivered_ledger_map
@@ -870,6 +890,31 @@ pub mod tests {
         assert_eq!(a, b);
         let report = evaluate(&a, &a.ledger, Some(&a.business_events), &a.final_state).unwrap();
         assert!(report.passed());
+        eprintln!(
+            "ledger={}",
+            report
+                .ledger_sorted_digest
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        );
+        eprintln!(
+            "business={}",
+            report
+                .business_sorted_digest
+                .unwrap()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        );
+        eprintln!(
+            "state={}",
+            report
+                .final_typed_checksum
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        );
         assert!(!report.sequence.gaps.is_empty());
         assert!(report.sequence.duplicates.is_empty());
     }

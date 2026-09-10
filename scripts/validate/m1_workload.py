@@ -6,6 +6,9 @@ PG_IMAGE="docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63d
 CH_IMAGE="docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f" # // M0-PROVISIONAL: boring-cdc-d-compose
 KEYS_DIGEST="30c14e8b953c11dfb9ab4ac10ccde0cbad9c7ae4d25097d62258e7d71d7a510d" # // M0-PROVISIONAL: boring-cdc-d-keys
 VALUES_DIGEST="b03d04460a78c4cd0b02817952e6bcc21d89c9b712b027b1b866cf5e62c7acc8" # // M0-PROVISIONAL: boring-cdc-d-values
+FIXED_LEDGER_DIGEST='5fa4f2cc7510beecd5769943e1d05eb8eef29f1a8ab9020d43ec21e144aff39e'
+FIXED_BUSINESS_DIGEST='e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab'
+FIXED_STATE_DIGEST='3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af'
 ORACLE_DIGEST="8b745babbe152ac65cc537c0e01f3e1814b785443d4a63aaddc08f56fba85774" # // M0-PROVISIONAL: boring-cdc-d-oracle
 FIELDS=['transaction_group_id','transaction_ordinal','entity_table','canonical_key','operation','after_hash']
 def h(v): return hashlib.sha256(v.encode()).hexdigest()
@@ -21,6 +24,7 @@ spec=[(10,'g01',0,'customers',B[0][4],'insert',"INSERT INTO customers VALUES(1,'
 # correct a deliberately compact literal typo before execution
 spec[7]=(*spec[7][:-1],spec[7][-1]+')')
 L=[['run-workload-v1',str(x[0]),f'm{x[0]:03}',x[1],str(x[2]),x[3],x[4],x[5],B[i][6],f'2025-01-01T00:00:{x[0]:02}Z','business'] for i,x in enumerate(spec)]
+L.append(['run-workload-v1','30','f030','fence','0','workload_fence','run-workload-v1','fence','','2025-01-01T00:00:30Z','fence'])
 S=[['customers',key_i8(2),B[9][6]],['order_items',key_item(100,1),B[7][6]],['orders',key_i8(100),B[2][6]],['products',key_i8(10),B[1][6]]]
 def compose(project,*args,input=None):
  r=subprocess.run(['docker','compose','-p',project,'-f','fixtures/m1/workload-compose.yml',*args],input=input,text=True,capture_output=True)
@@ -43,16 +47,36 @@ def external_digest(root,name,rows,maximum=4096):
    for stream in streams: stream.close()
   return digest.hexdigest()
  finally: shutil.rmtree(d,ignore_errors=True)
+def external_digest_file(root,name,path,transform=lambda row: row,maximum=4096):
+ d=root/f'sort-{name}'; shutil.rmtree(d,ignore_errors=True); d.mkdir(); files=[]; chunk=[]; count=0
+ try:
+  with path.open() as stream:
+   for line in stream:
+    count+=1
+    if count>maximum: raise AssertionError('WORKLOAD_SORT_RECORD_LIMIT')
+    chunk.append(transform(line.rstrip('\n').split('\t')))
+    if len(chunk)==3:
+     p=d/f'{len(files):08}.txt'; p.write_text(''.join(x+'\n' for x in sorted(chunk))); files.append(p); chunk=[]
+  if chunk:
+   p=d/f'{len(files):08}.txt'; p.write_text(''.join(x+'\n' for x in sorted(chunk))); files.append(p)
+  streams=[p.open() for p in files]; digest=hashlib.sha256()
+  try:
+   for line in heapq.merge(*streams): digest.update(line.encode())
+  finally:
+   for stream in streams: stream.close()
+  return digest.hexdigest()
+ finally: shutil.rmtree(d,ignore_errors=True)
 def canonical_ledger(r): return r[2]+'\t'+h('\x1f'.join(r[i] for i in [0,3,4,5,6,7,8,10]))
 def dimensions(root,mode):
  ledger,business,state,fence=(records(root/n) for n in ['ledger.tsv','business.tsv','state.tsv','fence.tsv']); business.sort(); unavailable=mode=='unavailable'; by_id={}; conflict=False
  for r in business:
   old=by_id.get(r[0]); conflict |= old is not None and old!=r; by_id.setdefault(r[0],r)
- business=list(by_id.values()); ld=external_digest(root,'ledger',[canonical_ledger(r) for r in ledger]); bd=None if unavailable else external_digest(root,'business',['\t'.join(r[1:]) for r in business]); sd=external_digest(root,'state',['\t'.join(r) for r in state])
+ business=list(by_id.values()); ld=external_digest_file(root,'ledger',root/'ledger.tsv',canonical_ledger); bd=None if unavailable else external_digest(root,'business',['\t'.join(r[1:]) for r in business]); sd=external_digest_file(root,'state',root/'state.tsv',lambda r:'\t'.join(r))
  eld=external_digest(root,'expected-ledger',[canonical_ledger(r) for r in L]); ebd=external_digest(root,'expected-business',['\t'.join(r[1:]) for r in B]); esd=external_digest(root,'expected-state',['\t'.join(r) for r in S])
+ assert (eld,ebd,esd)==(FIXED_LEDGER_DIGEST,FIXED_BUSINESS_DIGEST,FIXED_STATE_DIGEST)
  ledger_ok=ledger==L and ld==eld; business_ok=not unavailable and not conflict and sorted(r[1:] for r in business)==sorted(r[1:] for r in B) and bd==ebd; final=state==S and sd==esd and fence==[['run-workload-v1','30','10']]
  seq=[int(r[1]) for r in ledger]
- return {'ledger':'pass' if ledger_ok else 'fail','business':'unavailable' if unavailable else ('pass' if business_ok else 'fail'),'final_state':'pass' if final else 'fail','fence':'pass' if final else 'fail','sequence_gaps':'pass' if seq in ([10,12,13,14,17,18,21,24,27,28],[10,12,13,14,18,21,24,27,28]) else 'fail','ledger_count':len(ledger),'business_count':len(business),'state_count':len(state),'ledger_sorted_digest':ld,'business_sorted_digest':bd,'final_typed_checksum':sd}
+ return {'ledger':'pass' if ledger_ok else 'fail','business':'unavailable' if unavailable else ('pass' if business_ok else 'fail'),'final_state':'pass' if final else 'fail','fence':'pass' if final else 'fail','sequence_gaps':'pass' if seq in ([10,12,13,14,17,18,21,24,27,28,30],[10,12,13,14,18,21,24,27,28,30]) else 'fail','ledger_count':len(ledger),'business_count':len(business),'state_count':len(state),'ledger_sorted_digest':ld,'business_sorted_digest':bd,'final_typed_checksum':sd}
 def validate(root,mode='clean'):
  d=dimensions(root,mode); expected={'clean':('pass','pass'),'business-omission':('pass','fail'),'ledger-omission':('fail','pass'),'retry-duplicate':('pass','pass'),'retry-conflict':('pass','fail'),'unavailable':('pass','unavailable')}[mode]
  assert (d['ledger'],d['business'])==expected and d['final_state']=='pass' and d['fence']=='pass' and d['sequence_gaps']=='pass',d; return d
@@ -70,8 +94,8 @@ def execute(project,out):
   body=['BEGIN;']
   for seq,g,ordinal,table,key,op,stmt in group: body += [f"SELECT set_config('workload.group','{g}',true); SELECT set_config('workload.ordinal','{ordinal}',true); SELECT set_config('workload.key','{key}',true);",stmt+';',f"INSERT INTO mutation_ledger VALUES('run-workload-v1',{seq},'m{seq:03}','{g}',{ordinal},'{table}','{key}','{op}',(SELECT after_hash FROM business_event_observations ORDER BY physical_id DESC LIMIT 1),'2025-01-01T00:00:{seq:02}Z','business');"]
   body.append('COMMIT;'); pg(project,'\n'.join(body))
- pg(project,"BEGIN; INSERT INTO workload_fence VALUES('run-workload-v1',30,10); COMMIT;"); stop.set(); t.join(); samples.append(int(q(project,'SELECT count(*) FROM customers').strip())); assert samples[0]==0 and samples[-1]==1; Path(out,'reader.txt').write_text('pre_commit=0\npost_commit=1\n')
- source={'business':q(project,"SELECT physical_id,transaction_group_id,transaction_ordinal,entity_table,canonical_key,operation,coalesce(after_hash,'') FROM business_event_observations ORDER BY physical_id"),'ledger':q(project,"SELECT run_id,mutation_seq,mutation_id,transaction_group_id,transaction_ordinal,entity_table,canonical_key,operation,coalesce(expected_after_hash,''),committed_at,record_kind FROM mutation_ledger ORDER BY mutation_seq"),'state':'\n'.join('\t'.join(r) for r in S)+'\n','fence':q(project,'SELECT run_id,watermark,ledger_count FROM workload_fence')}
+ pg(project,"BEGIN; INSERT INTO workload_fence VALUES('run-workload-v1',30,10); INSERT INTO mutation_ledger VALUES('run-workload-v1',30,'f030','fence',0,'workload_fence','run-workload-v1','fence',NULL,'2025-01-01T00:00:30Z','fence'); COMMIT;"); stop.set(); t.join(); samples.append(int(q(project,'SELECT count(*) FROM customers').strip())); assert samples[0]==0 and samples[-1]==1; Path(out,'reader.txt').write_text('pre_commit=0\npost_commit=1\n')
+ source={'business':q(project,"SELECT physical_id,transaction_group_id,transaction_ordinal,entity_table,canonical_key,operation,coalesce(after_hash,'') FROM business_event_observations ORDER BY physical_id"),'ledger':q(project,"SELECT run_id,mutation_seq,mutation_id,transaction_group_id,transaction_ordinal,entity_table,canonical_key,operation,coalesce(expected_after_hash,''),committed_at,record_kind FROM mutation_ledger ORDER BY mutation_seq"),'state':q(project,"SELECT 'customers','01010000001400000008'||encode(set_byte(int8send(id),0,get_byte(int8send(id),0)#128),'hex'),encode(digest(convert_to('int8:'||id||'|text:'||name||'|int4:'||tier,'UTF8'),'sha256'),'hex') FROM customers UNION ALL SELECT 'order_items','01020000001400000008'||encode(set_byte(int8send(order_id),0,get_byte(int8send(order_id),0)#128),'hex')||'0000001700000004'||encode(set_byte(int4send(line_no),0,get_byte(int4send(line_no),0)#128),'hex'),encode(digest(convert_to('int8:'||order_id||'|int4:'||line_no||'|int8:'||product_id||'|int4:'||quantity,'UTF8'),'sha256'),'hex') FROM order_items UNION ALL SELECT 'orders','01010000001400000008'||encode(set_byte(int8send(id),0,get_byte(int8send(id),0)#128),'hex'),encode(digest(convert_to('int8:'||id||'|int8:'||customer_id||'|text:'||status,'UTF8'),'sha256'),'hex') FROM orders UNION ALL SELECT 'products','01010000001400000008'||encode(set_byte(int8send(id),0,get_byte(int8send(id),0)#128),'hex'),encode(digest(convert_to('int8:'||id||'|text:'||sku||'|numeric:'||price,'UTF8'),'sha256'),'hex') FROM products ORDER BY 1,2"),'fence':q(project,'SELECT run_id,watermark,ledger_count FROM workload_fence')}
  for n in source: ch(project,f'INSERT INTO source_{n} FORMAT TabSeparated',source[n]); ch(project,f'INSERT INTO delivered_{n} SELECT * FROM source_{n}')
  export(project,Path(out)); clean=validate(Path(out)); Path(out,'clean.json').write_text(json.dumps(clean,sort_keys=True)+'\n'); print(json.dumps(clean,sort_keys=True))
 def export(project,root):
