@@ -313,10 +313,16 @@ pub enum PolicyEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelevantConfigurationChange {
+    pub previous: FingerprintInput,
+    pub replacement: FingerprintInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RearmRequest {
     pub expected_failure_id: String,
     pub expected_fingerprint: String,
-    pub new_failure_fingerprint_for_relevant_configuration: Option<String>,
+    pub relevant_configuration_change: Option<RelevantConfigurationChange>,
     pub retained_wal_proven: bool,
     pub integrity_recovery_proven: bool,
     pub continuity_recovery_proven: bool,
@@ -336,7 +342,10 @@ pub enum PolicyAction {
     },
     StaleCompletion,
     RejectedRearm,
-    Rearmed(FailureRecord),
+    Rearmed {
+        record: FailureRecord,
+        expected_last_failed_at_ms: u64,
+    },
     Noop,
 }
 
@@ -472,9 +481,9 @@ fn rearm(
         FailureClass::Configuration => {
             request.retained_wal_proven
                 && request
-                    .new_failure_fingerprint_for_relevant_configuration
+                    .relevant_configuration_change
                     .as_ref()
-                    .is_some_and(|new| new != &record.fingerprint)
+                    .is_some_and(|proof| valid_configuration_change(record, proof))
         }
     };
     if !allowed {
@@ -493,7 +502,21 @@ fn rearm(
     } else {
         None
     };
-    PolicyAction::Rearmed(rearmed)
+    PolicyAction::Rearmed {
+        record: rearmed,
+        expected_last_failed_at_ms: record.last_failed_at_ms,
+    }
+}
+
+fn valid_configuration_change(record: &FailureRecord, proof: &RelevantConfigurationChange) -> bool {
+    build_fingerprint(&proof.previous) == record.fingerprint
+        && proof.previous.component == proof.replacement.component
+        && proof.previous.class == proof.replacement.class
+        && proof.previous.code == proof.replacement.code
+        && proof.previous.boundary == proof.replacement.boundary
+        && proof.previous.context == proof.replacement.context
+        && proof.previous.relevant_configuration_fingerprint
+            != proof.replacement.relevant_configuration_fingerprint
 }
 
 // M0-PROVISIONAL: boring-cdc-m2.1 -- typed hook variants pending canonical M0 artifact
@@ -613,7 +636,14 @@ impl DomainRecoveryHook for StrictDomainHook {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PreparedFailureOperation {
-    StoreAndArm(FailureRecord),
+    StoreAndArm {
+        record: FailureRecord,
+        expected_current_failure_id: Option<String>,
+    },
+    Rearm {
+        record: FailureRecord,
+        expected_last_failed_at_ms: u64,
+    },
     Clear {
         failure_id: String,
         fingerprint: String,
@@ -626,7 +656,10 @@ impl PreparedFailureOperation {
     /// Execute only inside the transaction supplied by the capture-priority sole writer.
     pub fn execute(&self, transaction: &Transaction<'_>) -> rusqlite::Result<()> {
         match self {
-            Self::StoreAndArm(record) => {
+            Self::StoreAndArm {
+                record,
+                expected_current_failure_id,
+            } => {
                 let (start, end) = record.boundary.seq_range();
                 let retry_class =
                     if is_automatic_retry(record.class) && record.attempt > MAX_ATTEMPTS {
@@ -642,13 +675,33 @@ impl PreparedFailureOperation {
                     return Err(rusqlite::Error::InvalidQuery);
                 }
                 if let Some(destination_id) = &record.destination_id {
+                    let FailedBoundary::Destination {
+                        capture_epoch,
+                        generation,
+                        ..
+                    } = &record.boundary
+                    else {
+                        return Err(rusqlite::Error::InvalidQuery);
+                    };
                     transaction.execute(
-                        "UPDATE destinations SET current_failure_id=?1,revision=revision+1 WHERE destination_id=?2",
-                        params![record.failure_id, destination_id],
+                        "UPDATE destinations SET current_failure_id=?1,revision=revision+1 WHERE destination_id=?2 AND capture_epoch=?3 AND generation=?4 AND current_failure_id IS ?5",
+                        params![record.failure_id, destination_id, capture_epoch, generation, expected_current_failure_id],
                     )?;
                     if transaction.changes() != 1 {
                         return Err(rusqlite::Error::QueryReturnedNoRows);
                     }
+                }
+            }
+            Self::Rearm {
+                record,
+                expected_last_failed_at_ms,
+            } => {
+                transaction.execute(
+                    "UPDATE processing_failures SET last_failed_at=?1 WHERE failure_id=?2 AND fingerprint=?3 AND attempt=?4 AND armed=1 AND last_failed_at=?5",
+                    params![timestamp(record.last_failed_at_ms), record.failure_id, record.fingerprint, record.attempt, timestamp(*expected_last_failed_at_ms)],
+                )?;
+                if transaction.changes() != 1 {
+                    return Err(rusqlite::Error::QueryReturnedNoRows);
                 }
             }
             Self::Clear {
@@ -931,7 +984,7 @@ pub mod tests {
             let base = RearmRequest {
                 expected_failure_id: record.failure_id.clone(),
                 expected_fingerprint: record.fingerprint.clone(),
-                new_failure_fingerprint_for_relevant_configuration: None,
+                relevant_configuration_change: None,
                 retained_wal_proven: false,
                 integrity_recovery_proven: false,
                 continuity_recovery_proven: false,
@@ -950,15 +1003,20 @@ pub mod tests {
                 }
                 FailureClass::Configuration => {
                     allowed.retained_wal_proven = true;
-                    allowed.new_failure_fingerprint_for_relevant_configuration =
-                        Some("sha256:new-policy-fingerprint".into());
+                    let previous = observation(FailureClass::Configuration, 0).fingerprint;
+                    let mut replacement = previous.clone();
+                    replacement.relevant_configuration_fingerprint = "config-b".into();
+                    allowed.relevant_configuration_change = Some(RelevantConfigurationChange {
+                        previous,
+                        replacement,
+                    });
                 }
                 FailureClass::OperatorBlocked => allowed.explicit_operator_authorization = true,
                 _ => unreachable!(),
             }
             assert!(matches!(
                 run_transition(Some(&record), PolicyEvent::Rearm(allowed)),
-                PolicyAction::Rearmed(_)
+                PolicyAction::Rearmed { .. }
             ));
         }
     }
@@ -1046,28 +1104,39 @@ pub mod tests {
             PolicyEvent::Observe(observation(FailureClass::Integrity, 0)),
         ));
         let tx = writer.connection_mut().transaction().unwrap();
-        PreparedFailureOperation::StoreAndArm(record.clone())
-            .execute(&tx)
-            .unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: record.clone(),
+            expected_current_failure_id: None,
+        }
+        .execute(&tx)
+        .unwrap();
         tx.commit().unwrap();
         let request = RearmRequest {
             expected_failure_id: record.failure_id.clone(),
             expected_fingerprint: record.fingerprint.clone(),
-            new_failure_fingerprint_for_relevant_configuration: None,
+            relevant_configuration_change: None,
             retained_wal_proven: false,
             integrity_recovery_proven: true,
             continuity_recovery_proven: false,
             explicit_operator_authorization: false,
         };
-        let rearmed = match run_transition(Some(&record), PolicyEvent::Rearm(request)) {
-            PolicyAction::Rearmed(record) => record,
-            other => panic!("expected rearm, got {other:?}"),
-        };
+        let (rearmed, expected_last_failed_at_ms) =
+            match run_transition_at(Some(&record), PolicyEvent::Rearm(request), 20_000) {
+                PolicyAction::Rearmed {
+                    record,
+                    expected_last_failed_at_ms,
+                } => (record, expected_last_failed_at_ms),
+                other => panic!("expected rearm, got {other:?}"),
+            };
         assert_eq!(rearmed.next_retry_at_ms, None);
+        assert!(rearmed.last_failed_at_ms > expected_last_failed_at_ms);
         let tx = writer.connection_mut().transaction().unwrap();
-        PreparedFailureOperation::StoreAndArm(rearmed)
-            .execute(&tx)
-            .unwrap();
+        PreparedFailureOperation::Rearm {
+            record: rearmed,
+            expected_last_failed_at_ms,
+        }
+        .execute(&tx)
+        .unwrap();
         tx.commit().unwrap();
         let newer = persisted(run_transition(
             Some(&record),
@@ -1081,10 +1150,20 @@ pub mod tests {
         ));
         let tx = writer.connection_mut().transaction().unwrap();
         // A different fingerprint receives a different immutable failure id.
-        PreparedFailureOperation::StoreAndArm(newer)
-            .execute(&tx)
-            .unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: newer,
+            expected_current_failure_id: Some(record.failure_id.clone()),
+        }
+        .execute(&tx)
+        .unwrap();
         tx.commit().unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        let stale_store = PreparedFailureOperation::StoreAndArm {
+            record: record.clone(),
+            expected_current_failure_id: None,
+        };
+        assert!(stale_store.execute(&tx).is_err());
+        tx.rollback().unwrap();
         let tx = writer.connection_mut().transaction().unwrap();
         let stale_clear = PreparedFailureOperation::Clear {
             failure_id: record.failure_id.clone(),
@@ -1156,9 +1235,12 @@ pub mod tests {
             PolicyEvent::Observe(observation(FailureClass::Transient, 1_000)),
         ));
         let tx = writer.connection_mut().transaction().unwrap();
-        PreparedFailureOperation::StoreAndArm(record.clone())
-            .execute(&tx)
-            .unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: record.clone(),
+            expected_current_failure_id: None,
+        }
+        .execute(&tx)
+        .unwrap();
         tx.commit().unwrap();
         drop(writer);
         let mut writer = open_writer(&path, "run-2", 2, 2_000).unwrap();
@@ -1186,15 +1268,21 @@ pub mod tests {
             PolicyEvent::Observe(observation(FailureClass::Transient, 2_000)),
         ));
         let tx = writer.connection_mut().transaction().unwrap();
-        PreparedFailureOperation::StoreAndArm(retry.clone())
-            .execute(&tx)
-            .unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: retry.clone(),
+            expected_current_failure_id: Some(record.failure_id.clone()),
+        }
+        .execute(&tx)
+        .unwrap();
         tx.commit().unwrap();
         let tx = writer.connection_mut().transaction().unwrap();
         assert!(
-            PreparedFailureOperation::StoreAndArm(record.clone())
-                .execute(&tx)
-                .is_err()
+            PreparedFailureOperation::StoreAndArm {
+                record: record.clone(),
+                expected_current_failure_id: None
+            }
+            .execute(&tx)
+            .is_err()
         );
         tx.rollback().unwrap();
         let tx = writer.connection_mut().transaction().unwrap();
