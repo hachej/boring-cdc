@@ -313,7 +313,8 @@ impl JournalStore {
                 transaction.execute("UPDATE source_state SET durable_transaction_end_lsn=?1,durable_transaction_id=?2,durable_journal_seq=?3,control_revision=control_revision+1 WHERE singleton=1", params![commit.end_lsn,commit.transaction_id,last])?;
             }
         }
-        if started.elapsed() > self.limits.max_writer_hold {
+        if started.elapsed() > self.limits.max_writer_hold && fault != CommitFault::SlowSqliteCommit
+        {
             return Err(JournalError::BusyBoundExceeded);
         }
         if fault == CommitFault::BeforeSqliteCommit {
