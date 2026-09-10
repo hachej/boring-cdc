@@ -1,0 +1,1 @@
+{"cases": 10, "golden_frames_per_major": 8, "golden_postgres_majors": [15, 16, 17], "owner_bead": "boring-cdc-m1-decoder", "runtime_observed": false, "schema_version": "boring-cdc/m1-decoder-proof/v1", "status": "pass", "targeted_tests": 11}

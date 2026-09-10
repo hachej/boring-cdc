@@ -1,0 +1,26 @@
+
+running 11 tests
+test m1_decoder::tests::contract_inventory_exactly_matches_executable_scenarios ... ok
+test m1_decoder::tests::changed_relation_requires_synchronous_validation ... ok
+test m1_decoder::tests::copy_both_keepalive_and_complete_status_packet ... ok
+test m1_decoder::tests::golden_transaction_preserves_row_only_ordinals_and_origin ... ok
+test m1_decoder::tests::key_and_toast_failures_block_feedback ... ok
+test m1_decoder::tests::control_relation_allows_only_fixed_key_update_and_mutable_columns ... ok
+test m1_decoder::tests::malformed_and_bounded_frames_never_panic_or_ack ... ok
+test m1_decoder::tests::reconnect_metadata_does_not_need_transaction_or_ordinal ... ok
+test m1_decoder::tests::provisional_protocol_matrix_is_explicit ... ok
+test m1_decoder::tests::postgres_major_golden_wire_corpus_decodes ... ok
+test m1_decoder::tests::unsupported_messages_and_binary_truncate_fail_closed ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 94 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
