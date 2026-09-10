@@ -3,6 +3,7 @@ set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+(cd "$root" && cargo build --locked --quiet)
 cp "$root/tests/fixtures/m1_config/representative.toml" "$tmp/boring-cdc.toml"
 export PG_RUNTIME=redacted PG_CONTROL=redacted PG_ADMIN=redacted CH_RUNTIME=redacted CH_MAINT=redacted
 python3 - "$root" "$tmp" <<'PY'
@@ -72,7 +73,19 @@ for case in cases:
     checks = {check["scenario_id"]: check for check in result["data"]["checks"]}
     actual = checks[case["id"]]["reason"]
     assert actual == case["blocked_or_unknown_reason"], (case["id"], actual)
-    expected_exit = 4 if checks[case["id"]]["status"] in {"unverified", "degraded"} else 3
+    expected_unverified = {
+        "SCN-M1-PREFLIGHT-SPILL-COUNTERS",
+        "SCN-M1-PREFLIGHT-WRITER-ATTESTATION",
+        "SCN-M1-PREFLIGHT-SOURCE-FREE-DISK",
+        "SCN-M1-PREFLIGHT-LIVE-COLLECTOR",
+    }
+    expected_status = (
+        "degraded" if case["id"] == "SCN-M1-PREFLIGHT-SOURCE-FREE-DISK"
+        else "unverified" if case["id"] in expected_unverified
+        else "blocked"
+    )
+    expected_exit = 4 if case["id"] in expected_unverified else 3
+    assert checks[case["id"]]["status"] == expected_status, (case["id"], checks[case["id"]]["status"])
     assert run.returncode == expected_exit, (case["id"], run.returncode)
     assert "redacted" not in run.stdout.lower()
 print(f"m1 preflight faults: PASS ({len(cases)}/41 contract cases exercised through public CLI)")
