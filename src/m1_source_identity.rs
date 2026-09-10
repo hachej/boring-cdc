@@ -326,6 +326,7 @@ pub enum StartupDecision {
         field: IdentityField,
     },
     BootstrapAmbiguousRequiresRestart,
+    RetryPreparedBootstrapSlotCreation,
     CreationFloorOnly {
         requested: RequestedPosition,
     },
@@ -354,10 +355,11 @@ pub fn reconcile_startup(local: &LocalSourceState, live: &LiveSourceState) -> St
         };
     }
 
-    if local.bootstrap == BootstrapProvenance::PreparedWithoutPersistedFloorOrSnapshot
-        && live.slot_exists
-    {
-        return StartupDecision::BootstrapAmbiguousRequiresRestart;
+    if local.bootstrap == BootstrapProvenance::PreparedWithoutPersistedFloorOrSnapshot {
+        if live.slot_exists {
+            return StartupDecision::BootstrapAmbiguousRequiresRestart;
+        }
+        return StartupDecision::RetryPreparedBootstrapSlotCreation;
     }
 
     if local.bootstrap == BootstrapProvenance::NonterminalWithPersistedFloor
@@ -767,6 +769,25 @@ mod tests {
     }
 
     #[test]
+    fn prepared_bootstrap_without_remote_slot_retries_creation() {
+        let mut local = local();
+        local.bootstrap = BootstrapProvenance::PreparedWithoutPersistedFloorOrSnapshot;
+        local.creation_floor = None;
+        local.durable_transaction = None;
+        local.feedback_position = FeedbackPosition::ProtocolZero;
+        let observed = LiveSourceState {
+            slot_exists: false,
+            slot_valid: false,
+            confirmed_flush_lsn: None,
+            ..live()
+        };
+        assert_eq!(
+            reconcile_startup(&local, &observed),
+            StartupDecision::RetryPreparedBootstrapSlotCreation
+        );
+    }
+
+    #[test]
     fn creation_floor_null_and_equal_are_not_durable_progress() {
         for confirmed in [None, Some(ReceivedLsn::from_wire(80))] {
             let mut local = local();
@@ -1019,14 +1040,14 @@ mod tests {
                 .unwrap();
         assert_eq!(inventory["owner_bead"], "boring-cdc-m1-source-identity");
         assert_eq!(inventory["evidence_tier"], "leaf");
-        assert_eq!(inventory["cases"].as_array().unwrap().len(), 13);
+        assert_eq!(inventory["cases"].as_array().unwrap().len(), 15);
         let ids: std::collections::BTreeSet<_> = inventory["cases"]
             .as_array()
             .unwrap()
             .iter()
             .map(|case| case["scenario_id"].as_str().unwrap())
             .collect();
-        assert_eq!(ids.len(), 13);
+        assert_eq!(ids.len(), 15);
         assert!(
             ids.iter()
                 .all(|id| id.starts_with("SCN-M1-SOURCE-IDENTITY-"))

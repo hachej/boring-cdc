@@ -6,9 +6,11 @@
   "cases": [
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-MISMATCH","unit_test":"every_identity_mismatch_blocks_before_position_rules","expected":"block_identity_mismatch_before_position_rules"},
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-AMBIGUOUS","unit_test":"ambiguous_bootstrap_precedes_server_ahead","expected":"bootstrap_ambiguous_requires_restart"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-RETRY-CREATION","unit_test":"prepared_bootstrap_without_remote_slot_retries_creation","expected":"retry_prepared_bootstrap_slot_creation"},
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-FLOOR","unit_test":"creation_floor_null_and_equal_are_not_durable_progress","expected":"request_verified_creation_floor_without_durable_progress"},
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-FLOOR-SAFETY","unit_test":"creation_floor_still_requires_valid_slot_and_available_wal","expected":"requires_reseed_if_slot_invalid_or_resume_wal_unavailable"},
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-SERVER-AHEAD","unit_test":"server_ahead_requires_reseed_before_generic_slot_checks","expected":"requires_reseed_server_ahead"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-SLOT-WAL","unit_test":"invalid_slot_and_missing_wal_require_reseed","expected":"requires_reseed_if_slot_invalid_or_resume_wal_unavailable"},
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-LOCAL-AHEAD","unit_test":"local_ahead_requests_durable_end_and_expects_duplicates","expected":"request_durable_end_and_tolerate_duplicates"},
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-COMPATIBLE","unit_test":"compatible_positions_apply_postgresql_effective_max_rule","expected":"request_durable_end_and_apply_effective_max"},
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-FEEDBACK","unit_test":"feedback_uses_only_durable_transaction_end_for_all_three_positions","expected":"write_flush_apply_equal_durable_transaction_end"},

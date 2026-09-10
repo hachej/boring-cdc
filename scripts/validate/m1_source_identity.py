@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Validate the complete M1 source-identity leaf scenario inventory."""
 import json
+import subprocess
 from pathlib import Path
 
 EXPECTED = {
     "SCN-M1-SOURCE-IDENTITY-MISMATCH": ("every_identity_mismatch_blocks_before_position_rules", "block_identity_mismatch_before_position_rules"),
     "SCN-M1-SOURCE-IDENTITY-AMBIGUOUS": ("ambiguous_bootstrap_precedes_server_ahead", "bootstrap_ambiguous_requires_restart"),
+    "SCN-M1-SOURCE-IDENTITY-RETRY-CREATION": ("prepared_bootstrap_without_remote_slot_retries_creation", "retry_prepared_bootstrap_slot_creation"),
     "SCN-M1-SOURCE-IDENTITY-FLOOR": ("creation_floor_null_and_equal_are_not_durable_progress", "request_verified_creation_floor_without_durable_progress"),
     "SCN-M1-SOURCE-IDENTITY-FLOOR-SAFETY": ("creation_floor_still_requires_valid_slot_and_available_wal", "requires_reseed_if_slot_invalid_or_resume_wal_unavailable"),
     "SCN-M1-SOURCE-IDENTITY-SERVER-AHEAD": ("server_ahead_requires_reseed_before_generic_slot_checks", "requires_reseed_server_ahead"),
+    "SCN-M1-SOURCE-IDENTITY-SLOT-WAL": ("invalid_slot_and_missing_wal_require_reseed", "requires_reseed_if_slot_invalid_or_resume_wal_unavailable"),
     "SCN-M1-SOURCE-IDENTITY-LOCAL-AHEAD": ("local_ahead_requests_durable_end_and_expects_duplicates", "request_durable_end_and_tolerate_duplicates"),
     "SCN-M1-SOURCE-IDENTITY-COMPATIBLE": ("compatible_positions_apply_postgresql_effective_max_rule", "request_durable_end_and_apply_effective_max"),
     "SCN-M1-SOURCE-IDENTITY-FEEDBACK": ("feedback_uses_only_durable_transaction_end_for_all_three_positions", "write_flush_apply_equal_durable_transaction_end"),
@@ -32,6 +35,19 @@ assert actual == EXPECTED
 source = Path("src/m1_source_identity.rs").read_text()
 for test, _ in EXPECTED.values():
     assert f"fn {test}()" in source, f"missing unit test: {test}"
+    subprocess.run(
+        [
+            "cargo",
+            "test",
+            "--locked",
+            "--quiet",
+            f"m1_source_identity::tests::{test}",
+            "--",
+            "--exact",
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
+    )
 lower = source.lower()
 assert "rusqlite" not in lower and "create table" not in lower and "sqlite::" not in lower
 print(f"PASS source identity vectors={len(EXPECTED)} exact=true sqlite=false")
