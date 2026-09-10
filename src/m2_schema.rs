@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
@@ -194,6 +194,26 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
             |r| r.get(0),
         )?;
         if checksum != MIGRATION_2_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let has_v3: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=3)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v3 {
+            connection.execute_batch(MIGRATION_3)?;
+            connection.execute(
+                "INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(3,'failure-command-audit-guards',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+                [MIGRATION_3_CHECKSUM],
+            )?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=3",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_3_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
         Ok(())
@@ -400,6 +420,71 @@ CREATE TRIGGER source_state_revision BEFORE UPDATE ON source_state WHEN NEW.cont
 CREATE TRIGGER command_revision BEFORE UPDATE ON operator_command_requests WHEN NEW.request_revision!=OLD.request_revision+1 BEGIN SELECT RAISE(ABORT,'stale command revision'); END;
 CREATE TRIGGER audit_subrange_insert BEFORE INSERT ON audit_coverage_subranges WHEN NOT EXISTS(SELECT 1 FROM destination_audits a WHERE a.audit_id=NEW.audit_id AND NEW.start_seq>=coalesce(a.retained_history_start_seq,0) AND NEW.start_seq>=coalesce(a.unverifiable_before_seq,0) AND NEW.end_seq<=a.round_target_seq AND NEW.fresh_until>a.freshness_window_started_at AND NEW.fresh_until<=a.freshness_expires_at) BEGIN SELECT RAISE(ABORT,'audit subrange outside frozen retention/freshness target'); END;
 CREATE TRIGGER audit_subrange_update BEFORE UPDATE ON audit_coverage_subranges WHEN NOT EXISTS(SELECT 1 FROM destination_audits a WHERE a.audit_id=NEW.audit_id AND NEW.start_seq>=coalesce(a.retained_history_start_seq,0) AND NEW.start_seq>=coalesce(a.unverifiable_before_seq,0) AND NEW.end_seq<=a.round_target_seq AND NEW.fresh_until>a.freshness_window_started_at AND NEW.fresh_until<=a.freshness_expires_at) BEGIN SELECT RAISE(ABORT,'audit subrange outside frozen retention/freshness target'); END;
+"#;
+
+const MIGRATION_3_CHECKSUM: &str =
+    "sha256:b38bd11847e47e4e74f325944ff0cfce453d916350ca241e1356677100ce2232";
+const MIGRATION_3: &str = r#"
+CREATE TRIGGER checkpoint_blocks_armed_failure BEFORE UPDATE ON destination_checkpoints
+WHEN (NEW.journal_seq!=OLD.journal_seq OR NEW.complete_transaction_id!=OLD.complete_transaction_id)
+ AND EXISTS(
+  SELECT 1 FROM destinations d JOIN processing_failures f
+   ON f.failure_id=d.current_failure_id AND f.destination_id=d.destination_id
+  WHERE d.destination_id=OLD.destination_id AND f.armed=1)
+BEGIN SELECT RAISE(ABORT,'armed destination failure blocks checkpoint advancement'); END;
+CREATE TRIGGER command_identity_immutable BEFORE UPDATE ON operator_command_requests
+WHEN NEW.request_id IS NOT OLD.request_id
+ OR NEW.dry_run_nonce IS NOT OLD.dry_run_nonce
+ OR NEW.canonical_payload IS NOT OLD.canonical_payload
+ OR NEW.payload_digest IS NOT OLD.payload_digest
+ OR NEW.run_id IS NOT OLD.run_id
+ OR NEW.peer_identity IS NOT OLD.peer_identity
+ OR NEW.observation_revision IS NOT OLD.observation_revision
+ OR NEW.control_revision IS NOT OLD.control_revision
+ OR NEW.expires_at IS NOT OLD.expires_at
+BEGIN SELECT RAISE(ABORT,'operator command request identity is immutable'); END;
+CREATE TRIGGER audit_inline_insert_bounds BEFORE INSERT ON destination_audits
+WHEN (NEW.journal_verified_start_seq IS NOT NULL AND (
+       NEW.journal_verified_start_seq<coalesce(NEW.retained_history_start_seq,0)
+    OR NEW.journal_verified_start_seq<coalesce(NEW.unverifiable_before_seq,0)
+    OR NEW.journal_verified_end_seq>NEW.round_target_seq))
+ OR (NEW.self_consistent_start_seq IS NOT NULL AND (
+       NEW.self_consistent_start_seq<coalesce(NEW.retained_history_start_seq,0)
+    OR NEW.self_consistent_start_seq<coalesce(NEW.unverifiable_before_seq,0)
+    OR NEW.self_consistent_end_seq>NEW.round_target_seq))
+BEGIN SELECT RAISE(ABORT,'inline audit coverage outside frozen retention target'); END;
+CREATE TRIGGER audit_inline_update_bounds BEFORE UPDATE ON destination_audits
+WHEN (NEW.journal_verified_start_seq IS NOT NULL AND (
+       NEW.journal_verified_start_seq<coalesce(NEW.retained_history_start_seq,0)
+    OR NEW.journal_verified_start_seq<coalesce(NEW.unverifiable_before_seq,0)
+    OR NEW.journal_verified_end_seq>NEW.round_target_seq))
+ OR (NEW.self_consistent_start_seq IS NOT NULL AND (
+       NEW.self_consistent_start_seq<coalesce(NEW.retained_history_start_seq,0)
+    OR NEW.self_consistent_start_seq<coalesce(NEW.unverifiable_before_seq,0)
+    OR NEW.self_consistent_end_seq>NEW.round_target_seq))
+BEGIN SELECT RAISE(ABORT,'inline audit coverage outside frozen retention target'); END;
+CREATE TRIGGER audit_identity_change_requires_empty_coverage BEFORE UPDATE ON destination_audits
+WHEN (NEW.capture_epoch IS NOT OLD.capture_epoch
+   OR NEW.generation IS NOT OLD.generation
+   OR NEW.round_target_seq IS NOT OLD.round_target_seq
+   OR NEW.round_identity_digest IS NOT OLD.round_identity_digest
+   OR NEW.configuration_fingerprint IS NOT OLD.configuration_fingerprint
+   OR NEW.contract_digest IS NOT OLD.contract_digest
+   OR NEW.freshness_window_started_at IS NOT OLD.freshness_window_started_at
+   OR NEW.freshness_expires_at IS NOT OLD.freshness_expires_at)
+ AND (OLD.journal_verified_start_seq IS NOT NULL
+   OR OLD.self_consistent_start_seq IS NOT NULL
+   OR EXISTS(SELECT 1 FROM audit_coverage_subranges r WHERE r.audit_id=OLD.audit_id))
+BEGIN SELECT RAISE(ABORT,'audit coverage must be invalidated before round identity changes'); END;
+CREATE TRIGGER audit_parent_update_preserves_subrange_bounds BEFORE UPDATE ON destination_audits
+WHEN EXISTS(
+ SELECT 1 FROM audit_coverage_subranges r WHERE r.audit_id=OLD.audit_id AND (
+      r.start_seq<coalesce(NEW.retained_history_start_seq,0)
+   OR r.start_seq<coalesce(NEW.unverifiable_before_seq,0)
+   OR r.end_seq>NEW.round_target_seq
+   OR r.fresh_until<=NEW.freshness_window_started_at
+   OR r.fresh_until>NEW.freshness_expires_at))
+BEGIN SELECT RAISE(ABORT,'audit update would retain out-of-bounds coverage'); END;
 "#;
 
 #[cfg(test)]
@@ -723,7 +808,7 @@ pub mod tests {
             c.query_row("SELECT count(*) FROM schema_migrations", [], |r| r
                 .get::<_, i64>(0))
                 .unwrap(),
-            2
+            3
         );
         assert_eq!(
             c.query_row(
@@ -817,6 +902,88 @@ pub mod tests {
             "identity"
         );
         let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn armed_destination_failure_blocks_checkpoint_advancement() {
+        let (_p, w) = writer("failure-checkpoint-guard");
+        tx(w.connection());
+        w.connection().execute("INSERT INTO source_transactions VALUES('tx2','epoch','sys','db','slot','8','0000000000000020',2,2,0,'sum2','committed')",[]).unwrap();
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','epoch',1)",[]).unwrap();
+        w.connection().execute("INSERT INTO destination_checkpoints VALUES('d','epoch',NULL,'cfg',1,'tx1',1,NULL,0)",[]).unwrap();
+        w.connection().execute("INSERT INTO processing_failures VALUES('fail','d','archive','io','fingerprint',2,2,'transient',1,'later',1,'first','last')",[]).unwrap();
+        w.connection().execute("UPDATE destinations SET current_failure_id='fail',revision=revision+1 WHERE destination_id='d'",[]).unwrap();
+
+        assert!(w.connection().execute("UPDATE destination_checkpoints SET complete_transaction_id='tx2',journal_seq=2,revision=revision+1 WHERE destination_id='d'",[]).is_err());
+        w.connection().execute("UPDATE processing_failures SET armed=0 WHERE failure_id='fail' AND destination_id='d'",[]).unwrap();
+        assert_eq!(w.connection().execute("UPDATE destination_checkpoints SET complete_transaction_id='tx2',journal_seq=2,revision=revision+1 WHERE destination_id='d'",[]).unwrap(),1);
+    }
+
+    #[test]
+    fn operator_command_identity_is_immutable_across_cas_transitions() {
+        let (_p, w) = writer("command-identity");
+        w.connection().execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at) VALUES('req','nonce',X'01','digest','run','peer','accepted',NULL,1,2,'later')",[]).unwrap();
+        for mutation in [
+            "request_id='req2'",
+            "dry_run_nonce='nonce2'",
+            "canonical_payload=X'02'",
+            "payload_digest='digest2'",
+            "run_id='run2'",
+            "peer_identity='peer2'",
+            "observation_revision=2",
+            "control_revision=3",
+            "expires_at='latest'",
+        ] {
+            let sql = format!(
+                "UPDATE operator_command_requests SET {mutation},request_revision=request_revision+1 WHERE request_id='req'"
+            );
+            assert!(
+                w.connection().execute(&sql, []).is_err(),
+                "accepted identity mutation: {mutation}"
+            );
+        }
+        assert_eq!(w.connection().execute("UPDATE operator_command_requests SET state='completed',result=X'03',request_revision=request_revision+1 WHERE request_id='req' AND request_revision=0",[]).unwrap(),1);
+    }
+
+    #[test]
+    fn audit_coverage_is_invalidated_and_bounded_by_frozen_round() {
+        let (_p, w) = writer("audit-invalidation");
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','epoch',1)",[]).unwrap();
+        w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,journal_verified_start_seq,journal_verified_end_seq,self_cursor_seq,budget_bytes_used,budget_events_used,budget_ms_used,freshness_window_started_at,freshness_expires_at,contract_digest,revision,retained_history_start_seq,unverifiable_before_seq) VALUES('audit','d','cfg','epoch',1,20,'identity',10,10,20,10,0,0,0,'2026-01-01','2027-01-01','contract',0,5,10)",[]).unwrap();
+        w.connection().execute("INSERT INTO audit_coverage_subranges VALUES('audit','journal_verified',10,20,'2026-06-01','proof')",[]).unwrap();
+
+        for mutation in [
+            "capture_epoch='epoch2'",
+            "generation=2",
+            "round_target_seq=21",
+            "round_identity_digest='identity2'",
+            "configuration_fingerprint='cfg2'",
+            "contract_digest='contract2'",
+            "freshness_expires_at='2028-01-01'",
+        ] {
+            let sql = format!(
+                "UPDATE destination_audits SET {mutation},revision=revision+1 WHERE audit_id='audit'"
+            );
+            assert!(
+                w.connection().execute(&sql, []).is_err(),
+                "retained stale coverage after {mutation}"
+            );
+        }
+        w.connection()
+            .execute(
+                "DELETE FROM audit_coverage_subranges WHERE audit_id='audit'",
+                [],
+            )
+            .unwrap();
+        w.connection().execute("UPDATE destination_audits SET journal_verified_start_seq=NULL,journal_verified_end_seq=NULL,revision=revision+1 WHERE audit_id='audit'",[]).unwrap();
+        w.connection().execute("UPDATE destination_audits SET round_identity_digest='identity2',revision=revision+1 WHERE audit_id='audit'",[]).unwrap();
+
+        assert!(w.connection().execute("UPDATE destination_audits SET journal_verified_start_seq=9,journal_verified_end_seq=20,revision=revision+1 WHERE audit_id='audit'",[]).is_err());
+        assert!(w.connection().execute("UPDATE destination_audits SET self_consistent_start_seq=10,self_consistent_end_seq=21,revision=revision+1 WHERE audit_id='audit'",[]).is_err());
+        assert!(w.connection().execute("INSERT INTO audit_coverage_subranges VALUES('audit','journal_verified',9,20,'2026-06-01','below-retention')",[]).is_err());
+        assert!(w.connection().execute("INSERT INTO audit_coverage_subranges VALUES('audit','journal_verified',10,21,'2026-06-01','above-target')",[]).is_err());
+        assert!(w.connection().execute("INSERT INTO audit_coverage_subranges VALUES('audit','journal_verified',10,20,'2025-12-31','before-window')",[]).is_err());
+        assert!(w.connection().execute("INSERT INTO audit_coverage_subranges VALUES('audit','journal_verified',10,20,'2027-01-02','after-window')",[]).is_err());
     }
 
     #[test]

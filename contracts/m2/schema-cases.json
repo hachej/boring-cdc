@@ -12,6 +12,9 @@
     {"id":"SCN-M2-SCHEMA-READER-BOUND","test":"reader_is_read_only_and_bounded","assertion":"reader handles are query-only and expose fixed row and transaction-age bounds"},
     {"id":"SCN-M2-SCHEMA-WRITER-READBACK","test":"reopened_writer_reapplies_full_and_attests_generation","assertion":"reopened writers reapply/read back FULL and publish run/generation-bound attestation"},
     {"id":"SCN-M2-SCHEMA-FAILURE-AUDIT","test":"failure_and_audit_state_survive_without_checkpoint_advance","assertion":"typed retry/failure and finite audit round state persist independently without checkpoint advancement"},
-    {"id":"SCN-M2-SCHEMA-CAS","test":"revision_cas_and_promotion_fence_uniqueness","assertion":"domain revisions support stale-write rejection and promotion fences cannot be reused"}
+    {"id":"SCN-M2-SCHEMA-CAS","test":"revision_cas_and_promotion_fence_uniqueness","assertion":"domain revisions support stale-write rejection and promotion fences cannot be reused"},
+    {"id":"SCN-M2-SCHEMA-FAILURE-CHECKPOINT-GUARD","test":"armed_destination_failure_blocks_checkpoint_advancement","assertion":"a destination-scoped armed current failure blocks checkpoint boundary advancement until explicitly recovered"},
+    {"id":"SCN-M2-SCHEMA-COMMAND-IDENTITY","test":"operator_command_identity_is_immutable_across_cas_transitions","assertion":"operator request identity and bound revisions remain immutable while result/state transitions remain revision-CAS fenced"},
+    {"id":"SCN-M2-SCHEMA-AUDIT-INVALIDATION","test":"audit_coverage_is_invalidated_and_bounded_by_frozen_round","assertion":"audit identity changes require prior coverage invalidation and inline/normalized ranges remain within retention, target, and freshness bounds"}
   ]
 }
