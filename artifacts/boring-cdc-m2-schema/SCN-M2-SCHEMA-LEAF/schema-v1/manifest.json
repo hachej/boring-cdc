@@ -1,0 +1,120 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-1.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    {
+      "argv": "cargo test --locked m2_schema::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-2.stderr",
+      "stderr_sha256": "54317d6af5c9634763f8ca3b06950a38cae861b13395b8b444df36f78cb4bd02",
+      "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-2.log",
+      "stdout_sha256": "9cd58b9ff58f8279430f431d839eb130ab0c412c54adb19073e3510a669b3bca",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    {
+      "argv": "python3 scripts/validate/m2_schema.py",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-3.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-3.log",
+      "stdout_sha256": "3a4da9dbbac85ab15599692e93c285d85bb82ff54e723db04ccbf3513dbbf1d3",
+      "version": "3.13.3"
+    },
+    {
+      "argv": "scripts/e2e/m2_schema.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-4.stderr",
+      "stderr_sha256": "9287970d5f0b2e3011389af07999ad62dafafd122145d8a5e9e745c6e33ce9db",
+      "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-4.log",
+      "stdout_sha256": "02703972c650a23c492ed78e5f93b74e1f496e39f1f4377076bd38487a1ca328",
+      "version": "3.13.3"
+    },
+    {
+      "argv": "scripts/faults/m2_schema.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-5.stderr",
+      "stderr_sha256": "28a962c0897054bdef09257c0936e9e3b9d75d2f211ce44d195928c70424ab21",
+      "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-5.log",
+      "stdout_sha256": "4e46d7ba3b1cc91fb0a6ff147ef36df786a22ea4a75de262b22feaf5686e0396",
+      "version": "3.13.3"
+    },
+    {
+      "argv": "scripts/validate/plan_coverage.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-6.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-6.log",
+      "stdout_sha256": "ad04944c32f5bd1b049c93e5e823b5896bd729220667a33cd9a27b7ecba38eea",
+      "version": "3.13.3"
+    },
+    {
+      "argv": "br lint",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-7.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-7.log",
+      "stdout_sha256": "54f5c1055ee90a314744f218772b20325926f235630ba6c6f61f983a86b4ce68",
+      "version": "3.13.3"
+    },
+    {
+      "argv": "python3 duplicate-id-scan",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-8.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-8.log",
+      "stdout_sha256": "268169ab3f1ad9562c5fee6474ab88cf46b40419e26df17515b2cb6d9e3e19c9",
+      "version": "3.13.3"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "leaf",
+  "git_commit": "f59a1377a5c3af4507ede32a8368da9d3327940e",
+  "owner_bead": "boring-cdc-m2-schema",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/proof-summary.json",
+      "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/versions.json"
+    ],
+    "digest": "07a699a435b014468908b57c9e3bd94e9bd026f50ca0df9297066bb7b1d42eba",
+    "product_faults": "migration-transaction-rollback",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M2-SCHEMA-LEAF",
+  "schema_version": "evidence/v1",
+  "seed": "schema-v1",
+  "source_preservation": {
+    "after_sha256": "24a9a6f0273d23c39dd5362d012f051afc18d514906e94bf1fe0100a3697f989",
+    "before_sha256": "24a9a6f0273d23c39dd5362d012f051afc18d514906e94bf1fe0100a3697f989",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": false,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "assertions": [
+    "28 tables installed",
+    "WAL/FULL/incremental readback",
+    "migration rollback and idempotent upgrade",
+    "floor and durable LSN identity binding",
+    "anchor completeness",
+    "bounded readers",
+    "failure/audit persistence",
+    "promotion fence monotonicity"
+  ],
+  "outcome": "pass"
+}
