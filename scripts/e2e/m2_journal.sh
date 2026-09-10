@@ -12,8 +12,9 @@ cargo test --locked m2_journal::tests::complete_range_peak_accounts_for_simultan
 cargo test --locked m2_journal::tests::coverage_inventory_is_assertion_aware
 scratch=$(mktemp -d /var/tmp/boring-cdc-m2-journal-e2e.XXXXXX)
 trap 'rm -rf "$scratch"' EXIT INT TERM
-export BORING_CDC_WORKSPACE_TEST_STDOUT="$scratch/workspace-tests-stdout.txt"
-export BORING_CDC_WORKSPACE_TEST_STDERR="$scratch/workspace-tests-stderr.txt"
+mkdir "$scratch/transcripts" "$scratch/expected"
+export BORING_CDC_WORKSPACE_TEST_STDOUT="$scratch/transcripts/workspace-tests-stdout.txt"
+export BORING_CDC_WORKSPACE_TEST_STDERR="$scratch/transcripts/workspace-tests-stderr.txt"
 if cargo test --locked --workspace --all-targets >"$BORING_CDC_WORKSPACE_TEST_STDOUT" 2>"$BORING_CDC_WORKSPACE_TEST_STDERR"; then
   export BORING_CDC_WORKSPACE_TEST_EXIT_CODE=0
 else
@@ -23,7 +24,7 @@ else
   exit "$code"
 fi
 python3 scripts/lib/m2_journal_component.py e2e
-cp -a artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-COMPONENT/. "$scratch"/
+cp -a artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-COMPONENT/. "$scratch/expected"/
 python3 scripts/lib/m2_journal_component.py e2e
-diff -ru "$scratch" artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-COMPONENT
+diff -ru "$scratch/expected" artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-COMPONENT
 python3 scripts/validate/m2_journal.py e2e
