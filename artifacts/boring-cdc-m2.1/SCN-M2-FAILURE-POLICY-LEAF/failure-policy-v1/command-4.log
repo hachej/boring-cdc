@@ -1,18 +1,19 @@
 {"findings":[],"schema_version":"validation-result/v1","valid":true,"validator":"failure-policy/v1"}
 
-running 10 tests
-test failure_policy::tests::deterministic_schedule_caps_jitters_and_ignores_clock_rollback ... ok
+running 11 tests
 test failure_policy::tests::exhaustive_classes_have_closed_stable_serialization ... ok
 test failure_policy::tests::fingerprint_changes_only_for_allowed_canonical_inputs_and_contains_no_raw_data ... ok
+test failure_policy::tests::restart_preserves_attempt_and_same_deterministic_failure_is_suppressed ... ok
+test failure_policy::tests::deterministic_schedule_caps_jitters_and_ignores_clock_rollback ... ok
 test failure_policy::tests::rearm_requires_class_specific_proofs_and_rejects_unrelated_change ... ok
 test failure_policy::tests::retry_due_boundaries_and_cleared_recurrence_fail_closed ... ok
-test failure_policy::tests::restart_preserves_attempt_and_same_deterministic_failure_is_suppressed ... ok
-test failure_policy::tests::stale_epoch_generation_attempt_and_fingerprint_completions_cannot_clear ... ok
+test failure_policy::tests::shared_bounded_harness_replays_policy_vectors_deterministically ... ok
 test failure_policy::tests::synthetic_hooks_fail_closed_on_close_generation_mismatch ... ok
+test failure_policy::tests::stale_epoch_generation_attempt_and_fingerprint_completions_cannot_clear ... ok
 test failure_policy::tests::non_transient_rearm_is_persistable_and_stale_operations_are_rejected ... ok
 test failure_policy::tests::prepared_adapter_persists_reopens_and_clears_via_supplied_transaction ... ok
 
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.25s
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 170 filtered out; finished in 0.18s
 
 
 running 0 tests

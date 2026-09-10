@@ -6,3 +6,4 @@ scripts/faults/failure_policy.sh
 scripts/validate/plan_coverage.sh
 br lint
 python3 duplicate-id-scan
+scripts/validate/evidence.sh artifacts/boring-cdc-m2.1
