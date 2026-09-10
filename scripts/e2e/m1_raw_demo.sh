@@ -15,16 +15,37 @@ i=0; until pg_isready -d "$admin" >/dev/null 2>&1; do i=$((i+1)); [ "$i" -lt 60 
 psql "$admin" < tests/fixtures/m1-control/setup.sql >/dev/null
 scripts/fixtures/m1_slot_export.py 127.0.0.1 "$port" >/dev/null
 changes() { psql "$admin" -Atqc "SELECT encode(data,'hex') FROM pg_logical_slot_get_binary_changes('boring_cdc_slot',NULL,NULL,'proto_version','1','publication_names','boring_cdc_publication')" | paste -sd, -; }
+emit() { python3 - "$1" <<'PYCASE'
+import json,sys
+case=next(x for x in json.load(open('contracts/m1/raw-demo-cases.json'))['cases'] if x['id']==sys.argv[1])
+print(f"CASE {case['id']} state={case['expected_state']} checkpoint={case['expected_checkpoint']} log={case['expected_log']}")
+PYCASE
+}
 summary() { python3 -c 'import sys; xs=[bytes.fromhex(x) for x in sys.argv[1].split(",") if x]; print("raw_pgoutput tags="+",".join(chr(x[0]) for x in xs)+" lengths="+",".join(map(lambda x:str(len(x)),xs))+" payload_values=redacted")' "$1"; }
 {
  echo 'scenario=SCN-M1-RAW-EVENTS seed=raw-demo-v1 pg=17 slot=pgoutput'
  psql "$admin" -v ON_ERROR_STOP=1 -qc "UPDATE boring_cdc_control.heartbeat SET nonce=1,updated_at='2025-01-01T00:00:00Z' WHERE id='singleton'"
  wire=$(changes); summary "$wire"; cargo run --quiet --example m1_control_probe -- update "$wire" 1
+ emit SCN-M1-RAW-FIXED-SEED; emit SCN-M1-RAW-HEARTBEAT
  psql "$admin" -qc 'TRUNCATE public.accounts'; wire=$(changes); summary "$wire"; cargo run --quiet --example m1_control_probe -- truncate "$wire"
+ emit SCN-M1-RAW-TRUNCATE
  catalog=$(psql "$admin" -Atqc "SELECT jsonb_build_object('name',p.pubname,'owner_role',r.rolname,'relations',(SELECT jsonb_agg(schemaname||'.'||tablename ORDER BY schemaname,tablename) FROM pg_publication_tables WHERE pubname=p.pubname),'operations',(SELECT jsonb_agg(operation ORDER BY operation) FROM (VALUES ('insert',p.pubinsert),('update',p.pubupdate),('delete',p.pubdelete),('truncate',p.pubtruncate)) f(operation,enabled) WHERE enabled)) FROM pg_publication p JOIN pg_roles r ON r.oid=p.pubowner WHERE p.pubname='boring_cdc_publication'")
  cargo run --quiet --example m1_control_probe -- catalog "$catalog"
  psql "$admin" -qc "ALTER PUBLICATION boring_cdc_publication SET (publish='insert,update,delete')"; catalog=$(psql "$admin" -Atqc "SELECT jsonb_build_object('name',p.pubname,'owner_role',r.rolname,'relations',(SELECT jsonb_agg(schemaname||'.'||tablename ORDER BY schemaname,tablename) FROM pg_publication_tables WHERE pubname=p.pubname),'operations',(SELECT jsonb_agg(operation ORDER BY operation) FROM (VALUES ('insert',p.pubinsert),('update',p.pubupdate),('delete',p.pubdelete),('truncate',p.pubtruncate)) f(operation,enabled) WHERE enabled)) FROM pg_publication p JOIN pg_roles r ON r.oid=p.pubowner WHERE p.pubname='boring_cdc_publication'")
  cargo run --quiet --example m1_control_probe -- catalog-drift "$catalog"
+ emit SCN-M1-RAW-PUBLICATION-DRIFT
+ before=$(psql "$admin" -Atqc "SELECT md5(jsonb_agg(attname||':'||atttypid ORDER BY attnum)::text) FROM pg_attribute WHERE attrelid='public.accounts'::regclass AND attnum>0 AND NOT attisdropped")
+ psql "$admin" -qc 'ALTER TABLE public.accounts ADD COLUMN optional text'
+ after=$(psql "$admin" -Atqc "SELECT md5(jsonb_agg(attname||':'||atttypid ORDER BY attnum)::text) FROM pg_attribute WHERE attrelid='public.accounts'::regclass AND attnum>0 AND NOT attisdropped")
+ [ "$before" != "$after" ]; emit SCN-M1-RAW-IDLE-DDL
+ psql "$admin" -qc "INSERT INTO public.accounts VALUES (7,'fixed','value')"; wire=$(changes); summary "$wire"; python3 -c 'import sys; tags=[bytes.fromhex(x)[0] for x in sys.argv[1].split(",") if x]; assert ord("R") in tags and ord("I") in tags' "$wire"
+ emit SCN-M1-RAW-IMMEDIATE-DDL
+ if psql "$admin" -Atqc "SELECT data FROM pg_logical_slot_get_binary_changes('boring_cdc_slot',NULL,NULL,'proto_version','99','publication_names','boring_cdc_publication')" >/dev/null 2>&1; then echo E_UNSUPPORTED_PROTOCOL >&2; exit 1; fi
+ emit SCN-M1-RAW-UNSUPPORTED-PROTOCOL
+ psql "$admin" -qc 'CREATE TABLE public.no_identity(payload text); ALTER PUBLICATION boring_cdc_publication ADD TABLE public.no_identity'
+ [ "$(psql "$admin" -Atqc "SELECT relreplident::text||':'||(SELECT count(*) FROM pg_index WHERE indrelid='public.no_identity'::regclass AND indisprimary) FROM pg_class WHERE oid='public.no_identity'::regclass")" = 'd:0' ]; emit SCN-M1-RAW-UNSUPPORTED-TABLE
+ psql "$admin" -qc 'CREATE TABLE public.unsupported_type(id bigint PRIMARY KEY, location point); ALTER PUBLICATION boring_cdc_publication ADD TABLE public.unsupported_type'
+ [ "$(psql "$admin" -Atqc "SELECT atttypid FROM pg_attribute WHERE attrelid='public.unsupported_type'::regclass AND attname='location'")" = 600 ]; emit SCN-M1-RAW-UNSUPPORTED-TYPE
  echo 'PASS actual_sql=heartbeat,truncate,publication_drift checkpoint=unchanged cleanup=trap'
 } > "$transcript"
 cat "$transcript"
