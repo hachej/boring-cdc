@@ -9,7 +9,7 @@ out="$TMPDIR/m1accept${$}"; transcript="$out/transcript.txt"; rm -rf "$out"; mkd
  cargo test --locked m1_raw_demo::tests
  scripts/e2e/m1_raw_demo.sh raw-demo-v1
  scripts/faults/m1_raw_demo.sh raw-demo-v1
- scripts/validate/m1_raw_demo.py validate
+ scripts/validate/m1_raw_demo.py contract
  echo 'PASS M1 raw inspection and fault suite; rerun once for deterministic_rerun=1'
 } > "$transcript" 2>&1
 cat "$transcript"

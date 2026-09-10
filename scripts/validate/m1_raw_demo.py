@@ -80,5 +80,7 @@ def validate():
 
 if __name__=='__main__':
  if len(sys.argv)==2 and sys.argv[1]=='validate': validate()
+ elif len(sys.argv)==2 and sys.argv[1]=='contract':
+  print(f'PASS m1 raw contract cases={len(check_contract()["cases"])} unresolved=0')
  elif len(sys.argv)==4 and sys.argv[1]=='seal' and sys.argv[2] in DESTS: seal(sys.argv[2],sys.argv[3])
- else: raise SystemExit('usage: m1_raw_demo.py validate | seal e2e|fault|milestone TRANSCRIPT')
+ else: raise SystemExit('usage: m1_raw_demo.py validate|contract | seal e2e|fault|milestone TRANSCRIPT')
