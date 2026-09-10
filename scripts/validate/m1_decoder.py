@@ -3,10 +3,15 @@ import json, pathlib, re, sys
 root=pathlib.Path(__file__).resolve().parents[2]
 contract=json.loads((root/'contracts/m1/decoder-cases.json').read_text())
 source=(root/'src/m1_decoder.rs').read_text()
+fixture=json.loads((root/'tests/fixtures/m1_decoder/pgoutput-v1.json').read_text())
 errors=[]
 if contract.get('schema_version')!='boring-cdc/m1-decoder-cases/v1': errors.append('schema_version')
 if contract.get('owner_bead')!='boring-cdc-m1-decoder': errors.append('owner_bead')
 if contract.get('supported_postgres_majors')!=[15,16,17]: errors.append('postgres_matrix')
+vectors=fixture.get('vectors',[])
+if [v.get('postgres_major') for v in vectors] != [15,16,17]: errors.append('golden_postgres_matrix')
+if any(len(v.get('frames_hex',[])) != 8 or any(not re.fullmatch(r'[0-9a-f]+', f) or len(f)%2 for f in v.get('frames_hex',[])) for v in vectors): errors.append('golden_wire_frames')
+if any(v.get('expected',{}).get('row_ordinals') != [0,1,2] or not v.get('expected',{}).get('keepalive_reply_requested') for v in vectors): errors.append('golden_expectations')
 ids=[c.get('id') for c in contract.get('cases',[])]
 if len(ids)!=10 or len(ids)!=len(set(ids)) or any(not re.fullmatch(r'SCN-M1-DECODER-[A-Z-]+', x or '') for x in ids): errors.append('case_inventory')
 for token in ["b'B'","b'R'","b'O'","b'I'","b'U'","b'D'","b'C'","b'T'","b'k'","b'w'","b'r'"]:

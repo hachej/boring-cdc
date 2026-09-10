@@ -106,12 +106,19 @@ pub enum RowKind {
     Delete,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum OldTupleKind {
+    Key,
+    Full,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RowChange {
     pub xid: u32,
     pub ordinal: u64,
     pub relation_id: u32,
     pub kind: RowKind,
+    pub old_kind: Option<OldTupleKind>,
     pub old: Option<Vec<TupleValue>>,
     pub new: Option<Vec<TupleValue>>,
 }
@@ -157,6 +164,7 @@ pub enum CopyBothEvent {
 #[derive(Clone, Debug)]
 struct Transaction {
     xid: u32,
+    final_lsn: u64,
     next_ordinal: u64,
     failed: bool,
 }
@@ -193,12 +201,15 @@ impl Decoder {
             .pending_relations
             .remove(&contract.relation.id)
             .ok_or_else(|| fail(FailureClass::Contract, "RELATION_VALIDATION_NOT_PENDING"))?;
+        let relation_key_columns = pending
+            .columns
+            .iter()
+            .enumerate()
+            .filter_map(|(index, column)| column.key.then_some(index))
+            .collect::<Vec<_>>();
         if pending != contract.relation
             || contract.key_columns.is_empty()
-            || contract
-                .key_columns
-                .iter()
-                .any(|&i| i >= pending.columns.len() || !pending.columns[i].key)
+            || contract.key_columns != relation_key_columns
         {
             return self.block(fail(FailureClass::Contract, "RELATION_CONTRACT_MISMATCH"));
         }
@@ -315,6 +326,7 @@ impl Decoder {
                 c.finish()?;
                 self.transaction = Some(Transaction {
                     xid,
+                    final_lsn,
                     next_ordinal: 0,
                     failed: false,
                 });
@@ -362,7 +374,7 @@ impl Decoder {
                 let end_lsn = c.u64()?;
                 let commit_time = c.i64()?;
                 c.finish()?;
-                if flags != 0 || end_lsn < commit_lsn {
+                if flags != 0 || end_lsn < commit_lsn || commit_lsn != tx.final_lsn {
                     return self.block(fail(FailureClass::Wire, "COMMIT_INVALID"));
                 }
                 PgoutputEvent::Commit {
@@ -415,52 +427,65 @@ impl Decoder {
         let new = decode_tuple(c, &self.limits)?;
         c.finish()?;
         validate_width(&contract, &new)?;
-        validate_key(&contract, &new)?;
-        self.row(relation_id, RowKind::Insert, None, Some(new))
+        validate_full_key(&contract, &new)?;
+        self.row(relation_id, RowKind::Insert, None, None, Some(new))
     }
 
     fn decode_update(&mut self, c: &mut Cursor<'_>) -> Result<PgoutputEvent> {
         let relation_id = c.u32()?;
         let contract = self.contract(relation_id)?.clone();
         let marker = c.u8()?;
-        let old = match marker {
+        let (old, old_kind) = match marker {
             b'K' | b'O' => {
+                let kind = if marker == b'K' {
+                    OldTupleKind::Key
+                } else {
+                    OldTupleKind::Full
+                };
                 let tuple = decode_tuple(c, &self.limits)?;
                 if c.u8()? != b'N' {
                     return self.block(fail(FailureClass::Wire, "UPDATE_NEW_TUPLE_MISSING"));
                 }
-                Some(tuple)
+                (Some(tuple), Some(kind))
             }
-            b'N' => None,
+            b'N' => (None, None),
             _ => return self.block(fail(FailureClass::Wire, "UPDATE_TUPLE_MARKER_INVALID")),
         };
         let new = decode_tuple(c, &self.limits)?;
         c.finish()?;
         validate_width(&contract, &new)?;
-        let old_ref = old.as_deref();
-        if let Some(values) = old_ref {
-            validate_key(&contract, values)?;
-        }
-        validate_key(&contract, &new)?;
-        let key_changed = old_ref.is_some_and(|v| key(&contract, v) != key(&contract, &new));
+        validate_full_key(&contract, &new)?;
+        let new_key = full_key(&contract, &new);
+        let old_key = match (old.as_deref(), old_kind) {
+            (Some(values), Some(OldTupleKind::Key)) => {
+                validate_compact_key(&contract, values)?;
+                Some(compact_key(values))
+            }
+            (Some(values), Some(OldTupleKind::Full)) => {
+                validate_width(&contract, values)?;
+                validate_full_key(&contract, values)?;
+                Some(full_key(&contract, values))
+            }
+            (None, None) => None,
+            _ => unreachable!("old tuple and marker are constructed together"),
+        };
+        let key_changed = old_key.as_ref().is_some_and(|key| key != &new_key);
         if key_changed && new.contains(&TupleValue::UnchangedToast) {
             return self.block(fail(FailureClass::Contract, "KEY_CHANGE_UNCHANGED_TOAST"));
         }
         if let Some(control) = &contract.control {
-            let old_values =
-                old_ref.ok_or_else(|| fail(FailureClass::Contract, "CONTROL_OLD_KEY_MISSING"))?;
-            if key(&contract, old_values) != control.immutable_key
-                || key(&contract, &new) != control.immutable_key
+            if old_key.as_ref().unwrap_or(&new_key) != &control.immutable_key
+                || new_key != control.immutable_key
             {
                 return self.block(fail(FailureClass::Contract, "CONTROL_KEY_CHANGED"));
             }
             let unobservable_fixed_column = (0..contract.relation.columns.len()).any(|i| {
                 !contract.key_columns.contains(&i) && !control.mutable_columns.contains(&i)
             });
-            if old_values.len() != contract.relation.columns.len() && unobservable_fixed_column {
+            if old_kind != Some(OldTupleKind::Full) && unobservable_fixed_column {
                 return self.block(fail(FailureClass::Contract, "CONTROL_OLD_ROW_REQUIRED"));
             }
-            if old_values.len() == contract.relation.columns.len() {
+            if let (Some(old_values), Some(OldTupleKind::Full)) = (old.as_deref(), old_kind) {
                 for i in 0..new.len() {
                     if !contract.key_columns.contains(&i)
                         && !control.mutable_columns.contains(&i)
@@ -474,7 +499,7 @@ impl Decoder {
                 }
             }
         }
-        self.row(relation_id, RowKind::Update, old, Some(new))
+        self.row(relation_id, RowKind::Update, old_kind, old, Some(new))
     }
 
     fn decode_delete(&mut self, c: &mut Cursor<'_>) -> Result<PgoutputEvent> {
@@ -483,19 +508,34 @@ impl Decoder {
         if contract.control.is_some() {
             return self.block(fail(FailureClass::Contract, "CONTROL_DELETE_FORBIDDEN"));
         }
-        if !matches!(c.u8()?, b'K' | b'O') {
-            return self.block(fail(FailureClass::Wire, "DELETE_OLD_TUPLE_MISSING"));
-        }
+        let old_kind = match c.u8()? {
+            b'K' => OldTupleKind::Key,
+            b'O' => OldTupleKind::Full,
+            _ => return self.block(fail(FailureClass::Wire, "DELETE_OLD_TUPLE_MISSING")),
+        };
         let old = decode_tuple(c, &self.limits)?;
         c.finish()?;
-        validate_key(&contract, &old)?;
-        self.row(relation_id, RowKind::Delete, Some(old), None)
+        match old_kind {
+            OldTupleKind::Key => validate_compact_key(&contract, &old)?,
+            OldTupleKind::Full => {
+                validate_width(&contract, &old)?;
+                validate_full_key(&contract, &old)?;
+            }
+        }
+        self.row(
+            relation_id,
+            RowKind::Delete,
+            Some(old_kind),
+            Some(old),
+            None,
+        )
     }
 
     fn row(
         &mut self,
         relation_id: u32,
         kind: RowKind,
+        old_kind: Option<OldTupleKind>,
         old: Option<Vec<TupleValue>>,
         new: Option<Vec<TupleValue>>,
     ) -> Result<PgoutputEvent> {
@@ -513,6 +553,7 @@ impl Decoder {
             ordinal,
             relation_id,
             kind,
+            old_kind,
             old,
             new,
         }))
@@ -552,7 +593,7 @@ fn validate_width(contract: &RelationContract, values: &[TupleValue]) -> Result<
         Err(fail(FailureClass::Wire, "TUPLE_COLUMN_COUNT_MISMATCH"))
     }
 }
-fn validate_key(contract: &RelationContract, values: &[TupleValue]) -> Result<()> {
+fn validate_full_key(contract: &RelationContract, values: &[TupleValue]) -> Result<()> {
     if contract
         .key_columns
         .iter()
@@ -563,12 +604,32 @@ fn validate_key(contract: &RelationContract, values: &[TupleValue]) -> Result<()
         Ok(())
     }
 }
-fn key(contract: &RelationContract, values: &[TupleValue]) -> Vec<Vec<u8>> {
+fn validate_compact_key(contract: &RelationContract, values: &[TupleValue]) -> Result<()> {
+    if values.len() != contract.key_columns.len()
+        || values
+            .iter()
+            .any(|value| !matches!(value, TupleValue::Text(_)))
+    {
+        Err(fail(FailureClass::Contract, "CANONICAL_KEY_INCOMPLETE"))
+    } else {
+        Ok(())
+    }
+}
+fn full_key(contract: &RelationContract, values: &[TupleValue]) -> Vec<Vec<u8>> {
     contract
         .key_columns
         .iter()
         .filter_map(|&i| match values.get(i) {
             Some(TupleValue::Text(v)) => Some(v.clone()),
+            _ => None,
+        })
+        .collect()
+}
+fn compact_key(values: &[TupleValue]) -> Vec<Vec<u8>> {
+    values
+        .iter()
+        .filter_map(|value| match value {
+            TupleValue::Text(value) => Some(value.clone()),
             _ => None,
         })
         .collect()
@@ -733,7 +794,7 @@ pub mod tests {
     }
     fn begin(xid: u32) -> Vec<u8> {
         let mut v = vec![b'B'];
-        v.extend(9u64.to_be_bytes());
+        v.extend(10u64.to_be_bytes());
         v.extend(1i64.to_be_bytes());
         v.extend(xid.to_be_bytes());
         v
@@ -845,6 +906,20 @@ pub mod tests {
     fn text(s: &str) -> TupleValue {
         TupleValue::Text(s.as_bytes().to_vec())
     }
+    fn from_hex(value: &str) -> Vec<u8> {
+        value
+            .as_bytes()
+            .chunks_exact(2)
+            .map(|pair| {
+                let digit = |byte: u8| match byte {
+                    b'0'..=b'9' => byte - b'0',
+                    b'a'..=b'f' => byte - b'a' + 10,
+                    _ => panic!("invalid fixture hex"),
+                };
+                digit(pair[0]) * 16 + digit(pair[1])
+            })
+            .collect()
+    }
 
     #[test]
     fn copy_both_keepalive_and_complete_status_packet() {
@@ -882,6 +957,70 @@ pub mod tests {
             "KEEPALIVE_REPLY_FLAG_INVALID"
         );
     }
+    #[test]
+    fn postgres_major_golden_wire_corpus_decodes() {
+        let corpus: serde_json::Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/m1_decoder/pgoutput-v1.json"
+        ))
+        .unwrap();
+        for vector in corpus["vectors"].as_array().unwrap() {
+            assert!(
+                SUPPORTED_POSTGRES_MAJORS
+                    .contains(&(vector["postgres_major"].as_u64().unwrap() as u16))
+            );
+            let frames = vector["frames_hex"].as_array().unwrap();
+            let mut d = Decoder::new(WireLimits::default());
+            let relation_event = d
+                .decode_copy_data(&from_hex(frames[0].as_str().unwrap()))
+                .unwrap();
+            let CopyBothEvent::XLogData {
+                event: PgoutputEvent::RelationNeedsValidation(relation),
+                ..
+            } = relation_event
+            else {
+                panic!("golden relation")
+            };
+            d.admit_relation(RelationContract {
+                relation,
+                key_columns: vec![0],
+                control: None,
+            })
+            .unwrap();
+            let mut ordinals = Vec::new();
+            for frame in &frames[1..] {
+                match d
+                    .decode_copy_data(&from_hex(frame.as_str().unwrap()))
+                    .unwrap()
+                {
+                    CopyBothEvent::XLogData {
+                        event: PgoutputEvent::Row(row),
+                        ..
+                    } => ordinals.push(row.ordinal),
+                    CopyBothEvent::XLogData {
+                        event:
+                            PgoutputEvent::Commit {
+                                commit_lsn,
+                                end_lsn,
+                                ..
+                            },
+                        ..
+                    } => {
+                        assert_eq!(
+                            commit_lsn,
+                            vector["expected"]["commit_lsn"].as_u64().unwrap()
+                        );
+                        assert_eq!(end_lsn, vector["expected"]["end_lsn"].as_u64().unwrap());
+                    }
+                    CopyBothEvent::Keepalive {
+                        reply_requested, ..
+                    } => assert!(reply_requested),
+                    _ => {}
+                }
+            }
+            assert_eq!(ordinals, vec![0, 1, 2]);
+        }
+    }
+
     #[test]
     fn golden_transaction_preserves_row_only_ordinals_and_origin() {
         let mut d = admitted(false);
@@ -980,6 +1119,34 @@ pub mod tests {
             assert_eq!(e.fingerprint, "CANONICAL_KEY_INCOMPLETE");
             assert!(d.is_feedback_blocked());
         }
+        let mut d = Decoder::new(WireLimits::default());
+        let mut composite = relation(9, false);
+        composite.columns[2].key = true;
+        d.decode_copy_data(&xlog(rel_wire(&composite))).unwrap();
+        assert_eq!(
+            d.admit_relation(RelationContract {
+                relation: composite.clone(),
+                key_columns: vec![0],
+                control: None
+            })
+            .unwrap_err()
+            .fingerprint,
+            "RELATION_CONTRACT_MISMATCH"
+        );
+        let mut d = Decoder::new(WireLimits::default());
+        d.decode_copy_data(&xlog(rel_wire(&composite))).unwrap();
+        d.admit_relation(RelationContract {
+            relation: composite,
+            key_columns: vec![0, 2],
+            control: None,
+        })
+        .unwrap();
+        d.decode_copy_data(&xlog(begin(1))).unwrap();
+        assert!(
+            d.decode_copy_data(&xlog(row(b'D', 9, b"K", &[vec![text("a"), text("g")]])))
+                .is_ok()
+        );
+
         let mut d = admitted(false);
         d.decode_copy_data(&xlog(begin(1))).unwrap();
         let e = d
@@ -1009,6 +1176,24 @@ pub mod tests {
         let mut d = admitted(true);
         d.decode_copy_data(&xlog(begin(1))).unwrap();
         assert!(d.decode_copy_data(&xlog(valid)).is_ok());
+
+        let mut d = admitted(true);
+        d.relations
+            .get_mut(&7)
+            .unwrap()
+            .control
+            .as_mut()
+            .unwrap()
+            .mutable_columns = vec![1, 2];
+        d.decode_copy_data(&xlog(begin(1))).unwrap();
+        let without_old = row(
+            b'U',
+            7,
+            b"N",
+            &[vec![text("fixed"), text("new"), text("changed")]],
+        );
+        assert!(d.decode_copy_data(&xlog(without_old)).is_ok());
+
         for (wire, code) in [
             (
                 row(
