@@ -19,8 +19,8 @@ def env(state,typ=None,value=None):
  if value is not None:d['value']=value
  return d
 EXPECTED_CANONICAL=[
- ('bool-false',env('value','bool','false')),('bool-true',env('value','bool','true')),('int2-min',env('value','int2','-32768')),('int4-zero',env('value','int4','0')),('int8-max',env('value','int8','9223372036854775807')),('numeric-trailing-zero-normalized',env('value','numeric','+12345e+2')),('numeric-negative-scale',env('value','numeric','+1e-3')),('numeric-negative-zero',env('value','numeric','-0e+0')),('float4-nan',env('value','float4','NaN')),('float4-shortest-point-one',env('value','float4','0.1')),('float8-positive-infinity',env('value','float8','+Infinity')),('float8-negative-infinity',env('value','float8','-Infinity')),('float8-negative-zero',env('value','float8','-0')),('float8-shortest-point-one',env('value','float8','0.1')),('float8-shortest-exponent',env('value','float8','1e-9')),('float8-round-trip',env('value','float8','1.2345678901234567')),('date',env('value','date','2024-02-29')),('date-positive-infinity',env('value','date','+infinity')),('timestamp-naive',env('value','timestamp','2024-02-29T12:34:56.123456')),('timestamp-negative-infinity',env('value','timestamp','-infinity')),('timestamptz-utc',env('value','timestamptz','2024-02-29T12:34:56.123456Z')),('uuid',env('value','uuid','01234567-89ab-cdef-0123-456789abcdef')),('text-no-normalization',env('value','text','é')),('bpchar-preserve-space',env('value','bpchar','x  ')),('bytea',env('value','bytea','-_8A')),('null',env('null','text')),('absent',env('absent')),('unchanged',env('unchanged','text')),('array-lower-bound',env('value','int4[]',{'element_type':'int4','length':3,'lower_bound':-2,'values':[env('value','int4','1'),env('null','int4'),env('value','int4','3')]}))]
-EXPECTED_SOURCES={'bool-false':(16,'f'),'bool-true':(16,'t'),'int2-min':(21,'-32768'),'int4-zero':(23,'0'),'int8-max':(20,'9223372036854775807'),'numeric-trailing-zero-normalized':(1700,'123.4500'),'numeric-negative-scale':(1700,'1e3'),'numeric-negative-zero':(1700,'-0.000'),'float4-nan':(700,'NaN'),'float4-shortest-point-one':(700,'0.1'),'float8-positive-infinity':(701,'Infinity'),'float8-negative-infinity':(701,'-Infinity'),'float8-negative-zero':(701,'-0'),'float8-shortest-point-one':(701,'0.1'),'float8-shortest-exponent':(701,'1e-9'),'float8-round-trip':(701,'1.2345678901234567'),'date':(1082,'2024-02-29'),'date-positive-infinity':(1082,'infinity'),'timestamp-naive':(1114,'2024-02-29 12:34:56.123456'),'timestamp-negative-infinity':(1114,'-infinity'),'timestamptz-utc':(1184,'2024-02-29 12:34:56.123456+00'),'uuid':(2950,'01234567-89AB-CDEF-0123-456789ABCDEF'),'text-no-normalization':(25,'é'),'bpchar-preserve-space':(1042,'x  '),'bytea':(17,'\\xfbff00'),'array-lower-bound':(1007,'[-2:0]={1,NULL,3}')}
+ ('bool-false',env('value','bool','false')),('bool-true',env('value','bool','true')),('int2-min',env('value','int2','-32768')),('int4-zero',env('value','int4','0')),('int8-max',env('value','int8','9223372036854775807')),('numeric-trailing-zero-normalized',env('value','numeric','+12345e+2')),('numeric-negative-scale',env('value','numeric','+1e-3')),('numeric-negative-zero',env('value','numeric','-0e+0')),('float4-nan',env('value','float4','NaN')),('float4-shortest-point-one',env('value','float4','0.1')),('float4-min-subnormal',env('value','float4','1e-45')),('float4-max-finite',env('value','float4','34028235e31')),('float4-halfway-ties-even',env('value','float4','1')),('float8-positive-infinity',env('value','float8','+Infinity')),('float8-negative-infinity',env('value','float8','-Infinity')),('float8-negative-zero',env('value','float8','-0')),('float8-shortest-point-one',env('value','float8','0.1')),('float8-fixed-exponent-shorter',env('value','float8','1e-4')),('float8-negative-fixed-exponent-shorter',env('value','float8','-1e-4')),('float8-fixed-exponent-tie-small',env('value','float8','0.01')),('float8-fixed-exponent-tie-large',env('value','float8','100')),('float8-min-subnormal',env('value','float8','5e-324')),('float8-halfway-ties-even',env('value','float8','1')),('float8-shortest-exponent',env('value','float8','1e-9')),('float8-round-trip',env('value','float8','1.2345678901234567')),('date',env('value','date','2024-02-29')),('date-positive-infinity',env('value','date','+infinity')),('timestamp-naive',env('value','timestamp','2024-02-29T12:34:56.123456')),('timestamp-negative-infinity',env('value','timestamp','-infinity')),('timestamptz-utc',env('value','timestamptz','2024-02-29T12:34:56.123456Z')),('uuid',env('value','uuid','01234567-89ab-cdef-0123-456789abcdef')),('text-no-normalization',env('value','text','é')),('bpchar-preserve-space',env('value','bpchar','x  ')),('bytea',env('value','bytea','-_8A')),('null',env('null','text')),('absent',env('absent')),('unchanged',env('unchanged','text')),('array-lower-bound',env('value','int4[]',{'element_type':'int4','length':3,'lower_bound':-2,'values':[env('value','int4','1'),env('null','int4'),env('value','int4','3')]}))]
+EXPECTED_SOURCES={'bool-false':(16,'f'),'bool-true':(16,'t'),'int2-min':(21,'-32768'),'int4-zero':(23,'0'),'int8-max':(20,'9223372036854775807'),'numeric-trailing-zero-normalized':(1700,'123.4500'),'numeric-negative-scale':(1700,'1e3'),'numeric-negative-zero':(1700,'-0.000'),'float4-nan':(700,'NaN'),'float4-shortest-point-one':(700,'0.1'),'float4-min-subnormal':(700,'1.401298464324817e-45'),'float4-max-finite':(700,'3.4028234663852886e38'),'float4-halfway-ties-even':(700,'1.0000000596046448'),'float8-positive-infinity':(701,'Infinity'),'float8-negative-infinity':(701,'-Infinity'),'float8-negative-zero':(701,'-0'),'float8-shortest-point-one':(701,'0.1'),'float8-fixed-exponent-shorter':(701,'0.0001'),'float8-negative-fixed-exponent-shorter':(701,'-0.0001'),'float8-fixed-exponent-tie-small':(701,'0.01'),'float8-fixed-exponent-tie-large':(701,'100'),'float8-min-subnormal':(701,'4.9406564584124654e-324'),'float8-halfway-ties-even':(701,'1.00000000000000011102230246251565404236316680908203125'),'float8-shortest-exponent':(701,'1e-9'),'float8-round-trip':(701,'1.2345678901234567'),'date':(1082,'2024-02-29'),'date-positive-infinity':(1082,'infinity'),'timestamp-naive':(1114,'2024-02-29 12:34:56.123456'),'timestamp-negative-infinity':(1114,'-infinity'),'timestamptz-utc':(1184,'2024-02-29 12:34:56.123456+00'),'uuid':(2950,'01234567-89AB-CDEF-0123-456789ABCDEF'),'text-no-normalization':(25,'é'),'bpchar-preserve-space':(1042,'x  '),'bytea':(17,'\\xfbff00'),'array-lower-bound':(1007,'[-2:0]={1,NULL,3}')}
 EXPECTED_FAILURES=[{'case_id':'unsupported-oid','input':{'oid':114},'expected_code':'SUPPORTED_VALUES_UNSUPPORTED_TYPE'},{'case_id':'numeric-precision-over','input':{'precision':1001},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'numeric-scale-low','input':{'scale':-16384},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'numeric-scale-high','input':{'scale':16384},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'scalar-over','input':{'scalar_bytes':1048577},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'row-over','input':{'row_bytes':4194305},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'event-over','input':{'event_bytes':8388609},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'array-dimensions-over','input':{'array_dimensions':2},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'array-elements-over','input':{'array_elements':10001},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'}]
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 def canonical_bytes(value): return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()
@@ -44,12 +44,35 @@ def shortest_float(text,width):
  import struct
  value=float(text); pack=lambda x: struct.pack('>f' if width==32 else '>d',x)
  target=pack(value); rounded=struct.unpack('>f',target)[0] if width==32 else value
+ def equivalent_spellings(decimal):
+  sign=''
+  if decimal.startswith('-'): sign,decimal='-',decimal[1:]
+  mantissa,marker,exponent=decimal.partition('e')
+  decimal_exponent=int(exponent) if marker else 0
+  whole,dot,fraction=mantissa.partition('.')
+  digits=(whole+fraction).lstrip('0') or '0'
+  decimal_exponent-=len(fraction)
+  while len(digits)>1 and digits.endswith('0'):
+   digits=digits[:-1]; decimal_exponent+=1
+  point=len(digits)+decimal_exponent
+  if point<=0: fixed='0.'+'0'*(-point)+digits
+  elif point>=len(digits): fixed=digits+'0'*(point-len(digits))
+  else: fixed=digits[:point]+'.'+digits[point:]
+  yield sign+fixed
+  for split in range(1,len(digits)+1):
+   mantissa=digits[:split]+(('.'+digits[split:]) if split<len(digits) else '')
+   yield sign+mantissa+'e'+str(decimal_exponent+len(digits)-split)
+ candidates=set()
  for precision in range(1,10 if width==32 else 18):
-  candidate=format(rounded,f'.{precision}g').lower()
-  if 'e' in candidate:
-   mantissa,exponent=candidate.split('e'); candidate=mantissa+'e'+str(int(exponent))
-  if pack(float(candidate))==target: return candidate
- raise ValueError('no shortest round-trip float')
+  rounded_decimal=format(rounded,f'.{precision}g').lower()
+  for candidate in equivalent_spellings(rounded_decimal):
+   try: matches=pack(float(candidate))==target
+   except OverflowError: matches=False
+   if matches: candidates.add(candidate)
+ if not candidates: raise ValueError('no shortest round-trip float')
+ # Global byte minimum; lexical UTF-8 order breaks equal-length ties and therefore
+ # selects fixed notation over exponent notation for ties such as 0.01/1e-2.
+ return min(candidates,key=lambda candidate:(len(candidate.encode()),candidate.encode()))
 def encode_source(case_id,source):
  if source!=source_record(case_id): raise ValueError('source drift')
  if source['format']!='pgoutput_text':
@@ -93,7 +116,7 @@ try:
  if spec['limits']!={'array_dimensions_max':1,'array_elements_max':10000,'event_bytes_max':8388608,'numeric_precision_max':1000,'numeric_scale_max':16383,'numeric_scale_min':-16383,'row_bytes_max':4194304,'scalar_bytes_max':1048576,'units':'bytes'}: fail()
  envelope=spec['canonical_contract']['envelope']
  if envelope!={'version':1,'states':['value','null','absent','unchanged'],'value_requires_type_tag':True,'states_are_distinct':True}: fail()
- required_literals=['minimal base-10 decimal','<sign><unscaled-digits>e<signed-scale>','shortest decimal that round-trips','exactly six fractional digits','base64url without padding','without Unicode normalization','preserve lower bound']
+ required_literals=['minimal base-10 decimal','<sign><unscaled-digits>e<signed-scale>','globally shortest JSON number spelling','lexicographically smallest UTF-8 bytes','exactly six fractional digits','base64url without padding','without Unicode normalization','preserve lower bound']
  contract_text=json.dumps(spec['canonical_contract'],sort_keys=True)
  if any(x not in contract_text for x in required_literals): fail()
  serialization={'encoding':'UTF-8','hash':'SHA-256','profile':'RFC 8785 JCS over the envelope object; all object keys are ASCII and all numeric bodies are strings','scope':'golden corpus transport and hash only; event framing and event/payload hash preimages remain owned by boring-cdc-m0-event-format'}
@@ -106,6 +129,7 @@ try:
   if encoded!=value: fail()
   body=canonical_bytes(encoded); expected_vectors.append({'canonical':encoded,'canonical_utf8_hex':body.hex(),'case_id':case_id,'sha256':hashlib.sha256(body).hexdigest(),'source':source})
  if spec['golden_vectors']!=expected_vectors or spec['failure_vectors']!=EXPECTED_FAILURES: fail()
+ if spec['expected']['metrics']!={'golden_vector_count':{'unit':'vectors','value':len(expected_vectors)},'supported_oid_count':{'unit':'oids','value':30}}: fail()
  case_ids={x['case_id'] for x in expected_vectors}|{x['case_id'] for x in EXPECTED_FAILURES}
  if selected_case!='all' and selected_case not in case_ids: fail()
  if spec['key_projection']!={'canonical_body':'identical to the value canonical body for the same scalar type','forbidden_states':['null','absent','unchanged'],'scope':'encoding only; effective replica identity selection remains owned by DEC-SUPPORTED-KEYS'}: fail()
@@ -131,7 +155,7 @@ try:
  evidence_sha=evidence['git_commit']; guarded=[fixture_rel,'scripts/validate/supported_values.sh','contracts/m0/decisions.json']
  if subprocess.run(['git','cat-file','-e',evidence_sha+'^{commit}'],cwd=root,capture_output=True).returncode or subprocess.run(['git','merge-base','--is-ancestor',evidence_sha,'HEAD'],cwd=root,capture_output=True).returncode or subprocess.run(['git','diff','--quiet',evidence_sha+'..HEAD','--',*guarded],cwd=root).returncode: fail()
 except (OSError,KeyError,ValueError,TypeError,StopIteration,json.JSONDecodeError): fail()
-if selected_case=='all': print('{"code":"SUPPORTED_VALUES_FIXTURE_VALID","golden_vectors":29,"outcome":"pass","phase":"validate_spec","type_oids":30}')
+if selected_case=='all': print('{"code":"SUPPORTED_VALUES_FIXTURE_VALID","golden_vectors":38,"outcome":"pass","phase":"validate_spec","type_oids":30}')
 else:
  failure=next((x for x in EXPECTED_FAILURES if x['case_id']==selected_case),None)
  print(json.dumps({'case_id':selected_case,'code':failure['expected_code'] if failure else 'SUPPORTED_VALUES_CASE_VALID','expected_outcome':'block_before_feedback' if failure else 'pass','outcome':'fail' if failure else 'pass','phase':'execute_fixture'},sort_keys=True,separators=(',',':')))
