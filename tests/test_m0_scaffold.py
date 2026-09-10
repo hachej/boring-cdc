@@ -65,7 +65,7 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIsNone(m0_scaffold.evidence_path(evidence_root, "Cargo.lock"))
 
     def test_m1_completion_rejects_reintroduced_provisional_marker(self):
-        marker = ROOT / "contracts" / ".test-provisional-marker"
+        marker = ROOT / "config" / ".test-provisional-marker"
         marker.write_text("M0-" + "PROVISIONAL")
         try:
             result = subprocess.run(
