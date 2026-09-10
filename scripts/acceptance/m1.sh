@@ -5,8 +5,10 @@ export TMPDIR=${TMPDIR:-/var/tmp}
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd); cd "$root"
 out="$TMPDIR/m1accept${$}"; transcript="$out/transcript.txt"; rm -rf "$out"; mkdir -p "$out"; trap 'rm -rf "$out"' EXIT HUP INT TERM
 {
- cargo test --locked --workspace --all-targets
- cargo test --locked m1_raw_demo::tests
+ cargo test --locked --workspace --all-targets >"$out/workspace.log" 2>&1
+ echo 'PASS cargo test --locked --workspace --all-targets'
+ cargo test --locked m1_raw_demo::tests >"$out/targeted.log" 2>&1
+ echo 'PASS cargo test --locked m1_raw_demo::tests cases=5'
  scripts/e2e/m1_raw_demo.sh raw-demo-v1
  scripts/faults/m1_raw_demo.sh raw-demo-v1
  scripts/validate/m1_raw_demo.py contract
