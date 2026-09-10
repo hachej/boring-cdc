@@ -1,10 +1,11 @@
 #!/bin/sh
 set -eu
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
-exec python3 - "$ROOT" <<'PY'
+CASE_ID=${1:-all}
+exec python3 - "$ROOT" "$CASE_ID" <<'PY'
 import hashlib,json,re,subprocess,sys
 from pathlib import Path
-root=Path(sys.argv[1]); owner='boring-cdc-d-security'; decision_id='DEC-SECURITY-EXPOSURE'
+root=Path(sys.argv[1]); selected_case=sys.argv[2]; owner='boring-cdc-d-security'; decision_id='DEC-SECURITY-EXPOSURE'
 fixture_rel='fixtures/m0/decisions/boring-cdc-d-security.json'
 executors=['boring-cdc-m1-preflight','boring-cdc-m1-cli-contract','boring-cdc-m2-ownership','boring-cdc-m2-fault-status','boring-cdc-m5.1','boring-cdc-m6-metrics','boring-cdc-m6-failure-matrix']
 proposed='Status and metrics are read-only and loopback-bound by default; non-loopback exposure requires authentication and verified TLS (minimum TLS 1.2, TLS 1.3 preferred); PostgreSQL and ClickHouse TLS certificates are verified; the mutating endpoint is Unix-domain-only under a 0700 directory with a 0600 socket, Linux peer credentials, 1 MiB requests, 4 MiB responses, 10 second reads, and 30 second writes; confirmations expire after 5 minutes and bind a 128-bit CSPRNG base64url-unpadded nonce to RFC 8785 JCS canonical payloads with SHA-256; state, spool, and archive directories are 0700 and secret-bearing files are 0600 or stricter; administration credentials exist only around the sole maintenance-owner request and readback; recursive redaction is bounded to depth 8 and 64 KiB and covers driver authentication errors, DSN/URL strings, TLS handshake errors, nested cause chains, SQLSTATE detail, and filesystem paths.'
@@ -31,6 +32,18 @@ try:
  if set(cases)!=required_cases or len(cases)!=len(spec['supported_matrix']): fail()
  expected_outcomes={'loopback_default':'pass','non_loopback_without_auth':'reject','non_loopback_without_tls':'reject','verified_tls':'pass','normal_progress_confirmation':'pass','self_issued_nonce':'reject','changed_relevant_revision':'reject_new_dry_run_required','unrelated_observation_progress':'pass','pin_loss':'reject','resource_failure':'reject','status_tcp_mutation':'reject','unix_peer_mismatch':'reject','filesystem_mode_too_open':'reject','redacted_nested_driver_error':'pass_redacted','redacted_explanation':'pass_redacted'}
  if any(cases[k].get('expected_outcome')!=v for k,v in expected_outcomes.items()): fail()
+ vectors=spec['vectors']
+ if set(vectors)!=required_cases or any(vectors[k].get('case_id')!=k or vectors[k].get('expected_outcome')!=expected_outcomes[k] or not vectors[k].get('inputs') or not vectors[k].get('before') or not vectors[k].get('action') or not vectors[k].get('expected') for k in required_cases): fail()
+ for name in ('normal_progress_confirmation','self_issued_nonce','changed_relevant_revision','unrelated_observation_progress','pin_loss','resource_failure'):
+  v=vectors[name]
+  if not v.get('action_control_revisions') or 'state_revision' not in v['before'] or 'snapshot_id' not in v['before'] or 'intent_record' not in v['expected']: fail()
+ for name in ('redacted_nested_driver_error','redacted_explanation'):
+  if not vectors[name].get('redaction_assertions'): fail()
+ rv=vectors['redacted_nested_driver_error']
+ if rv['inputs'].get('depth_boundary')!=[8,9] or rv['inputs'].get('byte_boundary')!=[65536,65537] or set(rv['inputs'].get('corpus',[]))!=set(boundary['redaction']['corpus']): fail()
+ registration=spec['operation_registration_contract']
+ if registration!={'registry_owner':'boring-cdc-m1-cli-contract','planning_inventory_combined_command':'traceability_only_not_cli_registry','required_entries':[{'operation_key':'journal_inspect','runtime_executor':'boring-cdc-m2-reconcile','mutation_class':'read_only','result_kind':'bounded_event_inspection'},{'operation_key':'journal_inspect_explain','runtime_executor':'boring-cdc-m5.1','mutation_class':'read_only','result_kind':'evidence_qualified_redacted_explanation'}],'separate_operation_ids_required':True,'combined_registration_forbidden':True}: fail()
+ if selected_case!='all' and selected_case not in vectors: fail()
  if spec['confirmation_revision_contract']!={'authorization_dependencies':'per_command_action_relevant_control_revisions','observation_provenance':['snapshot_id','state_revision'],'resource_measurements':'atomically_rechecked_current_safety_predicates','unrelated_observation_change':'does_not_invalidate','relevant_revision_or_bound_fingerprint_change':'new_dry_run_required','pin_or_resource_predicate_loss':'reject_before_intent_acceptance'}: fail()
  if spec['explanation_contract']!={'command_variant':'journal inspect --event-id ID --explain --json','mutation_class':'read_only','registration_owner':'boring-cdc-m1-cli-contract','runtime_executor':'boring-cdc-m5.1','separate_from_base_inspect':True,'output_policy':'identifiers_hashes_and_redacted_reason_codes_no_payloads_or_credentials'}: fail()
  if spec['script']['path']!='scripts/validate/security_exposure.sh' or sha(root/spec['script']['path'])!=spec['script']['sha256']: fail()
@@ -56,5 +69,6 @@ try:
  guarded=[fixture_rel,'scripts/validate/security_exposure.sh','contracts/m0/decisions.json']
  if subprocess.run(['git','cat-file','-e',evidence_sha+'^{commit}'],cwd=root,capture_output=True).returncode or subprocess.run(['git','merge-base','--is-ancestor',evidence_sha,'HEAD'],cwd=root,capture_output=True).returncode or subprocess.run(['git','diff','--quiet',evidence_sha+'..HEAD','--',*guarded],cwd=root).returncode: fail()
 except (OSError,KeyError,ValueError,TypeError,StopIteration,json.JSONDecodeError): fail()
-print('{"code":"SECURITY_EXPOSURE_FIXTURE_VALID","outcome":"pass","phase":"validate_spec"}')
+if selected_case=='all': print('{"code":"SECURITY_EXPOSURE_FIXTURE_VALID","outcome":"pass","phase":"validate_spec"}')
+else: print(json.dumps({'case_id':selected_case,'code':'SECURITY_EXPOSURE_CASE_VALID','expected_outcome':vectors[selected_case]['expected_outcome'],'outcome':'pass','phase':'validate_spec'},sort_keys=True,separators=(',',':')))
 PY
