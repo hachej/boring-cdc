@@ -10,13 +10,69 @@ fixture_rel='fixtures/m0/decisions/boring-cdc-d-security.json'
 executors=['boring-cdc-m1-preflight','boring-cdc-m1-cli-contract','boring-cdc-m2-ownership','boring-cdc-m2-fault-status','boring-cdc-m5.1','boring-cdc-m6-metrics','boring-cdc-m6-failure-matrix']
 proposed='Status and metrics are read-only and loopback-bound by default; non-loopback exposure requires authentication and verified TLS (minimum TLS 1.2, TLS 1.3 preferred); PostgreSQL and ClickHouse TLS certificates are verified; the mutating endpoint is Unix-domain-only under a 0700 directory with a 0600 socket, Linux peer credentials, 1 MiB requests, 4 MiB responses, 10 second reads, and 30 second writes; confirmations expire after 5 minutes and bind a 128-bit CSPRNG base64url-unpadded nonce to RFC 8785 JCS canonical payloads with SHA-256; state, spool, and archive directories are 0700 and secret-bearing files are 0600 or stricter; administration credentials exist only around the sole maintenance-owner request and readback; recursive redaction is bounded to depth 8 and 64 KiB and covers driver authentication errors, DSN/URL strings, TLS handshake errors, nested cause chains, SQLSTATE detail, and filesystem paths.'
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
+CATEGORY_PAYLOADS={
+ 'driver_authentication_errors':{'kind':'driver_authentication_error','driver':'postgresql','message':'password authentication failed for user fixture_user: CREDENTIAL_MARKER','credential':{'username':'fixture_user','password':'CREDENTIAL_MARKER'}},
+ 'dsn_and_url_strings':{'kind':'dsn_url_error','dsn':'postgresql://fixture_user:CREDENTIAL_MARKER@db.invalid/app?sslpassword=CREDENTIAL_MARKER','url':'https://fixture_user:CREDENTIAL_MARKER@sink.invalid/ingest?token=CREDENTIAL_MARKER'},
+ 'tls_handshake_errors':{'kind':'tls_handshake_error','message':'TLS handshake failed: client token CREDENTIAL_MARKER','server_name':'db.internal.invalid','certificate_subject':'CN=CREDENTIAL_MARKER'},
+ 'nested_cause_chains':{'kind':'nested_cause_error','message':'outer connector failure CREDENTIAL_MARKER','secret':'CREDENTIAL_MARKER'},
+ 'sqlstate_detail':{'kind':'sqlstate_error','sqlstate':'28P01','detail':'password CREDENTIAL_MARKER rejected for fixture_user','hint':'check postgresql://fixture_user:CREDENTIAL_MARKER@db.invalid/app'},
+ 'filesystem_paths':{'kind':'filesystem_error','path':'/var/lib/boring-cdc/CREDENTIAL_MARKER/state.sqlite','message':'permission denied opening /var/lib/boring-cdc/CREDENTIAL_MARKER/state.sqlite'},
+}
+CATEGORY_SIGNATURES={
+ 'driver_authentication_error':('driver_authentication_errors',{'driver','credential'}),
+ 'dsn_url_error':('dsn_and_url_strings',{'dsn','url'}),
+ 'tls_handshake_error':('tls_handshake_errors',{'server_name','certificate_subject'}),
+ 'nested_cause_error':('nested_cause_chains',{'message','secret'}),
+ 'sqlstate_error':('sqlstate_detail',{'sqlstate','detail'}),
+ 'filesystem_error':('filesystem_paths',{'path','message'}),
+}
+SENSITIVE_KEYS={'password','dsn','url','certificate_subject','detail','hint','path','secret'}
+EXPECTED_RECIPE={'encoding':'utf-8','fill_byte':' ','kind':'category_specific_structured_error','serialization':'canonical_compact_json_with_trailing_space_padding','templates':'validator_owned_CATEGORY_PAYLOADS','cause_link':'cause'}
+def canonical_bytes(value): return json.dumps(value,sort_keys=True,separators=(',',':')).encode('utf-8')
+def structured_input(corpus, depth, byte_length, recipe):
+ root_node=json.loads(json.dumps(CATEGORY_PAYLOADS[corpus]))
+ node=root_node
+ for level in range(2,depth+1):
+  node['cause']={'kind':'cause','level':level,'message':f'cause level {level}: CREDENTIAL_MARKER','secret':'CREDENTIAL_MARKER'}
+  node=node['cause']
+ base=canonical_bytes(root_node); fill=recipe['fill_byte'].encode(recipe['encoding'])
+ if fill!=b' ' or len(base)>byte_length: raise ValueError('structured redaction input exceeds vector size')
+ raw=base + fill*(byte_length-len(base))
+ if len(raw)!=byte_length: raise ValueError('structured redaction input has wrong byte length')
+ return raw
+def sanitize_value(value, key=None):
+ if key in SENSITIVE_KEYS: return '<redacted>',1
+ if isinstance(value,dict):
+  result={}; count=0
+  for child_key,child in value.items():
+   if child_key=='cause': continue
+   result[child_key],added=sanitize_value(child,child_key); count+=added
+  return result,count
+ if isinstance(value,list):
+  result=[]; count=0
+  for child in value:
+   clean,added=sanitize_value(child); result.append(clean); count+=added
+  return result,count
+ if isinstance(value,str) and ('CREDENTIAL_MARKER' in value or 'postgresql://' in value or 'https://' in value or '/var/lib/' in value): return '<redacted>',1
+ return value,0
 def reference_redact(corpus, depth, byte_length, recipe):
- prefix=recipe['prefix_template'].format(corpus=corpus).encode(recipe['encoding'])
- if len(prefix)>byte_length: raise ValueError('redaction prefix exceeds vector size')
- raw=prefix + recipe['fill_byte'].encode(recipe['encoding']) * (byte_length-len(prefix))
- if len(raw)!=byte_length or b'CREDENTIAL_MARKER' not in raw: raise ValueError('invalid generated redaction input')
- depth_truncated=depth>8; bytes_truncated=len(raw)>65536
- return {'bytes_truncated':bytes_truncated,'case_id':f'{corpus}-depth-{depth}-bytes-{byte_length}','code':'SECURITY_REDACTION_LIMITED' if depth_truncated or bytes_truncated else 'SECURITY_REDACTED','consumed_bytes':min(len(raw),65536),'contains_input_markers':False,'depth_processed':min(depth,8),'depth_truncated':depth_truncated,'redacted_corpus':corpus,'sanitized_value':'<redacted>'}
+ raw=structured_input(corpus,depth,byte_length,recipe)
+ collected=raw[:65536]
+ parsed=json.loads(collected.decode(recipe['encoding']))
+ try: observed_corpus,required=CATEGORY_SIGNATURES[parsed['kind']]
+ except (KeyError,TypeError): raise ValueError('unrecognized structured redaction category')
+ if not required.issubset(parsed): raise ValueError('incomplete structured redaction category')
+ sanitized=[]; redacted_fields=0; node=parsed; actual_depth=0
+ while node is not None:
+  if not isinstance(node,dict): raise ValueError('cause chain node is not structured')
+  actual_depth+=1
+  if actual_depth<=8:
+   clean,added=sanitize_value(node); sanitized.append(clean); redacted_fields+=added
+  node=node.get('cause')
+ depth_processed=min(actual_depth,8); depth_truncated=actual_depth>8
+ bytes_truncated=len(raw)>65536; sanitized_bytes=canonical_bytes(sanitized)
+ if b'CREDENTIAL_MARKER' in sanitized_bytes or observed_corpus!=corpus or actual_depth!=depth or redacted_fields<depth_processed: raise ValueError('structured redaction traversal failed')
+ return {'bytes_truncated':bytes_truncated,'case_id':f'{observed_corpus}-depth-{actual_depth}-bytes-{len(raw)}','code':'SECURITY_REDACTION_LIMITED' if depth_truncated or bytes_truncated else 'SECURITY_REDACTED','consumed_bytes':min(len(raw),65536),'contains_input_markers':False,'depth_processed':depth_processed,'depth_truncated':depth_truncated,'input_kind':parsed['kind'],'redacted_corpus':observed_corpus,'redacted_fields':redacted_fields,'sanitized_shape_sha256':hashlib.sha256(sanitized_bytes).hexdigest(),'sanitized_value':'<redacted>'}
 def fail():
  print('{"code":"SECURITY_EXPOSURE_FIXTURE_INVALID","outcome":"fail","phase":"validate_spec"}'); raise SystemExit(1)
 try:
@@ -48,7 +104,9 @@ try:
   if not vectors[name].get('redaction_assertions'): fail()
  rv=vectors['redacted_nested_driver_error']
  if rv['inputs'].get('depth_boundary')!=[8,9] or rv['inputs'].get('byte_boundary')!=[65536,65537] or set(rv['inputs'].get('corpus',[]))!=set(boundary['redaction']['corpus']): fail()
- recipe=rv['inputs']['generator']; generated=[]
+ recipe=rv['inputs']['generator']
+ if recipe!=EXPECTED_RECIPE: fail()
+ generated=[]
  for corpus in boundary['redaction']['corpus']:
   for depth in rv['inputs']['depth_boundary']:
    for size in rv['inputs']['byte_boundary']: generated.append(reference_redact(corpus,depth,size,recipe))
