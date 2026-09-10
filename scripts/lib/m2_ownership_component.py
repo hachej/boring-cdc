@@ -25,17 +25,17 @@ def docker_psql(name: str, sql: str, *, check=True) -> subprocess.CompletedProce
     return p
 
 def wait_ready(name: str):
-    for _ in range(100):
+    for _ in range(300):
         p = run(["docker", "exec", name, "pg_isready", "-U", "postgres"], timeout=5)
         if p.returncode == 0: return
-        time.sleep(.05)
+        time.sleep(.1)
     raise RuntimeError("PostgreSQL health deadline exceeded")
 
 def wait_value(name: str, sql: str, expected: str) -> str:
-    for _ in range(100):
+    for _ in range(300):
         p = docker_psql(name, sql, check=False)
         if p.returncode == 0 and p.stdout.strip() == expected: return p.stdout.strip()
-        time.sleep(.05)
+        time.sleep(.1)
     raise RuntimeError(f"condition did not become {expected!r}")
 
 def unix_peer_probe(work: Path) -> dict:
@@ -63,19 +63,26 @@ def stop_postgres(name: str): run(["docker", "rm", "-f", name])
 
 def postgres_probe(name: str, fault: bool) -> dict:
     holder_sql = f"SELECT pg_advisory_lock({KEY}); SELECT pg_sleep(120);"
-    p = run(["docker", "exec", "-d", "-e", "PGAPPNAME=m2-owner", name, "psql", "-XAt", "-U", "postgres", "-d", "postgres", "-c", holder_sql])
-    if p.returncode: raise RuntimeError(p.stderr.strip())
+    holder = subprocess.Popen(
+        ["docker", "exec", "-e", "PGAPPNAME=m2-owner", name, "psql", "-XAt", "-U", "postgres", "-d", "postgres", "-c", holder_sql],
+        cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
     pid_sql = "SELECT pid FROM pg_stat_activity WHERE application_name='m2-owner' AND state='active' ORDER BY pid LIMIT 1"
     pid = ""
-    for _ in range(100):
+    for _ in range(300):
         q = docker_psql(name, pid_sql, check=False)
         if q.returncode == 0 and q.stdout.strip().isdigit(): pid = q.stdout.strip(); break
-        time.sleep(.05)
-    if not pid: raise RuntimeError("advisory owner backend not observed")
+        if holder.poll() is not None:
+            raise RuntimeError(f"advisory owner process exited early ({holder.returncode})")
+        time.sleep(.1)
+    if not pid:
+        holder.terminate(); holder.wait(timeout=5)
+        raise RuntimeError("advisory owner backend not observed")
     contender = docker_psql(name, f"SELECT pg_try_advisory_lock({KEY})").stdout.strip()
     if contender != "f": raise RuntimeError("second advisory owner was admitted")
     terminated = docker_psql(name, f"SELECT pg_terminate_backend({pid})").stdout.strip()
     if terminated != "t": raise RuntimeError("backend termination fault was not injected")
+    holder.wait(timeout=10)
     successor = wait_value(name, f"SELECT pg_try_advisory_lock({KEY})", "t")
     return {"advisory_contention_rejected": contender == "f", "backend_death_injected": terminated == "t",
             "successor_acquired_after_backend_death": successor == "t", "reconciliation": "required-before-dispatch",
