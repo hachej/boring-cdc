@@ -22,7 +22,7 @@ for ident,root in dirs.items():
  binary_commands=[c for c in evidence.get('commands',[]) if c.get('argv')=='docker run --rm --entrypoint sha256sum <tested-connector-image> /usr/local/bin/boring-cdc']
  if len(binary_commands)!=2:fail(f"tested binary command mismatch: {ident}")
  for command in binary_commands:
-  output=root/command.get('stdout_path','')
+  output=ROOT/command.get('stdout_path','')
   if not output.is_file() or output.read_text().split()[0:1]!=[binary]:fail(f"tested binary digest mismatch: {ident}")
  exclusions=set(manifest.get('inventory_exclusions',[]))
  if exclusions!={'sha256.json','manifest.json','evidence.json'}:fail(f"inventory exclusion contract mismatch: {ident}")

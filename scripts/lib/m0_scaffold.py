@@ -80,7 +80,7 @@ def source_snapshot()->str:
 def normalize_capture(data:bytes)->bytes:
  text=data.decode(errors="replace")
  text=text.replace(str(ROOT),"<workspace>")
- text=re.sub(r"/(?:var/)?tmp/m0-scaffold-[^/\s]+","<isolated-temp>",text)
+ text=re.sub(r"/(?:var/)?tmp/[^\s,\"'\']+","<isolated-temp>",text)
  text=re.sub(r"(?i)(postgres(?:ql)?://[^\s:@]+:)[^\s@]+(@)",r"\1<redacted>\2",text)
  text=re.sub(r"(?im)(BORING_CDC_(?:SOURCE_DSN|POSTGRES_PASSWORD_FILE)=)[^\s]+",r"\1<redacted>",text)
  text=re.sub(r"/[^\s'\"]*/postgres_password(?:\b|$)","<secret-file>",text)
