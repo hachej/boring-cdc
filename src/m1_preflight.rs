@@ -403,8 +403,20 @@ fn evaluate_with_capability(
         .map_or(observed.source.process_limit_bytes, |v| {
             v.min(observed.source.process_limit_bytes)
         });
-    let memory_ok = aggregate
-        .is_some_and(|v| v <= effective_limit && v <= config.limits.process_memory_bytes.0)
+    let memory_components = [
+        observed.source.copy_both_receive_bytes,
+        observed.source.decoder_bytes,
+        observed.source.staging_bytes,
+        observed.source.worker_bytes,
+        observed.source.destination_worker_bytes,
+        observed.source.fixed_runtime_bytes,
+        observed.source.telemetry_bytes,
+        observed.source.command_headroom_bytes,
+        observed.source.sqlite_writer_staging_bytes,
+    ];
+    let memory_ok = memory_components.iter().all(|value| *value > 0)
+        && aggregate
+            .is_some_and(|v| v <= effective_limit && v <= config.limits.process_memory_bytes.0)
         && observed.source.logical_decoding_work_mem_bytes >= config.limits.max_transaction_bytes.0;
     c.push(CheckResult {
         scenario_id: "SCN-M1-PREFLIGHT-MEMORY",
@@ -522,8 +534,13 @@ fn evaluate_with_capability(
                     budget.concurrent_backfill_bytes.0,
                     budget.archive_segment_bytes.0,
                 ]);
+                let required = admitted
+                    .and_then(|v| v.checked_add(capacity.metadata_and_rounding_bytes))
+                    .and_then(|v| v.checked_add(capacity.archive_publication_bytes));
                 capacity.configured_total_bytes == budget.total_bytes.0
-                    && admitted.is_some_and(|required| capacity.available_bytes >= required)
+                    && capacity.metadata_and_rounding_bytes > 0
+                    && capacity.archive_publication_bytes > 0
+                    && required.is_some_and(|required| capacity.available_bytes >= required)
             })
     }) && observed.storage.reader_budget_units > 0
         && observed.storage.scheduler_budget_units > 0
@@ -595,26 +612,26 @@ fn evaluate_with_capability(
         .production_bytes_per_second
         .0
         .checked_mul(config.wal.monitor_delay_ms.0)
+        .and_then(|v| v.checked_add(999))
         .map(|v| v / 1_000);
     let wal_required = wal_growth
         .and_then(|v| v.checked_add(config.wal.reaction_reserve_bytes.0))
-        .and_then(|v| v.checked_add(config.wal.max_slot_wal_keep_bytes.0));
-    let source_disk_ok = observed
-        .source
-        .source_free_disk_bytes
-        .zip(wal_required)
-        .map(|(free, required)| free >= required);
+        .and_then(|v| v.checked_add(config.wal.max_slot_wal_keep_bytes.0))
+        .map(|v| v.max(config.wal.source_free_bytes.0));
+    let source_disk_status = match (observed.source.source_free_disk_bytes, wal_required) {
+        (_, None) => CheckStatus::Blocked,
+        (None, Some(_)) => CheckStatus::Degraded,
+        (Some(free), Some(required)) if free >= required => CheckStatus::Healthy,
+        (Some(_), Some(_)) => CheckStatus::Blocked,
+    };
     c.push(CheckResult {
         scenario_id: "SCN-M1-PREFLIGHT-SOURCE-FREE-DISK",
-        status: match source_disk_ok {
-            Some(true) => CheckStatus::Healthy,
-            Some(false) => CheckStatus::Blocked,
-            None => CheckStatus::Degraded,
-        },
-        reason: match source_disk_ok {
-            Some(true) => "PREFLIGHT_OK",
-            Some(false) => "PREFLIGHT_SOURCE_FREE_DISK_INSUFFICIENT",
-            None => "PREFLIGHT_SOURCE_FREE_DISK_UNKNOWN",
+        status: source_disk_status,
+        reason: match (observed.source.source_free_disk_bytes, wal_required) {
+            (_, None) => "PREFLIGHT_WAL_EQUATION_OVERFLOW",
+            (None, Some(_)) => "PREFLIGHT_SOURCE_FREE_DISK_UNKNOWN",
+            (Some(free), Some(required)) if free >= required => "PREFLIGHT_OK",
+            (Some(_), Some(_)) => "PREFLIGHT_SOURCE_FREE_DISK_INSUFFICIENT",
         },
         units: Some("bytes"),
     });
@@ -745,6 +762,7 @@ fn evaluate_reason_inventory() -> Vec<&'static str> {
         "PREFLIGHT_TYPE_UNSUPPORTED",
         "PREFLIGHT_UNIT_BUDGET_INVALID",
         "PREFLIGHT_WAL_LEVEL_NOT_LOGICAL",
+        "PREFLIGHT_WAL_EQUATION_OVERFLOW",
         "PREFLIGHT_WRITER_SYNCHRONOUS_UNVERIFIED",
     ]
 }
@@ -1098,6 +1116,65 @@ pub mod tests {
                 "PREFLIGHT_TIMEOUT_KEEPALIVE_INCOMPATIBLE"
             ));
         }
+    }
+
+    #[test]
+    fn resource_equations_reject_zero_overhead_and_configured_wal_floor() {
+        let cfg = config();
+        let mut zero = supported();
+        zero.source.sqlite_writer_staging_bytes = 0;
+        assert!(reason(
+            &evaluate_with_capability(
+                cfg.public(),
+                cfg.fingerprints().runtime.as_str(),
+                &zero,
+                Some(test_live_collector_capability())
+            ),
+            "PREFLIGHT_MEMORY_BUDGET_INSUFFICIENT"
+        ));
+        let mut metadata = supported();
+        metadata
+            .storage
+            .filesystem_capacities
+            .get_mut("state")
+            .unwrap()
+            .metadata_and_rounding_bytes = 0;
+        assert!(reason(
+            &evaluate_with_capability(
+                cfg.public(),
+                cfg.fingerprints().runtime.as_str(),
+                &metadata,
+                Some(test_live_collector_capability())
+            ),
+            "PREFLIGHT_UNIT_BUDGET_INVALID"
+        ));
+        let mut publication = supported();
+        publication
+            .storage
+            .filesystem_capacities
+            .get_mut("state")
+            .unwrap()
+            .available_bytes = 700_000_001;
+        assert!(reason(
+            &evaluate_with_capability(
+                cfg.public(),
+                cfg.fingerprints().runtime.as_str(),
+                &publication,
+                Some(test_live_collector_capability())
+            ),
+            "PREFLIGHT_UNIT_BUDGET_INVALID"
+        ));
+        let mut wal = supported();
+        wal.source.source_free_disk_bytes = Some(cfg.public().wal.source_free_bytes.0 - 1);
+        assert!(reason(
+            &evaluate_with_capability(
+                cfg.public(),
+                cfg.fingerprints().runtime.as_str(),
+                &wal,
+                Some(test_live_collector_capability())
+            ),
+            "PREFLIGHT_SOURCE_FREE_DISK_INSUFFICIENT"
+        ));
     }
 
     #[test]
