@@ -37,10 +37,10 @@ summary() { python3 -c 'import sys; xs=[bytes.fromhex(x) for x in sys.argv[1].sp
  cargo run --quiet --example m1_control_probe -- catalog-drift "$catalog"
  assert_live SCN-M1-RAW-PUBLICATION-DRIFT m1_control_fixtures::tests::publication_fingerprint_is_exact_and_order_independent; emit SCN-M1-RAW-PUBLICATION-DRIFT
  before=$(psql "$admin" -Atqc "SELECT md5(jsonb_agg(attname||':'||atttypid ORDER BY attnum)::text) FROM pg_attribute WHERE attrelid='public.accounts'::regclass AND attnum>0 AND NOT attisdropped")
- psql "$admin" -qc 'ALTER TABLE public.accounts ADD COLUMN optional text'
+ psql "$admin" -qc 'ALTER TABLE public.accounts ALTER COLUMN value TYPE bigint USING length(value)'
  after=$(psql "$admin" -Atqc "SELECT md5(jsonb_agg(attname||':'||atttypid ORDER BY attnum)::text) FROM pg_attribute WHERE attrelid='public.accounts'::regclass AND attnum>0 AND NOT attisdropped")
- [ "$before" != "$after" ]; assert_live SCN-M1-RAW-IDLE-DDL m1_ddl_fixtures::tests::catalog_poll_fingerprint_detects_idle_ddl_and_only_safe_addition_is_admitted; emit SCN-M1-RAW-IDLE-DDL
- psql "$admin" -qc "INSERT INTO public.accounts VALUES (7,'fixed','value')"; wire=$(changes); summary "$wire"; python3 -c 'import sys; tags=[bytes.fromhex(x)[0] for x in sys.argv[1].split(",") if x]; assert ord("R") in tags and ord("I") in tags' "$wire"
+ [ "$before" != "$after" ]; assert_live SCN-M1-RAW-IDLE-DDL m1_ddl_fixtures::tests::every_relation_contract_dimension_changes_the_fingerprint; emit SCN-M1-RAW-IDLE-DDL
+ psql "$admin" -qc "INSERT INTO public.accounts VALUES (7,42)"; wire=$(changes); summary "$wire"; python3 -c 'import sys; tags=[bytes.fromhex(x)[0] for x in sys.argv[1].split(",") if x]; assert ord("R") in tags and ord("I") in tags' "$wire"
  assert_live SCN-M1-RAW-IMMEDIATE-DDL m1_ddl_fixtures::tests::changed_relation_synchronously_blocks_following_dml_and_feedback; emit SCN-M1-RAW-IMMEDIATE-DDL
  if psql "$admin" -Atqc "SELECT data FROM pg_logical_slot_get_binary_changes('boring_cdc_slot',NULL,NULL,'proto_version','99','publication_names','boring_cdc_publication')" >/dev/null 2>&1; then echo E_UNSUPPORTED_PROTOCOL >&2; exit 1; fi
  assert_live SCN-M1-RAW-UNSUPPORTED-PROTOCOL m1_decoder::tests::unsupported_messages_and_binary_truncate_fail_closed; emit SCN-M1-RAW-UNSUPPORTED-PROTOCOL

@@ -75,7 +75,7 @@
       "expected_log": "idle_ddl_blocked",
       "expected_state": "blocked",
       "id": "SCN-M1-RAW-IDLE-DDL",
-      "unit_test": "m1_ddl_fixtures::tests::catalog_poll_fingerprint_detects_idle_ddl_and_only_safe_addition_is_admitted"
+      "unit_test": "m1_ddl_fixtures::tests::every_relation_contract_dimension_changes_the_fingerprint"
     },
     {
       "consumed_owner": "boring-cdc-m1-ddl-fixtures",

@@ -22,7 +22,7 @@ run() { cargo test --locked "$1" -- --exact --quiet >"$out/test.log" 2>"$out/tes
  run m1_bootstrap_sm::tests::failed_continuity_requires_confirmed_new_epoch_full_reseed SCN-M1-RAW-FULL-RESEED
  run m1_control_fixtures::tests::truncate_is_detection_only SCN-M1-RAW-TRUNCATE
  run m1_control_fixtures::tests::publication_fingerprint_is_exact_and_order_independent SCN-M1-RAW-PUBLICATION-DRIFT
- run m1_ddl_fixtures::tests::catalog_poll_fingerprint_detects_idle_ddl_and_only_safe_addition_is_admitted SCN-M1-RAW-IDLE-DDL
+ run m1_ddl_fixtures::tests::every_relation_contract_dimension_changes_the_fingerprint SCN-M1-RAW-IDLE-DDL
  run m1_ddl_fixtures::tests::changed_relation_synchronously_blocks_following_dml_and_feedback SCN-M1-RAW-IMMEDIATE-DDL
  run m1_decoder::tests::unsupported_messages_and_binary_truncate_fail_closed SCN-M1-RAW-UNSUPPORTED-PROTOCOL
  run m1_ddl_fixtures::tests::selected_types_keys_delete_and_destination_compatibility_fail_independently SCN-M1-RAW-UNSUPPORTED-TABLE
