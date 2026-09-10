@@ -4,10 +4,14 @@
 //! they do not open a second SQLite writer or load administration credentials themselves.
 
 use sha2::{Digest, Sha256};
-use std::fs::{File, OpenOptions, TryLockError};
+use std::ffi::CString;
+use std::fs::{File, TryLockError};
 use std::io::{Read, Seek, Write};
-use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt};
-use std::path::Path;
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+use std::os::unix::ffi::OsStrExt;
+use std::os::unix::fs::{FileTypeExt, MetadataExt, PermissionsExt};
+use std::os::unix::net::UnixStream;
+use std::path::{Component, Path};
 use std::time::{Duration, Instant};
 
 pub const SOCKET_DIR_MODE: u32 = 0o700;
@@ -16,8 +20,7 @@ pub const SOCKET_MODE: u32 = 0o600;
 pub const MAX_COMMAND_BYTES: usize = 64 * 1024;
 // M0-PROVISIONAL: boring-cdc-d-security
 pub const COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
-// Linux O_NOFOLLOW; v0.1 supports named Linux filesystems only.
-const O_NOFOLLOW: i32 = 0o400000;
+// v0.1 supports named Linux filesystems only; libc flags are used descriptor-relative.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OwnerKind {
@@ -66,35 +69,42 @@ impl StateLock {
             .parent()
             .ok_or_else(|| OwnershipError::Io("lock parent".into()))?;
         let process_uid = std::fs::metadata("/proc/self")?.uid();
-        // Do not follow the final parent component: a private target reached through a
-        // caller-controlled symlink is not an acceptable ownership boundary.
-        let parent_metadata = parent.symlink_metadata()?;
-        if parent_metadata.file_type().is_symlink()
-            || !parent_metadata.is_dir()
+        let parent_fd = open_directory_components_nofollow(parent)?;
+        let parent_metadata = File::from(parent_fd.try_clone()?).metadata()?;
+        if !parent_metadata.is_dir()
             || parent_metadata.uid() != process_uid
             || parent_metadata.permissions().mode() & 0o077 != 0
         {
             return Err(OwnershipError::Io("unsafe lock parent".into()));
         }
-        let mut file = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .mode(SOCKET_MODE)
-            .custom_flags(O_NOFOLLOW)
-            .open(&path)?;
+        let name = CString::new(
+            path.file_name()
+                .ok_or_else(|| OwnershipError::Io("lock file".into()))?
+                .as_bytes(),
+        )
+        .map_err(|_| OwnershipError::Io("lock file".into()))?;
+        // The validated parent descriptor cannot be swapped out between validation and create.
+        let raw = unsafe {
+            libc::openat(
+                parent_fd.as_raw_fd(),
+                name.as_ptr(),
+                libc::O_RDWR | libc::O_CREAT | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+                SOCKET_MODE,
+            )
+        };
+        if raw < 0 {
+            return Err(std::io::Error::last_os_error().into());
+        }
+        let mut file = unsafe { File::from_raw_fd(raw) };
         file.try_lock().map_err(|e| match e {
             TryLockError::WouldBlock => OwnershipError::StateAlreadyOwned,
             TryLockError::Error(error) => error.into(),
         })?;
         let metadata = file.metadata()?;
-        let path_metadata = path.symlink_metadata()?;
         if !metadata.file_type().is_file()
             || metadata.permissions().mode() & 0o777 != SOCKET_MODE
             || metadata.uid() != process_uid
             || metadata.nlink() != 1
-            || metadata.dev() != path_metadata.dev()
-            || metadata.ino() != path_metadata.ino()
         {
             return Err(OwnershipError::Io("unsafe lock file".into()));
         }
@@ -121,6 +131,43 @@ impl StateLock {
         Ok(())
     }
 }
+
+fn open_directory_components_nofollow(path: &Path) -> Result<OwnedFd, OwnershipError> {
+    let start = if path.is_absolute() { c"/" } else { c"." };
+    let raw = unsafe {
+        libc::open(
+            start.as_ptr(),
+            libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC,
+        )
+    };
+    if raw < 0 {
+        return Err(std::io::Error::last_os_error().into());
+    }
+    let mut current = unsafe { OwnedFd::from_raw_fd(raw) };
+    for component in path.components() {
+        let Component::Normal(value) = component else {
+            if matches!(component, Component::ParentDir) {
+                return Err(OwnershipError::Io("unsafe lock parent".into()));
+            }
+            continue;
+        };
+        let name = CString::new(value.as_bytes())
+            .map_err(|_| OwnershipError::Io("unsafe lock parent".into()))?;
+        let next = unsafe {
+            libc::openat(
+                current.as_raw_fd(),
+                name.as_ptr(),
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+        if next < 0 {
+            return Err(OwnershipError::Io("unsafe lock parent".into()));
+        }
+        current = unsafe { OwnedFd::from_raw_fd(next) };
+    }
+    Ok(current)
+}
+
 impl Drop for StateLock {
     fn drop(&mut self) {
         let _ = self.file.unlock();
@@ -409,7 +456,7 @@ pub fn shell_command(argv: &[String]) -> String {
 
 pub fn validate_socket(
     path: &Path,
-    verified_peer_uid: u32,
+    accepted: &UnixStream,
     bytes: usize,
     elapsed: Duration,
 ) -> Result<(), &'static str> {
@@ -431,10 +478,25 @@ pub fn validate_socket(
     {
         return Err("socket_mode");
     }
-    // `verified_peer_uid` must come from SO_PEERCRED. Authorization is anchored to
-    // the running process and the already-verified socket inode, never an owner UID
-    // supplied in the command request.
-    if verified_peer_uid != process_uid || socket_metadata.uid() != verified_peer_uid {
+    let mut credentials = libc::ucred {
+        pid: 0,
+        uid: 0,
+        gid: 0,
+    };
+    let mut length = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    let rc = unsafe {
+        libc::getsockopt(
+            accepted.as_raw_fd(),
+            libc::SOL_SOCKET,
+            libc::SO_PEERCRED,
+            (&mut credentials as *mut libc::ucred).cast(),
+            &mut length,
+        )
+    };
+    if rc != 0 || length as usize != std::mem::size_of::<libc::ucred>() {
+        return Err("peer_credentials");
+    }
+    if credentials.uid != process_uid || socket_metadata.uid() != credentials.uid {
         return Err("peer_rejected");
     }
     if bytes > MAX_COMMAND_BYTES {
@@ -535,9 +597,11 @@ pub(crate) mod tests {
         let linked = root.join("linked");
         fs::create_dir(&real).unwrap();
         fs::set_permissions(&real, fs::Permissions::from_mode(0o700)).unwrap();
+        fs::create_dir(real.join("nested")).unwrap();
+        fs::set_permissions(real.join("nested"), fs::Permissions::from_mode(0o700)).unwrap();
         std::os::unix::fs::symlink(&real, &linked).unwrap();
         assert!(matches!(
-            StateLock::acquire(&linked.join("state.db"), "run", "nonce"),
+            StateLock::acquire(&linked.join("nested/state.db"), "run", "nonce"),
             Err(OwnershipError::Io(message)) if message == "unsafe lock parent"
         ));
         fs::remove_dir_all(root).unwrap();
@@ -940,24 +1004,22 @@ pub(crate) mod tests {
         let p = d.join("command.sock");
         fs::create_dir_all(&d).unwrap();
         fs::set_permissions(&d, fs::Permissions::from_mode(0o700)).unwrap();
-        let _listener = std::os::unix::net::UnixListener::bind(&p).unwrap();
+        let listener = std::os::unix::net::UnixListener::bind(&p).unwrap();
         fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
-        let uid = std::fs::metadata("/proc/self").unwrap().uid();
-        assert_eq!(validate_socket(&p, uid, 1, Duration::ZERO), Ok(()));
-        // A caller cannot forge authorization by supplying a matching claimed owner UID:
-        // only the kernel-verified peer UID is accepted against process/socket ownership.
+        let client = UnixStream::connect(&p).unwrap();
+        let (accepted, _) = listener.accept().unwrap();
+        assert_eq!(validate_socket(&p, &accepted, 1, Duration::ZERO), Ok(()));
         assert_eq!(
-            validate_socket(&p, uid.wrapping_add(1), 1, Duration::ZERO),
-            Err("peer_rejected")
-        );
-        assert_eq!(
-            validate_socket(&p, uid, MAX_COMMAND_BYTES + 1, Duration::ZERO),
+            validate_socket(&p, &accepted, MAX_COMMAND_BYTES + 1, Duration::ZERO),
             Err("message_too_large")
         );
         assert_eq!(
-            validate_socket(&p, uid, 1, COMMAND_TIMEOUT + Duration::from_millis(1)),
+            validate_socket(&p, &accepted, 1, COMMAND_TIMEOUT + Duration::from_millis(1)),
             Err("request_timeout")
         );
+        drop(client);
+        drop(accepted);
+        drop(listener);
         fs::remove_dir_all(d).unwrap()
     }
     #[test]

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Deterministic M2 ownership component probe over PostgreSQL and Unix sockets."""
 from __future__ import annotations
-import argparse, hashlib, json, os, shutil, socket, struct, subprocess, sys, time
+import argparse, hashlib, json, os, re, shutil, socket, struct, subprocess, sys, time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -114,12 +114,17 @@ def emit(mode: str, observed: dict, image_id: str):
       {"schema_version":"ownership-event/v1","case_event_seq":2,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"postgres-advisory-lock","phase":"backend-death","outcome":"fenced"},
       {"schema_version":"ownership-event/v1","case_event_seq":3,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"unix-command-socket","phase":"peer-credentials","outcome":"authorized"}]
     write(out / "logs/boring-cdc.jsonl", b"".join(canonical(x) for x in events))
-    write(out / "stdout.txt", canonical(observed)); write(out / "stderr.txt", "")
+    docker_version = run(["docker", "version", "--format", "{{.Server.Version}}"])
+    write(out / "stdout.txt", docker_version.stdout); write(out / "stderr.txt", docker_version.stderr)
+    write(out / "state/product-probe.json", canonical(observed["product_probe"]))
     inventory_files = sorted(p for p in out.rglob("*") if p.is_file())
     write(out / "sha256.txt", "".join(f"{sha(p.read_bytes())}  {p.relative_to(out).as_posix()}\n" for p in inventory_files))
-    result_paths = [out / "state/after.json", out / "fault-timeline.json", out / "logs/boring-cdc.jsonl"]
+    result_paths = [out / "state/after.json", out / "fault-timeline.json", out / "logs/boring-cdc.jsonl", out / "state/product-probe.json"]
     source_digest = sha(canonical({"source":"postgres-component-fixture-v1"}))
     cmd = command_record("docker version", out / "stdout.txt", out / "stderr.txt", "docker-component-v1")
+    secret_pattern = re.compile(r"(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|postgres(?:ql)?://[^\s:@]+:[^\s@]+@)")
+    if any(secret_pattern.search(p.read_text(errors="replace")) for p in out.rglob("*") if p.is_file()):
+        raise RuntimeError("redaction scan found secret-like content")
     manifest = {"schema_version":"evidence/v1","owner_bead":"boring-cdc-m2-ownership","scenario_id":scenario,
       "evidence_profile":"runtime","evidence_tier":"component","seed":SEED,
       "git_commit":run(["git","rev-parse","HEAD"]).stdout.strip(),"commands":[cmd],
@@ -145,7 +150,10 @@ def main():
         pg=postgres_probe(name, args.mode == "fault")
         peer=unix_peer_probe(work)
         image_id=run(["docker","image","inspect","--format","{{.Id}}",IMAGE]).stdout.strip()
-        observed={"postgres":pg,"unix_peer":peer,"mode":args.mode}
+        product = run(["cargo", "run", "--quiet", "--locked", "--example", "m2_ownership_component", "--", str(work / "product")], timeout=120)
+        if product.returncode != 0 or product.stdout.strip() != "production_ownership_component=pass":
+            raise RuntimeError(f"production ownership probe failed: {product.stderr.strip()}")
+        observed={"postgres":pg,"unix_peer":peer,"product_probe":{"ownership_guard":True,"socket_validation":True,"crash_restart":True,"reconciliation_marker":True},"mode":args.mode}
     finally:
         stop_postgres(name); shutil.rmtree(work, ignore_errors=True)
     emit(args.mode, observed, image_id)

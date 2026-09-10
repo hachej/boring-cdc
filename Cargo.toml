@@ -17,6 +17,7 @@ path = "src/main.rs"
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
 rusqlite = { version = "0.37.0", features = ["bundled", "hooks"] }
+libc = "0.2.175"
 sha2 = "0.10.8"
 toml = "0.9.5"
 
