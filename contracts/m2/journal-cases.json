@@ -1,0 +1,16 @@
+{
+  "schema_version": "m2-journal-cases/v1",
+  "owner_bead": "boring-cdc-m2-journal",
+  "evidence_tier": "component",
+  "cases": [
+    {"id":"SCN-M2-JOURNAL-ATOMIC","test":"atomic_commit_publishes_complete_transaction_and_durable_end","assertion":"transaction metadata, schemas, events and durable end become visible atomically"},
+    {"id":"SCN-M2-JOURNAL-CRASH-BOUNDARY","test":"crash_before_and_after_commit_is_absent_or_complete","assertion":"before-commit is absent and after-commit ambiguity reconciles to one complete transaction"},
+    {"id":"SCN-M2-JOURNAL-DUPLICATE-CONFLICT","test":"positional_duplicate_is_idempotent_but_conflict_blocks","assertion":"exact positional replay is idempotent and changed payload blocks"},
+    {"id":"SCN-M2-JOURNAL-INVALID-LIMIT","test":"invalid_hash_order_lsn_and_limits_fail_before_visibility","assertion":"invalid hashes, ordinals, LSNs and limits publish no partial state"},
+    {"id":"SCN-M2-JOURNAL-SCHEMA-CONFLICT","test":"relation_schema_conflict_rolls_back_whole_source_commit","assertion":"immutable schema fingerprint conflict rolls back the complete source transaction"},
+    {"id":"SCN-M2-JOURNAL-FEEDBACK-ORDER","test":"feedback_token_exists_only_after_commit_return","assertion":"a feedback-eligible durable boundary exists only after successful SQLite commit return"},
+    {"id":"SCN-M2-JOURNAL-RANGE","test":"bounded_range_copies_complete_transactions_and_releases_reader","assertion":"bounded reads copy only complete transaction ranges before releasing the SQLite reader"},
+    {"id":"SCN-M2-JOURNAL-FAIR-SERVICE","test":"capture_priority_reserves_bounded_service_and_overload","assertion":"capture bursts reserve bounded failure, checkpoint and GC service with explicit overload"},
+    {"id":"SCN-M2-JOURNAL-SLOW-STORAGE","test":"slow_storage_hold_bound_rolls_back_without_partial_visibility","assertion":"an exceeded pre-commit writer-hold bound rolls back without partial visibility"}
+  ]
+}
