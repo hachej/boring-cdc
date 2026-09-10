@@ -823,13 +823,17 @@ impl PreparedFailureOperation {
                     else {
                         return Err(rusqlite::Error::InvalidQuery);
                     };
-                    // Fence destination identity first. This no-op CAS has no partial state to
-                    // commit if the subsequent failure-row CAS rejects.
-                    transaction.execute(
-                        "UPDATE destinations SET revision=revision+1 WHERE destination_id=?1 AND current_failure_id=?2 AND capture_epoch=?3 AND generation=?4",
-                        params![destination_id, record.failure_id, capture_epoch, generation],
-                    )?;
-                    if transaction.changes() != 1 {
+                    // Compare the exact destination fence first. The supplied sole-writer
+                    // transaction prevents drift before the failure-row swap and this read-only
+                    // phase leaves no revision churn if that later swap rejects.
+                    let destination_matches = transaction
+                        .query_row(
+                            "SELECT 1 FROM destinations WHERE destination_id=?1 AND current_failure_id=?2 AND capture_epoch=?3 AND generation=?4",
+                            params![destination_id, record.failure_id, capture_epoch, generation],
+                            |_| Ok(()),
+                        )
+                        .optional()?;
+                    if destination_matches.is_none() {
                         return Err(rusqlite::Error::QueryReturnedNoRows);
                     }
                 }
@@ -853,12 +857,15 @@ impl PreparedFailureOperation {
                     let Some(generation) = generation else {
                         return Err(rusqlite::Error::InvalidQuery);
                     };
-                    // Validate the exact destination boundary before disarming or unlinking.
-                    transaction.execute(
-                        "UPDATE destinations SET revision=revision+1 WHERE destination_id=?1 AND current_failure_id=?2 AND capture_epoch=?3 AND generation=?4",
-                        params![destination_id, failure_id, capture_epoch, generation],
-                    )?;
-                    if transaction.changes() != 1 {
+                    // Compare the exact destination boundary before disarming or unlinking.
+                    let destination_matches = transaction
+                        .query_row(
+                            "SELECT 1 FROM destinations WHERE destination_id=?1 AND current_failure_id=?2 AND capture_epoch=?3 AND generation=?4",
+                            params![destination_id, failure_id, capture_epoch, generation],
+                            |_| Ok(()),
+                        )
+                        .optional()?;
+                    if destination_matches.is_none() {
                         return Err(rusqlite::Error::QueryReturnedNoRows);
                     }
                 }
@@ -1925,12 +1932,31 @@ pub mod tests {
             reopened.last_rearm_token_digest,
             rearmed.last_rearm_token_digest
         );
+        let revision_before_replay: u64 = writer
+            .connection()
+            .query_row(
+                "SELECT revision FROM destinations WHERE destination_id='destination-a'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         let tx = writer.connection_mut().transaction().unwrap();
         assert!(
             prepared_rearm.execute(&tx).is_err(),
             "one durable token may be consumed only once"
         );
         tx.commit().unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT revision FROM destinations WHERE destination_id='destination-a'",
+                    [],
+                    |row| row.get::<_, u64>(0)
+                )
+                .unwrap(),
+            revision_before_replay
+        );
         assert_eq!(
             load_failure(writer.connection(), &record.failure_id, boundary())
                 .unwrap()
@@ -2159,6 +2185,14 @@ pub mod tests {
                 [],
             )
             .unwrap();
+        let revision_before_stale_clear: u64 = writer
+            .connection()
+            .query_row(
+                "SELECT revision FROM destinations WHERE destination_id='destination-a'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
         let tx = writer.connection_mut().transaction().unwrap();
         assert!(
             PreparedFailureOperation::Clear {
@@ -2173,6 +2207,17 @@ pub mod tests {
             .is_err()
         );
         tx.commit().unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT revision FROM destinations WHERE destination_id='destination-a'",
+                    [],
+                    |row| row.get::<_, u64>(0)
+                )
+                .unwrap(),
+            revision_before_stale_clear
+        );
         assert_eq!(
             writer
                 .connection()
