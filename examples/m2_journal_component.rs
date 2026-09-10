@@ -53,7 +53,7 @@ fn main() {
             max_events: 16,
             max_copied_bytes: 4096,
             max_writer_hold: if mode == "slow-commit" {
-                Duration::from_millis(1)
+                Duration::from_millis(20)
             } else {
                 Duration::from_secs(5)
             },

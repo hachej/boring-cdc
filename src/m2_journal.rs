@@ -331,7 +331,7 @@ impl JournalStore {
             std::process::exit(86);
         }
         if fault == CommitFault::SlowSqliteCommit {
-            std::thread::sleep(Duration::from_millis(5));
+            std::thread::sleep(Duration::from_millis(50));
         }
         transaction.commit()?;
         if fault == CommitFault::AfterSqliteCommit {
@@ -1120,7 +1120,7 @@ pub mod tests {
                 .unwrap(),
             0
         );
-        s.limits.max_writer_hold = Duration::from_millis(1);
+        s.limits.max_writer_hold = Duration::from_millis(20);
         assert_eq!(
             s.commit_atomic(&c, CommitFault::SlowSqliteCommit),
             Err(JournalError::BusyBoundExceededAfterCommit)
