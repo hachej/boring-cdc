@@ -15,7 +15,7 @@
       "hook": "copyboth_frame",
       "inputs": {
         "expected_xlog": {
-          "pgoutput_hex": "42",
+          "pgoutput_hex": "4200000000016b6d0000000000000003e80000002a",
           "server_time_micros": 123456,
           "wal_end_u64": 23817472,
           "wal_start_u64": 23817296
@@ -23,7 +23,7 @@
         "server_copyboth_response_hex": "5700000007000000",
         "start_replication_hex": "53544152545f5245504c49434154494f4e20534c4f5420626f72696e675f6364635f736c6f74204c4f474943414c20302f31364236433530202870726f746f5f76657273696f6e202731272c207075626c69636174696f6e5f6e616d65732027626f72696e675f636463272c2062696e617279202766616c7365272c206d65737361676573202774727565272c2073747265616d696e67202766616c7365272c2074776f5f7068617365202766616c7365272c206f726967696e2027616e792729",
         "start_replication_utf8": "START_REPLICATION SLOT boring_cdc_slot LOGICAL 0/16B6C50 (proto_version '1', publication_names 'boring_cdc', binary 'false', messages 'true', streaming 'false', two_phase 'false', origin 'any')",
-        "xlog_copydata_payload_hex": "7700000000016b6c5000000000016b6d00000000000001e24042"
+        "xlog_copydata_payload_hex": "7700000000016b6c5000000000016b6d00000000000001e2404200000000016b6d0000000000000003e80000002a"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -56,7 +56,7 @@
           "after_origin": 0,
           "before_origin": 0
         },
-        "insert_hex": "4900004001524e",
+        "insert_hex": "49000040014e0001740000000131",
         "origin_hex": "4f00000000016b6c506f726967696e5f6100"
       },
       "preconditions": [
@@ -807,7 +807,31 @@
       "fixture_id": "SCN-M0-PG-BEFORE-SLOT-CREATE",
       "hook": "before_slot_create",
       "inputs": {
-        "phase": "before_slot_create"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_slot_create",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -834,7 +858,31 @@
       "fixture_id": "SCN-M0-PG-TOKEN-PERSIST",
       "hook": "after_snapshot_token_persist",
       "inputs": {
-        "phase": "after_snapshot_token_persist"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_snapshot_token_persist",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -861,7 +909,31 @@
       "fixture_id": "SCN-M0-PG-EXPORTER-RELEASE-BEFORE",
       "hook": "before_exporter_release",
       "inputs": {
-        "phase": "before_exporter_release"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_exporter_release",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -888,7 +960,31 @@
       "fixture_id": "SCN-M0-PG-EXPORTER-RELEASE-AFTER",
       "hook": "after_exporter_release",
       "inputs": {
-        "phase": "after_exporter_release"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_exporter_release",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -915,7 +1011,31 @@
       "fixture_id": "SCN-M0-PG-START-REPLICATION",
       "hook": "before_start_replication",
       "inputs": {
-        "phase": "before_start_replication"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_start_replication",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -942,7 +1062,31 @@
       "fixture_id": "SCN-M0-PG-FIRST-FEEDBACK",
       "hook": "before_first_feedback",
       "inputs": {
-        "phase": "before_first_feedback"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_first_feedback",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -969,7 +1113,31 @@
       "fixture_id": "SCN-M0-PG-COMMIT-FEEDBACK-CRASH",
       "hook": "after_journal_commit_before_feedback",
       "inputs": {
-        "phase": "after_journal_commit_before_feedback"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_journal_commit_before_feedback",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -996,7 +1164,31 @@
       "fixture_id": "SCN-M0-PG-SAFE-STOP-PERSIST-BEFORE",
       "hook": "before_safe_stop_persist",
       "inputs": {
-        "phase": "before_safe_stop_persist"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_safe_stop_persist",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -1023,7 +1215,31 @@
       "fixture_id": "SCN-M0-PG-EXPECTED-CLOSE-TOKEN",
       "hook": "after_expected_close_token",
       "inputs": {
-        "phase": "after_expected_close_token"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_expected_close_token",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -1050,7 +1266,31 @@
       "fixture_id": "SCN-M0-PG-ADVISORY-PROBE-LATE",
       "hook": "advisory_probe_late",
       "inputs": {
-        "phase": "advisory_probe_late"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "advisory_probe_late",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -1077,7 +1317,31 @@
       "fixture_id": "SCN-M0-PG-SNAPSHOT-EXPORT-AFTER-GUARD",
       "hook": "before_snapshot_export",
       "inputs": {
-        "phase": "before_snapshot_export"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_snapshot_export",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -1104,7 +1368,31 @@
       "fixture_id": "SCN-M0-PG-CHUNK-COMMIT",
       "hook": "after_chunk_commit",
       "inputs": {
-        "phase": "after_chunk_commit"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_chunk_commit",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -1131,7 +1419,31 @@
       "fixture_id": "SCN-M0-PG-FENCE-UPDATE-BEFORE",
       "hook": "before_fence_update",
       "inputs": {
-        "phase": "before_fence_update"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_fence_update",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -1158,7 +1470,31 @@
       "fixture_id": "SCN-M0-PG-FENCE-UPDATE-AFTER",
       "hook": "after_fence_update_before_observe",
       "inputs": {
-        "phase": "after_fence_update_before_observe"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_fence_update_before_observe",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",
@@ -1185,7 +1521,31 @@
       "fixture_id": "SCN-M0-PG-GUARD-LOSS",
       "hook": "guard_connection_loss",
       "inputs": {
-        "phase": "guard_connection_loss"
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "guard_connection_loss",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
       },
       "preconditions": [
         "exclusive local and source ownership unless fixture asserts loss",

@@ -60,7 +60,376 @@
             "type": "string"
           },
           "inputs": {
-            "type": "object"
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "expected_xlog": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "pgoutput_hex": {
+                        "type": "string"
+                      },
+                      "server_time_micros": {
+                        "type": "integer"
+                      },
+                      "wal_end_u64": {
+                        "type": "integer"
+                      },
+                      "wal_start_u64": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "pgoutput_hex",
+                      "server_time_micros",
+                      "wal_end_u64",
+                      "wal_start_u64"
+                    ],
+                    "type": "object"
+                  },
+                  "server_copyboth_response_hex": {
+                    "type": "string"
+                  },
+                  "start_replication_hex": {
+                    "type": "string"
+                  },
+                  "start_replication_utf8": {
+                    "type": "string"
+                  },
+                  "xlog_copydata_payload_hex": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "expected_xlog",
+                  "server_copyboth_response_hex",
+                  "start_replication_hex",
+                  "start_replication_utf8",
+                  "xlog_copydata_payload_hex"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "begin_hex": {
+                    "type": "string"
+                  },
+                  "expected_row_ordinals": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "after_insert": {
+                        "type": "integer"
+                      },
+                      "after_origin": {
+                        "type": "integer"
+                      },
+                      "before_origin": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "before_origin",
+                      "after_origin",
+                      "after_insert"
+                    ],
+                    "type": "object"
+                  },
+                  "insert_hex": {
+                    "type": "string"
+                  },
+                  "origin_hex": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "begin_hex",
+                  "origin_hex",
+                  "insert_hex",
+                  "expected_row_ordinals"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "client_time_micros": {
+                    "type": "integer"
+                  },
+                  "durable_lsn": {
+                    "type": "string"
+                  },
+                  "expected_status_packet_bytes": {
+                    "type": "integer"
+                  },
+                  "expected_status_packet_hex": {
+                    "type": "string"
+                  },
+                  "keepalive_wal_end": {
+                    "type": "string"
+                  },
+                  "outgoing_reply_requested": {
+                    "type": "boolean"
+                  },
+                  "received_lsn": {
+                    "type": "string"
+                  },
+                  "reply_requested": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "client_time_micros",
+                  "durable_lsn",
+                  "expected_status_packet_bytes",
+                  "expected_status_packet_hex",
+                  "keepalive_wal_end",
+                  "outgoing_reply_requested",
+                  "received_lsn",
+                  "reply_requested"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "confirmed_flush_lsn": {
+                    "type": "string"
+                  },
+                  "expected_effective_lsn": {
+                    "type": "string"
+                  },
+                  "requested_lsn": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "confirmed_flush_lsn",
+                  "expected_effective_lsn",
+                  "requested_lsn"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "durable_transaction_end_lsn": {
+                    "type": "null"
+                  },
+                  "matching_nonterminal_bootstrap": {
+                    "type": "boolean"
+                  },
+                  "resume_wal_available": {
+                    "type": "boolean"
+                  },
+                  "server_confirmed_flush_lsn": {
+                    "type": "null"
+                  },
+                  "slot_creation_floor_lsn": {
+                    "type": "string"
+                  },
+                  "slot_valid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "durable_transaction_end_lsn",
+                  "matching_nonterminal_bootstrap",
+                  "resume_wal_available",
+                  "server_confirmed_flush_lsn",
+                  "slot_creation_floor_lsn",
+                  "slot_valid"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "durable_transaction_end_lsn": {
+                    "type": "null"
+                  },
+                  "matching_nonterminal_bootstrap": {
+                    "type": "boolean"
+                  },
+                  "resume_wal_available": {
+                    "type": "boolean"
+                  },
+                  "server_confirmed_flush_lsn": {
+                    "type": "string"
+                  },
+                  "slot_creation_floor_lsn": {
+                    "type": "string"
+                  },
+                  "slot_valid": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "durable_transaction_end_lsn",
+                  "matching_nonterminal_bootstrap",
+                  "resume_wal_available",
+                  "server_confirmed_flush_lsn",
+                  "slot_creation_floor_lsn",
+                  "slot_valid"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "capture_epoch": {
+                    "type": "integer"
+                  },
+                  "durable_lsn": {
+                    "type": "string"
+                  },
+                  "failed_boundary": {
+                    "type": "string"
+                  },
+                  "phase": {
+                    "type": "string"
+                  },
+                  "run_id": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "capture_epoch",
+                  "durable_lsn",
+                  "failed_boundary",
+                  "phase",
+                  "run_id"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "rate_samples_bytes_per_second": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "retained_wal_bytes": {
+                    "type": "integer"
+                  },
+                  "source_free_bytes": {
+                    "type": "integer"
+                  },
+                  "source_reserved_free_bytes": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "rate_samples_bytes_per_second",
+                  "retained_wal_bytes",
+                  "source_free_bytes",
+                  "source_reserved_free_bytes"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "capture_connection_generation": {
+                    "type": "integer"
+                  },
+                  "capture_epoch": {
+                    "type": "integer"
+                  },
+                  "creation_floor_lsn": {
+                    "type": "string"
+                  },
+                  "durable_transaction_end_lsn": {
+                    "type": "string"
+                  },
+                  "exporter_backend_pid": {
+                    "type": "integer"
+                  },
+                  "failure_fingerprint": {
+                    "type": "string"
+                  },
+                  "fault_action": {
+                    "type": "string"
+                  },
+                  "fault_phase": {
+                    "type": "string"
+                  },
+                  "fence_nonce_hex": {
+                    "type": "string"
+                  },
+                  "generation": {
+                    "type": "integer"
+                  },
+                  "guard_backend_pid": {
+                    "type": "integer"
+                  },
+                  "importer_acknowledged": {
+                    "type": "integer"
+                  },
+                  "importer_backend_pids": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "importer_expected": {
+                    "type": "integer"
+                  },
+                  "journal_checkpoint_seq": {
+                    "type": "integer"
+                  },
+                  "last_feedback_lsn": {
+                    "type": "string"
+                  },
+                  "operation_deadline_ms": {
+                    "type": "integer"
+                  },
+                  "ownership_deadline_remaining_ms": {
+                    "type": "integer"
+                  },
+                  "publication_name": {
+                    "type": "string"
+                  },
+                  "run_id": {
+                    "type": "string"
+                  },
+                  "slot_name": {
+                    "type": "string"
+                  },
+                  "table_set_fingerprint": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "run_id",
+                  "capture_connection_generation",
+                  "capture_epoch",
+                  "generation",
+                  "slot_name",
+                  "publication_name",
+                  "durable_transaction_end_lsn",
+                  "last_feedback_lsn",
+                  "journal_checkpoint_seq",
+                  "creation_floor_lsn",
+                  "ownership_deadline_remaining_ms",
+                  "operation_deadline_ms",
+                  "exporter_backend_pid",
+                  "guard_backend_pid",
+                  "importer_backend_pids",
+                  "importer_acknowledged",
+                  "importer_expected",
+                  "fence_nonce_hex",
+                  "table_set_fingerprint",
+                  "failure_fingerprint",
+                  "fault_phase",
+                  "fault_action"
+                ],
+                "type": "object"
+              }
+            ]
           },
           "preconditions": {
             "items": {

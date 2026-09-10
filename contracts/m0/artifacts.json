@@ -109,7 +109,7 @@
       "id": "ART-M0-PG-EVIDENCE",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "artifacts/boring-cdc-m0-pg-contract/spec/evidence.json",
-      "sha256": "202b344f779102115a7ec6a653196a8643aa57bf3da640cd066f33398fb93946",
+      "sha256": "d6df775b2a12b98ee9f8eb969281eb51a746f80909e632832253d745f087a4fa",
       "status": "complete"
     },
     {
@@ -123,14 +123,14 @@
       "id": "ART-M0-PG-FIXTURE-SCHEMA",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "contracts/postgres/capture-backfill-fixtures.schema.json",
-      "sha256": "76b6fe1602e49e6012776b6d2cb251f68f8aea2037db10dec82e510a3e588e22",
+      "sha256": "b42afc3fce6b9be674c680ed1c079266a771eebf73a2b1727680a63e5536abc0",
       "status": "complete"
     },
     {
       "id": "ART-M0-PG-FIXTURES",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "fixtures/m0/postgres/capture-backfill.json",
-      "sha256": "dd3cc148a4c8816e5ca78a93c32ecf002f8ee97e06789044048e07fb4b2b59bd",
+      "sha256": "35d292d77f509dbdfc69013dfc1f205554ab2bb9d77743a4c8b9cbbb932db7df",
       "status": "complete"
     },
     {
@@ -144,7 +144,7 @@
       "id": "ART-M0-PG-VALIDATOR",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "scripts/validate/postgres_contract.py",
-      "sha256": "04ec3675f623bba1a3c936bf4d76f585498511d5c0a5fc518354dbfff5fd8bf8",
+      "sha256": "0c34b037ef5e0d98a3660bef65319c6832a17f0f1d573d3ec791468f0b3a8b36",
       "status": "complete"
     },
     {

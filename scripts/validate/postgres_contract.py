@@ -25,7 +25,7 @@ CORE_SPEC.loader.exec_module(CORE)
 
 
 def load(path: Path):
-    return json.loads(path.read_text())
+    return CORE.read_strict(path)[0]
 
 
 def finding(items, code, path, message):
@@ -148,6 +148,27 @@ def validate():
     copyboth = cases[0].get("inputs", {}) if cases else {}
     if not copyboth.get("start_replication_hex") or not copyboth.get("server_copyboth_response_hex") or not copyboth.get("xlog_copydata_payload_hex"):
         finding(findings, "E_PROTOCOL_GOLDEN", "fixtures/0", "exact START_REPLICATION and CopyBoth bytes absent")
+    else:
+        try:
+            start_bytes = bytes.fromhex(copyboth["start_replication_hex"])
+            response = bytes.fromhex(copyboth["server_copyboth_response_hex"])
+            xlog = bytes.fromhex(copyboth["xlog_copydata_payload_hex"])
+            if start_bytes.decode() != copyboth["start_replication_utf8"] or response != b"W\x00\x00\x00\x07\x00\x00\x00":
+                raise ValueError("START_REPLICATION or CopyBothResponse bytes differ")
+            if len(xlog) < 26 or xlog[0] != ord("w") or xlog[25] != ord("B") or len(xlog[25:]) != 21:
+                raise ValueError("XLogData does not contain one complete 21-byte Begin message")
+        except (ValueError, UnicodeDecodeError) as error:
+            finding(findings, "E_PROTOCOL_GOLDEN", "fixtures/0", str(error))
+    origin_case = next((case for case in cases if case.get("fixture_id") == "SCN-M0-PG-ORIGIN-ORDINAL"), {})
+    try:
+        origin_inputs = origin_case["inputs"]
+        begin, origin, insert = (bytes.fromhex(origin_inputs[name]) for name in ("begin_hex", "origin_hex", "insert_hex"))
+        if len(begin) != 21 or begin[0] != ord("B") or len(origin) < 11 or origin[0] != ord("O") or origin[-1] != 0:
+            raise ValueError("Begin/Origin message truncated")
+        if len(insert) < 13 or insert[0] != ord("I") or insert[5] != ord("N") or int.from_bytes(insert[6:8], "big") != 1 or insert[8] != ord("t") or int.from_bytes(insert[9:13], "big") != len(insert[13:]):
+            raise ValueError("Insert tuple message truncated")
+    except (KeyError, ValueError) as error:
+        finding(findings, "E_PGOUTPUT_GOLDEN", "fixtures", str(error))
     keepalive = next((case for case in cases if case.get("fixture_id") == "SCN-M0-PG-KEEPALIVE-REPLY"), {})
     if keepalive.get("inputs", {}).get("expected_status_packet_bytes") != 34 or not keepalive.get("inputs", {}).get("expected_status_packet_hex", "").endswith("00"):
         finding(findings, "E_STATUS_GOLDEN", "fixtures", "complete 34-byte status packet with outgoing reply=false absent")
