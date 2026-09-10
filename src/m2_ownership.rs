@@ -66,8 +66,11 @@ impl StateLock {
             .parent()
             .ok_or_else(|| OwnershipError::Io("lock parent".into()))?;
         let process_uid = std::fs::metadata("/proc/self")?.uid();
-        let parent_metadata = parent.metadata()?;
-        if !parent_metadata.is_dir()
+        // Do not follow the final parent component: a private target reached through a
+        // caller-controlled symlink is not an acceptable ownership boundary.
+        let parent_metadata = parent.symlink_metadata()?;
+        if parent_metadata.file_type().is_symlink()
+            || !parent_metadata.is_dir()
             || parent_metadata.uid() != process_uid
             || parent_metadata.permissions().mode() & 0o077 != 0
         {
@@ -406,8 +409,7 @@ pub fn shell_command(argv: &[String]) -> String {
 
 pub fn validate_socket(
     path: &Path,
-    peer_uid: u32,
-    owner_uid: u32,
+    verified_peer_uid: u32,
     bytes: usize,
     elapsed: Duration,
 ) -> Result<(), &'static str> {
@@ -429,7 +431,10 @@ pub fn validate_socket(
     {
         return Err("socket_mode");
     }
-    if peer_uid != owner_uid {
+    // `verified_peer_uid` must come from SO_PEERCRED. Authorization is anchored to
+    // the running process and the already-verified socket inode, never an owner UID
+    // supplied in the command request.
+    if verified_peer_uid != process_uid || socket_metadata.uid() != verified_peer_uid {
         return Err("peer_rejected");
     }
     if bytes > MAX_COMMAND_BYTES {
@@ -520,6 +525,22 @@ pub(crate) mod tests {
             healthy: Arc::new(AtomicBool::new(true)),
             source_lock: Arc::new(AtomicBool::new(false)),
         }
+    }
+    #[test]
+    fn symlinked_lock_parent_is_rejected() {
+        let root = path("symlink-parent-root");
+        fs::create_dir_all(&root).unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+        let real = root.join("real");
+        let linked = root.join("linked");
+        fs::create_dir(&real).unwrap();
+        fs::set_permissions(&real, fs::Permissions::from_mode(0o700)).unwrap();
+        std::os::unix::fs::symlink(&real, &linked).unwrap();
+        assert!(matches!(
+            StateLock::acquire(&linked.join("state.db"), "run", "nonce"),
+            Err(OwnershipError::Io(message)) if message == "unsafe lock parent"
+        ));
+        fs::remove_dir_all(root).unwrap();
     }
     #[test]
     fn two_processes_same_store_fail_closed() {
@@ -921,17 +942,20 @@ pub(crate) mod tests {
         fs::set_permissions(&d, fs::Permissions::from_mode(0o700)).unwrap();
         let _listener = std::os::unix::net::UnixListener::bind(&p).unwrap();
         fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
-        assert_eq!(validate_socket(&p, 100, 100, 1, Duration::ZERO), Ok(()));
+        let uid = std::fs::metadata("/proc/self").unwrap().uid();
+        assert_eq!(validate_socket(&p, uid, 1, Duration::ZERO), Ok(()));
+        // A caller cannot forge authorization by supplying a matching claimed owner UID:
+        // only the kernel-verified peer UID is accepted against process/socket ownership.
         assert_eq!(
-            validate_socket(&p, 101, 100, 1, Duration::ZERO),
+            validate_socket(&p, uid.wrapping_add(1), 1, Duration::ZERO),
             Err("peer_rejected")
         );
         assert_eq!(
-            validate_socket(&p, 100, 100, MAX_COMMAND_BYTES + 1, Duration::ZERO),
+            validate_socket(&p, uid, MAX_COMMAND_BYTES + 1, Duration::ZERO),
             Err("message_too_large")
         );
         assert_eq!(
-            validate_socket(&p, 100, 100, 1, COMMAND_TIMEOUT + Duration::from_millis(1)),
+            validate_socket(&p, uid, 1, COMMAND_TIMEOUT + Duration::from_millis(1)),
             Err("request_timeout")
         );
         fs::remove_dir_all(d).unwrap()

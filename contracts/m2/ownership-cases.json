@@ -2,6 +2,7 @@
   "schema_version": "m2-ownership-cases/v1",
   "owner_bead": "boring-cdc-m2-ownership",
   "cases": [
+    {"id":"SCN-M2-OWN-SYMLINK-PARENT","test":"symlinked_lock_parent_is_rejected","assertion":"a symlinked lock parent is rejected without following the final path component"},
     {"id":"SCN-M2-OWN-SAME-STORE","test":"two_processes_same_store_fail_closed","assertion":"a direct second state owner is refused before effects"},
     {"id":"SCN-M2-OWN-SAME-SOURCE","test":"two_state_paths_same_source_fail_closed","assertion":"the source-derived advisory lock fences distinct state paths"},
     {"id":"SCN-M2-OWN-SESSION-LOSS","test":"deadline_and_session_loss_fence_without_reacquire","assertion":"backend loss and deadline-fit failure fence dispatch without reacquire"},
