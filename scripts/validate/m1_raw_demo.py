@@ -64,8 +64,10 @@ def seal(kind, transcript):
  expected={x['id']:x for x in data['cases']}
  observed={}
  for match in re.finditer(r'^CASE (SCN-M1-RAW-[A-Z0-9-]+) state=([^ ]+) checkpoint=([^ ]+) log=([^ ]+)$',current.decode(),re.M):
-  scenario_id,state,checkpoint,log=match.groups(); assert scenario_id not in observed
-  observed[scenario_id]={'scenario_id':scenario_id,'consumed_owner':expected[scenario_id]['consumed_owner'],'state':state,'checkpoint':checkpoint,'log':log}
+  scenario_id,state,checkpoint,log=match.groups()
+  row={'scenario_id':scenario_id,'consumed_owner':expected[scenario_id]['consumed_owner'],'state':state,'checkpoint':checkpoint,'log':log}
+  if scenario_id in observed: assert observed[scenario_id]==row
+  else: observed[scenario_id]=row
  for scenario_id,item in observed.items():
   wanted=expected[scenario_id]
   assert (item['state'],item['checkpoint'],item['log'])==(wanted['expected_state'],wanted['expected_checkpoint'],wanted['expected_log'])
