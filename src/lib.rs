@@ -9,5 +9,6 @@ pub mod m1_ordering;
 pub mod m1_preflight;
 pub mod m1_source_identity;
 pub mod m1_transition_kernel;
+pub mod m1_workload;
 
 pub mod m1_cli_contract;

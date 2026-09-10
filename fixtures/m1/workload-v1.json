@@ -1,0 +1,87 @@
+{
+  "schema_version": "m1-workload-fixture/v1",
+  "owner_bead": "boring-cdc-m1-workload",
+  "seed": "workload-v1",
+  "profile": "smoke-v1",
+  "contract_inputs": {
+    "keys_digest": "required-nonzero-opaque-input",
+    "values_digest": "required-nonzero-opaque-input",
+    "oracle_digest": "required-nonzero-opaque-input",
+    "normalization_owned_here": false
+  },
+  "tables": ["customers", "products", "orders", "order_items"],
+  "cases": [
+    {
+      "id": "SCN-M1-WORKLOAD-CLEAN",
+      "hook": "none",
+      "ledger": "pass",
+      "business_events": "pass",
+      "final_state": "pass",
+      "checkpoint": "unchanged",
+      "log_outcome": "pass"
+    },
+    {
+      "id": "SCN-M1-WORKLOAD-BUSINESS-OMISSION",
+      "hook": "drop_overwritten_business_event_only",
+      "ledger": "pass",
+      "business_events": "fail",
+      "final_state": "pass",
+      "checkpoint": "unchanged",
+      "log_outcome": "fail"
+    },
+    {
+      "id": "SCN-M1-WORKLOAD-LEDGER-OMISSION",
+      "hook": "drop_ledger_only",
+      "ledger": "fail",
+      "business_events": "pass",
+      "final_state": "pass",
+      "checkpoint": "unchanged",
+      "log_outcome": "fail"
+    },
+    {
+      "id": "SCN-M1-WORKLOAD-RETRY-DUPLICATE",
+      "hook": "duplicate_physical_delivery",
+      "ledger": "pass",
+      "business_events": "pass",
+      "final_state": "pass",
+      "checkpoint": "unchanged",
+      "log_outcome": "pass"
+    },
+    {
+      "id": "SCN-M1-WORKLOAD-RETRY-CONFLICT",
+      "hook": "conflict_same_physical_id",
+      "ledger": "pass",
+      "business_events": "fail",
+      "final_state": "pass",
+      "checkpoint": "unchanged",
+      "log_outcome": "fail"
+    },
+    {
+      "id": "SCN-M1-WORKLOAD-EVENT-BOUNDARY-UNAVAILABLE",
+      "hook": "remove_event_visibility",
+      "ledger": "pass",
+      "business_events": "unavailable",
+      "final_state": "pass",
+      "checkpoint": "unchanged",
+      "log_outcome": "unavailable"
+    },
+    {
+      "id": "SCN-M1-WORKLOAD-SEQUENCE-GAPS",
+      "hook": "legitimate_sequence_gaps",
+      "ledger": "pass",
+      "business_events": "pass",
+      "final_state": "pass",
+      "checkpoint": "unchanged",
+      "log_outcome": "pass_with_diagnostic"
+    },
+    {
+      "id": "SCN-M1-WORKLOAD-CONTRACT-UNRESOLVED",
+      "hook": "zero_contract_digest",
+      "ledger": "not_started",
+      "business_events": "not_started",
+      "final_state": "not_started",
+      "checkpoint": "unchanged",
+      "log_outcome": "blocked"
+    }
+  ]
+}
