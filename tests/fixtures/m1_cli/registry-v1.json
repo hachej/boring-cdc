@@ -1,0 +1,1118 @@
+[
+  {
+    "id": "CMD-CHECK",
+    "path": [
+      "check"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m1-preflight",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "check [--json]"
+  },
+  {
+    "id": "CMD-INIT",
+    "path": [
+      "init"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-schema",
+    "class": "mutation",
+    "ownership": "maintenance",
+    "confirmation": "dry_run_then_confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "source_identity",
+      "capture_epoch",
+      "configuration_fingerprint",
+      "table_set_fingerprint"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "init [--dry-run|--confirm] [--json]"
+  },
+  {
+    "id": "CMD-RUN",
+    "path": [
+      "run"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-capture-runtime",
+    "class": "mutation",
+    "ownership": "live_owner",
+    "confirmation": "none",
+    "json": false,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "source_identity",
+      "capture_epoch",
+      "configuration_fingerprint",
+      "table_set_fingerprint"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "run"
+  },
+  {
+    "id": "CMD-RUN-BOOTSTRAP",
+    "path": [
+      "run"
+    ],
+    "operation_variant": "bootstrap",
+    "owner_bead": "boring-cdc-m1-bootstrap-sm",
+    "class": "mutation",
+    "ownership": "live_owner",
+    "confirmation": "none",
+    "json": false,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "source_identity",
+      "capture_epoch",
+      "configuration_fingerprint",
+      "table_set_fingerprint"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "run --bootstrap"
+  },
+  {
+    "id": "CMD-STATUS",
+    "path": [
+      "status"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-fault-status",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "status [--json]"
+  },
+  {
+    "id": "CMD-BACKFILL-START",
+    "path": [
+      "backfill",
+      "start"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m3-controls",
+    "class": "mutation",
+    "ownership": "live_owner",
+    "confirmation": "dry_run_then_confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id",
+      "source_identity",
+      "capture_epoch",
+      "configuration_fingerprint",
+      "table_set_fingerprint"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "backfill start [--dry-run|--confirm] [--json]"
+  },
+  {
+    "id": "CMD-BACKFILL-PAUSE",
+    "path": [
+      "backfill",
+      "pause"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m3-controls",
+    "class": "mutation",
+    "ownership": "offline_eligible",
+    "confirmation": "dry_run_then_confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "backfill pause [--dry-run|--confirm] [--json]"
+  },
+  {
+    "id": "CMD-BACKFILL-RESUME",
+    "path": [
+      "backfill",
+      "resume"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m3-controls",
+    "class": "mutation",
+    "ownership": "live_owner",
+    "confirmation": "dry_run_then_confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "backfill resume [--dry-run|--confirm] [--json]"
+  },
+  {
+    "id": "CMD-BACKFILL-STATUS",
+    "path": [
+      "backfill",
+      "status"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m3-controls",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "backfill status [--json]"
+  },
+  {
+    "id": "CMD-BACKFILL-RESTART",
+    "path": [
+      "backfill",
+      "restart"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m3-controls",
+    "class": "mutation",
+    "ownership": "live_owner",
+    "confirmation": "confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id",
+      "source_identity",
+      "capture_epoch",
+      "configuration_fingerprint",
+      "table_set_fingerprint"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "backfill restart --confirm [--json]"
+  },
+  {
+    "id": "CMD-DESTINATION-LIST",
+    "path": [
+      "destination",
+      "list"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-reconcile",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "destination list [--json]"
+  },
+  {
+    "id": "CMD-DESTINATION-ADD",
+    "path": [
+      "destination",
+      "add"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m5-loops",
+    "class": "mutation",
+    "ownership": "live_owner",
+    "confirmation": "confirm_data_gap",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id",
+      "source_identity",
+      "capture_epoch",
+      "configuration_fingerprint",
+      "table_set_fingerprint"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "destination add DESTINATION --archive-root PATH --continuity-break --from-seq SEQ (--dry-run|--confirm-data-gap) [--json]"
+  },
+  {
+    "id": "CMD-DESTINATION-PAUSE",
+    "path": [
+      "destination",
+      "pause"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-reconcile",
+    "class": "mutation",
+    "ownership": "offline_eligible",
+    "confirmation": "dry_run_then_confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "destination pause DESTINATION [--dry-run|--confirm] [--json]"
+  },
+  {
+    "id": "CMD-DESTINATION-RESUME",
+    "path": [
+      "destination",
+      "resume"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-reconcile",
+    "class": "mutation",
+    "ownership": "live_owner",
+    "confirmation": "dry_run_then_confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "destination resume DESTINATION [--dry-run|--confirm] [--json]"
+  },
+  {
+    "id": "CMD-DESTINATION-DETACH",
+    "path": [
+      "destination",
+      "detach"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-reconcile",
+    "class": "mutation",
+    "ownership": "offline_eligible",
+    "confirmation": "confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id",
+      "destination_revision",
+      "destination_generation",
+      "selector_fence"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "destination detach DESTINATION --confirm [--json]"
+  },
+  {
+    "id": "CMD-DESTINATION-PROMOTE",
+    "path": [
+      "destination",
+      "promote"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m4-promotion",
+    "class": "mutation",
+    "ownership": "live_owner",
+    "confirmation": "confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id",
+      "destination_revision",
+      "destination_generation",
+      "selector_fence"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "destination promote DESTINATION --generation ID --confirm [--json]"
+  },
+  {
+    "id": "CMD-DESTINATION-RETIRE",
+    "path": [
+      "destination",
+      "retire"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m4-promotion",
+    "class": "mutation",
+    "ownership": "maintenance",
+    "confirmation": "confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id",
+      "destination_revision",
+      "destination_generation",
+      "selector_fence"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "destination retire DESTINATION --generation ID --confirm [--json]"
+  },
+  {
+    "id": "CMD-DESTINATION-VERIFY",
+    "path": [
+      "destination",
+      "verify"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m4-durability",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "destination verify DESTINATION [--from-seq SEQ] [--json]"
+  },
+  {
+    "id": "CMD-ARCHIVE-RECONSTRUCT",
+    "path": [
+      "archive",
+      "reconstruct"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m5-segment-set",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "archive reconstruct DESTINATION --selector-fence FENCE --output PATH [--json]"
+  },
+  {
+    "id": "CMD-ARCHIVE-VERIFY",
+    "path": [
+      "archive",
+      "verify"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m5-segment-set",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "archive verify DESTINATION --selector-fence FENCE --oracle-manifest PATH [--json]"
+  },
+  {
+    "id": "CMD-REPLAY",
+    "path": [
+      "replay"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m5-ops-cli",
+    "class": "mutation",
+    "ownership": "live_owner",
+    "confirmation": "confirm_replay",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id",
+      "source_identity",
+      "capture_epoch",
+      "configuration_fingerprint",
+      "table_set_fingerprint",
+      "destination_revision",
+      "destination_generation",
+      "selector_fence"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "replay DESTINATION (--from-anchor ANCHOR|--from-seq SEQ|--since TIME) --new-generation ID (--dry-run|--confirm-replay) [--json]"
+  },
+  {
+    "id": "CMD-JOURNAL-INSPECT",
+    "path": [
+      "journal",
+      "inspect"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-reconcile",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "journal inspect [--event-id ID] [--json]"
+  },
+  {
+    "id": "CMD-JOURNAL-INSPECT-EXPLAIN",
+    "path": [
+      "journal",
+      "inspect"
+    ],
+    "operation_variant": "explain",
+    "owner_bead": "boring-cdc-m5.1",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "journal inspect --event-id ID --explain [--json]"
+  },
+  {
+    "id": "CMD-JOURNAL-VERIFY",
+    "path": [
+      "journal",
+      "verify"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-reconcile",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "journal verify [--json]"
+  },
+  {
+    "id": "CMD-JOURNAL-GC",
+    "path": [
+      "journal",
+      "gc"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m5-gc",
+    "class": "mutation",
+    "ownership": "live_owner",
+    "confirmation": "dry_run_then_confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id",
+      "source_identity",
+      "capture_epoch",
+      "configuration_fingerprint",
+      "table_set_fingerprint"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "journal gc --dry-run [--json]"
+  },
+  {
+    "id": "CMD-RECOVER-INSPECT",
+    "path": [
+      "recover",
+      "inspect"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-init-recovery",
+    "class": "read_only",
+    "ownership": "none",
+    "confirmation": "none",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [],
+    "predicates": [],
+    "usage": "recover inspect [--json]"
+  },
+  {
+    "id": "CMD-RECOVER-PROMOTION",
+    "path": [
+      "recover",
+      "promotion"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-init-recovery",
+    "class": "mutation",
+    "ownership": "maintenance",
+    "confirmation": "confirm",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id",
+      "destination_revision",
+      "destination_generation",
+      "selector_fence"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "recover promotion DESTINATION --adopt-external-fence --confirm [--json]"
+  },
+  {
+    "id": "CMD-RECOVER-RESEED",
+    "path": [
+      "recover",
+      "reseed"
+    ],
+    "operation_variant": "base",
+    "owner_bead": "boring-cdc-m2-init-recovery",
+    "class": "mutation",
+    "ownership": "maintenance",
+    "confirmation": "confirm_data_gap",
+    "json": true,
+    "exit_codes": [
+      0,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "runbook_ids": [
+      "RB-OPERATOR-COMMAND"
+    ],
+    "redaction": [
+      "confirm_token",
+      "nonce",
+      "dsn",
+      "raw_path",
+      "raw_driver_error"
+    ],
+    "control_revisions": [
+      "ownership_revision",
+      "run_id",
+      "source_identity",
+      "capture_epoch",
+      "configuration_fingerprint",
+      "table_set_fingerprint"
+    ],
+    "predicates": [
+      "ownership_current",
+      "plan_unexpired",
+      "fingerprints_match",
+      "resources_sufficient"
+    ],
+    "usage": "recover reseed [--add-table SCHEMA.TABLE|--resume RESEED_ID] --recreate-publication --recreate-slot (--confirm-data-gap|--confirm) [--json]"
+  }
+]
