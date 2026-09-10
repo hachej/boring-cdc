@@ -1,0 +1,19 @@
+   Compiling boring-cdc v0.1.0 ([workspace])
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.36s
+     Running unittests src/lib.rs (target/debug/deps/boring_cdc-b604efced9ff1882)
+     Running unittests src/main.rs (target/debug/deps/boring_cdc-a5120d6777913092)
+     Running tests/compile_fail.rs (target/debug/deps/compile_fail-643486a7c948e1a6)
+    Checking boring-cdc v0.1.0 ([workspace])
+    Checking boring-cdc-tests v0.0.0 ([workspace]/target/tests/trybuild/boring-cdc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.06s
+
+
+test [0m[1mtests/ui/creation_floor_is_not_received.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/cursor_is_not_lsn.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/durable_boundary_is_not_deserializable.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/received_is_not_durable.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/synthetic_is_not_production.rs[0m ... [0m[32mok
+[0m
+
+     Running unittests examples/m1_cli_contract.rs (target/debug/examples/m1_cli_contract-a912acca78088de2)
+     Running unittests examples/m1_control_probe.rs (target/debug/examples/m1_control_probe-5a79c7cc3f4dc6bb)
