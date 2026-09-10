@@ -16,6 +16,7 @@
     {"scenario_id":"SCN-M1-ORDERING-KEY-CHANGE","unit_test":"key_change_expands_delete_before_upsert","expected":"old-key delete mutation 0 precedes new-key upsert mutation 1"},
     {"scenario_id":"SCN-M1-ORDERING-SAME-KEY-TOTAL","unit_test":"repeated_same_key_has_total_source_order","expected":"same-key mutations total-order only within one capture epoch"},
     {"scenario_id":"SCN-M1-ORDERING-DUPLICATE-CONFLICT","unit_test":"same_id_same_hash_is_duplicate_and_different_hash_is_conflict","expected":"same ID/same hash duplicates; same ID/different hash blocks before checkpoint and feedback"},
-    {"scenario_id":"SCN-M1-ORDERING-RELATION-FINGERPRINT","unit_test":"invalid_keys_fail_closed","expected":"payload consumes typed admitted relation and rejects invalid canonical keys"}
+    {"scenario_id":"SCN-M1-ORDERING-RELATION-FINGERPRINT","unit_test":"relation_fingerprint_changes_payload_hash","expected":"typed admitted relation fingerprint changes the payload hash"},
+    {"scenario_id":"SCN-M1-ORDERING-SNAPSHOT-PAYLOAD-BINDING","unit_test":"snapshot_payload_requires_matching_table_and_key","expected":"snapshot position and payload table/key metadata must match"}
   ]
 }

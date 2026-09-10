@@ -9,12 +9,23 @@ source = (root / "src/m1_ordering.rs").read_text()
 assert cases["owner_bead"] == "boring-cdc-m1-ordering"
 assert cases["evidence_tier"] == "leaf"
 ids = [case["scenario_id"] for case in cases["cases"]]
-assert len(ids) == len(set(ids)) == 9
+assert len(ids) == len(set(ids)) == 10
 assert all(value.startswith("SCN-M1-ORDERING-") for value in ids)
 for case in cases["cases"]:
     assert f"fn {case['unit_test']}" in source, case
 for marker in ("boring-cdc-d-event-id", "boring-cdc-d-keys"):
     assert f"M0-PROVISIONAL: {marker}" in source
+for provisional_literal in (
+    'HASH_LENGTH_FRAMING: &str = "u64-be"',
+    "COLUMN_ABSENT_TAG: u8 = 0",
+    "COLUMN_NULL_TAG: u8 = 1",
+    "COLUMN_UNCHANGED_TOAST_TAG: u8 = 2",
+    "COLUMN_VALUE_TAG: u8 = 3",
+    "MUTATION_DELETE_TAG: u8 = 0",
+    "MUTATION_UPSERT_TAG: u8 = 1",
+    "MAX_CANONICAL_KEY_COMPONENTS: usize = 32",
+):
+    assert provisional_literal in source
 for golden in (
     "06004c4a0b18bedd87c4fabd9102bbaf009e50ffecfea740528edeb68485d548",
     "e4a6350855eb0705318a27f6822976320cc869cff47753af9324600165c046a9",
@@ -29,10 +40,12 @@ for excluded in ("journal_seq", "run_id", "cache_timing", "timestamp"):
 for required in (
     "before_checkpoint_and_feedback", "DifferentCaptureEpoch", "CAPTURE_EPOCH_MISMATCH",
     "ROW_ORDINAL_OUT_OF_RANGE", "SourceSlotIdentity::derive", "LogicalTableIdentity",
+    "SNAPSHOT_PAYLOAD_IDENTITY_MISMATCH", "KEY_CHANGE_IDENTITIES_EQUAL",
+    "SNAPSHOT_ORDINAL_INVALID", "MAX_CANONICAL_KEY_COMPONENTS + 1",
 ):
     assert required in source
 subprocess.run(
     ["cargo", "test", "--locked", "m1_ordering::tests"], cwd=root, check=True,
     stdout=subprocess.DEVNULL,
 )
-print("m1 ordering contract: PASS (9 cases, 10 semantic tests, 5 fixed goldens)")
+print("m1 ordering contract: PASS (10 cases, 12 semantic tests, 5 fixed goldens)")

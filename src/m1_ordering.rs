@@ -28,6 +28,18 @@ const PAYLOAD_HASH_DOMAIN: &[u8] = b"boring-cdc/mutation-payload/v1";
 pub const SNAPSHOT_ORIGIN_RANK: u8 = 0;
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED origin rank: snapshot then WAL).
 pub const WAL_ORIGIN_RANK: u8 = 1;
+// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED canonical field framing: u64 big-endian byte length).
+const HASH_LENGTH_FRAMING: &str = "u64-be";
+// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED column-state tags).
+const COLUMN_ABSENT_TAG: u8 = 0;
+const COLUMN_NULL_TAG: u8 = 1;
+const COLUMN_UNCHANGED_TOAST_TAG: u8 = 2;
+const COLUMN_VALUE_TAG: u8 = 3;
+// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED mutation-kind tags).
+const MUTATION_DELETE_TAG: u8 = 0;
+const MUTATION_UPSERT_TAG: u8 = 1;
+// M0-PROVISIONAL: boring-cdc-d-keys (RECOMMENDED maximum canonical key arity).
+const MAX_CANONICAL_KEY_COMPONENTS: usize = 32;
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Hash32([u8; 32]);
@@ -61,6 +73,7 @@ fn hash_fields(domain: &[u8], fields: &[&[u8]]) -> Hash32 {
     Hash32(h.finalize().into())
 }
 fn put_field(h: &mut Sha256, bytes: &[u8]) {
+    debug_assert_eq!(HASH_LENGTH_FRAMING, "u64-be");
     h.update((bytes.len() as u64).to_be_bytes());
     h.update(bytes);
 }
@@ -97,11 +110,11 @@ pub enum ColumnState {
 impl ColumnState {
     fn encode_into(&self, out: &mut Vec<u8>) {
         match self {
-            Self::Absent => out.push(0),
-            Self::Null => out.push(1),
-            Self::UnchangedToast => out.push(2),
+            Self::Absent => out.push(COLUMN_ABSENT_TAG),
+            Self::Null => out.push(COLUMN_NULL_TAG),
+            Self::UnchangedToast => out.push(COLUMN_UNCHANGED_TOAST_TAG),
             Self::Value(value) => {
-                out.push(3);
+                out.push(COLUMN_VALUE_TAG);
                 out.extend(value.type_oid.to_be_bytes());
                 out.extend(value.type_modifier.to_be_bytes());
                 out.extend((value.bytes.len() as u64).to_be_bytes());
@@ -114,9 +127,8 @@ impl ColumnState {
 pub type CanonicalKey = Vec<CanonicalKeyComponent>;
 
 fn validate_key(key: &CanonicalKey) -> Result<(), OrderingFailure> {
-    // M0-PROVISIONAL: boring-cdc-d-keys (RECOMMENDED non-empty, max 32 components).
     if key.is_empty()
-        || key.len() > 32
+        || key.len() > MAX_CANONICAL_KEY_COMPONENTS
         || key.iter().any(|v| matches!(v, CanonicalKeyComponent::Null))
     {
         return Err(OrderingFailure::contract("CANONICAL_KEY_INVALID"));
@@ -198,8 +210,8 @@ pub enum MutationKind {
 impl MutationKind {
     const fn tag(self) -> u8 {
         match self {
-            Self::Delete => 0,
-            Self::Upsert => 1,
+            Self::Delete => MUTATION_DELETE_TAG,
+            Self::Upsert => MUTATION_UPSERT_TAG,
         }
     }
 }
@@ -215,6 +227,15 @@ pub struct MutationPayload {
 impl MutationPayload {
     pub fn hash(&self, version: MutationVersion) -> Result<Hash32, OrderingFailure> {
         let key_hash = canonical_key_hash(&self.key)?;
+        if let Some(binding) = version.snapshot_binding {
+            if binding.logical_table_id != self.relation.logical_table
+                || binding.key_hash != key_hash
+            {
+                return Err(OrderingFailure::contract(
+                    "SNAPSHOT_PAYLOAD_IDENTITY_MISMATCH",
+                ));
+            }
+        }
         let mut columns = Vec::new();
         columns.extend((self.columns.len() as u64).to_be_bytes());
         for state in &self.columns {
@@ -258,11 +279,18 @@ pub fn source_version_for_row(
 
 /// Total version for expanded mutations. SourceVersion is reused rather than represented again.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct SnapshotPayloadBinding {
+    logical_table_id: LogicalTableIdentity,
+    key_hash: PhysicalKeyHash,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MutationVersion {
     source: SourceVersion,
     origin_rank: u8,
     mutation_ordinal: u8,
     connector_event_id: Hash32,
+    snapshot_binding: Option<SnapshotPayloadBinding>,
 }
 impl MutationVersion {
     pub fn from_wal(
@@ -283,6 +311,7 @@ impl MutationVersion {
             origin_rank: WAL_ORIGIN_RANK,
             mutation_ordinal: position.mutation_ordinal,
             connector_event_id: wal_connector_event_id(position),
+            snapshot_binding: None,
         })
     }
     pub fn from_snapshot(
@@ -300,6 +329,10 @@ impl MutationVersion {
             origin_rank: SNAPSHOT_ORIGIN_RANK,
             mutation_ordinal: 0,
             connector_event_id: snapshot_connector_event_id(position),
+            snapshot_binding: Some(SnapshotPayloadBinding {
+                logical_table_id: position.logical_table_id,
+                key_hash: position.key_hash,
+            }),
         })
     }
     #[must_use]
@@ -509,8 +542,11 @@ mod tests {
         vec![CanonicalKeyComponent::Bytes(bytes.to_vec())]
     }
     fn relation() -> RelationSchemaVersion {
+        relation_for("accounts")
+    }
+    fn relation_for(table: &str) -> RelationSchemaVersion {
         RelationSchemaVersion::derive(
-            LogicalTableIdentity::derive(&source_identity(), "public", "accounts"),
+            LogicalTableIdentity::derive(&source_identity(), "public", table),
             42,
             b"id:bytea,value:text",
         )
@@ -640,6 +676,72 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_payload_requires_matching_table_and_key() {
+        let payload = MutationPayload {
+            relation: relation(),
+            key: key(b"k"),
+            kind: MutationKind::Upsert,
+            columns: vec![ColumnState::Null],
+        };
+        let snapshot_source =
+            source_version_for_row(EPOCH, ReceivedLsn::from_wire(80), 0, 0).unwrap();
+        let snapshot_version = |logical_table_id, key_hash| {
+            MutationVersion::from_snapshot(
+                snapshot_source,
+                SnapshotIdentityInput {
+                    capture_epoch: EPOCH,
+                    generation: DestinationGeneration::from_store(2),
+                    logical_table_id,
+                    chunk_id: 4,
+                    key_hash,
+                },
+            )
+            .unwrap()
+        };
+        assert!(
+            payload
+                .hash(snapshot_version(
+                    relation().logical_table,
+                    canonical_key_hash(&key(b"k")).unwrap()
+                ))
+                .is_ok()
+        );
+        for mismatched in [
+            snapshot_version(
+                relation_for("other").logical_table,
+                canonical_key_hash(&key(b"k")).unwrap(),
+            ),
+            snapshot_version(
+                relation().logical_table,
+                canonical_key_hash(&key(b"other")).unwrap(),
+            ),
+        ] {
+            assert_eq!(
+                payload.hash(mismatched).unwrap_err().fingerprint,
+                "SNAPSHOT_PAYLOAD_IDENTITY_MISMATCH"
+            );
+        }
+    }
+
+    #[test]
+    fn relation_fingerprint_changes_payload_hash() {
+        let payload_hash = |relation| {
+            MutationPayload {
+                relation,
+                key: key(b"k"),
+                kind: MutationKind::Upsert,
+                columns: vec![ColumnState::Null],
+            }
+            .hash(version())
+            .unwrap()
+        };
+        assert_ne!(
+            payload_hash(relation()),
+            payload_hash(relation_for("other"))
+        );
+    }
+
+    #[test]
     fn key_change_expands_delete_before_upsert() {
         let mutations = expand_key_change(
             wal(9),
@@ -660,6 +762,19 @@ mod tests {
         assert_ne!(
             mutations[0].connector_event_id(),
             mutations[1].connector_event_id()
+        );
+        assert_eq!(
+            expand_key_change(
+                wal(0),
+                source(112, 8, 3),
+                relation(),
+                key(b"same"),
+                key(b"same"),
+                vec![ColumnState::Null],
+            )
+            .unwrap_err()
+            .fingerprint,
+            "KEY_CHANGE_IDENTITIES_EQUAL"
         );
         for incomplete in [
             vec![],
@@ -860,6 +975,30 @@ mod tests {
             .fingerprint,
             "ROW_ORDINAL_MISMATCH"
         );
+        let snapshot_position = |capture_epoch| SnapshotIdentityInput {
+            capture_epoch,
+            generation: DestinationGeneration::from_store(2),
+            logical_table_id: relation().logical_table,
+            chunk_id: 4,
+            key_hash: canonical_key_hash(&key(b"k")).unwrap(),
+        };
+        assert_eq!(
+            MutationVersion::from_snapshot(
+                source(80, 0, 0),
+                snapshot_position(CaptureEpoch::from_store(8)),
+            )
+            .unwrap_err()
+            .fingerprint,
+            "CAPTURE_EPOCH_MISMATCH"
+        );
+        for invalid_source in [source(80, 1, 0), source(80, 0, 1)] {
+            assert_eq!(
+                MutationVersion::from_snapshot(invalid_source, snapshot_position(EPOCH))
+                    .unwrap_err()
+                    .fingerprint,
+                "SNAPSHOT_ORDINAL_INVALID"
+            );
+        }
     }
 
     #[test]
@@ -867,7 +1006,7 @@ mod tests {
         let inventory: serde_json::Value =
             serde_json::from_str(include_str!("../contracts/m1/ordering-cases.json")).unwrap();
         assert_eq!(inventory["owner_bead"], "boring-cdc-m1-ordering");
-        assert_eq!(inventory["cases"].as_array().unwrap().len(), 9);
+        assert_eq!(inventory["cases"].as_array().unwrap().len(), 10);
     }
 
     #[test]
@@ -880,6 +1019,13 @@ mod tests {
             canonical_key_hash(&vec![CanonicalKeyComponent::Null])
                 .unwrap_err()
                 .fingerprint,
+            "CANONICAL_KEY_INVALID"
+        );
+        let max_arity = vec![CanonicalKeyComponent::I64(1); MAX_CANONICAL_KEY_COMPONENTS];
+        assert!(canonical_key_hash(&max_arity).is_ok());
+        let over_max = vec![CanonicalKeyComponent::I64(1); MAX_CANONICAL_KEY_COMPONENTS + 1];
+        assert_eq!(
+            canonical_key_hash(&over_max).unwrap_err().fingerprint,
             "CANONICAL_KEY_INVALID"
         );
     }
