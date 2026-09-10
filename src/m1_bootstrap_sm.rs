@@ -994,7 +994,7 @@ mod tests {
     fn snapshot_and_wal_origin_order_is_explicit() {
         assert_eq!(SNAPSHOT_ORIGIN_RANK, 0);
         assert_eq!(WAL_ORIGIN_RANK, 1);
-        assert!(WAL_ORIGIN_RANK > SNAPSHOT_ORIGIN_RANK);
+        assert_eq!((SNAPSHOT_ORIGIN_RANK, WAL_ORIGIN_RANK), (0, 1));
     }
 
     #[test]
