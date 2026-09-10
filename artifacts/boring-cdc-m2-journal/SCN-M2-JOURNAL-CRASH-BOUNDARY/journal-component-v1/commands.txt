@@ -1,1 +1,4 @@
-target/debug/examples/m2_journal_component fault $TMPDIR/isolated-journal.sqlite
+target/debug/examples/m2_journal_component terminate-before $TMPDIR/isolated-journal.sqlite
+target/debug/examples/m2_journal_component terminate-after $TMPDIR/isolated-journal.sqlite
+target/debug/examples/m2_journal_component normal $TMPDIR/isolated-journal.sqlite
+cargo test --locked m2_journal::tests::slow_storage_hold_bound_rolls_back_without_partial_visibility

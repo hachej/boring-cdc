@@ -1,1 +1,1 @@
-["begin","events-staged","none","reconcile","complete-range-read"]
+["begin","before-commit-termination-probe-absent","sqlite-commit-returned","complete-range-read"]

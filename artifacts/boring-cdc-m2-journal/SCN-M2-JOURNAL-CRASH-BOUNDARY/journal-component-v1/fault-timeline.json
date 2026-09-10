@@ -1,1 +1,1 @@
-["begin","events-staged","after-sqlite-commit","reconcile","complete-range-read"]
+["begin","process-terminated-before-commit","sqlite-recovered-absent","process-terminated-after-commit","sqlite-recovered-complete","positional-replay-reconciled","complete-range-read"]
