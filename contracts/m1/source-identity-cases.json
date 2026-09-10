@@ -1,0 +1,21 @@
+{
+  "schema_version": "boring-cdc/source-identity-cases/v1",
+  "owner_bead": "boring-cdc-m1-source-identity",
+  "evidence_tier": "leaf",
+  "persistence_owners": ["boring-cdc-m2-schema", "boring-cdc-m2-reconcile"],
+  "cases": [
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-MISMATCH","unit_test":"every_identity_mismatch_blocks_before_position_rules","expected":"block_identity_mismatch_before_position_rules"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-AMBIGUOUS","unit_test":"ambiguous_bootstrap_precedes_server_ahead","expected":"bootstrap_ambiguous_requires_restart"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-FLOOR","unit_test":"creation_floor_null_and_equal_are_not_durable_progress","expected":"request_verified_creation_floor_without_durable_progress"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-FLOOR-SAFETY","unit_test":"creation_floor_still_requires_valid_slot_and_available_wal","expected":"requires_reseed_if_slot_invalid_or_resume_wal_unavailable"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-SERVER-AHEAD","unit_test":"server_ahead_requires_reseed_before_generic_slot_checks","expected":"requires_reseed_server_ahead"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-LOCAL-AHEAD","unit_test":"local_ahead_requests_durable_end_and_expects_duplicates","expected":"request_durable_end_and_tolerate_duplicates"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-COMPATIBLE","unit_test":"compatible_positions_apply_postgresql_effective_max_rule","expected":"request_durable_end_and_apply_effective_max"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-FEEDBACK","unit_test":"feedback_uses_only_durable_transaction_end_for_all_three_positions","expected":"write_flush_apply_equal_durable_transaction_end"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-COMMIT-END","unit_test":"commit_and_end_lsn_roles_remain_distinct","expected":"source_version_uses_commit_and_durable_boundary_uses_end"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-EPOCH","unit_test":"source_versions_never_compare_across_capture_epochs","expected":"different_capture_epoch_not_ordered"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-ROW","unit_test":"table_schema_and_row_identities_are_distinct_dimensions","expected":"canonical_table_schema_and_physical_key_dimensions"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-CONSTRUCTION","unit_test":"invalid_local_progress_relationships_fail_closed","expected":"invalid_progress_relationships_block"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-LOCK","unit_test":"identity_validation_and_lock_derivation_are_canonical","expected":"canonical_lock_and_protocol_fingerprints"}
+  ]
+}

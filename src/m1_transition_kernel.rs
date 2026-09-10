@@ -137,9 +137,15 @@ impl DurableSourceBoundary {
         }
     }
 
+    /// Complete decoded transaction end; retained field naming is a compatibility detail.
+    #[must_use]
+    pub const fn transaction_end_lsn(self) -> ReceivedLsn {
+        self.commit_lsn
+    }
+
     #[must_use]
     pub const fn commit_lsn(self) -> ReceivedLsn {
-        self.commit_lsn
+        self.transaction_end_lsn()
     }
 
     #[must_use]

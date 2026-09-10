@@ -4,7 +4,7 @@
 //! `boring-cdc-m2-schema` and `boring-cdc-m2-reconcile` persist and collect these facts.
 
 use crate::m1_transition_kernel::{
-    CaptureEpoch, DurableSourceBoundary, ReceivedLsn, SourceVersion,
+    CaptureEpoch, DurableSourceBoundary, ReceivedLsn, SlotCreationFloor, SourceVersion,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
@@ -24,6 +24,16 @@ pub const START_REPLICATION_OPTIONS: [&str; 4] = [
 ];
 // M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED canonical lock-key domain/version).
 const ADVISORY_LOCK_DOMAIN: &[u8] = b"boring-cdc/source-advisory-lock/v1";
+// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED canonical protocol fingerprint domain).
+const PROTOCOL_FINGERPRINT_DOMAIN: &[u8] = b"boring-cdc/pgoutput-protocol/v1";
+// M0-PROVISIONAL: boring-cdc-d-publication (RECOMMENDED canonical publication fingerprint domain).
+const PUBLICATION_FINGERPRINT_DOMAIN: &[u8] = b"boring-cdc/publication-definition/v1";
+// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED stable logical-table identity domain).
+const LOGICAL_TABLE_DOMAIN: &[u8] = b"boring-cdc/logical-table/v1";
+// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED relation-schema identity domain).
+const RELATION_SCHEMA_DOMAIN: &[u8] = b"boring-cdc/relation-schema/v1";
+// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED canonical physical-key hash domain).
+const PHYSICAL_KEY_DOMAIN: &[u8] = b"boring-cdc/physical-key/v1";
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -33,6 +43,15 @@ impl Fingerprint {
     #[must_use]
     pub fn digest(bytes: &[u8]) -> Self {
         Self(Sha256::digest(bytes).into())
+    }
+
+    fn canonical(domain: &[u8], fields: &[&[u8]]) -> Self {
+        let mut hash = Sha256::new();
+        hash_len_prefixed(&mut hash, domain);
+        for field in fields {
+            hash_len_prefixed(&mut hash, field);
+        }
+        Self(hash.finalize().into())
     }
 
     #[must_use]
@@ -69,6 +88,7 @@ pub enum IdentityValidationError {
     ZeroDatabaseIdentity,
     InvalidSlotName,
     InvalidPlugin,
+    UnsupportedProtocolFingerprint,
 }
 
 impl SourceIdentity {
@@ -88,6 +108,9 @@ impl SourceIdentity {
         if !is_pg_identifier(&self.plugin) {
             return Err(IdentityValidationError::InvalidPlugin);
         }
+        if self.protocol_fingerprint != supported_protocol_fingerprint() {
+            return Err(IdentityValidationError::UnsupportedProtocolFingerprint);
+        }
         Ok(())
     }
 
@@ -98,8 +121,8 @@ impl SourceIdentity {
         hash.update(ADVISORY_LOCK_DOMAIN);
         hash.update(self.system_identifier.to_be_bytes());
         hash.update(self.database_identity.to_be_bytes());
-        hash_len_prefixed(&mut hash, self.slot_name.as_bytes());
         hash.update(self.publication_fingerprint.bytes());
+        hash_len_prefixed(&mut hash, self.slot_name.as_bytes());
         let bytes: [u8; 8] = hash.finalize()[..8]
             .try_into()
             .expect("fixed SHA-256 prefix");
@@ -110,6 +133,30 @@ impl SourceIdentity {
 fn hash_len_prefixed(hash: &mut Sha256, value: &[u8]) {
     hash.update((value.len() as u64).to_be_bytes());
     hash.update(value);
+}
+
+/// Fingerprint of the exact owner-pending pgoutput option and origin policy set.
+#[must_use]
+pub fn supported_protocol_fingerprint() -> Fingerprint {
+    Fingerprint::canonical(
+        PROTOCOL_FINGERPRINT_DOMAIN,
+        &[
+            START_REPLICATION_OPTIONS[0].as_bytes(),
+            START_REPLICATION_OPTIONS[1].as_bytes(),
+            START_REPLICATION_OPTIONS[2].as_bytes(),
+            START_REPLICATION_OPTIONS[3].as_bytes(),
+            ORIGIN_POLICY.as_bytes(),
+        ],
+    )
+}
+
+/// Fingerprint a caller-supplied canonical publication definition under a fixed domain.
+#[must_use]
+pub fn publication_fingerprint(publication_name: &str, canonical_definition: &[u8]) -> Fingerprint {
+    Fingerprint::canonical(
+        PUBLICATION_FINGERPRINT_DOMAIN,
+        &[publication_name.as_bytes(), canonical_definition],
+    )
 }
 
 fn is_pg_identifier(value: &str) -> bool {
@@ -163,7 +210,7 @@ pub enum BootstrapProvenance {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum FeedbackPosition {
     ProtocolZero,
-    RepeatedCreationFloor(ReceivedLsn),
+    RepeatedCreationFloor(SlotCreationFloor),
     DurableTransactionEnd(ReceivedLsn),
 }
 
@@ -183,7 +230,7 @@ pub struct LocalSourceState {
     pub capture_epoch: CaptureEpoch,
     pub identity: SourceIdentity,
     pub bootstrap: BootstrapProvenance,
-    pub creation_floor: Option<ReceivedLsn>,
+    pub creation_floor: Option<SlotCreationFloor>,
     pub received_lsn: Option<ReceivedLsn>,
     pub durable_transaction: Option<DurableSourceBoundary>,
     pub feedback_position: FeedbackPosition,
@@ -214,14 +261,14 @@ impl LocalSourceState {
             }
             FeedbackPosition::DurableTransactionEnd(value) => self
                 .durable_transaction
-                .is_some_and(|durable| durable.commit_lsn() == value),
+                .is_some_and(|durable| durable.transaction_end_lsn() == value),
         };
         if !feedback_matches {
             return Err(StateValidationError::FeedbackDoesNotMatchEvidence);
         }
         if self.durable_transaction.is_some_and(|durable| {
             self.received_lsn
-                .is_none_or(|received| received.get() < durable.commit_lsn().get())
+                .is_none_or(|received| received.get() < durable.transaction_end_lsn().get())
         }) {
             return Err(StateValidationError::DurableAheadOfReceived);
         }
@@ -241,7 +288,7 @@ pub struct LiveSourceState {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RequestedPosition {
     ProtocolZero,
-    CreationFloor(ReceivedLsn),
+    CreationFloor(SlotCreationFloor),
     DurableTransactionEnd(ReceivedLsn),
 }
 
@@ -250,7 +297,8 @@ impl RequestedPosition {
     pub const fn lsn(self) -> ReceivedLsn {
         match self {
             Self::ProtocolZero => PROTOCOL_ZERO_SENTINEL,
-            Self::CreationFloor(lsn) | Self::DurableTransactionEnd(lsn) => lsn,
+            Self::CreationFloor(floor) => ReceivedLsn::from_wire(floor.get()),
+            Self::DurableTransactionEnd(lsn) => lsn,
         }
     }
 }
@@ -290,13 +338,13 @@ pub fn reconcile_startup(local: &LocalSourceState, live: &LiveSourceState) -> St
     if let Err(reason) = local.validate() {
         return StartupDecision::BlockInvalidState { reason };
     }
+    if let Some(field) = first_identity_mismatch(&local.identity, &live.identity) {
+        return StartupDecision::BlockIdentityMismatch { field };
+    }
     if let Err(reason) = live.identity.validate() {
         return StartupDecision::BlockInvalidState {
             reason: StateValidationError::LiveIdentity(reason),
         };
-    }
-    if let Some(field) = first_identity_mismatch(&local.identity, &live.identity) {
-        return StartupDecision::BlockIdentityMismatch { field };
     }
 
     if local.bootstrap == BootstrapProvenance::PreparedWithoutPersistedFloorOrSnapshot
@@ -310,9 +358,11 @@ pub fn reconcile_startup(local: &LocalSourceState, live: &LiveSourceState) -> St
         && live.slot_exists
         && live.slot_valid
         && live.resume_wal_available
-        && live
-            .confirmed_flush_lsn
-            .is_none_or(|confirmed| Some(confirmed) == local.creation_floor)
+        && live.confirmed_flush_lsn.is_none_or(|confirmed| {
+            local
+                .creation_floor
+                .is_some_and(|floor| confirmed.get() == floor.get())
+        })
     {
         return StartupDecision::CreationFloorOnly {
             requested: local.creation_floor.map_or(
@@ -324,8 +374,11 @@ pub fn reconcile_startup(local: &LocalSourceState, live: &LiveSourceState) -> St
 
     let durable_lsn = local
         .durable_transaction
-        .map(DurableSourceBoundary::commit_lsn);
-    let greatest_local_evidence = max_lsn(local.creation_floor, durable_lsn);
+        .map(DurableSourceBoundary::transaction_end_lsn);
+    let creation_floor_lsn = local
+        .creation_floor
+        .map(|floor| ReceivedLsn::from_wire(floor.get()));
+    let greatest_local_evidence = max_lsn(creation_floor_lsn, durable_lsn);
     if live.confirmed_flush_lsn.is_some_and(|confirmed| {
         greatest_local_evidence.is_none_or(|local_lsn| confirmed.get() > local_lsn.get())
     }) {
@@ -420,7 +473,7 @@ pub fn standby_status(
     client_timestamp_micros: i64,
     requested_reply: bool,
 ) -> StandbyStatus {
-    let end = durable.commit_lsn();
+    let end = durable.transaction_end_lsn();
     StandbyStatus {
         write_lsn: end,
         flush_lsn: end,
@@ -460,7 +513,22 @@ pub fn compare_source_versions(left: SourceVersion, right: SourceVersion) -> Ver
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct LogicalTableIdentity(pub Fingerprint);
+pub struct LogicalTableIdentity(Fingerprint);
+
+impl LogicalTableIdentity {
+    #[must_use]
+    pub fn derive(source: &SourceIdentity, schema: &str, table: &str) -> Self {
+        Self(Fingerprint::canonical(
+            LOGICAL_TABLE_DOMAIN,
+            &[
+                &source.system_identifier.to_be_bytes(),
+                &source.database_identity.to_be_bytes(),
+                schema.as_bytes(),
+                table.as_bytes(),
+            ],
+        ))
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct RelationSchemaVersion {
@@ -469,13 +537,92 @@ pub struct RelationSchemaVersion {
     pub schema_fingerprint: Fingerprint,
 }
 
+impl RelationSchemaVersion {
+    #[must_use]
+    pub fn derive(
+        logical_table: LogicalTableIdentity,
+        relation_id: u32,
+        canonical_schema: &[u8],
+    ) -> Self {
+        Self {
+            logical_table,
+            relation_id,
+            schema_fingerprint: Fingerprint::canonical(
+                RELATION_SCHEMA_DOMAIN,
+                &[
+                    &logical_table.0.bytes(),
+                    &relation_id.to_be_bytes(),
+                    canonical_schema,
+                ],
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum CanonicalKeyComponent<'a> {
+    Null,
+    Bool(bool),
+    I64(i64),
+    U64(u64),
+    Bytes(&'a [u8]),
+    Utf8(&'a str),
+}
+
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct PhysicalKeyHash(pub Fingerprint);
+pub struct PhysicalKeyHash(Fingerprint);
+
+impl PhysicalKeyHash {
+    #[must_use]
+    pub fn derive(components: &[CanonicalKeyComponent<'_>]) -> Self {
+        let mut encoded = Vec::new();
+        for component in components {
+            match component {
+                CanonicalKeyComponent::Null => encoded.push(0),
+                CanonicalKeyComponent::Bool(value) => {
+                    encoded.extend([1, u8::from(*value)]);
+                }
+                CanonicalKeyComponent::I64(value) => {
+                    encoded.push(2);
+                    encoded.extend(value.to_be_bytes());
+                }
+                CanonicalKeyComponent::U64(value) => {
+                    encoded.push(3);
+                    encoded.extend(value.to_be_bytes());
+                }
+                CanonicalKeyComponent::Bytes(value) => {
+                    encoded.push(4);
+                    encoded.extend((value.len() as u64).to_be_bytes());
+                    encoded.extend(*value);
+                }
+                CanonicalKeyComponent::Utf8(value) => {
+                    encoded.push(5);
+                    encoded.extend((value.len() as u64).to_be_bytes());
+                    encoded.extend(value.as_bytes());
+                }
+            }
+        }
+        Self(Fingerprint::canonical(PHYSICAL_KEY_DOMAIN, &[&encoded]))
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct CanonicalRowIdentity {
     pub logical_table: LogicalTableIdentity,
     pub physical_key_hash: PhysicalKeyHash,
+}
+
+impl CanonicalRowIdentity {
+    #[must_use]
+    pub const fn derive(
+        logical_table: LogicalTableIdentity,
+        physical_key_hash: PhysicalKeyHash,
+    ) -> Self {
+        Self {
+            logical_table,
+            physical_key_hash,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -492,13 +639,22 @@ mod tests {
             database_identity: 16_384,
             slot_name: "boring_cdc".into(),
             plugin: "pgoutput".into(),
-            publication_fingerprint: Fingerprint::digest(b"publication-v1"),
-            protocol_fingerprint: Fingerprint::digest(b"protocol-v1"),
+            publication_fingerprint: publication_fingerprint(
+                "boring_publication",
+                b"public.t1:insert,update,delete,truncate",
+            ),
+            protocol_fingerprint: supported_protocol_fingerprint(),
         }
     }
 
-    fn durable(lsn: u64) -> DurableSourceBoundary {
-        synthetic_durable_boundary(ReceivedLsn::from_wire(lsn), JournalCursor::from_store(3))
+    fn durable(transaction_end_lsn: u64) -> DurableSourceBoundary {
+        let decoded = DecodedTransactionPosition {
+            commit_lsn: ReceivedLsn::from_wire(transaction_end_lsn - 8),
+            end_lsn: ReceivedLsn::from_wire(transaction_end_lsn),
+        }
+        .validate()
+        .unwrap();
+        synthetic_durable_boundary(decoded.end_lsn, JournalCursor::from_store(3))
     }
 
     fn local() -> LocalSourceState {
@@ -528,6 +684,15 @@ mod tests {
         let source = identity();
         assert_eq!(source.validate(), Ok(()));
         assert_eq!(source.advisory_lock_key(), identity().advisory_lock_key());
+        assert_eq!(source.advisory_lock_key(), 2_303_614_348_662_131_884);
+        assert_eq!(
+            supported_protocol_fingerprint().bytes(),
+            [
+                0xcd, 0xca, 0x44, 0xde, 0x40, 0xd9, 0xd6, 0x86, 0x12, 0xee, 0x9f, 0x0e, 0x3c, 0x92,
+                0x60, 0x0c, 0x47, 0xb4, 0x7c, 0xb1, 0x5a, 0xd8, 0x83, 0x0b, 0xd7, 0x92, 0x81, 0x5b,
+                0x01, 0xde, 0x23, 0xee,
+            ]
+        );
         let mut moved_slot = identity();
         moved_slot.slot_name = "other_slot".into();
         assert_ne!(source.advisory_lock_key(), moved_slot.advisory_lock_key());
@@ -599,10 +764,10 @@ mod tests {
         for confirmed in [None, Some(ReceivedLsn::from_wire(80))] {
             let mut local = local();
             local.bootstrap = BootstrapProvenance::NonterminalWithPersistedFloor;
-            local.creation_floor = Some(ReceivedLsn::from_wire(80));
+            local.creation_floor = Some(SlotCreationFloor::from_server(80));
             local.durable_transaction = None;
             local.feedback_position =
-                FeedbackPosition::RepeatedCreationFloor(ReceivedLsn::from_wire(80));
+                FeedbackPosition::RepeatedCreationFloor(SlotCreationFloor::from_server(80));
             let observed = LiveSourceState {
                 confirmed_flush_lsn: confirmed,
                 ..live()
@@ -610,7 +775,7 @@ mod tests {
             assert_eq!(
                 reconcile_startup(&local, &observed),
                 StartupDecision::CreationFloorOnly {
-                    requested: RequestedPosition::CreationFloor(ReceivedLsn::from_wire(80))
+                    requested: RequestedPosition::CreationFloor(SlotCreationFloor::from_server(80))
                 }
             );
             assert!(local.durable_transaction.is_none());
@@ -622,10 +787,10 @@ mod tests {
     fn creation_floor_still_requires_valid_slot_and_available_wal() {
         let mut local = local();
         local.bootstrap = BootstrapProvenance::NonterminalWithPersistedFloor;
-        local.creation_floor = Some(ReceivedLsn::from_wire(80));
+        local.creation_floor = Some(SlotCreationFloor::from_server(80));
         local.durable_transaction = None;
         local.feedback_position =
-            FeedbackPosition::RepeatedCreationFloor(ReceivedLsn::from_wire(80));
+            FeedbackPosition::RepeatedCreationFloor(SlotCreationFloor::from_server(80));
         for (slot_valid, wal, reason) in [
             (false, true, ReseedReason::SlotInvalid),
             (true, false, ReseedReason::ResumeWalUnavailable),
@@ -728,7 +893,7 @@ mod tests {
     fn invalid_local_progress_relationships_fail_closed() {
         let mut state = local();
         state.feedback_position =
-            FeedbackPosition::RepeatedCreationFloor(ReceivedLsn::from_wire(80));
+            FeedbackPosition::RepeatedCreationFloor(SlotCreationFloor::from_server(80));
         assert_eq!(
             reconcile_startup(&state, &live()),
             StartupDecision::BlockInvalidState {
@@ -806,22 +971,43 @@ mod tests {
 
     #[test]
     fn table_schema_and_row_identities_are_distinct_dimensions() {
-        let table = LogicalTableIdentity(Fingerprint::digest(b"stable-logical-table"));
-        let schema_v1 = RelationSchemaVersion {
-            logical_table: table,
-            relation_id: 12,
-            schema_fingerprint: Fingerprint::digest(b"schema-v1"),
-        };
-        let schema_v2 = RelationSchemaVersion {
-            relation_id: 13,
-            schema_fingerprint: Fingerprint::digest(b"schema-v2"),
-            ..schema_v1
-        };
-        let row = CanonicalRowIdentity {
-            logical_table: table,
-            physical_key_hash: PhysicalKeyHash(Fingerprint::digest(b"canonical-key-tuple")),
-        };
+        let table = LogicalTableIdentity::derive(&identity(), "public", "accounts");
+        let schema_v1 = RelationSchemaVersion::derive(table, 12, b"id:int8,name:text");
+        let schema_v2 = RelationSchemaVersion::derive(table, 13, b"id:int8,name:text,email:text");
+        let key = PhysicalKeyHash::derive(&[
+            CanonicalKeyComponent::I64(42),
+            CanonicalKeyComponent::Utf8("tenant-a"),
+        ]);
+        let row = CanonicalRowIdentity::derive(table, key);
         assert_ne!(schema_v1, schema_v2);
         assert_eq!(row.logical_table, schema_v2.logical_table);
+        assert_ne!(
+            key,
+            PhysicalKeyHash::derive(&[
+                CanonicalKeyComponent::Utf8("tenant-a"),
+                CanonicalKeyComponent::I64(42),
+            ])
+        );
+    }
+
+    #[test]
+    fn source_identity_case_inventory_is_complete() {
+        let inventory: serde_json::Value =
+            serde_json::from_str(include_str!("../contracts/m1/source-identity-cases.json"))
+                .unwrap();
+        assert_eq!(inventory["owner_bead"], "boring-cdc-m1-source-identity");
+        assert_eq!(inventory["evidence_tier"], "leaf");
+        assert_eq!(inventory["cases"].as_array().unwrap().len(), 13);
+        let ids: std::collections::BTreeSet<_> = inventory["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|case| case["scenario_id"].as_str().unwrap())
+            .collect();
+        assert_eq!(ids.len(), 13);
+        assert!(
+            ids.iter()
+                .all(|id| id.starts_with("SCN-M1-SOURCE-IDENTITY-"))
+        );
     }
 }
