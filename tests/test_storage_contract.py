@@ -22,8 +22,9 @@ class StorageContractTests(unittest.TestCase):
    self.assertEqual((None,None,bytes.fromhex('0000000000000001')),con.execute('SELECT durable_lsn,durable_seq,slot_creation_floor_lsn FROM source_state').fetchone())
    con.execute("INSERT INTO destinations(destination_id,kind,state,generation,highest_external_fence) VALUES('archive','archive','ready',1,41)")
    self.assertEqual(41,con.execute("SELECT highest_external_fence FROM destinations WHERE destination_id='archive'").fetchone()[0])
-   with self.assertRaises(sqlite3.IntegrityError): con.execute("INSERT INTO source_state VALUES(2,'source','slot','epoch',NULL,x'0000000000000002',NULL,'config')")
-   with self.assertRaises(sqlite3.IntegrityError): con.execute("INSERT INTO source_state VALUES(3,'source','slot','epoch',NULL,NULL,2,'config')")
+   con.execute("DELETE FROM source_state WHERE id=1")
+   with self.assertRaisesRegex(sqlite3.IntegrityError,'durable_lsn IS NULL AND durable_seq IS NULL'): con.execute("INSERT INTO source_state VALUES(1,'source','slot','epoch',NULL,x'0000000000000002',NULL,'config')")
+   with self.assertRaisesRegex(sqlite3.IntegrityError,'durable_lsn IS NULL AND durable_seq IS NULL'): con.execute("INSERT INTO source_state VALUES(1,'source','slot','epoch',NULL,NULL,2,'config')")
    con.execute("INSERT INTO writer_attestations VALUES('run',1,'backend','wal',2,2,1,0,0,1,1)")
    self.assertEqual(1,con.execute("SELECT temp_store FROM writer_attestations").fetchone()[0])
  def test_frozen_corpus_and_manifest_bindings(self):
