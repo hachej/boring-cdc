@@ -5,4 +5,16 @@ if [ "${1:-}" = "--help" ] || [ $# -eq 0 ]; then
   echo "Deterministic evidence validation; emits one JSON result and exits nonzero on findings."
   exit $([ $# -eq 0 ] && echo 2 || echo 0)
 fi
+if [ -d "$1" ]; then
+  root=$1
+  shift
+  found=0
+  for manifest in "$root"/*/*/evidence.json; do
+    [ -f "$manifest" ] || continue
+    found=1
+    python3 "$(dirname "$0")/../lib/core_validator.py" evidence "$manifest" "$@"
+  done
+  [ "$found" -eq 1 ] || { echo "no evidence.json manifests found under $1" >&2; exit 2; }
+  exit 0
+fi
 exec python3 "$(dirname "$0")/../lib/core_validator.py" evidence "$@"

@@ -1,0 +1,85 @@
+{
+  "binary": {
+    "count": 1,
+    "license": "Apache-2.0",
+    "name": "boring-cdc",
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-compose",
+    "toolchain": "1.89.0"
+  },
+  "compose": {
+    "health": {
+      "configuration_exit": 78,
+      "interval_seconds": 5,
+      "readiness_timeout_seconds": 120,
+      "retries": 12,
+      "start_period_seconds": 30,
+      "temporary_dependency_exit": 75,
+      "timeout_seconds": 3
+    },
+    "image_amd64": {
+      "builder": "sha256:c9ac3fa8945b61dede1e4500d25028aa8fd8a8fe46365fcf9c0422f8d999b9b0",
+      "clickhouse": "sha256:78b6f0863688458b229b597f6a1bbf891855a01cf59c3f3dbe66428571c518c9",
+      "postgres": "sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409",
+      "runtime": "sha256:cea2634840f5a87503d8210e4df97b9f23a2acd67ff860a76c133d963032f866"
+    },
+    "image_indexes": {
+      "builder": "sha256:948f9b08a66e7fe01b03a98ef1c7568292e07ec2e4fe90d88c07bb14563c84ff",
+      "clickhouse": "sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f",
+      "postgres": "sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+      "runtime": "sha256:b1a741487078b369e78119849663d7f1a5341ef2768798f7b7406c4240f86aef"
+    },
+    "path": "compose.yaml",
+    "platform": "linux/amd64",
+    "postgres_reap": {
+      "client_connection_check_interval_seconds": 10,
+      "measured_bound_seconds": 70,
+      "ownership_takeover_seconds": 90,
+      "tcp_keepalives_count": 3,
+      "tcp_keepalives_idle_seconds": 30,
+      "tcp_keepalives_interval_seconds": 10
+    },
+    "project": "boring-cdc",
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-compose",
+    "restart": "unless-stopped",
+    "retry_authority": "persisted FailurePolicy",
+    "services": [
+      "postgres",
+      "clickhouse",
+      "connector"
+    ],
+    "tool_versions": {
+      "buildkit": "0.24.0",
+      "docker_compose": "2.39.2",
+      "docker_engine": "28.3.3",
+      "dockerfile_frontend": "1.12.0"
+    }
+  },
+  "configuration": {
+    "example": "config/boring-cdc.example.json",
+    "schema": "config/boring-cdc.schema.json"
+  },
+  "evidence_tier": "component",
+  "executors": [
+    "boring-cdc-m0-scaffold",
+    "boring-cdc-m6-failure-matrix",
+    "boring-cdc-m7-artifacts"
+  ],
+  "fixtures": [
+    "SCN-M0-SCAFFOLD-STATIC",
+    "SCN-M0-SCAFFOLD-DIGEST-MISMATCH",
+    "SCN-M0-SCAFFOLD-DEPENDENCY-DELAY",
+    "SCN-M0-SCAFFOLD-ZOMBIE-BOUND",
+    "SCN-M0-SCAFFOLD-AGENT-READONLY"
+  ],
+  "owner_bead": "boring-cdc-m0-scaffold",
+  "provisional_authorities": [
+    "// M0-PROVISIONAL: boring-cdc-d-security",
+    "// M0-PROVISIONAL: boring-cdc-d-values",
+    "// M0-PROVISIONAL: boring-cdc-d-keys",
+    "// M0-PROVISIONAL: boring-cdc-d-failure-policy",
+    "// M0-PROVISIONAL: boring-cdc-d-sqlite",
+    "// M0-PROVISIONAL: boring-cdc-d-wal-cap",
+    "// M0-PROVISIONAL: boring-cdc-d-compose"
+  ],
+  "schema_version": "m0-scaffold/v1"
+}

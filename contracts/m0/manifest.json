@@ -1,0 +1,24 @@
+{
+  "artifacts": [
+    {
+      "executor_ids": [
+        "boring-cdc-m0-scaffold",
+        "boring-cdc-m6-failure-matrix",
+        "boring-cdc-m7-artifacts"
+      ],
+      "fixture_ids": [
+        "SCN-M0-SCAFFOLD-STATIC",
+        "SCN-M0-SCAFFOLD-DIGEST-MISMATCH",
+        "SCN-M0-SCAFFOLD-DEPENDENCY-DELAY",
+        "SCN-M0-SCAFFOLD-ZOMBIE-BOUND",
+        "SCN-M0-SCAFFOLD-AGENT-READONLY"
+      ],
+      "id": "ART-M0-SCAFFOLD",
+      "owner_bead": "boring-cdc-m0-scaffold",
+      "path": "contracts/scaffold/m0-scaffold.json",
+      "sha256": "7fa378e469b8f76f341fd7601c7ab05a77e632fea1be3555fb46ebf5c7452562",
+      "status": "complete"
+    }
+  ],
+  "schema_version": "m0-manifest/v1"
+}

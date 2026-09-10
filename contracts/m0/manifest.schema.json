@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_version", "artifacts"],
+  "properties": {
+    "schema_version": {"const": "m0-manifest/v1"},
+    "artifacts": {"type": "array", "items": {"type": "object", "additionalProperties": false,
+      "required": ["id", "owner_bead", "path", "sha256", "fixture_ids", "executor_ids", "status"],
+      "properties": {
+        "id": {"pattern": "^ART-[A-Z0-9-]+$"}, "owner_bead": {"pattern": "^boring-cdc-[A-Za-z0-9.-]+$"},
+        "path": {"type": "string", "minLength": 1}, "sha256": {"pattern": "^[0-9a-f]{64}$"},
+        "fixture_ids": {"type": "array", "items": {"pattern": "^SCN-[A-Z0-9-]+$"}, "minItems": 1},
+        "executor_ids": {"type": "array", "items": {"pattern": "^boring-cdc-[A-Za-z0-9.-]+$"}, "minItems": 1},
+        "status": {"enum": ["complete"]}
+      }
+    }}
+  }
+}
