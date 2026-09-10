@@ -13,7 +13,7 @@ for symbol,literal in (('MAX_COMMAND_BYTES','1024 * 1024'),('MAX_RESPONSE_BYTES'
  p=src.find('pub const '+symbol)
  if p<0 or literal not in src[p:p+140]: errors.append('confirmed literal mismatch '+symbol)
 if 'M0-PROVISIONAL: boring-cdc-d-security' in src: errors.append('reconciled security marker remains')
-for required in ('SourceLockSession','OwnershipGuard','AdminCredential','RequestWriter','expected_run_id: Option<String>','OfflineDryRun','OfflineConfirm','libc::SO_PEERCRED','open_directory_components_nofollow'):
+for required in ('SourceLockSession','OwnershipGuard','AdminCredential','RequestWriter','expected_run_id: Option<String>','OfflineDryRun','OfflineConfirm','libc::SO_PEERCRED','open_directory_components_nofollow','pub fn validate_response('):
  if required not in src: errors.append('missing reusable boundary '+required)
 if 'owner_uid' in src: errors.append('caller-supplied owner UID remains in authorization path')
 for script, mode in [('scripts/e2e/m2_ownership.sh','e2e'),('scripts/faults/m2_ownership.sh','fault')]:

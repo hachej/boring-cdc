@@ -44,7 +44,11 @@
         "configuration"
       ],
       "stable_code_shape": "BCDC_<DOMAIN>_<CAUSE>",
-      "expected_close_identity": ["run_id", "capture_generation"]
+      "expected_close_identity": [
+        "run_id",
+        "capture_generation"
+      ],
+      "jitter_rng": "ChaCha20 tests; OS CSPRNG production"
     },
     "sqlite_writer_busy_timeout_ms": 5000
   },
@@ -78,5 +82,191 @@
     "boring-cdc-m1.6",
     "boring-cdc-m2-schema:READER_MAX_AGE",
     "boring-cdc-m2-schema:READER_MAX_ROWS"
+  ],
+  "untouched_provisional_markers": [
+    {
+      "path": "contracts/m1/control-fixtures.json",
+      "marker": "\"provenance\": \"// M0-PROVISIONAL: boring-cdc-d-pg-protocol\""
+    },
+    {
+      "path": "contracts/m1/control-fixtures.json",
+      "marker": "\"provenance\": \"// M0-PROVISIONAL: boring-cdc-d-pg-protocol\""
+    },
+    {
+      "path": "contracts/m1/control-fixtures.json",
+      "marker": "\"provenance\": \"// M0-PROVISIONAL: boring-cdc-d-pg-protocol\""
+    },
+    {
+      "path": "contracts/m1/ddl-fixtures.json",
+      "marker": "\"provenance\": \"// M0-PROVISIONAL: boring-cdc-d-ddl\""
+    },
+    {
+      "path": "contracts/m1/ddl-fixtures.json",
+      "marker": "\"provenance\": \"// M0-PROVISIONAL: boring-cdc-d-ddl\""
+    },
+    {
+      "path": "contracts/m1/ddl-fixtures.json",
+      "marker": "\"provenance\": \"// M0-PROVISIONAL: boring-cdc-d-ddl\""
+    },
+    {
+      "path": "scripts/e2e/m1_control_fixtures.sh",
+      "marker": "# M0-PROVISIONAL: boring-cdc-d-pg-protocol (recommended supported majors and image digests)."
+    },
+    {
+      "path": "scripts/e2e/m1_ddl_fixtures.sh",
+      "marker": "# M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED PostgreSQL majors and immutable image digests)."
+    },
+    {
+      "path": "src/m1_bootstrap_sm.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-backfill (RECOMMENDED bounded importer count)."
+    },
+    {
+      "path": "src/m1_bootstrap_sm.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-backfill (RECOMMENDED explicit fresh-store boundary)."
+    },
+    {
+      "path": "src/m1_bootstrap_sm.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED snapshot/WAL origin ranks)."
+    },
+    {
+      "path": "src/m1_bootstrap_sm.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED snapshot/WAL origin ranks)."
+    },
+    {
+      "path": "src/m1_config.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED non-streamed pgoutput policy)."
+    },
+    {
+      "path": "src/m1_config.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED origin='any')."
+    },
+    {
+      "path": "src/m1_config.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-ch-accept recommended concrete pins pending approval."
+    },
+    {
+      "path": "src/m1_config.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-archive-durability recommended concrete writer pins."
+    },
+    {
+      "path": "src/m1_control_fixtures.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-m1.6 (PostgreSQL timestamp fractional precision is 0..=6)."
+    },
+    {
+      "path": "src/m1_ddl_fixtures.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED catalog poll interval)."
+    },
+    {
+      "path": "src/m1_ddl_fixtures.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED DDL waiter source-impact bound)."
+    },
+    {
+      "path": "src/m1_ddl_fixtures.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED supported PostgreSQL majors)."
+    },
+    {
+      "path": "src/m1_decoder.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED PostgreSQL majors)."
+    },
+    {
+      "path": "src/m1_decoder.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED protocol zero sentinel)."
+    },
+    {
+      "path": "src/m1_decoder.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED PostgreSQL-to-Unix epoch offset)."
+    },
+    {
+      "path": "src/m1_decoder.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED relation-cache bound)."
+    },
+    {
+      "path": "src/m1_ordering.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals)."
+    },
+    {
+      "path": "src/m1_ordering.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED source/slot identity domain)."
+    },
+    {
+      "path": "src/m1_ordering.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals)."
+    },
+    {
+      "path": "src/m1_ordering.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals)."
+    },
+    {
+      "path": "src/m1_ordering.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals)."
+    },
+    {
+      "path": "src/m1_ordering.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED origin rank: snapshot then WAL)."
+    },
+    {
+      "path": "src/m1_ordering.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED origin rank: snapshot then WAL)."
+    },
+    {
+      "path": "src/m1_ordering.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED column-state tags)."
+    },
+    {
+      "path": "src/m1_ordering.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED mutation-kind tags)."
+    },
+    {
+      "path": "src/m1_ordering.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED canonical field framing: u64 big-endian byte length)."
+    },
+    {
+      "path": "src/m1_source_identity.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol"
+    },
+    {
+      "path": "src/m1_source_identity.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED protocol zero sentinel)."
+    },
+    {
+      "path": "src/m1_source_identity.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED origin policy)."
+    },
+    {
+      "path": "src/m1_source_identity.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED non-streamed pgoutput options)."
+    },
+    {
+      "path": "src/m1_source_identity.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED canonical lock-key domain/version)."
+    },
+    {
+      "path": "src/m1_source_identity.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED canonical protocol fingerprint domain)."
+    },
+    {
+      "path": "src/m1_source_identity.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-publication (RECOMMENDED canonical publication fingerprint domain)."
+    },
+    {
+      "path": "src/m1_source_identity.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED stable logical-table identity domain)."
+    },
+    {
+      "path": "src/m1_source_identity.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED relation-schema identity domain)."
+    },
+    {
+      "path": "src/m1_source_identity.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED canonical physical-key hash domain)."
+    },
+    {
+      "path": "src/m2_schema.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-m2-schema"
+    },
+    {
+      "path": "src/m2_schema.rs",
+      "marker": "// M0-PROVISIONAL: boring-cdc-m2-schema"
+    }
   ]
 }

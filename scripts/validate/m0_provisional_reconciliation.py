@@ -38,7 +38,8 @@ required_literals = {
         "socket_mode: 0o600",
         "max_request_bytes: Bytes(1_048_576)",
         "max_response_bytes: Bytes(4_194_304)",
-        "timeout_ms: Milliseconds(10_000)",
+        "read_timeout_ms: Milliseconds(10_000)",
+        "write_timeout_ms: Milliseconds(30_000)",
         "confirmation_expiry_ms: Milliseconds(300_000)",
     ),
     "src/m1_ordering.rs": ("MAX_CANONICAL_KEY_COMPONENTS: usize = 8",),
@@ -70,29 +71,29 @@ for path, literals in required_literals.items():
         if literal not in sources[path]:
             errors.append(f"missing confirmed literal: {path}: {literal}")
 
-actual_owners: set[str] = set()
-for subtree in ("src", "contracts/m1", "scripts/e2e"):
-    for path in (root / subtree).rglob("*"):
-        if not path.is_file():
+actual_markers: list[dict[str, str]] = []
+import subprocess
+tracked = subprocess.check_output(
+    ["git", "ls-files", "src", "contracts", "scripts"], cwd=root, text=True
+).splitlines()
+for relative in tracked:
+    path = root / relative
+    try:
+        lines = path.read_text().splitlines()
+    except UnicodeDecodeError:
+        continue
+    for line in lines:
+        if "M0-PROVISIONAL:" not in line:
             continue
-        try:
-            text = path.read_text()
-        except UnicodeDecodeError:
-            continue
-        actual_owners.update(re.findall(r"M0-PROVISIONAL:\s*([A-Za-z0-9_.-]+)", text))
-expected_owners = {
-    "boring-cdc-d-archive-durability",
-    "boring-cdc-d-backfill",
-    "boring-cdc-d-ch-accept",
-    "boring-cdc-d-ddl",
-    "boring-cdc-d-event-id",
-    "boring-cdc-d-pg-protocol",
-    "boring-cdc-d-publication",
-    "boring-cdc-m1.6",
-    "boring-cdc-m2-schema",
-}
-if actual_owners != expected_owners:
-    errors.append(f"untouched owner inventory mismatch: {sorted(actual_owners)}")
+        stripped = line.strip()
+        if stripped.startswith("//") or stripped.startswith("#") or stripped.startswith('"provenance"'):
+            actual_markers.append({"path": relative, "marker": stripped.rstrip(",")})
+expected_markers = contract.get("untouched_provisional_markers", [])
+if actual_markers != expected_markers:
+    errors.append("untouched marker inventory mismatch")
+for governed in ("boring-cdc-d-security", "boring-cdc-d-keys", "boring-cdc-m2.1"):
+    if any(governed in item["marker"] for item in actual_markers):
+        errors.append(f"governed marker remains in complete inventory: {governed}")
 
 print(json.dumps({
     "schema_version": "validation-result/v1",

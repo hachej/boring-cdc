@@ -11,9 +11,10 @@ use std::collections::BTreeMap;
 
 pub const POLICY_VERSION: &str = "failure-policy-v1";
 pub const JITTER_TEST_SEED: &str = "0x424344435f52455452595f563031";
-// The transition harness accepts u64 randomness; this is the first eight bytes of the
-// approved ChaCha20 test seed. Production supplies OS-CSPRNG samples through Randomness.
-pub const JITTER_HARNESS_SEED_U64: u64 = 0x4243_4443_5f52_4554;
+// The generic transition harness still needs a scheduling seed; policy jitter uses the
+// independently approved ChaCha20 seed below rather than this scheduler-only value.
+#[cfg(test)]
+const SCHEDULE_HARNESS_SEED_U64: u64 = 0x6661_696c_7572_652d;
 pub const BASE_DELAY_MS: u64 = 250;
 pub const MAX_DELAY_MS: u64 = 30_000;
 pub const MAX_ATTEMPTS: u32 = 10;
@@ -1011,14 +1012,51 @@ fn timestamp(ms: u64) -> String {
 pub mod tests {
     use super::*;
     use crate::m1_transition_kernel::{
-        Harness, HarnessBudget, ScheduleSeed, ScheduledAction, ScheduledStep, SplitMix64,
+        Harness, HarnessBudget, Randomness, ScheduleSeed, ScheduledAction, ScheduledStep,
         TransitionSystem, VirtualClock,
     };
     use crate::m2_schema::{WriterConnection, open_writer};
+    use rand_chacha::ChaCha20Rng;
+    use rand_core::{RngCore, SeedableRng};
     use std::cell::RefCell;
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct ApprovedTestRandomness(ChaCha20Rng);
+
+    impl ApprovedTestRandomness {
+        fn seeded() -> Self {
+            let decoded = hex_seed_bytes(JITTER_TEST_SEED);
+            let mut seed = [0_u8; 32];
+            seed[..decoded.len()].copy_from_slice(&decoded);
+            Self(ChaCha20Rng::from_seed(seed))
+        }
+    }
+
+    impl Default for ApprovedTestRandomness {
+        fn default() -> Self {
+            Self::seeded()
+        }
+    }
+
+    impl Randomness for ApprovedTestRandomness {
+        fn next_u64(&mut self) -> u64 {
+            self.0.next_u64()
+        }
+    }
+
+    fn hex_seed_bytes(value: &str) -> Vec<u8> {
+        let hex = value.strip_prefix("0x").expect("hex seed prefix");
+        assert!(hex.len().is_multiple_of(2));
+        hex.as_bytes()
+            .chunks_exact(2)
+            .map(|pair| {
+                u8::from_str_radix(std::str::from_utf8(pair).expect("ASCII seed"), 16)
+                    .expect("hex seed")
+            })
+            .collect()
+    }
 
     fn boundary() -> FailedBoundary {
         FailedBoundary::Destination {
@@ -1060,7 +1098,7 @@ pub mod tests {
         now_ms: u64,
     ) -> PolicyAction {
         let clock = VirtualClock::new(now_ms);
-        let mut randomness = SplitMix64::new(JITTER_HARNESS_SEED_U64);
+        let mut randomness = ApprovedTestRandomness::seeded();
         let mut context = TransitionContext {
             clock: &clock,
             randomness: &mut randomness,
@@ -1072,6 +1110,7 @@ pub mod tests {
     struct PolicyHarnessDomain {
         effects: RefCell<Vec<PolicyAction>>,
         lifecycle: RefCell<Vec<&'static str>>,
+        randomness: RefCell<ApprovedTestRandomness>,
     }
 
     impl PolicyHarnessDomain {
@@ -1096,7 +1135,12 @@ pub mod tests {
             event: Self::Event,
             context: &mut TransitionContext<'_>,
         ) -> Vec<Self::Effect> {
-            let action = transition(facts.as_ref(), event, context);
+            let mut randomness = self.randomness.borrow_mut();
+            let mut policy_context = TransitionContext {
+                clock: context.clock,
+                randomness: &mut *randomness,
+            };
+            let action = transition(facts.as_ref(), event, &mut policy_context);
             self.effects.borrow_mut().push(action.clone());
             match &action {
                 PolicyAction::Persist(record)
@@ -1156,6 +1200,7 @@ pub mod tests {
         writer: RefCell<WriterConnection>,
         effects: RefCell<Vec<PolicyAction>>,
         sql_error: RefCell<Option<String>>,
+        randomness: RefCell<ApprovedTestRandomness>,
     }
 
     impl PolicyPersistenceHarnessDomain {
@@ -1164,6 +1209,7 @@ pub mod tests {
                 writer: RefCell::new(writer),
                 effects: RefCell::new(Vec::new()),
                 sql_error: RefCell::new(None),
+                randomness: RefCell::new(ApprovedTestRandomness::seeded()),
             }
         }
 
@@ -1219,7 +1265,15 @@ pub mod tests {
             event: Self::Event,
             context: &mut TransitionContext<'_>,
         ) -> Vec<Self::Effect> {
-            self.apply(facts, transition(facts.as_ref(), event, context))
+            let mut randomness = self.randomness.borrow_mut();
+            let mut policy_context = TransitionContext {
+                clock: context.clock,
+                randomness: &mut *randomness,
+            };
+            self.apply(
+                facts,
+                transition(facts.as_ref(), event, &mut policy_context),
+            )
         }
 
         fn on_completion(
@@ -1293,7 +1347,7 @@ pub mod tests {
             max_scheduled_payload_bytes: 4_096,
         })
         .unwrap();
-        let seed = ScheduleSeed::splitmix64(JITTER_HARNESS_SEED_U64);
+        let seed = ScheduleSeed::splitmix64(SCHEDULE_HARNESS_SEED_U64);
         let one = harness
             .execute(
                 &PolicyHarnessDomain::default(),
@@ -1324,7 +1378,7 @@ pub mod tests {
             max_scheduled_payload_bytes: 8_192,
         })
         .unwrap();
-        let seed = ScheduleSeed::splitmix64(JITTER_HARNESS_SEED_U64);
+        let seed = ScheduleSeed::splitmix64(SCHEDULE_HARNESS_SEED_U64);
 
         let observe_domain = PolicyHarnessDomain::default();
         harness
@@ -1534,7 +1588,7 @@ pub mod tests {
             max_scheduled_payload_bytes: 4_096,
         })
         .unwrap();
-        let seed = ScheduleSeed::splitmix64(JITTER_HARNESS_SEED_U64);
+        let seed = ScheduleSeed::splitmix64(SCHEDULE_HARNESS_SEED_U64);
         let observed = harness
             .execute(
                 &domain,

@@ -5937,7 +5937,7 @@
     },
     {
       "accepted_examples": [
-        "fixture::operator.timeout_ms::accepted"
+        "fixture::operator.read_timeout_ms::accepted"
       ],
       "constraint": {
         "expected_error_code": "CONFIG_ZERO_BOUND",
@@ -5948,7 +5948,7 @@
       ],
       "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
       "expected_type": "integer",
-      "field": "timeout_ms",
+      "field": "read_timeout_ms",
       "fingerprint_impact": {
         "always": [
           "runtime"
@@ -5962,11 +5962,57 @@
         "mutation": "same_type_change_in_representative_fixture"
       },
       "group": "operator",
-      "id": "SCN-M1-CONFIG-OPERATOR-TIMEOUT-MS",
+      "id": "SCN-M1-CONFIG-OPERATOR-READ-TIMEOUT-MS",
       "log_code": null,
       "redaction": "shared_config_error_contains_only_stable_code_and_field",
       "rejected_examples": [
-        "constraint_violation::operator.timeout_ms::CONFIG_ZERO_BOUND"
+        "constraint_violation::operator.read_timeout_ms::CONFIG_ZERO_BOUND"
+      ],
+      "status_code": null,
+      "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
+      "vectors": {
+        "accepted": {
+          "expected": "accepted",
+          "mutation": "fixture"
+        },
+        "rejected": {
+          "expected_error_code": "CONFIG_ZERO_BOUND",
+          "mutation": "constraint_violation"
+        }
+      }
+    },
+    {
+      "accepted_examples": [
+        "fixture::operator.write_timeout_ms::accepted"
+      ],
+      "constraint": {
+        "expected_error_code": "CONFIG_ZERO_BOUND",
+        "negative_mutation": "constraint_violation"
+      },
+      "error_codes": [
+        "CONFIG_ZERO_BOUND"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
+      "expected_type": "integer",
+      "field": "write_timeout_ms",
+      "fingerprint_impact": {
+        "always": [
+          "runtime"
+        ],
+        "conditional": {}
+      },
+      "fingerprint_probe": {
+        "expected_changed": [
+          "runtime"
+        ],
+        "mutation": "same_type_change_in_representative_fixture"
+      },
+      "group": "operator",
+      "id": "SCN-M1-CONFIG-OPERATOR-WRITE-TIMEOUT-MS",
+      "log_code": null,
+      "redaction": "shared_config_error_contains_only_stable_code_and_field",
+      "rejected_examples": [
+        "constraint_violation::operator.write_timeout_ms::CONFIG_ZERO_BOUND"
       ],
       "status_code": null,
       "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",

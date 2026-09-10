@@ -541,6 +541,17 @@ pub fn validate_socket(
     Ok(())
 }
 
+/// Enforces the independently approved response-size and write-duration limits.
+pub fn validate_response(bytes: usize, elapsed: Duration) -> Result<(), &'static str> {
+    if bytes > MAX_RESPONSE_BYTES {
+        return Err("response_too_large");
+    }
+    if elapsed > COMMAND_WRITE_TIMEOUT {
+        return Err("response_timeout");
+    }
+    Ok(())
+}
+
 /// Administration credentials exist only in this value and are overwritten on drop.
 pub struct AdminCredential(Vec<u8>);
 impl AdminCredential {
@@ -1054,6 +1065,15 @@ pub(crate) mod tests {
                 COMMAND_READ_TIMEOUT + Duration::from_millis(1)
             ),
             Err("request_timeout")
+        );
+        assert_eq!(validate_response(1, Duration::ZERO), Ok(()));
+        assert_eq!(
+            validate_response(MAX_RESPONSE_BYTES + 1, Duration::ZERO),
+            Err("response_too_large")
+        );
+        assert_eq!(
+            validate_response(1, COMMAND_WRITE_TIMEOUT + Duration::from_millis(1)),
+            Err("response_timeout")
         );
         drop(client);
         drop(accepted);

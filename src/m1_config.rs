@@ -249,7 +249,8 @@ pub struct OperatorEndpoint {
     pub peer_credentials: bool,
     pub max_request_bytes: Bytes,
     pub max_response_bytes: Bytes,
-    pub timeout_ms: Milliseconds,
+    pub read_timeout_ms: Milliseconds,
+    pub write_timeout_ms: Milliseconds,
     pub result_retention_ms: Milliseconds,
     pub confirmation_expiry_ms: Milliseconds,
 }
@@ -263,7 +264,8 @@ impl Default for OperatorEndpoint {
             peer_credentials: true,
             max_request_bytes: Bytes(1_048_576),
             max_response_bytes: Bytes(4_194_304),
-            timeout_ms: Milliseconds(10_000),
+            read_timeout_ms: Milliseconds(10_000),
+            write_timeout_ms: Milliseconds(30_000),
             result_retention_ms: Milliseconds(86_400_000),
             confirmation_expiry_ms: Milliseconds(300_000),
         }
@@ -783,7 +785,8 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     }
     if raw.operator.max_request_bytes.0 == 0
         || raw.operator.max_response_bytes.0 == 0
-        || raw.operator.timeout_ms.0 == 0
+        || raw.operator.read_timeout_ms.0 == 0
+        || raw.operator.write_timeout_ms.0 == 0
         || raw.operator.result_retention_ms.0 == 0
         || raw.operator.confirmation_expiry_ms.0 == 0
     {
@@ -2196,7 +2199,7 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
         assert_eq!(inventory["schema_version"], "m1-config-cases/v2");
         assert_eq!(inventory["owner_bead"], "boring-cdc-m1-config");
         let cases = inventory["cases"].as_array().unwrap();
-        assert_eq!(cases.len(), 127);
+        assert_eq!(cases.len(), 128);
         assert!(inventory["status_log_projection"]["status_code"].is_null());
         assert!(inventory["status_log_projection"]["log_code"].is_null());
         assert!(

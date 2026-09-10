@@ -109,6 +109,7 @@
       "clickhouse",
       "archive"
     ],
-    "jitter": "full [0,delay]"
+    "jitter": "full [0,delay]",
+    "jitter_rng": "ChaCha20 in tests; OS CSPRNG in production"
   }
 }

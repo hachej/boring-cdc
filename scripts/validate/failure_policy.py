@@ -15,7 +15,7 @@ for name,value in [('BASE_DELAY_MS',250),('MAX_DELAY_MS',30000),('MAX_ATTEMPTS',
  match=re.search(rf'pub const {name}: [^=]+ = ([0-9_]+)',src)
  if not match or int(match.group(1).replace('_',''))!=value: errors.append('literal mismatch '+name)
 if 'M0-PROVISIONAL: boring-cdc-m2.1' in src: errors.append('reconciled failure-policy marker remains')
-for literal in ('0x424344435f52455452595f563031','sample % nominal.saturating_add(1)','transient_io','transient_source','transient_destination','rate_limited','ownership_lost','BCDC_SHARED_TRANSPORT_UNAVAILABLE'):
+for literal in ('0x424344435f52455452595f563031','sample % nominal.saturating_add(1)','transient_io','transient_source','transient_destination','rate_limited','ownership_lost','BCDC_SHARED_TRANSPORT_UNAVAILABLE','ChaCha20Rng','ApprovedTestRandomness'):
  if literal not in src: errors.append('missing confirmed failure-policy literal '+literal)
 for required in ['pub fn transition(','pub fn build_fingerprint(','pub fn load_failure(','pub enum PreparedFailureOperation','pub trait DomainRecoveryHook','fn complete_policy_vector_inventory_uses_bounded_harness_schedules(']:
  if required not in src: errors.append('missing production surface '+required)
