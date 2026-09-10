@@ -66,6 +66,17 @@
     }
   ],
   "closure_head": "8339ffca2926c0efb8dbc7ee300dc26922c41489",
+  "executed_assertions": [
+    "SCN-M1-RAW-FIXED-SEED",
+    "SCN-M1-RAW-HEARTBEAT",
+    "SCN-M1-RAW-IDLE-DDL",
+    "SCN-M1-RAW-IMMEDIATE-DDL",
+    "SCN-M1-RAW-PUBLICATION-DRIFT",
+    "SCN-M1-RAW-TRUNCATE",
+    "SCN-M1-RAW-UNSUPPORTED-PROTOCOL",
+    "SCN-M1-RAW-UNSUPPORTED-TABLE",
+    "SCN-M1-RAW-UNSUPPORTED-TYPE"
+  ],
   "raw_payload_values_recorded": false,
   "scenario_id": "SCN-M1-RAW-EVENTS",
   "schema_version": "m1-raw-demo-packet/v1",

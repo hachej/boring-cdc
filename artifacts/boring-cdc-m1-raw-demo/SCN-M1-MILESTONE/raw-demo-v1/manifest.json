@@ -10,7 +10,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/command-run-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/command-run-1.stdout",
-      "stdout_sha256": "92371147c435530800104fa619d2b3286dea6319c85cedc36d80d4a4f44a4b10",
+      "stdout_sha256": "2e7c6dc695faf217fae03c3f29f318385d78139866cadfe22d651b459bda49e2",
       "version": "raw-demo-v1"
     },
     {
@@ -19,13 +19,13 @@
       "stderr_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/command-run-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/command-run-2.stdout",
-      "stdout_sha256": "92371147c435530800104fa619d2b3286dea6319c85cedc36d80d4a4f44a4b10",
+      "stdout_sha256": "2e7c6dc695faf217fae03c3f29f318385d78139866cadfe22d651b459bda49e2",
       "version": "raw-demo-v1"
     }
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "milestone",
-  "git_commit": "8c8f8c345523ca4a7f01e28d9cf770ea11ab82d7",
+  "git_commit": "381d6f047d140756b55e8cf10cbf0861513c2a2f",
   "owner_bead": "boring-cdc-m1-raw-demo",
   "redaction": {
     "checked": true,
@@ -48,7 +48,7 @@
       "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/state/before.json",
       "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/versions.json"
     ],
-    "digest": "9407abd46d5a66f5cec7ecd6103d92d4b07e4cdc69e5b8edd354cee0c1a8dadc",
+    "digest": "89b5d18f7da19389b0ccd0122111ce592e02ac37e66bbf8e39fcc59b53c47eb8",
     "product_faults": "m1_fail_closed_matrix",
     "runtime_observed": true,
     "status": "pass"
