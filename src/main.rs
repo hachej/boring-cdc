@@ -1,6 +1,8 @@
 use boring_cdc::m1_cli_contract::{
     ExitCode, command_help, error_envelope, parse, root_help, unavailable,
 };
+use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
+use boring_cdc::m1_preflight::{CheckStatus, PreflightObservation, envelope, evaluate};
 use std::io::{self, Write};
 
 fn write_stdout(bytes: &[u8]) -> Result<(), ()> {
@@ -20,17 +22,52 @@ fn main() {
             let _ = write_stdout(command_help(parsed.spec).as_bytes());
         }
         Ok(parsed) => {
-            let result = unavailable(parsed.spec);
+            let check_result = if parsed.spec.id == "CMD-CHECK" {
+                let config_text = std::fs::read_to_string("boring-cdc.toml");
+                let observation_text = std::fs::read_to_string("preflight-observation.json");
+                match (config_text, observation_text) {
+                    (Ok(config_text), Ok(observation_text)) => {
+                        match (
+                            load_str_for(&config_text, &ProcessEnvironment, LoadPurpose::Check),
+                            serde_json::from_str::<PreflightObservation>(&observation_text),
+                        ) {
+                            (Ok(config), Ok(observation)) => {
+                                Some(evaluate(config.public(), &observation))
+                            }
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            let result = check_result
+                .as_ref()
+                .map(envelope)
+                .unwrap_or_else(|| unavailable(parsed.spec));
+            let exit = check_result
+                .as_ref()
+                .map_or(ExitCode::Unavailable, |report| match report.outcome {
+                    CheckStatus::Healthy => ExitCode::Success,
+                    CheckStatus::Degraded | CheckStatus::Unverified => ExitCode::Unavailable,
+                    CheckStatus::Blocked => ExitCode::SafetyBlocked,
+                });
             if parsed.json {
                 let mut bytes = serde_json::to_vec(&result).expect("envelope");
                 bytes.push(b'\n');
                 if write_stdout(&bytes).is_err() {
                     std::process::exit(0)
                 }
+            } else if parsed.spec.id == "CMD-CHECK" {
+                let text = format!("{}: {}\n", result.code, result.message);
+                if write_stdout(text.as_bytes()).is_err() {
+                    std::process::exit(0);
+                }
             } else {
                 eprintln!("{}: {}", result.code, result.message);
             }
-            std::process::exit(ExitCode::Unavailable as i32);
+            std::process::exit(exit as i32);
         }
         Err(error) => {
             if error.code == "CLI_ROOT_HELP" {

@@ -2,6 +2,7 @@
 
 pub mod m1_config;
 pub mod m1_control_fixtures;
+pub mod m1_preflight;
 pub mod m1_transition_kernel;
 
 pub mod m1_cli_contract;

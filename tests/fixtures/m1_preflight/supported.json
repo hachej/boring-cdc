@@ -1,0 +1,23 @@
+{
+  "schema_version": "m1-preflight/v1",
+  "source": {
+    "server_major": 16, "wal_level": "logical", "protocol": "postgres-replication-copyboth-v1", "copy_both_available": true,
+    "publication_name_matches": true, "publication_fingerprint_matches": true, "publication_owned_by_admin": true, "runtime_can_alter_publication": false,
+    "role_has_replication": true, "slot_name_matches": true, "slot_plugin": "pgoutput", "slot_intent_no_drop_bound": true, "slot_positions_valid": true,
+    "table_contracts_match": true, "keys_supported": true, "types_supported": true, "partitions_supported": true, "replica_identity_complete": true,
+    "control_rows_each": 1, "control_select_key_only": true, "control_update_value_only": true, "control_insert": false, "control_delete": false, "control_update_key": false,
+    "grants_sufficient": true, "logical_decoding_work_mem_bytes": 67108864, "spill_counters_available": true, "streaming_option": "streaming=false",
+    "copy_both_receive_bytes": 1048576, "decoder_bytes": 67108864, "staging_bytes": 67108864, "worker_bytes": 67108864,
+    "process_limit_bytes": 268435456, "cgroup_limit_bytes": 268435456, "idle_in_transaction_session_timeout_ms": 30000,
+    "statement_timeout_ms": 10000, "lock_timeout_ms": 5000, "tcp_keepalive_ms": 5000, "client_connection_check_interval_ms": 5000,
+    "zombie_detection_bound_ms": 15000, "source_free_disk_bytes": 21474836480
+  },
+  "storage": {
+    "before_state_sha256": "fixture-unchanged", "after_state_sha256": "fixture-unchanged", "journal_mode": "WAL", "synchronous": "FULL", "auto_vacuum": "INCREMENTAL",
+    "filesystem": "ext4", "disposable_probe_succeeded": true, "sqlite_budget_bytes": 1, "spool_budget_bytes": 1, "archive_budget_bytes": 1,
+    "reader_budget_units": 1, "scheduler_budget_units": 1, "audit_budget_units": 1,
+    "writer_attestation": {"run_id": "synthetic-run", "connection_generation": 1, "fresh": true, "synchronous": "FULL"}
+  },
+  "destination": {"clickhouse_mapping_matches": true, "clickhouse_capabilities_match": true, "archive_mapping_matches": true, "archive_capabilities_match": true, "tls_verified": true},
+  "security": {"socket_parent_secure": true, "socket_mode": 384, "peer_policy_enforced": true, "status_read_only": true, "prometheus_read_only": true, "listeners_match": true, "redaction_probe_passed": true, "lock_probe_configured": true, "supervised_restart_configured": true}
+}
