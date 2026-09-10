@@ -1,5 +1,6 @@
 //! Boring CDC library surfaces shared by the single `boring-cdc` binary.
 
+pub mod m1_bootstrap_sm;
 pub mod m1_config;
 pub mod m1_control_fixtures;
 pub mod m1_ddl_fixtures;
