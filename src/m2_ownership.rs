@@ -4,10 +4,10 @@
 //! they do not open a second SQLite writer or load administration credentials themselves.
 
 use sha2::{Digest, Sha256};
-use std::fs::{self, File, OpenOptions};
-use std::io::{Read, Write};
+use std::fs::{File, OpenOptions, TryLockError};
+use std::io::{Read, Seek, Write};
 use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 pub const SOCKET_DIR_MODE: u32 = 0o700;
@@ -45,35 +45,36 @@ impl From<std::io::Error> for OwnershipError {
 pub trait SourceLockSession {
     fn backend_pid(&self) -> i32;
     fn connection_nonce(&self) -> &str;
-    fn try_lock(&mut self, key: i64) -> Result<bool, OwnershipError>;
+    /// Fixed key derived by the adapter from the validated `SourceIdentity`.
+    fn advisory_lock_key(&self) -> i64;
+    fn try_lock(&mut self) -> Result<bool, OwnershipError>;
     fn healthy(&mut self) -> bool;
-    fn unlock(&mut self, key: i64) -> Result<(), OwnershipError>;
+    fn unlock(&mut self) -> Result<(), OwnershipError>;
 }
 
 /// Exclusive local-store lock. A sidecar is used instead of SQLite's transient write lock so
 /// ownership covers reads, reconciliation and remote effects between transactions.
 pub struct StateLock {
-    path: PathBuf,
     file: File,
 }
 impl StateLock {
     pub fn acquire(store: &Path, run_id: &str, nonce: &str) -> Result<Self, OwnershipError> {
         let path = store.with_extension("ownership.lock");
         let mut file = OpenOptions::new()
+            .read(true)
             .write(true)
-            .create_new(true)
+            .create(true)
             .mode(SOCKET_MODE)
-            .open(&path)
-            .map_err(|e| {
-                if e.kind() == std::io::ErrorKind::AlreadyExists {
-                    OwnershipError::StateAlreadyOwned
-                } else {
-                    e.into()
-                }
-            })?;
+            .open(&path)?;
+        file.try_lock().map_err(|e| match e {
+            TryLockError::WouldBlock => OwnershipError::StateAlreadyOwned,
+            TryLockError::Error(error) => error.into(),
+        })?;
+        file.set_len(0)?;
+        file.rewind()?;
         file.write_all(
             format!(
-                "pid={} run={} nonce={}\n",
+                "pid={} run={} nonce={} clean_release=pending\n",
                 std::process::id(),
                 run_id,
                 nonce
@@ -81,25 +82,25 @@ impl StateLock {
             .as_bytes(),
         )?;
         file.sync_all()?;
-        let mode = file.metadata()?.permissions().mode() & 0o777;
-        if mode != SOCKET_MODE {
-            let _ = fs::remove_file(&path);
+        if file.metadata()?.permissions().mode() & 0o777 != SOCKET_MODE {
             return Err(OwnershipError::Io("unsafe lock permissions".into()));
         }
-        Ok(Self { path, file })
+        Ok(Self { file })
     }
 }
 impl Drop for StateLock {
     fn drop(&mut self) {
+        let _ = self.file.set_len(0);
+        let _ = self.file.rewind();
+        let _ = self.file.write_all(b"clean_release=proved\n");
         let _ = self.file.sync_all();
-        let _ = fs::remove_file(&self.path);
+        let _ = self.file.unlock();
     }
 }
 
 pub struct OwnershipGuard<S: SourceLockSession> {
     _state: StateLock,
     source: S,
-    key: i64,
     pub run_id: String,
     pub kind: OwnerKind,
     deadline: Instant,
@@ -111,19 +112,17 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
         store: &Path,
         run_id: String,
         kind: OwnerKind,
-        key: i64,
         deadline: Duration,
         mut source: S,
     ) -> Result<Self, OwnershipError> {
         let nonce = source.connection_nonce().to_owned();
         let state = StateLock::acquire(store, &run_id, &nonce)?;
-        if !source.try_lock(key)? {
+        if !source.try_lock()? {
             return Err(OwnershipError::SourceAlreadyOwned);
         }
         Ok(Self {
             _state: state,
             source,
-            key,
             run_id,
             kind,
             deadline: Instant::now() + deadline,
@@ -162,11 +161,14 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
     pub fn backend_pid(&self) -> i32 {
         self.source.backend_pid()
     }
+    pub fn advisory_lock_key(&self) -> i64 {
+        self.source.advisory_lock_key()
+    }
 }
 impl<S: SourceLockSession> Drop for OwnershipGuard<S> {
     fn drop(&mut self) {
         if !self.fenced {
-            let _ = self.source.unlock(self.key);
+            let _ = self.source.unlock();
         }
     }
 }
@@ -189,12 +191,15 @@ pub enum StartupDecision {
     ResumeWithReseedIncomplete,
     BlockMaintenance,
 }
-pub fn startup_decision(phase: ReseedPhase) -> StartupDecision {
+pub fn startup_decision(phase: ReseedPhase, bound_live_snapshot: bool) -> StartupDecision {
     match phase {
         ReseedPhase::Prepared
         | ReseedPhase::SourceRecreatedAmbiguous
         | ReseedPhase::AmbiguousRequiresRestart
         | ReseedPhase::FailedRequiresFreshReseed => StartupDecision::BlockMaintenance,
+        ReseedPhase::SourceRecreatedBound if !bound_live_snapshot => {
+            StartupDecision::BlockMaintenance
+        }
         ReseedPhase::SourceRecreatedBound
         | ReseedPhase::SnapshotImported
         | ReseedPhase::Promoting => StartupDecision::ResumeWithReseedIncomplete,
@@ -214,8 +219,10 @@ pub struct ActionSnapshot {
     pub history_available: bool,
     pub reserve_sufficient: bool,
 }
-#[derive(Debug, Clone, PartialEq, Eq)]
+// Deliberately not `Debug`: the nonce and confirmation token must never enter logs.
+#[derive(Clone, PartialEq, Eq)]
 pub struct DryRun {
+    nonce: Vec<u8>,
     pub request_id: String,
     pub confirm_token: String,
     pub canonical_argv: Vec<String>,
@@ -256,14 +263,17 @@ pub fn issue_dry_run<W: RequestWriter>(
 ) -> Result<DryRun, ConfirmError> {
     let payload_digest = hash_parts(&[b"payload-v1", payload]);
     let id = hash_parts(&[b"request-v1", nonce, payload_digest.as_bytes()]);
+    let expiry = expires_mono_ms.to_be_bytes();
     let token = hash_parts(&[
         b"confirm-v1",
         secret,
         nonce,
         id.as_bytes(),
         payload_digest.as_bytes(),
+        &expiry,
     ]);
     let p = DryRun {
+        nonce: nonce.to_vec(),
         request_id: id,
         confirm_token: token,
         canonical_argv: argv,
@@ -277,6 +287,7 @@ pub fn confirm<W: RequestWriter>(
     writer: &mut W,
     plan: &DryRun,
     supplied: &str,
+    secret: &[u8],
     payload: &[u8],
     current: &ActionSnapshot,
     now_mono_ms: u64,
@@ -284,7 +295,19 @@ pub fn confirm<W: RequestWriter>(
     if now_mono_ms > plan.expires_mono_ms {
         return Err(ConfirmError::Expired);
     }
-    if !constant_time_eq(supplied.as_bytes(), plan.confirm_token.as_bytes()) {
+    let payload_digest = hash_parts(&[b"payload-v1", payload]);
+    let expiry = plan.expires_mono_ms.to_be_bytes();
+    let expected = hash_parts(&[
+        b"confirm-v1",
+        secret,
+        &plan.nonce,
+        plan.request_id.as_bytes(),
+        payload_digest.as_bytes(),
+        &expiry,
+    ]);
+    if !constant_time_eq(expected.as_bytes(), plan.confirm_token.as_bytes())
+        || !constant_time_eq(supplied.as_bytes(), plan.confirm_token.as_bytes())
+    {
         return Err(ConfirmError::InvalidToken);
     }
     writer.consume(&plan.request_id, payload, current)
@@ -372,8 +395,10 @@ impl AdminCredential {
         }
         Ok(Self(b))
     }
-    pub fn expose_for_admin_call<T>(&self, f: impl FnOnce(&[u8]) -> T) -> T {
-        f(&self.0)
+    pub fn one_shot_admin_call<T>(mut self, f: impl FnOnce(&[u8]) -> T) -> T {
+        let result = f(&self.0);
+        self.0.fill(0);
+        result
     }
 }
 impl Drop for AdminCredential {
@@ -386,6 +411,8 @@ impl Drop for AdminCredential {
 pub(crate) mod tests {
     use super::*;
     use std::collections::HashMap;
+    use std::fs;
+    use std::path::PathBuf;
     use std::sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -402,7 +429,10 @@ pub(crate) mod tests {
         fn connection_nonce(&self) -> &str {
             &self.nonce
         }
-        fn try_lock(&mut self, _: i64) -> Result<bool, OwnershipError> {
+        fn advisory_lock_key(&self) -> i64 {
+            99
+        }
+        fn try_lock(&mut self) -> Result<bool, OwnershipError> {
             Ok(self
                 .source_lock
                 .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
@@ -411,7 +441,7 @@ pub(crate) mod tests {
         fn healthy(&mut self) -> bool {
             self.healthy.load(Ordering::SeqCst)
         }
-        fn unlock(&mut self, _: i64) -> Result<(), OwnershipError> {
+        fn unlock(&mut self) -> Result<(), OwnershipError> {
             self.source_lock.store(false, Ordering::SeqCst);
             Ok(())
         }
@@ -433,7 +463,6 @@ pub(crate) mod tests {
             &p,
             "r1".into(),
             OwnerKind::Runtime,
-            1,
             Duration::from_secs(1),
             session("n1"),
         )
@@ -443,13 +472,25 @@ pub(crate) mod tests {
                 &p,
                 "r2".into(),
                 OwnerKind::Runtime,
-                1,
                 Duration::from_secs(1),
                 session("n2")
             ),
             Err(OwnershipError::StateAlreadyOwned)
         ));
-        drop(g)
+        drop(g);
+        assert_eq!(
+            fs::read_to_string(p.with_extension("ownership.lock")).unwrap(),
+            "clean_release=proved\n"
+        );
+        let g2 = OwnershipGuard::acquire(
+            &p,
+            "r3".into(),
+            OwnerKind::Runtime,
+            Duration::from_secs(1),
+            session("n3"),
+        )
+        .unwrap();
+        assert_eq!(g2.advisory_lock_key(), 99);
     }
     #[test]
     fn two_state_paths_same_source_fail_closed() {
@@ -465,7 +506,6 @@ pub(crate) mod tests {
             &p1,
             "r1".into(),
             OwnerKind::Runtime,
-            99,
             Duration::from_secs(1),
             make("n1"),
         )
@@ -475,7 +515,6 @@ pub(crate) mod tests {
                 &p2,
                 "r2".into(),
                 OwnerKind::Runtime,
-                99,
                 Duration::from_secs(1),
                 make("n2")
             ),
@@ -487,7 +526,6 @@ pub(crate) mod tests {
                 &p2,
                 "r3".into(),
                 OwnerKind::Maintenance,
-                99,
                 Duration::from_secs(1),
                 make("n3")
             )
@@ -508,7 +546,6 @@ pub(crate) mod tests {
             &p,
             "r".into(),
             OwnerKind::Runtime,
-            1,
             Duration::from_millis(10),
             s,
         )
@@ -531,7 +568,6 @@ pub(crate) mod tests {
             &p,
             "r".into(),
             OwnerKind::Runtime,
-            1,
             Duration::from_secs(1),
             session("n"),
         )
@@ -545,23 +581,31 @@ pub(crate) mod tests {
     #[test]
     fn startup_phase_machine_blocks_only_ambiguous_maintenance() {
         assert_eq!(
-            startup_decision(ReseedPhase::Prepared),
+            startup_decision(ReseedPhase::Prepared, true),
             StartupDecision::BlockMaintenance
         );
         assert_eq!(
-            startup_decision(ReseedPhase::SourceRecreatedAmbiguous),
+            startup_decision(ReseedPhase::SourceRecreatedAmbiguous, true),
             StartupDecision::BlockMaintenance
         );
         assert_eq!(
-            startup_decision(ReseedPhase::SnapshotImported),
+            startup_decision(ReseedPhase::SourceRecreatedBound, false),
+            StartupDecision::BlockMaintenance
+        );
+        assert_eq!(
+            startup_decision(ReseedPhase::SourceRecreatedBound, true),
             StartupDecision::ResumeWithReseedIncomplete
         );
         assert_eq!(
-            startup_decision(ReseedPhase::Promoting),
+            startup_decision(ReseedPhase::SnapshotImported, false),
             StartupDecision::ResumeWithReseedIncomplete
         );
         assert_eq!(
-            startup_decision(ReseedPhase::Complete),
+            startup_decision(ReseedPhase::Promoting, true),
+            StartupDecision::ResumeWithReseedIncomplete
+        );
+        assert_eq!(
+            startup_decision(ReseedPhase::Complete, true),
             StartupDecision::Start
         )
     }
@@ -650,9 +694,26 @@ pub(crate) mod tests {
         )
         .unwrap();
         assert_ne!(p1.request_id, p2.request_id);
-        confirm(&mut w, &p1, &p1.confirm_token, b"x", &snap(Some("run")), 10).unwrap();
+        confirm(
+            &mut w,
+            &p1,
+            &p1.confirm_token,
+            b"secret",
+            b"x",
+            &snap(Some("run")),
+            10,
+        )
+        .unwrap();
         assert_eq!(
-            confirm(&mut w, &p1, &p1.confirm_token, b"x", &snap(Some("run")), 10),
+            confirm(
+                &mut w,
+                &p1,
+                &p1.confirm_token,
+                b"secret",
+                b"x",
+                &snap(Some("run")),
+                10,
+            ),
             Err(ConfirmError::Replay)
         )
     }
@@ -671,21 +732,41 @@ pub(crate) mod tests {
         .unwrap();
         let mut changed = snap(Some("new-runtime"));
         assert_eq!(
-            confirm(&mut w, &p, &p.confirm_token, b"x", &changed, 10),
+            confirm(&mut w, &p, &p.confirm_token, b"k", b"x", &changed, 10),
             Err(ConfirmError::OwnershipChanged)
         );
         changed = snap(None);
         changed.control_revisions[0].1 = 3;
         assert_eq!(
-            confirm(&mut w, &p, &p.confirm_token, b"x", &changed, 10),
+            confirm(&mut w, &p, &p.confirm_token, b"k", b"x", &changed, 10),
             Err(ConfirmError::StaleActionPlan)
         );
         assert_eq!(
-            confirm(&mut w, &p, &p.confirm_token, b"changed", &snap(None), 10),
-            Err(ConfirmError::PayloadChanged)
+            confirm(
+                &mut w,
+                &p,
+                &p.confirm_token,
+                b"wrong-secret",
+                b"x",
+                &snap(None),
+                10,
+            ),
+            Err(ConfirmError::InvalidToken)
         );
         assert_eq!(
-            confirm(&mut w, &p, &p.confirm_token, b"x", &snap(None), 21),
+            confirm(
+                &mut w,
+                &p,
+                &p.confirm_token,
+                b"k",
+                b"changed",
+                &snap(None),
+                10,
+            ),
+            Err(ConfirmError::InvalidToken)
+        );
+        assert_eq!(
+            confirm(&mut w, &p, &p.confirm_token, b"k", b"x", &snap(None), 21),
             Err(ConfirmError::Expired)
         )
     }
@@ -706,8 +787,7 @@ pub(crate) mod tests {
         fs::write(&p, b"postgres://admin:seeded-secret@host/db").unwrap();
         fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
         let c = AdminCredential::load(&p).unwrap();
-        assert_eq!(c.expose_for_admin_call(|x| x.len()), 38);
-        drop(c);
+        assert_eq!(c.one_shot_admin_call(|x| x.len()), 38);
         fs::set_permissions(&p, fs::Permissions::from_mode(0o644)).unwrap();
         assert!(AdminCredential::load(&p).is_err());
         fs::remove_file(p).unwrap()
