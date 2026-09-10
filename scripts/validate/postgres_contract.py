@@ -142,9 +142,29 @@ def validate():
             finding(findings, "E_FIXTURE_SHAPE", f"cases/{index}", "fixture is not mechanically executable")
         if case["expected"]["checkpoint"] not in ("unchanged", "advanced_to_fence_transaction"):
             finding(findings, "E_CHECKPOINT_BOUNDARY", f"cases/{index}", "fixture permits partial checkpoint")
-    empty_inputs = [case["fixture_id"] for case in cases if not case.get("inputs")]
-    if empty_inputs:
-        finding(findings, "E_FIXTURE_INPUTS", "fixtures", "empty inputs: " + ",".join(empty_inputs))
+    required_runtime_inputs = {
+        "pre_state", "run_id", "capture_connection_generation", "capture_epoch", "generation",
+        "slot_name", "publication_name", "durable_transaction_end_lsn", "last_feedback_lsn",
+        "journal_checkpoint_seq", "creation_floor_lsn", "ownership_deadline_remaining_ms",
+        "operation_deadline_ms", "exporter_backend_pid", "guard_backend_pid",
+        "importer_backend_pids", "importer_acknowledged", "importer_expected",
+        "expected_close_token", "fence_nonce_hex", "table_set_fingerprint",
+        "failure_fingerprint", "fault_action", "fault_phase",
+    }
+    incomplete_inputs = [case["fixture_id"] for case in cases if required_runtime_inputs - set(case.get("inputs", {}))]
+    if incomplete_inputs:
+        finding(findings, "E_FIXTURE_INPUTS", "fixtures", "incomplete inputs: " + ",".join(incomplete_inputs))
+    required_case_inputs = {
+        "SCN-M0-PG-PUBLICATION-DRIFT": {"expected_publication_fingerprint", "observed_publication_fingerprint", "catalog_poll_age_ms"},
+        "SCN-M0-PG-CONTROL-CARDINALITY": {"attempted_affected_row_counts", "required_affected_rows"},
+        "SCN-M0-PG-DDL-CONFLICT-MATRIX": {"ddl_operation", "requested_lock", "held_guard_lock", "observed"},
+        "SCN-M0-PG-BOOTSTRAP-EXPORTER-LOSS": {"disconnect_backend_pid", "importer_acknowledged", "importer_expected"},
+        "SCN-M0-PG-GUARD-LOSS": {"disconnect_backend_pid", "durable_fence_observed"},
+    }
+    for case in cases:
+        missing = required_case_inputs.get(case["fixture_id"], set()) - set(case["inputs"])
+        if missing:
+            finding(findings, "E_FIXTURE_BRANCH_INPUT", case["fixture_id"], ",".join(sorted(missing)))
     copyboth = cases[0].get("inputs", {}) if cases else {}
     if not copyboth.get("start_replication_hex") or not copyboth.get("server_copyboth_response_hex") or not copyboth.get("xlog_copydata_payload_hex"):
         finding(findings, "E_PROTOCOL_GOLDEN", "fixtures/0", "exact START_REPLICATION and CopyBoth bytes absent")
