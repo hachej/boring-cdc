@@ -8,7 +8,6 @@ use crate::m1_transition_kernel::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
-use std::cmp::Ordering;
 use std::fmt;
 
 // M0-PROVISIONAL: boring-cdc-d-pg-protocol
@@ -495,35 +494,6 @@ pub fn standby_status(
         apply_lsn: end,
         client_timestamp_micros,
         requested_reply,
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum VersionComparison {
-    Less,
-    Equal,
-    Greater,
-    DifferentCaptureEpoch,
-}
-
-#[must_use]
-pub fn compare_source_versions(left: SourceVersion, right: SourceVersion) -> VersionComparison {
-    if left.capture_epoch() != right.capture_epoch() {
-        return VersionComparison::DifferentCaptureEpoch;
-    }
-    match (
-        left.commit_lsn().get(),
-        left.transaction_id(),
-        left.ordinal(),
-    )
-        .cmp(&(
-            right.commit_lsn().get(),
-            right.transaction_id(),
-            right.ordinal(),
-        )) {
-        Ordering::Less => VersionComparison::Less,
-        Ordering::Equal => VersionComparison::Equal,
-        Ordering::Greater => VersionComparison::Greater,
     }
 }
 
@@ -1034,22 +1004,9 @@ mod tests {
             1,
             0,
         );
-        assert_eq!(
-            compare_source_versions(left, later),
-            VersionComparison::Less
-        );
-        assert_eq!(
-            compare_source_versions(left, left),
-            VersionComparison::Equal
-        );
-        assert_eq!(
-            compare_source_versions(later, left),
-            VersionComparison::Greater
-        );
-        assert_eq!(
-            compare_source_versions(later, other_epoch),
-            VersionComparison::DifferentCaptureEpoch
-        );
+        assert_eq!(left.capture_epoch(), later.capture_epoch());
+        assert_ne!(left.commit_lsn(), later.commit_lsn());
+        assert_ne!(left.capture_epoch(), other_epoch.capture_epoch());
     }
 
     #[test]

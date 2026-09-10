@@ -275,6 +275,9 @@ impl MutationVersion {
         if position.row_ordinal != u64::from(source.ordinal()) {
             return Err(OrderingFailure::contract("ROW_ORDINAL_MISMATCH"));
         }
+        if position.transaction_end_lsn.get() < source.commit_lsn().get() {
+            return Err(OrderingFailure::contract("END_LSN_BEFORE_COMMIT_LSN"));
+        }
         Ok(Self {
             source,
             origin_rank: WAL_ORIGIN_RANK,
@@ -389,6 +392,13 @@ pub fn expand_key_change(
     validate_key(&new_key)?;
     if old_key == new_key {
         return Err(OrderingFailure::contract("KEY_CHANGE_IDENTITIES_EQUAL"));
+    }
+    if new_columns.is_empty()
+        || new_columns
+            .iter()
+            .any(|state| matches!(state, ColumnState::Absent | ColumnState::UnchangedToast))
+    {
+        return Err(OrderingFailure::contract("KEY_CHANGE_NEW_TUPLE_INCOMPLETE"));
     }
     let build = |mutation_ordinal, key, kind, columns| {
         let input = WalIdentityInput {
@@ -651,6 +661,25 @@ mod tests {
             mutations[0].connector_event_id(),
             mutations[1].connector_event_id()
         );
+        for incomplete in [
+            vec![],
+            vec![ColumnState::Absent],
+            vec![ColumnState::UnchangedToast],
+        ] {
+            assert_eq!(
+                expand_key_change(
+                    wal(0),
+                    source(112, 8, 3),
+                    relation(),
+                    key(b"old"),
+                    key(b"new"),
+                    incomplete
+                )
+                .unwrap_err()
+                .fingerprint,
+                "KEY_CHANGE_NEW_TUPLE_INCOMPLETE"
+            );
+        }
     }
 
     #[test]
@@ -803,6 +832,16 @@ mod tests {
             .unwrap_err()
             .fingerprint,
             "CAPTURE_EPOCH_MISMATCH"
+        );
+        let invalid_end = WalIdentityInput {
+            transaction_end_lsn: ReceivedLsn::from_wire(111),
+            ..wal(0)
+        };
+        assert_eq!(
+            MutationVersion::from_wal(source(112, 8, 3), invalid_end)
+                .unwrap_err()
+                .fingerprint,
+            "END_LSN_BEFORE_COMMIT_LSN"
         );
         let position = WalIdentityInput {
             row_ordinal: 4,
