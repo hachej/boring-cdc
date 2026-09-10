@@ -5,11 +5,11 @@ spec=importlib.util.spec_from_file_location('archive_contract',ROOT/'scripts/val
 class ArchiveContractTests(unittest.TestCase):
  def test_contract_is_valid(self): self.assertEqual([],m.validate()[0])
  def test_fixture_inventory_and_branches(self):
-  c=m.load(m.C); f=m.load(m.F); self.assertEqual(c['fixture_ids'],[x['fixture_id'] for x in f['cases']]); self.assertEqual(36,len(f['cases']))
+  c=m.load(m.C); f=m.load(m.F); self.assertEqual(c['fixture_ids'],[x['fixture_id'] for x in f['cases']]); self.assertEqual(41,len(f['cases']))
  def test_golden_manifest_hash_scope(self):
   h=m.load(m.C)['hashes']; wire=json.dumps(h['golden_manifest'],sort_keys=True,separators=(',',':'),ensure_ascii=True).encode(); self.assertEqual(h['golden_manifest_sha256'],hashlib.sha256(wire).hexdigest())
  def test_commit_order(self):
-  steps=m.load(m.C)['commit_protocol']['ordered_steps']; terms=['pending intent','write each file','manifest.json','rename staging','SEGMENT_READY','segment_ready','fence selector','promoted generation']; positions=[next(i for i,x in enumerate(steps) if term in x) for term in terms]; self.assertEqual(sorted(positions),positions)
+  steps=m.load(m.C)['commit_protocol']['ordered_steps']; terms=['pending intent','write each file','segment-manifest.json','rename staging','SEGMENT_READY','segment_ready']; positions=[next(i for i,x in enumerate(steps) if term in x) for term in terms]; self.assertEqual(sorted(positions),positions); promotion=m.load(m.C)['commit_protocol']['generation_promotion_steps']; pterms=['candidate_complete','generation-manifest.json','GENERATION_READY','greater-fence generation selector','promoted generation']; ppos=[next(i for i,x in enumerate(promotion) if term in x) for term in pterms]; self.assertEqual(sorted(ppos),ppos)
  def test_blocked_cases_never_advance(self):
   for case in m.load(m.F)['cases']:
    if case['expected']['archive_state'].startswith('blocked'): self.assertEqual('unchanged',case['expected']['checkpoint'],case['fixture_id'])

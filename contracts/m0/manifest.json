@@ -42,12 +42,17 @@
         "SCN-M0-ARCHIVE-GC-RETIREMENT-GRACE",
         "SCN-M0-ARCHIVE-GC-ELIGIBLE",
         "SCN-M0-ARCHIVE-UNSUPPORTED-FILESYSTEM",
-        "SCN-M0-ARCHIVE-ENOSPC-BEFORE-RESERVE"
+        "SCN-M0-ARCHIVE-ENOSPC-BEFORE-RESERVE",
+        "SCN-M0-ARCHIVE-CRASH-AFTER-GENERATION-MANIFEST",
+        "SCN-M0-ARCHIVE-CRASH-AFTER-GENERATION-READY",
+        "SCN-M0-ARCHIVE-CRASH-AFTER-SELECTOR-SYNC",
+        "SCN-M0-ARCHIVE-FORMAT-CHANGE-NEW-GENERATION",
+        "SCN-M0-ARCHIVE-EXPLICIT-DISCONTINUITY"
       ],
       "id": "ART-M0-ARCHIVE-MODEL",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.json",
-      "sha256": "dce8a2a0e8468fdd2f9cf995a43426056edb89ff070ed388f0a03e7744864a86",
+      "sha256": "e575933b71fcd74a277ca7d78603c7bc934a65a2b033fa141051391539e0f414",
       "status": "complete"
     },
     {

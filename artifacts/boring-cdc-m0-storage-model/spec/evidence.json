@@ -18,5 +18,5 @@
   "source_parent_git_commit": "574b026cfc848e97027157ed6e85bd3612f579a0",
   "status": "pass",
   "validator": "scripts/validate/storage_contract.py",
-  "validator_sha256": "2cd69a597eea32df628331b654719823bf104bdb47253444c8f2d9bd937284a1"
+  "validator_sha256": "a92977533e45744a5a95966f0e84e89e2f71faac190a7f444db4efdefd94cb8f"
 }

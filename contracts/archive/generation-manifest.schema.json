@@ -1,0 +1,140 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "capture_epoch",
+    "generation",
+    "promotion_fence",
+    "compatible_anchor",
+    "table_set_fingerprint",
+    "config_fingerprint",
+    "writer_config_sha256",
+    "enabled_formats",
+    "segment_manifests",
+    "complete_checkpoint",
+    "verification"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "archive-generation-manifest/v1"
+    },
+    "capture_epoch": {
+      "type": "string"
+    },
+    "generation": {
+      "type": "integer"
+    },
+    "promotion_fence": {
+      "type": "integer"
+    },
+    "compatible_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor_id",
+        "lower_journal_seq",
+        "post_copy_journal_seq"
+      ],
+      "properties": {
+        "anchor_id": {
+          "type": "string"
+        },
+        "lower_journal_seq": {
+          "type": "integer"
+        },
+        "post_copy_journal_seq": {
+          "type": "integer"
+        }
+      }
+    },
+    "table_set_fingerprint": {
+      "type": "string"
+    },
+    "config_fingerprint": {
+      "type": "string"
+    },
+    "writer_config_sha256": {
+      "type": "string"
+    },
+    "enabled_formats": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "segment_manifests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relative_path",
+          "manifest_sha256",
+          "start_journal_seq",
+          "end_journal_seq",
+          "event_count"
+        ],
+        "properties": {
+          "relative_path": {
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "type": "string"
+          },
+          "start_journal_seq": {
+            "type": "integer"
+          },
+          "end_journal_seq": {
+            "type": "integer"
+          },
+          "event_count": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "complete_checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journal_seq",
+        "commit_lsn_u64"
+      ],
+      "properties": {
+        "journal_seq": {
+          "type": "integer"
+        },
+        "commit_lsn_u64": {
+          "type": "integer"
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "watermark",
+        "formats_semantically_equal",
+        "no_gaps_or_overlaps"
+      ],
+      "properties": {
+        "anchor": {
+          "type": "boolean"
+        },
+        "watermark": {
+          "type": "boolean"
+        },
+        "formats_semantically_equal": {
+          "type": "boolean"
+        },
+        "no_gaps_or_overlaps": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Archive generation manifest"
+}

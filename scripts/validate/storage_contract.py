@@ -23,7 +23,7 @@ def validate():
  for x in sf:add(fs,'E_SCHEMA',x['pointer'],x['message'])
  sf=[]; core.validate_schema_instance(f,fschema,sf,base=FS.parent,root=fschema)
  for x in sf:add(fs,'E_FIXTURE_SCHEMA',x['pointer'],x['message'])
- if 'M0-" + "PROVISIONAL' in C.read_text() or 'M0-" + "PROVISIONAL' in Q.read_text():add(fs,'E_PROVISIONAL','contract','reconciled artifact contains a provisional marker')
+ if 'M0-' + 'PROVISIONAL' in C.read_text() or 'M0-' + 'PROVISIONAL' in Q.read_text():add(fs,'E_PROVISIONAL','contract','reconciled artifact contains a provisional marker')
  p=c['sqlite']; expected=('3.45.3',4096,5000,0,16,5000,4096,10000)
  got=(p['version'],p['page_size_bytes'],p['connection_pragmas']['busy_timeout_ms'],p['connection_pragmas']['wal_autocheckpoint_pages'],p['connections']['max_readers'],p['connections']['max_reader_age_ms'],p['connections']['max_reader_pages'],p['actual_connection_attestation']['freshness_ms'])
  if got!=expected:add(fs,'E_SQLITE_LITERALS','sqlite','recommended SQLite literals changed')

@@ -4,28 +4,35 @@
       "id": "ART-M0-ARCHIVE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "artifacts/boring-cdc-m0-archive-model/spec/evidence.json",
-      "sha256": "08be133239e6683c88dc527d259561f95dbfd6a98f4a972820713960649aae74",
+      "sha256": "1743042d7713b178c0e66331be669bf1475915c479af4a39d3036f61ffdaf4d2",
       "status": "complete"
     },
     {
       "id": "ART-M0-ARCHIVE-FIXTURE-SCHEMA",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-fixtures.schema.json",
-      "sha256": "09cd1d7bbe7f6cab538bdd33728dd6ae87e229474469614644d44c1e3a278ff7",
+      "sha256": "bbf69c25a3a2aee6e033c6f0f49c201bf8f43ab03a8038285f165a56165bc4d0",
       "status": "complete"
     },
     {
       "id": "ART-M0-ARCHIVE-FIXTURES",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "fixtures/m0/archive/scenarios.json",
-      "sha256": "64d03441435615d387f3ef739d047fa0c8153b2f3890d5647726f76fb7a2da2f",
+      "sha256": "7d7bac236b9ce99693b8492cef49c7c64006ecbfbeed6210f9b017d800fff01b",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-ARCHIVE-GENERATION-MANIFEST-SCHEMA",
+      "owner_bead": "boring-cdc-m0-archive-model",
+      "path": "contracts/archive/generation-manifest.schema.json",
+      "sha256": "af63decde44dcc9464d320bbe7b27e6ea82087e5416e7b859a31a0ff52f71eb1",
       "status": "complete"
     },
     {
       "id": "ART-M0-ARCHIVE-MODEL",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.json",
-      "sha256": "dce8a2a0e8468fdd2f9cf995a43426056edb89ff070ed388f0a03e7744864a86",
+      "sha256": "e575933b71fcd74a277ca7d78603c7bc934a65a2b033fa141051391539e0f414",
       "status": "complete"
     },
     {
@@ -39,7 +46,7 @@
       "id": "ART-M0-ARCHIVE-SCHEMA",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.schema.json",
-      "sha256": "6911ce47f17987a5e5395b3c88ad14ff9b915e45528dc352c6a96ddd0fffa3b2",
+      "sha256": "06bb79a0a781f58c86dcdd4ed010f2ea11d9eb89e12eccb9a5379b69ac492f5b",
       "status": "complete"
     },
     {
@@ -64,10 +71,17 @@
       "status": "complete"
     },
     {
+      "id": "ART-M0-ARCHIVE-SEGMENT-MANIFEST-SCHEMA",
+      "owner_bead": "boring-cdc-m0-archive-model",
+      "path": "contracts/archive/segment-manifest.schema.json",
+      "sha256": "bae21144d8c312f21b3c9c53deff34606367b89f8aee6639e9c1e3169026212f",
+      "status": "complete"
+    },
+    {
       "id": "ART-M0-ARCHIVE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "scripts/validate/archive_contract.py",
-      "sha256": "6c53ad53878e741c303c18b2a242d06330d1b11fc61800f6c74f2b29ad54cf2d",
+      "sha256": "87bd9caf960078161e9f7c80d1966936c13453c68b40378398d66b49570a18ce",
       "status": "complete"
     },
     {
@@ -242,7 +256,7 @@
       "id": "ART-M0-STORAGE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "artifacts/boring-cdc-m0-storage-model/spec/evidence.json",
-      "sha256": "12439da539bfbf057d075464ee9f9f5e5de19c0922e5d10bc20ad87e044a119b",
+      "sha256": "ec7f6abc7468fb24d022867dfd9f3e89662350d58d9767db7e0d29919b9efc1f",
       "status": "complete"
     },
     {
@@ -291,7 +305,7 @@
       "id": "ART-M0-STORAGE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "scripts/validate/storage_contract.py",
-      "sha256": "2cd69a597eea32df628331b654719823bf104bdb47253444c8f2d9bd937284a1",
+      "sha256": "a92977533e45744a5a95966f0e84e89e2f71faac190a7f444db4efdefd94cb8f",
       "status": "complete"
     }
   ],
