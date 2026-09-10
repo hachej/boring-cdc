@@ -1,0 +1,20 @@
+{
+  "assertions": [
+    "intent_guard_slot_order",
+    "exact_snapshot_first_statement",
+    "durable_feedback_gate",
+    "all_crash_boundaries",
+    "retained_slot_insert_delete",
+    "published_fence_anchor",
+    "strict_new_epoch_reseed",
+    "bounded_scoped_completions"
+  ],
+  "implementation_sha": "91a0d57c15dd487463b94c067e671949028e345b",
+  "m0_provisional_count": 4,
+  "owner_bead": "boring-cdc-m1-bootstrap-sm",
+  "result": "pass",
+  "runtime_observed": false,
+  "scenario_count": 18,
+  "schema_version": "boring-cdc/bootstrap-proof-summary/v1",
+  "seed": 45063
+}

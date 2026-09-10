@@ -1,0 +1,76 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-1.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    {
+      "argv": "cargo test --locked m1_bootstrap_sm::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-2.stderr",
+      "stderr_sha256": "a0e9244cf57b9dc9f0b37e4426b8a9e27fc90d118dba7becb5180b50a54f54b0",
+      "stdout_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-2.log",
+      "stdout_sha256": "b71d326228d4c140206adff46d9953ea7b1275e9182f4d328f33721ba1c1f635",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    {
+      "argv": "scripts/validate/m1_bootstrap_sm.py",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-3.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-3.log",
+      "stdout_sha256": "8d7eaa662b7a8cc2a78442069f715d98d60ca5273306bceb0aec1527d0bc661b",
+      "version": "3.13.3"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "leaf",
+  "git_commit": "91a0d57c15dd487463b94c067e671949028e345b",
+  "owner_bead": "boring-cdc-m1-bootstrap-sm",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/proof-summary.json",
+      "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/versions.json",
+      "contracts/m1/bootstrap-sm-cases.json"
+    ],
+    "digest": "f34f1758bd2292a760ecdfa8bf9492c33914a9231d1b9b211bc970faf0330a57",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-BOOTSTRAP-LEAF",
+  "schema_version": "evidence/v1",
+  "seed": "45063 (0xB007)",
+  "source_preservation": {
+    "after_sha256": "a88686577d95e1a915621b2ef6011fa451facc193e53378de86636def51c0275",
+    "before_sha256": "a88686577d95e1a915621b2ef6011fa451facc193e53378de86636def51c0275",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": false,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": false,
+    "full_failure_matrix": true,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}
