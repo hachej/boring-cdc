@@ -13,6 +13,7 @@
       "capture_epoch",
       "generation",
       "lower_stitch_lsn",
+      "lower_stitch_seq",
       "start_seq",
       "snapshot_boundary_lsn",
       "snapshot_complete_seq",
@@ -172,12 +173,6 @@
     {
       "guard_conflicts": true,
       "minimum_lock": "ACCESS EXCLUSIVE",
-      "operation": "ALTER TABLE ATTACH/DETACH PARTITION",
-      "outcome": "requires re-seed"
-    },
-    {
-      "guard_conflicts": true,
-      "minimum_lock": "ACCESS EXCLUSIVE",
       "operation": "ALTER TABLE SET SCHEMA",
       "outcome": "requires re-seed"
     },
@@ -249,31 +244,57 @@
     "SCN-M0-PG-EXISTING-SLOT-STITCH",
     "SCN-M0-PG-CAPTURE-FENCE",
     "SCN-M0-PG-RETAINED-SLOT-RECOVERY",
-    "SCN-M0-PG-WAL-HEADROOM"
+    "SCN-M0-PG-WAL-HEADROOM",
+    "SCN-M0-PG-BEFORE-SLOT-CREATE",
+    "SCN-M0-PG-TOKEN-PERSIST",
+    "SCN-M0-PG-EXPORTER-RELEASE-BEFORE",
+    "SCN-M0-PG-EXPORTER-RELEASE-AFTER",
+    "SCN-M0-PG-START-REPLICATION",
+    "SCN-M0-PG-FIRST-FEEDBACK",
+    "SCN-M0-PG-COMMIT-FEEDBACK-CRASH",
+    "SCN-M0-PG-SAFE-STOP-PERSIST-BEFORE",
+    "SCN-M0-PG-EXPECTED-CLOSE-TOKEN",
+    "SCN-M0-PG-ADVISORY-PROBE-LATE",
+    "SCN-M0-PG-SNAPSHOT-EXPORT-AFTER-GUARD",
+    "SCN-M0-PG-CHUNK-COMMIT",
+    "SCN-M0-PG-FENCE-UPDATE-BEFORE",
+    "SCN-M0-PG-FENCE-UPDATE-AFTER",
+    "SCN-M0-PG-GUARD-LOSS"
   ],
   "hooks": [
-    "before_slot_create",
+    "copyboth_frame",
+    "origin_message",
+    "keepalive_reply_requested",
+    "restart_request",
+    "startup_reconcile",
     "after_slot_server_response",
-    "after_snapshot_token_persist",
+    "after_safe_stop_persist_before_close",
+    "unexpected_copyboth_eof",
+    "during_spool_before_commit",
+    "catalog_poll",
+    "control_update_row_count",
+    "roles_sql_probe",
+    "before_snapshot_export",
+    "relation_then_dml",
+    "ddl_waiter_limit",
     "after_import_ack",
+    "before_all_import_ack",
+    "after_lower_stitch_persist",
+    "after_fence_journal_before_anchor",
+    "wal_metric_sample",
+    "before_slot_create",
+    "after_snapshot_token_persist",
     "before_exporter_release",
     "after_exporter_release",
     "before_start_replication",
     "before_first_feedback",
-    "during_spool_before_commit",
     "after_journal_commit_before_feedback",
     "before_safe_stop_persist",
-    "after_safe_stop_persist_before_close",
     "after_expected_close_token",
-    "unexpected_copyboth_eof",
     "advisory_probe_late",
-    "before_snapshot_export",
-    "after_lower_stitch_persist",
     "after_chunk_commit",
     "before_fence_update",
     "after_fence_update_before_observe",
-    "after_fence_journal_before_anchor",
-    "ddl_waiter_limit",
     "guard_connection_loss"
   ],
   "owner_bead": "boring-cdc-m0-pg-contract",
@@ -323,10 +344,13 @@
     ],
     "streaming": false,
     "transport": {
+      "adapter": "boring-cdc-pgwire-v1",
       "crate": "pgwire-replication",
       "feature": "tls-rustls,scram",
+      "implementation_boundary": "use pinned crate CopyBoth framing/auth/TLS and public status encoder; owned adapter encodes exact START_REPLICATION query and always passes false for outgoing reply_requested",
       "provisional": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol",
       "required_capability": "incremental bidirectional logical-replication CopyBoth with standby-status writes; no complete-stream collection",
+      "stock_high_level_worker": "forbidden: cannot encode frozen streaming/two_phase/origin options and replies to requested keepalive with outgoing reply_requested=true",
       "version": "0.4.0"
     },
     "tuple_mode": "text",
@@ -371,13 +395,15 @@
   },
   "result_contract": {
     "artifact_root": "artifacts/boring-cdc-m0-pg-contract/spec",
+    "contract_schema": "contracts/postgres/capture-backfill.schema.json",
+    "evidence_schema": "contracts/postgres/postgres-contract-evidence.schema.json",
+    "fixture_schema": "contracts/postgres/capture-backfill-fixtures.schema.json",
     "fixture_spec": "fixtures/m0/postgres/capture-backfill.json",
     "redaction": [
       "no DSN/password/private key",
       "no absolute workspace or temporary path",
       "role names and fixture literals only"
     ],
-    "schema": "contracts/postgres/capture-backfill.schema.json",
     "validator": "scripts/validate/postgres_contract.py"
   },
   "roles_sql": "contracts/postgres/roles-grants.sql",
@@ -584,6 +610,10 @@
     {
       "operation": "ALTER PUBLICATION membership/options",
       "reason": "administration-only lifecycle; may not run concurrently; fingerprint drift requires re-seed and is not claimed blocked by ACCESS SHARE"
+    },
+    {
+      "operation": "ALTER TABLE ATTACH PARTITION or DETACH PARTITION [CONCURRENTLY]",
+      "reason": "PostgreSQL 17 may use SHARE UPDATE EXCLUSIVE on the parent, which does not conflict with ACCESS SHARE; unsupported during an active guarded generation until a stronger guard exists"
     }
   ],
   "wal_headroom": {

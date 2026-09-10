@@ -495,10 +495,16 @@
         "transport": {
           "additionalProperties": false,
           "properties": {
+            "adapter": {
+              "type": "string"
+            },
             "crate": {
               "type": "string"
             },
             "feature": {
+              "type": "string"
+            },
+            "implementation_boundary": {
               "type": "string"
             },
             "provisional": {
@@ -507,15 +513,21 @@
             "required_capability": {
               "type": "string"
             },
+            "stock_high_level_worker": {
+              "type": "string"
+            },
             "version": {
               "type": "string"
             }
           },
           "required": [
+            "adapter",
             "crate",
             "feature",
+            "implementation_boundary",
             "provisional",
             "required_capability",
+            "stock_high_level_worker",
             "version"
           ],
           "type": "object"
@@ -627,6 +639,15 @@
         "artifact_root": {
           "type": "string"
         },
+        "contract_schema": {
+          "type": "string"
+        },
+        "evidence_schema": {
+          "type": "string"
+        },
+        "fixture_schema": {
+          "type": "string"
+        },
         "fixture_spec": {
           "type": "string"
         },
@@ -636,9 +657,6 @@
           },
           "type": "array"
         },
-        "schema": {
-          "type": "string"
-        },
         "validator": {
           "type": "string"
         }
@@ -647,8 +665,10 @@
         "artifact_root",
         "fixture_spec",
         "redaction",
-        "schema",
-        "validator"
+        "validator",
+        "contract_schema",
+        "fixture_schema",
+        "evidence_schema"
       ],
       "type": "object"
     },

@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import re
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -14,8 +15,10 @@ CONTRACT = ROOT / "contracts/postgres/capture-backfill.json"
 SCHEMA = ROOT / "contracts/postgres/capture-backfill.schema.json"
 FIXTURES = ROOT / "fixtures/m0/postgres/capture-backfill.json"
 FIXTURE_SCHEMA = ROOT / "contracts/postgres/capture-backfill-fixtures.schema.json"
+EVIDENCE_SCHEMA = ROOT / "contracts/postgres/postgres-contract-evidence.schema.json"
 SQL = ROOT / "contracts/postgres/roles-grants.sql"
 EVIDENCE = ROOT / "artifacts/boring-cdc-m0-pg-contract/spec/evidence.json"
+VALIDATOR = ROOT / "scripts/validate/postgres_contract.py"
 CORE_SPEC = importlib.util.spec_from_file_location("core_validator", ROOT / "scripts/lib/core_validator.py")
 CORE = importlib.util.module_from_spec(CORE_SPEC)
 CORE_SPEC.loader.exec_module(CORE)
@@ -63,8 +66,11 @@ def validate():
     required_options = ["proto_version", "publication_names", "binary", "messages", "streaming", "two_phase", "origin"]
     if protocol["option_order"] != required_options or any(value is not False for value in (protocol["binary"], protocol["streaming"], protocol["two_phase"])) or protocol["origin"] != "any":
         finding(findings, "E_PROTOCOL_OPTIONS", "protocol", "logical-replication options changed")
-    if (protocol["transport"]["crate"], protocol["transport"]["version"], protocol["transport"]["feature"]) != ("pgwire-replication", "0.4.0", "tls-rustls,scram"):
-        finding(findings, "E_TRANSPORT", "protocol/transport", "CopyBoth transport pin changed")
+    transport = protocol["transport"]
+    if (transport["crate"], transport["version"], transport["feature"], transport.get("adapter")) != ("pgwire-replication", "0.4.0", "tls-rustls,scram", "boring-cdc-pgwire-v1"):
+        finding(findings, "E_TRANSPORT", "protocol/transport", "CopyBoth transport/adapter pin changed")
+    if not transport.get("stock_high_level_worker", "").startswith("forbidden:") or "always passes false" not in transport.get("implementation_boundary", ""):
+        finding(findings, "E_TRANSPORT_ADAPTER", "protocol/transport", "stock-worker incompatibility or safe status adapter requirement absent")
     if "START_REPLICATION SLOT" not in protocol["start_replication_template"] or "origin 'any'" not in protocol["start_replication_template"]:
         finding(findings, "E_START_REPLICATION", "protocol/start_replication_template", "template is incomplete")
 
@@ -96,6 +102,8 @@ def validate():
         "GRANT UPDATE (nonce, updated_at) ON boring_cdc_control.heartbeat",
         "GRANT UPDATE (capture_epoch, generation, table_set_fingerprint, unique_nonce)",
         "publish = 'insert, update, delete, truncate'", "ALTER PUBLICATION boring_cdc OWNER TO boring_cdc_admin",
+        "configure_selected_relations(selected regclass[])", "GRANT SELECT ON TABLE %s TO boring_cdc_capture",
+        "ALTER PUBLICATION boring_cdc ADD TABLE %s",
     )
     for fragment in required_sql:
         if fragment not in sql:
@@ -106,6 +114,8 @@ def validate():
     ddl = contract["ddl_matrix"]
     if len(ddl) < 10 or any(row["minimum_lock"] != "ACCESS EXCLUSIVE" or row["guard_conflicts"] is not True for row in ddl):
         finding(findings, "E_DDL_MATRIX", "ddl_matrix", "finite admitted DDL conflict proof is incomplete")
+    if any("ATTACH" in row["operation"] or "DETACH" in row["operation"] for row in ddl):
+        finding(findings, "E_DDL_PARTITION_LOCK", "ddl_matrix", "PG17 partition attach/detach is not admitted under ACCESS SHARE")
     if not all(term in contract["bootstrap"]["initial"] for term in ("acquire canonical ACCESS SHARE DDL guard and verify contracts", "each importer SET TRANSACTION SNAPSHOT as first statement", "publish and durably observe unique capture fence")):
         finding(findings, "E_BOOTSTRAP_SEQUENCE", "bootstrap/initial", "required ordered bootstrap phases absent")
 
@@ -120,14 +130,27 @@ def validate():
     case_ids = [case.get("fixture_id") for case in cases]
     if fixture_ids != case_ids or len(set(case_ids)) != len(case_ids):
         finding(findings, "E_FIXTURE_INVENTORY", "fixtures", "ordered contract/fixture inventory differs or duplicates")
-    if {case.get("executor_id") for case in cases} - set(contract["executors"]):
-        finding(findings, "E_EXECUTOR_MAP", "fixtures", "fixture executor is not declared")
+    used_executors = {case.get("executor_id") for case in cases}
+    if used_executors != set(contract["executors"]):
+        finding(findings, "E_EXECUTOR_MAP", "fixtures", "fixture/executor mapping is not total")
+    used_hooks = {case.get("hook") for case in cases}
+    if used_hooks != set(contract["hooks"]):
+        finding(findings, "E_HOOK_MAP", "fixtures", "declared hooks and fixture hooks differ")
     required_expected = {"state", "exit_code", "checkpoint", "feedback", "external_effect", "status_code", "metric"}
     for index, case in enumerate(cases):
         if set(case.get("expected", {})) != required_expected or not case.get("hook") or not case.get("preconditions") or case.get("seed") != "0x50474344434d305631":
             finding(findings, "E_FIXTURE_SHAPE", f"cases/{index}", "fixture is not mechanically executable")
         if case["expected"]["checkpoint"] not in ("unchanged", "advanced_to_fence_transaction"):
             finding(findings, "E_CHECKPOINT_BOUNDARY", f"cases/{index}", "fixture permits partial checkpoint")
+    empty_inputs = [case["fixture_id"] for case in cases if not case.get("inputs")]
+    if empty_inputs:
+        finding(findings, "E_FIXTURE_INPUTS", "fixtures", "empty inputs: " + ",".join(empty_inputs))
+    copyboth = cases[0].get("inputs", {}) if cases else {}
+    if not copyboth.get("start_replication_hex") or not copyboth.get("server_copyboth_response_hex") or not copyboth.get("xlog_copydata_payload_hex"):
+        finding(findings, "E_PROTOCOL_GOLDEN", "fixtures/0", "exact START_REPLICATION and CopyBoth bytes absent")
+    keepalive = next((case for case in cases if case.get("fixture_id") == "SCN-M0-PG-KEEPALIVE-REPLY"), {})
+    if keepalive.get("inputs", {}).get("expected_status_packet_bytes") != 34 or not keepalive.get("inputs", {}).get("expected_status_packet_hex", "").endswith("00"):
+        finding(findings, "E_STATUS_GOLDEN", "fixtures", "complete 34-byte status packet with outgoing reply=false absent")
     compound = [case for case in cases if case["fixture_id"] in {
         "SCN-M0-PG-CREATION-FLOOR-NULL", "SCN-M0-PG-CREATION-FLOOR-EQUAL",
         "SCN-M0-PG-CREATION-FLOOR-INVALID-SLOT", "SCN-M0-PG-CREATION-FLOOR-WAL-UNAVAILABLE",
@@ -138,22 +161,35 @@ def validate():
     if rejected.get("SCN-M0-PG-CREATION-FLOOR-INVALID-SLOT") != "requires_reseed" or rejected.get("SCN-M0-PG-CREATION-FLOOR-WAL-UNAVAILABLE") != "requires_reseed":
         finding(findings, "E_CREATION_FLOOR_PREDICATES", "fixtures", "slot validity and WAL availability are not independently required")
 
-    inputs = {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in (CONTRACT, SCHEMA, FIXTURE_SCHEMA, FIXTURES, SQL)}
+    inputs = {str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest() for path in (CONTRACT, SCHEMA, FIXTURE_SCHEMA, EVIDENCE_SCHEMA, FIXTURES, SQL)}
     return findings, inputs
 
 
 def main():
     findings, inputs = validate()
+    prior = load(EVIDENCE) if EVIDENCE.exists() else {}
+    source_parent = prior.get("source_parent_git_commit") or subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    tree_material = b"".join((path + "\0" + digest + "\n").encode() for path, digest in sorted(inputs.items()))
     evidence = {
         "schema_version": "m0-postgres-contract-evidence/v1", "owner_bead": OWNER,
         "status": "pass" if not findings else "fail", "validator": "scripts/validate/postgres_contract.py",
+        "validator_sha256": hashlib.sha256(VALIDATOR.read_bytes()).hexdigest(),
+        "source_parent_git_commit": source_parent,
+        "input_tree_sha256": hashlib.sha256(tree_material).hexdigest(),
         "inputs": inputs, "fixture_count": len(load(FIXTURES)["cases"]), "findings": findings,
         "runtime_observed": False, "product_faults": "fault_not_applicable",
     }
+    evidence_schema_findings = []
+    CORE.validate_schema_instance(evidence, load(EVIDENCE_SCHEMA), evidence_schema_findings, base=EVIDENCE_SCHEMA.parent, root=load(EVIDENCE_SCHEMA))
+    if evidence_schema_findings:
+        evidence["status"] = "fail"
+        evidence["findings"].extend({"code": "E_EVIDENCE_SCHEMA", "path": item["pointer"], "message": item["message"]} for item in evidence_schema_findings)
     EVIDENCE.parent.mkdir(parents=True, exist_ok=True)
     EVIDENCE.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
     print(json.dumps(evidence, sort_keys=True, separators=(",", ":")))
-    return 0 if not findings else 1
+    return 0 if evidence["status"] == "pass" else 1
 
 
 if __name__ == "__main__":

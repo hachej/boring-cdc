@@ -95,21 +95,28 @@
       "id": "ART-M0-PG-CONTRACT",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "contracts/postgres/capture-backfill.json",
-      "sha256": "254a1b101769ed7dd8b0fe48d029ff4aeef67596030c09d3a954054ac7965fb4",
+      "sha256": "80b0ed73d3bb98c7b451fe211f36d0bdf328c8501aabb73124a9b9d129b77f70",
       "status": "complete"
     },
     {
       "id": "ART-M0-PG-CONTRACT-SCHEMA",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "contracts/postgres/capture-backfill.schema.json",
-      "sha256": "28394b523a57f09310326a447b1ed9accdb54aff83861be27c23c58298ad8ef1",
+      "sha256": "5b79cebc0c52da72c4331e5d9ee306075e078bd502096d0c7561cf476d84701a",
       "status": "complete"
     },
     {
       "id": "ART-M0-PG-EVIDENCE",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "artifacts/boring-cdc-m0-pg-contract/spec/evidence.json",
-      "sha256": "1f61decf61e487549bfb35cfc3e502be073ae796cce25eb7439ec7d6a13b9f6f",
+      "sha256": "202b344f779102115a7ec6a653196a8643aa57bf3da640cd066f33398fb93946",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-PG-EVIDENCE-SCHEMA",
+      "owner_bead": "boring-cdc-m0-pg-contract",
+      "path": "contracts/postgres/postgres-contract-evidence.schema.json",
+      "sha256": "c05e3e2d247ab5a8de8081dfaa147ba715e592055a1e31b23f01c95367650e8a",
       "status": "complete"
     },
     {
@@ -123,21 +130,21 @@
       "id": "ART-M0-PG-FIXTURES",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "fixtures/m0/postgres/capture-backfill.json",
-      "sha256": "4c9a6dcd9ef47eaeaa5446a2e21d7cfb64713d30490db516af88e9714d627913",
+      "sha256": "dd3cc148a4c8816e5ca78a93c32ecf002f8ee97e06789044048e07fb4b2b59bd",
       "status": "complete"
     },
     {
       "id": "ART-M0-PG-ROLES-SQL",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "contracts/postgres/roles-grants.sql",
-      "sha256": "e2cd359489ac0cf51171420d72295ae4a123ff9a461dc1561df6060259dbf58f",
+      "sha256": "77108266ada1057e40111c5d9065a44d494149699d7489ce1c6a58af2c69eee1",
       "status": "complete"
     },
     {
       "id": "ART-M0-PG-VALIDATOR",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "scripts/validate/postgres_contract.py",
-      "sha256": "5f3ea8747cad788d4efec6ce661938484576f2861f3724bbbf7571f8b0f1d603",
+      "sha256": "04ec3675f623bba1a3c936bf4d76f585498511d5c0a5fc518354dbfff5fd8bf8",
       "status": "complete"
     },
     {

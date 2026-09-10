@@ -20,13 +20,14 @@ class PostgresContractTests(unittest.TestCase):
     def test_complete_contract_and_fixtures_validate(self):
         findings, bundle = postgres_contract.validate()
         self.assertEqual([], findings)
-        self.assertEqual(5, len(bundle))
+        self.assertEqual(6, len(bundle))
 
     def test_fixture_to_executor_mapping_is_total(self):
         cases = self.fixtures["cases"]
         self.assertEqual(self.contract["fixture_ids"], [case["fixture_id"] for case in cases])
-        self.assertTrue({case["executor_id"] for case in cases} <= set(self.contract["executors"]))
-        self.assertTrue(all(case["hook"] and case["expected"]["status_code"] for case in cases))
+        self.assertEqual({case["executor_id"] for case in cases}, set(self.contract["executors"]))
+        self.assertEqual({case["hook"] for case in cases}, set(self.contract["hooks"]))
+        self.assertTrue(all(case["inputs"] and case["expected"]["status_code"] for case in cases))
 
     def test_creation_floor_requires_slot_and_wal_predicates(self):
         by_id = {case["fixture_id"]: case for case in self.fixtures["cases"]}
