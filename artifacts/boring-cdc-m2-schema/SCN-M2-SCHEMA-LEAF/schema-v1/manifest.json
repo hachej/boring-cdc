@@ -17,9 +17,9 @@
       "argv": "cargo test --locked m2_schema::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-2.stderr",
-      "stderr_sha256": "853a16c10f8f8d69f78526f0646288ba3e211c36fd604d50d5626406956ac764",
+      "stderr_sha256": "83179bc82e4840f36e04037cf765b76be5fffd1ec0c229631cafbcdafe88c797",
       "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-2.log",
-      "stdout_sha256": "be032951e9a39ab6715da4669bd9305f8746bff2c346e7729992dbba07f33058",
+      "stdout_sha256": "6c86b893e32fd27756a0e67b919ffeaa69ae7a6af9dbea732e40c2d443ba7224",
       "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
     },
     {
@@ -35,18 +35,18 @@
       "argv": "scripts/e2e/m2_schema.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-4.stderr",
-      "stderr_sha256": "853a16c10f8f8d69f78526f0646288ba3e211c36fd604d50d5626406956ac764",
+      "stderr_sha256": "73fceed95055d5bde79dee413e4b6252ec254e91354950900d87bab8f1a7ba13",
       "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-4.log",
-      "stdout_sha256": "6531e948b119b8907845ec908786caf834fade55b300f6beb4e318f6cd241ca2",
+      "stdout_sha256": "b22bb817d88b8b447ff458229c9135fbbd558761dc632a0c6569297a526dd402",
       "version": "3.13.3"
     },
     {
       "argv": "scripts/faults/m2_schema.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-5.stderr",
-      "stderr_sha256": "c5659e8a1a0672a0f14100af0a050d9e82b58662fece978c78beb8ed4f380cef",
+      "stderr_sha256": "352b74d4bf15a923ae4487669e5e8e0734970d4820dfc46212d5d6756eb60256",
       "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-5.log",
-      "stdout_sha256": "847562df954b29f6df997d07d6d106b6e138911ccc33b461c712262985bb0bc1",
+      "stdout_sha256": "782507239ec7634fe5c2ecc6e226344fabcace603ad04c06e0c43ffaa557008a",
       "version": "3.13.3"
     },
     {
@@ -55,7 +55,7 @@
       "stderr_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-6.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/command-6.log",
-      "stdout_sha256": "78956f3ae92eb83e80a564f9445b5bf47f571a484597dd931f6530c74ae00990",
+      "stdout_sha256": "5e6354b1888c69554f29d4c74ddb666482f6a544379cb6becccb7d97818a6430",
       "version": "3.13.3"
     },
     {
@@ -79,7 +79,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "leaf",
-  "git_commit": "abb7d128df4d37c578394285548468d53f2c4feb",
+  "git_commit": "7b8f980f0ed929793354378e97d62e0903cace2d",
   "owner_bead": "boring-cdc-m2-schema",
   "redaction": {
     "checked": true,
@@ -90,7 +90,7 @@
       "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/proof-summary.json",
       "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/versions.json"
     ],
-    "digest": "07a699a435b014468908b57c9e3bd94e9bd026f50ca0df9297066bb7b1d42eba",
+    "digest": "3e132210d48ce9a7616ccf801218a12fff3347d07601f6dfe71e1839fc51190a",
     "product_faults": "migration-transaction-rollback",
     "runtime_observed": true,
     "status": "pass"
@@ -99,8 +99,8 @@
   "schema_version": "evidence/v1",
   "seed": "schema-v1",
   "source_preservation": {
-    "after_sha256": "2799c93c8039a2f064dd123e9ffc756c0e4b7a034873a50c88932bff0c27d082",
-    "before_sha256": "2799c93c8039a2f064dd123e9ffc756c0e4b7a034873a50c88932bff0c27d082",
+    "before_sha256": "182929c8bb323f4f306dcdb20ce51f075da3eadeaab5b63550c604a9e384b265",
+    "after_sha256": "182929c8bb323f4f306dcdb20ce51f075da3eadeaab5b63550c604a9e384b265",
     "preserved": true
   },
   "tier_proof": {

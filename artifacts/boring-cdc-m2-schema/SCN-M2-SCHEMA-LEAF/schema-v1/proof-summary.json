@@ -7,7 +7,10 @@
     "anchor completeness",
     "bounded readers",
     "failure/audit persistence",
-    "promotion fence monotonicity"
+    "promotion fence monotonicity",
+    "armed destination failures block checkpoint advancement until explicit destination-scoped recovery",
+    "operator command request identity is immutable across revision-CAS result transitions",
+    "audit coverage invalidates on frozen identity changes and obeys retention, target, and freshness bounds"
   ],
   "outcome": "pass"
 }
