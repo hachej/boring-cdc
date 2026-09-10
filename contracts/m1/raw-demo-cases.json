@@ -1,0 +1,24 @@
+{
+  "schema_version": "m1-raw-demo-cases/v1",
+  "owner_bead": "boring-cdc-m1-raw-demo",
+  "workload_handoff_sha": "ece7ddf9f13255946e98717a8aa34eaaf58ea62d",
+  "closure_head": "8339ffca2926c0efb8dbc7ee300dc26922c41489",
+  "execution_ownership": "milestone-consumer-only; leaf owners retain transition ownership",
+  "cases": [
+    {"id":"SCN-M1-RAW-FIXED-SEED","consumed_owner":"boring-cdc-m1-decoder","unit_test":"m1_decoder::tests::golden_transaction_preserves_row_only_ordinals_and_origin","expected_state":"decoded","expected_checkpoint":"unchanged_until_durable","expected_log":"raw_event_normalized"},
+    {"id":"SCN-M1-RAW-COPYBOTH-RESTART","consumed_owner":"boring-cdc-m1-decoder","unit_test":"m1_decoder::tests::reconnect_metadata_does_not_need_transaction_or_ordinal","expected_state":"resume_safe","expected_checkpoint":"durable_only","expected_log":"copyboth_restart_safe"},
+    {"id":"SCN-M1-RAW-HEARTBEAT","consumed_owner":"boring-cdc-m1-control-fixtures","unit_test":"m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop","expected_state":"durable_noop","expected_checkpoint":"durable_only","expected_log":"heartbeat_control_noop"},
+    {"id":"SCN-M1-RAW-BOOTSTRAP","consumed_owner":"boring-cdc-m1-bootstrap-sm","unit_test":"m1_bootstrap_sm::tests::feedback_is_gated_until_all_import_acks_then_uses_durable_wal_only","expected_state":"feedback_gated","expected_checkpoint":"creation_floor_not_progress","expected_log":"bootstrap_gate"},
+    {"id":"SCN-M1-RAW-EXACT-SET","consumed_owner":"boring-cdc-m1-workload","unit_test":"m1_raw_demo::tests::fixed_seed_exact_set_oracle_smoke_passes","expected_state":"oracle_pass","expected_checkpoint":"fence_observed","expected_log":"exact_set_pass"},
+    {"id":"SCN-M1-RAW-FULL-RESEED","consumed_owner":"boring-cdc-m1-bootstrap-sm","unit_test":"m1_bootstrap_sm::tests::failed_continuity_requires_confirmed_new_epoch_full_reseed","expected_state":"requires_reseed","expected_checkpoint":"unchanged","expected_log":"full_reseed_required"},
+    {"id":"SCN-M1-RAW-TRUNCATE","consumed_owner":"boring-cdc-m1-control-fixtures","unit_test":"m1_control_fixtures::tests::truncate_is_detection_only","expected_state":"requires_reseed","expected_checkpoint":"unchanged","expected_log":"truncate_requires_reseed"},
+    {"id":"SCN-M1-RAW-PUBLICATION-DRIFT","consumed_owner":"boring-cdc-m1-control-fixtures","unit_test":"m1_control_fixtures::tests::publication_fingerprint_is_exact_and_order_independent","expected_state":"requires_reseed","expected_checkpoint":"unchanged","expected_log":"publication_drift"},
+    {"id":"SCN-M1-RAW-IDLE-DDL","consumed_owner":"boring-cdc-m1-ddl-fixtures","unit_test":"m1_ddl_fixtures::tests::catalog_poll_fingerprint_detects_idle_ddl_and_only_safe_addition_is_admitted","expected_state":"blocked","expected_checkpoint":"unchanged","expected_log":"idle_ddl_blocked"},
+    {"id":"SCN-M1-RAW-IMMEDIATE-DDL","consumed_owner":"boring-cdc-m1-ddl-fixtures","unit_test":"m1_ddl_fixtures::tests::changed_relation_synchronously_blocks_following_dml_and_feedback","expected_state":"blocked","expected_checkpoint":"unchanged","expected_log":"immediate_ddl_blocked"},
+    {"id":"SCN-M1-RAW-UNSUPPORTED-PROTOCOL","consumed_owner":"boring-cdc-m1-decoder","unit_test":"m1_decoder::tests::unsupported_messages_and_binary_truncate_fail_closed","expected_state":"blocked","expected_checkpoint":"unchanged","expected_log":"unsupported_protocol"},
+    {"id":"SCN-M1-RAW-UNSUPPORTED-TABLE","consumed_owner":"boring-cdc-m1-ddl-fixtures","unit_test":"m1_ddl_fixtures::tests::selected_types_keys_delete_and_destination_compatibility_fail_independently","expected_state":"blocked","expected_checkpoint":"unchanged","expected_log":"unsupported_table"},
+    {"id":"SCN-M1-RAW-UNSUPPORTED-TYPE","consumed_owner":"boring-cdc-m1-ddl-fixtures","unit_test":"m1_ddl_fixtures::tests::changed_type_or_removed_replica_identity_blocks_update_delete_safety","expected_state":"blocked","expected_checkpoint":"unchanged","expected_log":"unsupported_type"},
+    {"id":"SCN-M1-RAW-IDENTITY-CONFLICT","consumed_owner":"boring-cdc-m1-ordering","unit_test":"m1_ordering::tests::same_id_same_hash_is_duplicate_and_different_hash_is_conflict","expected_state":"blocked","expected_checkpoint":"unchanged","expected_log":"identity_payload_conflict"},
+    {"id":"SCN-M1-RAW-NO-ONLINE-TABLE-ADD","consumed_owner":"boring-cdc-m1-control-fixtures","unit_test":"m1_control_fixtures::tests::table_membership_change_has_no_live_path","expected_state":"requires_reseed","expected_checkpoint":"unchanged","expected_log":"no_online_table_add"}
+  ]
+}

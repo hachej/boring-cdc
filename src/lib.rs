@@ -7,6 +7,7 @@ pub mod m1_ddl_fixtures;
 pub mod m1_decoder;
 pub mod m1_ordering;
 pub mod m1_preflight;
+pub mod m1_raw_demo;
 pub mod m1_source_identity;
 pub mod m1_transition_kernel;
 pub mod m1_workload;
