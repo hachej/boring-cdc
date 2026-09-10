@@ -50,17 +50,24 @@ for major in 15 16 17; do
   set +e; PGAPPNAME=boring_cdc_ddl_waiter psql "$dsn" -v ON_ERROR_STOP=1 -qc "SET lock_timeout='300ms'; $ddl" >/dev/null 2>"$err"; rc=$?; set -e
   [ "$rc" -ne 0 ] && grep -q 'lock timeout' "$err" || { echo "E_DDL_DID_NOT_CONFLICT major=$major case=$label" >&2; exit 1; }
  }
- # Guard-before-export boundary.
- start_guard; conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' guard-before-export; stop_guard
- # Export boundary: a real command-idle exported snapshot coexists with the independent guard.
- start_guard; PGAPPNAME=boring_cdc_snapshot_exporter psql "$dsn" -v ON_ERROR_STOP=1 -qc 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SELECT pg_export_snapshot(); SELECT pg_sleep(90)' >"$tmp/export-$major.out" 2>"$tmp/export-$major.err" & session_pid=$!
- i=0; while [ "$i" -lt 60 ]; do [ "$(psql "$dsn" -Atqc "SELECT count(*) FROM pg_stat_activity WHERE application_name='boring_cdc_snapshot_exporter'")" = 1 ] && break; i=$((i+1)); sleep 1; done; [ "$i" -lt 60 ]; conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' export; psql "$dsn" -Atqc "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name='boring_cdc_snapshot_exporter'" | grep -qx t; wait "$session_pid" >/dev/null 2>&1 || true; stop_guard
- # Copy boundary: a real repeatable-read importer has read the selected relation.
- start_guard; PGAPPNAME=boring_cdc_snapshot_importer psql "$dsn" -v ON_ERROR_STOP=1 -qc 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SELECT count(*) FROM public.guarded; SELECT pg_sleep(90)' >"$tmp/copy-$major.out" 2>"$tmp/copy-$major.err" & session_pid=$!
- i=0; while [ "$i" -lt 60 ]; do [ "$(psql "$dsn" -Atqc "SELECT count(*) FROM pg_stat_activity WHERE application_name='boring_cdc_snapshot_importer'")" = 1 ] && break; i=$((i+1)); sleep 1; done; [ "$i" -lt 60 ]; conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' copy; psql "$dsn" -Atqc "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name='boring_cdc_snapshot_importer'" | grep -qx t; wait "$session_pid" >/dev/null 2>&1 || true; stop_guard
- # Durable-fence boundary: fence state is committed and observed while the guard still conflicts.
- psql "$dsn" -qc 'CREATE TABLE public.capture_fence(generation bigint PRIMARY KEY, nonce bigint NOT NULL); INSERT INTO public.capture_fence VALUES (7,99)'
- start_guard; [ "$(psql "$dsn" -Atqc 'SELECT nonce FROM public.capture_fence WHERE generation=7')" = 99 ]; conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' durable-fence; stop_guard
+ # One guarded lifecycle: before export -> exported snapshot -> imported copy -> durable fence.
+ psql "$dsn" -qc 'CREATE TABLE public.capture_fence(generation bigint PRIMARY KEY, nonce bigint NOT NULL)'
+ start_guard
+ conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' guard-before-export
+ mkfifo "$tmp/export-$major.in" "$tmp/export-$major.out"
+ PGAPPNAME=boring_cdc_snapshot_exporter psql "$dsn" -qAt -v ON_ERROR_STOP=1 <"$tmp/export-$major.in" >"$tmp/export-$major.out" 2>"$tmp/export-$major.err" & exporter_pid=$!
+ exec 3>"$tmp/export-$major.in"; exec 4<"$tmp/export-$major.out"
+ printf 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\nSELECT pg_export_snapshot();\n' >&3
+ IFS= read -r snapshot <&4; [ -n "$snapshot" ]
+ conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' export
+ PGAPPNAME=boring_cdc_snapshot_importer psql "$dsn" -qAt -v ON_ERROR_STOP=1 -c "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT '$snapshot'; SELECT count(*) FROM public.guarded; SELECT pg_sleep(2); COMMIT" >"$tmp/copy-$major.out" 2>"$tmp/copy-$major.err" & importer_pid=$!
+ i=0; while [ "$i" -lt 60 ]; do [ "$(psql "$dsn" -Atqc "SELECT count(*) FROM pg_stat_activity WHERE application_name='boring_cdc_snapshot_importer'")" = 1 ] && break; i=$((i+1)); sleep 1; done; [ "$i" -lt 60 ]
+ conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' copy
+ wait "$importer_pid"; grep -qx 0 "$tmp/copy-$major.out"
+ printf 'COMMIT;\n\\q\n' >&3; exec 3>&-; exec 4<&-; wait "$exporter_pid"
+ psql "$dsn" -v ON_ERROR_STOP=1 -qc 'INSERT INTO public.capture_fence VALUES (7,99)'; [ "$(psql "$dsn" -Atqc 'SELECT nonce FROM public.capture_fence WHERE generation=7')" = 99 ]
+ conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' durable-fence
+ stop_guard
  # Execute the complete admitted operation matrix under one guarded generation.
  start_guard; index=0
  matrix="$tmp/matrix-$major"; python3 -c 'import json; [print(x["sql"]) for x in json.load(open("contracts/m1/ddl-fixtures.json"))["admitted_ddl_matrix"]]' >"$matrix"

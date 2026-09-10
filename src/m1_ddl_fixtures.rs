@@ -148,22 +148,28 @@ pub enum AdmissionDecision {
     BlockCapture(&'static str),
     BlockDestination(&'static str),
 }
-
-/// Fixture-level admission for the schema/delete-safety dimensions carried by the fingerprint.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct AdmissionPolicy {
+    pub configured_publication_attnums: BTreeSet<i16>,
+    pub configured_key_attnums: Vec<i16>,
+    pub capture_type_oids: BTreeSet<u32>,
+    pub destination_columns: BTreeMap<i16, u32>,
+    pub destination_supports_delete: bool,
+}
 pub fn validate_relation_admission(
     contract: &RelationContract,
-    capture_type_oids: &BTreeSet<u32>,
-    destination_type_oids: &BTreeSet<u32>,
-    destination_supports_delete: bool,
+    policy: &AdmissionPolicy,
 ) -> AdmissionDecision {
-    if !contract.publication_member {
-        return AdmissionDecision::BlockCapture("SELECTED_TABLE_NOT_PUBLISHED");
+    if !contract.publication_member
+        || contract.publication_attnums != policy.configured_publication_attnums
+    {
+        return AdmissionDecision::BlockCapture("PUBLICATION_PROJECTION_MISMATCH");
     }
     if contract
         .columns
         .iter()
-        .filter(|c| !c.dropped)
-        .any(|c| !capture_type_oids.contains(&c.type_oid))
+        .filter(|c| contract.publication_attnums.contains(&c.attnum))
+        .any(|c| !policy.capture_type_oids.contains(&c.type_oid))
     {
         return AdmissionDecision::BlockCapture("SOURCE_TYPE_UNSUPPORTED");
     }
@@ -179,7 +185,8 @@ pub fn validate_relation_admission(
     let Some(key) = effective_key else {
         return AdmissionDecision::BlockCapture("REPLICA_IDENTITY_UNSUPPORTED");
     };
-    if key.is_empty()
+    if key != &policy.configured_key_attnums
+        || key.is_empty()
         || key.iter().any(|attnum| {
             contract
                 .columns
@@ -188,18 +195,19 @@ pub fn validate_relation_admission(
                 .is_none_or(|c| c.nullable || c.dropped)
         })
     {
-        return AdmissionDecision::BlockCapture("REPLICA_IDENTITY_INCOMPLETE");
+        return AdmissionDecision::BlockCapture("REPLICA_IDENTITY_MISMATCH");
     }
-    if !destination_supports_delete {
+    if !policy.destination_supports_delete {
         return AdmissionDecision::BlockDestination("DESTINATION_DELETE_UNSUPPORTED");
     }
-    if contract
+    let expected_destination: BTreeMap<_, _> = contract
         .columns
         .iter()
-        .filter(|c| !c.dropped)
-        .any(|c| !destination_type_oids.contains(&c.type_oid))
-    {
-        return AdmissionDecision::BlockDestination("DESTINATION_TYPE_INCOMPATIBLE");
+        .filter(|c| contract.publication_attnums.contains(&c.attnum))
+        .map(|c| (c.attnum, c.type_oid))
+        .collect();
+    if policy.destination_columns != expected_destination {
+        return AdmissionDecision::BlockDestination("DESTINATION_SCHEMA_INCOMPATIBLE");
     }
     AdmissionDecision::Admit
 }
@@ -519,6 +527,7 @@ impl GuardedDecoder {
         catalog: &RelationContract,
         expected: Option<&RelationContract>,
         active_generation: bool,
+        policy: &AdmissionPolicy,
     ) -> Result<ContractDecision, GuardedDecodeFailure> {
         if self.blocked {
             return Err(GuardedDecodeFailure::Catalog(DdlFailure::contract(
@@ -526,6 +535,41 @@ impl GuardedDecoder {
             )));
         }
         let id = wire.relation.id;
+        let wire_matches_catalog = catalog.identity.relation_oid == id
+            && catalog.namespace == wire.relation.namespace
+            && catalog.relation_name == wire.relation.name
+            && catalog.columns.iter().filter(|c| !c.dropped).count() == wire.relation.columns.len()
+            && wire
+                .relation
+                .columns
+                .iter()
+                .zip(catalog.columns.iter().filter(|c| !c.dropped))
+                .all(|(w, c)| {
+                    w.name == c.name && w.type_oid == c.type_oid && w.type_modifier == c.typmod
+                })
+            && wire
+                .key_columns
+                .iter()
+                .map(|i| wire.relation.columns[*i].name.as_str())
+                .eq(policy.configured_key_attnums.iter().filter_map(|attnum| {
+                    catalog
+                        .columns
+                        .iter()
+                        .find(|c| c.attnum == *attnum)
+                        .map(|c| c.name.as_str())
+                }));
+        if !wire_matches_catalog {
+            self.blocked = true;
+            return Err(GuardedDecodeFailure::Catalog(DdlFailure::contract(
+                "WIRE_CATALOG_CONTRACT_MISMATCH",
+            )));
+        }
+        if validate_relation_admission(catalog, policy) != AdmissionDecision::Admit {
+            self.blocked = true;
+            return Err(GuardedDecodeFailure::Catalog(DdlFailure::contract(
+                "RELATION_ADMISSION_BLOCKED",
+            )));
+        }
         let decision = self
             .catalog
             .admit_catalog(id, catalog, expected, active_generation)
@@ -885,14 +929,21 @@ pub(crate) mod tests {
     #[test]
     fn selected_types_keys_delete_and_destination_compatibility_fail_independently() {
         let base = relation(1);
-        let capture = BTreeSet::from([20]);
-        let destination = BTreeSet::from([20]);
+        let policy = AdmissionPolicy {
+            configured_publication_attnums: BTreeSet::from([1]),
+            configured_key_attnums: vec![1],
+            capture_type_oids: BTreeSet::from([20]),
+            destination_columns: BTreeMap::from([(1, 20)]),
+            destination_supports_delete: true,
+        };
         assert_eq!(
-            validate_relation_admission(&base, &capture, &destination, true),
+            validate_relation_admission(&base, &policy),
             AdmissionDecision::Admit
         );
+        let mut p = policy.clone();
+        p.capture_type_oids.clear();
         assert_eq!(
-            validate_relation_admission(&base, &BTreeSet::new(), &destination, true),
+            validate_relation_admission(&base, &p),
             AdmissionDecision::BlockCapture("SOURCE_TYPE_UNSUPPORTED")
         );
         let mut unique = base.clone();
@@ -904,27 +955,32 @@ pub(crate) mod tests {
             .unique_indexes
             .insert("logical_key".into(), vec![1]);
         assert_eq!(
-            validate_relation_admission(&unique, &capture, &destination, true),
+            validate_relation_admission(&unique, &policy),
             AdmissionDecision::Admit
         );
-        unique.columns[0].nullable = true;
+        let mut p = policy.clone();
+        p.configured_key_attnums = vec![2];
         assert_eq!(
-            validate_relation_admission(&unique, &capture, &destination, true),
-            AdmissionDecision::BlockCapture("REPLICA_IDENTITY_INCOMPLETE")
+            validate_relation_admission(&base, &p),
+            AdmissionDecision::BlockCapture("REPLICA_IDENTITY_MISMATCH")
         );
+        let mut p = policy.clone();
+        p.destination_supports_delete = false;
         assert_eq!(
-            validate_relation_admission(&base, &capture, &destination, false),
+            validate_relation_admission(&base, &p),
             AdmissionDecision::BlockDestination("DESTINATION_DELETE_UNSUPPORTED")
         );
+        let mut p = policy.clone();
+        p.destination_columns.insert(2, 25);
         assert_eq!(
-            validate_relation_admission(&base, &capture, &BTreeSet::new(), true),
-            AdmissionDecision::BlockDestination("DESTINATION_TYPE_INCOMPATIBLE")
+            validate_relation_admission(&base, &p),
+            AdmissionDecision::BlockDestination("DESTINATION_SCHEMA_INCOMPATIBLE")
         );
-        let mut absent = base.clone();
-        absent.publication_member = false;
+        let mut p = policy.clone();
+        p.configured_publication_attnums.clear();
         assert_eq!(
-            validate_relation_admission(&absent, &capture, &destination, true),
-            AdmissionDecision::BlockCapture("SELECTED_TABLE_NOT_PUBLISHED")
+            validate_relation_admission(&base, &p),
+            AdmissionDecision::BlockCapture("PUBLICATION_PROJECTION_MISMATCH")
         );
     }
 
@@ -981,6 +1037,13 @@ pub(crate) mod tests {
                 &relation(1),
                 None,
                 false,
+                &AdmissionPolicy {
+                    configured_publication_attnums: BTreeSet::from([1]),
+                    configured_key_attnums: vec![1],
+                    capture_type_oids: BTreeSet::from([20]),
+                    destination_columns: BTreeMap::from([(1, 20)]),
+                    destination_supports_delete: true,
+                },
             )
             .unwrap();
         let mut begin = vec![b'B'];
