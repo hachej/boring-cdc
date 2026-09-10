@@ -523,7 +523,10 @@
         "golden_manifest_sha256",
         "generation_ready_bytes",
         "golden_generation_manifest",
-        "golden_generation_manifest_sha256"
+        "golden_generation_manifest_sha256",
+        "golden_selector",
+        "golden_selector_sha256",
+        "golden_generation_ready_base64"
       ],
       "properties": {
         "algorithm": {
@@ -883,6 +886,44 @@
           }
         },
         "golden_generation_manifest_sha256": {
+          "type": "string"
+        },
+        "golden_selector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "capture_epoch",
+            "generation",
+            "promotion_fence",
+            "generation_manifest_sha256",
+            "generation_relative_path"
+          ],
+          "properties": {
+            "schema_version": {
+              "type": "string"
+            },
+            "capture_epoch": {
+              "type": "string"
+            },
+            "generation": {
+              "type": "integer"
+            },
+            "promotion_fence": {
+              "type": "integer"
+            },
+            "generation_manifest_sha256": {
+              "type": "string"
+            },
+            "generation_relative_path": {
+              "type": "string"
+            }
+          }
+        },
+        "golden_selector_sha256": {
+          "type": "string"
+        },
+        "golden_generation_ready_base64": {
           "type": "string"
         }
       }

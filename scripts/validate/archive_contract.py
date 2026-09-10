@@ -14,8 +14,8 @@ FS = ROOT / "contracts/archive/archive-fixtures.schema.json"
 RS = ROOT / "contracts/archive/archive-result.schema.json"
 SMS = ROOT / "contracts/archive/segment-manifest.schema.json"
 GMS = ROOT / "contracts/archive/generation-manifest.schema.json"
-EXPECTED_CONTRACT_SHA256 = "e575933b71fcd74a277ca7d78603c7bc934a65a2b033fa141051391539e0f414"
-EXPECTED_FIXTURES_SHA256 = "7d7bac236b9ce99693b8492cef49c7c64006ecbfbeed6210f9b017d800fff01b"
+EXPECTED_CONTRACT_SHA256 = "6fa9f016a45fe1142b7d0a30cbb54d346bdd60ebab16cd359da513dfe869acf3"
+EXPECTED_FIXTURES_SHA256 = "d657c954159fed635bfa20656db2de1b23cd1c3f2e3325bde7347f8228a04cf4"
 E = ROOT / "artifacts/boring-cdc-m0-archive-model/spec/evidence.json"
 M = ROOT / "contracts/m0/manifest.json"
 A = ROOT / "contracts/m0/artifacts.json"
@@ -111,6 +111,18 @@ def validate():
             finding(out, "E_GOLDEN_BYTES", f"golden_vectors/{name}", "golden bytes and SHA-256 differ")
     if hashlib.sha256(json.dumps(vectors["generation_manifest"], sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest() != vectors["generation_manifest_jcs_sha256"]:
         finding(out, "E_GOLDEN_GENERATION_MANIFEST", "golden_vectors/generation_manifest", "fixture generation manifest hash scope differs")
+    manifest_files = {item["format"]: item for item in vectors["segment_manifest"]["files"]}
+    for name, format_name, bytes_key, hash_key in (("jsonl", "jsonl-zstd", "zstd_bytes_base64", "zstd_sha256"), ("parquet", "parquet-zstd", "bytes_base64", "sha256")):
+        raw = base64.b64decode(vectors[name][bytes_key], validate=True)
+        entry = manifest_files[format_name]
+        if entry["size_bytes"] != len(raw) or entry["sha256"] != vectors[name][hash_key]:
+            finding(out, "E_GOLDEN_MANIFEST_FILE", f"golden_vectors/{name}", "segment manifest size/hash does not bind golden artifact")
+    selector_wire = base64.b64decode(vectors["selector_jcs_base64"], validate=True)
+    if selector_wire != json.dumps(vectors["selector"], sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode() or hashlib.sha256(selector_wire).hexdigest() != vectors["selector_jcs_sha256"]:
+        finding(out, "E_GOLDEN_SELECTOR", "golden_vectors/selector", "selector object, bytes and hash differ")
+    generation_ready = base64.b64decode(vectors["generation_ready_bytes_base64"], validate=True).decode()
+    if generation_ready != "generation-manifest-sha256:" + vectors["generation_manifest_jcs_sha256"] + "\n":
+        finding(out, "E_GOLDEN_GENERATION_READY", "golden_vectors/generation_ready_bytes_base64", "generation ready marker does not bind manifest")
     ready = base64.b64decode(vectors["ready_bytes_base64"], validate=True).decode()
     if ready != "intent:" + "d" * 64 + "\nmanifest-sha256:" + vectors["segment_manifest_jcs_sha256"] + "\n":
         finding(out, "E_GOLDEN_READY", "golden_vectors/ready_bytes_base64", "ready bytes do not bind golden intent and manifest")

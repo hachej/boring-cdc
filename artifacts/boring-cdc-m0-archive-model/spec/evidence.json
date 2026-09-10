@@ -1,15 +1,15 @@
 {
   "findings": [],
   "fixture_count": 41,
-  "input_tree_sha256": "eddc77418e04b00698de477440362bb97501b94a95f4cac42557d9829425793b",
+  "input_tree_sha256": "7829fecac3993ae45561e4ba021d94c9d52aa617df2ea94601f021ce832b38eb",
   "inputs": {
-    "contracts/archive/archive-fixtures.schema.json": "bbf69c25a3a2aee6e033c6f0f49c201bf8f43ab03a8038285f165a56165bc4d0",
-    "contracts/archive/archive-model.json": "e575933b71fcd74a277ca7d78603c7bc934a65a2b033fa141051391539e0f414",
-    "contracts/archive/archive-model.schema.json": "06bb79a0a781f58c86dcdd4ed010f2ea11d9eb89e12eccb9a5379b69ac492f5b",
+    "contracts/archive/archive-fixtures.schema.json": "d0f3b2e0b742c126d2824f34fdedbc858817e4470f6ba4e5896ecf4baf3a84ee",
+    "contracts/archive/archive-model.json": "6fa9f016a45fe1142b7d0a30cbb54d346bdd60ebab16cd359da513dfe869acf3",
+    "contracts/archive/archive-model.schema.json": "03ead5ecc65d0c630379b523e047ea8fc1ed3f42d8cfbf339cb1551e97e3b030",
     "contracts/archive/archive-result.schema.json": "9760edf105c164adf49fee4b126c2d0a741630cf4a05ff7c966bfd678e881d71",
-    "contracts/archive/generation-manifest.schema.json": "af63decde44dcc9464d320bbe7b27e6ea82087e5416e7b859a31a0ff52f71eb1",
-    "contracts/archive/segment-manifest.schema.json": "bae21144d8c312f21b3c9c53deff34606367b89f8aee6639e9c1e3169026212f",
-    "fixtures/m0/archive/scenarios.json": "7d7bac236b9ce99693b8492cef49c7c64006ecbfbeed6210f9b017d800fff01b"
+    "contracts/archive/generation-manifest.schema.json": "d17bfac2e0d3feb40958ed63e0f3d3b03eb04039995694c541d98cf821741a8c",
+    "contracts/archive/segment-manifest.schema.json": "562f597faa463a021947acb0056dd039a48de23e3a16d12d70411080bbb08b63",
+    "fixtures/m0/archive/scenarios.json": "d657c954159fed635bfa20656db2de1b23cd1c3f2e3325bde7347f8228a04cf4"
   },
   "owner_bead": "boring-cdc-m0-archive-model",
   "product_faults": "fault_not_applicable",
@@ -18,5 +18,5 @@
   "source_parent_git_commit": "a16951d2772b5f183db762ae0d65349d0bf589c3",
   "status": "pass",
   "validator": "scripts/validate/archive_contract.py",
-  "validator_sha256": "87bd9caf960078161e9f7c80d1966936c13453c68b40378398d66b49570a18ce"
+  "validator_sha256": "ddb1686575b468a4e882afcf4a277a67334416b519328774557c53e2b06efea1"
 }

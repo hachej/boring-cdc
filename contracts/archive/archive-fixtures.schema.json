@@ -188,7 +188,10 @@
                   "staging",
                   "segment_ready",
                   "generation_selector",
-                  "byte_hashes"
+                  "byte_hashes",
+                  "generation_ready",
+                  "expected_generation_ready_bytes_base64",
+                  "expected_selector_jcs_base64"
                 ],
                 "properties": {
                   "staging": {
@@ -201,6 +204,15 @@
                     "type": "string"
                   },
                   "byte_hashes": {
+                    "type": "string"
+                  },
+                  "generation_ready": {
+                    "type": "string"
+                  },
+                  "expected_generation_ready_bytes_base64": {
+                    "type": "string"
+                  },
+                  "expected_selector_jcs_base64": {
                     "type": "string"
                   }
                 }
@@ -221,7 +233,11 @@
         "segment_manifest_jcs_sha256",
         "ready_bytes_base64",
         "generation_manifest",
-        "generation_manifest_jcs_sha256"
+        "generation_manifest_jcs_sha256",
+        "generation_ready_bytes_base64",
+        "selector",
+        "selector_jcs_base64",
+        "selector_jcs_sha256"
       ],
       "properties": {
         "input_events": {
@@ -646,6 +662,47 @@
           }
         },
         "generation_manifest_jcs_sha256": {
+          "type": "string"
+        },
+        "generation_ready_bytes_base64": {
+          "type": "string"
+        },
+        "selector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "capture_epoch",
+            "generation",
+            "promotion_fence",
+            "generation_manifest_sha256",
+            "generation_relative_path"
+          ],
+          "properties": {
+            "schema_version": {
+              "type": "string"
+            },
+            "capture_epoch": {
+              "type": "string"
+            },
+            "generation": {
+              "type": "integer"
+            },
+            "promotion_fence": {
+              "type": "integer"
+            },
+            "generation_manifest_sha256": {
+              "type": "string"
+            },
+            "generation_relative_path": {
+              "type": "string"
+            }
+          }
+        },
+        "selector_jcs_base64": {
+          "type": "string"
+        },
+        "selector_jcs_sha256": {
           "type": "string"
         }
       }
