@@ -1,1 +1,1 @@
-["begin","before-commit-termination-probe-absent","sqlite-commit-returned","complete-range-read"]
+["begin","before-commit-termination-probe-absent","sqlite-commit-returned","complete-range-read","slow-commit-bound-exceeded-and-reconciled"]
