@@ -40,7 +40,7 @@ try:
  if vectors['passive_page_threshold']['inputs'].get('wal_pages')!=1000 or vectors['passive_time_threshold']['inputs'].get('elapsed_seconds')!=30: fail()
  if vectors['incremental_vacuum_bound']['inputs'].get('requested_pages')!=1001 or vectors['incremental_vacuum_bound']['expected'].get('pages_processed')!=1000: fail()
  if vectors['wal_busy_reader_pin']['expected'].get('checkpoint')!='unchanged_busy' or vectors['restart_pin_permitted']['preconditions']!=['all logical range pins permit WAL recycling']: fail()
- if vectors['abrupt_host_ext4']['expected'].get('claim')!='recovery only after successful FULL and required directory syncs on honest ext4' or vectors['abrupt_host_xfs']['expected'].get('claim')!='recovery only after successful FULL and required directory syncs on honest XFS': fail()
+ if vectors['abrupt_host_ext4']['expected'].get('claim')!='recovery only after successful FULL and required directory syncs on honest ext4' or vectors['abrupt_host_xfs']['expected'].get('claim')!='recovery only after successful FULL and required directory syncs on honest xfs': fail()
  if spec['script']['path']!='scripts/validate/sqlite_durability.sh' or sha(root/spec['script']['path'])!=spec['script']['sha256']: fail()
  graph_ids={x['id'] for x in graph}
  if set(executors)-graph_ids: fail()
