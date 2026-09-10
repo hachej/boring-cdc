@@ -310,6 +310,21 @@ impl GuardState {
     pub fn feedback_gate_open(&self) -> bool {
         self.feedback_gate_open
     }
+    /// Typed bootstrap consumers can verify this guard is bound and catalog-checked without
+    /// re-owning DDL lock acquisition or fingerprint semantics.
+    pub fn proves_bootstrap_binding(
+        &self,
+        capture_epoch: u64,
+        generation: u64,
+        table_set_fingerprint: &str,
+    ) -> bool {
+        self.capture_epoch == capture_epoch
+            && self.generation == generation
+            && self.table_set_fingerprint == table_set_fingerprint
+            && self.phase == GuardPhase::BeforeExport
+            && self.catalog_fingerprint_verified
+            && !self.locked.is_empty()
+    }
     /// Records a live catalog fingerprint read after this guard acquired its lock set.
     /// Export cannot begin until the read matches the fingerprint bound to the generation.
     pub fn verify_catalog_fingerprint(
