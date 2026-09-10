@@ -532,6 +532,11 @@ pub struct LogicalTableIdentity(Fingerprint);
 
 impl LogicalTableIdentity {
     #[must_use]
+    pub const fn fingerprint(self) -> Fingerprint {
+        self.0
+    }
+
+    #[must_use]
     pub fn derive(source: &SourceIdentity, schema: &str, table: &str) -> Self {
         Self(Fingerprint::canonical(
             LOGICAL_TABLE_DOMAIN,

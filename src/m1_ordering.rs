@@ -3,6 +3,7 @@
 //! Inputs are already-admitted decoder values and the relation fingerprint owned by
 //! `m1_ddl_fixtures`. This module performs no journal or destination I/O.
 
+use crate::m1_source_identity::{LogicalTableIdentity, SourceIdentity};
 use crate::m1_transition_kernel::{
     CaptureEpoch, DestinationGeneration, ReceivedLsn, SourceVersion,
 };
@@ -12,6 +13,8 @@ use std::fmt;
 
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
 const WAL_EVENT_DOMAIN: &[u8] = b"boring-cdc/wal-event/v1";
+// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED source/slot identity domain).
+const SOURCE_SLOT_DOMAIN: &[u8] = b"boring-cdc/source-slot/v1";
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
 const SNAPSHOT_EVENT_DOMAIN: &[u8] = b"boring-cdc/snapshot-event/v1";
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
@@ -29,6 +32,10 @@ pub const WAL_ORIGIN_RANK: u8 = 1;
 pub struct Hash32([u8; 32]);
 
 impl Hash32 {
+    #[must_use]
+    pub const fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
     #[must_use]
     pub const fn bytes(self) -> [u8; 32] {
         self.0
@@ -128,10 +135,27 @@ impl CanonicalKey {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SourceSlotIdentity(Hash32);
+impl SourceSlotIdentity {
+    #[must_use]
+    pub fn derive(source: &SourceIdentity) -> Self {
+        Self(hash_fields(
+            SOURCE_SLOT_DOMAIN,
+            &[
+                &source.system_identifier.to_be_bytes(),
+                &source.database_identity.to_be_bytes(),
+                source.slot_name.as_bytes(),
+                source.plugin.as_bytes(),
+            ],
+        ))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct WalIdentityInput {
     pub capture_epoch: CaptureEpoch,
     /// Stable fingerprint of source system/database/slot, never a raw identifier.
-    pub source_slot_fingerprint: Hash32,
+    pub source_slot_identity: SourceSlotIdentity,
     pub transaction_end_lsn: ReceivedLsn,
     pub row_ordinal: u64,
     pub mutation_ordinal: u8,
@@ -142,7 +166,7 @@ pub fn wal_connector_event_id(input: WalIdentityInput) -> Hash32 {
         WAL_EVENT_DOMAIN,
         &[
             &input.capture_epoch.get().to_be_bytes(),
-            &input.source_slot_fingerprint.bytes(),
+            &input.source_slot_identity.0.bytes(),
             &input.transaction_end_lsn.get().to_be_bytes(),
             &input.row_ordinal.to_be_bytes(),
             &[input.mutation_ordinal],
@@ -154,7 +178,7 @@ pub fn wal_connector_event_id(input: WalIdentityInput) -> Hash32 {
 pub struct SnapshotIdentityInput {
     pub capture_epoch: CaptureEpoch,
     pub generation: DestinationGeneration,
-    pub logical_table_id: Hash32,
+    pub logical_table_id: LogicalTableIdentity,
     pub chunk_id: u64,
     pub key_hash: Hash32,
 }
@@ -165,7 +189,7 @@ pub fn snapshot_connector_event_id(input: SnapshotIdentityInput) -> Hash32 {
         &[
             &input.capture_epoch.get().to_be_bytes(),
             &input.generation.get().to_be_bytes(),
-            &input.logical_table_id.bytes(),
+            &input.logical_table_id.fingerprint().bytes(),
             &input.chunk_id.to_be_bytes(),
             &input.key_hash.bytes(),
         ],
@@ -229,6 +253,23 @@ impl MutationPayload {
     }
 }
 
+/// Checked bridge from the decoder's u64 row ordinal into the shared M1.1 representation.
+pub fn source_version_for_row(
+    capture_epoch: CaptureEpoch,
+    commit_lsn: ReceivedLsn,
+    transaction_id: u32,
+    row_ordinal: u64,
+) -> Result<SourceVersion, OrderingFailure> {
+    let ordinal = u32::try_from(row_ordinal)
+        .map_err(|_| OrderingFailure::contract("ROW_ORDINAL_OUT_OF_RANGE"))?;
+    Ok(SourceVersion::from_decoded(
+        capture_epoch,
+        commit_lsn,
+        transaction_id,
+        ordinal,
+    ))
+}
+
 /// Total version for expanded mutations. SourceVersion is reused rather than represented again.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MutationVersion {
@@ -283,6 +324,12 @@ pub fn expand_key_change(
     new_key: CanonicalKey,
     new_columns: Vec<ColumnState>,
 ) -> Result<[CanonicalMutation; 2], OrderingFailure> {
+    if positional.capture_epoch != source.capture_epoch() {
+        return Err(OrderingFailure::contract("CAPTURE_EPOCH_MISMATCH"));
+    }
+    if positional.row_ordinal != u64::from(source.ordinal()) {
+        return Err(OrderingFailure::contract("ROW_ORDINAL_MISMATCH"));
+    }
     old_key.validate()?;
     new_key.validate()?;
     if old_key == new_key {
@@ -387,7 +434,18 @@ mod tests {
         CanonicalKey(vec![value(25, bytes)])
     }
     fn source(lsn: u64, xid: u32, ordinal: u32) -> SourceVersion {
-        SourceVersion::from_decoded(EPOCH, ReceivedLsn::from_wire(lsn), xid, ordinal)
+        source_version_for_row(EPOCH, ReceivedLsn::from_wire(lsn), xid, u64::from(ordinal)).unwrap()
+    }
+    fn source_identity() -> SourceIdentity {
+        SourceIdentity {
+            system_identifier: 42,
+            timeline: 1,
+            database_identity: 16_384,
+            slot_name: "boring_cdc".into(),
+            plugin: "pgoutput".into(),
+            publication_fingerprint: crate::m1_source_identity::Fingerprint::digest(b"publication"),
+            protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
+        }
     }
     fn version() -> MutationVersion {
         MutationVersion {
@@ -400,7 +458,7 @@ mod tests {
     fn wal(mutation_ordinal: u8) -> WalIdentityInput {
         WalIdentityInput {
             capture_epoch: EPOCH,
-            source_slot_fingerprint: hash_fields(b"fixture", &[b"source-slot"]),
+            source_slot_identity: SourceSlotIdentity::derive(&source_identity()),
             transaction_end_lsn: ReceivedLsn::from_wire(120),
             row_ordinal: 3,
             mutation_ordinal,
@@ -460,18 +518,22 @@ mod tests {
         let snapshot_id = snapshot_connector_event_id(SnapshotIdentityInput {
             capture_epoch: EPOCH,
             generation: DestinationGeneration::from_store(2),
-            logical_table_id: hash_fields(b"fixture", &[b"table"]),
+            logical_table_id: LogicalTableIdentity::derive(
+                &source_identity(),
+                "public",
+                "accounts",
+            ),
             chunk_id: 4,
             key_hash: key(b"k").hash().unwrap(),
         });
         assert_ne!(wal_id, snapshot_id);
         assert_eq!(
             wal_id.hex(),
-            "2e61c53ad7f03342674ea78b9db8f0b008ee6b3363135b544a0e3c31d3fd16c7"
+            "06004c4a0b18bedd87c4fabd9102bbaf009e50ffecfea740528edeb68485d548"
         );
         assert_eq!(
             snapshot_id.hex(),
-            "4f76eeb2353aa1ff3a934ee5b83bba95b0676194f22699645c871b0e82d7c2d9"
+            "5a0574e19de8c33923e12953a6c002e16c06dc13c46aa82b8e249f77ffb83fe3"
         );
     }
 
@@ -551,6 +613,19 @@ mod tests {
             classify_replay(a, a, b, b),
             DuplicateDecision::DifferentIdentity
         );
+        for seed in 0_u64..64 {
+            let id = hash_fields(b"property-id", &[&seed.to_be_bytes()]);
+            let payload = hash_fields(b"property-payload", &[&seed.to_be_bytes()]);
+            let changed = hash_fields(b"property-payload", &[&seed.wrapping_add(1).to_be_bytes()]);
+            assert_eq!(
+                classify_replay(id, payload, id, payload),
+                DuplicateDecision::AcceptDuplicate
+            );
+            assert_eq!(
+                classify_replay(id, payload, id, changed),
+                DuplicateDecision::BlockConflict
+            );
+        }
         let failure = OrderingFailure::payload_conflict();
         assert_eq!(failure.failed_boundary, "before_checkpoint_and_feedback");
     }
@@ -570,6 +645,66 @@ mod tests {
             CanonicalKey(vec![value(20, b"1")]).hash().unwrap()
         );
         assert_ne!(value(25, b"x").hash(), value(17, b"x").hash());
+        assert_eq!(
+            key(b"golden").hash().unwrap().hex(),
+            "000162f8dd1a1f04d4ec4e8f6357c5202e25db4f0993de3069591621cbc56be3"
+        );
+        assert_eq!(
+            value(25, b"golden").hash().hex(),
+            "ddf09f7280c10ad15ffb79c78ce4678a5a99d27a890655098046394736f39adb"
+        );
+        let payload = MutationPayload {
+            relation_fingerprint: "11".repeat(32),
+            key: key(b"golden"),
+            kind: MutationKind::Upsert,
+            columns: vec![ColumnState::Null],
+        };
+        assert_eq!(
+            payload.hash(version()).unwrap().hex(),
+            "69977ac3ca1be0868cf1f6dc35ecaef3cf68e8eace61967a1ad0e24eaf8e0b00"
+        );
+    }
+
+    #[test]
+    fn epoch_and_decoder_ordinal_mismatches_fail_closed() {
+        assert_eq!(
+            source_version_for_row(EPOCH, ReceivedLsn::from_wire(1), 1, u64::from(u32::MAX) + 1)
+                .unwrap_err()
+                .fingerprint,
+            "ROW_ORDINAL_OUT_OF_RANGE"
+        );
+        let mut position = wal(0);
+        position.capture_epoch = CaptureEpoch::from_store(8);
+        assert_eq!(
+            expand_key_change(
+                position,
+                source(112, 8, 3),
+                &"11".repeat(32),
+                key(b"old"),
+                key(b"new"),
+                vec![]
+            )
+            .unwrap_err()
+            .fingerprint,
+            "CAPTURE_EPOCH_MISMATCH"
+        );
+        let position = WalIdentityInput {
+            row_ordinal: 4,
+            ..wal(0)
+        };
+        assert_eq!(
+            expand_key_change(
+                position,
+                source(112, 8, 3),
+                &"11".repeat(32),
+                key(b"old"),
+                key(b"new"),
+                vec![]
+            )
+            .unwrap_err()
+            .fingerprint,
+            "ROW_ORDINAL_MISMATCH"
+        );
     }
 
     #[test]
