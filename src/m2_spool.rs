@@ -21,6 +21,8 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
 const MAGIC: &[u8; 8] = b"BCDCSP01";
+const HEADER_WORK_BYTES: usize = 8 * 1024;
+const READER_WORK_BYTES: usize = 16 * 1024;
 // M0-PROVISIONAL: boring-cdc-d-admission must approve the spool format version.
 pub const SPOOL_FORMAT_VERSION: u32 = 1;
 
@@ -287,6 +289,7 @@ impl ReceiveBuffer {
 
 pub struct TxnBuffer {
     directory: PathBuf,
+    filesystem: u64,
     header: Header,
     limits: SpoolLimits,
     memory: MemoryBudget,
@@ -298,6 +301,7 @@ pub struct TxnBuffer {
     spool: Option<(File, PathBuf, u64, u64)>,
     bytes: u64,
     events: u64,
+    spill_bytes: u64,
     failed: bool,
     receive_admitted: Option<usize>,
 }
@@ -340,6 +344,7 @@ impl TxnBuffer {
         let memory_events = Vec::with_capacity(event_capacity);
         Ok(Self {
             directory,
+            filesystem: dev,
             header: Header {
                 version: SPOOL_FORMAT_VERSION,
                 capture_epoch,
@@ -356,6 +361,7 @@ impl TxnBuffer {
             spool: None,
             bytes: 0,
             events: 0,
+            spill_bytes: 0,
             failed: false,
             receive_admitted: None,
         })
@@ -418,7 +424,14 @@ impl TxnBuffer {
             self.memory.release(MemoryClass::Receive, frame_len);
             return Err(SpoolError::Invalid("receive permit length mismatch"));
         }
-        let result = self.push_frame_inner(frame.bytes);
+        if let Err(error) = self.memory.reserve(MemoryClass::Decoder, frame_len) {
+            self.memory.release(MemoryClass::Receive, frame_len);
+            self.failed = true;
+            return Err(error);
+        }
+        let result = self.stage_frame(frame.bytes);
+        self.memory.release(MemoryClass::Decoder, frame_len);
+        self.memory.release(MemoryClass::Receive, frame_len);
         if result.is_err() {
             self.failed = true;
         }
@@ -431,39 +444,9 @@ impl TxnBuffer {
         self.memory.release(MemoryClass::Receive, frame.expected);
         Ok(())
     }
-    fn push_frame_inner(&mut self, frame: Vec<u8>) -> Result<(), SpoolError> {
-        let frame_len = frame.len();
-        if frame.len() > self.limits.max_event_bytes {
-            self.memory.release(MemoryClass::Receive, frame_len);
-            return Err(SpoolError::EventLimit {
-                limit: self.limits.max_event_bytes,
-                observed: frame.len(),
-            });
-        }
-        self.memory.reserve(MemoryClass::Decoder, frame.len())?;
-        let next_bytes = self.bytes.checked_add(frame.len() as u64).ok_or(
-            SpoolError::TransactionBytesLimit {
-                limit: self.limits.max_transaction_bytes,
-                observed: u64::MAX,
-            },
-        )?;
+    fn stage_frame(&mut self, frame: Vec<u8>) -> Result<(), SpoolError> {
+        let next_bytes = self.bytes + frame.len() as u64;
         let next_events = self.events + 1;
-        if next_bytes > self.limits.max_transaction_bytes {
-            self.memory.release(MemoryClass::Decoder, frame.len());
-            self.memory.release(MemoryClass::Receive, frame.len());
-            return Err(SpoolError::TransactionBytesLimit {
-                limit: self.limits.max_transaction_bytes,
-                observed: next_bytes,
-            });
-        }
-        if next_events > self.limits.max_transaction_events {
-            self.memory.release(MemoryClass::Decoder, frame.len());
-            self.memory.release(MemoryClass::Receive, frame.len());
-            return Err(SpoolError::TransactionEventsLimit {
-                limit: self.limits.max_transaction_events,
-                observed: next_events,
-            });
-        }
         if self.spool.is_none()
             && self
                 .memory_payload
@@ -479,56 +462,71 @@ impl TxnBuffer {
         }
         self.bytes = next_bytes;
         self.events = next_events;
-        self.memory.release(MemoryClass::Decoder, frame_len);
-        self.memory.release(MemoryClass::Receive, frame_len);
         Ok(())
     }
     fn ensure_spool(&mut self) -> Result<(), SpoolError> {
         if self.spool.is_some() {
             return Ok(());
         }
+        self.memory
+            .reserve(MemoryClass::Decoder, HEADER_WORK_BYTES)?;
         let name = spool_name(&self.header);
         let path = self.directory.join(name);
-        let mut file = OpenOptions::new()
+        let opened = OpenOptions::new()
             .create_new(true)
             .read(true)
             .write(true)
-            .open(&path)?;
-        let header_bound = 64usize
-            .checked_add(self.header.capture_epoch.len())
-            .and_then(|v| v.checked_add(self.header.xid.len()))
-            .and_then(|v| v.checked_add(self.header.creation_run.len()))
-            .ok_or(SpoolError::MemoryLimit(MemoryClass::Decoder))?;
-        self.memory.reserve(MemoryClass::Decoder, header_bound)?;
-        let header = serde_json::to_vec(&self.header)
-            .map_err(|_| SpoolError::Invalid("spool header encoding"))?;
-        if header.len() > header_bound {
-            self.memory.release(MemoryClass::Decoder, header_bound);
+            .open(&path);
+        let mut file = match opened {
+            Ok(file) => file,
+            Err(error) => {
+                self.memory.release(MemoryClass::Decoder, HEADER_WORK_BYTES);
+                return Err(error.into());
+            }
+        };
+        let header = match serde_json::to_vec(&self.header) {
+            Ok(header) => header,
+            Err(_) => {
+                self.memory.release(MemoryClass::Decoder, HEADER_WORK_BYTES);
+                fs::remove_file(&path).ok();
+                return Err(SpoolError::Invalid("spool header encoding"));
+            }
+        };
+        if header.len() > HEADER_WORK_BYTES / 2 {
+            self.memory.release(MemoryClass::Decoder, HEADER_WORK_BYTES);
+            fs::remove_file(&path).ok();
             return Err(SpoolError::MemoryLimit(MemoryClass::Decoder));
         }
         let header_len = (header.len() as u32).to_be_bytes();
         let header_sum = Sha256::digest(&header);
-        let dev = fs::metadata(&self.directory)?.dev();
-        let prefix_len = self.preallocate_parts(
+        let dev = self.filesystem;
+        let prefix_result = self.preallocate_parts(
             &mut file,
             dev,
             0,
             &[MAGIC, &header_len, &header, &header_sum],
-        )?;
-        self.memory.release(MemoryClass::Decoder, header_bound);
+        );
+        self.memory.release(MemoryClass::Decoder, HEADER_WORK_BYTES);
+        let prefix_len = match prefix_result {
+            Ok(value) => value,
+            Err(error) => {
+                drop(file);
+                fs::remove_file(&path).ok();
+                sync_dir(&self.directory).ok();
+                return Err(error);
+            }
+        };
         self.spool = Some((file, path, prefix_len, dev));
         let prior = std::mem::take(&mut self.memory_events);
         let prior_payload: usize = prior.iter().map(Vec::len).sum();
-        for event in &prior {
-            self.append_file(event)?;
-        }
+        let flush_result = prior.iter().try_for_each(|event| self.append_file(event));
         drop(prior);
         self.memory.release(MemoryClass::Staging, prior_payload);
         self.memory_payload = 0;
         self.memory
             .release(MemoryClass::Staging, self.metadata_reserved);
         self.metadata_reserved = 0;
-        Ok(())
+        flush_result
     }
     fn append_file(&mut self, event: &[u8]) -> Result<(), SpoolError> {
         let event_len = (event.len() as u32).to_be_bytes();
@@ -538,6 +536,9 @@ impl TxnBuffer {
             self.preallocate_parts(&mut file, dev, offset, &[&event_len, event, &checksum]);
         let next = result.as_ref().map_or(offset, |written| offset + written);
         self.spool = Some((file, path, next, dev));
+        if result.is_ok() {
+            self.spill_bytes = self.spill_bytes.saturating_add(event.len() as u64);
+        }
         result.map(|_| ())
     }
     fn preallocate_parts(
@@ -574,7 +575,9 @@ impl TxnBuffer {
             Ok::<_, io::Error>(())
         })();
         if let Err(error) = result {
-            self.disk.0.borrow_mut().release(dev, bytes);
+            if file.set_len(offset).is_ok() {
+                self.disk.0.borrow_mut().release(dev, bytes);
+            }
             return Err(error.into());
         }
         Ok(bytes)
@@ -585,22 +588,46 @@ impl TxnBuffer {
     pub fn observed(&self) -> (u64, u64) {
         (self.bytes, self.events)
     }
+    pub fn spill_bytes(&self) -> u64 {
+        self.spill_bytes
+    }
+    pub fn stream_events(&self) -> u64 {
+        0
+    }
     pub fn commit_iter(&mut self) -> Result<CommitIter<'_>, SpoolError> {
         if self.failed || self.events == 0 {
             return Err(SpoolError::Invalid("failed or empty transaction"));
         }
-        if let Some((file, _, _, _)) = &mut self.spool {
-            file.sync_all()?;
-            file.seek(SeekFrom::Start(0))?;
-            let mut reader = BufReader::new(file.try_clone()?);
-            read_header(&mut reader)?;
+        if self.spool.is_some() {
             let reservation = self.limits.max_event_bytes;
-            self.memory.reserve(MemoryClass::Staging, reservation)?;
+            self.memory
+                .reserve(MemoryClass::Decoder, READER_WORK_BYTES)?;
+            if let Err(error) = self.memory.reserve(MemoryClass::Staging, reservation) {
+                self.memory.release(MemoryClass::Decoder, READER_WORK_BYTES);
+                return Err(error);
+            }
+            let prepared = (|| {
+                let (file, _, _, _) = self.spool.as_mut().expect("spool");
+                file.sync_all()?;
+                file.seek(SeekFrom::Start(0))?;
+                let mut reader = BufReader::new(file.try_clone()?);
+                read_header(&mut reader)?;
+                Ok::<_, SpoolError>(reader)
+            })();
+            let reader = match prepared {
+                Ok(reader) => reader,
+                Err(error) => {
+                    self.memory.release(MemoryClass::Staging, reservation);
+                    self.memory.release(MemoryClass::Decoder, READER_WORK_BYTES);
+                    return Err(error);
+                }
+            };
             return Ok(CommitIter::File {
                 reader,
                 remaining: self.events,
                 max_event_bytes: self.limits.max_event_bytes,
                 reservation,
+                reader_reservation: READER_WORK_BYTES,
                 owner: self,
             });
         }
@@ -732,6 +759,7 @@ pub enum CommitIter<'a> {
         remaining: u64,
         max_event_bytes: usize,
         reservation: usize,
+        reader_reservation: usize,
         owner: &'a mut TxnBuffer,
     },
 }
@@ -758,10 +786,16 @@ impl<'a> Iterator for CommitIter<'a> {
 impl Drop for CommitIter<'_> {
     fn drop(&mut self) {
         if let Self::File {
-            reservation, owner, ..
+            reservation,
+            reader_reservation,
+            owner,
+            ..
         } = self
         {
             owner.memory.release(MemoryClass::Staging, *reservation);
+            owner
+                .memory
+                .release(MemoryClass::Decoder, *reader_reservation);
         }
     }
 }
@@ -891,7 +925,16 @@ pub fn classify_startup_spools(
                     0 => break,
                     1 => {
                         r.seek_relative(-1)?;
-                        let event = read_record(&mut r, max_event_bytes)?;
+                        if events >= max_transaction_events {
+                            return Err(SpoolError::TransactionEventsLimit {
+                                limit: max_transaction_events,
+                                observed: events + 1,
+                            });
+                        }
+                        let remaining = max_transaction_bytes.saturating_sub(bytes);
+                        let allocation_limit =
+                            max_event_bytes.min(usize::try_from(remaining).unwrap_or(usize::MAX));
+                        let event = read_record(&mut r, allocation_limit)?;
                         bytes = bytes.checked_add(event.len() as u64).ok_or(
                             SpoolError::TransactionBytesLimit {
                                 limit: max_transaction_bytes,
@@ -1002,11 +1045,11 @@ pub mod tests {
         )
         .unwrap();
         let mem = MemoryBudget::new(MemoryLimits {
-            process_limit: 2048,
-            runtime_fixed: 256,
-            receive: 512,
-            decoder: 512,
-            staging: 768,
+            process_limit: 65_536,
+            runtime_fixed: 4_096,
+            receive: 1_024,
+            decoder: 32_768,
+            staging: 16_384,
         })
         .unwrap();
         TxnBuffer::new(
@@ -1046,7 +1089,7 @@ pub mod tests {
             (h.receive_bytes, h.decoder_bytes, h.staging_bytes),
             (100, 100, 100 + 4 * std::mem::size_of::<Vec<u8>>())
         );
-        assert!(h.aggregate_bytes <= 2048);
+        assert!(h.aggregate_bytes <= 65_536);
         b.finish().unwrap();
     }
     #[test]
@@ -1184,11 +1227,11 @@ pub mod tests {
             )
             .unwrap();
             let mem = MemoryBudget::new(MemoryLimits {
-                process_limit: 2048,
-                runtime_fixed: 256,
-                receive: 512,
-                decoder: 512,
-                staging: 768,
+                process_limit: 65_536,
+                runtime_fixed: 4_096,
+                receive: 1_024,
+                decoder: 32_768,
+                staging: 16_384,
             })
             .unwrap();
             TxnBuffer::new(
@@ -1217,6 +1260,23 @@ pub mod tests {
         drop(bad);
         let malformed = store_dir.join("malformed.spool");
         fs::write(&malformed, b"bad").unwrap();
+        let aliased_store = store_dir.join("state.db");
+        assert!(matches!(
+            classify_startup_spools(
+                &lock,
+                &aliased_store,
+                &store_dir,
+                "epoch",
+                "owner",
+                512,
+                1024,
+                4,
+                |_, _| ExistingTransaction::Uncommitted
+            ),
+            Err(SpoolError::Invalid(
+                "startup lock does not protect state store"
+            ))
+        ));
         let blocked = classify_startup_spools(
             &lock,
             &store,

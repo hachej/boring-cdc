@@ -24,9 +24,9 @@ def main():
   result=run([str(binary),item,str(work/item)]);assert result.returncode==0,result.stderr;observed[item]=json.loads(result.stdout);stdout=out/f'{item}-stdout.txt';stderr=out/f'{item}-stderr.txt';write(stdout,result.stdout);write(stderr,result.stderr);display=f'target/debug/examples/m2_spool_component {item} $TMPDIR/isolated-spool';displays.append(display);commands.append(cmd(display,stdout,stderr,result.returncode))
  if mode=='e2e':
   assert observed['near-limit']['spill_delta']>0 and observed['near-limit']['stream_delta']==0 and observed['near-limit']['iterator_events']==2
-  assert observed['oversized']['outcome']['feedback_permitted'] is False
+  assert observed['oversized']['outcome']['feedback_permitted'] is False and observed['oversized']['prepared_persistence']
  else:
-  assert observed['enospc']['outcome']['feedback_permitted'] is False
+  assert observed['enospc']['outcome']['feedback_permitted'] is False and observed['enospc']['prepared_persistence']
   assert observed['startup']['removed']==1 and observed['startup']['quarantined']==2 and observed['startup']['feedback_permitted'] is False
  config={'profile':'component','seed':SEED,'spool_format_version':1,'limits':'fixture-supplied','emergency_reserve_bytes':512};fingerprint=sha(canon(config));git=run(['git','rev-parse','HEAD']).stdout.strip();impl=impl_digest()
  write(out/'commands.txt','\n'.join(displays)+'\n');write(out/'versions.json',canon({'python':sys.version.split()[0],'rustc':run(['rustc','--version']).stdout.strip(),'git_commit':git,'binary_sha256':sha(binary.read_bytes()),'implementation_sha256':impl}));write(out/'config.json',canon(config));write(out/'state/before.json',canon({'admitted_transactions':0,'feedback_permits':0}));write(out/'state/after.json',canon(observed));write(out/'fault-timeline.json',canon(['begin',*modes,'cleanup']))

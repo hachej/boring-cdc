@@ -1,3 +1,4 @@
+use boring_cdc::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
 use boring_cdc::m2_ownership::StateLock;
 use boring_cdc::m2_spool::*;
 use serde_json::json;
@@ -6,6 +7,12 @@ use std::io;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 
+struct ZeroRandom;
+impl Randomness for ZeroRandom {
+    fn next_u64(&mut self) -> u64 {
+        0
+    }
+}
 struct FixedSpace(u64);
 impl FreeSpace for FixedSpace {
     fn available_bytes(&self, _: &Path) -> io::Result<u64> {
@@ -33,11 +40,11 @@ fn buffer(
     )
     .unwrap();
     let memory = MemoryBudget::new(MemoryLimits {
-        process_limit: 2048,
-        runtime_fixed: 256,
-        receive: 512,
-        decoder: 512,
-        staging: 768,
+        process_limit: 65_536,
+        runtime_fixed: 4_096,
+        receive: 1_024,
+        decoder: 32_768,
+        staging: 16_384,
     })
     .unwrap();
     TxnBuffer::new(
@@ -84,21 +91,42 @@ fn main() {
             };
             let high = b.high_water();
             let observed = b.observed();
+            let spill_delta = b.spill_bytes();
+            let stream_delta = b.stream_events();
             b.finish().unwrap();
-            json!({"outcome":"commit_ready","observed_bytes":observed.0,"observed_events":observed.1,"iterator_events":iterator_events,"spill_delta":8,"stream_delta":0,"feedback_permitted":false,"high_water":high})
+            json!({"outcome":"commit_ready","observed_bytes":observed.0,"observed_events":observed.1,"iterator_events":iterator_events,"spill_delta":spill_delta,"stream_delta":stream_delta,"feedback_permitted":false,"high_water":high})
         }
         "oversized" => {
             let mut b = buffer(&root, "xid-large", 8, 4096, 4, 2);
             push(&mut b, b"1234").unwrap();
             let error = push(&mut b, b"5").unwrap_err();
-            let (_, out) = b.failure_observation(&error, Some("0000000000000042"), "limit-a");
-            json!({"outcome":out,"error":format!("{error:?}")})
+            let clock = VirtualClock::new(1000);
+            let mut random = ZeroRandom;
+            let mut context = TransitionContext {
+                clock: &clock,
+                randomness: &mut random,
+            };
+            let (out, action, prepared) = b.apply_failure_policy(
+                &error,
+                Some("0000000000000042"),
+                "limit-a",
+                None,
+                &mut context,
+            );
+            json!({"outcome":out,"error":format!("{error:?}"),"policy_action":format!("{action:?}"),"prepared_persistence":prepared.is_some()})
         }
         "enospc" => {
             let mut b = buffer(&root, "xid-enospc", 0, 520, 32, 2);
             let error = push(&mut b, b"1234").unwrap_err();
-            let (_, out) = b.failure_observation(&error, None, "disk-a");
-            json!({"outcome":out,"error":format!("{error:?}")})
+            let clock = VirtualClock::new(1000);
+            let mut random = ZeroRandom;
+            let mut context = TransitionContext {
+                clock: &clock,
+                randomness: &mut random,
+            };
+            let (out, action, prepared) =
+                b.apply_failure_policy(&error, None, "disk-a", None, &mut context);
+            json!({"outcome":out,"error":format!("{error:?}"),"policy_action":format!("{action:?}"),"prepared_persistence":prepared.is_some()})
         }
         "startup" => {
             let store = root.join("state.sqlite");
