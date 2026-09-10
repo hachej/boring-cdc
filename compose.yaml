@@ -1,7 +1,6 @@
 name: boring-cdc
 services:
   postgres:
-    # // M0-PROVISIONAL: boring-cdc-d-compose
     # linux/amd64 child sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409
     image: docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
     platform: linux/amd64
@@ -10,10 +9,8 @@ services:
       POSTGRES_USER: boring_cdc
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
     secrets: [postgres_password]
-    # // M0-PROVISIONAL: boring-cdc-d-compose
     command: ["postgres", "-c", "wal_level=logical", "-c", "max_slot_wal_keep_size=65536MB", "-c", "tcp_keepalives_idle=30", "-c", "tcp_keepalives_interval=10", "-c", "tcp_keepalives_count=3", "-c", "client_connection_check_interval=10s"]
     healthcheck:
-      # // M0-PROVISIONAL: boring-cdc-d-compose
       test: ["CMD-SHELL", "pg_isready -U boring_cdc -d boring_cdc"]
       interval: 5s
       timeout: 3s
@@ -22,12 +19,10 @@ services:
     volumes: ["pgdata:/var/lib/postgresql/data"]
 
   clickhouse:
-    # // M0-PROVISIONAL: boring-cdc-d-compose
     # linux/amd64 child sha256:78b6f0863688458b229b597f6a1bbf891855a01cf59c3f3dbe66428571c518c9
     image: docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f
     platform: linux/amd64
     healthcheck:
-      # // M0-PROVISIONAL: boring-cdc-d-compose
       test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 5s
       timeout: 3s
@@ -41,7 +36,6 @@ services:
       context: .
       dockerfile: Dockerfile
     platform: linux/amd64
-    # // M0-PROVISIONAL: boring-cdc-d-compose
     restart: unless-stopped
     depends_on:
       postgres: {condition: service_healthy}

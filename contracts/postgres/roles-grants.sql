@@ -1,6 +1,5 @@
 -- Boring CDC v0.1 source role/grant contract. Administrative execution substitutes
 -- safely quoted configured identifiers; ordinary run never receives the admin credential.
--- // M0-PROVISIONAL: boring-cdc-d-publication
 CREATE ROLE boring_cdc_admin NOLOGIN;
 CREATE ROLE boring_cdc_application NOLOGIN;
 CREATE ROLE boring_cdc_capture LOGIN REPLICATION;

@@ -1,5 +1,4 @@
 -- Boring CDC v0.1 physical journal schema. SQLite 3.45.3.
--- // M0-PROVISIONAL: boring-cdc-d-sqlite
 -- init MUST set page_size=4096 and auto_vacuum=INCREMENTAL before executing this file.
 PRAGMA foreign_keys=ON;
 PRAGMA trusted_schema=OFF;

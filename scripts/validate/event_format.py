@@ -318,9 +318,8 @@ def validate() -> tuple[list[dict], dict]:
     for title in required_sections:
         if f"## {title}" not in document:
             fail(findings, "E_DOC_SECTION", "docs/EVENT_FORMAT.md", title)
-    for marker in contract["provisional_authorities"]:
-        if marker not in document and marker not in CONTRACT.read_text():
-            fail(findings, "E_PROVISIONAL", "contract", marker)
+    if "M0-" + "PROVISIONAL" in document or "M0-" + "PROVISIONAL" in CONTRACT.read_text():
+        fail(findings, "E_PROVISIONAL", "contract", "reconciled artifact contains a provisional marker")
 
     primitives = vectors["identity_primitives"]
     observed_slot = source_slot_identity(primitives["source_slot"]["input"])

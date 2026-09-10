@@ -3,7 +3,6 @@
     "count": 1,
     "license": "Apache-2.0",
     "name": "boring-cdc",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-compose",
     "toolchain": "1.89.0"
   },
   "compose": {
@@ -39,7 +38,6 @@
       "tcp_keepalives_interval_seconds": 10
     },
     "project": "boring-cdc",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-compose",
     "restart": "unless-stopped",
     "retry_authority": "persisted FailurePolicy",
     "services": [
@@ -78,14 +76,5 @@
     "SCN-M0-SCAFFOLD-AGENT-READONLY"
   ],
   "owner_bead": "boring-cdc-m0-scaffold",
-  "provisional_authorities": [
-    "// M0-PROVISIONAL: boring-cdc-d-security",
-    "// M0-PROVISIONAL: boring-cdc-d-values",
-    "// M0-PROVISIONAL: boring-cdc-d-keys",
-    "// M0-PROVISIONAL: boring-cdc-d-failure-policy",
-    "// M0-PROVISIONAL: boring-cdc-d-sqlite",
-    "// M0-PROVISIONAL: boring-cdc-d-wal-cap",
-    "// M0-PROVISIONAL: boring-cdc-d-compose"
-  ],
   "schema_version": "m0-scaffold/v1"
 }

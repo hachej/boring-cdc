@@ -45,22 +45,14 @@ def validate():
     for item in fixture_schema_findings:
         finding(findings, "E_FIXTURE_SCHEMA", "fixtures", item["pointer"] + ": " + item["message"])
 
-    expected_markers = {f"// M0-PROVISIONAL: {item}" for item in (
-        "boring-cdc-d-pg-protocol", "boring-cdc-d-publication", "boring-cdc-d-ddl",
-        "boring-cdc-d-backfill", "boring-cdc-d-wal-cap", "boring-cdc-d-failure-policy",
-        "boring-cdc-d-keys",
-    )}
     text = CONTRACT.read_text() + SQL.read_text()
-    if set(contract.get("provisional_authorities", [])) != expected_markers:
-        finding(findings, "E_PROVISIONAL_INVENTORY", "provisional_authorities", "authority inventory changed")
-    for marker in expected_markers:
-        if marker not in text:
-            finding(findings, "E_PROVISIONAL_MARKER", "contract", marker)
+    if "M0-" + "PROVISIONAL" in text:
+        finding(findings, "E_PROVISIONAL_MARKER", "contract", "reconciled artifact contains a provisional marker")
 
     protocol = contract["protocol"]
     if contract["supported_postgresql"] != [{
         "exact_version": "17.6", "image_manifest": "sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
-        "major": 17, "platform": "linux/amd64", "provisional": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol"
+        "major": 17, "platform": "linux/amd64"
     }]:
         finding(findings, "E_SERVER_MATRIX", "supported_postgresql", "only pinned PostgreSQL 17.6 linux/amd64 is admitted")
     required_options = ["proto_version", "publication_names", "binary", "messages", "streaming", "two_phase", "origin"]

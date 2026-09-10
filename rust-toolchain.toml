@@ -1,5 +1,4 @@
 [toolchain]
-# // M0-PROVISIONAL: boring-cdc-d-compose
 channel = "1.89.0"
 profile = "minimal"
 components = ["clippy", "rustfmt"]

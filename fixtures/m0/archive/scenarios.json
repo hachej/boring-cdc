@@ -1,0 +1,1232 @@
+{
+  "schema_version": "archive-fixtures/v1",
+  "owner_bead": "boring-cdc-m0-archive-model",
+  "contract": "contracts/archive/archive-model.json",
+  "fixed_seed": "0x424344435f415243484956455f563031",
+  "cases": [
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-EMPTY-RANGE",
+      "executor_id": "boring-cdc-m2-jsonl",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "select",
+        "fault_hook": "none",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "complete_no_segment",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_EMPTY_RANGE",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-JSONL-BYTE-RETRY",
+      "executor_id": "boring-cdc-m2-jsonl",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "write_jsonl",
+        "fault_hook": "after_jsonl_sync",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "byte_identical",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_JSONL_BYTE_RETRY",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-PARQUET-BYTE-RETRY",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "write_parquet",
+        "fault_hook": "after_parquet_sync",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "byte_identical",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_PARQUET_BYTE_RETRY",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-INTENT",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "intent",
+        "fault_hook": "after_intent_commit",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "remove_empty_staging_and_retry",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_INTENT",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-DURING-FILE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "stage",
+        "fault_hook": "during_file_write",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "remove_partial_staging_and_retry",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_DURING_FILE",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-FILE-SYNC",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "stage",
+        "fault_hook": "after_all_files_sync",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "validate_files_then_continue",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_FILE_SYNC",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-MANIFEST-SYNC",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "manifest",
+        "fault_hook": "after_manifest_sync",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "validate_manifest_then_continue",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_MANIFEST_SYNC",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-DIRECTORY-RENAME",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "finalize",
+        "fault_hook": "after_directory_rename",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "sync_parent_then_continue",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_DIRECTORY_RENAME",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-BEFORE-READY",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "ready",
+        "fault_hook": "before_ready_create",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "validate_final_then_create_ready",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_BEFORE_READY",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-READY-SYNC",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "ready",
+        "fault_hook": "after_ready_sync",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "adopt_ready_segment",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_READY_SYNC",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-FINAL-WITHOUT-READY-VALID",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "reconcile",
+        "fault_hook": "final_without_ready",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "resync_and_create_ready",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_FINAL_WITHOUT_READY_VALID",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-FINAL-WITHOUT-READY-CORRUPT",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "reconcile",
+        "fault_hook": "final_manifest_mismatch",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "quarantine_and_block",
+        "archive_state": "blocked_integrity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_integrity",
+        "log_code": "BCDC_ARCHIVE_FINAL_WITHOUT_READY_CORRUPT",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-MANIFEST-HASH-MISMATCH",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "manifest_hash_mismatch",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "block_archive_only",
+        "archive_state": "blocked_integrity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_integrity",
+        "log_code": "BCDC_ARCHIVE_MANIFEST_HASH_MISMATCH",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-FILE-HASH-MISMATCH",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "file_hash_mismatch",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "block_archive_only",
+        "archive_state": "blocked_integrity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_integrity",
+        "log_code": "BCDC_ARCHIVE_FILE_HASH_MISMATCH",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-MISSING-READY",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "ready_removed_after_checkpoint",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "block_archive_only",
+        "archive_state": "blocked_integrity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_integrity",
+        "log_code": "BCDC_ARCHIVE_MISSING_READY",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-SYMLINK-RACE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "path_open",
+        "fault_hook": "swap_intermediate_to_symlink",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "reject_and_block",
+        "archive_state": "blocked_security",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 78,
+        "status_code": "archive_blocked_security",
+        "log_code": "BCDC_ARCHIVE_SYMLINK_RACE",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-HARDLINK-RACE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "path_open",
+        "fault_hook": "unexpected_link_count",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "reject_and_block",
+        "archive_state": "blocked_security",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 78,
+        "status_code": "archive_blocked_security",
+        "log_code": "BCDC_ARCHIVE_HARDLINK_RACE",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-HOSTILE-IDENTIFIER",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "path_encode",
+        "fault_hook": "raw_identifier_attempt",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "reject_raw_path_component",
+        "archive_state": "blocked_contract",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 78,
+        "status_code": "archive_blocked_contract",
+        "log_code": "BCDC_ARCHIVE_HOSTILE_IDENTIFIER",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-LOWER-FENCE-NOOP",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "selector",
+        "fault_hook": "publish_lower_fence",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "no_external_change",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_LOWER_FENCE_NOOP",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-SAME-FENCE-CONFLICT",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "selector",
+        "fault_hook": "publish_conflicting_same_fence",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "block_corruption",
+        "archive_state": "blocked_integrity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_integrity",
+        "log_code": "BCDC_ARCHIVE_SAME_FENCE_CONFLICT",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-HIGHER-FENCE-WINS",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "selector",
+        "fault_hook": "publish_higher_fence",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "select_new_generation",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_HIGHER_FENCE_WINS",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-EXTERNAL-FENCE-AHEAD",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "startup",
+        "fault_hook": "external_fence_above_sqlite",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "maintenance_adopt_or_reject",
+        "archive_state": "blocked_continuity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 66,
+        "status_code": "archive_blocked_continuity",
+        "log_code": "BCDC_ARCHIVE_EXTERNAL_FENCE_AHEAD",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-TRANSIENT-RESTART",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "retry",
+        "fault_hook": "restart_before_due",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "preserve_attempt_and_due",
+        "archive_state": "retry_wait",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_retry_wait",
+        "log_code": "BCDC_ARCHIVE_TRANSIENT_RESTART",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-DETERMINISTIC-POISON",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "materialize",
+        "fault_hook": "canonical_encode_failure",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "persist_block_no_hot_loop",
+        "archive_state": "blocked_poison",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_poison",
+        "log_code": "BCDC_ARCHIVE_DETERMINISTIC_POISON",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-EXHAUSTED-RETRY",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "retry",
+        "fault_hook": "attempt_ten_failed",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "persist_exhausted_block",
+        "archive_state": "blocked_exhausted",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_exhausted",
+        "log_code": "BCDC_ARCHIVE_EXHAUSTED_RETRY",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-RESUME-CHANGED-BOUNDARY",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "resume",
+        "fault_hook": "boundary_changed",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "reject_resume",
+        "archive_state": "blocked_poison",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 78,
+        "status_code": "archive_blocked_poison",
+        "log_code": "BCDC_ARCHIVE_RESUME_CHANGED_BOUNDARY",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-BOOTSTRAP-OUTSIDE-RETENTION",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "bootstrap",
+        "fault_hook": "requested_start_gced",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "require_reseed_or_detach",
+        "archive_state": "blocked_continuity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 66,
+        "status_code": "archive_blocked_continuity",
+        "log_code": "BCDC_ARCHIVE_BOOTSTRAP_OUTSIDE_RETENTION",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-AUDIT-FINITE-PASS",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "budget_exhausted",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "persist_cursor_partial_unknown",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_AUDIT_FINITE_PASS",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-AUDIT-OVERSIZED-PART-RESUME",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "part_exceeds_pass_bytes",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "persist_part_offset_and_resume",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_AUDIT_OVERSIZED_PART_RESUME",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-AUDIT-IDENTITY-CHANGE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "selector_changed_mid_round",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "discard_round_restart",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_AUDIT_IDENTITY_CHANGE",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-AUDIT-FRESHNESS-EXPIRES",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "fresh_until_elapsed",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "report_unknown_not_verified",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_AUDIT_FRESHNESS_EXPIRES",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-GC-PINNED-LIVE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "gc",
+        "fault_hook": "segment_referenced_by_live_selector",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "retain",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_GC_PINNED_LIVE",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-GC-RETIREMENT-GRACE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "gc",
+        "fault_hook": "retired_before_grace",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "retain",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_GC_RETIREMENT_GRACE",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-GC-ELIGIBLE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "gc",
+        "fault_hook": "retired_after_grace_no_pins",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "descriptor_relative_delete_and_sync",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_GC_ELIGIBLE",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-UNSUPPORTED-FILESYSTEM",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "preflight",
+        "fault_hook": "filesystem_tmpfs",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "reject_configuration",
+        "archive_state": "blocked_configuration",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 78,
+        "status_code": "archive_blocked_configuration",
+        "log_code": "BCDC_ARCHIVE_UNSUPPORTED_FILESYSTEM",
+        "redacted": true
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-ENOSPC-BEFORE-RESERVE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "action": {
+        "phase": "admission",
+        "fault_hook": "reserve_exceeds_headroom",
+        "fault_once": true
+      },
+      "expected": {
+        "recovery": "do_not_create_intent",
+        "archive_state": "blocked_resource",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_blocked_resource",
+        "log_code": "BCDC_ARCHIVE_ENOSPC_BEFORE_RESERVE",
+        "redacted": true
+      }
+    }
+  ]
+}

@@ -8,7 +8,6 @@
       "post-export sampled LSN",
       "timer"
     ],
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-backfill",
     "required_fields": [
       "capture_epoch",
       "generation",
@@ -59,7 +58,6 @@
       "source-impact limit"
     ],
     "normal_exporter_release": "after all import acknowledgements is valid and does not invalidate",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-backfill",
     "states": [
       "prepared",
       "snapshot_exported",
@@ -102,7 +100,6 @@
         "updated_at"
       ]
     },
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-publication",
     "routing": "journal control event; complete-transaction destination checkpoint no-op; never user-table state",
     "schema": "boring_cdc_control"
   },
@@ -115,7 +112,6 @@
     "idle_in_transaction_session_timeout_seconds": 120,
     "lock": "ACCESS SHARE",
     "lock_timeout_seconds": 10,
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-ddl",
     "relation_message": "pause synchronously, reread and validate before following DML decode/feedback",
     "release": "only after matching capture fence is durable, or checked invalidation cleanup",
     "statement_timeout_seconds": 30,
@@ -213,7 +209,6 @@
     "service": {
       "during_spool_or_commit": "send only prior durable boundary; never block behind decoder/writer work",
       "ownership_probe_interval_ms": 5000,
-      "provisional": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol",
       "queue_capacity": 64,
       "requested_reply_deadline_ms": 1000,
       "task": "independent bounded feedback/probe task"
@@ -303,7 +298,6 @@
     "loss": "fence all dispatch, persist ownership_lost when possible, exit nonzero; no in-process reacquire or CopyBoth reopen",
     "ownership_deadline_seconds": 15,
     "probe_interval_seconds": 5,
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-publication",
     "session": "dedicated non-pooled SQL connection; persist backend PID plus random 128-bit nonce",
     "source_mutation_max_seconds": 10,
     "takeover_wait_seconds": 90
@@ -321,7 +315,6 @@
       "origin"
     ],
     "origin": "any",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol",
     "slot_plugin": "pgoutput",
     "spill_counters": [
       "spill_txns",
@@ -348,7 +341,6 @@
       "crate": "pgwire-replication",
       "feature": "tls-rustls,scram",
       "implementation_boundary": "use pinned crate CopyBoth framing/auth/TLS and public status encoder; owned adapter encodes exact START_REPLICATION query and always passes false for outgoing reply_requested",
-      "provisional": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol",
       "required_capability": "incremental bidirectional logical-replication CopyBoth with standby-status writes; no complete-stream collection",
       "stock_high_level_worker": "forbidden: cannot encode frozen streaming/two_phase/origin options and replies to requested keepalive with outgoing reply_requested=true",
       "version": "0.4.0"
@@ -358,15 +350,6 @@
     "wire_frame_max_bytes": 8388608,
     "zero_lsn_sentinel": "0/0"
   },
-  "provisional_authorities": [
-    "// M0-PROVISIONAL: boring-cdc-d-pg-protocol",
-    "// M0-PROVISIONAL: boring-cdc-d-publication",
-    "// M0-PROVISIONAL: boring-cdc-d-ddl",
-    "// M0-PROVISIONAL: boring-cdc-d-backfill",
-    "// M0-PROVISIONAL: boring-cdc-d-wal-cap",
-    "// M0-PROVISIONAL: boring-cdc-d-failure-policy",
-    "// M0-PROVISIONAL: boring-cdc-d-keys"
-  ],
   "publication": {
     "catalog_poll_seconds": 30,
     "column_lists": false,
@@ -382,7 +365,6 @@
     ],
     "name": "boring_cdc",
     "owner_role": "boring_cdc_admin",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-publication",
     "publish": [
       "insert",
       "update",
@@ -412,7 +394,6 @@
     "advisory_loss_always": "ownership loss and nonzero exit",
     "matching_close": "process remains alive; source lock remains probed; safe destination draining continues",
     "nonmatching_or_late_generation": "ownership loss and nonzero exit",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol",
     "reopen": "forbidden in process",
     "sequence": [
       "stop capture dispatch",
@@ -486,8 +467,7 @@
         "slot/publication administration"
       ],
       "role": "boring_cdc_control_writer"
-    },
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-publication"
+    }
   },
   "source_state_fields": [
     {
@@ -598,8 +578,7 @@
       "exact_version": "17.6",
       "image_manifest": "sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
       "major": 17,
-      "platform": "linux/amd64",
-      "provisional": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol"
+      "platform": "linux/amd64"
     }
   ],
   "unadmitted_concurrent_ddl": [
@@ -637,7 +616,6 @@
     "metric_freshness_seconds": 30,
     "missing_metric": "unknown; block new bootstrap/backfill unless explicit unsafe_local_experiment; do not stop healthy capture solely for unknown",
     "monitoring_delay_seconds": 30,
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-wal-cap",
     "rate_statistic": "maximum of five nonnegative 60-second retained-WAL deltas, bytes/second, integer ceiling",
     "rate_window_seconds": 300,
     "reaction_reserve_seconds": 120,

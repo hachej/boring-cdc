@@ -24,7 +24,6 @@
     "logical_table": "boring-cdc/logical-table/v1",
     "mutation_payload": "boring-cdc/mutation-payload/v1",
     "physical_key": "boring-cdc/physical-key/v1",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-event-id",
     "relation_component": "boring-cdc/relation-component/v1",
     "relation_schema": "boring-cdc/relation-schema/v1",
     "snapshot_event": "boring-cdc/snapshot-event/v1",
@@ -73,7 +72,6 @@
       "u8 mutation tag delete=0 upsert=1",
       "column state encoding"
     ],
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-event-id",
     "snapshot_event": [
       "u64-be capture_epoch",
       "u64-be generation",
@@ -92,13 +90,11 @@
   "hashing": {
     "algorithm": "SHA-256",
     "field_framing": "u64-be byte length followed by bytes",
-    "hex_rendering": "lowercase",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-event-id"
+    "hex_rendering": "lowercase"
   },
   "identity_encodings": {
     "canonical_key": "u32-be component count; each component is one-byte representation tag (bool=1,int64=2,uint64=3,bytes=4,text=5), u32-be PostgreSQL type OID (bool 16; int64 21/23/20; uint64 OID 26; bytes 17/2950; text 25/1043/1042/19), i32-be typmod, then bool as one byte, integers as eight-byte big-endian, or bytes/text as u64-be byte length plus raw unpadded-base64url-decoded/UTF-8 bytes",
     "logical_table_id": "u64-be system_identifier, UTF-8 database_identity, UTF-8 schema name, UTF-8 table name; each field receives outer u64 length framing",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-event-id",
     "relation_component_hash": "SHA-256 over outer-length-framed domain boring-cdc/relation-component/v1, UTF-8 component kind, and canonical UTF-8 definition. Definitions are PostgreSQL catalog-deparsed expressions/index/partition/publication forms with identifiers UTF-8, keywords lower-case, one ASCII space between tokens, no comments, no trailing semicolon, and numeric literals in minimal decimal form.",
     "source_slot_identity": "u64-be system_identifier, u32-be timeline, UTF-8 database_identity, UTF-8 slot name, UTF-8 plugin; each field receives outer u64 length framing"
   },
@@ -115,25 +111,15 @@
     "name",
     "bytea"
   ],
-  "key_types_provisional": "// M0-PROVISIONAL: boring-cdc-d-keys",
   "limits": {
     "canonical_key_components": 32,
     "event_bytes": 8388608,
     "key_component_bytes": 1024,
-    "keys_provisional": "// M0-PROVISIONAL: boring-cdc-d-keys",
     "row_bytes": 4194304,
     "scalar_bytes": 1048576,
-    "units": "bytes (octets); limits are inclusive over canonical decoded bytes",
-    "values_provisional": "// M0-PROVISIONAL: boring-cdc-d-values"
+    "units": "bytes (octets); limits are inclusive over canonical decoded bytes"
   },
   "owner_bead": "boring-cdc-m0-event-format",
-  "provisional_authorities": [
-    "// M0-PROVISIONAL: boring-cdc-d-event-id",
-    "// M0-PROVISIONAL: boring-cdc-d-values",
-    "// M0-PROVISIONAL: boring-cdc-d-keys",
-    "// M0-PROVISIONAL: boring-cdc-d-toast",
-    "// M0-PROVISIONAL: boring-cdc-d-additive"
-  ],
   "relation_contract_encoding": "u64-length-framed logical_table_id; u32-be relation_id; u32-be physical-column count; each physical attnum ascending: i16-be attnum, u32-be logical ordinal (ffffffff if dropped), framed UTF-8 name (empty only if dropped), one-byte dropped, u32-be type OID, i32-be typmod, u32-be collation OID, one-byte nullable, framed SHA-256 default-expression hash or empty, framed SHA-256 generated-expression hash or empty, framed SHA-256 identity-expression hash or empty; one-byte replica mode d=0 n=1 f=2 i=3; framed replica-index definition hash or empty; framed primary/unique effective-key definition hash; framed partition-root logical_table_id or empty; framed partition-routing definition hash or empty; framed partition-key hash or empty; framed partition-bounds hash or empty; one-byte publication action bits INSERT=1 UPDATE=2 DELETE=4 TRUNCATE=8; one-byte publication membership; framed publication row-filter hash or empty; framed publication column-projection hash or empty",
   "schema_version": "boring-cdc/event-format-contract/v1",
   "tags": {
@@ -150,8 +136,7 @@
     "origin_rank": {
       "snapshot": 0,
       "wal": 1
-    },
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-event-id"
+    }
   },
   "value_types": [
     {
@@ -234,6 +219,5 @@
       "oid": "element-specific",
       "pg": "one-dimensional arrays of admitted non-array scalars"
     }
-  ],
-  "value_types_provisional": "// M0-PROVISIONAL: boring-cdc-d-values"
+  ]
 }

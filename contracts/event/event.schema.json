@@ -1,7 +1,6 @@
 {
   "$defs": {
     "column": {
-      "$comment": "// M0-PROVISIONAL: boring-cdc-d-toast",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -96,7 +95,6 @@
       "type": "object"
     },
     "controlEvent": {
-      "$comment": "// M0-PROVISIONAL: boring-cdc-d-event-id",
       "additionalProperties": false,
       "properties": {
         "capture_epoch": {
@@ -157,7 +155,6 @@
       "type": "string"
     },
     "key": {
-      "$comment": "// M0-PROVISIONAL: boring-cdc-d-keys",
       "items": {
         "oneOf": [
           {
@@ -327,7 +324,6 @@
       "type": "array"
     },
     "mutation": {
-      "$comment": "// M0-PROVISIONAL: boring-cdc-d-event-id",
       "additionalProperties": false,
       "allOf": [
         {
@@ -547,7 +543,6 @@
           "$ref": "#/$defs/hash"
         },
         "lsn_u64": {
-          "$comment": "// M0-PROVISIONAL: boring-cdc-d-event-id",
           "maximum": 18446744073709551615,
           "minimum": 0,
           "type": "integer"

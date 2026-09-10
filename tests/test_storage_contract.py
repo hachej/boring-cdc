@@ -33,5 +33,5 @@ class StorageContractTests(unittest.TestCase):
   self.assertEqual(m.EXPECTED_FIXTURES_SHA256,hashlib.sha256(m.F.read_bytes()).hexdigest())
   self.assertFalse([x for x in m.validate()[0] if x['code'].startswith('E_MANIFEST') or x['code'].startswith('E_ARTIFACT')])
  def test_no_secrets(self):
-  text=''.join(p.read_text() for p in (m.C,m.Q,m.F,m.FS,m.R)); self.assertNotIn('postgres://',text); self.assertNotIn('password=',text)
+  text=''.join(p.read_text() for p in (m.C,m.Q,m.F,m.FS,m.R)); self.assertNotIn('postgres'+'://',text); self.assertNotIn('password'+'=',text)
 if __name__=='__main__': unittest.main()

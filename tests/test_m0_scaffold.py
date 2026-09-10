@@ -34,10 +34,9 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIn("restart: unless-stopped", text)
         self.assertIn("@sha256:", text)
 
-    def test_all_provisional_authorities_are_explicit(self):
-        contract = json.loads((ROOT / "contracts/scaffold/m0-scaffold.json").read_text())
-        expected = {f"// M0-PROVISIONAL: boring-cdc-d-{x}" for x in ("security", "values", "keys", "failure-policy", "sqlite", "wal-cap", "compose")}
-        self.assertEqual(set(contract["provisional_authorities"]), expected)
+    def test_owner_confirmed_contract_has_no_provisional_markers(self):
+        paths = (ROOT / "contracts/scaffold/m0-scaffold.json", ROOT / "config/boring-cdc.schema.json")
+        self.assertFalse(any("M0-" + "PROVISIONAL" in path.read_text() for path in paths))
 
 if __name__ == "__main__":
     unittest.main()

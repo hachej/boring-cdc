@@ -5,33 +5,32 @@ use std::io::{self, Write};
 use std::thread;
 use std::time::Duration;
 
-// M0-PROVISIONAL: boring-cdc-d-security
 const REQUEST_LIMIT_BYTES: u64 = 1_048_576;
-// M0-PROVISIONAL: boring-cdc-d-security
+
 const RESPONSE_LIMIT_BYTES: u64 = 4_194_304;
-// M0-PROVISIONAL: boring-cdc-d-security
+
 const READ_TIMEOUT_SECONDS: u64 = 10;
-// M0-PROVISIONAL: boring-cdc-d-security
+
 const WRITE_TIMEOUT_SECONDS: u64 = 30;
-// M0-PROVISIONAL: boring-cdc-d-security
+
 const CONFIRMATION_EXPIRY_SECONDS: u64 = 300;
-// M0-PROVISIONAL: boring-cdc-d-failure-policy
+
 const RETRY_BASE_MILLISECONDS: u64 = 250;
-// M0-PROVISIONAL: boring-cdc-d-failure-policy
+
 const RETRY_CAP_SECONDS: u64 = 30;
-// M0-PROVISIONAL: boring-cdc-d-failure-policy
+
 const RETRY_MAX_ATTEMPTS: u16 = 10;
-// M0-PROVISIONAL: boring-cdc-d-sqlite
+
 const SQLITE_BUSY_TIMEOUT_MILLISECONDS: u64 = 5_000;
-// M0-PROVISIONAL: boring-cdc-d-sqlite
+
 const SQLITE_MAX_READERS: u16 = 16;
-// M0-PROVISIONAL: boring-cdc-d-wal-cap
+
 const SLOT_WAL_CAP_BYTES: u64 = 68_719_476_736;
-// M0-PROVISIONAL: boring-cdc-d-wal-cap
+
 const WAL_REACTION_RESERVE_SECONDS: u64 = 120;
-// M0-PROVISIONAL: boring-cdc-d-compose
+
 const READINESS_TIMEOUT_SECONDS: u64 = 120;
-// M0-PROVISIONAL: boring-cdc-d-compose
+
 const OWNERSHIP_TAKEOVER_SECONDS: u64 = 90;
 
 fn check() -> io::Result<()> {

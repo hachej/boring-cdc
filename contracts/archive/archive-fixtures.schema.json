@@ -1,0 +1,170 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "owner_bead",
+    "contract",
+    "fixed_seed",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "archive-fixtures/v1"
+    },
+    "owner_bead": {
+      "const": "boring-cdc-m0-archive-model"
+    },
+    "contract": {
+      "type": "string"
+    },
+    "fixed_seed": {
+      "type": "string"
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "executor_id",
+          "seed",
+          "pre_state",
+          "action",
+          "expected"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string"
+          },
+          "executor_id": {
+            "type": "string"
+          },
+          "seed": {
+            "type": "string"
+          },
+          "pre_state": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "archive_state",
+              "capture_epoch",
+              "generation",
+              "promotion_fence",
+              "checkpoint_journal_seq",
+              "requested_range",
+              "config_fingerprint"
+            ],
+            "properties": {
+              "archive_state": {
+                "type": "string"
+              },
+              "capture_epoch": {
+                "type": "string"
+              },
+              "generation": {
+                "type": "integer"
+              },
+              "promotion_fence": {
+                "type": "integer"
+              },
+              "checkpoint_journal_seq": {
+                "type": "integer"
+              },
+              "requested_range": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "start",
+                  "end"
+                ],
+                "properties": {
+                  "start": {
+                    "type": "integer"
+                  },
+                  "end": {
+                    "type": "integer"
+                  }
+                }
+              },
+              "config_fingerprint": {
+                "type": "string"
+              }
+            }
+          },
+          "action": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "phase",
+              "fault_hook",
+              "fault_once"
+            ],
+            "properties": {
+              "phase": {
+                "type": "string"
+              },
+              "fault_hook": {
+                "type": "string"
+              },
+              "fault_once": {
+                "type": "boolean"
+              }
+            }
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "recovery",
+              "archive_state",
+              "checkpoint",
+              "feedback",
+              "capture_and_other_destinations",
+              "external_effect",
+              "exit_code",
+              "status_code",
+              "log_code",
+              "redacted"
+            ],
+            "properties": {
+              "recovery": {
+                "type": "string"
+              },
+              "archive_state": {
+                "type": "string"
+              },
+              "checkpoint": {
+                "type": "string"
+              },
+              "feedback": {
+                "type": "string"
+              },
+              "capture_and_other_destinations": {
+                "type": "string"
+              },
+              "external_effect": {
+                "type": "string"
+              },
+              "exit_code": {
+                "type": "integer"
+              },
+              "status_code": {
+                "type": "string"
+              },
+              "log_code": {
+                "type": "string"
+              },
+              "redacted": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Closed archive fixture corpus"
+}

@@ -6,21 +6,20 @@ from pathlib import Path
 from core_validator import validate_schema_instance
 
 ROOT = Path(__file__).resolve().parents[2]
-SEED = "0x424344435f434f4d504f53455f563031"  # // M0-PROVISIONAL: boring-cdc-d-compose
-PROVISIONAL = {"boring-cdc-d-security", "boring-cdc-d-values", "boring-cdc-d-keys", "boring-cdc-d-failure-policy", "boring-cdc-d-sqlite", "boring-cdc-d-wal-cap", "boring-cdc-d-compose"}
+SEED = "0x424344435f434f4d504f53455f563031"
 PINS = {
- "postgres_index":"sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929", # // M0-PROVISIONAL: boring-cdc-d-compose
- "postgres_amd64":"sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409", # // M0-PROVISIONAL: boring-cdc-d-compose
- "clickhouse_index":"sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f", # // M0-PROVISIONAL: boring-cdc-d-compose
- "clickhouse_amd64":"sha256:78b6f0863688458b229b597f6a1bbf891855a01cf59c3f3dbe66428571c518c9", # // M0-PROVISIONAL: boring-cdc-d-compose
- "builder_index":"sha256:948f9b08a66e7fe01b03a98ef1c7568292e07ec2e4fe90d88c07bb14563c84ff", # // M0-PROVISIONAL: boring-cdc-d-compose
- "builder_amd64":"sha256:c9ac3fa8945b61dede1e4500d25028aa8fd8a8fe46365fcf9c0422f8d999b9b0", # // M0-PROVISIONAL: boring-cdc-d-compose
- "runtime_index":"sha256:b1a741487078b369e78119849663d7f1a5341ef2768798f7b7406c4240f86aef", # // M0-PROVISIONAL: boring-cdc-d-compose
- "runtime_amd64":"sha256:cea2634840f5a87503d8210e4df97b9f23a2acd67ff860a76c133d963032f866", # // M0-PROVISIONAL: boring-cdc-d-compose
- "frontend":"sha256:db1ff77fb637a5955317c7a3a62540196396d565f3dd5742e76dddbb6d75c4c5", # // M0-PROVISIONAL: boring-cdc-d-compose
- "buildkit":"sha256:6eceb8971ce4fceb3daca562832642706238b7eea72941fcf9896c93c3c4a53e", # // M0-PROVISIONAL: boring-cdc-d-compose
- "docker_cli":"sha256:0135662b510037ea581d99c2e5929c5e01185139c0b86986a418bd4da0b98a44", # // M0-PROVISIONAL: boring-cdc-d-compose
- "docker_dind":"sha256:a56b3bdde89315ed2cc0e4906e582b5033d93bf20d9cb9510c2cdd4e7f7690b1", # // M0-PROVISIONAL: boring-cdc-d-compose
+ "postgres_index":"sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+ "postgres_amd64":"sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409",
+ "clickhouse_index":"sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f",
+ "clickhouse_amd64":"sha256:78b6f0863688458b229b597f6a1bbf891855a01cf59c3f3dbe66428571c518c9",
+ "builder_index":"sha256:948f9b08a66e7fe01b03a98ef1c7568292e07ec2e4fe90d88c07bb14563c84ff",
+ "builder_amd64":"sha256:c9ac3fa8945b61dede1e4500d25028aa8fd8a8fe46365fcf9c0422f8d999b9b0",
+ "runtime_index":"sha256:b1a741487078b369e78119849663d7f1a5341ef2768798f7b7406c4240f86aef",
+ "runtime_amd64":"sha256:cea2634840f5a87503d8210e4df97b9f23a2acd67ff860a76c133d963032f866",
+ "frontend":"sha256:db1ff77fb637a5955317c7a3a62540196396d565f3dd5742e76dddbb6d75c4c5",
+ "buildkit":"sha256:6eceb8971ce4fceb3daca562832642706238b7eea72941fcf9896c93c3c4a53e",
+ "docker_cli":"sha256:0135662b510037ea581d99c2e5929c5e01185139c0b86986a418bd4da0b98a44",
+ "docker_dind":"sha256:a56b3bdde89315ed2cc0e4906e582b5033d93bf20d9cb9510c2cdd4e7f7690b1",
 }
 def sha(data: bytes)->str:return hashlib.sha256(data).hexdigest()
 def read(path:str)->bytes:return (ROOT/path).read_bytes()
@@ -40,10 +39,9 @@ def validate()->list[str]:
   if digest not in deploy and digest not in read("contracts/scaffold/m0-scaffold.json").decode():errors.append(f"pin:{name}")
  for token in ("restart: unless-stopped","tcp_keepalives_idle=30","tcp_keepalives_interval=10","tcp_keepalives_count=3","client_connection_check_interval=10s","condition: service_healthy"):
   if token not in deploy:errors.append(f"compose:{token}")
- source_paths=[p for p in ROOT.rglob("*") if p.is_file() and not any(x in p.parts for x in (".git","target","artifacts",".beads"))]
+ source_paths=[p for p in ROOT.rglob("*") if p.is_file() and not any(x in p.parts for x in (".git","target","artifacts",".beads",".handoff","__pycache__")) and not ("docs" in p.parts and "issues" in p.parts)]
  all_text="\n".join(p.read_text(errors="replace") for p in source_paths)
- for bead in sorted(PROVISIONAL):
-  if f"// M0-PROVISIONAL: {bead}" not in all_text:errors.append(f"provisional:{bead}")
+ if "M0-" + "PROVISIONAL" in all_text:errors.append("provisional-marker-after-reconciliation")
  schema=json.loads(read("config/boring-cdc.schema.json"));example=json.loads(read("config/boring-cdc.example.json"))
  if set(schema["required"])!=set(example):errors.append("config:root-fields")
  manifest_doc=json.loads(read("contracts/m0/manifest.json")); schema_findings=[]

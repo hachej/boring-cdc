@@ -134,12 +134,6 @@
           ],
           "type": "object"
         },
-        "provisional": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
         "reservation_rules": {
           "items": {
             "type": "string"
@@ -218,7 +212,6 @@
         "filesystem_equation",
         "limits",
         "profiles",
-        "provisional",
         "reservation_rules",
         "runtime_memory",
         "source_wal_reaction_reserve_seconds",
@@ -325,12 +318,6 @@
         },
         "probe": {
           "type": "string"
-        },
-        "provisional": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
         }
       },
       "required": [
@@ -338,8 +325,7 @@
         "denied",
         "modes",
         "ownership",
-        "probe",
-        "provisional"
+        "probe"
       ],
       "type": "object"
     },
@@ -418,9 +404,6 @@
         "probe_interval_ms": {
           "type": "integer"
         },
-        "provisional": {
-          "type": "string"
-        },
         "source_lock": {
           "type": "string"
         },
@@ -436,7 +419,6 @@
         "loss",
         "ownership_deadline_ms",
         "probe_interval_ms",
-        "provisional",
         "source_lock",
         "state_lock",
         "takeover_wait_ms"
@@ -502,12 +484,6 @@
         "metadata_retention"
       ],
       "type": "object"
-    },
-    "provisional_markers": {
-      "items": {
-        "type": "string"
-      },
-      "type": "array"
     },
     "result_schema": {
       "type": "string"
@@ -914,9 +890,6 @@
           ],
           "type": "object"
         },
-        "provisional": {
-          "type": "string"
-        },
         "schema_path": {
           "type": "string"
         },
@@ -939,7 +912,6 @@
         "page_size_bytes",
         "payload_log_file",
         "persistent_pragmas",
-        "provisional",
         "schema_path",
         "single_database",
         "version"
@@ -967,9 +939,6 @@
         "overload": {
           "type": "string"
         },
-        "provisional": {
-          "type": "string"
-        },
         "queue_capacity": {
           "type": "integer"
         },
@@ -986,7 +955,6 @@
         "essential_classes",
         "noncapture_max_wait_ms",
         "overload",
-        "provisional",
         "queue_capacity",
         "scheduling",
         "single_writer"
@@ -1006,7 +974,6 @@
     "owner_bead",
     "ownership_commands",
     "pins_gc",
-    "provisional_markers",
     "result_schema",
     "safe_stop",
     "schema_version",
