@@ -5,9 +5,11 @@ root=Path(__file__).resolve().parents[2]
 src=(root/'src/m2_schema.rs').read_text()
 contract=json.loads((root/'contracts/m2/schema-cases.json').read_text())
 tables={'journal_events','source_transactions','source_state','runtime_ownership','operator_command_requests','relation_schemas','destinations','destination_checkpoints','backfill_runs','backfill_generations','backfill_chunks','bootstrap_intents','bootstrap_imports','durable_capture_fences','bootstrap_anchors','reseed_intents','destination_generation_leases','destination_promotion_intents','clickhouse_batch_intents','archive_generations','archive_segment_intents','archive_segments','archive_generation_markers','processing_failures','destination_audits','condition_hysteresis','alerts','schema_migrations'}
-found=set(re.findall(r'CREATE TABLE IF NOT EXISTS ([a-z_]+)',src))
+found=set(re.findall(r'CREATE TABLE(?: IF NOT EXISTS)? ([a-z_]+)',src))
+found.discard('forbidden')
 errors=[]
-if found!=tables: errors.append(f'table inventory mismatch missing={sorted(tables-found)} extra={sorted(found-tables)}')
+auxiliary={'audit_coverage_subranges'}
+if not tables.issubset(found) or found-tables!=auxiliary: errors.append(f'table inventory mismatch missing={sorted(tables-found)} extra={sorted(found-tables)}')
 ids=[c['id'] for c in contract['cases']]
 if len(ids)!=len(set(ids)): errors.append('duplicate scenario IDs')
 for case in contract['cases']:
