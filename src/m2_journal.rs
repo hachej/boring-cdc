@@ -175,10 +175,10 @@ impl JournalStore {
                 count,
                 &checksum,
             )?;
-            let durable: Option<(String, String, String, String, String)> = transaction.query_row(
-                "SELECT capture_epoch,source_system_id,timeline_id,database_id,slot_name FROM source_state WHERE singleton=1 AND durable_journal_seq>=?1 AND durable_transaction_end_lsn>=?2",
+            let durable: Option<(String, String, String, String, String, String, String)> = transaction.query_row(
+                "SELECT capture_epoch,source_system_id,timeline_id,database_id,slot_name,publication_fingerprint,protocol_fingerprint FROM source_state WHERE singleton=1 AND durable_journal_seq>=?1 AND durable_transaction_end_lsn>=?2",
                 params![last, commit.end_lsn],
-                |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+                |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?)),
             ).optional()?;
             if durable
                 != Some((
@@ -187,11 +187,16 @@ impl JournalStore {
                     identity.timeline_id.clone(),
                     identity.database_id.clone(),
                     identity.slot_name.clone(),
+                    identity.publication_fingerprint.clone(),
+                    identity.protocol_fingerprint.clone(),
                 ))
             {
                 return Err(JournalError::Conflict(
                     "committed transaction is not covered by durable source state",
                 ));
+            }
+            if started.elapsed() > self.limits.max_writer_hold {
+                return Err(JournalError::BusyBoundExceeded);
             }
             transaction.rollback()?;
             return Ok(DurableCommit {
@@ -284,22 +289,24 @@ impl JournalStore {
                     }
                 })?;
         }
-        let state: Option<(String,String,String,String,String,Option<String>)> = transaction.query_row(
-            "SELECT capture_epoch,source_system_id,timeline_id,database_id,slot_name,durable_transaction_end_lsn FROM source_state WHERE singleton=1", [],
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)),
+        let state: Option<(String,String,String,String,String,String,String,Option<String>)> = transaction.query_row(
+            "SELECT capture_epoch,source_system_id,timeline_id,database_id,slot_name,publication_fingerprint,protocol_fingerprint,durable_transaction_end_lsn FROM source_state WHERE singleton=1", [],
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?)),
         ).optional()?;
         match state {
             None => {
                 transaction.execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint,durable_transaction_end_lsn,durable_transaction_id,durable_journal_seq) VALUES(1,?1,?2,?3,?4,?5,'pgoutput',?6,?7,?8,?9,?10)", params![identity.capture_epoch,identity.source_system_id,identity.timeline_id,identity.database_id,identity.slot_name,identity.publication_fingerprint,identity.protocol_fingerprint,commit.end_lsn,commit.transaction_id,last])?;
             }
-            Some((epoch, sys, timeline, db, slot, durable)) => {
-                if (epoch, sys, timeline, db, slot)
+            Some((epoch, sys, timeline, db, slot, publication, protocol, durable)) => {
+                if (epoch, sys, timeline, db, slot, publication, protocol)
                     != (
                         identity.capture_epoch.clone(),
                         identity.source_system_id.clone(),
                         identity.timeline_id.clone(),
                         identity.database_id.clone(),
                         identity.slot_name.clone(),
+                        identity.publication_fingerprint.clone(),
+                        identity.protocol_fingerprint.clone(),
                     )
                 {
                     return Err(JournalError::Conflict("source state identity mismatch"));
@@ -543,7 +550,7 @@ pub fn read_complete_range(
         }
         let escaped = txid.replace('\'', "''");
         let measures: Vec<(i64,i64,Option<i64>,Option<i64>)> = reader.query_bounded(
-            &format!("SELECT count(*),coalesce(sum(length(payload)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id='{escaped}'"),
+            &format!("SELECT count(*),coalesce(sum(length(payload)+length(transaction_id)+length(event_id)+length(payload_hash)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id='{escaped}'"),
             |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
         )?;
         let (count, tx_bytes, min_seq, max_seq) = measures
@@ -553,8 +560,15 @@ pub fn read_complete_range(
         if count as usize != expected || min_seq != Some(first) || max_seq != Some(last) {
             return Err(JournalError::Conflict("incomplete committed transaction"));
         }
+        let allocation_bytes = (tx_bytes as usize)
+            .checked_add(
+                expected
+                    .checked_mul(std::mem::size_of::<CopiedEvent>())
+                    .ok_or(JournalError::Limit("copied bytes overflow"))?,
+            )
+            .ok_or(JournalError::Limit("copied bytes overflow"))?;
         let next_bytes = copied
-            .checked_add(tx_bytes as usize)
+            .checked_add(allocation_bytes)
             .ok_or(JournalError::Limit("copied bytes overflow"))?;
         if next_bytes > max_bytes {
             if events.is_empty() {
@@ -676,62 +690,33 @@ impl<T> CapturePriorityScheduler<T> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct ServiceDeadline {
-    started: Instant,
-    max_hold: Duration,
+#[derive(Clone, Copy, Debug)]
+pub enum ServiceCommand {
+    /// Typed integration seam for a bounded control/checkpoint/GC writer turn.
+    /// Domain mutations are added as closed variants, never arbitrary closures.
+    Probe { max_writer_hold: Duration },
 }
-impl ServiceDeadline {
-    pub fn exceeded(self) -> bool {
-        self.started.elapsed() > self.max_hold
-    }
-    pub fn check(self) -> Result<(), JournalError> {
-        if self.exceeded() {
-            Err(JournalError::BusyBoundExceeded)
-        } else {
-            Ok(())
+impl ServiceCommand {
+    fn execute(self, writer: &mut WriterConnection) -> Result<(), JournalError> {
+        match self {
+            Self::Probe { max_writer_hold } => {
+                if max_writer_hold.is_zero() {
+                    return Err(JournalError::Invalid("zero service hold bound"));
+                }
+                let started = Instant::now();
+                writer.connection().query_row("SELECT 1", [], |_| Ok(()))?;
+                if started.elapsed() > max_writer_hold {
+                    Err(JournalError::BusyBoundExceeded)
+                } else {
+                    Ok(())
+                }
+            }
         }
-    }
-}
-pub trait WriterServiceWork: Send {
-    fn max_writer_hold(&self) -> Duration;
-    fn execute(
-        self: Box<Self>,
-        writer: &mut WriterConnection,
-        deadline: ServiceDeadline,
-    ) -> Result<(), JournalError>;
-}
-pub struct BoundedWriterWork<F> {
-    max_hold: Duration,
-    work: F,
-}
-impl<F> BoundedWriterWork<F> {
-    pub fn new(max_hold: Duration, work: F) -> Result<Self, JournalError> {
-        if max_hold.is_zero() {
-            Err(JournalError::Invalid("zero service hold bound"))
-        } else {
-            Ok(Self { max_hold, work })
-        }
-    }
-}
-impl<F> WriterServiceWork for BoundedWriterWork<F>
-where
-    F: FnOnce(&mut WriterConnection, ServiceDeadline) -> Result<(), JournalError> + Send,
-{
-    fn max_writer_hold(&self) -> Duration {
-        self.max_hold
-    }
-    fn execute(
-        self: Box<Self>,
-        writer: &mut WriterConnection,
-        deadline: ServiceDeadline,
-    ) -> Result<(), JournalError> {
-        (self.work)(writer, deadline)
     }
 }
 enum PendingWork {
     Capture(SourceCommit, CommitFault),
-    Service(WorkClass, Box<dyn WriterServiceWork>),
+    Service(WorkClass, ServiceCommand),
 }
 pub enum WorkOutcome {
     Durable(DurableCommit),
@@ -762,16 +747,17 @@ impl JournalWriterService {
         self.scheduler
             .enqueue(WorkClass::Capture, PendingWork::Capture(commit, fault))
     }
-    pub fn enqueue_service<W>(&mut self, class: WorkClass, work: W) -> Result<(), EnqueueError>
-    where
-        W: WriterServiceWork + 'static,
-    {
+    pub fn enqueue_service(
+        &mut self,
+        class: WorkClass,
+        work: ServiceCommand,
+    ) -> Result<(), EnqueueError> {
         assert!(
             class != WorkClass::Capture,
             "capture work must use enqueue_capture"
         );
         self.scheduler
-            .enqueue(class, PendingWork::Service(class, Box::new(work)))
+            .enqueue(class, PendingWork::Service(class, work))
     }
     pub fn service_next(&mut self) -> Option<Result<WorkOutcome, JournalError>> {
         let (class, work, _tick) = self.scheduler.next()?;
@@ -784,14 +770,8 @@ impl JournalWriterService {
                 if expected != class {
                     return Some(Err(JournalError::Conflict("scheduler class mismatch")));
                 }
-                let deadline = ServiceDeadline {
-                    started: Instant::now(),
-                    max_hold: work.max_writer_hold(),
-                };
-                match work.execute(&mut self.store.writer, deadline) {
-                    Ok(()) => deadline.check().map(|()| WorkOutcome::Serviced(class)),
-                    Err(error) => Err(error),
-                }
+                work.execute(&mut self.store.writer)
+                    .map(|()| WorkOutcome::Serviced(class))
             }
         })
     }
@@ -918,6 +898,12 @@ pub mod tests {
                 .unwrap()
                 .was_duplicate()
         );
+        s.limits.max_writer_hold = Duration::from_nanos(1);
+        assert_eq!(
+            s.commit_atomic(&c, CommitFault::None),
+            Err(JournalError::BusyBoundExceeded)
+        );
+        s.limits = limits();
         let mut bad = c.clone();
         bad.events[0].payload = b"other".into();
         bad.events[0].payload_hash = sha256(b"other");
@@ -967,6 +953,12 @@ pub mod tests {
                 .unwrap(),
             1
         );
+        s.identity.publication_fingerprint = "changed-publication".into();
+        let c3 = commit("tx3", "0000000000000030", vec![event("e3", 0, b"three")]);
+        assert!(matches!(
+            s.commit_atomic(&c3, CommitFault::None),
+            Err(JournalError::Conflict("source state identity mismatch"))
+        ));
     }
     #[test]
     fn feedback_token_exists_only_after_commit_return() {
@@ -1013,14 +1005,15 @@ pub mod tests {
         .unwrap();
         drop(s);
         assert!(matches!(
-            read_complete_range(&p, 0, 1, 100, Duration::from_secs(1)),
+            read_complete_range(&p, 0, 1, 1000, Duration::from_secs(1)),
             Err(JournalError::Limit(_))
         ));
-        let r = read_complete_range(&p, 0, 2, 100, Duration::from_secs(1))
+        let r = read_complete_range(&p, 0, 2, 1000, Duration::from_secs(1))
             .unwrap()
             .unwrap();
-        assert_eq!((r.first_seq, r.last_seq, r.copied_bytes), (1, 2, 3));
-        let r2 = read_complete_range(&p, 2, 1, 3, Duration::from_secs(1))
+        assert_eq!((r.first_seq, r.last_seq), (1, 2));
+        assert!(r.copied_bytes > 3);
+        let r2 = read_complete_range(&p, 2, 1, 1000, Duration::from_secs(1))
             .unwrap()
             .unwrap();
         assert_eq!((r2.first_seq, r2.last_seq), (3, 3));
@@ -1086,14 +1079,9 @@ pub mod tests {
         service
             .enqueue_service(
                 WorkClass::FailureControl,
-                BoundedWriterWork::new(
-                    Duration::from_secs(1),
-                    |writer: &mut WriterConnection, deadline: ServiceDeadline| {
-                        writer.connection().query_row("SELECT 1", [], |_| Ok(()))?;
-                        deadline.check()
-                    },
-                )
-                .unwrap(),
+                ServiceCommand::Probe {
+                    max_writer_hold: Duration::from_secs(1),
+                },
             )
             .unwrap();
         service
