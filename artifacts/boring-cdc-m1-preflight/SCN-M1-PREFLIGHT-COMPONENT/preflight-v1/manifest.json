@@ -1,0 +1,97 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/e2e/m1_preflight.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-1.stdout",
+      "stdout_sha256": "4d0cb85e02d46804f18b7ce45d7032ce7556a2c8749150da52c9c5bbb236aa95",
+      "version": "preflight-v1"
+    },
+    {
+      "argv": "scripts/e2e/m1_preflight.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-2.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-2.stdout",
+      "stdout_sha256": "4d0cb85e02d46804f18b7ce45d7032ce7556a2c8749150da52c9c5bbb236aa95",
+      "version": "preflight-v1"
+    },
+    {
+      "argv": "scripts/faults/m1_preflight.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-1.stdout",
+      "stdout_sha256": "ed92d22e18df73035d257ddd023336079eb8248768d1eb6ec9739dde1a1d0742",
+      "version": "preflight-v1"
+    },
+    {
+      "argv": "scripts/faults/m1_preflight.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-2.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-2.stdout",
+      "stdout_sha256": "ed92d22e18df73035d257ddd023336079eb8248768d1eb6ec9739dde1a1d0742",
+      "version": "preflight-v1"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "component",
+  "git_commit": "3815e16445d1d4507f6b509f33c503513f6bec77",
+  "owner_bead": "boring-cdc-m1-preflight",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/commands.txt",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/config.json",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-1.stderr",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-1.stdout",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-2.stderr",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-2.stdout",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-1.stderr",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-1.stdout",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-2.stderr",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-2.stdout",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-timeline.json",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/versions.json",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/logs/boring-cdc.jsonl",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/state/after.json",
+      "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/state/before.json"
+    ],
+    "digest": "135d2794a6b8ccc7e3c7fd0ded36192cabbf5326242f28f8a8b1107d35012d18",
+    "product_faults": "protocol_fingerprint,state_mutation,mutating_route",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-PREFLIGHT-COMPONENT",
+  "schema_version": "evidence/v1",
+  "seed": "preflight-v1",
+  "source_preservation": {
+    "after_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "before_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": true,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": true,
+    "targeted_checks": true,
+    "workspace_tests": true
+  }
+}

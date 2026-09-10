@@ -1,0 +1,23 @@
+{
+  "events": [
+    {
+      "case_event_seq": 1,
+      "outcome": "blocked",
+      "reason": "PREFLIGHT_PROTOCOL_FINGERPRINT_MISMATCH",
+      "scenario_id": "SCN-M1-PREFLIGHT-PROTOCOL-FINGERPRINT"
+    },
+    {
+      "case_event_seq": 2,
+      "outcome": "blocked",
+      "reason": "PREFLIGHT_STATE_MUTATED",
+      "scenario_id": "SCN-M1-PREFLIGHT-NO-MUTATION"
+    },
+    {
+      "case_event_seq": 3,
+      "outcome": "blocked",
+      "reason": "PREFLIGHT_MUTATING_OBSERVABILITY_ROUTE",
+      "scenario_id": "SCN-M1-PREFLIGHT-READONLY-ROUTES"
+    }
+  ],
+  "schema_version": "fault-timeline/v1"
+}
