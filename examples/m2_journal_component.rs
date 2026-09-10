@@ -1,6 +1,6 @@
 use boring_cdc::m2_journal::{
-    CommitFault, CommitLimits, JournalEvent, JournalStore, RelationSchema, SourceCommit,
-    SourceIdentity, read_complete_range, sha256, transaction_checksum,
+    CommitFault, CommitLimits, JournalEvent, JournalStore, JournalWriterService, RelationSchema,
+    SourceCommit, SourceIdentity, WorkOutcome, read_complete_range, sha256, transaction_checksum,
 };
 use boring_cdc::m2_schema::open_writer;
 use std::path::Path;
@@ -46,7 +46,7 @@ fn main() {
         protocol_fingerprint: "protocol-v1".into(),
     };
     let writer = open_writer(Path::new(&path), "journal-component-run", 1, 1000).unwrap();
-    let mut store = JournalStore::new(
+    let store = JournalStore::new(
         writer,
         identity,
         CommitLimits {
@@ -56,20 +56,25 @@ fn main() {
         },
     )
     .unwrap();
+    let mut service = JournalWriterService::new(store, [8, 4, 4, 4], 2).unwrap();
     let commit = source_commit();
-    let (fault, duplicate) = if mode == "fault" {
-        assert!(
-            store
-                .commit(&commit, CommitFault::AfterSqliteCommit)
-                .is_err()
-        );
-        let d = store.commit(&commit, CommitFault::None).unwrap();
-        ("after-sqlite-commit", d.was_duplicate())
-    } else {
-        let d = store.commit(&commit, CommitFault::None).unwrap();
-        ("none", d.was_duplicate())
+    let injected = match mode.as_str() {
+        "terminate-before" => CommitFault::TerminateBeforeSqliteCommit,
+        "terminate-after" => CommitFault::TerminateAfterSqliteCommit,
+        _ => CommitFault::None,
     };
-    drop(store);
+    service.enqueue_capture(commit, injected).unwrap();
+    let durable = match service.service_next().unwrap().unwrap() {
+        WorkOutcome::Durable(d) => d,
+        WorkOutcome::Serviced(_) => unreachable!(),
+    };
+    let fault = if mode == "normal" {
+        "none"
+    } else {
+        mode.as_str()
+    };
+    let duplicate = durable.was_duplicate();
+    drop(service);
     let range = read_complete_range(Path::new(&path), 0, 16, 4096, Duration::from_secs(2))
         .unwrap()
         .unwrap();

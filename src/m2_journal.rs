@@ -78,6 +78,10 @@ pub enum CommitFault {
     None,
     BeforeSqliteCommit,
     AfterSqliteCommit,
+    /// Component-only abrupt process termination while the SQLite transaction is open.
+    TerminateBeforeSqliteCommit,
+    /// Component-only abrupt process termination immediately after SQLite commit returns.
+    TerminateAfterSqliteCommit,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -85,6 +89,7 @@ pub enum JournalError {
     Invalid(&'static str),
     Conflict(&'static str),
     Limit(&'static str),
+    Unavailable(&'static str),
     BusyBoundExceeded,
     BusyBoundExceededAfterCommit,
     FaultBeforeCommit,
@@ -138,7 +143,7 @@ impl JournalStore {
     /// Publishes schemas, transaction metadata, events and durable end LSN in one SQLite commit.
     /// The returned value is the only feedback-eligible token; an after-commit fault is ambiguous
     /// and must be reconciled by replaying the same positional transaction.
-    pub fn commit(
+    fn commit_atomic(
         &mut self,
         commit: &SourceCommit,
         fault: CommitFault,
@@ -312,9 +317,15 @@ impl JournalStore {
         if fault == CommitFault::BeforeSqliteCommit {
             return Err(JournalError::FaultBeforeCommit);
         }
+        if fault == CommitFault::TerminateBeforeSqliteCommit {
+            std::process::exit(86);
+        }
         transaction.commit()?;
         if fault == CommitFault::AfterSqliteCommit {
             return Err(JournalError::AmbiguousAfterCommit);
+        }
+        if fault == CommitFault::TerminateAfterSqliteCommit {
+            std::process::exit(87);
         }
         if started.elapsed() > self.limits.max_writer_hold {
             return Err(JournalError::BusyBoundExceededAfterCommit);
@@ -478,6 +489,17 @@ pub fn read_complete_range(
         return Err(JournalError::Invalid("zero range bound"));
     }
     let reader = open_reader_with_limits(path, max_age, max_events)?;
+    if after_seq > 0 {
+        let boundary: Vec<i64> = reader.query_bounded(
+            &format!("SELECT last_seq FROM source_transactions WHERE last_seq={after_seq}"),
+            |r| r.get(0),
+        )?;
+        if boundary != vec![after_seq as i64] {
+            return Err(JournalError::Unavailable(
+                "requested position is not a complete transaction boundary",
+            ));
+        }
+    }
     let boundaries: Vec<(String,i64,i64)> = reader.query_bounded(
         &format!("SELECT transaction_id,first_seq,last_seq FROM source_transactions WHERE state='committed' AND first_seq>{after_seq} ORDER BY first_seq LIMIT {max_events}"),
         |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
@@ -485,11 +507,21 @@ pub fn read_complete_range(
     if boundaries.is_empty() {
         return Ok(None);
     }
+    if boundaries[0].1 != after_seq as i64 + 1 {
+        return Err(JournalError::Unavailable(
+            "requested range is no longer contiguous and retained",
+        ));
+    }
     let mut events = Vec::new();
     let mut copied = 0usize;
     for (txid, first, last) in boundaries {
-        let count = (last - first + 1) as usize;
-        if events.len() + count > max_events {
+        let expected = (last - first + 1) as usize;
+        if events
+            .len()
+            .checked_add(expected)
+            .ok_or(JournalError::Limit("event count overflow"))?
+            > max_events
+        {
             if events.is_empty() {
                 return Err(JournalError::Limit(
                     "next complete transaction exceeds event bound",
@@ -497,21 +529,22 @@ pub fn read_complete_range(
             }
             break;
         }
-        let rows: Vec<(i64,String,String,String,String)> = reader.query_bounded(
-            &format!("SELECT journal_seq,transaction_id,event_id,hex(payload),payload_hash FROM journal_events WHERE transaction_id='{}' ORDER BY journal_seq",txid.replace('\'', "''")),
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+        let escaped = txid.replace('\'', "''");
+        let measures: Vec<(i64,i64,Option<i64>,Option<i64>)> = reader.query_bounded(
+            &format!("SELECT count(*),coalesce(sum(length(payload)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id='{escaped}'"),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
         )?;
-        if rows.len() != count
-            || rows.first().map(|r| r.0) != Some(first)
-            || rows.last().map(|r| r.0) != Some(last)
-        {
+        let (count, tx_bytes, min_seq, max_seq) = measures
+            .into_iter()
+            .next()
+            .ok_or(JournalError::Conflict("missing transaction measures"))?;
+        if count as usize != expected || min_seq != Some(first) || max_seq != Some(last) {
             return Err(JournalError::Conflict("incomplete committed transaction"));
         }
-        let tx_bytes = rows.iter().try_fold(0usize, |sum, row| {
-            sum.checked_add(row.3.len() / 2)
-                .ok_or(JournalError::Limit("copied bytes overflow"))
-        })?;
-        if copied + tx_bytes > max_bytes {
+        let next_bytes = copied
+            .checked_add(tx_bytes as usize)
+            .ok_or(JournalError::Limit("copied bytes overflow"))?;
+        if next_bytes > max_bytes {
             if events.is_empty() {
                 return Err(JournalError::Limit(
                     "next complete transaction exceeds byte bound",
@@ -519,17 +552,20 @@ pub fn read_complete_range(
             }
             break;
         }
-        for (seq, txid, event_id, hex_payload, payload_hash) in rows {
-            let payload = decode_hex(&hex_payload)?;
+        let rows: Vec<(i64,String,String,Vec<u8>,String)> = reader.query_bounded(
+            &format!("SELECT journal_seq,transaction_id,event_id,payload,payload_hash FROM journal_events WHERE transaction_id='{escaped}' ORDER BY journal_seq"),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+        )?;
+        for (seq, transaction_id, event_id, payload, payload_hash) in rows {
             events.push(CopiedEvent {
                 journal_seq: seq as u64,
-                transaction_id: txid,
+                transaction_id,
                 event_id,
                 payload,
                 payload_hash,
             });
         }
-        copied += tx_bytes;
+        copied = next_bytes;
     }
     let first_seq = events[0].journal_seq;
     let last_seq = events.last().unwrap().journal_seq;
@@ -540,18 +576,6 @@ pub fn read_complete_range(
         last_seq,
         copied_bytes: copied,
     }))
-}
-fn decode_hex(value: &str) -> Result<Vec<u8>, JournalError> {
-    if value.len() % 2 != 0 {
-        return Err(JournalError::Conflict("invalid stored payload"));
-    }
-    (0..value.len())
-        .step_by(2)
-        .map(|i| {
-            u8::from_str_radix(&value[i..i + 2], 16)
-                .map_err(|_| JournalError::Conflict("invalid stored payload"))
-        })
-        .collect()
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -639,6 +663,79 @@ impl<T> CapturePriorityScheduler<T> {
     }
 }
 
+pub trait WriterServiceWork: Send {
+    fn execute(self: Box<Self>, writer: &mut WriterConnection) -> Result<(), JournalError>;
+}
+impl<F> WriterServiceWork for F
+where
+    F: FnOnce(&mut WriterConnection) -> Result<(), JournalError> + Send,
+{
+    fn execute(self: Box<Self>, writer: &mut WriterConnection) -> Result<(), JournalError> {
+        (*self)(writer)
+    }
+}
+enum PendingWork {
+    Capture(SourceCommit, CommitFault),
+    Service(WorkClass, Box<dyn WriterServiceWork>),
+}
+pub enum WorkOutcome {
+    Durable(DurableCommit),
+    Serviced(WorkClass),
+}
+/// Sole production writer entry point: every capture commit and sibling writer unit is
+/// admitted to one bounded fair queue and executed between complete atomic transactions.
+pub struct JournalWriterService {
+    store: JournalStore,
+    scheduler: CapturePriorityScheduler<PendingWork>,
+}
+impl JournalWriterService {
+    pub fn new(
+        store: JournalStore,
+        queue_caps: [usize; 4],
+        capture_burst: usize,
+    ) -> Result<Self, JournalError> {
+        Ok(Self {
+            store,
+            scheduler: CapturePriorityScheduler::new(queue_caps, capture_burst)?,
+        })
+    }
+    pub fn enqueue_capture(
+        &mut self,
+        commit: SourceCommit,
+        fault: CommitFault,
+    ) -> Result<(), EnqueueError> {
+        self.scheduler
+            .enqueue(WorkClass::Capture, PendingWork::Capture(commit, fault))
+    }
+    pub fn enqueue_service<W>(&mut self, class: WorkClass, work: W) -> Result<(), EnqueueError>
+    where
+        W: WriterServiceWork + 'static,
+    {
+        assert!(
+            class != WorkClass::Capture,
+            "capture work must use enqueue_capture"
+        );
+        self.scheduler
+            .enqueue(class, PendingWork::Service(class, Box::new(work)))
+    }
+    pub fn service_next(&mut self) -> Option<Result<WorkOutcome, JournalError>> {
+        let (class, work, _tick) = self.scheduler.next()?;
+        Some(match work {
+            PendingWork::Capture(commit, fault) => self
+                .store
+                .commit_atomic(&commit, fault)
+                .map(WorkOutcome::Durable),
+            PendingWork::Service(expected, work) => {
+                if expected != class {
+                    return Some(Err(JournalError::Conflict("scheduler class mismatch")));
+                }
+                work.execute(&mut self.store.writer)
+                    .map(|()| WorkOutcome::Serviced(class))
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -710,7 +807,7 @@ pub mod tests {
             "0000000000000010",
             vec![event("e1", 0, b"one"), event("e2", 1, b"two")],
         );
-        let d = s.commit(&c, CommitFault::None).unwrap();
+        let d = s.commit_atomic(&c, CommitFault::None).unwrap();
         assert_eq!(
             (d.first_seq(), d.last_seq(), d.feedback_eligible_end_lsn()),
             (1, 2, "0000000000000010")
@@ -731,7 +828,7 @@ pub mod tests {
         let (_p, mut s) = store("crash");
         let c = commit("tx1", "0000000000000010", vec![event("e1", 0, b"one")]);
         assert_eq!(
-            s.commit(&c, CommitFault::BeforeSqliteCommit),
+            s.commit_atomic(&c, CommitFault::BeforeSqliteCommit),
             Err(JournalError::FaultBeforeCommit)
         );
         assert_eq!(
@@ -743,10 +840,10 @@ pub mod tests {
             0
         );
         assert_eq!(
-            s.commit(&c, CommitFault::AfterSqliteCommit),
+            s.commit_atomic(&c, CommitFault::AfterSqliteCommit),
             Err(JournalError::AmbiguousAfterCommit)
         );
-        let d = s.commit(&c, CommitFault::None).unwrap();
+        let d = s.commit_atomic(&c, CommitFault::None).unwrap();
         assert!(d.was_duplicate());
         assert_eq!(d.feedback_eligible_end_lsn(), "0000000000000010");
     }
@@ -754,14 +851,18 @@ pub mod tests {
     fn positional_duplicate_is_idempotent_but_conflict_blocks() {
         let (_p, mut s) = store("dupe");
         let c = commit("tx1", "0000000000000010", vec![event("e1", 0, b"one")]);
-        s.commit(&c, CommitFault::None).unwrap();
-        assert!(s.commit(&c, CommitFault::None).unwrap().was_duplicate());
+        s.commit_atomic(&c, CommitFault::None).unwrap();
+        assert!(
+            s.commit_atomic(&c, CommitFault::None)
+                .unwrap()
+                .was_duplicate()
+        );
         let mut bad = c.clone();
         bad.events[0].payload = b"other".into();
         bad.events[0].payload_hash = sha256(b"other");
         bad.payload_checksum = transaction_checksum(&bad.events);
         assert!(matches!(
-            s.commit(&bad, CommitFault::None),
+            s.commit_atomic(&bad, CommitFault::None),
             Err(JournalError::Conflict(_))
         ));
     }
@@ -769,14 +870,14 @@ pub mod tests {
     fn invalid_hash_order_lsn_and_limits_fail_before_visibility() {
         let (_p, mut s) = store("invalid");
         let mut c = commit("tx1", "0000000000000010", vec![event("e1", 1, b"one")]);
-        assert!(s.commit(&c, CommitFault::None).is_err());
+        assert!(s.commit_atomic(&c, CommitFault::None).is_err());
         c.events[0].transaction_ordinal = 0;
         c.events[0].payload_hash = "bad".into();
-        assert!(s.commit(&c, CommitFault::None).is_err());
+        assert!(s.commit_atomic(&c, CommitFault::None).is_err());
         c.events[0].payload_hash = sha256(b"one");
         c.payload_checksum = transaction_checksum(&c.events);
         c.end_lsn = "0/10".into();
-        assert!(s.commit(&c, CommitFault::None).is_err());
+        assert!(s.commit_atomic(&c, CommitFault::None).is_err());
         assert_eq!(
             s.writer
                 .connection()
@@ -790,11 +891,11 @@ pub mod tests {
     fn relation_schema_conflict_rolls_back_whole_source_commit() {
         let (_p, mut s) = store("schema-conflict");
         let c = commit("tx1", "0000000000000010", vec![event("e1", 0, b"one")]);
-        s.commit(&c, CommitFault::None).unwrap();
+        s.commit_atomic(&c, CommitFault::None).unwrap();
         let mut c2 = commit("tx2", "0000000000000020", vec![event("e2", 0, b"two")]);
         c2.schemas[0].canonical_schema = b"changed".into();
         assert!(matches!(
-            s.commit(&c2, CommitFault::None),
+            s.commit_atomic(&c2, CommitFault::None),
             Err(JournalError::Conflict(_))
         ));
         assert_eq!(
@@ -819,15 +920,18 @@ pub mod tests {
         let (_p, mut s) = store("feedback");
         let c = commit("tx1", "0000000000000010", vec![event("e1", 0, b"one")]);
         let mut sender = Sender { sent: vec![] };
-        assert!(s.commit(&c, CommitFault::BeforeSqliteCommit).is_err());
+        assert!(
+            s.commit_atomic(&c, CommitFault::BeforeSqliteCommit)
+                .is_err()
+        );
         assert!(sender.sent.is_empty());
-        sender.send(s.commit(&c, CommitFault::None).unwrap());
+        sender.send(s.commit_atomic(&c, CommitFault::None).unwrap());
         assert_eq!(sender.sent, vec![c.end_lsn]);
     }
     #[test]
     fn bounded_range_copies_complete_transactions_and_releases_reader() {
         let (p, mut s) = store("range");
-        s.commit(
+        s.commit_atomic(
             &commit(
                 "tx1",
                 "0000000000000010",
@@ -836,7 +940,7 @@ pub mod tests {
             CommitFault::None,
         )
         .unwrap();
-        s.commit(
+        s.commit_atomic(
             &commit("tx2", "0000000000000020", vec![event("e3", 0, b"333")]),
             CommitFault::None,
         )
@@ -854,6 +958,10 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!((r2.first_seq, r2.last_seq), (3, 3));
+        assert!(matches!(
+            read_complete_range(&p, 1, 2, 100, Duration::from_secs(1)),
+            Err(JournalError::Unavailable(_))
+        ));
         fs::remove_file(p).ok();
     }
     #[test]
@@ -888,12 +996,50 @@ pub mod tests {
         assert!(classes.iter().position(|x| *x == WorkClass::Gc).unwrap() <= 8);
     }
     #[test]
+    fn writer_service_serializes_real_capture_and_reserved_work() {
+        let (_p, store) = store("writer-service");
+        let mut service = JournalWriterService::new(store, [4, 2, 2, 2], 1).unwrap();
+        service
+            .enqueue_capture(
+                commit("tx1", "0000000000000010", vec![event("e1", 0, b"one")]),
+                CommitFault::None,
+            )
+            .unwrap();
+        service
+            .enqueue_service(
+                WorkClass::FailureControl,
+                |writer: &mut WriterConnection| {
+                    writer.connection().query_row("SELECT 1", [], |_| Ok(()))?;
+                    Ok(())
+                },
+            )
+            .unwrap();
+        service
+            .enqueue_capture(
+                commit("tx2", "0000000000000020", vec![event("e2", 0, b"two")]),
+                CommitFault::None,
+            )
+            .unwrap();
+        assert!(matches!(
+            service.service_next().unwrap().unwrap(),
+            WorkOutcome::Durable(_)
+        ));
+        assert!(matches!(
+            service.service_next().unwrap().unwrap(),
+            WorkOutcome::Serviced(WorkClass::FailureControl)
+        ));
+        assert!(matches!(
+            service.service_next().unwrap().unwrap(),
+            WorkOutcome::Durable(_)
+        ));
+    }
+    #[test]
     fn slow_storage_hold_bound_rolls_back_without_partial_visibility() {
         let (_p, mut s) = store("slow");
         s.limits.max_writer_hold = Duration::from_nanos(1);
         let c = commit("tx1", "0000000000000010", vec![event("e1", 0, b"one")]);
         assert_eq!(
-            s.commit(&c, CommitFault::None),
+            s.commit_atomic(&c, CommitFault::None),
             Err(JournalError::BusyBoundExceeded)
         );
         assert_eq!(
