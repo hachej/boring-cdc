@@ -2,17 +2,22 @@
   "assertions": {
     "cross_epoch_ordering": "rejected",
     "duplicate_conflict_property_samples": 64,
+    "equal_key_change": "blocked",
     "fixed_goldens": 5,
     "immutable_position_conflict": "blocked",
     "key_change_incomplete_tuple": "blocked",
-    "semantic_tests": 10,
-    "stable_cases": 9
+    "max_key_arity": 32,
+    "relation_fingerprint_sensitivity": "proven",
+    "semantic_tests": 12,
+    "snapshot_invalid_epoch_xid_ordinal": "blocked",
+    "snapshot_payload_identity_mismatch": "blocked",
+    "stable_cases": 10
   },
-  "git_commit": "0c720a29b192a60e15e3960867a735d7fec3d8f7",
+  "git_commit": "cadf8b1e5488e6f6e1f49393ae75673aa511e934",
   "inputs": {
-    "contracts/m1/ordering-cases.json": "f7907a6a50ad49664e6ef01f176bf1458452dc9ddeb4bb8a13eece11ee408e2d",
-    "scripts/validate/m1_ordering.py": "1be559ab9307c37c6ce7c142243bac38a39ab23254f62e46aa518dba0d69ae45",
-    "src/m1_ordering.rs": "4dcc633e93a7d62962639c5380224b0d9b48b35f2a2289ed4a69d31937402b5b",
+    "contracts/m1/ordering-cases.json": "ac4cf238a2d24bf13589259500daa3a4ed8a21273ba2725b850b5720579c03b8",
+    "scripts/validate/m1_ordering.py": "eea898f9b01dacb0f1042f517973a7cf7a00bb6aa8524f33bc0e50b371255b08",
+    "src/m1_ordering.rs": "23e22b6e0c43321fa93e520040a4a78ec90623d64659226a1efacf9c204e3c64",
     "src/m1_source_identity.rs": "3677c2c7341d170106b908f55eb6471b04ebd46952973f0e5960966564aff9e3"
   },
   "owner_bead": "boring-cdc-m1-ordering",
@@ -27,6 +32,9 @@
     "PAYLOAD_HASH_DOMAIN=boring-cdc/mutation-payload/v1",
     "SNAPSHOT_ORIGIN_RANK=0",
     "WAL_ORIGIN_RANK=1",
+    "HASH_LENGTH_FRAMING=u64-be",
+    "COLUMN_STATE_TAGS=Absent:0,Null:1,UnchangedToast:2,Value:3",
+    "MUTATION_KIND_TAGS=Delete:0,Upsert:1",
     "MAX_CANONICAL_KEY_COMPONENTS=32"
   ],
   "schema_version": "m1-ordering-proof/v1"
