@@ -14,14 +14,18 @@ for ident,root in dirs.items():
  if evidence['scenario_id']!=ident or manifest['scenario_id']!=ident:fail(f"scenario identity mismatch: {ident}")
  if manifest['specified_exit']!=spec['expected_exit'] or manifest['specified_outcome']!=spec['expected_status'] or manifest['observed_probe_exit']!=spec['expected_exit']:fail(f"unobserved expected outcome: {ident}")
  probes=[c for c in manifest['commands'] if ident in c['argv']]
- if len(probes)!=1 or probes[0]['exit_code']!=spec['expected_exit']:fail(f"probe command mismatch: {ident}")
+ if len(probes)!=2 or any(p['exit_code']!=spec['expected_exit'] for p in probes):fail(f"probe command mismatch: {ident}")
  reruns=manifest.get('rerun_digests',[])
  if len(reruns)!=2 or reruns[0]!=reruns[1] or evidence['result'].get('attempts')!=reruns:fail(f"rerun mismatch: {ident}")
+ exclusions=set(manifest.get('inventory_exclusions',[]))
+ if exclusions!={'sha256.json','manifest.json','evidence.json'}:fail(f"inventory exclusion contract mismatch: {ident}")
+ actual={str(p.relative_to(root)) for p in root.rglob('*') if p.is_file()}-exclusions
+ if set(inventory)!=actual or manifest.get('artifact_hashes')!=inventory:fail(f"inventory completeness mismatch: {ident}")
  for rel,digest in inventory.items():
   p=root/rel
   if not p.is_file() or sha(p)!=digest:fail(f"inventory mismatch: {ident}/{rel}")
  log=json.loads((root/'logs/boring-cdc.jsonl').read_text());required={'schema_version','case_event_seq','bead_id','scenario_id','correlation_id','run_id','capture_epoch','component','phase','outcome','config_fingerprint','evidence_digest'}
- if not required<=set(log) or log['scenario_id']!=ident:fail(f"log correlation mismatch: {ident}")
+ if not required<=set(log) or log['scenario_id']!=ident or log['bead_id']!='boring-cdc-m0-scaffold' or log['outcome']!=spec['expected_status'] or log['run_id']!='00000000-0000-0000-0000-000000000001' or log['correlation_id']!='scaffold-component' or log['config_fingerprint']!=manifest['config_fingerprint'] or log['evidence_digest']!=sha(ROOT/'contracts/scaffold/m0-scaffold.json'):fail(f"log correlation mismatch: {ident}")
  text='\n'.join(p.read_text(errors='replace') for p in root.rglob('*') if p.is_file())
  if re.search(r'postgres(?:ql)?://[^\s:@]+:[^\s@]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----|BORING_CDC_SOURCE_DSN',text,re.I):fail(f"redaction failure: {ident}")
  if evidence['source_preservation']['before_sha256']!=evidence['source_preservation']['after_sha256'] or not evidence['cleanup']['complete']:fail(f"provenance claim mismatch: {ident}")
