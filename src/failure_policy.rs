@@ -470,7 +470,7 @@ fn rearm(
         return PolicyAction::RejectedRearm;
     }
     let allowed = match record.class {
-        FailureClass::Transient | FailureClass::ResourcePressure => true,
+        FailureClass::Transient | FailureClass::ResourcePressure => false,
         FailureClass::Deterministic | FailureClass::OperatorBlocked => {
             request.explicit_operator_authorization
         }
@@ -486,22 +486,14 @@ fn rearm(
                     .is_some_and(|proof| valid_configuration_change(record, proof))
         }
     };
-    if !allowed {
+    if !allowed || context.clock.now() <= record.last_failed_at_ms {
         return PolicyAction::RejectedRearm;
     }
     let mut rearmed = record.clone();
     rearmed.attempt = record.attempt;
     rearmed.armed = true;
     rearmed.last_failed_at_ms = context.clock.now().max(record.last_failed_at_ms);
-    rearmed.next_retry_at_ms = if is_automatic_retry(record.class) {
-        Some(
-            rearmed
-                .last_failed_at_ms
-                .saturating_add(retry_delay_ms(context.randomness.next_u64(), 1)),
-        )
-    } else {
-        None
-    };
+    rearmed.next_retry_at_ms = None;
     PolicyAction::Rearmed {
         record: rearmed,
         expected_last_failed_at_ms: record.last_failed_at_ms,
@@ -775,9 +767,8 @@ pub fn load_failure(
         return Ok(None);
     };
     let boundary_digest = format!("{:x}", Sha256::digest(boundary.canonical()));
-    if boundary.seq_range() != (start, end)
-        || !failure_id.starts_with(&format!("failure-{boundary_digest}-"))
-    {
+    let expected_failure_id = format!("failure-{boundary_digest}-{}", &fingerprint[7..]);
+    if boundary.seq_range() != (start, end) || failure_id != expected_failure_id {
         return Err(rusqlite::Error::InvalidQuery);
     }
     Ok(Some(FailureRecord {
@@ -822,7 +813,10 @@ fn timestamp(ms: u64) -> String {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::m1_transition_kernel::{SplitMix64, VirtualClock};
+    use crate::m1_transition_kernel::{
+        Harness, HarnessBudget, ScheduleSeed, ScheduledAction, ScheduledStep, SplitMix64,
+        TransitionSystem, VirtualClock,
+    };
     use crate::m2_schema::open_writer;
     use std::fs;
     use std::path::PathBuf;
@@ -869,11 +863,123 @@ pub mod tests {
         transition(current, event, &mut context)
     }
 
+    struct PolicyHarnessDomain;
+
+    impl TransitionSystem for PolicyHarnessDomain {
+        type Facts = Option<FailureRecord>;
+        type Event = PolicyEvent;
+        type Effect = PolicyAction;
+        type Completion = CompletionToken;
+
+        fn on_event(
+            &self,
+            facts: &mut Self::Facts,
+            event: Self::Event,
+            context: &mut TransitionContext<'_>,
+        ) -> Vec<Self::Effect> {
+            let action = transition(facts.as_ref(), event, context);
+            match &action {
+                PolicyAction::Persist(record)
+                | PolicyAction::RetryNow(record)
+                | PolicyAction::Rearmed { record, .. } => *facts = Some(record.clone()),
+                PolicyAction::Clear { .. } => *facts = None,
+                PolicyAction::Suppressed
+                | PolicyAction::StaleCompletion
+                | PolicyAction::RejectedRearm
+                | PolicyAction::Noop => {}
+            }
+            vec![action]
+        }
+
+        fn on_completion(
+            &self,
+            facts: &mut Self::Facts,
+            completion: Self::Completion,
+            context: &mut TransitionContext<'_>,
+        ) -> Vec<Self::Effect> {
+            self.on_event(facts, PolicyEvent::Completed(completion), context)
+        }
+
+        fn on_expiry(&self, _facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {}
+        fn on_cancel(&self, _facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {}
+        fn on_crash_restart(&self, facts: &mut Self::Facts, context: &mut TransitionContext<'_>) {
+            let _ = self.on_event(facts, PolicyEvent::ProcessRestarted, context);
+        }
+        fn invariant_violation(&self, _facts: &Self::Facts) -> Option<String> {
+            None
+        }
+        fn redacted_state(&self, facts: &Self::Facts) -> String {
+            facts.as_ref().map_or_else(
+                || "clear".into(),
+                |record| format!("armed={};attempt={}", record.armed, record.attempt),
+            )
+        }
+        fn facts_size_bytes(&self, facts: &Self::Facts) -> usize {
+            facts
+                .as_ref()
+                .map_or(0, |_| std::mem::size_of::<FailureRecord>())
+        }
+        fn event_size_bytes(&self, _event: &Self::Event) -> usize {
+            std::mem::size_of::<PolicyEvent>()
+        }
+        fn completion_size_bytes(&self, _completion: &Self::Completion) -> usize {
+            std::mem::size_of::<CompletionToken>()
+        }
+    }
+
     fn persisted(action: PolicyAction) -> FailureRecord {
         match action {
             PolicyAction::Persist(record) => record,
             other => panic!("expected persisted action, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn shared_bounded_harness_replays_policy_vectors_deterministically() {
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::Transient, 0)),
+        ));
+        let completion = CompletionToken {
+            failure_id: record.failure_id.clone(),
+            fingerprint: record.fingerprint.clone(),
+            capture_epoch: "epoch-a".into(),
+            generation: Some(7),
+            attempt: record.attempt,
+        };
+        let steps = vec![
+            ScheduledStep::new("restart", ScheduledAction::CrashRestart),
+            ScheduledStep::new("advance", ScheduledAction::AdvanceClock(20_000)),
+            ScheduledStep::new("due", ScheduledAction::Event(PolicyEvent::RetryDue)),
+            ScheduledStep::new("complete", ScheduledAction::Completion(completion)),
+        ];
+        let harness = Harness::new(HarnessBudget {
+            max_steps: 8,
+            max_trace_entries: 8,
+            max_minimizer_runs: 8,
+            max_redacted_bytes: 256,
+            max_state_bytes: 4_096,
+            max_scheduled_payload_bytes: 4_096,
+        })
+        .unwrap();
+        let seed = ScheduleSeed::splitmix64(JITTER_SEED_U64);
+        let one = harness
+            .execute(
+                &PolicyHarnessDomain,
+                Some(record.clone()),
+                &steps,
+                seed.clone(),
+            )
+            .unwrap();
+        let two = harness
+            .execute(&PolicyHarnessDomain, Some(record), &steps, seed)
+            .unwrap();
+        assert_eq!(
+            serde_json::to_vec(&one).unwrap(),
+            serde_json::to_vec(&two).unwrap()
+        );
+        assert_eq!(one.entries.len(), 4);
+        assert!(one.violation.is_none());
     }
 
     #[test]
@@ -1015,7 +1121,7 @@ pub mod tests {
                 _ => unreachable!(),
             }
             assert!(matches!(
-                run_transition(Some(&record), PolicyEvent::Rearm(allowed)),
+                run_transition_at(Some(&record), PolicyEvent::Rearm(allowed), 20_000),
                 PolicyAction::Rearmed { .. }
             ));
         }
@@ -1092,6 +1198,23 @@ pub mod tests {
         ));
         assert!(recurrence.armed);
         assert_eq!(recurrence.attempt, cleared.attempt + 1);
+        let automatic_rearm = RearmRequest {
+            expected_failure_id: recurrence.failure_id.clone(),
+            expected_fingerprint: recurrence.fingerprint.clone(),
+            relevant_configuration_change: None,
+            retained_wal_proven: true,
+            integrity_recovery_proven: true,
+            continuity_recovery_proven: true,
+            explicit_operator_authorization: true,
+        };
+        assert_eq!(
+            run_transition_at(
+                Some(&recurrence),
+                PolicyEvent::Rearm(automatic_rearm),
+                due + 2
+            ),
+            PolicyAction::RejectedRearm
+        );
     }
 
     #[test]
@@ -1250,6 +1373,18 @@ pub mod tests {
             load_failure(writer.connection(), &record.failure_id, boundary()).unwrap(),
             Some(record.clone())
         );
+        writer.connection().execute(
+            "UPDATE processing_failures SET fingerprint='sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' WHERE failure_id=?1",
+            [&record.failure_id],
+        ).unwrap();
+        assert!(load_failure(writer.connection(), &record.failure_id, boundary()).is_err());
+        writer
+            .connection()
+            .execute(
+                "UPDATE processing_failures SET fingerprint=?1 WHERE failure_id=?2",
+                params![record.fingerprint, record.failure_id],
+            )
+            .unwrap();
         assert!(
             load_failure(
                 writer.connection(),

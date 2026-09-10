@@ -83,7 +83,7 @@
     {
       "id": "SCN-M2-FAILURE-PERSISTENCE",
       "test": "prepared_adapter_persists_reopens_and_clears_via_supplied_transaction",
-      "assertion": "prepared operations execute only through a supplied transaction, survive reopen, validate boundary context, and preserve destination current_failure_id"
+      "assertion": "prepared operations execute only through a supplied transaction, survive reopen, validate exact boundary-plus-fingerprint identity, and preserve destination current_failure_id"
     },
     {
       "id": "SCN-M2-FAILURE-DUE-RECURRENCE",
@@ -93,7 +93,12 @@
     {
       "id": "SCN-M2-FAILURE-PERSISTENCE-CAS",
       "test": "non_transient_rearm_is_persistable_and_stale_operations_are_rejected",
-      "assertion": "non-transient re-arm satisfies schema constraints and stale transactional clears fail closed"
+      "assertion": "delayed non-transient re-arm is revision-CAS persisted; automatic re-arm and stale store/link/clear operations fail closed"
+    },
+    {
+      "id": "SCN-M2-FAILURE-BOUNDED-HARNESS",
+      "test": "shared_bounded_harness_replays_policy_vectors_deterministically",
+      "assertion": "the shared m1.1 bounded TransitionSystem harness replays production transitions byte-identically under the fixed seed"
     }
   ]
 }
