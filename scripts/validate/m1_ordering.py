@@ -17,10 +17,10 @@ for marker in ("boring-cdc-d-event-id", "boring-cdc-d-keys"):
     assert f"M0-PROVISIONAL: {marker}" in source
 for golden in (
     "06004c4a0b18bedd87c4fabd9102bbaf009e50ffecfea740528edeb68485d548",
-    "5a0574e19de8c33923e12953a6c002e16c06dc13c46aa82b8e249f77ffb83fe3",
-    "000162f8dd1a1f04d4ec4e8f6357c5202e25db4f0993de3069591621cbc56be3",
+    "e4a6350855eb0705318a27f6822976320cc869cff47753af9324600165c046a9",
+    "4317afc16b609fcbf9d0133dc604a3250d0b18425f37226a9dd16320e4bba187",
     "ddf09f7280c10ad15ffb79c78ce4678a5a99d27a890655098046394736f39adb",
-    "69977ac3ca1be0868cf1f6dc35ecaef3cf68e8eace61967a1ad0e24eaf8e0b00",
+    "fc98f5b0520965efe632181840282500e412a5bab5e9ca2c2a63645e6abf4f4d",
 ):
     assert golden in source
 wal_body = source[source.index("pub fn wal_connector_event_id"):source.index("pub struct SnapshotIdentityInput")]

@@ -3,7 +3,10 @@
 //! Inputs are already-admitted decoder values and the relation fingerprint owned by
 //! `m1_ddl_fixtures`. This module performs no journal or destination I/O.
 
-use crate::m1_source_identity::{LogicalTableIdentity, SourceIdentity};
+use crate::m1_source_identity::{
+    CanonicalKeyComponent, LogicalTableIdentity, PhysicalKeyHash, RelationSchemaVersion,
+    SourceIdentity,
+};
 use crate::m1_transition_kernel::{
     CaptureEpoch, DestinationGeneration, ReceivedLsn, SourceVersion,
 };
@@ -17,8 +20,6 @@ const WAL_EVENT_DOMAIN: &[u8] = b"boring-cdc/wal-event/v1";
 const SOURCE_SLOT_DOMAIN: &[u8] = b"boring-cdc/source-slot/v1";
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
 const SNAPSHOT_EVENT_DOMAIN: &[u8] = b"boring-cdc/snapshot-event/v1";
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
-const KEY_HASH_DOMAIN: &[u8] = b"boring-cdc/canonical-key/v1";
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
 const VALUE_HASH_DOMAIN: &[u8] = b"boring-cdc/canonical-value/v1";
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
@@ -110,28 +111,21 @@ impl ColumnState {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CanonicalKey(pub Vec<CanonicalValue>);
-impl CanonicalKey {
-    pub fn validate(&self) -> Result<(), OrderingFailure> {
-        // M0-PROVISIONAL: boring-cdc-d-keys (RECOMMENDED non-empty, max 32 components).
-        if self.0.is_empty() || self.0.len() > 32 {
-            return Err(OrderingFailure::contract("CANONICAL_KEY_ARITY_INVALID"));
-        }
-        Ok(())
+pub type CanonicalKey = Vec<CanonicalKeyComponent>;
+
+fn validate_key(key: &CanonicalKey) -> Result<(), OrderingFailure> {
+    // M0-PROVISIONAL: boring-cdc-d-keys (RECOMMENDED non-empty, max 32 components).
+    if key.is_empty()
+        || key.len() > 32
+        || key.iter().any(|v| matches!(v, CanonicalKeyComponent::Null))
+    {
+        return Err(OrderingFailure::contract("CANONICAL_KEY_INVALID"));
     }
-    pub fn hash(&self) -> Result<Hash32, OrderingFailure> {
-        self.validate()?;
-        let mut bytes = Vec::new();
-        bytes.extend((self.0.len() as u64).to_be_bytes());
-        for value in &self.0 {
-            bytes.extend(value.type_oid.to_be_bytes());
-            bytes.extend(value.type_modifier.to_be_bytes());
-            bytes.extend((value.bytes.len() as u64).to_be_bytes());
-            bytes.extend(&value.bytes);
-        }
-        Ok(hash_fields(KEY_HASH_DOMAIN, &[&bytes]))
-    }
+    Ok(())
+}
+fn canonical_key_hash(key: &CanonicalKey) -> Result<PhysicalKeyHash, OrderingFailure> {
+    validate_key(key)?;
+    Ok(PhysicalKeyHash::derive(key))
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -180,7 +174,7 @@ pub struct SnapshotIdentityInput {
     pub generation: DestinationGeneration,
     pub logical_table_id: LogicalTableIdentity,
     pub chunk_id: u64,
-    pub key_hash: Hash32,
+    pub key_hash: PhysicalKeyHash,
 }
 #[must_use]
 pub fn snapshot_connector_event_id(input: SnapshotIdentityInput) -> Hash32 {
@@ -213,22 +207,14 @@ impl MutationKind {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MutationPayload {
     /// Lowercase SHA-256 emitted by the admitted DDL relation contract.
-    pub relation_fingerprint: String,
+    pub relation: RelationSchemaVersion,
     pub key: CanonicalKey,
     pub kind: MutationKind,
     pub columns: Vec<ColumnState>,
 }
 impl MutationPayload {
     pub fn hash(&self, version: MutationVersion) -> Result<Hash32, OrderingFailure> {
-        if self.relation_fingerprint.len() != 64
-            || !self
-                .relation_fingerprint
-                .bytes()
-                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
-        {
-            return Err(OrderingFailure::contract("RELATION_FINGERPRINT_INVALID"));
-        }
-        let key_hash = self.key.hash()?;
+        let key_hash = canonical_key_hash(&self.key)?;
         let mut columns = Vec::new();
         columns.extend((self.columns.len() as u64).to_be_bytes());
         for state in &self.columns {
@@ -244,7 +230,7 @@ impl MutationPayload {
                 &version.source.ordinal().to_be_bytes(),
                 &[version.mutation_ordinal],
                 &version.connector_event_id.bytes(),
-                self.relation_fingerprint.as_bytes(),
+                &self.relation.fingerprint().bytes(),
                 &key_hash.bytes(),
                 &[self.kind.tag()],
                 &columns,
@@ -273,10 +259,62 @@ pub fn source_version_for_row(
 /// Total version for expanded mutations. SourceVersion is reused rather than represented again.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MutationVersion {
-    pub source: SourceVersion,
-    pub origin_rank: u8,
-    pub mutation_ordinal: u8,
-    pub connector_event_id: Hash32,
+    source: SourceVersion,
+    origin_rank: u8,
+    mutation_ordinal: u8,
+    connector_event_id: Hash32,
+}
+impl MutationVersion {
+    pub fn from_wal(
+        source: SourceVersion,
+        position: WalIdentityInput,
+    ) -> Result<Self, OrderingFailure> {
+        if position.capture_epoch != source.capture_epoch() {
+            return Err(OrderingFailure::contract("CAPTURE_EPOCH_MISMATCH"));
+        }
+        if position.row_ordinal != u64::from(source.ordinal()) {
+            return Err(OrderingFailure::contract("ROW_ORDINAL_MISMATCH"));
+        }
+        Ok(Self {
+            source,
+            origin_rank: WAL_ORIGIN_RANK,
+            mutation_ordinal: position.mutation_ordinal,
+            connector_event_id: wal_connector_event_id(position),
+        })
+    }
+    pub fn from_snapshot(
+        source: SourceVersion,
+        position: SnapshotIdentityInput,
+    ) -> Result<Self, OrderingFailure> {
+        if position.capture_epoch != source.capture_epoch() {
+            return Err(OrderingFailure::contract("CAPTURE_EPOCH_MISMATCH"));
+        }
+        if source.transaction_id() != 0 || source.ordinal() != 0 {
+            return Err(OrderingFailure::contract("SNAPSHOT_ORDINAL_INVALID"));
+        }
+        Ok(Self {
+            source,
+            origin_rank: SNAPSHOT_ORIGIN_RANK,
+            mutation_ordinal: 0,
+            connector_event_id: snapshot_connector_event_id(position),
+        })
+    }
+    #[must_use]
+    pub const fn source(self) -> SourceVersion {
+        self.source
+    }
+    #[must_use]
+    pub const fn origin_rank(self) -> u8 {
+        self.origin_rank
+    }
+    #[must_use]
+    pub const fn mutation_ordinal(self) -> u8 {
+        self.mutation_ordinal
+    }
+    #[must_use]
+    pub const fn connector_event_id(self) -> Hash32 {
+        self.connector_event_id
+    }
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum VersionComparison {
@@ -294,7 +332,6 @@ pub fn compare_versions(left: MutationVersion, right: MutationVersion) -> Versio
         (
             v.source.commit_lsn().get(),
             v.origin_rank,
-            v.source.transaction_id(),
             v.source.ordinal(),
             v.mutation_ordinal,
             v.connector_event_id,
@@ -309,17 +346,35 @@ pub fn compare_versions(left: MutationVersion, right: MutationVersion) -> Versio
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CanonicalMutation {
-    pub connector_event_id: Hash32,
-    pub version: MutationVersion,
-    pub payload: MutationPayload,
-    pub payload_hash: Hash32,
+    connector_event_id: Hash32,
+    version: MutationVersion,
+    payload: MutationPayload,
+    payload_hash: Hash32,
+}
+impl CanonicalMutation {
+    #[must_use]
+    pub const fn connector_event_id(&self) -> Hash32 {
+        self.connector_event_id
+    }
+    #[must_use]
+    pub const fn version(&self) -> MutationVersion {
+        self.version
+    }
+    #[must_use]
+    pub const fn payload(&self) -> &MutationPayload {
+        &self.payload
+    }
+    #[must_use]
+    pub const fn payload_hash(&self) -> Hash32 {
+        self.payload_hash
+    }
 }
 
 /// One logical key change is deterministically delete-old then upsert-new.
 pub fn expand_key_change(
     positional: WalIdentityInput,
     source: SourceVersion,
-    relation_fingerprint: &str,
+    relation: RelationSchemaVersion,
     old_key: CanonicalKey,
     new_key: CanonicalKey,
     new_columns: Vec<ColumnState>,
@@ -330,8 +385,8 @@ pub fn expand_key_change(
     if positional.row_ordinal != u64::from(source.ordinal()) {
         return Err(OrderingFailure::contract("ROW_ORDINAL_MISMATCH"));
     }
-    old_key.validate()?;
-    new_key.validate()?;
+    validate_key(&old_key)?;
+    validate_key(&new_key)?;
     if old_key == new_key {
         return Err(OrderingFailure::contract("KEY_CHANGE_IDENTITIES_EQUAL"));
     }
@@ -340,18 +395,13 @@ pub fn expand_key_change(
             mutation_ordinal,
             ..positional
         };
-        let event_id = wal_connector_event_id(input);
+        let version = MutationVersion::from_wal(source, input)?;
+        let event_id = version.connector_event_id();
         let payload = MutationPayload {
-            relation_fingerprint: relation_fingerprint.to_owned(),
+            relation,
             key,
             kind,
             columns,
-        };
-        let version = MutationVersion {
-            source,
-            origin_rank: WAL_ORIGIN_RANK,
-            mutation_ordinal,
-            connector_event_id: event_id,
         };
         let payload_hash = payload.hash(version)?;
         Ok(CanonicalMutation {
@@ -373,19 +423,34 @@ pub enum DuplicateDecision {
     AcceptDuplicate,
     BlockConflict,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ImmutableMutationRecord {
+    event_id: Hash32,
+    position: MutationVersion,
+    payload_hash: Hash32,
+}
+impl ImmutableMutationRecord {
+    #[must_use]
+    pub const fn from_parts(position: MutationVersion, payload_hash: Hash32) -> Self {
+        Self {
+            event_id: position.connector_event_id(),
+            position,
+            payload_hash,
+        }
+    }
+}
 #[must_use]
 pub fn classify_replay(
-    existing_id: Hash32,
-    existing_payload_hash: Hash32,
-    replay_id: Hash32,
-    replay_payload_hash: Hash32,
+    existing: ImmutableMutationRecord,
+    replay: ImmutableMutationRecord,
 ) -> DuplicateDecision {
-    if existing_id != replay_id {
+    if existing.event_id != replay.event_id {
         DuplicateDecision::DifferentIdentity
-    } else if existing_payload_hash == replay_payload_hash {
-        DuplicateDecision::AcceptDuplicate
-    } else {
+    } else if existing.position != replay.position || existing.payload_hash != replay.payload_hash {
         DuplicateDecision::BlockConflict
+    } else {
+        DuplicateDecision::AcceptDuplicate
     }
 }
 
@@ -431,7 +496,14 @@ mod tests {
         }
     }
     fn key(bytes: &[u8]) -> CanonicalKey {
-        CanonicalKey(vec![value(25, bytes)])
+        vec![CanonicalKeyComponent::Bytes(bytes.to_vec())]
+    }
+    fn relation() -> RelationSchemaVersion {
+        RelationSchemaVersion::derive(
+            LogicalTableIdentity::derive(&source_identity(), "public", "accounts"),
+            42,
+            b"id:bytea,value:text",
+        )
     }
     fn source(lsn: u64, xid: u32, ordinal: u32) -> SourceVersion {
         source_version_for_row(EPOCH, ReceivedLsn::from_wire(lsn), xid, u64::from(ordinal)).unwrap()
@@ -448,12 +520,14 @@ mod tests {
         }
     }
     fn version() -> MutationVersion {
-        MutationVersion {
-            source: source(112, 8, 3),
-            origin_rank: WAL_ORIGIN_RANK,
-            mutation_ordinal: 0,
-            connector_event_id: wal_connector_event_id(wal(0)),
-        }
+        MutationVersion::from_wal(source(112, 8, 3), wal(0)).unwrap()
+    }
+    fn ordered_version(lsn: u64, xid: u32, ordinal: u32) -> MutationVersion {
+        let position = WalIdentityInput {
+            row_ordinal: u64::from(ordinal),
+            ..wal(0)
+        };
+        MutationVersion::from_wal(source(lsn, xid, ordinal), position).unwrap()
     }
     fn wal(mutation_ordinal: u8) -> WalIdentityInput {
         WalIdentityInput {
@@ -467,7 +541,6 @@ mod tests {
 
     #[test]
     fn four_column_states_have_distinct_payload_hashes() {
-        let fp = "11".repeat(32);
         let hashes = [
             ColumnState::Absent,
             ColumnState::Null,
@@ -477,7 +550,7 @@ mod tests {
         .into_iter()
         .map(|state| {
             MutationPayload {
-                relation_fingerprint: fp.clone(),
+                relation: relation(),
                 key: key(b"k"),
                 kind: MutationKind::Upsert,
                 columns: vec![state],
@@ -493,7 +566,7 @@ mod tests {
     fn positional_event_id_excludes_payload_and_volatile_fields() {
         let id = wal_connector_event_id(wal(0));
         let a = MutationPayload {
-            relation_fingerprint: "11".repeat(32),
+            relation: relation(),
             key: key(b"k"),
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Value(value(25, b"a"))],
@@ -501,7 +574,7 @@ mod tests {
         .hash(version())
         .unwrap();
         let b = MutationPayload {
-            relation_fingerprint: "11".repeat(32),
+            relation: relation(),
             key: key(b"k"),
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Value(value(25, b"b"))],
@@ -524,7 +597,7 @@ mod tests {
                 "accounts",
             ),
             chunk_id: 4,
-            key_hash: key(b"k").hash().unwrap(),
+            key_hash: canonical_key_hash(&key(b"k")).unwrap(),
         });
         assert_ne!(wal_id, snapshot_id);
         assert_eq!(
@@ -533,7 +606,26 @@ mod tests {
         );
         assert_eq!(
             snapshot_id.hex(),
-            "5a0574e19de8c33923e12953a6c002e16c06dc13c46aa82b8e249f77ffb83fe3"
+            "e4a6350855eb0705318a27f6822976320cc869cff47753af9324600165c046a9"
+        );
+        let snapshot_source =
+            source_version_for_row(EPOCH, ReceivedLsn::from_wire(80), 0, 0).unwrap();
+        let snapshot_position = SnapshotIdentityInput {
+            capture_epoch: EPOCH,
+            generation: DestinationGeneration::from_store(2),
+            logical_table_id: LogicalTableIdentity::derive(
+                &source_identity(),
+                "public",
+                "accounts",
+            ),
+            chunk_id: 4,
+            key_hash: canonical_key_hash(&key(b"k")).unwrap(),
+        };
+        assert_eq!(
+            MutationVersion::from_snapshot(snapshot_source, snapshot_position)
+                .unwrap()
+                .connector_event_id(),
+            snapshot_id
         );
     }
 
@@ -542,55 +634,51 @@ mod tests {
         let mutations = expand_key_change(
             wal(9),
             source(112, 8, 3),
-            &"11".repeat(32),
+            relation(),
             key(b"old"),
             key(b"new"),
             vec![ColumnState::Value(value(25, b"row"))],
         )
         .unwrap();
-        assert_eq!(mutations[0].payload.kind, MutationKind::Delete);
-        assert_eq!(mutations[1].payload.kind, MutationKind::Upsert);
-        assert_eq!(mutations[0].version.mutation_ordinal, 0);
+        assert_eq!(mutations[0].payload().kind, MutationKind::Delete);
+        assert_eq!(mutations[1].payload().kind, MutationKind::Upsert);
+        assert_eq!(mutations[0].version().mutation_ordinal(), 0);
         assert_eq!(
-            compare_versions(mutations[0].version, mutations[1].version),
+            compare_versions(mutations[0].version(), mutations[1].version()),
             VersionComparison::Less
         );
         assert_ne!(
-            mutations[0].connector_event_id,
-            mutations[1].connector_event_id
+            mutations[0].connector_event_id(),
+            mutations[1].connector_event_id()
         );
     }
 
     #[test]
     fn repeated_same_key_has_total_source_order() {
-        let id0 = wal_connector_event_id(wal(0));
-        let versions = [
-            MutationVersion {
-                source: source(100, 9, 1),
-                origin_rank: WAL_ORIGIN_RANK,
-                mutation_ordinal: 0,
-                connector_event_id: id0,
-            },
-            MutationVersion {
-                source: source(101, 1, 0),
-                origin_rank: WAL_ORIGIN_RANK,
-                mutation_ordinal: 0,
-                connector_event_id: id0,
-            },
-        ];
+        let versions = [ordered_version(100, 9, 1), ordered_version(101, 1, 0)];
         assert_eq!(
             compare_versions(versions[0], versions[1]),
             VersionComparison::Less
         );
-        let other = MutationVersion {
-            source: SourceVersion::from_decoded(
-                CaptureEpoch::from_store(8),
-                ReceivedLsn::from_wire(1),
-                1,
-                0,
-            ),
-            ..versions[0]
+        let same_position_other_xid = ordered_version(100, 99, 1);
+        assert_eq!(
+            compare_versions(versions[0], same_position_other_xid),
+            VersionComparison::Equal
+        );
+        let next_transaction_ordinal = ordered_version(100, 1, 2);
+        assert_eq!(
+            compare_versions(versions[0], next_transaction_ordinal),
+            VersionComparison::Less
+        );
+        let other_source =
+            source_version_for_row(CaptureEpoch::from_store(8), ReceivedLsn::from_wire(1), 1, 0)
+                .unwrap();
+        let other_position = WalIdentityInput {
+            capture_epoch: CaptureEpoch::from_store(8),
+            row_ordinal: 0,
+            ..wal(0)
         };
+        let other = MutationVersion::from_wal(other_source, other_position).unwrap();
         assert_eq!(
             compare_versions(versions[0], other),
             VersionComparison::DifferentCaptureEpoch
@@ -601,28 +689,52 @@ mod tests {
     fn same_id_same_hash_is_duplicate_and_different_hash_is_conflict() {
         let a = hash_fields(b"fixture", &[b"a"]);
         let b = hash_fields(b"fixture", &[b"b"]);
+        let position = version();
+        let same = ImmutableMutationRecord::from_parts(position, a);
         assert_eq!(
-            classify_replay(a, a, a, a),
+            classify_replay(same, same),
             DuplicateDecision::AcceptDuplicate
         );
         assert_eq!(
-            classify_replay(a, a, a, b),
+            classify_replay(same, ImmutableMutationRecord::from_parts(position, b)),
             DuplicateDecision::BlockConflict
         );
+        let other_position = MutationVersion::from_wal(source(113, 8, 3), wal(1)).unwrap();
         assert_eq!(
-            classify_replay(a, a, b, b),
+            classify_replay(same, ImmutableMutationRecord::from_parts(other_position, b)),
             DuplicateDecision::DifferentIdentity
+        );
+        let corrupted_position = MutationVersion {
+            source: source(999, 8, 3),
+            ..position
+        };
+        let corrupted = ImmutableMutationRecord {
+            event_id: same.event_id,
+            position: corrupted_position,
+            payload_hash: a,
+        };
+        assert_eq!(
+            classify_replay(same, corrupted),
+            DuplicateDecision::BlockConflict
         );
         for seed in 0_u64..64 {
             let id = hash_fields(b"property-id", &[&seed.to_be_bytes()]);
             let payload = hash_fields(b"property-payload", &[&seed.to_be_bytes()]);
             let changed = hash_fields(b"property-payload", &[&seed.wrapping_add(1).to_be_bytes()]);
+            let position = MutationVersion {
+                connector_event_id: id,
+                ..version()
+            };
+            let record = ImmutableMutationRecord::from_parts(position, payload);
             assert_eq!(
-                classify_replay(id, payload, id, payload),
+                classify_replay(record, record),
                 DuplicateDecision::AcceptDuplicate
             );
             assert_eq!(
-                classify_replay(id, payload, id, changed),
+                classify_replay(
+                    record,
+                    ImmutableMutationRecord::from_parts(position, changed)
+                ),
                 DuplicateDecision::BlockConflict
             );
         }
@@ -633,35 +745,39 @@ mod tests {
     #[test]
     fn canonical_hashes_are_unambiguous_for_component_boundaries_and_types() {
         assert_ne!(
-            CanonicalKey(vec![value(25, b"ab"), value(25, b"c")])
-                .hash()
-                .unwrap(),
-            CanonicalKey(vec![value(25, b"a"), value(25, b"bc")])
-                .hash()
-                .unwrap()
+            canonical_key_hash(&vec![
+                CanonicalKeyComponent::Bytes(b"ab".to_vec()),
+                CanonicalKeyComponent::Bytes(b"c".to_vec())
+            ])
+            .unwrap(),
+            canonical_key_hash(&vec![
+                CanonicalKeyComponent::Bytes(b"a".to_vec()),
+                CanonicalKeyComponent::Bytes(b"bc".to_vec())
+            ])
+            .unwrap()
         );
         assert_ne!(
-            key(b"1").hash().unwrap(),
-            CanonicalKey(vec![value(20, b"1")]).hash().unwrap()
+            canonical_key_hash(&key(b"1")).unwrap(),
+            PhysicalKeyHash::derive(&[CanonicalKeyComponent::I64(1)])
         );
         assert_ne!(value(25, b"x").hash(), value(17, b"x").hash());
         assert_eq!(
-            key(b"golden").hash().unwrap().hex(),
-            "000162f8dd1a1f04d4ec4e8f6357c5202e25db4f0993de3069591621cbc56be3"
+            Hash32::from_bytes(canonical_key_hash(&key(b"golden")).unwrap().bytes()).hex(),
+            "4317afc16b609fcbf9d0133dc604a3250d0b18425f37226a9dd16320e4bba187"
         );
         assert_eq!(
             value(25, b"golden").hash().hex(),
             "ddf09f7280c10ad15ffb79c78ce4678a5a99d27a890655098046394736f39adb"
         );
         let payload = MutationPayload {
-            relation_fingerprint: "11".repeat(32),
+            relation: relation(),
             key: key(b"golden"),
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Null],
         };
         assert_eq!(
             payload.hash(version()).unwrap().hex(),
-            "69977ac3ca1be0868cf1f6dc35ecaef3cf68e8eace61967a1ad0e24eaf8e0b00"
+            "fc98f5b0520965efe632181840282500e412a5bab5e9ca2c2a63645e6abf4f4d"
         );
     }
 
@@ -679,7 +795,7 @@ mod tests {
             expand_key_change(
                 position,
                 source(112, 8, 3),
-                &"11".repeat(32),
+                relation(),
                 key(b"old"),
                 key(b"new"),
                 vec![]
@@ -696,7 +812,7 @@ mod tests {
             expand_key_change(
                 position,
                 source(112, 8, 3),
-                &"11".repeat(32),
+                relation(),
                 key(b"old"),
                 key(b"new"),
                 vec![]
@@ -716,20 +832,16 @@ mod tests {
     }
 
     #[test]
-    fn invalid_key_and_relation_fingerprint_fail_closed() {
+    fn invalid_keys_fail_closed() {
         assert_eq!(
-            CanonicalKey(Vec::new()).hash().unwrap_err().fingerprint,
-            "CANONICAL_KEY_ARITY_INVALID"
+            canonical_key_hash(&Vec::new()).unwrap_err().fingerprint,
+            "CANONICAL_KEY_INVALID"
         );
-        let payload = MutationPayload {
-            relation_fingerprint: "raw-name".into(),
-            key: key(b"k"),
-            kind: MutationKind::Delete,
-            columns: vec![],
-        };
         assert_eq!(
-            payload.hash(version()).unwrap_err().fingerprint,
-            "RELATION_FINGERPRINT_INVALID"
+            canonical_key_hash(&vec![CanonicalKeyComponent::Null])
+                .unwrap_err()
+                .fingerprint,
+            "CANONICAL_KEY_INVALID"
         );
     }
 }

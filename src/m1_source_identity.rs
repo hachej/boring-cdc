@@ -559,6 +559,11 @@ pub struct RelationSchemaVersion {
 
 impl RelationSchemaVersion {
     #[must_use]
+    pub const fn fingerprint(self) -> Fingerprint {
+        self.schema_fingerprint
+    }
+
+    #[must_use]
     pub fn derive(
         logical_table: LogicalTableIdentity,
         relation_id: u32,
@@ -580,13 +585,13 @@ impl RelationSchemaVersion {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CanonicalKeyComponent<'a> {
+pub enum CanonicalKeyComponent {
     Null,
     Bool(bool),
     I64(i64),
     U64(u64),
-    Bytes(&'a [u8]),
-    Utf8(&'a str),
+    Bytes(Vec<u8>),
+    Utf8(String),
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -594,7 +599,12 @@ pub struct PhysicalKeyHash(Fingerprint);
 
 impl PhysicalKeyHash {
     #[must_use]
-    pub fn derive(components: &[CanonicalKeyComponent<'_>]) -> Self {
+    pub const fn bytes(self) -> [u8; 32] {
+        self.0.bytes()
+    }
+
+    #[must_use]
+    pub fn derive(components: &[CanonicalKeyComponent]) -> Self {
         let mut encoded = Vec::new();
         for component in components {
             match component {
@@ -613,7 +623,7 @@ impl PhysicalKeyHash {
                 CanonicalKeyComponent::Bytes(value) => {
                     encoded.push(4);
                     encoded.extend((value.len() as u64).to_be_bytes());
-                    encoded.extend(*value);
+                    encoded.extend(value);
                 }
                 CanonicalKeyComponent::Utf8(value) => {
                     encoded.push(5);
@@ -1049,7 +1059,7 @@ mod tests {
         let schema_v2 = RelationSchemaVersion::derive(table, 13, b"id:int8,name:text,email:text");
         let key = PhysicalKeyHash::derive(&[
             CanonicalKeyComponent::I64(42),
-            CanonicalKeyComponent::Utf8("tenant-a"),
+            CanonicalKeyComponent::Utf8("tenant-a".into()),
         ]);
         let row = CanonicalRowIdentity::derive(table, key);
         assert_ne!(schema_v1, schema_v2);
@@ -1057,7 +1067,7 @@ mod tests {
         assert_ne!(
             key,
             PhysicalKeyHash::derive(&[
-                CanonicalKeyComponent::Utf8("tenant-a"),
+                CanonicalKeyComponent::Utf8("tenant-a".into()),
                 CanonicalKeyComponent::I64(42),
             ])
         );
