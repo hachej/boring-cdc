@@ -1,1 +1,2 @@
+production_peer_uid_mismatch_rejected=pass
 production_ownership_component=pass

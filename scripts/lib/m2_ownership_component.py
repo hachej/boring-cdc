@@ -55,10 +55,10 @@ def unix_peer_probe(work: Path) -> dict:
     if not actual["authorized"] or not actual["peer_pid_is_client"]: raise RuntimeError("SO_PEERCRED authorization failed")
     return actual
 
-def start_postgres(name: str):
+def start_postgres(name: str, work: Path):
     run(["docker", "rm", "-f", name])
     p = run(["docker", "run", "-d", "--rm", "--name", name,
-             "-e", "POSTGRES_HOST_AUTH_METHOD=trust", IMAGE])
+             "-v", f"{work}:/ownership-probe", "-e", "POSTGRES_HOST_AUTH_METHOD=trust", IMAGE])
     if p.returncode: raise RuntimeError(p.stderr.strip())
     wait_ready(name)
 
@@ -99,6 +99,11 @@ def command_record(argv: str, stdout_path: Path, stderr_path: Path, version: str
 
 def emit(mode: str, observed: dict, image_id: str):
     scenario = "SCN-M2-OWN-COMPONENT" if mode == "e2e" else "SCN-M2-OWN-CRASH-RECONCILE"
+    run_id = f"ownership-{mode}-run-v1"
+    capture_epoch = "ownership-capture-epoch-v1"
+    config = {"advisory_key": KEY, "image": IMAGE, "profile": "component", "seed": SEED}
+    config_fingerprint = sha(canonical(config))
+    correlation_id = f"{scenario.lower()}:{run_id}"
     out = ARTIFACT_ROOT / scenario / SEED
     if out.exists(): shutil.rmtree(out)
     (out / "logs").mkdir(parents=True); (out / "state").mkdir()
@@ -109,14 +114,18 @@ def emit(mode: str, observed: dict, image_id: str):
     after = {"owner": "successor", "dispatch_allowed": "verified_before_release", "source_lock": "released_cleanly", **observed}
     write(out / "state/before.json", canonical(before)); write(out / "state/after.json", canonical(after))
     write(out / "fault-timeline.json", canonical(["owner-acquired", "contender-rejected", "backend-terminated", "successor-reconciled"]))
-    write(out / "config.json", canonical({"advisory_key": KEY, "image": IMAGE, "profile": "component", "seed": SEED}))
+    write(out / "config.json", canonical(config))
     write(out / "versions.json", canonical({"docker": run(["docker", "version", "--format", "{{.Server.Version}}"]).stdout.strip(), "image_id": image_id, "python": sys.version.split()[0]}))
     container = f"boring-cdc-m2-ownership-{mode}"
-    write(out / "commands.txt", f"docker run -d --rm --name {container} -e POSTGRES_HOST_AUTH_METHOD=trust {IMAGE}\n{product_argv}\n")
+    work = Path("/var/tmp") / container
+    write(out / "commands.txt", f"docker run -d --rm --name {container} -v {work}:/ownership-probe -e POSTGRES_HOST_AUTH_METHOD=trust {IMAGE}\n{product_argv}\n")
+    event_context = {"correlation_id": correlation_id, "run_id": run_id,
+                     "capture_epoch": capture_epoch, "config_fingerprint": config_fingerprint}
     events = [
-      {"schema_version":"ownership-event/v1","case_event_seq":1,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"postgres-advisory-lock","phase":"contention","outcome":"rejected"},
-      {"schema_version":"ownership-event/v1","case_event_seq":2,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"postgres-advisory-lock","phase":"backend-death","outcome":"fenced"},
-      {"schema_version":"ownership-event/v1","case_event_seq":3,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"unix-command-socket","phase":"peer-credentials","outcome":"authorized"}]
+      {**event_context,"schema_version":"ownership-event/v1","case_event_seq":1,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"postgres-advisory-lock","phase":"contention","outcome":"rejected"},
+      {**event_context,"schema_version":"ownership-event/v1","case_event_seq":2,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"postgres-advisory-lock","phase":"backend-death","outcome":"fenced"},
+      {**event_context,"schema_version":"ownership-event/v1","case_event_seq":3,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"unix-command-socket","phase":"peer-credentials","outcome":"authorized"},
+      {**event_context,"schema_version":"ownership-event/v1","case_event_seq":4,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"unix-command-socket","phase":"peer-uid-mismatch","outcome":"rejected"}]
     write(out / "logs/boring-cdc.jsonl", b"".join(canonical(x) for x in events))
     docker_version = run(["docker", "version", "--format", "{{.Server.Version}}"])
     write(out / "stdout.txt", docker_version.stdout); write(out / "stderr.txt", docker_version.stderr)
@@ -154,14 +163,15 @@ def main():
     if work.exists(): shutil.rmtree(work)
     work.mkdir(mode=0o700)
     try:
-        start_postgres(name)
+        start_postgres(name, work)
         peer=unix_peer_probe(work)
         image_id=run(["docker","image","inspect","--format","{{.Id}}",IMAGE]).stdout.strip()
         cargo_argv = ["cargo", "run", "--quiet", "--locked", "--example", "m2_ownership_component", "--", str(work / "product"), name]
         product = run(cargo_argv, timeout=180)
-        if product.returncode != 0 or product.stdout.strip() != "production_ownership_component=pass":
+        product_lines = product.stdout.splitlines()
+        if product.returncode != 0 or product_lines != ["production_peer_uid_mismatch_rejected=pass", "production_ownership_component=pass"]:
             raise RuntimeError(f"production ownership probe failed: {product.stderr.strip()}")
-        observed={"postgres":{"production_guard_advisory_contention":True,"backend_death_injected":True,"successor_reconciled":True},"unix_peer":peer,"product_probe":{"ownership_guard":True,"socket_validation":True,"crash_restart":True,"postgres_backend_death_fenced":True,"successor_reconciled_and_admitted":True},"mode":args.mode,"_product_stdout":product.stdout,"_product_stderr":product.stderr,"_product_argv":" ".join(cargo_argv)}
+        observed={"postgres":{"production_guard_advisory_contention":True,"backend_death_injected":True,"successor_reconciled":True},"unix_peer":peer,"product_probe":{"ownership_guard":True,"socket_validation":True,"mismatched_kernel_peer_uid_rejected":True,"crash_restart":True,"postgres_backend_death_fenced":True,"successor_reconciled_and_admitted":True},"mode":args.mode,"_product_stdout":product.stdout,"_product_stderr":product.stderr,"_product_argv":" ".join(cargo_argv)}
     finally:
         stop_postgres(name); shutil.rmtree(work, ignore_errors=True)
     emit(args.mode, observed, image_id)

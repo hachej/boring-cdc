@@ -1,1 +1,1 @@
-{"crash_restart":true,"ownership_guard":true,"postgres_backend_death_fenced":true,"socket_validation":true,"successor_reconciled_and_admitted":true}
+{"crash_restart":true,"mismatched_kernel_peer_uid_rejected":true,"ownership_guard":true,"postgres_backend_death_fenced":true,"socket_validation":true,"successor_reconciled_and_admitted":true}

@@ -1,2 +1,2 @@
-docker run -d --rm --name boring-cdc-m2-ownership-fault -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
+docker run -d --rm --name boring-cdc-m2-ownership-fault -v /var/tmp/boring-cdc-m2-ownership-fault:/ownership-probe -e POSTGRES_HOST_AUTH_METHOD=trust postgres:15-alpine@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b
 cargo run --quiet --locked --example m2_ownership_component -- /var/tmp/boring-cdc-m2-ownership-fault/product boring-cdc-m2-ownership-fault

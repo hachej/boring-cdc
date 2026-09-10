@@ -252,11 +252,11 @@ fn postgres_guard_probe(root: &Path, container: &str) {
     );
 }
 
-fn socket_probe(root: &Path) {
+fn socket_probe(root: &Path, container: &str) {
     let dir = root.join("socket");
     fs::create_dir_all(&dir).unwrap();
     fs::set_permissions(&dir, fs::Permissions::from_mode(0o700)).unwrap();
-    let path = dir.join("command.sock");
+    let path = dir.join(".s.PGSQL.5432");
     let listener = UnixListener::bind(&path).unwrap();
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
     let client = UnixStream::connect(&path).unwrap();
@@ -265,6 +265,49 @@ fn socket_probe(root: &Path) {
     drop(client);
     drop(accepted);
     drop(listener);
+    fs::remove_file(&path).unwrap();
+
+    // Exercise the production authorization path with credentials supplied by
+    // the kernel for a different UID. The pinned component container runs this
+    // client as root while the connector process and socket are owned by the
+    // unprivileged host account.
+    let listener = UnixListener::bind(&path).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+    let container_dir = "/ownership-probe/product/socket";
+    let mut mismatched_client = Command::new("docker")
+        .args([
+            "exec",
+            container,
+            "psql",
+            "-XAt",
+            "-h",
+            container_dir,
+            "-p",
+            "5432",
+            "-U",
+            "postgres",
+            "-d",
+            "postgres",
+            "-c",
+            "SELECT 1",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let (accepted, _) = listener.accept().unwrap();
+    assert_eq!(
+        validate_socket(&path, &accepted, 8, Duration::from_millis(1)),
+        Err("peer_rejected")
+    );
+    drop(accepted);
+    drop(listener);
+    let status = mismatched_client.wait().unwrap();
+    assert!(
+        !status.success(),
+        "non-PostgreSQL probe socket unexpectedly completed a protocol exchange"
+    );
     fs::remove_dir_all(dir).unwrap();
 }
 fn crash_probe(root: &Path) {
@@ -338,10 +381,10 @@ fn main() {
     let root = PathBuf::from(args.get(1).expect("probe root"));
     fs::create_dir_all(&root).unwrap();
     fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
-    socket_probe(&root);
+    let container = args.get(2).expect("PostgreSQL component container");
+    socket_probe(&root, container);
     crash_probe(&root);
-    if let Some(container) = args.get(2) {
-        postgres_guard_probe(&root, container);
-    }
+    postgres_guard_probe(&root, container);
+    println!("production_peer_uid_mismatch_rejected=pass");
     println!("production_ownership_component=pass");
 }
