@@ -24,4 +24,4 @@ run_once 1
 run_once 2
 scripts/validate/evidence.sh artifacts/boring-cdc-m1-raw-demo
 scripts/validate/plan_coverage.sh
-echo 'PASS M1 deterministic_rerun=1 evidence=validated cleanup=trap'
+echo 'PASS M1 deterministic_rerun=1 evidence=validated cleanup=verified'

@@ -1,27 +1,28 @@
 scenario=SCN-M1-RAW-EVENTS seed=raw-demo-v1 pg=17 slot=pgoutput
 raw_pgoutput tags=B,R,U,C lengths=21,84,55,26 payload_values=redacted
 PASS pgoutput_update=decoded_typed_noop feedback=awaits_durable_commit
-ASSERT SCN-M1-RAW-FIXED-SEED test=m1_decoder::tests::golden_transaction_preserves_row_only_ordinals_and_origin exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-FIXED-SEED test=m1_decoder::tests::golden_transaction_preserves_row_only_ordinals_and_origin exit=0 live_sql_fact=true product_observation=true
 CASE SCN-M1-RAW-FIXED-SEED state=decoded checkpoint=unchanged_until_durable log=raw_event_normalized
-ASSERT SCN-M1-RAW-HEARTBEAT test=m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-HEARTBEAT test=m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop exit=0 live_sql_fact=true product_observation=true
 CASE SCN-M1-RAW-HEARTBEAT state=durable_noop checkpoint=durable_only log=heartbeat_control_noop
 raw_pgoutput tags=B,R,T,C lengths=21,51,10,26 payload_values=redacted
 PASS pgoutput_truncate=decoded_block_before_feedback
-ASSERT SCN-M1-RAW-TRUNCATE test=m1_control_fixtures::tests::truncate_is_detection_only exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-TRUNCATE test=m1_control_fixtures::tests::truncate_is_detection_only exit=0 live_sql_fact=true product_observation=true
 CASE SCN-M1-RAW-TRUNCATE state=requires_reseed checkpoint=unchanged log=truncate_requires_reseed
 PASS live_catalog=exact fingerprint=2ac597b232224b4d2cffcf4a815ad917a95e5afc1620b4eefc66a7d92441dd52
 PASS live_catalog_drift=publication_drift_requires_reseed
-ASSERT SCN-M1-RAW-PUBLICATION-DRIFT test=m1_control_fixtures::tests::publication_fingerprint_is_exact_and_order_independent exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-PUBLICATION-DRIFT test=m1_control_fixtures::tests::publication_fingerprint_is_exact_and_order_independent exit=0 live_sql_fact=true product_observation=true
 CASE SCN-M1-RAW-PUBLICATION-DRIFT state=requires_reseed checkpoint=unchanged log=publication_drift
-ASSERT SCN-M1-RAW-IDLE-DDL test=m1_ddl_fixtures::tests::every_relation_contract_dimension_changes_the_fingerprint exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-IDLE-DDL test=m1_ddl_fixtures::tests::every_relation_contract_dimension_changes_the_fingerprint exit=0 live_sql_fact=true product_observation=true
 CASE SCN-M1-RAW-IDLE-DDL state=blocked checkpoint=unchanged log=idle_ddl_blocked
 raw_pgoutput tags=B,R,I,C lengths=21,51,21,26 payload_values=redacted
-ASSERT SCN-M1-RAW-IMMEDIATE-DDL test=m1_ddl_fixtures::tests::changed_relation_synchronously_blocks_following_dml_and_feedback exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-IMMEDIATE-DDL test=m1_ddl_fixtures::tests::changed_relation_synchronously_blocks_following_dml_and_feedback exit=0 live_sql_fact=true product_observation=true
 CASE SCN-M1-RAW-IMMEDIATE-DDL state=blocked checkpoint=unchanged log=immediate_ddl_blocked
-ASSERT SCN-M1-RAW-UNSUPPORTED-PROTOCOL test=m1_decoder::tests::unsupported_messages_and_binary_truncate_fail_closed exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-UNSUPPORTED-PROTOCOL test=m1_decoder::tests::unsupported_messages_and_binary_truncate_fail_closed exit=0 live_sql_fact=true product_observation=true
 CASE SCN-M1-RAW-UNSUPPORTED-PROTOCOL state=blocked checkpoint=unchanged log=unsupported_protocol
-ASSERT SCN-M1-RAW-UNSUPPORTED-TABLE test=m1_ddl_fixtures::tests::selected_types_keys_delete_and_destination_compatibility_fail_independently exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-UNSUPPORTED-TABLE test=m1_ddl_fixtures::tests::selected_types_keys_delete_and_destination_compatibility_fail_independently exit=0 live_sql_fact=true product_observation=true
 CASE SCN-M1-RAW-UNSUPPORTED-TABLE state=blocked checkpoint=unchanged log=unsupported_table
-ASSERT SCN-M1-RAW-UNSUPPORTED-TYPE test=m1_ddl_fixtures::tests::changed_type_or_removed_replica_identity_blocks_update_delete_safety exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-UNSUPPORTED-TYPE test=m1_ddl_fixtures::tests::changed_type_or_removed_replica_identity_blocks_update_delete_safety exit=0 live_sql_fact=true product_observation=true
 CASE SCN-M1-RAW-UNSUPPORTED-TYPE state=blocked checkpoint=unchanged log=unsupported_type
-PASS actual_sql=heartbeat,truncate,publication_drift checkpoint=unchanged cleanup=trap
+CLEANUP container_absent=true isolated_docker_resources_absent=true
+PASS actual_sql=heartbeat,truncate,publication_drift checkpoint=unchanged cleanup=verified
