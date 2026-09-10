@@ -22,5 +22,10 @@ if [x.get('id') for x in ca]!=owned or any(not x.get('executed_by') or not set(x
 for marker in ['// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED catalog poll interval).','// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED DDL waiter source-impact bound).','// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED supported PostgreSQL majors).']:
  if marker not in src: errors.append('provisional_marker')
 if re.search(r'\b(TBD|TODO|FIXME)\b',src+json.dumps(c)):errors.append('unresolved')
+artifact_root=root/'artifacts/boring-cdc-m1-ddl-fixtures'
+if artifact_root.exists():
+ corpus='\n'.join(x.read_text(errors='replace') for x in artifact_root.rglob('*') if x.is_file())
+ for forbidden in ['/home/','postgresql://','POSTGRES_PASSWORD','TBD','TODO','FIXME']:
+  if forbidden in corpus: errors.append('artifact_redaction:'+forbidden)
 print(json.dumps({'schema_version':'boring-cdc/validation-result/v1','validator':'m1_ddl_fixtures','status':'pass' if not errors else 'fail','scenarios':len(ids),'matrix_rows':len(m),'errors':errors},sort_keys=True))
 sys.exit(bool(errors))
