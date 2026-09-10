@@ -17,16 +17,16 @@
       "argv": "cargo test --locked m1_ordering::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-2.stderr",
-      "stderr_sha256": "0a994fcf11c3686b94df429e41a6dd241069ebc0dc1ee47f77fbd06ecf674f1c",
+      "stderr_sha256": "36551aadc5d034f65be1128814b9520a8536c43adbfd49b2678590a344163a1f",
       "stdout_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-2.log",
-      "stdout_sha256": "e0f8f21ab61ab4950a7e3422a4c0a298e38a7deea90522ddc57d2d65365ea7bf",
+      "stdout_sha256": "c644113a5e3e33eba477df3d1e51176a74b59798fe24b96205b320e26781d07c",
       "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
     },
     {
       "argv": "scripts/validate/m1_ordering.py",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-3.stderr",
-      "stderr_sha256": "d2006dab1b88bf7e03b4d9236f4e6896ecae6bda362a889062343577cf90415c",
+      "stderr_sha256": "01a54c2297d535053904aa31b3ce782e8d166bda75f82d9cff7253650479b038",
       "stdout_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-3.log",
       "stdout_sha256": "d8321b1e3208d1cc312834d6e9350b368ae53eede8e4df8981c65eaf4a130074",
       "version": "python 3.13.3"
@@ -34,7 +34,7 @@
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "f4f64446e787aa808e04102f69594f286fa12501",
+  "git_commit": "acb5b0ea054fb54c28eb363a16e34dd22e71631f",
   "owner_bead": "boring-cdc-m1-ordering",
   "redaction": {
     "checked": true,
@@ -46,7 +46,7 @@
       "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/versions.json",
       "contracts/m1/ordering-cases.json"
     ],
-    "digest": "6a678d3d3516529c4470b3604cccdb63c93d77db7ba180d3d5628bcd0e4d977d",
+    "digest": "a0252423dcad58352bff8e0287168c792946e31a239e450990c85fb507f322b0",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -55,8 +55,8 @@
   "schema_version": "evidence/v1",
   "seed": "ordering-v1 fixed vectors",
   "source_preservation": {
-    "after_sha256": "a9b50b9f6d85936b055f84d6d01d5242cfdc8d7b9d6d930bf44ebb4190dcff83",
-    "before_sha256": "a9b50b9f6d85936b055f84d6d01d5242cfdc8d7b9d6d930bf44ebb4190dcff83",
+    "after_sha256": "f7907a6a50ad49664e6ef01f176bf1458452dc9ddeb4bb8a13eece11ee408e2d",
+    "before_sha256": "f7907a6a50ad49664e6ef01f176bf1458452dc9ddeb4bb8a13eece11ee408e2d",
     "preserved": true
   },
   "tier_proof": {
