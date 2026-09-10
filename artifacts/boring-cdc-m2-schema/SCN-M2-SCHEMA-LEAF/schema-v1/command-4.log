@@ -1,18 +1,18 @@
 {"findings":[],"schema_version":"validation-result/v1","valid":true,"validator":"m2-schema/v1"}
 
 running 10 tests
-test m2_schema::tests::failed_migration_rolls_back_atomically_and_upgrade_is_idempotent ... ok
-test m2_schema::tests::constraints_reject_bad_lsn_duplicate_identity_and_incomplete_checkpoint ... ok
 test m2_schema::tests::clean_install_has_all_tables_and_required_pragmas ... ok
+test m2_schema::tests::failure_and_audit_state_survive_without_checkpoint_advance ... ok
+test m2_schema::tests::constraints_reject_bad_lsn_duplicate_identity_and_incomplete_checkpoint ... ok
 test m2_schema::tests::command_nonce_abort_and_external_fence_survive_restart ... ok
 test m2_schema::tests::revision_cas_and_promotion_fence_uniqueness ... ok
-test m2_schema::tests::reader_is_read_only_and_bounded ... ok
 test m2_schema::tests::creation_floor_is_separate_bound_and_marker_survives_reopen ... ok
 test m2_schema::tests::immutable_rows_fences_and_anchor_proof_fail_closed ... ok
-test m2_schema::tests::failure_and_audit_state_survive_without_checkpoint_advance ... ok
+test m2_schema::tests::reader_is_read_only_and_bounded ... ok
+test m2_schema::tests::failed_migration_rolls_back_atomically_and_upgrade_is_idempotent ... ok
 test m2_schema::tests::reopened_writer_reapplies_full_and_attests_generation ... ok
 
-test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 151 filtered out; finished in 0.42s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 151 filtered out; finished in 0.95s
 
 
 running 0 tests
