@@ -16,7 +16,7 @@
     "strict_new_epoch_reseed",
     "bounded_scoped_completions"
   ],
-  "implementation_sha": "1e0ab51723153f916d7941bfa8c39ed5ac31ad2c",
+  "implementation_sha": "ef2584585c405aede06f9c3cabbb5a342e79a80f",
   "m0_provisional_count": 4,
   "owner_bead": "boring-cdc-m1-bootstrap-sm",
   "result": "pass",

@@ -1,30 +1,30 @@
 
 running 23 tests
 test m1_bootstrap_sm::tests::anchor_requires_reads_lower_stitch_and_matching_durable_fence ... ok
+test m1_bootstrap_sm::tests::continuity_capability_binds_full_identity_and_active_intent ... ok
+test m1_bootstrap_sm::tests::creation_floor_is_separate_and_capture_connection_is_separate ... ok
+test m1_bootstrap_sm::tests::every_importer_requires_snapshot_as_first_statement_and_bound_ack ... ok
+test m1_bootstrap_sm::tests::failed_continuity_requires_confirmed_new_epoch_full_reseed ... ok
+test m1_bootstrap_sm::tests::crash_matrix_retries_or_marks_ambiguous_without_silent_attach ... ok
+test m1_bootstrap_sm::tests::fence_nonce_and_complete_boundary_fail_closed_before_anchor ... ok
+test m1_bootstrap_sm::tests::harness_accounting_includes_guard_vector_capacity_and_dead_sessions ... ok
+test m1_bootstrap_sm::tests::guard_is_not_an_importer_and_loss_invalidates_through_fence ... ok
+test m1_bootstrap_sm::tests::feedback_is_gated_until_all_import_acks_then_uses_durable_wal_only ... ok
 test m1_bootstrap_sm::tests::durable_wal_rejects_lsn_and_journal_cursor_divergence ... ok
 test m1_bootstrap_sm::tests::bounded_harness_replays_exporter_and_guard_faults ... ok
-test m1_bootstrap_sm::tests::creation_floor_is_separate_and_capture_connection_is_separate ... ok
-test m1_bootstrap_sm::tests::continuity_capability_binds_full_identity_and_active_intent ... ok
-test m1_bootstrap_sm::tests::exporter_loss_before_each_ack_invalidates_and_releases_gate ... ok
-test m1_bootstrap_sm::tests::crash_matrix_retries_or_marks_ambiguous_without_silent_attach ... ok
-test m1_bootstrap_sm::tests::feedback_is_gated_until_all_import_acks_then_uses_durable_wal_only ... ok
-test m1_bootstrap_sm::tests::failed_continuity_requires_confirmed_new_epoch_full_reseed ... ok
-test m1_bootstrap_sm::tests::every_importer_requires_snapshot_as_first_statement_and_bound_ack ... ok
-test m1_bootstrap_sm::tests::harness_accounting_includes_guard_vector_capacity_and_dead_sessions ... ok
-test m1_bootstrap_sm::tests::fence_nonce_and_complete_boundary_fail_closed_before_anchor ... ok
-test m1_bootstrap_sm::tests::guard_is_not_an_importer_and_loss_invalidates_through_fence ... ok
 test m1_bootstrap_sm::tests::feedback_position_alone_never_selects_reseed_or_slot_drop ... ok
-test m1_bootstrap_sm::tests::normal_exporter_release_after_readback_does_not_invalidate ... ok
+test m1_bootstrap_sm::tests::exporter_loss_before_each_ack_invalidates_and_releases_gate ... ok
 test m1_bootstrap_sm::tests::intent_guard_and_one_permanent_slot_precede_export ... ok
+test m1_bootstrap_sm::tests::invalid_session_bounds_and_cancellation_are_bounded ... ok
+test m1_bootstrap_sm::tests::lost_creation_token_starts_retained_capture_and_replacement_snapshot ... ok
+test m1_bootstrap_sm::tests::importer_ack_reordering_and_stale_inputs_preserve_gate ... ok
+test m1_bootstrap_sm::tests::importer_loss_after_ack_but_before_reads_complete_invalidates ... ok
+test m1_bootstrap_sm::tests::normal_exporter_release_after_readback_does_not_invalidate ... ok
+test m1_bootstrap_sm::tests::stale_completions_and_fence_proofs_cannot_cross_generation ... ok
 test m1_bootstrap_sm::tests::snapshot_and_wal_origin_order_is_explicit ... ok
 test m1_bootstrap_sm::tests::retained_slot_recovery_requires_all_proofs_and_preserves_transient_wal ... ok
-test m1_bootstrap_sm::tests::lost_creation_token_starts_retained_capture_and_replacement_snapshot ... ok
-test m1_bootstrap_sm::tests::invalid_session_bounds_and_cancellation_are_bounded ... ok
-test m1_bootstrap_sm::tests::importer_loss_after_ack_but_before_reads_complete_invalidates ... ok
-test m1_bootstrap_sm::tests::importer_ack_reordering_and_stale_inputs_preserve_gate ... ok
-test m1_bootstrap_sm::tests::stale_completions_and_fence_proofs_cannot_cross_generation ... ok
 
-test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 134 filtered out; finished in 0.03s
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 134 filtered out; finished in 0.01s
 
 
 running 0 tests

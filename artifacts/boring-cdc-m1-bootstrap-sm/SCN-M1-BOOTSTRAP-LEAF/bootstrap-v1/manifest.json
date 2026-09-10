@@ -17,9 +17,9 @@
       "argv": "cargo test --locked m1_bootstrap_sm::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-2.stderr",
-      "stderr_sha256": "176e6177fd7b6e6f37e87dc1c0c58ca0d71162ecaf71ef338e54bda9c2e85942",
+      "stderr_sha256": "f250cb9a720adcce88ab38383cf2a3cd126569ce0e30a90838ff385f77ef30c3",
       "stdout_path": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/command-2.log",
-      "stdout_sha256": "027c531a71ce4a83540bdafb85bffed575e93d12c3dfcc64c4392d362bedebe5",
+      "stdout_sha256": "7699aa0572c3ab47f226357542de820388fa2acff6e575767d3bbee32cd69a67",
       "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
     },
     {
@@ -34,7 +34,7 @@
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "1e0ab51723153f916d7941bfa8c39ed5ac31ad2c",
+  "git_commit": "ef2584585c405aede06f9c3cabbb5a342e79a80f",
   "owner_bead": "boring-cdc-m1-bootstrap-sm",
   "redaction": {
     "checked": true,
@@ -46,7 +46,7 @@
       "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/versions.json",
       "contracts/m1/bootstrap-sm-cases.json"
     ],
-    "digest": "089ad97e671045e80f5c756dbf8f0c54afb251429449e9cb9b757b5ffc2a7823",
+    "digest": "3490b1505f7cee04c4014b85531d9a9135bcd15188956c0ede2ec1707670d3b5",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
