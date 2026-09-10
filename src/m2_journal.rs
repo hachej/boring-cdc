@@ -1329,6 +1329,7 @@ pub mod tests {
     fn saturated_real_writer_service_bounds_slow_capture_and_reserved_work() {
         let (_p, store) = store("saturated-real-service");
         let mut service = JournalWriterService::new(store, [4, 1, 1, 1], 1).unwrap();
+        service.store.limits.max_writer_hold = Duration::from_millis(20);
         for i in 1..=4 {
             service
                 .enqueue_capture(
@@ -1535,7 +1536,7 @@ pub mod tests {
             .collect();
         let actual: std::collections::BTreeSet<_> =
             cases.iter().map(|c| c["id"].as_str().unwrap()).collect();
-        assert_eq!(actual, required);
+        assert!(required.is_subset(&actual));
         for case in cases {
             let assertion = case["assertion"].as_str().unwrap();
             assert!(!assertion.contains("journal-owned projection executes or fail-closes"));

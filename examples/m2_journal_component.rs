@@ -54,7 +54,7 @@ fn main() {
         CommitLimits {
             max_events: 16,
             max_copied_bytes: 4096,
-            max_writer_hold: if mode == "slow-commit" {
+            max_writer_hold: if mode == "slow-commit" || mode == "saturated-service" {
                 Duration::from_millis(20)
             } else {
                 Duration::from_secs(5)
