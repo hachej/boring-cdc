@@ -1,0 +1,410 @@
+{
+  "owner_bead": "boring-cdc-m0-event-format",
+  "schema_version": "m0-event-format-vectors/v1",
+  "seed": "event-format-v1",
+  "vectors": [
+    {
+      "category": "identity",
+      "event": {
+        "canonical_key": [
+          {
+            "kind": "int64",
+            "value": 42
+          }
+        ],
+        "capture_epoch": 7,
+        "columns": [
+          {
+            "bytes": "AAAAAAAAACo",
+            "column_id": 0,
+            "state": "explicit_value",
+            "type_modifier": -1,
+            "type_oid": 20
+          }
+        ],
+        "connector_event_id": "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9",
+        "event_type": "mutation",
+        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "mutation_kind": "upsert",
+        "payload_hash": "bbde242a35c00e04951f43bba0a4b0644ed76399c4bb84255b2768c3c070e4b2",
+        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
+        "routing": "business",
+        "schema_version": "boring-cdc/event/v1",
+        "source_version": {
+          "capture_epoch": 7,
+          "commit_lsn": 112,
+          "mutation_ordinal": 0,
+          "origin_rank": 1,
+          "transaction_id": 8,
+          "transaction_ordinal": 0
+        }
+      },
+      "expected_outcome": "emit",
+      "fixture_id": "SCN-M0-EVENT-WAL-IDENTITY",
+      "identity_input": {
+        "capture_epoch": 7,
+        "mutation_ordinal": 0,
+        "row_ordinal": 0,
+        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "transaction_end_lsn": 120
+      },
+      "identity_kind": "wal"
+    },
+    {
+      "category": "identity",
+      "event": {
+        "canonical_key": [
+          {
+            "kind": "int64",
+            "value": 42
+          }
+        ],
+        "capture_epoch": 7,
+        "columns": [
+          {
+            "bytes": "AAAAAAAAACo",
+            "column_id": 0,
+            "state": "explicit_value",
+            "type_modifier": -1,
+            "type_oid": 20
+          }
+        ],
+        "connector_event_id": "e9b41ec5cb5a178adc6d60fad853a0103a7e1dc3194c4dfe2b3456563cc553ec",
+        "event_type": "mutation",
+        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "mutation_kind": "upsert",
+        "payload_hash": "b5d0c35fa5b366d9e926dab6e07955aae52ddfd77389003c380460341bd9bc20",
+        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
+        "routing": "business",
+        "schema_version": "boring-cdc/event/v1",
+        "source_version": {
+          "capture_epoch": 7,
+          "commit_lsn": 80,
+          "mutation_ordinal": 0,
+          "origin_rank": 0,
+          "transaction_id": 0,
+          "transaction_ordinal": 0
+        }
+      },
+      "expected_outcome": "emit",
+      "fixture_id": "SCN-M0-EVENT-SNAPSHOT-IDENTITY",
+      "identity_input": {
+        "capture_epoch": 7,
+        "chunk_id": 4,
+        "generation": 2,
+        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695"
+      },
+      "identity_kind": "snapshot"
+    },
+    {
+      "assertion": "lexicographic source_version within capture_epoch; different capture epochs incomparable",
+      "category": "order",
+      "event": {
+        "canonical_key": [
+          {
+            "kind": "int64",
+            "value": 42
+          }
+        ],
+        "capture_epoch": 7,
+        "columns": [
+          {
+            "bytes": "AAAAAAAAACo",
+            "column_id": 0,
+            "state": "explicit_value",
+            "type_modifier": -1,
+            "type_oid": 20
+          }
+        ],
+        "connector_event_id": "da343972b47c53416131ef9792e14ecc94f64c3a3b44fee9a7103eeceda58f50",
+        "event_type": "mutation",
+        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "mutation_kind": "upsert",
+        "payload_hash": "a374c872fbe8b54f438588df11685a3b85133d32d662a01169de3fd249aa1bec",
+        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
+        "routing": "business",
+        "schema_version": "boring-cdc/event/v1",
+        "source_version": {
+          "capture_epoch": 7,
+          "commit_lsn": 112,
+          "mutation_ordinal": 0,
+          "origin_rank": 1,
+          "transaction_id": 8,
+          "transaction_ordinal": 1
+        }
+      },
+      "expected_outcome": "emit",
+      "fixture_id": "SCN-M0-EVENT-SAME-KEY-ORDER",
+      "identity_input": {
+        "capture_epoch": 7,
+        "mutation_ordinal": 0,
+        "row_ordinal": 1,
+        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "transaction_end_lsn": 120
+      },
+      "identity_kind": "wal"
+    },
+    {
+      "assertion": "mutation ordinal 0 old-key delete precedes ordinal 1 new-key upsert",
+      "category": "order",
+      "event": {
+        "canonical_key": [
+          {
+            "kind": "int64",
+            "value": 42
+          }
+        ],
+        "capture_epoch": 7,
+        "columns": [
+          {
+            "bytes": "AAAAAAAAACo",
+            "column_id": 0,
+            "state": "explicit_value",
+            "type_modifier": -1,
+            "type_oid": 20
+          }
+        ],
+        "connector_event_id": "e74713974578a5a0772fb9beecc147527ae1e1eff277635ff81b889c3f2eaa2e",
+        "event_type": "mutation",
+        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "mutation_kind": "upsert",
+        "payload_hash": "8b95b01e0d4e61799ad9c08a1f8c1b43424fab720dee00da097c38c4a66c5000",
+        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
+        "routing": "business",
+        "schema_version": "boring-cdc/event/v1",
+        "source_version": {
+          "capture_epoch": 7,
+          "commit_lsn": 112,
+          "mutation_ordinal": 1,
+          "origin_rank": 1,
+          "transaction_id": 8,
+          "transaction_ordinal": 2
+        }
+      },
+      "expected_outcome": "emit",
+      "fixture_id": "SCN-M0-EVENT-KEY-CHANGE-ORDER",
+      "identity_input": {
+        "capture_epoch": 7,
+        "mutation_ordinal": 1,
+        "row_ordinal": 2,
+        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "transaction_end_lsn": 120
+      },
+      "identity_kind": "wal"
+    },
+    {
+      "category": "types",
+      "event": {
+        "canonical_key": [
+          {
+            "kind": "int64",
+            "value": 42
+          }
+        ],
+        "capture_epoch": 7,
+        "columns": [
+          {
+            "bytes": "AQ",
+            "column_id": 0,
+            "state": "explicit_value",
+            "type_modifier": -1,
+            "type_oid": 16
+          },
+          {
+            "bytes": "aMOpbGxv",
+            "column_id": 1,
+            "state": "explicit_value",
+            "type_modifier": -1,
+            "type_oid": 25
+          }
+        ],
+        "connector_event_id": "06004c4a0b18bedd87c4fabd9102bbaf009e50ffecfea740528edeb68485d548",
+        "event_type": "mutation",
+        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "mutation_kind": "upsert",
+        "payload_hash": "b2617fb11691ec43cf08757bedde33604b4dcb776d77606848c5f5929b949881",
+        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
+        "routing": "business",
+        "schema_version": "boring-cdc/event/v1",
+        "source_version": {
+          "capture_epoch": 7,
+          "commit_lsn": 112,
+          "mutation_ordinal": 0,
+          "origin_rank": 1,
+          "transaction_id": 8,
+          "transaction_ordinal": 3
+        }
+      },
+      "expected_outcome": "emit",
+      "fixture_id": "SCN-M0-EVENT-TYPE-CANONICAL",
+      "identity_input": {
+        "capture_epoch": 7,
+        "mutation_ordinal": 0,
+        "row_ordinal": 3,
+        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "transaction_end_lsn": 120
+      },
+      "identity_kind": "wal"
+    },
+    {
+      "category": "types",
+      "checkpoint": "unchanged",
+      "expected_outcome": "block",
+      "failed_boundary": "before_journal_checkpoint_and_source_feedback",
+      "failure_class": "deterministic_contract",
+      "failure_code": "BCDC_EVENT_UNSUPPORTED_VALUE",
+      "feedback": "unchanged",
+      "fixture_id": "SCN-M0-EVENT-TYPE-UNSUPPORTED",
+      "identity_kind": "none",
+      "recovery": "correct_schema_or_confirm_reseed"
+    },
+    {
+      "category": "toast",
+      "event": {
+        "canonical_key": [
+          {
+            "kind": "int64",
+            "value": 42
+          }
+        ],
+        "capture_epoch": 7,
+        "columns": [
+          {
+            "bytes": "AAAAAAAAACo",
+            "column_id": 0,
+            "state": "explicit_value",
+            "type_modifier": -1,
+            "type_oid": 20
+          },
+          {
+            "column_id": 1,
+            "state": "explicit_null"
+          },
+          {
+            "column_id": 2,
+            "state": "unchanged_toast"
+          },
+          {
+            "column_id": 3,
+            "state": "absent_for_schema"
+          }
+        ],
+        "connector_event_id": "206f2a26c32e3c9ebe3ed60ed249314cbe3be79654fee36095264cca8d113312",
+        "event_type": "mutation",
+        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "mutation_kind": "upsert",
+        "payload_hash": "5786a78b910022d0729028ff6e9793fa83609ecf1d58a67f74fc457d1f07dcb4",
+        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
+        "routing": "business",
+        "schema_version": "boring-cdc/event/v1",
+        "source_version": {
+          "capture_epoch": 7,
+          "commit_lsn": 112,
+          "mutation_ordinal": 0,
+          "origin_rank": 1,
+          "transaction_id": 8,
+          "transaction_ordinal": 4
+        }
+      },
+      "expected_outcome": "emit",
+      "fixture_id": "SCN-M0-EVENT-TOAST-STATES",
+      "identity_input": {
+        "capture_epoch": 7,
+        "mutation_ordinal": 0,
+        "row_ordinal": 4,
+        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "transaction_end_lsn": 120
+      },
+      "identity_kind": "wal"
+    },
+    {
+      "category": "toast",
+      "checkpoint": "unchanged",
+      "expected_outcome": "block",
+      "failed_boundary": "before_journal_checkpoint_and_source_feedback",
+      "failure_class": "deterministic_contract",
+      "failure_code": "BCDC_EVENT_KEY_CHANGE_UNCHANGED_TOAST",
+      "feedback": "unchanged",
+      "fixture_id": "SCN-M0-EVENT-TOAST-KEY-CHANGE-BLOCK",
+      "identity_kind": "none",
+      "recovery": "confirmed_full_reseed"
+    },
+    {
+      "assertion": "journal for durable progress; exclude business destinations",
+      "category": "control_routing",
+      "event": {
+        "capture_epoch": 7,
+        "connector_event_id": "76371732f3de7a3f0173bb828b38aa6f794f38225d1aceb696df5e13b79c9a02",
+        "control": {
+          "generation": null,
+          "kind": "heartbeat",
+          "transaction_end_lsn": 128
+        },
+        "event_type": "control",
+        "payload_hash": "95a81cb80b9bfee16ef18bfd2cef699b1dd0bff184fef6686c90e8d8150cd8d0",
+        "routing": "control",
+        "schema_version": "boring-cdc/event/v1",
+        "source_version": {
+          "capture_epoch": 7,
+          "commit_lsn": 124,
+          "mutation_ordinal": 0,
+          "origin_rank": 1,
+          "transaction_id": 9,
+          "transaction_ordinal": 5
+        }
+      },
+      "expected_outcome": "emit",
+      "fixture_id": "SCN-M0-EVENT-CONTROL-HEARTBEAT",
+      "identity_input": {
+        "capture_epoch": 7,
+        "mutation_ordinal": 0,
+        "row_ordinal": 5,
+        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "transaction_end_lsn": 128
+      },
+      "identity_kind": "wal"
+    },
+    {
+      "assertion": "journal for durable progress; exclude business destinations",
+      "category": "control_routing",
+      "event": {
+        "capture_epoch": 7,
+        "connector_event_id": "67b5791a4c1f8d37c01127a378540fb69962bf81438518f90c3f0dd14cf60be9",
+        "control": {
+          "generation": 2,
+          "kind": "snapshot_fence",
+          "transaction_end_lsn": 128
+        },
+        "event_type": "control",
+        "payload_hash": "811a89fc352cc22ba6be8e2ddf5a29d6852a7ca5f63f75dfcd24978469fa49dd",
+        "routing": "control",
+        "schema_version": "boring-cdc/event/v1",
+        "source_version": {
+          "capture_epoch": 7,
+          "commit_lsn": 124,
+          "mutation_ordinal": 0,
+          "origin_rank": 1,
+          "transaction_id": 9,
+          "transaction_ordinal": 6
+        }
+      },
+      "expected_outcome": "emit",
+      "fixture_id": "SCN-M0-EVENT-CONTROL-FENCE",
+      "identity_input": {
+        "capture_epoch": 7,
+        "mutation_ordinal": 0,
+        "row_ordinal": 6,
+        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "transaction_end_lsn": 128
+      },
+      "identity_kind": "wal"
+    }
+  ]
+}

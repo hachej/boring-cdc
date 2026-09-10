@@ -18,6 +18,30 @@
       "path": "contracts/scaffold/m0-scaffold.json",
       "sha256": "5b00e384c3ea7f68635c8586021986f1ed01fef237d00ea133974ee01282cb32",
       "status": "complete"
+    },
+    {
+      "executor_ids": [
+        "boring-cdc-m1-ordering",
+        "boring-cdc-m1-decoder",
+        "boring-cdc-m2-journal"
+      ],
+      "fixture_ids": [
+        "SCN-M0-EVENT-WAL-IDENTITY",
+        "SCN-M0-EVENT-SNAPSHOT-IDENTITY",
+        "SCN-M0-EVENT-SAME-KEY-ORDER",
+        "SCN-M0-EVENT-KEY-CHANGE-ORDER",
+        "SCN-M0-EVENT-TYPE-CANONICAL",
+        "SCN-M0-EVENT-TYPE-UNSUPPORTED",
+        "SCN-M0-EVENT-TOAST-STATES",
+        "SCN-M0-EVENT-TOAST-KEY-CHANGE-BLOCK",
+        "SCN-M0-EVENT-CONTROL-HEARTBEAT",
+        "SCN-M0-EVENT-CONTROL-FENCE"
+      ],
+      "id": "ART-M0-EVENT-FORMAT",
+      "owner_bead": "boring-cdc-m0-event-format",
+      "path": "contracts/event/event-format.json",
+      "sha256": "6cfc9e0db325d6c5e2d9dfb503c803d34bb247bf3dfb94a5dfeccfb9fd18e744",
+      "status": "complete"
     }
   ],
   "schema_version": "m0-manifest/v1"

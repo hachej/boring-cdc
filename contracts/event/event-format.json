@@ -1,0 +1,82 @@
+{
+  "schema_version": "boring-cdc/event-format-contract/v1",
+  "owner_bead": "boring-cdc-m0-event-format",
+  "event_schema": "contracts/event/event.schema.json",
+  "golden_vectors": "fixtures/m0/event-format/golden-vectors.json",
+  "hashing": {
+    "algorithm": "SHA-256",
+    "field_framing": "u64-be byte length followed by bytes",
+    "hex_rendering": "lowercase",
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-event-id"
+  },
+  "domains": {
+    "wal_event": "boring-cdc/wal-event/v1",
+    "snapshot_event": "boring-cdc/snapshot-event/v1",
+    "source_slot": "boring-cdc/source-slot/v1",
+    "logical_table": "boring-cdc/logical-table/v1",
+    "relation_schema": "boring-cdc/relation-schema/v1",
+    "physical_key": "boring-cdc/physical-key/v1",
+    "canonical_value": "boring-cdc/canonical-value/v1",
+    "mutation_payload": "boring-cdc/mutation-payload/v1",
+    "control_payload": "boring-cdc/control-payload/v1",
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-event-id"
+  },
+  "tags": {
+    "column_state": {"absent_for_schema": 0, "explicit_null": 1, "unchanged_toast": 2, "explicit_value": 3},
+    "mutation_kind": {"delete": 0, "upsert": 1},
+    "origin_rank": {"snapshot": 0, "wal": 1},
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-event-id"
+  },
+  "limits": {
+    "key_component_bytes": 1024,
+    "canonical_key_components": 32,
+    "scalar_bytes": 1048576,
+    "row_bytes": 4194304,
+    "event_bytes": 8388608,
+    "units": "bytes (octets); limits are inclusive over canonical decoded bytes",
+    "keys_provisional": "// M0-PROVISIONAL: boring-cdc-d-keys",
+    "values_provisional": "// M0-PROVISIONAL: boring-cdc-d-values"
+  },
+  "value_types": [
+    {"pg":"bool","oid":16,"canonical":"one byte: 00 false, 01 true"},
+    {"pg":"int2","oid":21,"canonical":"two-byte signed big-endian two's complement"},
+    {"pg":"int4","oid":23,"canonical":"four-byte signed big-endian two's complement"},
+    {"pg":"int8","oid":20,"canonical":"eight-byte signed big-endian two's complement"},
+    {"pg":"oid","oid":26,"canonical":"four-byte unsigned big-endian"},
+    {"pg":"float4","oid":700,"canonical":"IEEE-754 binary32 big-endian; preserve signed zero; all NaNs become 7fc00000"},
+    {"pg":"float8","oid":701,"canonical":"IEEE-754 binary64 big-endian; preserve signed zero; all NaNs become 7ff8000000000000"},
+    {"pg":"numeric","oid":1700,"canonical":"UTF-8 minimal decimal: no plus, exponent, leading/trailing zero, or negative zero; NaN and infinity unsupported"},
+    {"pg":"date","oid":1082,"canonical":"signed int32 big-endian days since 2000-01-01; infinities int32 min/max"},
+    {"pg":"timestamp","oid":1114,"canonical":"signed int64 big-endian microseconds since 2000-01-01; infinities int64 min/max; no timezone conversion"},
+    {"pg":"timestamptz","oid":1184,"canonical":"signed int64 big-endian UTC microseconds since 2000-01-01; infinities int64 min/max"},
+    {"pg":"uuid","oid":2950,"canonical":"16 RFC 4122 network-order bytes"},
+    {"pg":"text/varchar/bpchar/name","oid":[25,1043,1042,19],"canonical":"exact UTF-8 bytes after PostgreSQL type semantics; no connector Unicode normalization"},
+    {"pg":"bytea","oid":17,"canonical":"raw octets"},
+    {"pg":"one-dimensional arrays of admitted non-array scalars","oid":"element-specific","canonical":"u32-be count, then each element as state tag plus u32-be OID, i32-be typmod, u64-be length and canonical bytes; lower bound must be 1"}
+  ],
+  "array_type_oids": {"bool":1000,"bytea":1001,"name":1003,"int2":1005,"int4":1007,"text":1009,"bpchar":1014,"varchar":1015,"int8":1016,"float4":1021,"float8":1022,"oid":1028,"timestamp":1115,"date":1182,"timestamptz":1185,"numeric":1231,"uuid":2951},
+  "relation_contract_encoding": "u32-be column count; for each position: u32-be ordinal and u64-length-framed UTF-8 name, u32-be OID, i32-be typmod, one-byte nullable, one-byte generated, one-byte has-default, one-byte effective-replica-identity; then one-byte publication action bits in INSERT=1 UPDATE=2 DELETE=4 TRUNCATE=8 order",
+  "value_types_provisional": "// M0-PROVISIONAL: boring-cdc-d-values",
+  "key_types": ["bool", "int2", "int4", "int8", "oid", "uuid", "text", "varchar", "bpchar", "name", "bytea"],
+  "key_types_provisional": "// M0-PROVISIONAL: boring-cdc-d-keys",
+  "fixture_ids": [
+    "SCN-M0-EVENT-WAL-IDENTITY",
+    "SCN-M0-EVENT-SNAPSHOT-IDENTITY",
+    "SCN-M0-EVENT-SAME-KEY-ORDER",
+    "SCN-M0-EVENT-KEY-CHANGE-ORDER",
+    "SCN-M0-EVENT-TYPE-CANONICAL",
+    "SCN-M0-EVENT-TYPE-UNSUPPORTED",
+    "SCN-M0-EVENT-TOAST-STATES",
+    "SCN-M0-EVENT-TOAST-KEY-CHANGE-BLOCK",
+    "SCN-M0-EVENT-CONTROL-HEARTBEAT",
+    "SCN-M0-EVENT-CONTROL-FENCE"
+  ],
+  "executors": ["boring-cdc-m1-ordering", "boring-cdc-m1-decoder", "boring-cdc-m2-journal"],
+  "provisional_authorities": [
+    "// M0-PROVISIONAL: boring-cdc-d-event-id",
+    "// M0-PROVISIONAL: boring-cdc-d-values",
+    "// M0-PROVISIONAL: boring-cdc-d-keys",
+    "// M0-PROVISIONAL: boring-cdc-d-toast",
+    "// M0-PROVISIONAL: boring-cdc-d-additive"
+  ]
+}
