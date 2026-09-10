@@ -99,6 +99,11 @@
       "id": "SCN-M2-FAILURE-BOUNDED-HARNESS",
       "test": "shared_bounded_harness_replays_policy_vectors_deterministically",
       "assertion": "the shared m1.1 bounded TransitionSystem harness replays production transitions byte-identically under the fixed seed"
+    },
+    {
+      "id": "SCN-M2-FAILURE-COMPLETE-HARNESS-INVENTORY",
+      "test": "complete_policy_vector_inventory_uses_bounded_harness_schedules",
+      "assertion": "observe, explicit and automatic re-arm, configuration proof, stale completion, restart, expiry, cancel, and persistence-CAS projections use production transitions under bounded deterministic harness schedules"
     }
   ]
 }

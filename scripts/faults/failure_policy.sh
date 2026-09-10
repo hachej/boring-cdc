@@ -6,3 +6,5 @@ cargo test --locked failure_policy::tests::stale_epoch_generation_attempt_and_fi
 cargo test --locked failure_policy::tests::non_transient_rearm_is_persistable_and_stale_operations_are_rejected
 cargo test --locked failure_policy::tests::shared_bounded_harness_replays_policy_vectors_deterministically
 cargo test --locked failure_policy::tests::prepared_adapter_persists_reopens_and_clears_via_supplied_transaction
+cargo test --locked failure_policy::tests::fingerprint_changes_only_for_allowed_canonical_inputs_and_contains_no_raw_data
+cargo test --locked failure_policy::tests::complete_policy_vector_inventory_uses_bounded_harness_schedules
