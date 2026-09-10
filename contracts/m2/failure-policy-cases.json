@@ -17,12 +17,17 @@
     {
       "id": "SCN-M2-FAILURE-ENUM",
       "test": "exhaustive_classes_have_closed_stable_serialization",
-      "assertion": "all eight confirmed failure classes serialize through one closed enum and only the four transient/rate classes auto-retry"
+      "assertion": "all eight confirmed failure classes and all eight public stable error codes serialize and round-trip through their exact closed representations; only the four transient/rate classes auto-retry"
     },
     {
       "id": "SCN-M2-FAILURE-SCHEDULE",
       "test": "deterministic_schedule_caps_jitters_and_ignores_clock_rollback",
-      "assertion": "approved ChaCha20-seeded exponential schedule is deterministic, capped, full-jittered over [0,delay], and monotonic under clock rollback"
+      "assertion": "approved zero-padded ChaCha20 seed expansion and one next_u64 draw per ascending attempt match exact multi-attempt full-jitter golden vectors, with exponential cap and monotonic clock rollback handling"
+    },
+    {
+      "id": "SCN-M2-FAILURE-JITTER-GOLDEN",
+      "test": "approved_chacha20_seed_expansion_and_draw_order_match_golden_vectors",
+      "assertion": "the 14 decoded seed bytes occupy the leading bytes of the 32-byte ChaCha20 seed with 18 trailing zero bytes, then exactly one next_u64 draw is consumed for each ascending attempt"
     },
     {
       "id": "SCN-M2-FAILURE-RESTART-SUPPRESS",
@@ -110,6 +115,75 @@
       "archive"
     ],
     "jitter": "full [0,delay]",
-    "jitter_rng": "ChaCha20 in tests; OS CSPRNG in production"
+    "jitter_rng": "ChaCha20 in tests; OS CSPRNG in production",
+    "jitter_seed_expansion": {
+      "decoded_ascii": "BCDC_RETRY_V01",
+      "decoded_hex": "424344435f52455452595f563031",
+      "expanded_32_bytes_hex": "424344435f52455452595f563031000000000000000000000000000000000000",
+      "rule": "decoded bytes copied at offset 0; remaining trailing bytes zero-filled"
+    },
+    "jitter_draw_order": "one ChaCha20Rng::next_u64 draw per attempt in ascending attempt order before inclusive modulo",
+    "jitter_golden_vectors": [
+      {
+        "attempt": 1,
+        "sample_u64": 2469525849052024087,
+        "nominal_delay_ms": 250,
+        "delay_ms": 132
+      },
+      {
+        "attempt": 2,
+        "sample_u64": 14682752550997020102,
+        "nominal_delay_ms": 500,
+        "delay_ms": 273
+      },
+      {
+        "attempt": 3,
+        "sample_u64": 6383775579002771793,
+        "nominal_delay_ms": 1000,
+        "delay_ms": 844
+      },
+      {
+        "attempt": 4,
+        "sample_u64": 18292979100849785532,
+        "nominal_delay_ms": 2000,
+        "delay_ms": 204
+      },
+      {
+        "attempt": 5,
+        "sample_u64": 12610900134770089858,
+        "nominal_delay_ms": 4000,
+        "delay_ms": 3694
+      },
+      {
+        "attempt": 6,
+        "sample_u64": 12413990053327801956,
+        "nominal_delay_ms": 8000,
+        "delay_ms": 7521
+      },
+      {
+        "attempt": 7,
+        "sample_u64": 13472926905698362994,
+        "nominal_delay_ms": 16000,
+        "delay_ms": 8489
+      },
+      {
+        "attempt": 8,
+        "sample_u64": 6063425432550872070,
+        "nominal_delay_ms": 30000,
+        "delay_ms": 11847
+      },
+      {
+        "attempt": 9,
+        "sample_u64": 15583386212084045179,
+        "nominal_delay_ms": 30000,
+        "delay_ms": 12137
+      },
+      {
+        "attempt": 10,
+        "sample_u64": 5276732411777251899,
+        "nominal_delay_ms": 30000,
+        "delay_ms": 29910
+      }
+    ]
   }
 }

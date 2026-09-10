@@ -70,20 +70,38 @@ impl FailureClass {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
 pub enum StableErrorCode {
+    #[serde(rename = "BCDC_SHARED_TRANSPORT_UNAVAILABLE")]
     TransportUnavailable,
+    #[serde(rename = "BCDC_SHARED_DEADLINE_EXCEEDED")]
     DeadlineExceeded,
+    #[serde(rename = "BCDC_SHARED_INVALID_RECORD")]
     InvalidRecord,
+    #[serde(rename = "BCDC_SHARED_CHECKSUM_MISMATCH")]
     ChecksumMismatch,
+    #[serde(rename = "BCDC_SHARED_HISTORY_UNAVAILABLE")]
     HistoryUnavailable,
+    #[serde(rename = "BCDC_SHARED_UNSUPPORTED_CONFIGURATION")]
     UnsupportedConfiguration,
+    #[serde(rename = "BCDC_SHARED_RESOURCE_LIMIT")]
     ResourceLimit,
+    #[serde(rename = "BCDC_SHARED_OPERATOR_PAUSE")]
     OperatorPause,
 }
 
 impl StableErrorCode {
-    const fn as_str(self) -> &'static str {
+    pub const ALL: [Self; 8] = [
+        Self::TransportUnavailable,
+        Self::DeadlineExceeded,
+        Self::InvalidRecord,
+        Self::ChecksumMismatch,
+        Self::HistoryUnavailable,
+        Self::UnsupportedConfiguration,
+        Self::ResourceLimit,
+        Self::OperatorPause,
+    ];
+
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::TransportUnavailable => "BCDC_SHARED_TRANSPORT_UNAVAILABLE",
             Self::DeadlineExceeded => "BCDC_SHARED_DEADLINE_EXCEEDED",
@@ -1701,6 +1719,15 @@ pub mod tests {
                 class
             );
         }
+        for code in StableErrorCode::ALL {
+            let serialized = serde_json::to_string(&code).unwrap();
+            assert_eq!(serialized, format!(r#""{}""#, code.as_str()));
+            assert_eq!(
+                serde_json::from_str::<StableErrorCode>(&serialized).unwrap(),
+                code
+            );
+        }
+        assert!(serde_json::from_str::<StableErrorCode>("\"transport_unavailable\"").is_err());
         for class in [
             FailureClass::TransientIo,
             FailureClass::TransientSource,
@@ -1716,6 +1743,52 @@ pub mod tests {
             FailureClass::Configuration,
         ] {
             assert!(!is_automatic_retry(class));
+        }
+    }
+
+    #[test]
+    fn approved_chacha20_seed_expansion_and_draw_order_match_golden_vectors() {
+        let decoded = hex_seed_bytes(JITTER_TEST_SEED);
+        assert_eq!(decoded, b"BCDC_RETRY_V01");
+        let mut expanded = [0_u8; 32];
+        expanded[..decoded.len()].copy_from_slice(&decoded);
+        assert_eq!(
+            expanded,
+            [
+                0x42, 0x43, 0x44, 0x43, 0x5f, 0x52, 0x45, 0x54, 0x52, 0x59, 0x5f, 0x56, 0x30, 0x31,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ]
+        );
+
+        // Draw exactly once per ascending attempt. `next_u64` assembly, stream position,
+        // zero padding, exponential capping, or modulo drift changes this complete vector.
+        let expected = [
+            (1, 2_469_525_849_052_024_087, 250, 132),
+            (2, 14_682_752_550_997_020_102, 500, 273),
+            (3, 6_383_775_579_002_771_793, 1_000, 844),
+            (4, 18_292_979_100_849_785_532, 2_000, 204),
+            (5, 12_610_900_134_770_089_858, 4_000, 3_694),
+            (6, 12_413_990_053_327_801_956, 8_000, 7_521),
+            (7, 13_472_926_905_698_362_994, 16_000, 8_489),
+            (8, 6_063_425_432_550_872_070, 30_000, 11_847),
+            (9, 15_583_386_212_084_045_179, 30_000, 12_137),
+            (10, 5_276_732_411_777_251_899, 30_000, 29_910),
+        ];
+        let mut rng = ChaCha20Rng::from_seed(expanded);
+        for (attempt, expected_sample, nominal, expected_delay) in expected {
+            let sample = rng.next_u64();
+            assert_eq!(
+                sample, expected_sample,
+                "ChaCha20 draw for attempt {attempt}"
+            );
+            assert_eq!(retry_delay_ms(sample, attempt), expected_delay);
+            assert_eq!(
+                BASE_DELAY_MS
+                    .saturating_mul(1_u64 << attempt.saturating_sub(1))
+                    .min(MAX_DELAY_MS),
+                nominal
+            );
         }
     }
 
