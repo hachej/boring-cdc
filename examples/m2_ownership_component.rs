@@ -126,7 +126,10 @@ impl SourceLockSession for DockerPgSession {
         72420260910
     }
     fn try_lock(&mut self) -> Result<bool, OwnershipError> {
-        Ok(self.healthy())
+        Ok(self.sql(&format!(
+            "SELECT count(*) FROM pg_locks WHERE pid={} AND locktype='advisory' AND granted",
+            self.pid
+        )) == "1")
     }
     fn healthy(&mut self) -> bool {
         self.sql(&format!(
@@ -142,6 +145,20 @@ impl SourceLockSession for DockerPgSession {
 }
 impl Drop for DockerPgSession {
     fn drop(&mut self) {
+        let _ = Command::new("docker")
+            .args([
+                "exec",
+                &self.container,
+                "psql",
+                "-XAt",
+                "-U",
+                "postgres",
+                "-d",
+                "postgres",
+                "-c",
+                &format!("SELECT pg_terminate_backend({})", self.pid),
+            ])
+            .output();
         let _ = self.child.kill();
         let _ = self.child.wait();
     }
@@ -156,6 +173,17 @@ fn postgres_guard_probe(root: &Path, container: &str) {
         DockerPgSession::open(container, "owner"),
     )
     .unwrap();
+    let contender_store = root.join("pg-contender.db");
+    assert!(matches!(
+        OwnershipGuard::acquire(
+            &contender_store,
+            "pg-contender".into(),
+            OwnerKind::Runtime,
+            Duration::from_secs(5),
+            DockerPgSession::open(container, "contender")
+        ),
+        Err(OwnershipError::SourceAlreadyOwned)
+    ));
     let pid = owner.backend_pid();
     let out = Command::new("docker")
         .args([
@@ -188,6 +216,30 @@ fn postgres_guard_probe(root: &Path, container: &str) {
         DockerPgSession::open(container, "successor"),
     )
     .unwrap();
+    assert_eq!(
+        successor.admit_source_mutation(Duration::from_millis(1)),
+        Err(OwnershipError::ReconciliationRequired)
+    );
+    successor
+        .reconcile_after_unclean_release(|| {
+            let out = Command::new("docker")
+                .args([
+                    "exec",
+                    container,
+                    "psql",
+                    "-XAt",
+                    "-U",
+                    "postgres",
+                    "-d",
+                    "postgres",
+                    "-c",
+                    "SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND granted",
+                ])
+                .output()
+                .unwrap();
+            out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "1"
+        })
+        .unwrap();
     successor
         .admit_source_mutation(Duration::from_millis(1))
         .unwrap();
@@ -241,7 +293,7 @@ fn crash_probe(root: &Path) {
             .unwrap()
             .contains("clean_release=pending")
     );
-    let successor = OwnershipGuard::acquire(
+    let mut successor = OwnershipGuard::acquire(
         &store,
         "successor".into(),
         OwnerKind::Runtime,
@@ -250,6 +302,12 @@ fn crash_probe(root: &Path) {
     )
     .unwrap();
     assert!(successor.backend_pid() > 0);
+    assert_eq!(
+        successor.admit_source_mutation(Duration::ZERO),
+        Err(OwnershipError::ReconciliationRequired)
+    );
+    successor.reconcile_after_unclean_release(|| true).unwrap();
+    successor.admit_source_mutation(Duration::ZERO).unwrap();
     drop(successor);
     assert_eq!(
         fs::read_to_string(store.with_extension("ownership.lock")).unwrap(),

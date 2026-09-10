@@ -37,6 +37,7 @@ pub enum OwnershipError {
     SourceSessionLost,
     DeadlineCannotFit,
     UnexpectedTransportLoss,
+    ReconciliationRequired,
     Io(String),
 }
 
@@ -61,6 +62,7 @@ pub trait SourceLockSession {
 /// ownership covers reads, reconciliation and remote effects between transactions.
 pub struct StateLock {
     file: File,
+    requires_reconciliation: bool,
 }
 impl StateLock {
     pub fn acquire(store: &Path, run_id: &str, nonce: &str) -> Result<Self, OwnershipError> {
@@ -108,6 +110,10 @@ impl StateLock {
         {
             return Err(OwnershipError::Io("unsafe lock file".into()));
         }
+        let mut previous = String::new();
+        file.rewind()?;
+        file.read_to_string(&mut previous)?;
+        let requires_reconciliation = previous.contains("clean_release=pending");
         file.set_len(0)?;
         file.rewind()?;
         file.write_all(
@@ -120,7 +126,10 @@ impl StateLock {
             .as_bytes(),
         )?;
         file.sync_all()?;
-        Ok(Self { file })
+        Ok(Self {
+            file,
+            requires_reconciliation,
+        })
     }
 
     fn mark_clean_release(&mut self) -> Result<(), OwnershipError> {
@@ -184,6 +193,7 @@ pub struct OwnershipGuard<S: SourceLockSession> {
     connection_nonce: String,
     advisory_lock_key: i64,
     fenced: bool,
+    reconciled: bool,
 }
 impl<S: SourceLockSession> OwnershipGuard<S> {
     /// Canonical acquisition order is local store, then source advisory lock.
@@ -209,6 +219,7 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
             let _ = source.unlock();
             return Err(OwnershipError::SourceSessionLost);
         }
+        let reconciled = !state.requires_reconciliation;
         Ok(Self {
             source,
             state,
@@ -219,6 +230,7 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
             connection_nonce,
             advisory_lock_key,
             fenced: false,
+            reconciled,
         })
     }
     fn source_identity_is_live(&mut self) -> bool {
@@ -228,7 +240,24 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
             && self.source.advisory_lock_key() == self.advisory_lock_key
     }
 
+    pub fn reconcile_after_unclean_release(
+        &mut self,
+        reconcile_source_and_external_state: impl FnOnce() -> bool,
+    ) -> Result<(), OwnershipError> {
+        if self.fenced || !self.source_identity_is_live() {
+            self.fenced = true;
+            return Err(OwnershipError::SourceSessionLost);
+        }
+        if !reconcile_source_and_external_state() {
+            return Err(OwnershipError::ReconciliationRequired);
+        }
+        self.reconciled = true;
+        Ok(())
+    }
     pub fn admit_source_mutation(&mut self, worst_case: Duration) -> Result<(), OwnershipError> {
+        if !self.reconciled {
+            return Err(OwnershipError::ReconciliationRequired);
+        }
         if self.fenced || !self.source_identity_is_live() {
             self.fenced = true;
             return Err(OwnershipError::SourceSessionLost);
@@ -258,7 +287,7 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
         if !self.fenced && !self.source_identity_is_live() {
             self.fenced = true;
         }
-        !self.fenced
+        !self.fenced && self.reconciled
     }
     pub fn backend_pid(&self) -> i32 {
         self.backend_pid
@@ -269,7 +298,11 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
 }
 impl<S: SourceLockSession> Drop for OwnershipGuard<S> {
     fn drop(&mut self) {
-        if !self.fenced && self.source_identity_is_live() && self.source.unlock().is_ok() {
+        if self.reconciled
+            && !self.fenced
+            && self.source_identity_is_live()
+            && self.source.unlock().is_ok()
+        {
             let _ = self.state.mark_clean_release();
         }
     }

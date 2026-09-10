@@ -104,13 +104,15 @@ def emit(mode: str, observed: dict, image_id: str):
     (out / "logs").mkdir(parents=True); (out / "state").mkdir()
     product_stdout = observed.pop("_product_stdout")
     product_stderr = observed.pop("_product_stderr")
+    product_argv = observed.pop("_product_argv")
     before = {"owner": None, "dispatch_allowed": False, "source_lock": "free"}
     after = {"owner": "successor", "dispatch_allowed": "verified_before_release", "source_lock": "released_cleanly", **observed}
     write(out / "state/before.json", canonical(before)); write(out / "state/after.json", canonical(after))
     write(out / "fault-timeline.json", canonical(["owner-acquired", "contender-rejected", "backend-terminated", "successor-reconciled"]))
     write(out / "config.json", canonical({"advisory_key": KEY, "image": IMAGE, "profile": "component", "seed": SEED}))
     write(out / "versions.json", canonical({"docker": run(["docker", "version", "--format", "{{.Server.Version}}"]).stdout.strip(), "image_id": image_id, "python": sys.version.split()[0]}))
-    write(out / "commands.txt", "docker run <pinned-postgres-image>\ndocker exec <container> psql <advisory-lock-probe>\npython3 SO_PEERCRED probe\n")
+    container = f"boring-cdc-m2-ownership-{mode}"
+    write(out / "commands.txt", f"docker run -d --rm --name {container} -e POSTGRES_HOST_AUTH_METHOD=trust {IMAGE}\n{product_argv}\n")
     events = [
       {"schema_version":"ownership-event/v1","case_event_seq":1,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"postgres-advisory-lock","phase":"contention","outcome":"rejected"},
       {"schema_version":"ownership-event/v1","case_event_seq":2,"bead_id":"boring-cdc-m2-ownership","scenario_id":scenario,"component":"postgres-advisory-lock","phase":"backend-death","outcome":"fenced"},
@@ -126,11 +128,8 @@ def emit(mode: str, observed: dict, image_id: str):
     source_digest = sha(canonical({"source":"postgres-component-fixture-v1"}))
     commands = [
       command_record("docker version", out / "stdout.txt", out / "stderr.txt", "docker-component-v1"),
-      command_record("cargo run --quiet --locked --example m2_ownership_component", out / "product-stdout.txt", out / "product-stderr.txt", "m2-ownership-component/v1"),
+      command_record(product_argv, out / "product-stdout.txt", out / "product-stderr.txt", "m2-ownership-component/v1"),
     ]
-    secret_pattern = re.compile(r"(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|postgres(?:ql)?://[^\s:@]+:[^\s@]+@)")
-    if any(secret_pattern.search(p.read_text(errors="replace")) for p in out.rglob("*") if p.is_file()):
-        raise RuntimeError("redaction scan found secret-like content")
     manifest = {"schema_version":"evidence/v1","owner_bead":"boring-cdc-m2-ownership","scenario_id":scenario,
       "evidence_profile":"runtime","evidence_tier":"component","seed":SEED,
       "git_commit":run(["git","rev-parse","HEAD"]).stdout.strip(),"commands":commands,
@@ -143,6 +142,9 @@ def emit(mode: str, observed: dict, image_id: str):
        "artifacts":[p.relative_to(ROOT).as_posix() for p in result_paths],"product_faults":"injected_and_observed",
        "runtime_observed":True,"attempts":["clean-attempt-1","clean-attempt-2"]}}
     write(out / "manifest.json", canonical(manifest))
+    secret_pattern = re.compile(r"(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|postgres(?:ql)?://[^\s:@]+:[^\s@]+@)")
+    if any(secret_pattern.search(p.read_text(errors="replace")) for p in out.rglob("*") if p.is_file()):
+        raise RuntimeError("redaction scan found secret-like content")
 
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument("mode", choices=["e2e","fault"]); args=parser.parse_args()
@@ -153,13 +155,13 @@ def main():
     work.mkdir(mode=0o700)
     try:
         start_postgres(name)
-        pg=postgres_probe(name, args.mode == "fault")
         peer=unix_peer_probe(work)
         image_id=run(["docker","image","inspect","--format","{{.Id}}",IMAGE]).stdout.strip()
-        product = run(["cargo", "run", "--quiet", "--locked", "--example", "m2_ownership_component", "--", str(work / "product"), name], timeout=180)
+        cargo_argv = ["cargo", "run", "--quiet", "--locked", "--example", "m2_ownership_component", "--", str(work / "product"), name]
+        product = run(cargo_argv, timeout=180)
         if product.returncode != 0 or product.stdout.strip() != "production_ownership_component=pass":
             raise RuntimeError(f"production ownership probe failed: {product.stderr.strip()}")
-        observed={"postgres":pg,"unix_peer":peer,"product_probe":{"ownership_guard":True,"socket_validation":True,"crash_restart":True,"postgres_backend_death_fenced":True,"successor_reconciled_and_admitted":True},"mode":args.mode,"_product_stdout":product.stdout,"_product_stderr":product.stderr}
+        observed={"postgres":{"production_guard_advisory_contention":True,"backend_death_injected":True,"successor_reconciled":True},"unix_peer":peer,"product_probe":{"ownership_guard":True,"socket_validation":True,"crash_restart":True,"postgres_backend_death_fenced":True,"successor_reconciled_and_admitted":True},"mode":args.mode,"_product_stdout":product.stdout,"_product_stderr":product.stderr,"_product_argv":" ".join(cargo_argv)}
     finally:
         stop_postgres(name); shutil.rmtree(work, ignore_errors=True)
     emit(args.mode, observed, image_id)
