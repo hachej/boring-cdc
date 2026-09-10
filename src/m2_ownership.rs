@@ -6,7 +6,7 @@
 use sha2::{Digest, Sha256};
 use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{Read, Seek, Write};
-use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -16,6 +16,8 @@ pub const SOCKET_MODE: u32 = 0o600;
 pub const MAX_COMMAND_BYTES: usize = 64 * 1024;
 // M0-PROVISIONAL: boring-cdc-d-security
 pub const COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
+// Linux O_NOFOLLOW; v0.1 supports named Linux filesystems only.
+const O_NOFOLLOW: i32 = 0o400000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OwnerKind {
@@ -60,16 +62,27 @@ pub struct StateLock {
 impl StateLock {
     pub fn acquire(store: &Path, run_id: &str, nonce: &str) -> Result<Self, OwnershipError> {
         let path = store.with_extension("ownership.lock");
+        path.parent()
+            .ok_or_else(|| OwnershipError::Io("lock parent".into()))?;
+        let process_uid = std::fs::metadata("/proc/self")?.uid();
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
             .create(true)
             .mode(SOCKET_MODE)
+            .custom_flags(O_NOFOLLOW)
             .open(&path)?;
         file.try_lock().map_err(|e| match e {
             TryLockError::WouldBlock => OwnershipError::StateAlreadyOwned,
             TryLockError::Error(error) => error.into(),
         })?;
+        let metadata = file.metadata()?;
+        if !metadata.file_type().is_file()
+            || metadata.permissions().mode() & 0o777 != SOCKET_MODE
+            || metadata.uid() != process_uid
+        {
+            return Err(OwnershipError::Io("unsafe lock file".into()));
+        }
         file.set_len(0)?;
         file.rewind()?;
         file.write_all(
@@ -82,28 +95,32 @@ impl StateLock {
             .as_bytes(),
         )?;
         file.sync_all()?;
-        if file.metadata()?.permissions().mode() & 0o777 != SOCKET_MODE {
-            return Err(OwnershipError::Io("unsafe lock permissions".into()));
-        }
         Ok(Self { file })
+    }
+
+    fn mark_clean_release(&mut self) -> Result<(), OwnershipError> {
+        self.file.set_len(0)?;
+        self.file.rewind()?;
+        self.file.write_all(b"clean_release=proved\n")?;
+        self.file.sync_all()?;
+        Ok(())
     }
 }
 impl Drop for StateLock {
     fn drop(&mut self) {
-        let _ = self.file.set_len(0);
-        let _ = self.file.rewind();
-        let _ = self.file.write_all(b"clean_release=proved\n");
-        let _ = self.file.sync_all();
         let _ = self.file.unlock();
     }
 }
 
 pub struct OwnershipGuard<S: SourceLockSession> {
-    _state: StateLock,
     source: S,
+    state: StateLock,
     pub run_id: String,
     pub kind: OwnerKind,
     deadline: Instant,
+    backend_pid: i32,
+    connection_nonce: String,
+    advisory_lock_key: i64,
     fenced: bool,
 }
 impl<S: SourceLockSession> OwnershipGuard<S> {
@@ -115,22 +132,42 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
         deadline: Duration,
         mut source: S,
     ) -> Result<Self, OwnershipError> {
-        let nonce = source.connection_nonce().to_owned();
-        let state = StateLock::acquire(store, &run_id, &nonce)?;
+        let connection_nonce = source.connection_nonce().to_owned();
+        let backend_pid = source.backend_pid();
+        let advisory_lock_key = source.advisory_lock_key();
+        let state = StateLock::acquire(store, &run_id, &connection_nonce)?;
         if !source.try_lock()? {
             return Err(OwnershipError::SourceAlreadyOwned);
         }
+        if !source.healthy()
+            || source.backend_pid() != backend_pid
+            || source.connection_nonce() != connection_nonce
+            || source.advisory_lock_key() != advisory_lock_key
+        {
+            let _ = source.unlock();
+            return Err(OwnershipError::SourceSessionLost);
+        }
         Ok(Self {
-            _state: state,
             source,
+            state,
             run_id,
             kind,
             deadline: Instant::now() + deadline,
+            backend_pid,
+            connection_nonce,
+            advisory_lock_key,
             fenced: false,
         })
     }
+    fn source_identity_is_live(&mut self) -> bool {
+        self.source.healthy()
+            && self.source.backend_pid() == self.backend_pid
+            && self.source.connection_nonce() == self.connection_nonce
+            && self.source.advisory_lock_key() == self.advisory_lock_key
+    }
+
     pub fn admit_source_mutation(&mut self, worst_case: Duration) -> Result<(), OwnershipError> {
-        if self.fenced || !self.source.healthy() {
+        if self.fenced || !self.source_identity_is_live() {
             self.fenced = true;
             return Err(OwnershipError::SourceSessionLost);
         }
@@ -143,7 +180,7 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
         Ok(())
     }
     pub fn probe(&mut self, extension: Duration) -> Result<(), OwnershipError> {
-        if self.fenced || !self.source.healthy() {
+        if self.fenced || !self.source_identity_is_live() {
             self.fenced = true;
             return Err(OwnershipError::SourceSessionLost);
         }
@@ -159,16 +196,16 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
         !self.fenced
     }
     pub fn backend_pid(&self) -> i32 {
-        self.source.backend_pid()
+        self.backend_pid
     }
     pub fn advisory_lock_key(&self) -> i64 {
-        self.source.advisory_lock_key()
+        self.advisory_lock_key
     }
 }
 impl<S: SourceLockSession> Drop for OwnershipGuard<S> {
     fn drop(&mut self) {
-        if !self.fenced {
-            let _ = self.source.unlock();
+        if !self.fenced && self.source_identity_is_live() && self.source.unlock().is_ok() {
+            let _ = self.state.mark_clean_release();
         }
     }
 }
@@ -262,7 +299,13 @@ pub fn issue_dry_run<W: RequestWriter>(
     expires_mono_ms: u64,
 ) -> Result<DryRun, ConfirmError> {
     let payload_digest = hash_parts(&[b"payload-v1", payload]);
-    let id = hash_parts(&[b"request-v1", nonce, payload_digest.as_bytes()]);
+    let argv_digest = hash_argv(&argv);
+    let id = hash_parts(&[
+        b"request-v1",
+        nonce,
+        payload_digest.as_bytes(),
+        argv_digest.as_bytes(),
+    ]);
     let expiry = expires_mono_ms.to_be_bytes();
     let token = hash_parts(&[
         b"confirm-v1",
@@ -270,6 +313,7 @@ pub fn issue_dry_run<W: RequestWriter>(
         nonce,
         id.as_bytes(),
         payload_digest.as_bytes(),
+        argv_digest.as_bytes(),
         &expiry,
     ]);
     let p = DryRun {
@@ -296,6 +340,7 @@ pub fn confirm<W: RequestWriter>(
         return Err(ConfirmError::Expired);
     }
     let payload_digest = hash_parts(&[b"payload-v1", payload]);
+    let argv_digest = hash_argv(&plan.canonical_argv);
     let expiry = plan.expires_mono_ms.to_be_bytes();
     let expected = hash_parts(&[
         b"confirm-v1",
@@ -303,6 +348,7 @@ pub fn confirm<W: RequestWriter>(
         &plan.nonce,
         plan.request_id.as_bytes(),
         payload_digest.as_bytes(),
+        argv_digest.as_bytes(),
         &expiry,
     ]);
     if !constant_time_eq(expected.as_bytes(), plan.confirm_token.as_bytes())
@@ -311,6 +357,10 @@ pub fn confirm<W: RequestWriter>(
         return Err(ConfirmError::InvalidToken);
     }
     writer.consume(&plan.request_id, payload, current)
+}
+fn hash_argv(argv: &[String]) -> String {
+    let parts = argv.iter().map(String::as_bytes).collect::<Vec<_>>();
+    hash_parts(&parts)
 }
 fn hash_parts(parts: &[&[u8]]) -> String {
     let mut h = Sha256::new();
@@ -458,39 +508,74 @@ pub(crate) mod tests {
     }
     #[test]
     fn two_processes_same_store_fail_closed() {
-        let p = path("same");
-        let g = OwnershipGuard::acquire(
-            &p,
-            "r1".into(),
-            OwnerKind::Runtime,
-            Duration::from_secs(1),
-            session("n1"),
-        )
-        .unwrap();
+        let child_path = std::env::var_os("BORING_CDC_OWNERSHIP_CHILD");
+        let p = child_path
+            .as_ref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| path("same-process"));
+        let ready = p.with_extension("ready");
+        let release = p.with_extension("release");
+        if child_path.is_some() {
+            let _guard = OwnershipGuard::acquire(
+                &p,
+                "child".into(),
+                OwnerKind::Runtime,
+                Duration::from_secs(10),
+                session("child-nonce"),
+            )
+            .unwrap();
+            fs::write(&ready, b"ready").unwrap();
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while !release.exists() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            assert!(release.exists(), "parent never released child");
+            return;
+        }
+        for stale in [&ready, &release, &p.with_extension("ownership.lock")] {
+            let _ = fs::remove_file(stale);
+        }
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "m2_ownership::tests::two_processes_same_store_fail_closed",
+                "--nocapture",
+            ])
+            .env("BORING_CDC_OWNERSHIP_CHILD", &p)
+            .spawn()
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !ready.exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(ready.exists(), "child owner did not become ready");
         assert!(matches!(
             OwnershipGuard::acquire(
                 &p,
-                "r2".into(),
+                "parent".into(),
                 OwnerKind::Runtime,
                 Duration::from_secs(1),
-                session("n2")
+                session("parent-nonce")
             ),
             Err(OwnershipError::StateAlreadyOwned)
         ));
-        drop(g);
+        fs::write(&release, b"release").unwrap();
+        assert!(child.wait().unwrap().success());
         assert_eq!(
             fs::read_to_string(p.with_extension("ownership.lock")).unwrap(),
             "clean_release=proved\n"
         );
         let g2 = OwnershipGuard::acquire(
             &p,
-            "r3".into(),
+            "successor".into(),
             OwnerKind::Runtime,
             Duration::from_secs(1),
-            session("n3"),
+            session("successor-nonce"),
         )
         .unwrap();
         assert_eq!(g2.advisory_lock_key(), 99);
+        let _ = fs::remove_file(ready);
+        let _ = fs::remove_file(release);
     }
     #[test]
     fn two_state_paths_same_source_fail_closed() {
@@ -576,7 +661,13 @@ pub(crate) mod tests {
             g.unexpected_transport_loss(),
             OwnershipError::UnexpectedTransportLoss
         );
-        assert!(!g.dispatch_allowed())
+        assert!(!g.dispatch_allowed());
+        drop(g);
+        assert!(
+            fs::read_to_string(p.with_extension("ownership.lock"))
+                .unwrap()
+                .contains("clean_release=pending")
+        )
     }
     #[test]
     fn startup_phase_machine_blocks_only_ambiguous_maintenance() {
@@ -694,6 +785,20 @@ pub(crate) mod tests {
         )
         .unwrap();
         assert_ne!(p1.request_id, p2.request_id);
+        let mut altered_display = p1.clone();
+        altered_display.canonical_argv.push("different".into());
+        assert_eq!(
+            confirm(
+                &mut w,
+                &altered_display,
+                &p1.confirm_token,
+                b"secret",
+                b"x",
+                &snap(Some("run")),
+                10,
+            ),
+            Err(ConfirmError::InvalidToken)
+        );
         confirm(
             &mut w,
             &p1,
