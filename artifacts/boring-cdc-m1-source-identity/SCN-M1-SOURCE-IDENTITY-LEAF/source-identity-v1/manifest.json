@@ -17,9 +17,9 @@
       "argv": "cargo test --locked m1_source_identity::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-2.stderr",
-      "stderr_sha256": "6d805f043ba4da36bf08272e4adcf2274bf7a1255fc919e1870f923e39d25f35",
+      "stderr_sha256": "856fad4a1cefe91cf3e1350e9b74df0d9ac3aafd40eb21c6594c8666b0a958f4",
       "stdout_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-2.log",
-      "stdout_sha256": "30da93237fb003f9d02f65a234037423a0108674972cfb90fa6495c5c7d751c3",
+      "stdout_sha256": "53b5fbdaaf3fab64e5257fe24e5aa306e99538cf3bd9d8afb6e711dbe80bd372",
       "version": "cargo 1.95.0"
     },
     {
@@ -28,13 +28,13 @@
       "stderr_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-3.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-3.log",
-      "stdout_sha256": "98fad8924564f3420be10f2d1e9fd07e95e64ead8145d9b4923d7942dd66f339",
+      "stdout_sha256": "1b784818068f03f5fed5e05ccc0f774a41187c9b25b41a3d78af29feee4a3e42",
       "version": "python 3"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "3fd5f6059c681acabce51c3eea4c78f7d9d407d2",
+  "git_commit": "54812fb499b7321970382df2a05f37ca0afee6aa",
   "owner_bead": "boring-cdc-m1-source-identity",
   "redaction": {
     "checked": true,
@@ -45,7 +45,7 @@
       "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/proof-summary.json",
       "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/versions.json"
     ],
-    "digest": "43145832257e3fb88f59d756bc271a7c2789ebe889ac8956bb4a660005499376",
+    "digest": "cea6131e3a734c1fcb1e29bb7ebe77c70bdf8725d3798ed868eb58cd53e6911a",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -54,8 +54,8 @@
   "schema_version": "evidence/v1",
   "seed": "fixed pure startup vectors v1",
   "source_preservation": {
-    "after_sha256": "5b1baf66e1fd88f6b2dd433d5136ffcf6cee8c40790fa52c0a7de2efa528f2fd",
-    "before_sha256": "5b1baf66e1fd88f6b2dd433d5136ffcf6cee8c40790fa52c0a7de2efa528f2fd",
+    "after_sha256": "492239063cb28ffa697a34a3a6e6a82ef77df5532aa7c7d0f45e08f66c83adde",
+    "before_sha256": "492239063cb28ffa697a34a3a6e6a82ef77df5532aa7c7d0f45e08f66c83adde",
     "preserved": true
   },
   "tier_proof": {
