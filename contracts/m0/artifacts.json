@@ -193,21 +193,21 @@
       "id": "ART-M0-STORAGE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "artifacts/boring-cdc-m0-storage-model/spec/evidence.json",
-      "sha256": "6cb3ae67f18c21e1f05bde34da5930d1322609b5d86b7ea4e9d1de1f0b5fe76a",
+      "sha256": "c7fa40b9a71991a9377d57430259cac37e32b8f2b77949da80a4b703a0a0910d",
       "status": "complete"
     },
     {
       "id": "ART-M0-STORAGE-FIXTURE-SCHEMA",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-fixtures.schema.json",
-      "sha256": "57e4f5071bb7b691e7700978ecb5d5a1105408251b5dbb914cf78b5f28a8b38b",
+      "sha256": "0b170d1fc49e80ac6b2e142b45af6fa0ee3505699a9b2f729b1fed10b1f8542f",
       "status": "complete"
     },
     {
       "id": "ART-M0-STORAGE-FIXTURES",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "fixtures/m0/storage/scenarios.json",
-      "sha256": "5dbb539cf3e2fd064d0ea2b3793a3c7ed785e624415364a6cc63988a3e4dfdbb",
+      "sha256": "1cd91668950293580ab810814f948501b4dcbe90e40951bfcb99617ee9ef3e8b",
       "status": "complete"
     },
     {
@@ -235,14 +235,14 @@
       "id": "ART-M0-STORAGE-SQLITE-SCHEMA",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/sqlite-schema.sql",
-      "sha256": "e8a0ca493baacece6afcae18aa727e5e807f1442cc530a0e0da123fc64ee2800",
+      "sha256": "08480890e20840a4a0c0d3d477ec5b18b890c71cacef871c32501570ad857104",
       "status": "complete"
     },
     {
       "id": "ART-M0-STORAGE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "scripts/validate/storage_contract.py",
-      "sha256": "d233d716ac5130052881db9a2896602c8202ee501ae9ebb2152ca19406329dcc",
+      "sha256": "9570fb3fe676303f003d3d12d760ab9d0ff24b42ecaf5efe166a9d7374bbcf5f",
       "status": "complete"
     }
   ],

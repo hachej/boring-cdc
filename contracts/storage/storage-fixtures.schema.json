@@ -94,21 +94,33 @@
               },
               "run_id": {
                 "type": "string"
+              },
+              "transaction_bytes": {
+                "type": "integer"
+              },
+              "wire_frame_bytes": {
+                "type": "integer"
+              },
+              "writer_queue_depth": {
+                "type": "integer"
               }
             },
             "required": [
+              "allocation_request_bytes",
+              "available_above_reserve_bytes",
               "capture_epoch",
               "case_seq",
+              "configured_memory_limit_bytes",
               "connection_generation",
               "fault_once",
+              "filesystem_observed",
               "free_bytes",
               "precondition",
               "required_free_bytes",
               "run_id",
-              "filesystem_observed",
-              "allocation_request_bytes",
-              "available_above_reserve_bytes",
-              "configured_memory_limit_bytes"
+              "wire_frame_bytes",
+              "transaction_bytes",
+              "writer_queue_depth"
             ],
             "type": "object"
           },

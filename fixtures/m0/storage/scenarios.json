@@ -26,7 +26,10 @@
         "free_bytes": 21474836480,
         "precondition": "fresh_path",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -61,7 +64,10 @@
         "free_bytes": 21474836480,
         "precondition": "writer_sync_off",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -96,7 +102,10 @@
         "free_bytes": 21474836480,
         "precondition": "pooled_writer_reopen",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -131,7 +140,10 @@
         "free_bytes": 21474836480,
         "precondition": "attestation_age_10001ms",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -166,7 +178,10 @@
         "free_bytes": 21474836480,
         "precondition": "existing_store",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -201,7 +216,10 @@
         "free_bytes": 21474836480,
         "precondition": "tmpfs",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "tmpfs",
@@ -236,7 +254,10 @@
         "free_bytes": 21474836480,
         "precondition": "ext4_ordered_barrier",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -267,11 +288,14 @@
         "configured_memory_limit_bytes": 855638016,
         "connection_generation": 1,
         "fault_once": true,
-        "filesystem_observed": "ext4",
+        "filesystem_observed": "xfs",
         "free_bytes": 21474836480,
         "precondition": "xfs_v5_barrier",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "xfs",
@@ -306,7 +330,10 @@
         "free_bytes": 21474836480,
         "precondition": "transaction_open",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -341,7 +368,10 @@
         "free_bytes": 21474836480,
         "precondition": "transaction_committed",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -376,7 +406,10 @@
         "free_bytes": 21474836480,
         "precondition": "reader_active",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -411,7 +444,10 @@
         "free_bytes": 21474836480,
         "precondition": "reader_age_5001ms",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -446,7 +482,10 @@
         "free_bytes": 21474836480,
         "precondition": "destination_lag_pin",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -481,7 +520,10 @@
         "free_bytes": 21474836480,
         "precondition": "wal_pages_4096",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -516,7 +558,10 @@
         "free_bytes": 21474836480,
         "precondition": "freelist_pages_2048",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -551,7 +596,10 @@
         "free_bytes": 21474836480,
         "precondition": "automatic_full_vacuum",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -586,7 +634,10 @@
         "free_bytes": 21474836480,
         "precondition": "valid_closed_orphan",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -621,7 +672,10 @@
         "free_bytes": 21474836480,
         "precondition": "malformed_orphan",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -656,7 +710,10 @@
         "free_bytes": 21474836480,
         "precondition": "state_required_equals_free_minus_reserve",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -691,7 +748,10 @@
         "free_bytes": 21474836480,
         "precondition": "state_required_plus_one",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -726,7 +786,10 @@
         "free_bytes": 21474836480,
         "precondition": "archive_free_below_required",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -761,7 +824,10 @@
         "free_bytes": 21474836480,
         "precondition": "state_archive_combined",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -796,7 +862,10 @@
         "free_bytes": 21474836480,
         "precondition": "reserve_breach_fault",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -831,7 +900,10 @@
         "free_bytes": 21474836480,
         "precondition": "required_equals_cgroup",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -866,7 +938,10 @@
         "free_bytes": 21474836480,
         "precondition": "required_plus_one",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -901,7 +976,10 @@
         "free_bytes": 21474836480,
         "precondition": "8388609",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 8388609,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -936,7 +1014,10 @@
         "free_bytes": 21474836480,
         "precondition": "1073741825",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 1073741825,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -971,7 +1052,10 @@
         "free_bytes": 21474836480,
         "precondition": "continuous_capture_accepted_control",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -1006,7 +1090,10 @@
         "free_bytes": 21474836480,
         "precondition": "1025_pending",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 1025
       },
       "matrix": {
         "filesystem": "ext4",
@@ -1041,7 +1128,10 @@
         "free_bytes": 21474836480,
         "precondition": "same_nonce_request_digest",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -1076,7 +1166,10 @@
         "free_bytes": 21474836480,
         "precondition": "prior_run_nonterminal",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -1111,7 +1204,10 @@
         "free_bytes": 21474836480,
         "precondition": "state_lock_held",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -1146,7 +1242,10 @@
         "free_bytes": 21474836480,
         "precondition": "probe_uncertain_15001ms",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -1181,7 +1280,10 @@
         "free_bytes": 21474836480,
         "precondition": "corrupt_page",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -1216,7 +1318,10 @@
         "free_bytes": 21474836480,
         "precondition": "sha256_mismatch",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",
@@ -1251,7 +1356,10 @@
         "free_bytes": 21474836480,
         "precondition": "database_mode_0644",
         "required_free_bytes": 10737418240,
-        "run_id": "run-fixture-0001"
+        "run_id": "run-fixture-0001",
+        "transaction_bytes": 0,
+        "wire_frame_bytes": 0,
+        "writer_queue_depth": 0
       },
       "matrix": {
         "filesystem": "ext4",

@@ -4,7 +4,7 @@ from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; OWNER='boring-cdc-m0-storage-model'
 C=ROOT/'contracts/storage/storage-model.json'; S=ROOT/'contracts/storage/storage-model.schema.json'; Q=ROOT/'contracts/storage/sqlite-schema.sql'; F=ROOT/'fixtures/m0/storage/scenarios.json'; FS=ROOT/'contracts/storage/storage-fixtures.schema.json'; R=ROOT/'contracts/storage/storage-result.schema.json'; E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence.json'; V=Path(__file__); M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
 EXPECTED_CONTRACT_SHA256='ee29a7d15db9a7c6c223023cb268e1b96ba2e5197072c13041037beb58170e7e'
-EXPECTED_FIXTURES_SHA256='5dbb539cf3e2fd064d0ea2b3793a3c7ed785e624415364a6cc63988a3e4dfdbb'
+EXPECTED_FIXTURES_SHA256='1cd91668950293580ab810814f948501b4dcbe90e40951bfcb99617ee9ef3e8b'
 core_spec=importlib.util.spec_from_file_location('core_validator',ROOT/'scripts/lib/core_validator.py'); core=importlib.util.module_from_spec(core_spec); core_spec.loader.exec_module(core)
 def load(p):
  def pairs(xs):
@@ -59,6 +59,11 @@ def validate():
   if (i.get('allocation_request_bytes'),i.get('available_above_reserve_bytes'))!=pair:add(fs,'E_BOUNDARY_VECTOR',fid,'numeric allocation boundary changed')
  u=by_id.get('SCN-M0-STORAGE-UNSUPPORTED-FS',{})
  if u.get('matrix',{}).get('filesystem')!='tmpfs' or u.get('inputs',{}).get('filesystem_observed')!='tmpfs':add(fs,'E_FS_VECTOR','SCN-M0-STORAGE-UNSUPPORTED-FS','unsupported filesystem not encoded as a value')
+ xfs=by_id.get('SCN-M0-STORAGE-XFS-ABRUPT-HOST',{})
+ if xfs.get('matrix',{}).get('filesystem')!='xfs' or xfs.get('inputs',{}).get('filesystem_observed')!='xfs':add(fs,'E_FS_VECTOR','SCN-M0-STORAGE-XFS-ABRUPT-HOST','XFS crash vector is internally inconsistent')
+ numeric={'SCN-M0-STORAGE-OVERSIZED-WIRE':('wire_frame_bytes',8388609),'SCN-M0-STORAGE-OVERSIZED-TRANSACTION':('transaction_bytes',1073741825),'SCN-M0-STORAGE-WRITER-QUEUE-FULL':('writer_queue_depth',1025)}
+ for fid,(field,value) in numeric.items():
+  if by_id.get(fid,{}).get('inputs',{}).get(field)!=value:add(fs,'E_NUMERIC_VECTOR',fid,f'{field} must equal {value}')
  # Actual connection-level attestation against a disposable database; never mutate the real store.
  try:
   with tempfile.TemporaryDirectory() as td:
