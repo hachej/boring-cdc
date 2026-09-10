@@ -15,6 +15,7 @@ assert inventory["seed"] == 0xB007
 cases = inventory["cases"]
 ids = [row["scenario_id"] for row in cases]
 tests = [row["unit_test"] for row in cases]
+assert all(row["expected_state"] and row["expected_checkpoint"] and row["expected_log_outcome"] for row in cases)
 assert len(cases) == 17 and len(ids) == len(set(ids)) and len(tests) == len(set(tests))
 assert all(re.fullmatch(r"SCN-M1-BOOTSTRAP-[A-Z0-9-]+", value) for value in ids)
 source = Path("src/m1_bootstrap_sm.rs").read_text()

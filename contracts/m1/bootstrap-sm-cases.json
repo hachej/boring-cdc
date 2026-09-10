@@ -3,25 +3,147 @@
   "owner_bead": "boring-cdc-m1-bootstrap-sm",
   "evidence_tier": "leaf",
   "runtime_owner": "boring-cdc-m3-bootstrap",
-  "persistence_owners": ["boring-cdc-m2-schema", "boring-cdc-m2-reconcile"],
+  "persistence_owners": [
+    "boring-cdc-m2-schema",
+    "boring-cdc-m2-reconcile"
+  ],
   "seed": 45063,
   "cases": [
-    {"scenario_id":"SCN-M1-BOOTSTRAP-INTENT-GUARD-SLOT","clause":"intent-before-slot; guard-before-export; one permanent slot; command-idle exporter","unit_test":"intent_guard_and_one_permanent_slot_precede_export"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-FLOOR-CAPTURE","clause":"separate creation floor/start_seq and separate CopyBoth capture connection","unit_test":"creation_floor_is_separate_and_capture_connection_is_separate"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-FIRST-STATEMENT","clause":"read-only repeatable-read importer uses SET TRANSACTION SNAPSHOT first and binds range/schema","unit_test":"every_importer_requires_snapshot_as_first_statement_and_bound_ack"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-FEEDBACK-GATE","clause":"eligible generation gates feedback; requested zero is not persisted feedback; durable WAL only after release","unit_test":"feedback_is_gated_until_all_import_acks_then_uses_durable_wal_only"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-EXPORTER-LOSS-EACH-ACK","clause":"exporter loss before every importer acknowledgement invalidates and releases feedback gate","unit_test":"exporter_loss_before_each_ack_invalidates_and_releases_gate"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-EXPORTER-RELEASE","clause":"post-readback exporter release is legitimate and does not invalidate","unit_test":"normal_exporter_release_after_readback_does_not_invalidate"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-RESTART-RESPONSE-WINDOW","clause":"before slot retries; existing slot without durable token becomes ambiguous; no silent attach","unit_test":"crash_matrix_retries_or_marks_ambiguous_without_silent_attach"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-RETAINED-SLOT-TRANSIENT","clause":"proved retained-slot drain preserves insert-delete and establishes lower stitch","unit_test":"retained_slot_recovery_requires_all_proofs_and_preserves_transient_wal"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-FEEDBACK-NOT-DECISION","clause":"confirmed feedback position alone never selects drop/recreate or re-seed","unit_test":"feedback_position_alone_never_selects_reseed_or_slot_drop"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-FULL-RESEED","clause":"ambiguous continuity requires confirmation, new epoch, and explicit continuity break","unit_test":"failed_continuity_requires_confirmed_new_epoch_full_reseed"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-GUARD-LIFECYCLE","clause":"guard is independent from importers and loss before durable fence invalidates","unit_test":"guard_is_not_an_importer_and_loss_invalidates_through_fence"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-ACK-REORDER-STALE","clause":"reordered acknowledgements and stale completion preserve eligibility/gate invariants","unit_test":"importer_ack_reordering_and_stale_inputs_preserve_gate"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-ANCHOR-FENCE","clause":"all reads, lower anchor, chunks, matching published durable fence precede anchor and guard release","unit_test":"anchor_requires_reads_lower_stitch_and_matching_durable_fence"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-ORIGIN-ORDER","clause":"snapshot uses lower boundary/rank zero/zero ordinals and WAL rank one wins","unit_test":"snapshot_and_wal_origin_order_is_explicit"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-HARNESS-REPLAY","clause":"bounded seeded production transition harness replays exporter/guard fault ordering","unit_test":"bounded_harness_replays_exporter_and_guard_faults"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-IMPORTER-LOSS","clause":"importer death before assigned reads complete invalidates and releases feedback gate","unit_test":"importer_loss_after_ack_but_before_reads_complete_invalidates"},
-    {"scenario_id":"SCN-M1-BOOTSTRAP-BOUNDS-CANCEL","clause":"typed admitted session bounds and cancellation/expiry end generation without unbounded pin","unit_test":"invalid_session_bounds_and_cancellation_are_bounded"}
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-INTENT-GUARD-SLOT",
+      "clause": "intent-before-slot; guard-before-export; one permanent slot; command-idle exporter",
+      "unit_test": "intent_guard_and_one_permanent_slot_precede_export",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-FLOOR-CAPTURE",
+      "clause": "separate creation floor/start_seq and separate CopyBoth capture connection",
+      "unit_test": "creation_floor_is_separate_and_capture_connection_is_separate",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-FIRST-STATEMENT",
+      "clause": "read-only repeatable-read importer uses SET TRANSACTION SNAPSHOT first and binds range/schema",
+      "unit_test": "every_importer_requires_snapshot_as_first_statement_and_bound_ack",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-FEEDBACK-GATE",
+      "clause": "eligible generation gates feedback; requested zero is not persisted feedback; durable WAL only after release",
+      "unit_test": "feedback_is_gated_until_all_import_acks_then_uses_durable_wal_only",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-EXPORTER-LOSS-EACH-ACK",
+      "clause": "exporter loss before every importer acknowledgement invalidates and releases feedback gate",
+      "unit_test": "exporter_loss_before_each_ack_invalidates_and_releases_gate",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-EXPORTER-RELEASE",
+      "clause": "post-readback exporter release is legitimate and does not invalidate",
+      "unit_test": "normal_exporter_release_after_readback_does_not_invalidate",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-RESTART-RESPONSE-WINDOW",
+      "clause": "before slot retries; existing slot without durable token becomes ambiguous; no silent attach",
+      "unit_test": "crash_matrix_retries_or_marks_ambiguous_without_silent_attach",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-RETAINED-SLOT-TRANSIENT",
+      "clause": "proved retained-slot drain preserves insert-delete and establishes lower stitch",
+      "unit_test": "retained_slot_recovery_requires_all_proofs_and_preserves_transient_wal",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-FEEDBACK-NOT-DECISION",
+      "clause": "confirmed feedback position alone never selects drop/recreate or re-seed",
+      "unit_test": "feedback_position_alone_never_selects_reseed_or_slot_drop",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-FULL-RESEED",
+      "clause": "ambiguous continuity requires confirmation, new epoch, and explicit continuity break",
+      "unit_test": "failed_continuity_requires_confirmed_new_epoch_full_reseed",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-GUARD-LIFECYCLE",
+      "clause": "guard is independent from importers and loss before durable fence invalidates",
+      "unit_test": "guard_is_not_an_importer_and_loss_invalidates_through_fence",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-ACK-REORDER-STALE",
+      "clause": "reordered acknowledgements and stale completion preserve eligibility/gate invariants",
+      "unit_test": "importer_ack_reordering_and_stale_inputs_preserve_gate",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-ANCHOR-FENCE",
+      "clause": "all reads, lower anchor, chunks, matching published durable fence precede anchor and guard release",
+      "unit_test": "anchor_requires_reads_lower_stitch_and_matching_durable_fence",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-ORIGIN-ORDER",
+      "clause": "snapshot uses lower boundary/rank zero/zero ordinals and WAL rank one wins",
+      "unit_test": "snapshot_and_wal_origin_order_is_explicit",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-HARNESS-REPLAY",
+      "clause": "bounded seeded production transition harness replays exporter/guard fault ordering",
+      "unit_test": "bounded_harness_replays_exporter_and_guard_faults",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-IMPORTER-LOSS",
+      "clause": "importer death before assigned reads complete invalidates and releases feedback gate",
+      "unit_test": "importer_loss_after_ack_but_before_reads_complete_invalidates",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-BOUNDS-CANCEL",
+      "clause": "typed admitted session bounds and cancellation/expiry end generation without unbounded pin",
+      "unit_test": "invalid_session_bounds_and_cancellation_are_bounded",
+      "expected_state": "asserted_by_exact_unit_vector",
+      "expected_checkpoint": "complete_journal_boundary_only_or_unchanged",
+      "expected_log_outcome": "redacted_stable_phase_outcome"
+    }
   ]
 }

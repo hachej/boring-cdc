@@ -4,11 +4,12 @@
 //! transactions, and runtime crash execution remain owned by M2/M3.
 
 use crate::m1_transition_kernel::{
-    CaptureEpoch, JournalCursor, ReceivedLsn, SlotCreationFloor, TransitionContext,
-    TransitionSystem,
+    CaptureEpoch, DurableSourceBoundary, JournalCursor, ReceivedLsn, SlotCreationFloor,
+    TransitionContext, TransitionSystem,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 
 // M0-PROVISIONAL: boring-cdc-d-backfill (RECOMMENDED bounded importer count).
 pub const MAX_IMPORTERS: usize = 16;
@@ -18,6 +19,67 @@ pub const ZERO_START_SEQ: JournalCursor = JournalCursor::from_store(0);
 pub const SNAPSHOT_ORIGIN_RANK: u8 = 0;
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED snapshot/WAL origin ranks).
 pub const WAL_ORIGIN_RANK: u8 = 1;
+const MAX_IDENTITY_BYTES: usize = 256;
+const MAX_SNAPSHOT_IDENTIFIER_BYTES: usize = 1_024;
+
+#[derive(Clone, Eq, PartialEq)]
+pub struct ExportedSnapshotIdentifier(String);
+impl ExportedSnapshotIdentifier {
+    pub fn from_server(value: String) -> Result<Self, BootstrapFailure> {
+        if value.is_empty() || value.len() > MAX_SNAPSHOT_IDENTIFIER_BYTES || !value.is_ascii() {
+            return Err(BootstrapFailure::deterministic(
+                "SNAPSHOT_IDENTIFIER_INVALID",
+                "snapshot_export",
+            ));
+        }
+        Ok(Self(value))
+    }
+}
+impl fmt::Debug for ExportedSnapshotIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("ExportedSnapshotIdentifier([REDACTED])")
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GuardAcquisitionProof {
+    locked_relation_ids: Vec<String>,
+}
+impl GuardAcquisitionProof {
+    pub fn validated(
+        mut locked_relation_ids: Vec<String>,
+        read_only: bool,
+        xid_free: bool,
+        canonical_order: bool,
+        finite_contracts_match: bool,
+    ) -> Result<Self, BootstrapFailure> {
+        if !read_only
+            || !xid_free
+            || !canonical_order
+            || !finite_contracts_match
+            || locked_relation_ids.is_empty()
+            || locked_relation_ids
+                .iter()
+                .any(|v| v.is_empty() || v.len() > MAX_IDENTITY_BYTES)
+        {
+            return Err(BootstrapFailure::deterministic(
+                "DDL_GUARD_PROOF_INVALID",
+                "guard_before_slot_creation",
+            ));
+        }
+        let mut sorted = locked_relation_ids.clone();
+        sorted.sort();
+        if sorted != locked_relation_ids || sorted.windows(2).any(|w| w[0] == w[1]) {
+            return Err(BootstrapFailure::deterministic(
+                "DDL_GUARD_LOCK_ORDER_INVALID",
+                "guard_before_slot_creation",
+            ));
+        }
+        Ok(Self {
+            locked_relation_ids: std::mem::take(&mut locked_relation_ids),
+        })
+    }
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum IntentPhase {
@@ -86,6 +148,9 @@ pub struct BootstrapFacts {
     pub ownership_locks_held: bool,
     pub remote_slot_exists: bool,
     pub snapshot_token_persisted: bool,
+    snapshot_identifier: Option<ExportedSnapshotIdentifier>,
+    pub source_identity_fingerprint: Option<String>,
+    guard_proof: Option<GuardAcquisitionProof>,
     pub creation_floor: Option<SlotCreationFloor>,
     pub snapshot_boundary: Option<SlotCreationFloor>,
     pub start_seq: Option<JournalCursor>,
@@ -93,13 +158,13 @@ pub struct BootstrapFacts {
     pub importers: BTreeMap<u16, ImporterState>,
     pub snapshot_events_promotable: bool,
     pub importer_feedback_gate: bool,
-    pub durable_wal_end: Option<ReceivedLsn>,
+    pub durable_wal_end: Option<DurableSourceBoundary>,
     pub feedback_lsn: Option<ReceivedLsn>,
     pub chunks_complete: bool,
     pub intended_fence_nonce: Option<u64>,
     pub durable_fence: Option<(u64, ReceivedLsn, JournalCursor)>,
     pub transient_wal_event_ids: BTreeSet<String>,
-    pub lower_stitch: Option<(ReceivedLsn, JournalCursor)>,
+    pub lower_stitch: Option<DurableSourceBoundary>,
     pub continuity_break_recorded: bool,
 }
 
@@ -189,7 +254,19 @@ impl BootstrapFacts {
             || input.config_fingerprint.is_empty()
             || input.importer_ranges.is_empty()
             || input.importer_ranges.len() > MAX_IMPORTERS
-            || input.importer_ranges.iter().any(String::is_empty)
+            || input
+                .importer_ranges
+                .iter()
+                .any(|v| v.is_empty() || v.len() > MAX_IDENTITY_BYTES)
+            || [
+                input.intent_id.as_str(),
+                input.slot_identity.as_str(),
+                input.publication_fingerprint.as_str(),
+                input.table_set_fingerprint.as_str(),
+                input.config_fingerprint.as_str(),
+            ]
+            .iter()
+            .any(|v| v.len() > MAX_IDENTITY_BYTES || !v.is_ascii())
             || !input.session_bounds.valid()
         {
             return Err(BootstrapFailure::deterministic(
@@ -227,6 +304,9 @@ impl BootstrapFacts {
             ownership_locks_held: true,
             remote_slot_exists: false,
             snapshot_token_persisted: false,
+            snapshot_identifier: None,
+            source_identity_fingerprint: None,
+            guard_proof: None,
             creation_floor: None,
             snapshot_boundary: None,
             start_seq: None,
@@ -245,7 +325,7 @@ impl BootstrapFacts {
         })
     }
 
-    pub fn acquire_guard(&mut self) -> Result<(), BootstrapFailure> {
+    pub fn acquire_guard(&mut self, proof: GuardAcquisitionProof) -> Result<(), BootstrapFailure> {
         if self.phase != IntentPhase::Prepared || !self.ownership_locks_held {
             return Err(BootstrapFailure::deterministic(
                 "DDL_GUARD_MUST_PRECEDE_EXPORT",
@@ -253,6 +333,7 @@ impl BootstrapFacts {
             ));
         }
         self.guard = GuardLiveness::Held;
+        self.guard_proof = Some(proof);
         Ok(())
     }
 
@@ -277,11 +358,15 @@ impl BootstrapFacts {
         &mut self,
         consistent_point: SlotCreationFloor,
         start_seq: JournalCursor,
+        snapshot_identifier: ExportedSnapshotIdentifier,
+        source_identity_fingerprint: String,
     ) -> Result<(), BootstrapFailure> {
         if !self.remote_slot_exists
             || self.exporter != ExporterLiveness::CommandIdle
             || self.guard != GuardLiveness::Held
             || consistent_point.get() == 0
+            || source_identity_fingerprint.is_empty()
+            || source_identity_fingerprint.len() > MAX_IDENTITY_BYTES
         {
             return Err(BootstrapFailure::deterministic(
                 "EXPORT_RESPONSE_NOT_DURABLE",
@@ -292,6 +377,8 @@ impl BootstrapFacts {
         self.snapshot_boundary = Some(consistent_point);
         self.start_seq = Some(start_seq);
         self.snapshot_token_persisted = true;
+        self.snapshot_identifier = Some(snapshot_identifier);
+        self.source_identity_fingerprint = Some(source_identity_fingerprint);
         self.snapshot_events_promotable = true;
         self.phase = IntentPhase::SnapshotExported;
         self.phase = IntentPhase::ImportsPending;
@@ -359,6 +446,32 @@ impl BootstrapFacts {
         }
     }
 
+    pub fn bind_import_contract(
+        &mut self,
+        worker: u16,
+        snapshot_identifier: &ExportedSnapshotIdentifier,
+        snapshot_schema_fingerprint: &str,
+    ) -> Result<(), BootstrapFailure> {
+        let importer = self
+            .importers
+            .get_mut(&worker)
+            .ok_or_else(|| BootstrapFailure::deterministic("IMPORTER_UNKNOWN", "contract_bind"))?;
+        if self.phase != IntentPhase::ImportsPending
+            || importer.phase != ImporterPhase::SnapshotSetFirst
+            || self.snapshot_identifier.as_ref() != Some(snapshot_identifier)
+            || snapshot_schema_fingerprint.is_empty()
+            || snapshot_schema_fingerprint.len() > MAX_IDENTITY_BYTES
+        {
+            return Err(BootstrapFailure::deterministic(
+                "IMPORT_CONTRACT_BINDING_MISMATCH",
+                "contract_bind",
+            ));
+        }
+        importer.snapshot_schema_fingerprint = Some(snapshot_schema_fingerprint.into());
+        importer.phase = ImporterPhase::ContractBound;
+        Ok(())
+    }
+
     pub fn acknowledge_import(
         &mut self,
         worker: u16,
@@ -369,16 +482,16 @@ impl BootstrapFacts {
             .importers
             .get_mut(&worker)
             .ok_or_else(|| BootstrapFailure::deterministic("IMPORTER_UNKNOWN", "import_ack"))?;
-        if importer.phase != ImporterPhase::SnapshotSetFirst
+        if self.phase != IntentPhase::ImportsPending
+            || importer.phase != ImporterPhase::ContractBound
             || importer.assigned_range != assigned_range
-            || snapshot_schema_fingerprint.is_empty()
+            || importer.snapshot_schema_fingerprint.as_deref() != Some(snapshot_schema_fingerprint)
         {
             return Err(BootstrapFailure::deterministic(
                 "IMPORT_ACK_CONTRACT_MISMATCH",
                 "import_ack",
             ));
         }
-        importer.snapshot_schema_fingerprint = Some(snapshot_schema_fingerprint.into());
         importer.phase = ImporterPhase::Acknowledged;
         if self
             .importers
@@ -394,17 +507,31 @@ impl BootstrapFacts {
 
     pub fn record_durable_wal(
         &mut self,
-        end_lsn: ReceivedLsn,
+        boundary: DurableSourceBoundary,
         event_id: Option<&str>,
     ) -> Result<(), BootstrapFailure> {
-        if !self.capture_connection_started || end_lsn.get() == 0 {
+        if !self.capture_connection_started {
             return Err(BootstrapFailure::deterministic(
                 "WAL_NOT_DURABLE",
                 "journal_transaction_boundary",
             ));
         }
-        self.durable_wal_end = Some(end_lsn);
+        if self.durable_wal_end.is_some_and(|prior| {
+            prior.transaction_end_lsn().get() > boundary.transaction_end_lsn().get()
+        }) {
+            return Err(BootstrapFailure::deterministic(
+                "DURABLE_WAL_REGRESSION",
+                "journal_transaction_boundary",
+            ));
+        }
+        self.durable_wal_end = Some(boundary);
         if let Some(id) = event_id {
+            if id.is_empty() || id.len() > MAX_IDENTITY_BYTES || !id.is_ascii() {
+                return Err(BootstrapFailure::deterministic(
+                    "WAL_EVENT_ID_INVALID",
+                    "journal_transaction_boundary",
+                ));
+            }
             self.transient_wal_event_ids.insert(id.into());
         }
         Ok(())
@@ -418,8 +545,9 @@ impl BootstrapFacts {
         let end = self.durable_wal_end.ok_or_else(|| {
             BootstrapFailure::deterministic("NO_DURABLE_WAL_FOR_FEEDBACK", "feedback")
         })?;
-        self.feedback_lsn = Some(end);
-        Ok(Some(end))
+        let end_lsn = end.transaction_end_lsn();
+        self.feedback_lsn = Some(end_lsn);
+        Ok(Some(end_lsn))
     }
 
     pub fn release_exporter(&mut self) -> Result<(), BootstrapFailure> {
@@ -554,21 +682,26 @@ impl BootstrapFacts {
             self.phase = IntentPhase::FullReseedRequired;
             return RecoveryDecision::RequireConfirmedFullReseed;
         }
+        if matches!(
+            self.phase,
+            IntentPhase::FullReseedRequired | IntentPhase::FullReseedConfirmed
+        ) {
+            return RecoveryDecision::RequireConfirmedFullReseed;
+        }
         RecoveryDecision::ResumeEligibleGeneration
     }
 
     pub fn retained_wal_drained(
         &mut self,
-        lower_lsn: ReceivedLsn,
-        lower_seq: JournalCursor,
+        lower_boundary: DurableSourceBoundary,
     ) -> Result<(), BootstrapFailure> {
-        if self.phase != IntentPhase::ExistingSlotGenerationRequired || lower_lsn.get() == 0 {
+        if self.phase != IntentPhase::ExistingSlotGenerationRequired {
             return Err(BootstrapFailure::deterministic(
                 "LOWER_STITCH_NOT_DURABLE",
                 "retained_slot_drain",
             ));
         }
-        self.lower_stitch = Some((lower_lsn, lower_seq));
+        self.lower_stitch = Some(lower_boundary);
         self.phase = IntentPhase::RetainedWalDrained;
         Ok(())
     }
@@ -621,7 +754,14 @@ impl BootstrapFacts {
         self.snapshot_boundary
             .zip(self.start_seq)
             .map(|(lsn, seq)| (lsn.get(), seq.get()))
-            .or_else(|| self.lower_stitch.map(|(lsn, seq)| (lsn.get(), seq.get())))
+            .or_else(|| {
+                self.lower_stitch.map(|boundary| {
+                    (
+                        boundary.transaction_end_lsn().get(),
+                        boundary.journal_cursor().get(),
+                    )
+                })
+            })
     }
 }
 
@@ -632,7 +772,7 @@ pub enum BootstrapEvent {
 }
 #[derive(Clone, Debug)]
 pub enum BootstrapCompletion {
-    DurableWal(ReceivedLsn),
+    DurableWal(DurableSourceBoundary),
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BootstrapEffect {
@@ -697,10 +837,32 @@ impl TransitionSystem for BootstrapDomain {
     fn facts_size_bytes(&self, facts: &Self::Facts) -> usize {
         std::mem::size_of::<Self::Facts>()
             + facts.intent_id.len()
+            + facts.slot_identity.len()
+            + facts.publication_fingerprint.len()
+            + facts.table_set_fingerprint.len()
+            + facts.config_fingerprint.len()
+            + facts
+                .source_identity_fingerprint
+                .as_ref()
+                .map_or(0, String::len)
+            + facts.snapshot_identifier.as_ref().map_or(0, |v| v.0.len())
+            + facts.guard_proof.as_ref().map_or(0, |proof| {
+                proof.locked_relation_ids.iter().map(String::len).sum()
+            })
             + facts
                 .importers
                 .values()
-                .map(|v| v.assigned_range.len())
+                .map(|v| {
+                    v.assigned_range.len()
+                        + v.snapshot_schema_fingerprint
+                            .as_ref()
+                            .map_or(0, String::len)
+                })
+                .sum::<usize>()
+            + facts
+                .transient_wal_event_ids
+                .iter()
+                .map(String::len)
                 .sum::<usize>()
     }
     fn event_size_bytes(&self, _event: &Self::Event) -> usize {
@@ -716,6 +878,7 @@ mod tests {
     use super::*;
     use crate::m1_transition_kernel::{
         Harness, HarnessBudget, ScheduleSeed, ScheduledAction, ScheduledStep,
+        synthetic_durable_boundary,
     };
 
     fn prepared(workers: usize) -> BootstrapFacts {
@@ -740,10 +903,15 @@ mod tests {
 
     fn exported(workers: usize) -> BootstrapFacts {
         let mut f = prepared(workers);
-        f.acquire_guard().unwrap();
+        f.acquire_guard(guard_proof()).unwrap();
         f.slot_created("boring_slot").unwrap();
-        f.persist_export_response(SlotCreationFloor::from_server(100), ZERO_START_SEQ)
-            .unwrap();
+        f.persist_export_response(
+            SlotCreationFloor::from_server(100),
+            ZERO_START_SEQ,
+            snapshot_id(),
+            "source-fp".into(),
+        )
+        .unwrap();
         f.start_capture(true).unwrap();
         f
     }
@@ -754,6 +922,8 @@ mod tests {
             f.begin_importer_transaction(id, true, true).unwrap();
             f.importer_statement(id, StatementKind::SetTransactionSnapshot)
                 .unwrap();
+            f.bind_import_contract(id, &snapshot_id(), "schema-fp")
+                .unwrap();
             f.acknowledge_import(id, &range, "schema-fp").unwrap();
         }
     }
@@ -761,11 +931,25 @@ mod tests {
     #[test]
     fn intent_guard_and_one_permanent_slot_precede_export() {
         let mut f = prepared(1);
+        assert!(
+            GuardAcquisitionProof::validated(
+                vec!["rel-b".into(), "rel-a".into()],
+                true,
+                true,
+                true,
+                true
+            )
+            .is_err()
+        );
+        assert!(
+            GuardAcquisitionProof::validated(vec!["rel-a".into()], false, true, true, true)
+                .is_err()
+        );
         assert_eq!(
             f.slot_created("boring_slot").unwrap_err().fingerprint,
             "PERMANENT_SLOT_CREATION_NOT_AUTHORIZED"
         );
-        f.acquire_guard().unwrap();
+        f.acquire_guard(guard_proof()).unwrap();
         assert_eq!(
             f.slot_created("auxiliary_slot").unwrap_err().fingerprint,
             "PERMANENT_SLOT_CREATION_NOT_AUTHORIZED"
@@ -777,10 +961,15 @@ mod tests {
     #[test]
     fn creation_floor_is_separate_and_capture_connection_is_separate() {
         let mut f = prepared(1);
-        f.acquire_guard().unwrap();
+        f.acquire_guard(guard_proof()).unwrap();
         f.slot_created("boring_slot").unwrap();
-        f.persist_export_response(SlotCreationFloor::from_server(100), ZERO_START_SEQ)
-            .unwrap();
+        f.persist_export_response(
+            SlotCreationFloor::from_server(100),
+            ZERO_START_SEQ,
+            snapshot_id(),
+            "source-fp".into(),
+        )
+        .unwrap();
         assert_eq!(f.creation_floor, Some(SlotCreationFloor::from_server(100)));
         assert!(f.durable_wal_end.is_none());
         assert!(f.start_capture(false).is_err());
@@ -804,11 +993,15 @@ mod tests {
         f.begin_importer_transaction(0, true, true).unwrap();
         f.importer_statement(0, StatementKind::SetTransactionSnapshot)
             .unwrap();
+        f.bind_import_contract(0, &snapshot_id(), "schema-fp")
+            .unwrap();
         assert!(f.acknowledge_import(0, "wrong-range", "schema-fp").is_err());
         f.acknowledge_import(0, "range-0", "schema-fp").unwrap();
         assert!(f.importer_feedback_gate);
         f.begin_importer_transaction(1, true, true).unwrap();
         f.importer_statement(1, StatementKind::SetTransactionSnapshot)
+            .unwrap();
+        f.bind_import_contract(1, &snapshot_id(), "schema-fp")
             .unwrap();
         f.acknowledge_import(1, "range-1", "schema-fp").unwrap();
         assert_eq!(f.phase, IntentPhase::ExporterReleasePermitted);
@@ -818,8 +1011,13 @@ mod tests {
     #[test]
     fn feedback_is_gated_until_all_import_acks_then_uses_durable_wal_only() {
         let mut f = exported(1);
-        f.record_durable_wal(ReceivedLsn::from_wire(120), None)
-            .unwrap();
+        f.record_durable_wal(boundary(120, 2), None).unwrap();
+        assert_eq!(
+            f.record_durable_wal(boundary(119, 3), None)
+                .unwrap_err()
+                .fingerprint,
+            "DURABLE_WAL_REGRESSION"
+        );
         assert_eq!(f.feedback(false).unwrap(), None);
         assert_eq!(f.feedback(true).unwrap(), Some(ReceivedLsn::from_wire(0)));
         assert!(f.feedback_lsn.is_none());
@@ -837,6 +1035,8 @@ mod tests {
             for id in 0..acknowledged {
                 f.begin_importer_transaction(id, true, true).unwrap();
                 f.importer_statement(id, StatementKind::SetTransactionSnapshot)
+                    .unwrap();
+                f.bind_import_contract(id, &snapshot_id(), "schema-fp")
                     .unwrap();
                 f.acknowledge_import(id, &format!("range-{id}"), "schema-fp")
                     .unwrap();
@@ -865,7 +1065,7 @@ mod tests {
             RecoveryDecision::RetryPreparedCreation
         );
         let mut after_response = prepared(1);
-        after_response.acquire_guard().unwrap();
+        after_response.acquire_guard(guard_proof()).unwrap();
         after_response.slot_created("boring_slot").unwrap();
         assert_eq!(
             after_response.restart_decision(no_proof()),
@@ -880,34 +1080,26 @@ mod tests {
     #[test]
     fn retained_slot_recovery_requires_all_proofs_and_preserves_transient_wal() {
         let mut f = exported(1);
-        f.record_durable_wal(ReceivedLsn::from_wire(110), Some("insert-42"))
+        f.record_durable_wal(boundary(110, 1), Some("insert-42"))
             .unwrap();
-        f.record_durable_wal(ReceivedLsn::from_wire(120), Some("delete-42"))
+        f.record_durable_wal(boundary(120, 2), Some("delete-42"))
             .unwrap();
         f.exporter_lost();
         assert_eq!(
             f.restart_decision(all_proof()),
             RecoveryDecision::DrainRetainedWalThenExistingSlotSnapshot
         );
-        f.retained_wal_drained(ReceivedLsn::from_wire(120), JournalCursor::from_store(2))
-            .unwrap();
+        f.retained_wal_drained(boundary(120, 2)).unwrap();
         assert_eq!(
             f.transient_wal_event_ids,
             BTreeSet::from(["delete-42".into(), "insert-42".into()])
         );
-        assert_eq!(
-            f.lower_stitch,
-            Some((ReceivedLsn::from_wire(120), JournalCursor::from_store(2)))
-        );
+        assert_eq!(f.lower_stitch, Some(boundary(120, 2)));
     }
 
     #[test]
     fn feedback_position_alone_never_selects_reseed_or_slot_drop() {
-        for durable in [
-            None,
-            Some(ReceivedLsn::from_wire(100)),
-            Some(ReceivedLsn::from_wire(999)),
-        ] {
+        for durable in [None, Some(boundary(100, 1)), Some(boundary(999, 2))] {
             let mut f = exported(1);
             f.durable_wal_end = durable;
             f.exporter_lost();
@@ -925,6 +1117,10 @@ mod tests {
         f.exporter_lost();
         assert_eq!(
             f.restart_decision(no_proof()),
+            RecoveryDecision::RequireConfirmedFullReseed
+        );
+        assert_eq!(
+            f.restart_decision(all_proof()),
             RecoveryDecision::RequireConfirmedFullReseed
         );
         assert!(f.confirm_full_reseed(CaptureEpoch::from_store(7)).is_err());
@@ -952,6 +1148,8 @@ mod tests {
         for id in [2, 0, 1] {
             f.begin_importer_transaction(id, true, true).unwrap();
             f.importer_statement(id, StatementKind::SetTransactionSnapshot)
+                .unwrap();
+            f.bind_import_contract(id, &snapshot_id(), "schema-fp")
                 .unwrap();
             f.acknowledge_import(id, &format!("range-{id}"), "schema-fp")
                 .unwrap();
@@ -1075,6 +1273,16 @@ mod tests {
         f.invalidate("GENERATION_CANCELLED");
         assert_eq!(f.phase, IntentPhase::SnapshotUnusable);
         assert!(!f.importer_feedback_gate);
+    }
+
+    fn snapshot_id() -> ExportedSnapshotIdentifier {
+        ExportedSnapshotIdentifier::from_server("00000003-0000001B-1".into()).unwrap()
+    }
+    fn guard_proof() -> GuardAcquisitionProof {
+        GuardAcquisitionProof::validated(vec!["db:1/rel:1".into()], true, true, true, true).unwrap()
+    }
+    fn boundary(lsn: u64, seq: u64) -> DurableSourceBoundary {
+        synthetic_durable_boundary(ReceivedLsn::from_wire(lsn), JournalCursor::from_store(seq))
     }
 
     fn all_proof() -> RecoveryProof {
