@@ -1,0 +1,571 @@
+//! Versioned SQLite state schema and durability-bearing connection admission.
+
+use rusqlite::{Connection, OpenFlags};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
+
+pub const SCHEMA_VERSION: i64 = 1;
+// M0-PROVISIONAL: boring-cdc-m2-schema
+pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
+// M0-PROVISIONAL: boring-cdc-m2-schema
+pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
+// M0-PROVISIONAL: boring-cdc-m2-schema
+pub const READER_MAX_ROWS: usize = 1_000;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WriterAttestation {
+    pub run_id: String,
+    pub connection_generation: u64,
+    pub journal_mode: String,
+    pub synchronous: i64,
+    pub auto_vacuum: i64,
+    pub observed_at_unix_ms: i64,
+    pub fresh_until_unix_ms: i64,
+}
+
+pub struct WriterConnection {
+    connection: Connection,
+    attestation: WriterAttestation,
+}
+
+impl WriterConnection {
+    pub fn connection(&self) -> &Connection {
+        &self.connection
+    }
+    pub fn connection_mut(&mut self) -> &mut Connection {
+        &mut self.connection
+    }
+    pub fn attestation(&self) -> &WriterAttestation {
+        &self.attestation
+    }
+}
+
+pub struct ReaderHandle {
+    connection: Connection,
+    opened_at: Instant,
+    deadline: Instant,
+    max_rows: usize,
+}
+
+impl ReaderHandle {
+    pub fn connection(&self) -> rusqlite::Result<&Connection> {
+        if self.expired() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(&self.connection)
+    }
+    pub fn expired(&self) -> bool {
+        Instant::now() >= self.deadline
+    }
+    pub fn age(&self) -> Duration {
+        self.opened_at.elapsed()
+    }
+    pub fn max_rows(&self) -> usize {
+        self.max_rows
+    }
+}
+
+pub fn open_writer(
+    path: &Path,
+    run_id: impl Into<String>,
+    connection_generation: u64,
+    now_unix_ms: i64,
+) -> rusqlite::Result<WriterConnection> {
+    reject_non_file(path)?;
+    let is_new = !path.exists();
+    let connection = Connection::open(path)?;
+    connection.busy_timeout(WRITER_BUSY_TIMEOUT)?;
+    connection.pragma_update(None, "foreign_keys", "ON")?;
+    if is_new {
+        connection.pragma_update(None, "auto_vacuum", "INCREMENTAL")?;
+    }
+    connection.pragma_update(None, "journal_mode", "WAL")?;
+    connection.pragma_update(None, "synchronous", "FULL")?;
+    connection.pragma_update(None, "wal_autocheckpoint", 0)?;
+    let journal_mode: String = connection.pragma_query_value(None, "journal_mode", |r| r.get(0))?;
+    let synchronous: i64 = connection.pragma_query_value(None, "synchronous", |r| r.get(0))?;
+    let auto_vacuum: i64 = connection.pragma_query_value(None, "auto_vacuum", |r| r.get(0))?;
+    if !journal_mode.eq_ignore_ascii_case("wal") || synchronous != 2 || auto_vacuum != 2 {
+        return Err(rusqlite::Error::InvalidQuery);
+    }
+    apply_migrations(&connection)?;
+    Ok(WriterConnection {
+        connection,
+        attestation: WriterAttestation {
+            run_id: run_id.into(),
+            connection_generation,
+            journal_mode,
+            synchronous,
+            auto_vacuum,
+            observed_at_unix_ms: now_unix_ms,
+            fresh_until_unix_ms: now_unix_ms.saturating_add(READER_MAX_AGE.as_millis() as i64),
+        },
+    })
+}
+
+pub fn open_reader(path: &Path) -> rusqlite::Result<ReaderHandle> {
+    reject_non_file(path)?;
+    let connection = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+    )?;
+    connection.pragma_update(None, "query_only", "ON")?;
+    connection.pragma_update(None, "foreign_keys", "ON")?;
+    let opened_at = Instant::now();
+    Ok(ReaderHandle {
+        connection,
+        opened_at,
+        deadline: opened_at + READER_MAX_AGE,
+        max_rows: READER_MAX_ROWS,
+    })
+}
+
+fn reject_non_file(path: &Path) -> rusqlite::Result<()> {
+    if path == Path::new(":memory:") || path.as_os_str().is_empty() {
+        return Err(rusqlite::Error::InvalidPath(PathBuf::from(path)));
+    }
+    Ok(())
+}
+
+pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
+    connection.execute_batch("BEGIN IMMEDIATE")?;
+    let result = (|| {
+        connection.execute_batch(MIGRATION_1)?;
+        connection.execute(
+            "INSERT OR IGNORE INTO schema_migrations(version, name, checksum, applied_at) VALUES (1, 'initial', ?1, strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+            [MIGRATION_1_CHECKSUM],
+        )?;
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=1",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_1_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(())
+    })();
+    match result {
+        Ok(()) => connection.execute_batch("COMMIT"),
+        Err(error) => {
+            let _ = connection.execute_batch("ROLLBACK");
+            Err(error)
+        }
+    }
+}
+
+const MIGRATION_1_CHECKSUM: &str = "sha256:m2-schema-v1-20260910";
+
+// LSN columns are canonical zero-padded uppercase 16-hex strings, so SQLite bytewise
+// ordering equals PostgreSQL unsigned LSN ordering without signed arithmetic.
+pub const MIGRATION_1: &str = r#"
+CREATE TABLE IF NOT EXISTS schema_migrations(
+ version INTEGER PRIMARY KEY CHECK(version>0), name TEXT NOT NULL UNIQUE,
+ checksum TEXT NOT NULL CHECK(length(checksum)>0), applied_at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS source_transactions(
+ transaction_id TEXT PRIMARY KEY, capture_epoch TEXT NOT NULL, source_system_id TEXT NOT NULL,
+ database_id TEXT NOT NULL, slot_name TEXT NOT NULL, xid TEXT NOT NULL, end_lsn TEXT NOT NULL CHECK(length(end_lsn)=16 AND end_lsn NOT GLOB '*[^0-9A-F]*'),
+ first_seq INTEGER NOT NULL CHECK(first_seq>0), last_seq INTEGER NOT NULL CHECK(last_seq>=first_seq), event_count INTEGER NOT NULL CHECK(event_count>=0),
+ payload_checksum TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('committed','gc_removed')),
+ UNIQUE(capture_epoch,source_system_id,database_id,slot_name,end_lsn), UNIQUE(capture_epoch,last_seq), UNIQUE(transaction_id,capture_epoch,last_seq));
+CREATE TABLE IF NOT EXISTS relation_schemas(
+ schema_fingerprint TEXT PRIMARY KEY, capture_epoch TEXT NOT NULL, relation_id TEXT NOT NULL,
+ canonical_schema BLOB NOT NULL, schema_checksum TEXT NOT NULL, created_seq INTEGER NOT NULL CHECK(created_seq>0),
+ UNIQUE(capture_epoch,relation_id,schema_fingerprint));
+CREATE TABLE IF NOT EXISTS journal_events(
+ journal_seq INTEGER PRIMARY KEY CHECK(journal_seq>0), event_id TEXT NOT NULL UNIQUE,
+ transaction_id TEXT NOT NULL REFERENCES source_transactions(transaction_id), transaction_ordinal INTEGER NOT NULL CHECK(transaction_ordinal>=0),
+ capture_epoch TEXT NOT NULL, relation_schema_fingerprint TEXT REFERENCES relation_schemas(schema_fingerprint),
+ control_kind TEXT CHECK(control_kind IN ('heartbeat','capture_fence') OR control_kind IS NULL), payload BLOB NOT NULL, payload_hash TEXT NOT NULL,
+ UNIQUE(transaction_id,transaction_ordinal));
+CREATE TABLE IF NOT EXISTS bootstrap_intents(
+ intent_id TEXT PRIMARY KEY, capture_epoch TEXT NOT NULL, source_system_id TEXT NOT NULL, database_id TEXT NOT NULL, slot_name TEXT NOT NULL,
+ creation_floor_lsn TEXT CHECK(creation_floor_lsn IS NULL OR (length(creation_floor_lsn)=16 AND creation_floor_lsn NOT GLOB '*[^0-9A-F]*')),
+ state TEXT NOT NULL CHECK(state IN ('prepared','remote_slot_unknown','slot_created','copying','complete','invalidated','aborted')),
+ revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0), created_at TEXT NOT NULL,
+ UNIQUE(intent_id,capture_epoch,source_system_id,database_id,slot_name));
+CREATE TABLE IF NOT EXISTS source_state(
+ singleton INTEGER PRIMARY KEY CHECK(singleton=1), capture_epoch TEXT NOT NULL, source_system_id TEXT NOT NULL,
+ timeline_id TEXT NOT NULL, database_id TEXT NOT NULL, slot_name TEXT NOT NULL, plugin TEXT NOT NULL, publication_fingerprint TEXT NOT NULL, protocol_fingerprint TEXT NOT NULL,
+ durable_transaction_end_lsn TEXT CHECK(durable_transaction_end_lsn IS NULL OR (length(durable_transaction_end_lsn)=16 AND durable_transaction_end_lsn NOT GLOB '*[^0-9A-F]*')),
+ durable_transaction_id TEXT REFERENCES source_transactions(transaction_id), durable_journal_seq INTEGER,
+ slot_creation_floor_lsn TEXT CHECK(slot_creation_floor_lsn IS NULL OR (length(slot_creation_floor_lsn)=16 AND slot_creation_floor_lsn NOT GLOB '*[^0-9A-F]*')),
+ slot_creation_intent_id TEXT, last_feedback_lsn TEXT CHECK(last_feedback_lsn IS NULL OR (length(last_feedback_lsn)=16 AND last_feedback_lsn NOT GLOB '*[^0-9A-F]*')),
+ last_feedback_repeated_creation_floor INTEGER NOT NULL DEFAULT 0 CHECK(last_feedback_repeated_creation_floor IN (0,1)),
+ observed_confirmed_flush_lsn TEXT, observed_restart_lsn TEXT, control_revision INTEGER NOT NULL DEFAULT 0 CHECK(control_revision>=0),
+ CHECK((durable_transaction_end_lsn IS NULL)=(durable_transaction_id IS NULL)), CHECK((durable_transaction_end_lsn IS NULL)=(durable_journal_seq IS NULL)),
+ CHECK((slot_creation_floor_lsn IS NULL)=(slot_creation_intent_id IS NULL)),
+ CHECK(last_feedback_repeated_creation_floor=0 OR (slot_creation_floor_lsn IS NOT NULL AND last_feedback_lsn=slot_creation_floor_lsn)),
+ FOREIGN KEY(slot_creation_intent_id,capture_epoch,source_system_id,database_id,slot_name) REFERENCES bootstrap_intents(intent_id,capture_epoch,source_system_id,database_id,slot_name),
+ FOREIGN KEY(durable_transaction_id,capture_epoch,durable_journal_seq) REFERENCES source_transactions(transaction_id,capture_epoch,last_seq));
+CREATE TABLE IF NOT EXISTS runtime_ownership(
+ run_id TEXT PRIMARY KEY, backend_pid INTEGER NOT NULL, connection_nonce TEXT NOT NULL UNIQUE, ownership_deadline_mono_ms INTEGER NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('held','expected_close','lost','released')), connection_generation INTEGER NOT NULL CHECK(connection_generation>0),
+ expected_close_token TEXT UNIQUE, loss_evidence TEXT, takeover_evidence TEXT, revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0));
+CREATE TABLE IF NOT EXISTS operator_command_requests(
+ request_id TEXT PRIMARY KEY, dry_run_nonce TEXT NOT NULL UNIQUE, canonical_payload BLOB NOT NULL, payload_digest TEXT NOT NULL,
+ run_id TEXT NOT NULL, peer_identity TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('accepted','reconciling','completed','failed','aborted_by_restart')),
+ result BLOB, observation_revision INTEGER NOT NULL, control_revision INTEGER NOT NULL, expires_at TEXT NOT NULL,
+ CHECK((state IN ('completed','failed'))=(result IS NOT NULL)), UNIQUE(request_id,payload_digest));
+CREATE TABLE IF NOT EXISTS destinations(
+ destination_id TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('clickhouse','archive')), configuration_fingerprint TEXT NOT NULL,
+ capture_epoch TEXT NOT NULL, generation INTEGER NOT NULL CHECK(generation>0), highest_external_fence INTEGER NOT NULL DEFAULT 0 CHECK(highest_external_fence>=0),
+ adopted_external_fence_at TEXT, adopted_external_fence_evidence TEXT, current_failure_id TEXT,
+ FOREIGN KEY(current_failure_id) REFERENCES processing_failures(failure_id));
+CREATE TABLE IF NOT EXISTS processing_failures(
+ failure_id TEXT PRIMARY KEY, destination_id TEXT REFERENCES destinations(destination_id), component TEXT NOT NULL, failure_class TEXT NOT NULL,
+ fingerprint TEXT NOT NULL, failed_boundary_start_seq INTEGER, failed_boundary_end_seq INTEGER, retry_class TEXT NOT NULL CHECK(retry_class IN ('transient','deterministic','exhausted','integrity_mismatch')),
+ attempt INTEGER NOT NULL DEFAULT 0 CHECK(attempt>=0), next_retry_at TEXT, armed INTEGER NOT NULL DEFAULT 0 CHECK(armed IN (0,1)), first_failed_at TEXT NOT NULL, last_failed_at TEXT NOT NULL,
+ UNIQUE(component,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq));
+CREATE TABLE IF NOT EXISTS destination_checkpoints(
+ destination_id TEXT PRIMARY KEY REFERENCES destinations(destination_id), capture_epoch TEXT NOT NULL, anchor_id TEXT,
+ configuration_fingerprint TEXT NOT NULL, generation INTEGER NOT NULL CHECK(generation>0), complete_transaction_id TEXT NOT NULL REFERENCES source_transactions(transaction_id),
+ journal_seq INTEGER NOT NULL, current_failure_id TEXT REFERENCES processing_failures(failure_id), revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0),
+ FOREIGN KEY(complete_transaction_id,capture_epoch,journal_seq) REFERENCES source_transactions(transaction_id,capture_epoch,last_seq));
+CREATE TABLE IF NOT EXISTS backfill_runs(run_id TEXT PRIMARY KEY, destination_id TEXT NOT NULL REFERENCES destinations(destination_id), capture_epoch TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('prepared','running','paused','complete','invalidated')), revision INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS backfill_generations(generation_id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES backfill_runs(run_id), generation INTEGER NOT NULL CHECK(generation>0), intended_fence_nonce TEXT UNIQUE, state TEXT NOT NULL CHECK(state IN ('prepared','copying','fencing','complete','invalidated')), UNIQUE(run_id,generation));
+CREATE TABLE IF NOT EXISTS backfill_chunks(chunk_id TEXT PRIMARY KEY, generation_id TEXT NOT NULL REFERENCES backfill_generations(generation_id), range_start BLOB NOT NULL, range_end BLOB NOT NULL, state TEXT NOT NULL CHECK(state IN ('pending','complete','invalidated')), completed_seq INTEGER, checksum TEXT, CHECK(state!='complete' OR (completed_seq IS NOT NULL AND checksum IS NOT NULL)));
+CREATE TABLE IF NOT EXISTS bootstrap_imports(import_id TEXT PRIMARY KEY, intent_id TEXT NOT NULL REFERENCES bootstrap_intents(intent_id), destination_id TEXT NOT NULL REFERENCES destinations(destination_id), state TEXT NOT NULL CHECK(state IN ('prepared','importing','acknowledged','failed','invalidated')), revision INTEGER NOT NULL DEFAULT 0, UNIQUE(intent_id,destination_id));
+CREATE TABLE IF NOT EXISTS durable_capture_fences(fence_id TEXT PRIMARY KEY, capture_epoch TEXT NOT NULL, generation INTEGER NOT NULL, nonce TEXT NOT NULL, transaction_id TEXT NOT NULL REFERENCES source_transactions(transaction_id), post_copy_fence_lsn TEXT NOT NULL CHECK(length(post_copy_fence_lsn)=16 AND post_copy_fence_lsn NOT GLOB '*[^0-9A-F]*'), post_copy_fence_seq INTEGER NOT NULL, first_proof INTEGER NOT NULL CHECK(first_proof IN (0,1)), FOREIGN KEY(transaction_id,capture_epoch,post_copy_fence_seq) REFERENCES source_transactions(transaction_id,capture_epoch,last_seq), UNIQUE(capture_epoch,generation,nonce,transaction_id));
+CREATE UNIQUE INDEX IF NOT EXISTS one_first_capture_fence_proof ON durable_capture_fences(capture_epoch,generation,nonce) WHERE first_proof=1;
+CREATE TABLE IF NOT EXISTS bootstrap_anchors(anchor_id TEXT PRIMARY KEY, capture_epoch TEXT NOT NULL, generation INTEGER NOT NULL, lower_stitch_lsn TEXT CHECK(lower_stitch_lsn IS NULL OR (length(lower_stitch_lsn)=16 AND lower_stitch_lsn NOT GLOB '*[^0-9A-F]*')), start_seq INTEGER NOT NULL CHECK(start_seq>=0), snapshot_boundary_lsn TEXT NOT NULL CHECK(length(snapshot_boundary_lsn)=16 AND snapshot_boundary_lsn NOT GLOB '*[^0-9A-F]*'), snapshot_complete_seq INTEGER, post_copy_fence_nonce TEXT, post_copy_fence_lsn TEXT CHECK(post_copy_fence_lsn IS NULL OR (length(post_copy_fence_lsn)=16 AND post_copy_fence_lsn NOT GLOB '*[^0-9A-F]*')), post_copy_fence_seq INTEGER, table_set_fingerprint TEXT NOT NULL, snapshot_schema_fingerprints BLOB NOT NULL, state TEXT NOT NULL CHECK(state IN ('building','complete','expired','invalidated')), expires_at TEXT NOT NULL, CHECK(state!='complete' OR (snapshot_complete_seq IS NOT NULL AND post_copy_fence_nonce IS NOT NULL AND post_copy_fence_lsn IS NOT NULL AND post_copy_fence_seq IS NOT NULL)), UNIQUE(capture_epoch,generation));
+CREATE TABLE IF NOT EXISTS reseed_intents(intent_id TEXT PRIMARY KEY, destination_id TEXT REFERENCES destinations(destination_id), capture_epoch TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('prepared','reconciling','ready','complete','blocked','aborted')), revision INTEGER NOT NULL DEFAULT 0, evidence_digest TEXT);
+CREATE TABLE IF NOT EXISTS destination_generation_leases(lease_id TEXT PRIMARY KEY, destination_id TEXT NOT NULL REFERENCES destinations(destination_id), capture_epoch TEXT NOT NULL, anchor_id TEXT REFERENCES bootstrap_anchors(anchor_id), generation INTEGER NOT NULL, configuration_fingerprint TEXT NOT NULL, run_id TEXT NOT NULL, expires_mono_ms INTEGER NOT NULL, state TEXT NOT NULL CHECK(state IN ('held','fenced','expired','released')), revision INTEGER NOT NULL DEFAULT 0, UNIQUE(destination_id,capture_epoch,generation));
+CREATE TABLE IF NOT EXISTS destination_promotion_intents(intent_id TEXT PRIMARY KEY, destination_id TEXT NOT NULL REFERENCES destinations(destination_id), capture_epoch TEXT NOT NULL, old_generation INTEGER, candidate_generation INTEGER NOT NULL, anchor_id TEXT NOT NULL REFERENCES bootstrap_anchors(anchor_id), configuration_fingerprint TEXT NOT NULL, promotion_fence INTEGER NOT NULL CHECK(promotion_fence>0), expected_selector_digest TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('prepared','old_leases_fenced','candidate_verified','switch_pending','switched','verified','retirement_eligible','retired','promotion_recovery_required')), revision INTEGER NOT NULL DEFAULT 0, UNIQUE(destination_id,promotion_fence));
+CREATE TABLE IF NOT EXISTS clickhouse_batch_intents(intent_id TEXT PRIMARY KEY, destination_id TEXT NOT NULL REFERENCES destinations(destination_id), capture_epoch TEXT NOT NULL, generation INTEGER NOT NULL, first_seq INTEGER NOT NULL, last_seq INTEGER NOT NULL CHECK(last_seq>=first_seq), payload_checksum TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('prepared','dispatched','verified','failed')), UNIQUE(destination_id,capture_epoch,generation,first_seq,last_seq));
+CREATE TABLE IF NOT EXISTS archive_generations(generation_id TEXT PRIMARY KEY, destination_id TEXT NOT NULL REFERENCES destinations(destination_id), capture_epoch TEXT NOT NULL, generation INTEGER NOT NULL, anchor_id TEXT REFERENCES bootstrap_anchors(anchor_id), state TEXT NOT NULL CHECK(state IN ('candidate','live','retirement_eligible','retired','invalidated')), UNIQUE(destination_id,capture_epoch,generation));
+CREATE TABLE IF NOT EXISTS archive_segment_intents(intent_id TEXT PRIMARY KEY, generation_id TEXT NOT NULL REFERENCES archive_generations(generation_id), first_seq INTEGER NOT NULL, last_seq INTEGER NOT NULL CHECK(last_seq>=first_seq), selection_digest TEXT NOT NULL, state TEXT NOT NULL CHECK(state IN ('selected','writing','published','failed')), UNIQUE(generation_id,first_seq,last_seq));
+CREATE TABLE IF NOT EXISTS archive_segments(segment_id TEXT PRIMARY KEY, intent_id TEXT NOT NULL UNIQUE REFERENCES archive_segment_intents(intent_id), manifest_digest TEXT NOT NULL, ready_marker_digest TEXT NOT NULL, first_seq INTEGER NOT NULL, last_seq INTEGER NOT NULL CHECK(last_seq>=first_seq));
+CREATE TABLE IF NOT EXISTS archive_generation_markers(marker_id TEXT PRIMARY KEY, generation_id TEXT NOT NULL REFERENCES archive_generations(generation_id), promotion_fence INTEGER NOT NULL CHECK(promotion_fence>0), intent_id TEXT NOT NULL REFERENCES destination_promotion_intents(intent_id), marker_digest TEXT NOT NULL, UNIQUE(generation_id,promotion_fence), UNIQUE(promotion_fence,marker_digest));
+CREATE TABLE IF NOT EXISTS destination_audits(audit_id TEXT PRIMARY KEY, destination_id TEXT NOT NULL REFERENCES destinations(destination_id), configuration_fingerprint TEXT NOT NULL, capture_epoch TEXT NOT NULL, generation INTEGER NOT NULL, round_target_seq INTEGER NOT NULL, round_identity_digest TEXT NOT NULL, journal_cursor_seq INTEGER NOT NULL, journal_verified_start_seq INTEGER, journal_verified_end_seq INTEGER, self_cursor_seq INTEGER, self_consistent_start_seq INTEGER, self_consistent_end_seq INTEGER, budget_bytes_used INTEGER NOT NULL DEFAULT 0, budget_events_used INTEGER NOT NULL DEFAULT 0, budget_ms_used INTEGER NOT NULL DEFAULT 0, freshness_window_started_at TEXT NOT NULL, freshness_expires_at TEXT NOT NULL, contract_digest TEXT NOT NULL, evidence_digest TEXT, first_mismatch TEXT, revision INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS condition_hysteresis(condition_id TEXT PRIMARY KEY, entered_at TEXT, last_observed_at TEXT NOT NULL, cleared_at TEXT);
+CREATE TABLE IF NOT EXISTS alerts(alert_id TEXT PRIMARY KEY, condition_id TEXT NOT NULL, failure_id TEXT REFERENCES processing_failures(failure_id), state TEXT NOT NULL CHECK(state IN ('active','acknowledged','cleared')), opened_at TEXT NOT NULL, cleared_at TEXT, evidence_digest TEXT);
+CREATE TRIGGER IF NOT EXISTS relation_schemas_immutable BEFORE UPDATE ON relation_schemas BEGIN SELECT RAISE(ABORT,'relation schema is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS journal_events_immutable BEFORE UPDATE ON journal_events BEGIN SELECT RAISE(ABORT,'journal event is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS source_transactions_immutable BEFORE UPDATE OF capture_epoch,source_system_id,database_id,slot_name,end_lsn,first_seq,last_seq,event_count,payload_checksum ON source_transactions BEGIN SELECT RAISE(ABORT,'source transaction identity and checksum are immutable'); END;
+CREATE TRIGGER IF NOT EXISTS archive_selection_immutable BEFORE UPDATE OF generation_id,first_seq,last_seq,selection_digest ON archive_segment_intents BEGIN SELECT RAISE(ABORT,'archive selection is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS destination_fence_monotonic BEFORE UPDATE OF highest_external_fence ON destinations WHEN NEW.highest_external_fence < OLD.highest_external_fence BEGIN SELECT RAISE(ABORT,'external fence regression'); END;
+CREATE TRIGGER IF NOT EXISTS source_progress_monotonic BEFORE UPDATE OF durable_transaction_end_lsn ON source_state WHEN OLD.durable_transaction_end_lsn IS NOT NULL AND (NEW.durable_transaction_end_lsn IS NULL OR NEW.durable_transaction_end_lsn < OLD.durable_transaction_end_lsn) BEGIN SELECT RAISE(ABORT,'durable source progress regression'); END;
+CREATE TRIGGER IF NOT EXISTS complete_anchor_requires_fence BEFORE INSERT ON bootstrap_anchors WHEN NEW.state='complete' AND NOT EXISTS(SELECT 1 FROM durable_capture_fences f WHERE f.capture_epoch=NEW.capture_epoch AND f.generation=NEW.generation AND f.nonce=NEW.post_copy_fence_nonce AND f.post_copy_fence_lsn=NEW.post_copy_fence_lsn AND f.post_copy_fence_seq=NEW.post_copy_fence_seq AND f.first_proof=1) BEGIN SELECT RAISE(ABORT,'complete anchor lacks matching durable fence'); END;
+CREATE TRIGGER IF NOT EXISTS complete_anchor_update_requires_fence BEFORE UPDATE OF state ON bootstrap_anchors WHEN NEW.state='complete' AND NOT EXISTS(SELECT 1 FROM durable_capture_fences f WHERE f.capture_epoch=NEW.capture_epoch AND f.generation=NEW.generation AND f.nonce=NEW.post_copy_fence_nonce AND f.post_copy_fence_lsn=NEW.post_copy_fence_lsn AND f.post_copy_fence_seq=NEW.post_copy_fence_seq AND f.first_proof=1) BEGIN SELECT RAISE(ABORT,'complete anchor lacks matching durable fence'); END;
+"#;
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+    fn path(name: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "boring-cdc-m2-{name}-{}-{}.sqlite",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ))
+    }
+    fn writer(name: &str) -> (PathBuf, WriterConnection) {
+        let p = path(name);
+        let w = open_writer(&p, "run-1", 1, 1000).unwrap();
+        (p, w)
+    }
+    fn tx(c: &Connection) {
+        c.execute("INSERT INTO source_transactions VALUES('tx1','epoch','sys','db','slot','7','0000000000000010',1,1,0,'sum','committed')",[]).unwrap();
+    }
+
+    #[test]
+    fn clean_install_has_all_tables_and_required_pragmas() {
+        let (p, w) = writer("clean");
+        assert_eq!(
+            (
+                w.attestation().journal_mode.as_str(),
+                w.attestation().synchronous,
+                w.attestation().auto_vacuum
+            ),
+            ("wal", 2, 2)
+        );
+        let names: Vec<String> = w
+            .connection()
+            .prepare("SELECT name FROM sqlite_schema WHERE type='table' ORDER BY name")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        for n in [
+            "journal_events",
+            "source_transactions",
+            "source_state",
+            "runtime_ownership",
+            "operator_command_requests",
+            "relation_schemas",
+            "destinations",
+            "destination_checkpoints",
+            "backfill_runs",
+            "backfill_generations",
+            "backfill_chunks",
+            "bootstrap_intents",
+            "bootstrap_imports",
+            "durable_capture_fences",
+            "bootstrap_anchors",
+            "reseed_intents",
+            "destination_generation_leases",
+            "destination_promotion_intents",
+            "clickhouse_batch_intents",
+            "archive_generations",
+            "archive_segment_intents",
+            "archive_segments",
+            "archive_generation_markers",
+            "processing_failures",
+            "destination_audits",
+            "condition_hysteresis",
+            "alerts",
+            "schema_migrations",
+        ] {
+            assert!(names.contains(&n.to_string()), "missing {n}");
+        }
+        assert_eq!(
+            w.connection()
+                .query_row("PRAGMA foreign_key_check", [], |_| Ok(()))
+                .optional()
+                .unwrap(),
+            None
+        );
+        drop(w);
+        let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn creation_floor_is_separate_bound_and_marker_survives_reopen() {
+        let (p, w) = writer("floor");
+        tx(w.connection());
+        w.connection().execute("INSERT INTO bootstrap_intents VALUES('boot','epoch','sys','db','slot','0000000000000008','slot_created',0,'now')",[]).unwrap();
+        w.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint,slot_creation_floor_lsn,slot_creation_intent_id,last_feedback_lsn,last_feedback_repeated_creation_floor) VALUES(1,'epoch','sys','tl','db','slot','pgoutput','pub','proto','0000000000000008','boot','0000000000000008',1)",[]).unwrap();
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT durable_transaction_end_lsn IS NULL FROM source_state",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            1
+        );
+        assert!(
+            w.connection()
+                .execute(
+                    "UPDATE source_state SET slot_name='other' WHERE singleton=1",
+                    []
+                )
+                .is_err()
+        );
+        drop(w);
+        let w = open_writer(&p, "run-2", 2, 2000).unwrap();
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT last_feedback_repeated_creation_floor FROM source_state",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            1
+        );
+        let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn constraints_reject_bad_lsn_duplicate_identity_and_incomplete_checkpoint() {
+        let (_p, w) = writer("constraints");
+        tx(w.connection());
+        assert!(w.connection().execute("INSERT INTO source_transactions VALUES('tx2','epoch','sys','db','slot','8','0000000000000010',2,2,0,'sum2','committed')",[]).is_err());
+        assert!(w.connection().execute("INSERT INTO source_transactions VALUES('tx3','epoch','sys','db','slot','8','0/10',2,2,0,'sum2','committed')",[]).is_err());
+        w.connection()
+            .execute(
+                "INSERT INTO relation_schemas VALUES('fp','epoch','r',X'01','sum',1)",
+                [],
+            )
+            .unwrap();
+        w.connection()
+            .execute(
+                "INSERT INTO journal_events VALUES(1,'pos','tx1',0,'epoch','fp',NULL,X'01','hash')",
+                [],
+            )
+            .unwrap();
+        assert!(w.connection().execute("INSERT INTO journal_events VALUES(2,'pos','tx1',1,'epoch','fp',NULL,X'02','different')",[]).is_err());
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','epoch',1)",[]).unwrap();
+        assert!(w.connection().execute("INSERT INTO destination_checkpoints VALUES('d','epoch',NULL,'cfg',1,'tx1',2,NULL,0)",[]).is_err());
+    }
+
+    #[test]
+    fn immutable_rows_fences_and_anchor_proof_fail_closed() {
+        let (_p, w) = writer("immutability");
+        tx(w.connection());
+        w.connection()
+            .execute(
+                "INSERT INTO relation_schemas VALUES('fp','epoch','r',X'01','sum',1)",
+                [],
+            )
+            .unwrap();
+        assert!(w.connection().execute("UPDATE relation_schemas SET canonical_schema=X'02' WHERE schema_fingerprint='fp'",[]).is_err());
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation,highest_external_fence) VALUES('d','archive','cfg','epoch',1,9)",[]).unwrap();
+        assert!(
+            w.connection()
+                .execute(
+                    "UPDATE destinations SET highest_external_fence=8 WHERE destination_id='d'",
+                    []
+                )
+                .is_err()
+        );
+        assert!(w.connection().execute("INSERT INTO bootstrap_anchors VALUES('a','epoch',1,NULL,0,'0000000000000000',1,'nonce','0000000000000010',1,'tables',X'01','complete','later')",[]).is_err());
+        w.connection().execute("INSERT INTO durable_capture_fences VALUES('f','epoch',1,'nonce','tx1','0000000000000010',1,1)",[]).unwrap();
+        w.connection().execute("INSERT INTO bootstrap_anchors VALUES('a','epoch',1,NULL,0,'0000000000000000',1,'nonce','0000000000000010',1,'tables',X'01','complete','later')",[]).unwrap();
+    }
+
+    #[test]
+    fn command_nonce_abort_and_external_fence_survive_restart() {
+        let (p, w) = writer("restart");
+        w.connection().execute("INSERT INTO operator_command_requests VALUES('req','nonce',X'01','digest','run','peer','accepted',NULL,1,1,'later')",[]).unwrap();
+        w.connection().execute("UPDATE operator_command_requests SET state='aborted_by_restart' WHERE state IN ('accepted','reconciling') AND run_id!='new-run'",[]).unwrap();
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation,highest_external_fence,adopted_external_fence_at,adopted_external_fence_evidence) VALUES('d','clickhouse','cfg','epoch',1,9,'now','proof')",[]).unwrap();
+        drop(w);
+        let w = open_writer(&p, "new-run", 2, 2000).unwrap();
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT state FROM operator_command_requests", [], |r| {
+                    r.get::<_, String>(0)
+                })
+                .unwrap(),
+            "aborted_by_restart"
+        );
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT highest_external_fence FROM destinations", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            9
+        );
+        let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn failed_migration_rolls_back_atomically_and_upgrade_is_idempotent() {
+        let p = path("upgrade");
+        let c = Connection::open(&p).unwrap();
+        c.pragma_update(None, "auto_vacuum", "INCREMENTAL").unwrap();
+        c.pragma_update(None, "journal_mode", "WAL").unwrap();
+        c.pragma_update(None, "synchronous", "FULL").unwrap();
+        c.execute_batch("CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY,name TEXT UNIQUE NOT NULL,checksum TEXT NOT NULL,applied_at TEXT NOT NULL); INSERT INTO schema_migrations VALUES(1,'initial','wrong','now');").unwrap();
+        assert!(apply_migrations(&c).is_err());
+        assert_eq!(
+            c.query_row(
+                "SELECT count(*) FROM sqlite_schema WHERE name='journal_events'",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            0
+        );
+        c.execute("DELETE FROM schema_migrations", []).unwrap();
+        apply_migrations(&c).unwrap();
+        apply_migrations(&c).unwrap();
+        assert_eq!(
+            c.query_row("SELECT count(*) FROM schema_migrations", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn reopened_writer_reapplies_full_and_attests_generation() {
+        let (p, w) = writer("reopen");
+        drop(w);
+        let c = Connection::open(&p).unwrap();
+        c.pragma_update(None, "synchronous", "OFF").unwrap();
+        drop(c);
+        let w = open_writer(&p, "run-2", 7, 5_000).unwrap();
+        assert_eq!(
+            (
+                w.attestation().run_id.as_str(),
+                w.attestation().connection_generation,
+                w.attestation().synchronous
+            ),
+            ("run-2", 7, 2)
+        );
+        let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn failure_and_audit_state_survive_without_checkpoint_advance() {
+        let (p, w) = writer("audit");
+        tx(w.connection());
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','epoch',1)",[]).unwrap();
+        w.connection().execute("INSERT INTO destination_checkpoints VALUES('d','epoch',NULL,'cfg',1,'tx1',1,NULL,0)",[]).unwrap();
+        w.connection().execute("INSERT INTO processing_failures VALUES('fail','d','archive','io','fingerprint',1,1,'transient',2,'later',1,'first','last')",[]).unwrap();
+        w.connection()
+            .execute(
+                "UPDATE destinations SET current_failure_id='fail' WHERE destination_id='d'",
+                [],
+            )
+            .unwrap();
+        w.connection().execute("INSERT INTO destination_audits VALUES('audit','d','cfg','epoch',1,1,'identity',0,NULL,NULL,0,NULL,NULL,10,2,3,'start','expiry','contract','evidence','mismatch',0)",[]).unwrap();
+        drop(w);
+        let w = open_writer(&p, "run-2", 2, 2_000).unwrap();
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT journal_seq FROM destination_checkpoints", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT attempt FROM processing_failures", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT round_identity_digest FROM destination_audits",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+            "identity"
+        );
+        let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn revision_cas_and_promotion_fence_uniqueness() {
+        let (_p, w) = writer("cas");
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','clickhouse','cfg','epoch',1)",[]).unwrap();
+        assert_eq!(w.connection().execute("UPDATE destinations SET generation=2 WHERE destination_id='d' AND generation=1",[]).unwrap(),1);
+        assert_eq!(w.connection().execute("UPDATE destinations SET generation=3 WHERE destination_id='d' AND generation=1",[]).unwrap(),0);
+        w.connection().execute("INSERT INTO bootstrap_anchors(anchor_id,capture_epoch,generation,start_seq,snapshot_boundary_lsn,table_set_fingerprint,snapshot_schema_fingerprints,state,expires_at) VALUES('a','epoch',1,0,'0000000000000000','tables',X'01','building','later')",[]).unwrap();
+        w.connection().execute("INSERT INTO destination_promotion_intents VALUES('p1','d','epoch',1,2,'a','cfg',5,'selector','prepared',0)",[]).unwrap();
+        assert!(w.connection().execute("INSERT INTO destination_promotion_intents VALUES('p2','d','epoch',1,3,'a','cfg',5,'other','prepared',0)",[]).is_err());
+    }
+
+    #[test]
+    fn reader_is_read_only_and_bounded() {
+        let (p, w) = writer("reader");
+        drop(w);
+        let r = open_reader(&p).unwrap();
+        assert_eq!(r.max_rows(), READER_MAX_ROWS);
+        assert!(!r.expired());
+        assert!(
+            r.connection()
+                .unwrap()
+                .execute("CREATE TABLE forbidden(x)", [])
+                .is_err()
+        );
+        let _ = fs::remove_file(p);
+    }
+
+    use rusqlite::OptionalExtension;
+}

@@ -1,0 +1,17 @@
+{
+  "schema_version": "m2-schema-cases/v1",
+  "owner_bead": "boring-cdc-m2-schema",
+  "evidence_tier": "leaf",
+  "cases": [
+    {"id":"SCN-M2-SCHEMA-CLEAN-INSTALL","test":"clean_install_has_all_tables_and_required_pragmas","assertion":"all 28 logical tables install under WAL/FULL/incremental-auto-vacuum writer admission"},
+    {"id":"SCN-M2-SCHEMA-CREATION-FLOOR","test":"creation_floor_is_separate_bound_and_marker_survives_reopen","assertion":"creation floor is nullable, separate from durable progress, identity-bound, and repeated-floor feedback survives reopen"},
+    {"id":"SCN-M2-SCHEMA-CONSTRAINTS","test":"constraints_reject_bad_lsn_duplicate_identity_and_incomplete_checkpoint","assertion":"ordered LSN, connector identity, complete-boundary FK, and payload identity constraints fail closed"},
+    {"id":"SCN-M2-SCHEMA-IMMUTABILITY","test":"immutable_rows_fences_and_anchor_proof_fail_closed","assertion":"schema/event/transaction/archive identities are immutable, fences do not regress, and complete anchors require a matching first durable fence"},
+    {"id":"SCN-M2-SCHEMA-RESTART","test":"command_nonce_abort_and_external_fence_survive_restart","assertion":"nonce-bearing requests abort without replay and adopted external high-water fences survive reopen"},
+    {"id":"SCN-M2-SCHEMA-MIGRATION-CRASH","test":"failed_migration_rolls_back_atomically_and_upgrade_is_idempotent","assertion":"checksum conflict rolls back all schema DDL and a valid upgrade rerun is idempotent"},
+    {"id":"SCN-M2-SCHEMA-READER-BOUND","test":"reader_is_read_only_and_bounded","assertion":"reader handles are query-only and expose fixed row and transaction-age bounds"},
+    {"id":"SCN-M2-SCHEMA-WRITER-READBACK","test":"reopened_writer_reapplies_full_and_attests_generation","assertion":"reopened writers reapply/read back FULL and publish run/generation-bound attestation"},
+    {"id":"SCN-M2-SCHEMA-FAILURE-AUDIT","test":"failure_and_audit_state_survive_without_checkpoint_advance","assertion":"typed retry/failure and finite audit round state persist independently without checkpoint advancement"},
+    {"id":"SCN-M2-SCHEMA-CAS","test":"revision_cas_and_promotion_fence_uniqueness","assertion":"domain revisions support stale-write rejection and promotion fences cannot be reused"}
+  ]
+}
