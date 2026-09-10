@@ -2,15 +2,20 @@
   "clean": {
     "business": "pass",
     "business_count": 10,
-    "business_sorted_digest": "f53dce3d0ec57d3f3d06d33d54ec63dc26cdfa0af3a8ca84f0db897b1ae3e525",
+    "business_sorted_digest": "e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab",
     "fence": "pass",
     "final_state": "pass",
-    "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+    "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
     "ledger": "pass",
     "ledger_count": 10,
-    "ledger_sorted_digest": "51954592c5e08ca00af1b9af3819c01c8046d1e6f73056da2b3bd3e72649c571",
+    "ledger_sorted_digest": "00fb6be4a62437bc75013c1991f64651901808376298c2e1c44cfff6367e4ba0",
     "sequence_gaps": "pass",
     "state_count": 4
+  },
+  "contract_digests": {
+    "keys": "30c14e8b953c11dfb9ab4ac10ccde0cbad9c7ae4d25097d62258e7d71d7a510d",
+    "oracle": "8b745babbe152ac65cc537c0e01f3e1814b785443d4a63aaddc08f56fba85774",
+    "values": "b03d04460a78c4cd0b02817952e6bcc21d89c9b712b027b1b866cf5e62c7acc8"
   },
   "correlation_fields": [
     "transaction_group_id",
@@ -20,23 +25,17 @@
     "operation",
     "after_hash"
   ],
-  "digests": {
-    "business.tsv": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "fence.tsv": "8f04ab8f47c53c1f98b3241e2cdedb834610c766a1474004c05d6bf101388f82",
-    "ledger.tsv": "3bf153c0a5cd1c94a07a5ca09edf04a5ce5ac848c21eaedc6e82000eeb565e91",
-    "state.tsv": "9a200747953ba8663b91527a991c3f5e427f4baee52e0970c027024ffe8d12de"
-  },
   "faults": {
     "business-omission": {
       "business": "fail",
       "business_count": 9,
-      "business_sorted_digest": "ee6dc372cbe586f20fff65ec395561101a9ce9f510ba12b7cffae5b90177c999",
+      "business_sorted_digest": "f0fe2b747c73ed4a8d2284d8c3eeee69085aa780080b5e0a6b9aa78032045420",
       "fence": "pass",
       "final_state": "pass",
-      "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
       "ledger": "pass",
       "ledger_count": 10,
-      "ledger_sorted_digest": "51954592c5e08ca00af1b9af3819c01c8046d1e6f73056da2b3bd3e72649c571",
+      "ledger_sorted_digest": "00fb6be4a62437bc75013c1991f64651901808376298c2e1c44cfff6367e4ba0",
       "scenario": "business-omission",
       "sequence_gaps": "pass",
       "state_count": 4
@@ -44,13 +43,13 @@
     "ledger-omission": {
       "business": "pass",
       "business_count": 10,
-      "business_sorted_digest": "f53dce3d0ec57d3f3d06d33d54ec63dc26cdfa0af3a8ca84f0db897b1ae3e525",
+      "business_sorted_digest": "e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab",
       "fence": "pass",
       "final_state": "pass",
-      "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
       "ledger": "fail",
       "ledger_count": 9,
-      "ledger_sorted_digest": "8ef0061a126b39c83d14d280704c6436e83bd9a0d31d0dbaac224983b6b87018",
+      "ledger_sorted_digest": "7eb97f37680e7eb9305223cd4e70cac671bfebc41ffefd2ca7f301879641dba4",
       "scenario": "ledger-omission",
       "sequence_gaps": "pass",
       "state_count": 4
@@ -58,13 +57,13 @@
     "retry-conflict": {
       "business": "fail",
       "business_count": 10,
-      "business_sorted_digest": "f53dce3d0ec57d3f3d06d33d54ec63dc26cdfa0af3a8ca84f0db897b1ae3e525",
+      "business_sorted_digest": "e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab",
       "fence": "pass",
       "final_state": "pass",
-      "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
       "ledger": "pass",
       "ledger_count": 10,
-      "ledger_sorted_digest": "51954592c5e08ca00af1b9af3819c01c8046d1e6f73056da2b3bd3e72649c571",
+      "ledger_sorted_digest": "00fb6be4a62437bc75013c1991f64651901808376298c2e1c44cfff6367e4ba0",
       "scenario": "retry-conflict",
       "sequence_gaps": "pass",
       "state_count": 4
@@ -72,13 +71,13 @@
     "retry-duplicate": {
       "business": "pass",
       "business_count": 10,
-      "business_sorted_digest": "f53dce3d0ec57d3f3d06d33d54ec63dc26cdfa0af3a8ca84f0db897b1ae3e525",
+      "business_sorted_digest": "e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab",
       "fence": "pass",
       "final_state": "pass",
-      "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
       "ledger": "pass",
       "ledger_count": 10,
-      "ledger_sorted_digest": "51954592c5e08ca00af1b9af3819c01c8046d1e6f73056da2b3bd3e72649c571",
+      "ledger_sorted_digest": "00fb6be4a62437bc75013c1991f64651901808376298c2e1c44cfff6367e4ba0",
       "scenario": "retry-duplicate",
       "sequence_gaps": "pass",
       "state_count": 4
@@ -89,19 +88,19 @@
       "business_sorted_digest": null,
       "fence": "pass",
       "final_state": "pass",
-      "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
       "ledger": "pass",
       "ledger_count": 10,
-      "ledger_sorted_digest": "51954592c5e08ca00af1b9af3819c01c8046d1e6f73056da2b3bd3e72649c571",
+      "ledger_sorted_digest": "00fb6be4a62437bc75013c1991f64651901808376298c2e1c44cfff6367e4ba0",
       "scenario": "unavailable",
       "sequence_gaps": "pass",
       "state_count": 4
     }
   },
-  "observation_boundary": "ClickHouse delivered_business populated from PostgreSQL AFTER-row trigger event stream independently of mutation-ledger delivery",
-  "reader_samples": [
-    "pre_commit=0",
-    "post_commit=1"
-  ],
-  "schema_version": "m1-workload-packet/v1"
+  "observation_boundary": "ClickHouse delivered tables populated independently from PostgreSQL trigger stream, ledger, fence, and typed final state",
+  "reader": {
+    "post_commit": 1,
+    "pre_commit": 0
+  },
+  "schema_version": "m1-workload-packet/v2"
 }

@@ -430,6 +430,11 @@ fn ledger_leaf(row: &LedgerEntry) -> [u8; 32] {
     )
 }
 
+fn ledger_set_leaf(row: &LedgerEntry) -> [u8; 32] {
+    let canonical = ledger_leaf(row);
+    framed_hash(DIGEST_DOMAIN, &[&row.mutation_id, &canonical])
+}
+
 fn business_leaf(row: &BusinessObservation) -> [u8; 32] {
     let after = row.observed_after_hash.unwrap_or([0; 32]);
     framed_hash(
@@ -787,7 +792,7 @@ pub fn evaluate(
         std::thread::current().id()
     ));
     let ledger_sorted_digest = external_sorted_digest(
-        delivered_ledger.iter().map(ledger_leaf),
+        delivered_ledger.iter().map(ledger_set_leaf),
         &scratch,
         256,
         limit,
