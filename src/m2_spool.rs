@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 
 const MAGIC: &[u8; 8] = b"BCDCSP01";
 const HEADER_WORK_BYTES: usize = 8 * 1024;
-const READER_WORK_BYTES: usize = 16 * 1024;
+const READER_WORK_BYTES: usize = 32 * 1024;
 // M0-PROVISIONAL: boring-cdc-d-admission must approve the spool format version.
 pub const SPOOL_FORMAT_VERSION: u32 = 1;
 
@@ -254,6 +254,27 @@ impl FreeSpace for StatvfsSpace {
     }
 }
 
+pub trait PhysicalAllocation {
+    fn allocate(&self, file: &File, offset: u64, bytes: u64) -> io::Result<()>;
+}
+pub struct PosixAllocation;
+impl PhysicalAllocation for PosixAllocation {
+    fn allocate(&self, file: &File, offset: u64, bytes: u64) -> io::Result<()> {
+        let code = unsafe {
+            libc::posix_fallocate(
+                file.as_raw_fd(),
+                offset as libc::off_t,
+                bytes as libc::off_t,
+            )
+        };
+        if code == 0 {
+            Ok(())
+        } else {
+            Err(io::Error::from_raw_os_error(code))
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct SpoolLimits {
     pub max_frame_bytes: usize,
@@ -295,6 +316,7 @@ pub struct TxnBuffer {
     memory: MemoryBudget,
     disk: FilesystemAdmissionController,
     space: Box<dyn FreeSpace>,
+    allocator: Box<dyn PhysicalAllocation>,
     memory_events: Vec<Vec<u8>>,
     metadata_reserved: usize,
     memory_payload: usize,
@@ -315,6 +337,7 @@ impl TxnBuffer {
         memory: MemoryBudget,
         disk: FilesystemAdmissionController,
         space: Box<dyn FreeSpace>,
+        allocator: Box<dyn PhysicalAllocation>,
     ) -> Result<Self, SpoolError> {
         if capture_epoch.is_empty()
             || xid.is_empty()
@@ -355,6 +378,7 @@ impl TxnBuffer {
             memory,
             disk,
             space,
+            allocator,
             memory_events,
             metadata_reserved,
             memory_payload: 0,
@@ -488,13 +512,15 @@ impl TxnBuffer {
             Ok(header) => header,
             Err(_) => {
                 self.memory.release(MemoryClass::Decoder, HEADER_WORK_BYTES);
-                fs::remove_file(&path).ok();
+                fs::remove_file(&path)?;
+                sync_dir(&self.directory)?;
                 return Err(SpoolError::Invalid("spool header encoding"));
             }
         };
         if header.len() > HEADER_WORK_BYTES / 2 {
             self.memory.release(MemoryClass::Decoder, HEADER_WORK_BYTES);
-            fs::remove_file(&path).ok();
+            fs::remove_file(&path)?;
+            sync_dir(&self.directory)?;
             return Err(SpoolError::MemoryLimit(MemoryClass::Decoder));
         }
         let header_len = (header.len() as u32).to_be_bytes();
@@ -511,8 +537,10 @@ impl TxnBuffer {
             Ok(value) => value,
             Err(error) => {
                 drop(file);
-                fs::remove_file(&path).ok();
-                sync_dir(&self.directory).ok();
+                if let Err(cleanup) = fs::remove_file(&path) {
+                    return Err(cleanup.into());
+                }
+                sync_dir(&self.directory)?;
                 return Err(error);
             }
         };
@@ -558,16 +586,7 @@ impl TxnBuffer {
         let available = self.space.available_bytes(&self.directory)?;
         self.disk.0.borrow_mut().admit(dev, available, bytes)?;
         let result = (|| {
-            let code = unsafe {
-                libc::posix_fallocate(
-                    file.as_raw_fd(),
-                    offset as libc::off_t,
-                    bytes as libc::off_t,
-                )
-            };
-            if code != 0 {
-                return Err(io::Error::from_raw_os_error(code));
-            }
+            self.allocator.allocate(file, offset, bytes)?;
             file.seek(SeekFrom::Start(offset))?;
             for part in parts {
                 file.write_all(part)?;
@@ -893,6 +912,8 @@ pub fn classify_startup_spools(
     max_event_bytes: usize,
     max_transaction_bytes: u64,
     max_transaction_events: u64,
+    max_spools: usize,
+    startup_memory: &mut MemoryBudget,
     mut existing: impl FnMut(&str, &str) -> ExistingTransaction,
 ) -> Result<Vec<StartupAction>, SpoolError> {
     if !lock.protects_store(store) {
@@ -900,17 +921,37 @@ pub fn classify_startup_spools(
             "startup lock does not protect state store",
         ));
     }
-    if max_event_bytes == 0 || max_transaction_bytes == 0 || max_transaction_events == 0 {
+    if max_event_bytes == 0
+        || max_transaction_bytes == 0
+        || max_transaction_events == 0
+        || max_spools == 0
+    {
         return Err(SpoolError::Invalid("zero startup scan bound"));
     }
+    let action_reservation = max_spools
+        .checked_mul(std::mem::size_of::<StartupAction>() + 4096)
+        .ok_or(SpoolError::MemoryLimit(MemoryClass::Staging))?;
+    startup_memory.reserve(MemoryClass::Staging, action_reservation)?;
     let quarantine = directory.join("quarantine");
-    fs::create_dir_all(&quarantine)?;
-    let mut actions = vec![];
+    if let Err(error) = fs::create_dir_all(&quarantine) {
+        startup_memory.release(MemoryClass::Staging, action_reservation);
+        return Err(error.into());
+    }
+    let mut actions = Vec::with_capacity(max_spools);
     for entry in fs::read_dir(directory)? {
         let path = entry?.path();
+        if path.as_os_str().as_encoded_bytes().len() > 4096 {
+            startup_memory.release(MemoryClass::Staging, action_reservation);
+            return Err(SpoolError::Invalid("spool path too long"));
+        }
         if path.extension().and_then(|x| x.to_str()) != Some("spool") {
             continue;
         }
+        if actions.len() == max_spools {
+            startup_memory.release(MemoryClass::Staging, action_reservation);
+            return Err(SpoolError::StartupBlocked);
+        }
+        startup_memory.reserve(MemoryClass::Decoder, READER_WORK_BYTES)?;
         let parsed = (|| {
             let mut r = BufReader::new(File::open(&path)?);
             let h = read_header(&mut r)?;
@@ -960,6 +1001,7 @@ pub fn classify_startup_spools(
             }
             Ok::<_, SpoolError>(h)
         })();
+        startup_memory.release(MemoryClass::Decoder, READER_WORK_BYTES);
         let action = match parsed {
             Ok(h) if h.capture_epoch == current_epoch && h.creation_run != current_run => {
                 match existing(&h.capture_epoch, &h.xid) {
@@ -980,10 +1022,11 @@ pub fn classify_startup_spools(
     }
     sync_dir(directory)?;
     sync_dir(&quarantine)?;
-    if actions
+    let blocked = actions
         .iter()
-        .any(|a| matches!(a, StartupAction::Quarantined(_)))
-    {
+        .any(|a| matches!(a, StartupAction::Quarantined(_)));
+    startup_memory.release(MemoryClass::Staging, action_reservation);
+    if blocked {
         return Err(SpoolError::StartupBlocked);
     }
     Ok(actions)
@@ -1032,6 +1075,16 @@ pub mod tests {
         receive.extend_from_slice(bytes)?;
         buffer.push_received(receive)
     }
+    fn startup_budget() -> MemoryBudget {
+        MemoryBudget::new(MemoryLimits {
+            process_limit: 1_048_576,
+            runtime_fixed: 1,
+            receive: 1,
+            decoder: 65_536,
+            staging: 65_536,
+        })
+        .unwrap()
+    }
     fn setup(name: &str, prefix: usize, space: u64) -> TxnBuffer {
         let d = dir(name);
         let dev = fs::metadata(&d).unwrap().dev();
@@ -1067,6 +1120,7 @@ pub mod tests {
             mem,
             FilesystemAdmissionController::new(disk),
             Box::new(FixedSpace(space)),
+            Box::new(PosixAllocation),
         )
         .unwrap()
     }
@@ -1249,6 +1303,7 @@ pub mod tests {
                 mem,
                 FilesystemAdmissionController::new(disk),
                 Box::new(FixedSpace(4096)),
+                Box::new(PosixAllocation),
             )
             .unwrap()
         };
@@ -1261,6 +1316,7 @@ pub mod tests {
         let malformed = store_dir.join("malformed.spool");
         fs::write(&malformed, b"bad").unwrap();
         let aliased_store = store_dir.join("state.db");
+        let mut scan_memory = startup_budget();
         assert!(matches!(
             classify_startup_spools(
                 &lock,
@@ -1271,6 +1327,8 @@ pub mod tests {
                 512,
                 1024,
                 4,
+                8,
+                &mut scan_memory,
                 |_, _| ExistingTransaction::Uncommitted
             ),
             Err(SpoolError::Invalid(
@@ -1286,6 +1344,8 @@ pub mod tests {
             512,
             1024,
             4,
+            8,
+            &mut scan_memory,
             |_, xid| {
                 if xid == "good" {
                     ExistingTransaction::Uncommitted

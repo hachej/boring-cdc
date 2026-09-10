@@ -13,6 +13,12 @@ impl Randomness for ZeroRandom {
         0
     }
 }
+struct EnospcAllocation;
+impl PhysicalAllocation for EnospcAllocation {
+    fn allocate(&self, _: &std::fs::File, _: u64, _: u64) -> io::Result<()> {
+        Err(io::Error::from_raw_os_error(libc::ENOSPC))
+    }
+}
 struct FixedSpace(u64);
 impl FreeSpace for FixedSpace {
     fn available_bytes(&self, _: &Path) -> io::Result<u64> {
@@ -47,6 +53,11 @@ fn buffer(
         staging: 16_384,
     })
     .unwrap();
+    let allocator: Box<dyn PhysicalAllocation> = if xid == "xid-enospc" {
+        Box::new(EnospcAllocation)
+    } else {
+        Box::new(PosixAllocation)
+    };
     TxnBuffer::new(
         root.to_path_buf(),
         "capture-epoch-v1".into(),
@@ -62,6 +73,7 @@ fn buffer(
         memory,
         FilesystemAdmissionController::new(disk),
         Box::new(FixedSpace(space)),
+        allocator,
     )
     .unwrap()
 }
@@ -116,7 +128,7 @@ fn main() {
             json!({"outcome":out,"error":format!("{error:?}"),"policy_action":format!("{action:?}"),"prepared_persistence":prepared.is_some()})
         }
         "enospc" => {
-            let mut b = buffer(&root, "xid-enospc", 0, 520, 32, 2);
+            let mut b = buffer(&root, "xid-enospc", 0, 4096, 32, 2);
             let error = push(&mut b, b"1234").unwrap_err();
             let clock = VirtualClock::new(1000);
             let mut random = ZeroRandom;
@@ -138,6 +150,14 @@ fn main() {
             push(&mut contradictory, b"two").unwrap();
             drop(contradictory);
             fs::write(root.join("malformed.spool"), b"bad").unwrap();
+            let mut startup_memory = MemoryBudget::new(MemoryLimits {
+                process_limit: 1_048_576,
+                runtime_fixed: 1,
+                receive: 1,
+                decoder: 65_536,
+                staging: 65_536,
+            })
+            .unwrap();
             let blocked = classify_startup_spools(
                 &lock,
                 &store,
@@ -147,6 +167,8 @@ fn main() {
                 512,
                 32,
                 2,
+                8,
+                &mut startup_memory,
                 |_, xid| {
                     if xid == "xid-dead" {
                         ExistingTransaction::Uncommitted
