@@ -57,7 +57,7 @@
     "retry-conflict": {
       "business": "fail",
       "business_count": 10,
-      "business_sorted_digest": "e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab",
+      "business_sorted_digest": "f7dc1b0c600ca3b039481375448c54611950b5ec6e803785b66cbfba5d80187f",
       "fence": "pass",
       "final_state": "pass",
       "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",

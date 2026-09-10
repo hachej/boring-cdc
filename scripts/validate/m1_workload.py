@@ -45,7 +45,7 @@ def external_digest(root,name,rows,maximum=4096):
  finally: shutil.rmtree(d,ignore_errors=True)
 def canonical_ledger(r): return r[2]+'\t'+h('\x1f'.join(r[i] for i in [0,3,4,5,6,7,8,10]))
 def dimensions(root,mode):
- ledger,business,state,fence=(records(root/n) for n in ['ledger.tsv','business.tsv','state.tsv','fence.tsv']); unavailable=mode=='unavailable'; by_id={}; conflict=False
+ ledger,business,state,fence=(records(root/n) for n in ['ledger.tsv','business.tsv','state.tsv','fence.tsv']); business.sort(); unavailable=mode=='unavailable'; by_id={}; conflict=False
  for r in business:
   old=by_id.get(r[0]); conflict |= old is not None and old!=r; by_id.setdefault(r[0],r)
  business=list(by_id.values()); ld=external_digest(root,'ledger',[canonical_ledger(r) for r in ledger]); bd=None if unavailable else external_digest(root,'business',['\t'.join(r[1:]) for r in business]); sd=external_digest(root,'state',['\t'.join(r) for r in state])
