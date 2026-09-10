@@ -1,0 +1,1 @@
+{"copied_bytes":9,"duplicate_reconciled":true,"event_count":2,"fault_hook":"after-sqlite-commit","first_seq":1,"last_seq":2,"durable_end_lsn":"0000000000000042"}

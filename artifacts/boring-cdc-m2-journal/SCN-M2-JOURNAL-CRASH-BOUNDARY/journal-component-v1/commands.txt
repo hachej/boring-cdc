@@ -1,0 +1,1 @@
+target/debug/examples/m2_journal_component fault $TMPDIR/isolated-journal.sqlite
