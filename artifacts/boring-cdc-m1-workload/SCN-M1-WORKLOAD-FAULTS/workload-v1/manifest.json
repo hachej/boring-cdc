@@ -1,0 +1,65 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/e2e/m1_workload.sh workload-v1",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command.stdout",
+      "stdout_sha256": "7a7fd899dfbb692b9939caf999d4fe22a8f423610f3281239f5edf9bdba49b32",
+      "version": "workload-v1"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "component",
+  "git_commit": "e7d19b74cb42d5cf8c482c174e19e6aeeed771e7",
+  "owner_bead": "boring-cdc-m1-workload.2",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command.stderr",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command.stdout",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/commands.txt",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/config.json",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/fault-timeline.json",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/logs/boring-cdc.jsonl",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/oracle.json",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/state/after.json",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/state/before.json",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/versions.json"
+    ],
+    "digest": "848c43d602e91b0cb91df1a8c9b334c68b7e03b34e2c627ea378e3981d6c09a5",
+    "product_faults": "independent_ledger_and_business_omissions",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-WORKLOAD-FAULTS",
+  "schema_version": "evidence/v1",
+  "seed": "workload-v1",
+  "source_preservation": {
+    "after_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "before_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": true,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": true,
+    "targeted_checks": true,
+    "workspace_tests": true
+  }
+}

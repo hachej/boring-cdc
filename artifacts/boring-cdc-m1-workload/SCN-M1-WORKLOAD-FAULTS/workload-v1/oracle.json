@@ -1,0 +1,103 @@
+{
+  "clean": {
+    "business": "pass",
+    "business_count": 10,
+    "business_sorted_digest": "37cf1c098cbfe0453bc600a1e5826c299394042a7e6bd9979d7e5d2c3af29ab6",
+    "fence": "pass",
+    "final_state": "pass",
+    "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+    "ledger": "pass",
+    "ledger_count": 11,
+    "ledger_sorted_digest": "7e0a5703fe958c14ce7dff6d70cf7c1a3bc0186bbfe350201aea7c01784d3d45",
+    "sequence_gaps": "pass",
+    "state_count": 4
+  },
+  "correlation_fields": [
+    "transaction_group_id",
+    "transaction_ordinal",
+    "entity_table",
+    "canonical_key",
+    "operation",
+    "after_hash"
+  ],
+  "digests": {
+    "business.tsv": "e69b8514a32326032468ea9c38f5229556ac327554623404267168f3ddee6dc1",
+    "fence.tsv": "8f04ab8f47c53c1f98b3241e2cdedb834610c766a1474004c05d6bf101388f82",
+    "ledger.tsv": "627ca6afbd78d7ae4fbb0a03f897ff04dfa0ea0558819fab93a01bab39345e02",
+    "state.tsv": "9a200747953ba8663b91527a991c3f5e427f4baee52e0970c027024ffe8d12de"
+  },
+  "faults": {
+    "business-omission": {
+      "business": "fail",
+      "business_count": 9,
+      "business_sorted_digest": "3fba12c20c4253a25bbb87c86585810f2368ae5b2f502118ad59fe2cd9aed729",
+      "fence": "pass",
+      "final_state": "pass",
+      "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+      "ledger": "pass",
+      "ledger_count": 11,
+      "ledger_sorted_digest": "7e0a5703fe958c14ce7dff6d70cf7c1a3bc0186bbfe350201aea7c01784d3d45",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    },
+    "ledger-omission": {
+      "business": "pass",
+      "business_count": 10,
+      "business_sorted_digest": "37cf1c098cbfe0453bc600a1e5826c299394042a7e6bd9979d7e5d2c3af29ab6",
+      "fence": "pass",
+      "final_state": "pass",
+      "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+      "ledger": "fail",
+      "ledger_count": 10,
+      "ledger_sorted_digest": "27f1eebb8dd6cea8787affef5f44cffc2a2bad67890c11691f41e10e834eeb1e",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    },
+    "retry-conflict": {
+      "business": "fail",
+      "business_count": 10,
+      "business_sorted_digest": "37cf1c098cbfe0453bc600a1e5826c299394042a7e6bd9979d7e5d2c3af29ab6",
+      "fence": "pass",
+      "final_state": "pass",
+      "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+      "ledger": "pass",
+      "ledger_count": 11,
+      "ledger_sorted_digest": "7e0a5703fe958c14ce7dff6d70cf7c1a3bc0186bbfe350201aea7c01784d3d45",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    },
+    "retry-duplicate": {
+      "business": "pass",
+      "business_count": 10,
+      "business_sorted_digest": "37cf1c098cbfe0453bc600a1e5826c299394042a7e6bd9979d7e5d2c3af29ab6",
+      "fence": "pass",
+      "final_state": "pass",
+      "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+      "ledger": "pass",
+      "ledger_count": 11,
+      "ledger_sorted_digest": "7e0a5703fe958c14ce7dff6d70cf7c1a3bc0186bbfe350201aea7c01784d3d45",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    },
+    "unavailable": {
+      "business": "unavailable",
+      "business_count": 0,
+      "business_sorted_digest": null,
+      "fence": "pass",
+      "final_state": "pass",
+      "final_typed_checksum": "470a153a0a2c464aba6dc0d1cd1293d1e1f4e75418327f7b66db1ff993607a85",
+      "ledger": "pass",
+      "ledger_count": 11,
+      "ledger_sorted_digest": "7e0a5703fe958c14ce7dff6d70cf7c1a3bc0186bbfe350201aea7c01784d3d45",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    }
+  },
+  "observation_boundary": "PostgreSQL AFTER-row triggers committed atomically with source transactions but independent of mutation-ledger writes",
+  "reader_samples": [
+    "0",
+    "",
+    "1"
+  ],
+  "schema_version": "m1-workload-packet/v1"
+}
