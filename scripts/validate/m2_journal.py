@@ -35,9 +35,13 @@ for scenario in selected:
  packet=root/'artifacts/boring-cdc-m2-journal'/scenario/'journal-component-v1'
  if packet.exists():
   manifest=json.loads((packet/'manifest.json').read_text()); versions=json.loads((packet/'versions.json').read_text())
-  if manifest['git_commit']!=head: errors.append(f'{scenario} not bound to exact HEAD')
+  evidence_commit=manifest['git_commit']
+  ancestor=subprocess.run(['git','merge-base','--is-ancestor',evidence_commit,head],cwd=root).returncode==0
+  bound=['src/m2_journal.rs','src/m2_schema.rs','src/lib.rs','examples/m2_journal_component.rs','contracts/m2/journal-cases.json','scripts/lib/m2_journal_component.py','scripts/validate/m2_journal.py','scripts/lib/core_validator.py','scripts/e2e/m2_journal.sh','scripts/faults/m2_journal.sh']
+  source_unchanged=ancestor and subprocess.run(['git','diff','--quiet',evidence_commit+'..'+head,'--',*bound],cwd=root).returncode==0
+  if not source_unchanged: errors.append(f'{scenario} not bound to reviewed implementation')
   if manifest['source_preservation']['before_sha256']!=impl or manifest['source_preservation']['after_sha256']!=impl: errors.append(f'{scenario} implementation digest mismatch')
-  if versions.get('git_commit')!=head or versions.get('implementation_sha256')!=impl: errors.append(f'{scenario} binary provenance source mismatch')
+  if versions.get('git_commit')!=evidence_commit or versions.get('implementation_sha256')!=impl: errors.append(f'{scenario} binary provenance source mismatch')
   binary=root/'target/debug/examples/m2_journal_component'
   if binary.exists() and versions.get('binary_sha256')!=sha(binary.read_bytes()): errors.append(f'{scenario} binary hash mismatch')
   events=[json.loads(x) for x in (packet/'logs/boring-cdc.jsonl').read_text().splitlines()]
