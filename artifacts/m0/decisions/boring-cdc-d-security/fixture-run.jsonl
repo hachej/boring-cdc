@@ -1,1 +1,1 @@
-{"code":"SECURITY_EXPOSURE_FIXTURE_VALID","outcome":"pass","phase":"validate_spec"}
+{"code":"SECURITY_EXPOSURE_FIXTURE_VALID","generator":"category_specific_structured_error","outcome":"pass","phase":"validate_spec","vector_count":24}

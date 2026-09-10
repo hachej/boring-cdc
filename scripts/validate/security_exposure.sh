@@ -123,7 +123,7 @@ try:
  if stable['owner_bead']!=owner or covered!={'evidence_status':'pending','id':decision_id,'owner_bead':owner,'source':'docs/PLAN.md','source_digest':stable['source_digest']}: fail()
  if subprocess.run([str(root/'scripts/validate/plan_coverage.sh')],cwd=root,capture_output=True).returncode: fail()
  probe_rel='artifacts/m0/decisions/boring-cdc-d-security/fixture-run.jsonl'; probe=[json.loads(x) for x in (root/probe_rel).read_text().splitlines()]
- expected_probe=[{'code':'SECURITY_EXPOSURE_FIXTURE_VALID','outcome':'pass','phase':'validate_spec'}]
+ expected_probe=[{'code':'SECURITY_EXPOSURE_FIXTURE_VALID','generator':'category_specific_structured_error','outcome':'pass','phase':'validate_spec','vector_count':24}]
  if probe!=expected_probe or spec['execution_probe']!={'expected_lines':expected_probe,'path':probe_rel,'sha256':sha(root/probe_rel)}: fail()
  decision=next(x for x in decisions['decisions'] if x['id']==decision_id)
  approval={'approved_at':'2026-09-10T14:03:30.910Z','approved_by':'Julien Hurault (repository owner), intentions d3e8abc3-d2f4-4bc0-8aec-d6ffd7bf2e36 and 5a994cfd-e4e2-46a7-b512-5dae280acae0','value_digest':hashlib.sha256(proposed.encode()).hexdigest()}
