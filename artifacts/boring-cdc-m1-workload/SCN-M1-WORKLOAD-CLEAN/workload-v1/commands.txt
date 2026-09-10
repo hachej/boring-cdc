@@ -1,1 +1,2 @@
-scripts/faults/m1_workload.sh workload-v1
+scripts/e2e/m1_workload.sh workload-v1
+scripts/e2e/m1_workload.sh workload-v1

@@ -7,16 +7,25 @@
     {
       "argv": "scripts/faults/m1_workload.sh workload-v1",
       "exit_code": 0,
-      "stderr_path": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command.stderr",
+      "stderr_path": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command-run-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_path": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command.stdout",
-      "stdout_sha256": "60dae84a530644c652d79c711da16cc1df7c153439b7ae27e2e4a4a775c9c316",
+      "stdout_path": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command-run-1.stdout",
+      "stdout_sha256": "c49b026a407069ebf318dc6df20927ac3b28586398f0134bd6e5f4cf2594939c",
+      "version": "workload-v1"
+    },
+    {
+      "argv": "scripts/faults/m1_workload.sh workload-v1",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command-run-2.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command-run-2.stdout",
+      "stdout_sha256": "c49b026a407069ebf318dc6df20927ac3b28586398f0134bd6e5f4cf2594939c",
       "version": "workload-v1"
     }
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "e4468d037db2fdbc4e5006567ed093d246a15e62",
+  "git_commit": "6747b9b6aeea4cc9a6009da973cfb530aceec544",
   "owner_bead": "boring-cdc-m1-workload.2",
   "redaction": {
     "checked": true,
@@ -24,6 +33,10 @@
   },
   "result": {
     "artifacts": [
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command-run-1.stderr",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command-run-1.stdout",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command-run-2.stderr",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command-run-2.stdout",
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command.stderr",
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/command.stdout",
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/commands.txt",
@@ -33,10 +46,11 @@
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/oracle.json",
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/state/after.json",
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/state/before.json",
+      "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/state/reader.txt",
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/versions.json"
     ],
-    "digest": "f7bd2197aaffad95340f611528fd7527327eb9c7c6d7a5a43c2e0a108fe1cee3",
-    "product_faults": "independent_clickhouse_ledger_business_fence_omissions",
+    "digest": "1e3ee3aedb4034620ff4d75bb78d5d30e707845864f2971b4535f50d079d393b",
+    "product_faults": "independent_clickhouse_ledger_business_fence_omissions_and_unavailable_boundary",
     "runtime_observed": true,
     "status": "pass"
   },
@@ -44,8 +58,8 @@
   "schema_version": "evidence/v1",
   "seed": "workload-v1",
   "source_preservation": {
-    "after_sha256": "c9dea03428b9b8bc451b4fec6d230fff89c669de7eecb6286d89b6cfe61c3672",
-    "before_sha256": "c9dea03428b9b8bc451b4fec6d230fff89c669de7eecb6286d89b6cfe61c3672",
+    "after_sha256": "7a3369f5c2aa355c91ec87ddfcd6cdabef5929fdba88ce00156e4fe7f45adaa3",
+    "before_sha256": "7a3369f5c2aa355c91ec87ddfcd6cdabef5929fdba88ce00156e4fe7f45adaa3",
     "preserved": true
   },
   "tier_proof": {
