@@ -77,15 +77,24 @@ def source_snapshot()->str:
   if path.is_file():chunks.extend((name.encode(),b"\0",path.read_bytes(),b"\0"))
  return sha(b"".join(chunks))
 
+def normalize_capture(data:bytes)->bytes:
+ text=data.decode(errors="replace")
+ text=text.replace(str(ROOT),"<workspace>")
+ text=re.sub(r"/(?:var/)?tmp/m0-scaffold-[^/\s]+","<isolated-temp>",text)
+ text=re.sub(r"(?i)(postgres(?:ql)?://[^\s:@]+:)[^\s@]+(@)",r"\1<redacted>\2",text)
+ text=re.sub(r"(?im)(BORING_CDC_(?:SOURCE_DSN|POSTGRES_PASSWORD_FILE)=)[^\s]+",r"\1<redacted>",text)
+ text=re.sub(r"/[^\s'\"]*/postgres_password(?:\b|$)","<secret-file>",text)
+ return text.encode()
+
 def run_record(argv:list[str],proof:Path,env:dict[str,str]|None=None,expected:int=0,display:str|None=None)->dict:
  index=len(list(proof.glob("*.stdout")));out=proof/f"{index:02d}.stdout";err=proof/f"{index:02d}.stderr"
  p=subprocess.run(argv,cwd=ROOT,env=env,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
- out.write_bytes(p.stdout);err.write_bytes(p.stderr)
+ out.write_bytes(normalize_capture(p.stdout));err.write_bytes(normalize_capture(p.stderr))
  record={"argv":display or " ".join(argv),"version":"m0-scaffold/2","exit_code":p.returncode,"stdout":out,"stderr":err}
  if p.returncode!=expected:raise RuntimeError(f"command exit {p.returncode}, expected {expected}: {' '.join(argv)}\n{p.stderr.decode(errors='replace')}")
  return record
 
-def emit_evidence(out:Path,attempt_records:list[tuple[list[dict],dict[str,list[dict]]]],source_digest:str,versions:dict,attempts:list[str])->None:
+def emit_evidence(out:Path,attempt_records:list[tuple[list[dict],dict[str,list[dict]]]],source_digest:str,versions:dict,attempts:list[str],binary_digest:str)->None:
  head=git("rev-parse","HEAD");scenarios=json.loads(read("fixtures/m0/scaffold/scenarios.json"))["scenarios"];shutil.rmtree(out,ignore_errors=True)
  for scenario in scenarios:
   root=out/scenario["id"]/SEED;root.mkdir(parents=True);selected=[]
@@ -102,7 +111,7 @@ def emit_evidence(out:Path,attempt_records:list[tuple[list[dict],dict[str,list[d
     rel=str(Path(command[f"{stream}_path"]).relative_to(root.relative_to(ROOT)))
     inventory[rel]=command[f"{stream}_sha256"]
   write_json(root/"sha256.json",inventory)
-  manifest={"schema_version":"m0-scaffold-manifest/v1","bead_id":"boring-cdc-m0-scaffold","scenario_id":scenario["id"],"git_sha":head,"binary_sha256":sha(read("Cargo.lock")),"image_digests":PINS,"seed":SEED,"profile":"component","commands":[{"argv":r["argv"],"exit_code":r["exit_code"]} for r in selected],"config_fingerprint":sha(read("config/boring-cdc.example.json")),"assertions":["single binary","immutable images","isolated health-gated Compose","artifact redaction","agent helpers read-only"],"artifact_hashes":inventory,"outcome":"pass","specified_outcome":scenario["expected_status"],"specified_exit":scenario["expected_exit"],"observed_probe_exit":observed_probe["exit_code"],"rerun_digests":attempts,"failure_fingerprint":None,"inventory_exclusions":["sha256.json","manifest.json","evidence.json"]}
+  manifest={"schema_version":"m0-scaffold-manifest/v1","bead_id":"boring-cdc-m0-scaffold","scenario_id":scenario["id"],"git_sha":head,"binary_sha256":binary_digest,"cargo_lock_sha256":sha(read("Cargo.lock")),"image_digests":PINS,"seed":SEED,"profile":"component","commands":[{"argv":r["argv"],"exit_code":r["exit_code"]} for r in selected],"config_fingerprint":sha(read("config/boring-cdc.example.json")),"assertions":["single binary","immutable images","isolated health-gated Compose","artifact redaction","agent helpers read-only"],"artifact_hashes":inventory,"outcome":"pass","specified_outcome":scenario["expected_status"],"specified_exit":scenario["expected_exit"],"observed_probe_exit":observed_probe["exit_code"],"rerun_digests":attempts,"failure_fingerprint":None,"inventory_exclusions":["sha256.json","manifest.json","evidence.json"]}
   write_json(root/"manifest.json",manifest);manifest_bytes=(root/"manifest.json").read_bytes()
   evidence={"schema_version":"evidence/v1","owner_bead":"boring-cdc-m0-scaffold","scenario_id":scenario["id"],"evidence_profile":"runtime","evidence_tier":"component","seed":SEED,"git_commit":head,"commands":commands,"source_preservation":{"before_sha256":source_digest,"after_sha256":source_digest,"preserved":True},"cleanup":{"complete":True,"remaining_paths":[]},"redaction":{"checked":True,"secrets_found":0},"tier_proof":{"targeted_checks":True,"boundary_e2e":True,"fault_suite":True,"deterministic_rerun":True,"consumed_contract_vectors":True,"workspace_tests":True,"integration":True,"clean_environment":True,"exit_assertions":True,"endurance":False,"full_failure_matrix":False,"clean_clone":False},"result":{"status":"pass","digest":sha(manifest_bytes),"artifacts":[str((root/"manifest.json").relative_to(ROOT))],"product_faults":"scaffold probes only; M6 owns partition and zombie timing","runtime_observed":True,"attempts":attempts}}
   write_json(root/"evidence.json",evidence)
@@ -175,7 +184,7 @@ def execute(out:Path)->None:
      scenarios["SCN-M0-SCAFFOLD-DIGEST-MISMATCH"]=[run_record(["python3","scripts/lib/m0_scaffold.py","probe","SCN-M0-SCAFFOLD-DIGEST-MISMATCH","--path",str(mutated)],proof,env,78,"python3 scripts/lib/m0_scaffold.py probe SCN-M0-SCAFFOLD-DIGEST-MISMATCH --path <isolated-mutated-compose>")]
      delay_project=f"{project}-delay";override=proof/"dependency-delay.yaml";override.write_text("services:\n  postgres:\n    healthcheck:\n      test: [\"CMD\", \"false\"]\n      interval: 1s\n      timeout: 1s\n      retries: 2\n      start_period: 0s\n")
      delay_env={**env,"COMPOSE_PROJECT_NAME":delay_project};delay_setup=run_record(["docker","compose","-f","compose.yaml","-f",str(override),"up","-d","--no-build","--wait","--wait-timeout","8"],proof,delay_env,1,"docker compose -f compose.yaml -f <dependency-delay> up -d --no-build --wait --wait-timeout 8")
-     delay_ps=run_record(["docker","compose","-f","compose.yaml","-f",str(override),"ps","--format","json"],proof,delay_env);scenarios["SCN-M0-SCAFFOLD-DEPENDENCY-DELAY"]=[delay_setup,delay_ps,run_record(["python3","scripts/lib/m0_scaffold.py","probe","SCN-M0-SCAFFOLD-DEPENDENCY-DELAY","--path",str(delay_ps["stdout"])],proof,env,75,"python3 scripts/lib/m0_scaffold.py probe SCN-M0-SCAFFOLD-DEPENDENCY-DELAY --path <observed-compose-status>")]
+     delay_ps=run_record(["docker","compose","-f","compose.yaml","-f",str(override),"ps","--format","json"],proof,delay_env,display="docker compose -f compose.yaml -f <dependency-delay> ps --format json");scenarios["SCN-M0-SCAFFOLD-DEPENDENCY-DELAY"]=[delay_setup,delay_ps,run_record(["python3","scripts/lib/m0_scaffold.py","probe","SCN-M0-SCAFFOLD-DEPENDENCY-DELAY","--path",str(delay_ps["stdout"])],proof,env,75,"python3 scripts/lib/m0_scaffold.py probe SCN-M0-SCAFFOLD-DEPENDENCY-DELAY --path <observed-compose-status>")]
      scenarios["SCN-M0-SCAFFOLD-ZOMBIE-BOUND"]=[run_record(["python3","scripts/lib/m0_scaffold.py","probe","SCN-M0-SCAFFOLD-ZOMBIE-BOUND"],proof,env)]
      scenarios["SCN-M0-SCAFFOLD-AGENT-READONLY"]=[run_record(["python3","scripts/lib/m0_scaffold.py","probe","SCN-M0-SCAFFOLD-AGENT-READONLY"],proof,env)]
      cargo_results=[]
@@ -184,7 +193,7 @@ def execute(out:Path)->None:
      for line in subprocess.check_output(["docker","compose","-f","compose.yaml","ps","--format","json"],env=env,text=True).splitlines():
       row=json.loads(line);services.append({k:row.get(k) for k in ("Service","State","Health")})
      image_id=subprocess.check_output(["docker","image","inspect",image,"--format","{{.Id}}"],env=env,text=True).strip()
-     semantic={"command_exits":[r["exit_code"] for r in common],"cargo_results":cargo_results,"compose_config_sha256":sha(common[2]["stdout"].read_bytes()),"connector_check":json.loads(common[-1]["stdout"].read_text()),"services":sorted(services,key=lambda x:x["Service"] or ""),"connector_image_id":image_id,"tools":{"server":server,"compose":compose,"buildkit":observed_buildkit},"scenarios":{k:{"exits":[r["exit_code"] for r in rows],"probe":rows[-1]["stdout"].read_text()} for k,rows in scenarios.items()}}
+     semantic={"command_exits":[r["exit_code"] for r in common],"cargo_results":cargo_results,"compose_config_sha256":sha(common[2]["stdout"].read_bytes()),"connector_check":json.loads(common[-2]["stdout"].read_text()),"binary_sha256":binary_digest,"services":sorted(services,key=lambda x:x["Service"] or ""),"connector_image_id":image_id,"tools":{"server":server,"compose":compose,"buildkit":observed_buildkit},"scenarios":{k:{"exits":[r["exit_code"] for r in rows],"probe":rows[-1]["stdout"].read_text()} for k,rows in scenarios.items()}}
      digest=sha(canonical(semantic));attempts.append(digest);semantic_attempts.append(semantic);attempt_records.append((common,scenarios));versions={"required":{"docker_engine":"28.3.3","docker_compose":"2.39.2","buildkit":"0.24.0","dockerfile_frontend":"1.12.0"},"observed":{"docker_engine":server,"docker_compose":compose,"buildkit":observed_buildkit}}
     finally:
      cleanup=[]
@@ -203,7 +212,7 @@ def execute(out:Path)->None:
   for outer_name in (dind,cli_container):
    if subprocess.run(["docker","inspect",outer_name],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode==0: raise RuntimeError(f"outer cleanup left container: {outer_name}")
   if source_snapshot()!=source_digest:raise RuntimeError("source tree changed before evidence emission")
-  emit_evidence(out,attempt_records,source_digest,versions,attempts)
+  emit_evidence(out,attempt_records,source_digest,versions,attempts,binary_digest)
  if source_snapshot()!=source_digest:raise RuntimeError("source tree changed after cleanup")
  print(canonical({"status":"pass","scenarios":5,"reruns":2,"docker_engine":"28.3.3","compose":"2.39.2","buildkit":"0.24.0"}).decode(),end="")
 

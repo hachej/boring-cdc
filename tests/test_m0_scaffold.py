@@ -1,9 +1,12 @@
 import json
 import subprocess
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts" / "lib"))
+import m0_scaffold
 
 def run(*args):
     return subprocess.run(args, cwd=ROOT, text=True, capture_output=True, check=True)
@@ -37,6 +40,34 @@ class ScaffoldTests(unittest.TestCase):
     def test_owner_confirmed_contract_has_no_provisional_markers(self):
         paths = (ROOT / "contracts/scaffold/m0-scaffold.json", ROOT / "config/boring-cdc.schema.json")
         self.assertFalse(any("M0-" + "PROVISIONAL" in path.read_text() for path in paths))
+
+    def test_capture_normalization_redacts_host_and_secret_paths(self):
+        captured = (
+            f"workspace={ROOT}/target/debug/boring-cdc "
+            "/var/tmp/m0-scaffold-random/attempt-1/postgres_password "
+            "postgresql://user:hunter2@db/source"
+        ).encode()
+        normalized = m0_scaffold.normalize_capture(captured).decode()
+        self.assertNotIn(str(ROOT), normalized)
+        self.assertNotIn("/var/tmp/", normalized)
+        self.assertNotIn("hunter2", normalized)
+        self.assertIn("<workspace>", normalized)
+        self.assertIn("<redacted>", normalized)
+
+    def test_m1_completion_rejects_reintroduced_provisional_marker(self):
+        marker = ROOT / "contracts" / ".test-provisional-marker"
+        marker.write_text("M0-" + "PROVISIONAL")
+        try:
+            result = subprocess.run(
+                ["scripts/acceptance/m1_complete.sh", "--probe"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+        finally:
+            marker.unlink(missing_ok=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("provisional marker reintroduced", result.stdout)
 
 if __name__ == "__main__":
     unittest.main()

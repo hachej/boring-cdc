@@ -111,11 +111,13 @@ if set(reconciliation.get('cards',{}))!=expected_cards: fail('owner cards missin
 for card in reconciliation.get('cards',{}).values():
  if card.get('decision')!='accept': fail('owner card is not accepted')
 markers=('boring-cdc-d-security','boring-cdc-d-values','boring-cdc-d-keys','boring-cdc-d-failure-policy','boring-cdc-d-sqlite','boring-cdc-d-wal-cap','boring-cdc-d-compose')
+provisional_marker='M0-'+'PROVISIONAL'
 for base in ('src','scripts','fixtures','contracts','artifacts','tests'):
  for path in (root/base).rglob('*'):
   if path.is_file() and 'target' not in path.parts:
    try: text=path.read_text()
    except UnicodeDecodeError: continue
+   if provisional_marker in text: fail(f'provisional marker reintroduced: {path.relative_to(root)}')
    for marker in markers:
     if f'M0-RECONCILED: {marker}' in text: fail(f'unreconciled marker {marker}: {path.relative_to(root)}')
 source=(root/'src/m1_config.rs').read_text()
