@@ -560,7 +560,7 @@ pub fn read_complete_range(
             break;
         }
         let measure: Option<(i64, i64, Option<i64>, Option<i64>)> = reader.query_one_bounded_params(
-            "SELECT count(*),coalesce(sum(length(payload)+length(transaction_id)+length(event_id)+length(payload_hash)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id=?1",
+            "SELECT count(*),coalesce(sum(length(payload)+length(CAST(transaction_id AS BLOB))+length(CAST(event_id AS BLOB))+length(CAST(payload_hash AS BLOB))),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id=?1",
             [txid.as_str()],
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )?;
@@ -1550,10 +1550,10 @@ pub mod tests {
         store
             .commit_atomic(
                 &commit(
-                    "tx1",
+                    "交易-1",
                     "0000000000000010",
                     vec![
-                        event("event-1", 0, b"payload"),
+                        event("événement-1", 0, b"payload"),
                         event("event-2", 1, b"payload-two"),
                         event("event-3", 2, b"payload-three"),
                     ],
