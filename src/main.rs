@@ -1,4 +1,6 @@
-use boring_cdc::m1_cli_contract::{ExitCode, command_help, parse, root_help, unavailable};
+use boring_cdc::m1_cli_contract::{
+    ExitCode, command_help, error_envelope, parse, root_help, unavailable,
+};
 use std::io::{self, Write};
 
 fn write_stdout(bytes: &[u8]) -> Result<(), ()> {
@@ -35,7 +37,15 @@ fn main() {
                 let _ = write_stdout(root_help().as_bytes());
                 return;
             }
-            eprintln!("{}: {}", error.code, error.message);
+            if argv.iter().any(|arg| arg == "--json") {
+                let mut bytes = serde_json::to_vec(&error_envelope(&error)).expect("envelope");
+                bytes.push(b'\n');
+                if write_stdout(&bytes).is_err() {
+                    std::process::exit(0);
+                }
+            } else {
+                eprintln!("{}: {}", error.code, error.message);
+            }
             std::process::exit(error.exit as i32);
         }
     }

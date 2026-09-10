@@ -1,0 +1,68 @@
+{
+  "attestation": {
+    "evidence_digest": "attestation-digest",
+    "facts": {
+      "audit_coverage": "unavailable"
+    },
+    "status": "unknown",
+    "subject_id": "destination-1"
+  },
+  "concurrent_conditions": [
+    {
+      "code": "journal_pressure",
+      "evidence_digest": "e1",
+      "runbook_id": "RB-JOURNAL-PRESSURE",
+      "severity": "warning"
+    },
+    {
+      "code": "destination_audit_stale",
+      "evidence_digest": null,
+      "runbook_id": "RB-AUDIT-STALE",
+      "severity": "blocked"
+    }
+  ],
+  "event_explanation": {
+    "baseline_eligibility": "eligible",
+    "candidate_eligibility": "unknown",
+    "current_audit_coverage": "unknown",
+    "destination_checkpoint_coverage": "covered",
+    "event_id": "event-1",
+    "live_generation_selection": "selected",
+    "locally_durable": "true",
+    "reason_codes": [
+      "EXPLAIN_AUDIT_UNAVAILABLE"
+    ],
+    "unavailable_evidence": [
+      "audit_gc_expired"
+    ]
+  },
+  "fact_freshness": [
+    "fresh",
+    "stale",
+    "unknown"
+  ],
+  "forecast": {
+    "assumptions": [
+      "synthetic_only"
+    ],
+    "evidence_digest": "forecast-digest",
+    "observed_snapshot_id": "snapshot-before",
+    "profile_id": "synthetic-profile",
+    "recoverable_until": null
+  },
+  "ownership_classes": [
+    "none",
+    "live_owner",
+    "offline_eligible",
+    "maintenance"
+  ],
+  "schema_version": 1,
+  "terminal_trace": {
+    "after_snapshot_id": "snapshot-after",
+    "before_snapshot_id": "snapshot-before",
+    "external_effect_evidence_digest": "effect-digest",
+    "immutable_intent_id": "intent-1",
+    "plan_digest": "plan-digest",
+    "safe_terminal_state": null
+  }
+}

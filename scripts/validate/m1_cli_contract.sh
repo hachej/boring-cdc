@@ -4,7 +4,9 @@ root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd); cd "$root"
 generated=$(mktemp); trap 'rm -f "$generated"' EXIT HUP INT TERM
 cargo run --quiet --locked --example m1_cli_contract >"$generated"
 cmp "$generated" tests/fixtures/m1_cli/registry-v1.json
-python3 - "$generated" <<'PY'
+cargo run --quiet --locked --example m1_cli_contract -- fixture >"$generated"
+cmp "$generated" tests/fixtures/m1_cli/envelopes-v1.json
+python3 - tests/fixtures/m1_cli/registry-v1.json <<'PY'
 import json,sys
 items=json.load(open(sys.argv[1]))
 assert len(items)==28
