@@ -314,15 +314,19 @@ CREATE TRIGGER IF NOT EXISTS source_floor_requires_nonterminal_intent BEFORE INS
 CREATE TRIGGER IF NOT EXISTS source_floor_update_requires_nonterminal_intent BEFORE UPDATE OF slot_creation_intent_id,slot_creation_floor_lsn ON source_state WHEN NEW.slot_creation_intent_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM bootstrap_intents b WHERE b.intent_id=NEW.slot_creation_intent_id AND b.state NOT IN ('complete','invalidated','aborted')) BEGIN SELECT RAISE(ABORT,'creation floor intent is terminal'); END;
 CREATE TRIGGER IF NOT EXISTS referenced_bootstrap_intent_stays_nonterminal BEFORE UPDATE OF state ON bootstrap_intents WHEN NEW.state IN ('complete','invalidated','aborted') AND EXISTS(SELECT 1 FROM source_state s WHERE s.slot_creation_intent_id=OLD.intent_id) BEGIN SELECT RAISE(ABORT,'referenced creation-floor intent cannot become terminal'); END;
 CREATE TRIGGER IF NOT EXISTS promotion_fence_above_high_water BEFORE INSERT ON destination_promotion_intents WHEN NEW.promotion_fence <= (SELECT highest_external_fence FROM destinations WHERE destination_id=NEW.destination_id) BEGIN SELECT RAISE(ABORT,'promotion fence is not above high-water'); END;
-CREATE TRIGGER IF NOT EXISTS promotion_fence_allocated AFTER INSERT ON destination_promotion_intents BEGIN UPDATE destinations SET highest_external_fence=NEW.promotion_fence,revision=revision+1 WHERE destination_id=NEW.destination_id; END;
+CREATE TRIGGER IF NOT EXISTS promotion_fence_allocated AFTER INSERT ON destination_promotion_intents BEGIN UPDATE destinations SET highest_external_fence=NEW.promotion_fence WHERE destination_id=NEW.destination_id; END;
 "#;
 
 const MIGRATION_2_CHECKSUM: &str =
-    "sha256:fe127c9d8724319ed12c6173b7df45a0b5c51d22c2955a9e2df62ac9fda3022c";
+    "sha256:eb434cd6a33109e6ecafebc92c510763f9bd964944079b895c018e737e36ee3b";
 const MIGRATION_2: &str = r#"
+DROP TRIGGER complete_anchor_immutable;
+DROP TRIGGER promotion_fence_allocated;
 ALTER TABLE bootstrap_anchors ADD COLUMN generation_id TEXT;
 ALTER TABLE bootstrap_anchors ADD COLUMN bootstrap_intent_id TEXT;
+UPDATE bootstrap_anchors SET state='invalidated' WHERE state='complete';
 ALTER TABLE destinations ADD COLUMN revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0);
+ALTER TABLE operator_command_requests ADD COLUMN request_revision INTEGER NOT NULL DEFAULT 0 CHECK(request_revision>=0);
 ALTER TABLE destination_audits ADD COLUMN retained_history_start_seq INTEGER CHECK(retained_history_start_seq IS NULL OR retained_history_start_seq>=0);
 ALTER TABLE destination_audits ADD COLUMN unverifiable_before_seq INTEGER CHECK(unverifiable_before_seq IS NULL OR unverifiable_before_seq>=0);
 CREATE TABLE audit_coverage_subranges(
@@ -331,13 +335,15 @@ CREATE TABLE audit_coverage_subranges(
  start_seq INTEGER NOT NULL CHECK(start_seq>=0), end_seq INTEGER NOT NULL CHECK(end_seq>=start_seq),
  fresh_until TEXT NOT NULL, evidence_digest TEXT NOT NULL,
  PRIMARY KEY(audit_id,coverage_kind,start_seq,end_seq));
+CREATE TRIGGER complete_anchor_immutable BEFORE UPDATE ON bootstrap_anchors WHEN OLD.state='complete' BEGIN SELECT RAISE(ABORT,'complete anchor is immutable'); END;
+CREATE TRIGGER promotion_fence_allocated AFTER INSERT ON destination_promotion_intents BEGIN UPDATE destinations SET highest_external_fence=NEW.promotion_fence,revision=revision+1 WHERE destination_id=NEW.destination_id; END;
 CREATE TRIGGER anchor_v2_insert BEFORE INSERT ON bootstrap_anchors WHEN NEW.state='complete' AND (
  NEW.generation_id IS NULL OR NEW.bootstrap_intent_id IS NULL OR
  NOT EXISTS(SELECT 1 FROM backfill_generations g JOIN backfill_runs r ON r.run_id=g.run_id WHERE g.generation_id=NEW.generation_id AND r.capture_epoch=NEW.capture_epoch AND g.generation=NEW.generation AND g.state='complete') OR
  NOT EXISTS(SELECT 1 FROM backfill_chunks c WHERE c.generation_id=NEW.generation_id AND c.state='complete') OR
  EXISTS(SELECT 1 FROM backfill_chunks c WHERE c.generation_id=NEW.generation_id AND c.state!='complete') OR
  NEW.snapshot_complete_seq!=(SELECT max(c.completed_seq) FROM backfill_chunks c WHERE c.generation_id=NEW.generation_id) OR
- NOT EXISTS(SELECT 1 FROM bootstrap_intents b WHERE b.intent_id=NEW.bootstrap_intent_id AND b.capture_epoch=NEW.capture_epoch) OR
+ NOT EXISTS(SELECT 1 FROM bootstrap_intents b WHERE b.intent_id=NEW.bootstrap_intent_id AND b.capture_epoch=NEW.capture_epoch AND (NEW.lower_stitch_lsn IS NOT NULL OR b.creation_floor_lsn=NEW.snapshot_boundary_lsn)) OR
  NOT EXISTS(SELECT 1 FROM bootstrap_imports i WHERE i.intent_id=NEW.bootstrap_intent_id AND i.state='acknowledged') OR
  EXISTS(SELECT 1 FROM bootstrap_imports i WHERE i.intent_id=NEW.bootstrap_intent_id AND i.state!='acknowledged') OR
  (NEW.start_seq!=0 AND NOT EXISTS(SELECT 1 FROM source_transactions t WHERE t.capture_epoch=NEW.capture_epoch AND t.last_seq=NEW.start_seq))
@@ -348,7 +354,7 @@ CREATE TRIGGER anchor_v2_update BEFORE UPDATE OF state ON bootstrap_anchors WHEN
  NOT EXISTS(SELECT 1 FROM backfill_chunks c WHERE c.generation_id=NEW.generation_id AND c.state='complete') OR
  EXISTS(SELECT 1 FROM backfill_chunks c WHERE c.generation_id=NEW.generation_id AND c.state!='complete') OR
  NEW.snapshot_complete_seq!=(SELECT max(c.completed_seq) FROM backfill_chunks c WHERE c.generation_id=NEW.generation_id) OR
- NOT EXISTS(SELECT 1 FROM bootstrap_intents b WHERE b.intent_id=NEW.bootstrap_intent_id AND b.capture_epoch=NEW.capture_epoch) OR
+ NOT EXISTS(SELECT 1 FROM bootstrap_intents b WHERE b.intent_id=NEW.bootstrap_intent_id AND b.capture_epoch=NEW.capture_epoch AND (NEW.lower_stitch_lsn IS NOT NULL OR b.creation_floor_lsn=NEW.snapshot_boundary_lsn)) OR
  NOT EXISTS(SELECT 1 FROM bootstrap_imports i WHERE i.intent_id=NEW.bootstrap_intent_id AND i.state='acknowledged') OR
  EXISTS(SELECT 1 FROM bootstrap_imports i WHERE i.intent_id=NEW.bootstrap_intent_id AND i.state!='acknowledged') OR
  (NEW.start_seq!=0 AND NOT EXISTS(SELECT 1 FROM source_transactions t WHERE t.capture_epoch=NEW.capture_epoch AND t.last_seq=NEW.start_seq))
@@ -383,6 +389,17 @@ CREATE TRIGGER archive_generation_transition BEFORE UPDATE OF state ON archive_g
 CREATE TRIGGER archive_segment_transition BEFORE UPDATE OF state ON archive_segment_intents WHEN NOT ((OLD.state='selected' AND NEW.state IN ('writing','failed')) OR (OLD.state='writing' AND NEW.state IN ('published','failed')) OR NEW.state=OLD.state) BEGIN SELECT RAISE(ABORT,'invalid archive-segment transition'); END;
 CREATE TRIGGER audit_revision BEFORE UPDATE ON destination_audits WHEN NEW.revision!=OLD.revision+1 BEGIN SELECT RAISE(ABORT,'stale audit revision'); END;
 CREATE TRIGGER complete_anchor_blocks_generation_delete BEFORE DELETE ON backfill_generations WHEN EXISTS(SELECT 1 FROM bootstrap_anchors a WHERE a.state='complete' AND a.generation_id=OLD.generation_id) BEGIN SELECT RAISE(ABORT,'anchor generation proof is immutable'); END;
+CREATE TRIGGER complete_anchor_blocks_chunk_insert BEFORE INSERT ON backfill_chunks WHEN EXISTS(SELECT 1 FROM bootstrap_anchors a WHERE a.state='complete' AND a.generation_id=NEW.generation_id) BEGIN SELECT RAISE(ABORT,'anchor chunk set is immutable'); END;
+CREATE TRIGGER complete_anchor_blocks_import_insert BEFORE INSERT ON bootstrap_imports WHEN EXISTS(SELECT 1 FROM bootstrap_anchors a WHERE a.state='complete' AND a.bootstrap_intent_id=NEW.intent_id) BEGIN SELECT RAISE(ABORT,'anchor importer set is immutable'); END;
+CREATE TRIGGER complete_anchor_blocks_fence_update BEFORE UPDATE ON durable_capture_fences WHEN EXISTS(SELECT 1 FROM bootstrap_anchors a WHERE a.state='complete' AND a.capture_epoch=OLD.capture_epoch AND a.generation=OLD.generation AND a.post_copy_fence_nonce=OLD.nonce) BEGIN SELECT RAISE(ABORT,'anchor fence proof is immutable'); END;
+CREATE TRIGGER complete_anchor_blocks_run_update BEFORE UPDATE ON backfill_runs WHEN EXISTS(SELECT 1 FROM backfill_generations g JOIN bootstrap_anchors a ON a.generation_id=g.generation_id WHERE a.state='complete' AND g.run_id=OLD.run_id) BEGIN SELECT RAISE(ABORT,'anchor run proof is immutable'); END;
+CREATE TRIGGER complete_anchor_blocks_intent_update BEFORE UPDATE ON bootstrap_intents WHEN EXISTS(SELECT 1 FROM bootstrap_anchors a WHERE a.state='complete' AND a.bootstrap_intent_id=OLD.intent_id) BEGIN SELECT RAISE(ABORT,'anchor bootstrap proof is immutable'); END;
+CREATE TRIGGER complete_anchor_blocks_source_delete BEFORE DELETE ON source_transactions WHEN EXISTS(SELECT 1 FROM bootstrap_anchors a WHERE a.state='complete' AND a.capture_epoch=OLD.capture_epoch AND a.start_seq=OLD.last_seq) BEGIN SELECT RAISE(ABORT,'anchor lower proof is immutable'); END;
+CREATE TRIGGER checkpoint_revision BEFORE UPDATE ON destination_checkpoints WHEN NEW.revision!=OLD.revision+1 BEGIN SELECT RAISE(ABORT,'stale checkpoint revision'); END;
+CREATE TRIGGER source_state_revision BEFORE UPDATE ON source_state WHEN NEW.control_revision!=OLD.control_revision+1 BEGIN SELECT RAISE(ABORT,'stale source-state revision'); END;
+CREATE TRIGGER command_revision BEFORE UPDATE ON operator_command_requests WHEN NEW.request_revision!=OLD.request_revision+1 BEGIN SELECT RAISE(ABORT,'stale command revision'); END;
+CREATE TRIGGER audit_subrange_insert BEFORE INSERT ON audit_coverage_subranges WHEN NOT EXISTS(SELECT 1 FROM destination_audits a WHERE a.audit_id=NEW.audit_id AND NEW.start_seq>=coalesce(a.retained_history_start_seq,0) AND NEW.start_seq>=coalesce(a.unverifiable_before_seq,0) AND NEW.end_seq<=a.round_target_seq AND NEW.fresh_until>a.freshness_window_started_at AND NEW.fresh_until<=a.freshness_expires_at) BEGIN SELECT RAISE(ABORT,'audit subrange outside frozen retention/freshness target'); END;
+CREATE TRIGGER audit_subrange_update BEFORE UPDATE ON audit_coverage_subranges WHEN NOT EXISTS(SELECT 1 FROM destination_audits a WHERE a.audit_id=NEW.audit_id AND NEW.start_seq>=coalesce(a.retained_history_start_seq,0) AND NEW.start_seq>=coalesce(a.unverifiable_before_seq,0) AND NEW.end_seq<=a.round_target_seq AND NEW.fresh_until>a.freshness_window_started_at AND NEW.fresh_until<=a.freshness_expires_at) BEGIN SELECT RAISE(ABORT,'audit subrange outside frozen retention/freshness target'); END;
 "#;
 
 #[cfg(test)]
@@ -580,7 +597,7 @@ pub mod tests {
                 [],
             )
             .unwrap();
-        w.connection().execute("INSERT INTO bootstrap_intents VALUES('boot','epoch','sys','db','slot',NULL,'complete',0,'now')",[]).unwrap();
+        w.connection().execute("INSERT INTO bootstrap_intents VALUES('boot','epoch','sys','db','slot','0000000000000000','complete',0,'now')",[]).unwrap();
         w.connection()
             .execute(
                 "INSERT INTO bootstrap_imports VALUES('import','boot','d','acknowledged',0)",
@@ -614,13 +631,31 @@ pub mod tests {
                 )
                 .is_err()
         );
+        assert!(w.connection().execute("UPDATE durable_capture_fences SET post_copy_fence_lsn='0000000000000011' WHERE fence_id='f'",[]).is_err());
+        assert!(
+            w.connection()
+                .execute(
+                    "UPDATE backfill_runs SET revision=revision+1 WHERE run_id='br'",
+                    []
+                )
+                .is_err()
+        );
+        assert!(
+            w.connection()
+                .execute(
+                    "UPDATE bootstrap_intents SET revision=revision+1 WHERE intent_id='boot'",
+                    []
+                )
+                .is_err()
+        );
+        assert!(w.connection().execute("INSERT INTO backfill_chunks VALUES('late','bg',X'02',X'03','pending',NULL,NULL)",[]).is_err());
     }
 
     #[test]
     fn command_nonce_abort_and_external_fence_survive_restart() {
         let (p, w) = writer("restart");
-        w.connection().execute("INSERT INTO operator_command_requests VALUES('req','nonce',X'01','digest','run','peer','accepted',NULL,1,1,'later')",[]).unwrap();
-        w.connection().execute("UPDATE operator_command_requests SET state='aborted_by_restart' WHERE state IN ('accepted','reconciling') AND run_id!='new-run'",[]).unwrap();
+        w.connection().execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at) VALUES('req','nonce',X'01','digest','run','peer','accepted',NULL,1,1,'later')",[]).unwrap();
+        w.connection().execute("UPDATE operator_command_requests SET state='aborted_by_restart',request_revision=request_revision+1 WHERE state IN ('accepted','reconciling') AND run_id!='new-run'",[]).unwrap();
         w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation,highest_external_fence,adopted_external_fence_at,adopted_external_fence_evidence) VALUES('d','clickhouse','cfg','epoch',1,9,'now','proof')",[]).unwrap();
         drop(w);
         let w = open_writer(&p, "new-run", 2, 2000).unwrap();
@@ -675,6 +710,13 @@ pub mod tests {
         )
         .unwrap();
         c.execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation,highest_external_fence) VALUES('preserved','archive','cfg','epoch',1,11)",[]).unwrap();
+        c.execute_batch(
+            "BEGIN IMMEDIATE; ALTER TABLE bootstrap_anchors ADD COLUMN crash_probe TEXT; ROLLBACK;",
+        )
+        .unwrap();
+        drop(c);
+        let c = Connection::open(&upgrade).unwrap();
+        assert_eq!(c.query_row("SELECT count(*) FROM pragma_table_info('bootstrap_anchors') WHERE name='crash_probe'",[],|r|r.get::<_,i64>(0)).unwrap(),0);
         apply_migrations(&c).unwrap();
         apply_migrations(&c).unwrap();
         assert_eq!(
@@ -746,6 +788,8 @@ pub mod tests {
         w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,budget_bytes_used,budget_events_used,budget_ms_used,freshness_window_started_at,freshness_expires_at,contract_digest,evidence_digest,first_mismatch,revision,retained_history_start_seq,unverifiable_before_seq) VALUES('audit','d','cfg','epoch',1,1,'identity',0,0,10,2,3,'2026-01-01','2027-01-01','contract','evidence','mismatch',0,0,NULL)",[]).unwrap();
         w.connection().execute("INSERT INTO audit_coverage_subranges VALUES('audit','journal_verified',0,1,'2027-01-01','range-proof')",[]).unwrap();
         assert!(w.connection().execute("INSERT INTO audit_coverage_subranges VALUES('audit','self_consistent',2,1,'2027-01-01','bad')",[]).is_err());
+        assert!(w.connection().execute("INSERT INTO audit_coverage_subranges VALUES('audit','self_consistent',0,2,'2027-01-01','beyond-target')",[]).is_err());
+        assert!(w.connection().execute("INSERT INTO audit_coverage_subranges VALUES('audit','self_consistent',0,1,'2028-01-01','expired')",[]).is_err());
         drop(w);
         let w = open_writer(&p, "run-2", 2, 2_000).unwrap();
         assert_eq!(
