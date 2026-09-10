@@ -2,14 +2,14 @@
   "actual_connection_attestation": true,
   "findings": [],
   "fixture_count": 36,
-  "input_tree_sha256": "f8a208734f4586683d8a115c04c8d6f537f898755ffb6eaba589bbeca6d267be",
+  "input_tree_sha256": "e0f6e25915b8a5ddab5c608a4146cab0419b9a9d04d95b210176854fd8946518",
   "inputs": {
-    "contracts/storage/sqlite-schema.sql": "4d20a9396fecd1b868a26c91ff8bc456bd99a8194cd14c199ae4c819a129e59c",
-    "contracts/storage/storage-fixtures.schema.json": "9b20458b7a7f5cc2c1ff4e5cf7e76ac9a4ae8d8e28ef2e44a5bede628bd8f3aa",
-    "contracts/storage/storage-model.json": "6e7d11d0ca777d362f3f39132ab5b9f04d027a73fc4d5d5edb370d6f75756799",
-    "contracts/storage/storage-model.schema.json": "408c68eec392414cbd0bf148b23ae20230601f8676fb2978e0446b2ce0964b75",
+    "contracts/storage/sqlite-schema.sql": "e8a0ca493baacece6afcae18aa727e5e807f1442cc530a0e0da123fc64ee2800",
+    "contracts/storage/storage-fixtures.schema.json": "57e4f5071bb7b691e7700978ecb5d5a1105408251b5dbb914cf78b5f28a8b38b",
+    "contracts/storage/storage-model.json": "ee29a7d15db9a7c6c223023cb268e1b96ba2e5197072c13041037beb58170e7e",
+    "contracts/storage/storage-model.schema.json": "a3cb35624b35ca63634d0de5202102a6df03f24c0def0e4156d3fa2e1d041013",
     "contracts/storage/storage-result.schema.json": "844ff4da1b54ffc653ab79e489ba7eeb41814a05f434a0b3bb5688d3db43b266",
-    "fixtures/m0/storage/scenarios.json": "bf33aa2290ee4eda046dfb5ed610eab2a54a20366899c2c25a3dc6320ede6339"
+    "fixtures/m0/storage/scenarios.json": "5dbb539cf3e2fd064d0ea2b3793a3c7ed785e624415364a6cc63988a3e4dfdbb"
   },
   "owner_bead": "boring-cdc-m0-storage-model",
   "product_faults": "fault_not_applicable",
@@ -18,5 +18,5 @@
   "source_parent_git_commit": "574b026cfc848e97027157ed6e85bd3612f579a0",
   "status": "pass",
   "validator": "scripts/validate/storage_contract.py",
-  "validator_sha256": "e2383e99d75bbacee7b93772a3fa9e82933a82980915bfe984bf476decb8516a"
+  "validator_sha256": "d233d716ac5130052881db9a2896602c8202ee501ae9ebb2152ca19406329dcc"
 }

@@ -618,6 +618,42 @@
             "observer_may_certify_writer": {
               "type": "boolean"
             },
+            "required_observed_values": {
+              "additionalProperties": false,
+              "properties": {
+                "auto_vacuum": {
+                  "type": "integer"
+                },
+                "foreign_keys": {
+                  "type": "integer"
+                },
+                "journal_mode": {
+                  "type": "string"
+                },
+                "synchronous": {
+                  "type": "integer"
+                },
+                "temp_store": {
+                  "type": "integer"
+                },
+                "trusted_schema": {
+                  "type": "integer"
+                },
+                "wal_autocheckpoint": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "journal_mode",
+                "synchronous",
+                "auto_vacuum",
+                "foreign_keys",
+                "trusted_schema",
+                "wal_autocheckpoint",
+                "temp_store"
+              ],
+              "type": "object"
+            },
             "stale_or_offline": {
               "type": "string"
             },
@@ -633,7 +669,8 @@
             "freshness_ms",
             "observer_may_certify_writer",
             "stale_or_offline",
-            "writer_applies_and_reads_back"
+            "writer_applies_and_reads_back",
+            "required_observed_values"
           ],
           "type": "object"
         },

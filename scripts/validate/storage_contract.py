@@ -2,7 +2,9 @@
 import hashlib, importlib.util, json, sqlite3, subprocess, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; OWNER='boring-cdc-m0-storage-model'
-C=ROOT/'contracts/storage/storage-model.json'; S=ROOT/'contracts/storage/storage-model.schema.json'; Q=ROOT/'contracts/storage/sqlite-schema.sql'; F=ROOT/'fixtures/m0/storage/scenarios.json'; FS=ROOT/'contracts/storage/storage-fixtures.schema.json'; R=ROOT/'contracts/storage/storage-result.schema.json'; E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence.json'; V=Path(__file__)
+C=ROOT/'contracts/storage/storage-model.json'; S=ROOT/'contracts/storage/storage-model.schema.json'; Q=ROOT/'contracts/storage/sqlite-schema.sql'; F=ROOT/'fixtures/m0/storage/scenarios.json'; FS=ROOT/'contracts/storage/storage-fixtures.schema.json'; R=ROOT/'contracts/storage/storage-result.schema.json'; E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence.json'; V=Path(__file__); M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
+EXPECTED_CONTRACT_SHA256='ee29a7d15db9a7c6c223023cb268e1b96ba2e5197072c13041037beb58170e7e'
+EXPECTED_FIXTURES_SHA256='5dbb539cf3e2fd064d0ea2b3793a3c7ed785e624415364a6cc63988a3e4dfdbb'
 core_spec=importlib.util.spec_from_file_location('core_validator',ROOT/'scripts/lib/core_validator.py'); core=importlib.util.module_from_spec(core_spec); core_spec.loader.exec_module(core)
 def load(p):
  def pairs(xs):
@@ -47,18 +49,40 @@ def validate():
  required={'fixture_id','executor_id','seed','matrix','hook','inputs','expected'}; expected={'state','exit_code','feedback','checkpoint','external_effect','status_code','log_code','redacted'}
  for i,x in enumerate(cases):
   if set(x)!=required or set(x['expected'])!=expected or x['seed']!=f['fixed_seed'] or not x['hook'] or not x['inputs']['fault_once'] or x['expected']['redacted'] is not True:add(fs,'E_FIXTURE_SHAPE',f'cases/{i}','fixture is not closed and executable')
+ by_id={x['fixture_id']:x for x in cases}
+ exit_expect={'SCN-M0-STORAGE-UNSUPPORTED-FS':78,'SCN-M0-STORAGE-PERMISSION-WEAK':78,'SCN-M0-STORAGE-MEMORY-OVER-LIMIT':78,'SCN-M0-STORAGE-ENOSPC-PERSIST-FAIL':74,'SCN-M0-STORAGE-ADVISORY-UNCERTAIN':73,'SCN-M0-STORAGE-DIRECT-SECOND-WRITER':75}
+ for fid,code in exit_expect.items():
+  if by_id.get(fid,{}).get('expected',{}).get('exit_code')!=code:add(fs,'E_EXIT_TAXONOMY',fid,f'expected exit {code}')
+ boundary={'SCN-M0-STORAGE-STATE-NEAR-LIMIT':(10737418240,10737418240),'SCN-M0-STORAGE-STATE-OVER-LIMIT':(10737418241,10737418240),'SCN-M0-STORAGE-SEPARATE-ARCHIVE-FULL':(1073741824,1073741823),'SCN-M0-STORAGE-SHARED-FS-COMBINED':(21474836480,21474836480)}
+ for fid,pair in boundary.items():
+  i=by_id.get(fid,{}).get('inputs',{})
+  if (i.get('allocation_request_bytes'),i.get('available_above_reserve_bytes'))!=pair:add(fs,'E_BOUNDARY_VECTOR',fid,'numeric allocation boundary changed')
+ u=by_id.get('SCN-M0-STORAGE-UNSUPPORTED-FS',{})
+ if u.get('matrix',{}).get('filesystem')!='tmpfs' or u.get('inputs',{}).get('filesystem_observed')!='tmpfs':add(fs,'E_FS_VECTOR','SCN-M0-STORAGE-UNSUPPORTED-FS','unsupported filesystem not encoded as a value')
  # Actual connection-level attestation against a disposable database; never mutate the real store.
  try:
   with tempfile.TemporaryDirectory() as td:
    db=Path(td)/'journal.sqlite'; con=sqlite3.connect(db)
-   con.execute('PRAGMA page_size=4096'); con.execute('PRAGMA auto_vacuum=INCREMENTAL'); con.execute('PRAGMA journal_mode=WAL'); con.execute('PRAGMA synchronous=FULL'); con.execute('PRAGMA foreign_keys=ON'); con.execute('PRAGMA trusted_schema=OFF'); con.execute('PRAGMA wal_autocheckpoint=0'); con.execute('PRAGMA busy_timeout=5000')
+   con.execute('PRAGMA page_size=4096'); con.execute('PRAGMA auto_vacuum=INCREMENTAL'); con.execute('PRAGMA journal_mode=WAL'); con.execute('PRAGMA synchronous=FULL'); con.execute('PRAGMA foreign_keys=ON'); con.execute('PRAGMA trusted_schema=OFF'); con.execute('PRAGMA wal_autocheckpoint=0'); con.execute('PRAGMA busy_timeout=5000'); con.execute('PRAGMA temp_store=FILE')
    con.executescript(Q.read_text())
-   observed=(con.execute('PRAGMA journal_mode').fetchone()[0],con.execute('PRAGMA synchronous').fetchone()[0],con.execute('PRAGMA auto_vacuum').fetchone()[0],con.execute('PRAGMA foreign_keys').fetchone()[0],con.execute('PRAGMA trusted_schema').fetchone()[0],con.execute('PRAGMA wal_autocheckpoint').fetchone()[0])
-   if observed!=('wal',2,2,1,0,0):add(fs,'E_ACTUAL_ATTESTATION','sqlite-schema.sql',repr(observed))
+   observed=(con.execute('PRAGMA journal_mode').fetchone()[0],con.execute('PRAGMA synchronous').fetchone()[0],con.execute('PRAGMA auto_vacuum').fetchone()[0],con.execute('PRAGMA foreign_keys').fetchone()[0],con.execute('PRAGMA trusted_schema').fetchone()[0],con.execute('PRAGMA wal_autocheckpoint').fetchone()[0],con.execute('PRAGMA temp_store').fetchone()[0])
+   if observed!=('wal',2,2,1,0,0,1):add(fs,'E_ACTUAL_ATTESTATION','sqlite-schema.sql',repr(observed))
    tables={x[0] for x in con.execute("SELECT name FROM sqlite_schema WHERE type='table'")}; required_tables={'journal_events','source_transactions','source_state','runtime_ownership','writer_attestations','operator_command_requests','relation_schemas','destinations','destination_checkpoints','backfill_runs','backfill_generations','backfill_chunks','bootstrap_intents','bootstrap_imports','durable_capture_fences','bootstrap_anchors','reseed_intents','destination_generation_leases','destination_promotion_intents','clickhouse_batch_intents','archive_generations','archive_segment_intents','archive_segments','archive_generation_markers','processing_failures','destination_audits','logical_range_pins','condition_hysteresis','alerts','schema_migrations'}
    if not required_tables<=tables:add(fs,'E_SQL_SCHEMA','sqlite-schema.sql',','.join(sorted(required_tables-tables)))
    con.close()
  except Exception as e:add(fs,'E_SQL_EXEC','sqlite-schema.sql',str(e))
+ if hashlib.sha256(C.read_bytes()).hexdigest()!=EXPECTED_CONTRACT_SHA256:add(fs,'E_CONTRACT_DIGEST','storage-model.json','entire approved provisional contract changed without validator reconciliation')
+ if hashlib.sha256(F.read_bytes()).hexdigest()!=EXPECTED_FIXTURES_SHA256:add(fs,'E_FIXTURE_DIGEST','scenarios.json','entire executable fixture corpus changed without validator reconciliation')
+ try:
+  manifest=load(M); artifacts=load(A); mr=next(x for x in manifest['artifacts'] if x['owner_bead']==OWNER)
+  if mr['path']!='contracts/storage/storage-model.json' or mr['sha256']!=hashlib.sha256(C.read_bytes()).hexdigest() or mr['fixture_ids']!=c['fixture_ids'] or mr['executor_ids']!=c['executors']:add(fs,'E_MANIFEST_BINDING','contracts/m0/manifest.json','storage row does not bind contract, fixtures, and executors')
+  rows=[x for x in artifacts['artifacts'] if x['owner_bead']==OWNER]
+  expected_paths={str(x.relative_to(ROOT)) for x in (C,S,Q,F,FS,R,V,E)}
+  if {x['path'] for x in rows}!=expected_paths:add(fs,'E_ARTIFACT_INVENTORY','contracts/m0/artifacts.json','storage artifact path inventory differs')
+  for x in rows:
+   q=ROOT/x['path']
+   if not q.is_file() or hashlib.sha256(q.read_bytes()).hexdigest()!=x['sha256']:add(fs,'E_ARTIFACT_HASH',x['path'],'artifact hash mismatch')
+ except Exception as e:add(fs,'E_MANIFEST','contracts/m0',str(e))
  text='\n'.join(p.read_text(errors='replace') for p in (C,Q,F,FS,R))
  for secret in ('postgres://','password=','BEGIN PRIVATE KEY','AKIA'):
   if secret in text:add(fs,'E_SECRET','inputs',f'forbidden token {secret}')

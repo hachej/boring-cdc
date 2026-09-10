@@ -59,10 +59,19 @@
           "inputs": {
             "additionalProperties": false,
             "properties": {
+              "allocation_request_bytes": {
+                "type": "integer"
+              },
+              "available_above_reserve_bytes": {
+                "type": "integer"
+              },
               "capture_epoch": {
                 "type": "string"
               },
               "case_seq": {
+                "type": "integer"
+              },
+              "configured_memory_limit_bytes": {
                 "type": "integer"
               },
               "connection_generation": {
@@ -70,6 +79,9 @@
               },
               "fault_once": {
                 "type": "boolean"
+              },
+              "filesystem_observed": {
+                "type": "string"
               },
               "free_bytes": {
                 "type": "integer"
@@ -92,7 +104,11 @@
               "free_bytes",
               "precondition",
               "required_free_bytes",
-              "run_id"
+              "run_id",
+              "filesystem_observed",
+              "allocation_request_bytes",
+              "available_above_reserve_bytes",
+              "configured_memory_limit_bytes"
             ],
             "type": "object"
           },
