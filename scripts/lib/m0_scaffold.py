@@ -77,13 +77,34 @@ def source_snapshot()->str:
   if path.is_file():chunks.extend((name.encode(),b"\0",path.read_bytes(),b"\0"))
  return sha(b"".join(chunks))
 
+def is_sha256(value:object)->bool:
+ return isinstance(value,str) and re.fullmatch(r"[0-9a-f]{64}",value) is not None
+
+def contains_sensitive_absolute_path(text:str)->bool:
+ patterns=(
+  r"/(?:var/)?tmp/",
+  r"/(?:home|Users|workspace|workspaces)/[^\s,\"']+",
+  r"/(?:var/)?run/secrets?(?:/|\b)",
+  r"/[^\s,\"']*(?:secret|credential|password)[^\s,\"']*",
+ )
+ return str(ROOT) in text or any(re.search(pattern,text,re.I) for pattern in patterns)
+
+def evidence_path(base:Path,value:object)->Path|None:
+ if not isinstance(value,str) or Path(value).is_absolute():return None
+ candidate=(ROOT/value).resolve()
+ try:candidate.relative_to(base.resolve())
+ except ValueError:return None
+ return candidate if candidate.is_file() else None
+
 def normalize_capture(data:bytes)->bytes:
  text=data.decode(errors="replace")
  text=text.replace(str(ROOT),"<workspace>")
- text=re.sub(r"/(?:var/)?tmp/[^\s,\"'\']+","<isolated-temp>",text)
+ text=re.sub(r"/(?:var/)?tmp/[^\s,\"']+","<isolated-temp>",text)
+ text=re.sub(r"/(?:home|Users|workspace|workspaces)/[^\s,\"']+","<workspace-path>",text)
+ text=re.sub(r"/(?:var/)?run/secrets?/[^\s,\"']+","<secret-file>",text,flags=re.I)
+ text=re.sub(r"/[^\s,\"']*(?:secret|credential|password)[^\s,\"']*","<secret-file>",text,flags=re.I)
  text=re.sub(r"(?i)(postgres(?:ql)?://[^\s:@]+:)[^\s@]+(@)",r"\1<redacted>\2",text)
  text=re.sub(r"(?im)(BORING_CDC_(?:SOURCE_DSN|POSTGRES_PASSWORD_FILE)=)[^\s]+",r"\1<redacted>",text)
- text=re.sub(r"/[^\s'\"]*/postgres_password(?:\b|$)","<secret-file>",text)
  return text.encode()
 
 def run_record(argv:list[str],proof:Path,env:dict[str,str]|None=None,expected:int=0,display:str|None=None)->dict:

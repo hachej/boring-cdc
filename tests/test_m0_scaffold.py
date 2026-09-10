@@ -54,6 +54,16 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIn("<workspace>", normalized)
         self.assertIn("<redacted>", normalized)
 
+    def test_evidence_digest_and_path_guards_fail_closed(self):
+        evidence_root = ROOT / "artifacts" / "boring-cdc-m0-scaffold" / "scenario"
+        self.assertTrue(m0_scaffold.is_sha256("a" * 64))
+        self.assertFalse(m0_scaffold.is_sha256("not-a-digest"))
+        self.assertTrue(m0_scaffold.contains_sensitive_absolute_path("/home/other/worktree/file"))
+        self.assertTrue(m0_scaffold.contains_sensitive_absolute_path("/run/secrets/db-key"))
+        self.assertFalse(m0_scaffold.contains_sensitive_absolute_path("/usr/local/bin/boring-cdc"))
+        self.assertIsNone(m0_scaffold.evidence_path(evidence_root, "/etc/passwd"))
+        self.assertIsNone(m0_scaffold.evidence_path(evidence_root, "Cargo.lock"))
+
     def test_m1_completion_rejects_reintroduced_provisional_marker(self):
         marker = ROOT / "contracts" / ".test-provisional-marker"
         marker.write_text("M0-" + "PROVISIONAL")
