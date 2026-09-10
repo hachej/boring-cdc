@@ -35,6 +35,7 @@ pub enum Confirmation {
     Confirm,
     ConfirmDataGap,
     ConfirmReplay,
+    DryRunOnly,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
@@ -70,6 +71,71 @@ pub enum Grammar {
     RecoverReseed,
 }
 
+impl Grammar {
+    pub fn usage(self) -> &'static str {
+        match self {
+            Grammar::Check => "check [--json]",
+            Grammar::Init => "init [--dry-run|--confirm] --confirm-token TOKEN [--json]",
+            Grammar::Run => "run",
+            Grammar::RunBootstrap => "run --bootstrap",
+            Grammar::Status => "status [--json]",
+            Grammar::BackfillStart => {
+                "backfill start [--dry-run|--confirm] --confirm-token TOKEN [--json]"
+            }
+            Grammar::BackfillPause => {
+                "backfill pause [--dry-run|--confirm] --confirm-token TOKEN [--json]"
+            }
+            Grammar::BackfillResume => {
+                "backfill resume [--dry-run|--confirm] --confirm-token TOKEN [--json]"
+            }
+            Grammar::BackfillStatus => "backfill status [--json]",
+            Grammar::BackfillRestart => "backfill restart --confirm --confirm-token TOKEN [--json]",
+            Grammar::DestinationList => "destination list [--json]",
+            Grammar::DestinationAdd => {
+                "destination add DESTINATION --archive-root PATH --continuity-break --from-seq SEQ (--dry-run|--confirm-data-gap) [--json]"
+            }
+            Grammar::DestinationPause => {
+                "destination pause DESTINATION [--dry-run|--confirm] [--json]"
+            }
+            Grammar::DestinationResume => {
+                "destination resume DESTINATION [--dry-run|--confirm] [--json]"
+            }
+            Grammar::DestinationDetach => {
+                "destination detach DESTINATION --confirm --confirm-token TOKEN [--json]"
+            }
+            Grammar::DestinationPromote => {
+                "destination promote DESTINATION --generation ID --confirm [--json]"
+            }
+            Grammar::DestinationRetire => {
+                "destination retire DESTINATION --generation ID --confirm [--json]"
+            }
+            Grammar::DestinationVerify => {
+                "destination verify DESTINATION [--from-seq SEQ] [--json]"
+            }
+            Grammar::ArchiveReconstruct => {
+                "archive reconstruct DESTINATION --selector-fence FENCE --output PATH [--json]"
+            }
+            Grammar::ArchiveVerify => {
+                "archive verify DESTINATION --selector-fence FENCE --oracle-manifest PATH [--json]"
+            }
+            Grammar::Replay => {
+                "replay DESTINATION (--from-anchor ANCHOR|--from-seq SEQ|--since TIME) --new-generation ID (--dry-run|--confirm-replay) [--json]"
+            }
+            Grammar::JournalInspect => "journal inspect [--event-id ID] [--json]",
+            Grammar::JournalInspectExplain => "journal inspect --event-id ID --explain [--json]",
+            Grammar::JournalVerify => "journal verify [--json]",
+            Grammar::JournalGc => "journal gc --dry-run [--json]",
+            Grammar::RecoverInspect => "recover inspect [--json]",
+            Grammar::RecoverPromotion => {
+                "recover promotion DESTINATION --adopt-external-fence --confirm [--json]"
+            }
+            Grammar::RecoverReseed => {
+                "recover reseed [--add-table SCHEMA.TABLE|--resume RESEED_ID] --recreate-publication --recreate-slot (--confirm-data-gap|--confirm) [--json]"
+            }
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Serialize)]
 pub struct CommandSpec {
     pub id: &'static str,
@@ -86,7 +152,6 @@ pub struct CommandSpec {
     pub control_revisions: &'static [&'static str],
     pub predicates: &'static [&'static str],
     pub grammar: Grammar,
-    pub usage: &'static str,
 }
 
 const ALL_CODES: &[u8] = &[0, 2, 3, 4, 5, 6];
@@ -139,7 +204,7 @@ const SAFE: &[&str] = &[
 ];
 
 macro_rules! spec {
-    ($id:literal,$path:expr,$variant:literal,$owner:literal,$class:ident,$ownership:ident,$confirmation:ident,$json:expr,$revs:expr,$pred:expr,$grammar:ident,$usage:literal) => {
+    ($id:literal,$path:expr,$variant:literal,$owner:literal,$class:ident,$ownership:ident,$confirmation:ident,$json:expr,$revs:expr,$pred:expr,$grammar:ident $(,)?) => {
         CommandSpec {
             id: $id,
             path: $path,
@@ -159,7 +224,6 @@ macro_rules! spec {
             control_revisions: $revs,
             predicates: $pred,
             grammar: Grammar::$grammar,
-            usage: $usage,
         }
     };
 }
@@ -178,7 +242,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         Check,
-        "check [--json]"
     ),
     spec!(
         "CMD-INIT",
@@ -192,7 +255,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         SOURCE,
         SAFE,
         Init,
-        "init [--dry-run|--confirm] [--json]"
     ),
     spec!(
         "CMD-RUN",
@@ -206,7 +268,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         SOURCE,
         SAFE,
         Run,
-        "run"
     ),
     spec!(
         "CMD-RUN-BOOTSTRAP",
@@ -220,7 +281,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         SOURCE,
         SAFE,
         RunBootstrap,
-        "run --bootstrap"
     ),
     spec!(
         "CMD-STATUS",
@@ -234,7 +294,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         Status,
-        "status [--json]"
     ),
     spec!(
         "CMD-BACKFILL-START",
@@ -248,7 +307,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER_SOURCE,
         SAFE,
         BackfillStart,
-        "backfill start [--dry-run|--confirm] [--json]"
     ),
     spec!(
         "CMD-BACKFILL-PAUSE",
@@ -262,7 +320,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER,
         SAFE,
         BackfillPause,
-        "backfill pause [--dry-run|--confirm] [--json]"
     ),
     spec!(
         "CMD-BACKFILL-RESUME",
@@ -276,7 +333,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER,
         SAFE,
         BackfillResume,
-        "backfill resume [--dry-run|--confirm] [--json]"
     ),
     spec!(
         "CMD-BACKFILL-STATUS",
@@ -290,7 +346,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         BackfillStatus,
-        "backfill status [--json]"
     ),
     spec!(
         "CMD-BACKFILL-RESTART",
@@ -304,7 +359,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER_SOURCE,
         SAFE,
         BackfillRestart,
-        "backfill restart --confirm [--json]"
     ),
     spec!(
         "CMD-DESTINATION-LIST",
@@ -318,7 +372,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         DestinationList,
-        "destination list [--json]"
     ),
     spec!(
         "CMD-DESTINATION-ADD",
@@ -332,7 +385,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER_SOURCE,
         SAFE,
         DestinationAdd,
-        "destination add DESTINATION --archive-root PATH --continuity-break --from-seq SEQ (--dry-run|--confirm-data-gap) [--json]"
     ),
     spec!(
         "CMD-DESTINATION-PAUSE",
@@ -346,7 +398,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER,
         SAFE,
         DestinationPause,
-        "destination pause DESTINATION [--dry-run|--confirm] [--json]"
     ),
     spec!(
         "CMD-DESTINATION-RESUME",
@@ -360,7 +411,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER,
         SAFE,
         DestinationResume,
-        "destination resume DESTINATION [--dry-run|--confirm] [--json]"
     ),
     spec!(
         "CMD-DESTINATION-DETACH",
@@ -374,7 +424,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER_DEST,
         SAFE,
         DestinationDetach,
-        "destination detach DESTINATION --confirm [--json]"
     ),
     spec!(
         "CMD-DESTINATION-PROMOTE",
@@ -388,7 +437,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER_DEST,
         SAFE,
         DestinationPromote,
-        "destination promote DESTINATION --generation ID --confirm [--json]"
     ),
     spec!(
         "CMD-DESTINATION-RETIRE",
@@ -402,7 +450,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER_DEST,
         SAFE,
         DestinationRetire,
-        "destination retire DESTINATION --generation ID --confirm [--json]"
     ),
     spec!(
         "CMD-DESTINATION-VERIFY",
@@ -416,7 +463,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         DestinationVerify,
-        "destination verify DESTINATION [--from-seq SEQ] [--json]"
     ),
     spec!(
         "CMD-ARCHIVE-RECONSTRUCT",
@@ -430,7 +476,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         ArchiveReconstruct,
-        "archive reconstruct DESTINATION --selector-fence FENCE --output PATH [--json]"
     ),
     spec!(
         "CMD-ARCHIVE-VERIFY",
@@ -444,7 +489,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         ArchiveVerify,
-        "archive verify DESTINATION --selector-fence FENCE --oracle-manifest PATH [--json]"
     ),
     spec!(
         "CMD-REPLAY",
@@ -458,7 +502,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER_SOURCE_DEST,
         SAFE,
         Replay,
-        "replay DESTINATION (--from-anchor ANCHOR|--from-seq SEQ|--since TIME) --new-generation ID (--dry-run|--confirm-replay) [--json]"
     ),
     spec!(
         "CMD-JOURNAL-INSPECT",
@@ -472,7 +515,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         JournalInspect,
-        "journal inspect [--event-id ID] [--json]"
     ),
     spec!(
         "CMD-JOURNAL-INSPECT-EXPLAIN",
@@ -486,7 +528,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         JournalInspectExplain,
-        "journal inspect --event-id ID --explain [--json]"
     ),
     spec!(
         "CMD-JOURNAL-VERIFY",
@@ -500,7 +541,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         JournalVerify,
-        "journal verify [--json]"
     ),
     spec!(
         "CMD-JOURNAL-GC",
@@ -509,12 +549,11 @@ pub static COMMANDS: &[CommandSpec] = &[
         "boring-cdc-m5-gc",
         Mutation,
         LiveOwner,
-        DryRunThenConfirm,
+        DryRunOnly,
         true,
         OWNER_SOURCE,
         SAFE,
         JournalGc,
-        "journal gc --dry-run [--json]"
     ),
     spec!(
         "CMD-RECOVER-INSPECT",
@@ -528,7 +567,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         &[],
         &[],
         RecoverInspect,
-        "recover inspect [--json]"
     ),
     spec!(
         "CMD-RECOVER-PROMOTION",
@@ -542,7 +580,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER_DEST,
         SAFE,
         RecoverPromotion,
-        "recover promotion DESTINATION --adopt-external-fence --confirm [--json]"
     ),
     spec!(
         "CMD-RECOVER-RESEED",
@@ -556,7 +593,6 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER_SOURCE,
         SAFE,
         RecoverReseed,
-        "recover reseed [--add-table SCHEMA.TABLE|--resume RESEED_ID] --recreate-publication --recreate-slot (--confirm-data-gap|--confirm) [--json]"
     ),
 ];
 
@@ -622,6 +658,8 @@ pub struct ActionPlan {
     pub schema_version: u32,
     pub plan_id: String,
     pub plan_digest: String,
+    pub request_id: String,
+    pub canonical_payload_digest: String,
     pub command_id: String,
     pub observed_snapshot_id: String,
     pub observed_state_revision: u64,
@@ -645,7 +683,32 @@ pub struct ActionPlan {
     pub extensions: BTreeMap<String, Value>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ConfirmationAttempt {
+    pub confirm_token: String,
+    pub request_id: String,
+    pub canonical_payload_digest: String,
+    pub plan_digest: String,
+}
+
 impl ActionPlan {
+    pub fn authorize_confirmation(
+        &self,
+        attempt: &ConfirmationAttempt,
+        current: &BTreeMap<String, String>,
+        fingerprints: &BTreeMap<String, String>,
+        now: &str,
+        predicates_hold: bool,
+        verify_opaque_token: impl FnOnce(&ConfirmationAttempt, &ActionPlan) -> bool,
+    ) -> bool {
+        !attempt.confirm_token.is_empty()
+            && attempt.request_id == self.request_id
+            && attempt.canonical_payload_digest == self.canonical_payload_digest
+            && attempt.plan_digest == self.plan_digest
+            && self.authorization_is_current(current, fingerprints, now, predicates_hold)
+            && verify_opaque_token(attempt, self)
+    }
+
     pub fn authorization_is_current(
         &self,
         current: &BTreeMap<String, String>,
@@ -675,17 +738,47 @@ impl ActionPlan {
 /// chronological and alternate-offset spellings cannot bypass expiry.
 fn canonical_utc_timestamp(value: &str) -> bool {
     let bytes = value.as_bytes();
-    bytes.len() == 20
-        && bytes[4] == b'-'
-        && bytes[7] == b'-'
-        && bytes[10] == b'T'
-        && bytes[13] == b':'
-        && bytes[16] == b':'
-        && bytes[19] == b'Z'
-        && bytes
+    if bytes.len() != 20
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+        || bytes[19] != b'Z'
+        || !bytes
             .iter()
             .enumerate()
             .all(|(i, byte)| matches!(i, 4 | 7 | 10 | 13 | 16 | 19) || byte.is_ascii_digit())
+    {
+        return false;
+    }
+    let number = |range: std::ops::Range<usize>| value[range].parse::<u32>().ok();
+    let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
+        number(0..4),
+        number(5..7),
+        number(8..10),
+        number(11..13),
+        number(14..16),
+        number(17..19),
+    ) else {
+        return false;
+    };
+    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => 0,
+    };
+    day >= 1 && day <= days && hour <= 23 && minute <= 59 && second <= 59
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationTerminal {
+    AfterSnapshot { after_snapshot_id: String },
+    SafeTerminal { safe_terminal_state: String },
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -694,8 +787,7 @@ pub struct MutationTrace {
     pub plan_digest: String,
     pub immutable_intent_id: String,
     pub external_effect_evidence_digest: Option<String>,
-    pub after_snapshot_id: Option<String>,
-    pub safe_terminal_state: Option<String>,
+    pub terminal: MutationTerminal,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -746,6 +838,25 @@ pub struct CliEnvelope {
     pub plan_digest: Option<String>,
     pub postcondition_evidence_digest: Option<String>,
     pub mutation_trace: Option<MutationTrace>,
+}
+
+impl CliEnvelope {
+    pub fn validate_for(&self, spec: &CommandSpec) -> bool {
+        if self.schema_version != CLI_SCHEMA_VERSION || self.command != spec.id {
+            return false;
+        }
+        if spec.class == CommandClass::Mutation && self.outcome == "success" {
+            let Some(trace) = &self.mutation_trace else {
+                return false;
+            };
+            self.plan_digest.as_deref() == Some(trace.plan_digest.as_str())
+                && self.postcondition_evidence_digest.is_some()
+                && !trace.before_snapshot_id.is_empty()
+                && !trace.immutable_intent_id.is_empty()
+        } else {
+            true
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -812,7 +923,7 @@ pub fn parse(argv: &[String]) -> Result<ParsedCommand, CliError> {
         ));
     }
     if !help {
-        validate_argv(spec, argv)?;
+        spec.grammar.validate(spec, argv)?;
     }
     Ok(ParsedCommand {
         spec,
@@ -844,218 +955,250 @@ fn positional_after_path(spec: &CommandSpec, argv: &[String]) -> bool {
 fn exactly_one(argv: &[String], flags: &[&str]) -> bool {
     flags.iter().filter(|f| has(argv, f)).count() == 1
 }
-
-fn validate_token_shape(spec: &CommandSpec, argv: &[String]) -> Result<(), CliError> {
-    let (allowed, positional): (&[&str], usize) = match spec.grammar {
-        Grammar::Check
-        | Grammar::Status
-        | Grammar::BackfillStatus
-        | Grammar::DestinationList
-        | Grammar::JournalVerify
-        | Grammar::RecoverInspect => (&["--json"], 0),
-        Grammar::Run => (&[], 0),
-        Grammar::RunBootstrap => (&["--bootstrap"], 0),
-        Grammar::Init
-        | Grammar::BackfillStart
-        | Grammar::BackfillPause
-        | Grammar::BackfillResume => (&["--dry-run", "--confirm", "--json"], 0),
-        Grammar::BackfillRestart => (&["--confirm", "--json"], 0),
-        Grammar::DestinationAdd => (
-            &[
-                "--archive-root",
-                "--continuity-break",
-                "--from-seq",
-                "--dry-run",
-                "--confirm-data-gap",
-                "--json",
-            ],
-            1,
-        ),
-        Grammar::DestinationPause | Grammar::DestinationResume => {
-            (&["--dry-run", "--confirm", "--json"], 1)
-        }
-        Grammar::DestinationDetach => (&["--confirm", "--json"], 1),
-        Grammar::DestinationPromote | Grammar::DestinationRetire => {
-            (&["--generation", "--confirm", "--json"], 1)
-        }
-        Grammar::DestinationVerify => (&["--from-seq", "--json"], 1),
-        Grammar::ArchiveReconstruct => (&["--selector-fence", "--output", "--json"], 1),
-        Grammar::ArchiveVerify => (&["--selector-fence", "--oracle-manifest", "--json"], 1),
-        Grammar::Replay => (
-            &[
-                "--from-anchor",
-                "--from-seq",
-                "--since",
-                "--new-generation",
-                "--dry-run",
-                "--confirm-replay",
-                "--json",
-            ],
-            1,
-        ),
-        Grammar::JournalInspect => (&["--event-id", "--json"], 0),
-        Grammar::JournalInspectExplain => (&["--event-id", "--explain", "--json"], 0),
-        Grammar::JournalGc => (&["--dry-run", "--json"], 0),
-        Grammar::RecoverPromotion => (&["--adopt-external-fence", "--confirm", "--json"], 1),
-        Grammar::RecoverReseed => (
-            &[
-                "--add-table",
-                "--resume",
-                "--recreate-publication",
-                "--recreate-slot",
-                "--confirm-data-gap",
-                "--confirm",
-                "--json",
-            ],
-            0,
-        ),
-    };
-    let valued = [
-        "--archive-root",
-        "--from-seq",
-        "--generation",
-        "--selector-fence",
-        "--output",
-        "--oracle-manifest",
-        "--from-anchor",
-        "--since",
-        "--new-generation",
-        "--event-id",
-        "--add-table",
-        "--resume",
-    ];
-    let mut positionals = 0;
-    let mut seen = std::collections::BTreeSet::new();
-    let mut i = spec.path.len();
-    while i < argv.len() {
-        let token = &argv[i];
-        if token.starts_with('-') {
-            if !allowed.contains(&token.as_str()) {
-                return Err(invalid("CLI_UNKNOWN_ARGUMENT", "unknown argument"));
-            }
-            if !seen.insert(token.as_str()) {
-                return Err(invalid(
-                    "CLI_DUPLICATE_ARGUMENT",
-                    "argument supplied more than once",
-                ));
-            }
-            if valued.contains(&token.as_str()) {
-                if argv.get(i + 1).is_none_or(|v| v.starts_with('-')) {
-                    return Err(invalid(
-                        "CLI_ARGUMENT_VALUE_REQUIRED",
-                        "argument value required",
-                    ));
-                }
-                i += 1;
-            }
+fn confirmed(argv: &[String], flag: &str) -> bool {
+    has(argv, flag) && value_after(argv, "--confirm-token")
+}
+fn dry_or_confirmed(argv: &[String], dry: &str, confirm: &str) -> bool {
+    exactly_one(argv, &[dry, confirm])
+        && if has(argv, confirm) {
+            value_after(argv, "--confirm-token")
         } else {
-            positionals += 1;
+            !has(argv, "--confirm-token")
         }
-        i += 1;
-    }
-    if positionals != positional {
-        return Err(invalid(
-            "CLI_INVALID_INVOCATION",
-            "wrong number of positional arguments",
-        ));
-    }
-    Ok(())
 }
 
-fn validate_argv(spec: &CommandSpec, a: &[String]) -> Result<(), CliError> {
-    validate_token_shape(spec, a)?;
-    let ok = match spec.grammar {
-        Grammar::Check
-        | Grammar::Status
-        | Grammar::BackfillStatus
-        | Grammar::DestinationList
-        | Grammar::JournalVerify
-        | Grammar::RecoverInspect => true,
-        Grammar::Run => !has(a, "--bootstrap"),
-        Grammar::RunBootstrap => has(a, "--bootstrap"),
-        Grammar::Init
-        | Grammar::BackfillStart
-        | Grammar::BackfillPause
-        | Grammar::BackfillResume => exactly_one(a, &["--dry-run", "--confirm"]),
-        Grammar::BackfillRestart => has(a, "--confirm"),
-        Grammar::DestinationAdd => {
-            positional_after_path(spec, a)
-                && value_after(a, "--archive-root")
-                && has(a, "--continuity-break")
-                && value_after(a, "--from-seq")
-                && exactly_one(a, &["--dry-run", "--confirm-data-gap"])
-        }
-        Grammar::DestinationPause | Grammar::DestinationResume => {
-            positional_after_path(spec, a) && exactly_one(a, &["--dry-run", "--confirm"])
-        }
-        Grammar::DestinationDetach => positional_after_path(spec, a) && has(a, "--confirm"),
-        Grammar::DestinationPromote | Grammar::DestinationRetire => {
-            positional_after_path(spec, a) && value_after(a, "--generation") && has(a, "--confirm")
-        }
-        Grammar::DestinationVerify => {
-            positional_after_path(spec, a)
-                && (!has(a, "--from-seq") || value_after(a, "--from-seq"))
-        }
-        Grammar::ArchiveReconstruct => {
-            positional_after_path(spec, a)
-                && value_after(a, "--selector-fence")
-                && value_after(a, "--output")
-        }
-        Grammar::ArchiveVerify => {
-            positional_after_path(spec, a)
-                && value_after(a, "--selector-fence")
-                && value_after(a, "--oracle-manifest")
-        }
-        Grammar::Replay => {
-            positional_after_path(spec, a)
-                && exactly_one(a, &["--from-anchor", "--from-seq", "--since"])
-                && ["--from-anchor", "--from-seq", "--since"]
-                    .iter()
-                    .all(|f| !has(a, f) || value_after(a, f))
-                && value_after(a, "--new-generation")
-                && exactly_one(a, &["--dry-run", "--confirm-replay"])
-        }
-        Grammar::JournalInspect => {
-            !has(a, "--explain") && (!has(a, "--event-id") || value_after(a, "--event-id"))
-        }
-        Grammar::JournalInspectExplain => has(a, "--explain") && value_after(a, "--event-id"),
-        Grammar::JournalGc => has(a, "--dry-run"),
-        Grammar::RecoverPromotion => {
-            positional_after_path(spec, a)
-                && has(a, "--adopt-external-fence")
-                && has(a, "--confirm")
-        }
-        Grammar::RecoverReseed => {
-            if has(a, "--resume") {
-                value_after(a, "--resume")
-                    && has(a, "--confirm")
-                    && !has(a, "--confirm-data-gap")
-                    && !has(a, "--add-table")
-                    && !has(a, "--recreate-publication")
-                    && !has(a, "--recreate-slot")
-            } else {
-                (!has(a, "--add-table") || value_after(a, "--add-table"))
-                    && !has(a, "--confirm")
-                    && has(a, "--recreate-publication")
-                    && has(a, "--recreate-slot")
-                    && has(a, "--confirm-data-gap")
+impl Grammar {
+    fn validate_token_shape(self, spec: &CommandSpec, argv: &[String]) -> Result<(), CliError> {
+        let (allowed, positional): (&[&str], usize) = match self {
+            Grammar::Check
+            | Grammar::Status
+            | Grammar::BackfillStatus
+            | Grammar::DestinationList
+            | Grammar::JournalVerify
+            | Grammar::RecoverInspect => (&["--json"], 0),
+            Grammar::Run => (&[], 0),
+            Grammar::RunBootstrap => (&["--bootstrap"], 0),
+            Grammar::Init
+            | Grammar::BackfillStart
+            | Grammar::BackfillPause
+            | Grammar::BackfillResume => {
+                (&["--dry-run", "--confirm", "--confirm-token", "--json"], 0)
             }
+            Grammar::BackfillRestart => (&["--confirm", "--confirm-token", "--json"], 0),
+            Grammar::DestinationAdd => (
+                &[
+                    "--archive-root",
+                    "--continuity-break",
+                    "--from-seq",
+                    "--dry-run",
+                    "--confirm-data-gap",
+                    "--confirm-token",
+                    "--json",
+                ],
+                1,
+            ),
+            Grammar::DestinationPause | Grammar::DestinationResume => {
+                (&["--dry-run", "--confirm", "--confirm-token", "--json"], 1)
+            }
+            Grammar::DestinationDetach => (&["--confirm", "--confirm-token", "--json"], 1),
+            Grammar::DestinationPromote | Grammar::DestinationRetire => (
+                &["--generation", "--confirm", "--confirm-token", "--json"],
+                1,
+            ),
+            Grammar::DestinationVerify => (&["--from-seq", "--json"], 1),
+            Grammar::ArchiveReconstruct => (&["--selector-fence", "--output", "--json"], 1),
+            Grammar::ArchiveVerify => (&["--selector-fence", "--oracle-manifest", "--json"], 1),
+            Grammar::Replay => (
+                &[
+                    "--from-anchor",
+                    "--from-seq",
+                    "--since",
+                    "--new-generation",
+                    "--dry-run",
+                    "--confirm-replay",
+                    "--confirm-token",
+                    "--json",
+                ],
+                1,
+            ),
+            Grammar::JournalInspect => (&["--event-id", "--json"], 0),
+            Grammar::JournalInspectExplain => (&["--event-id", "--explain", "--json"], 0),
+            Grammar::JournalGc => (&["--dry-run", "--json"], 0),
+            Grammar::RecoverPromotion => (
+                &[
+                    "--adopt-external-fence",
+                    "--confirm",
+                    "--confirm-token",
+                    "--json",
+                ],
+                1,
+            ),
+            Grammar::RecoverReseed => (
+                &[
+                    "--add-table",
+                    "--resume",
+                    "--recreate-publication",
+                    "--recreate-slot",
+                    "--confirm-data-gap",
+                    "--confirm",
+                    "--confirm-token",
+                    "--json",
+                ],
+                0,
+            ),
+        };
+        let valued = [
+            "--archive-root",
+            "--from-seq",
+            "--generation",
+            "--selector-fence",
+            "--output",
+            "--oracle-manifest",
+            "--from-anchor",
+            "--since",
+            "--new-generation",
+            "--event-id",
+            "--add-table",
+            "--resume",
+            "--confirm-token",
+        ];
+        let mut positionals = 0;
+        let mut seen = std::collections::BTreeSet::new();
+        let mut i = spec.path.len();
+        while i < argv.len() {
+            let token = &argv[i];
+            if token.starts_with('-') {
+                if !allowed.contains(&token.as_str()) {
+                    return Err(invalid("CLI_UNKNOWN_ARGUMENT", "unknown argument"));
+                }
+                if !seen.insert(token.as_str()) {
+                    return Err(invalid(
+                        "CLI_DUPLICATE_ARGUMENT",
+                        "argument supplied more than once",
+                    ));
+                }
+                if valued.contains(&token.as_str()) {
+                    if argv.get(i + 1).is_none_or(|v| v.starts_with('-')) {
+                        return Err(invalid(
+                            "CLI_ARGUMENT_VALUE_REQUIRED",
+                            "argument value required",
+                        ));
+                    }
+                    i += 1;
+                }
+            } else {
+                positionals += 1;
+            }
+            i += 1;
         }
-    };
-    if ok {
+        if positionals != positional {
+            return Err(invalid(
+                "CLI_INVALID_INVOCATION",
+                "wrong number of positional arguments",
+            ));
+        }
         Ok(())
-    } else {
-        Err(invalid(
-            "CLI_INVALID_INVOCATION",
-            "arguments do not match the command contract",
-        ))
+    }
+
+    fn validate(self, spec: &CommandSpec, a: &[String]) -> Result<(), CliError> {
+        self.validate_token_shape(spec, a)?;
+        let ok = match self {
+            Grammar::Check
+            | Grammar::Status
+            | Grammar::BackfillStatus
+            | Grammar::DestinationList
+            | Grammar::JournalVerify
+            | Grammar::RecoverInspect => true,
+            Grammar::Run => !has(a, "--bootstrap"),
+            Grammar::RunBootstrap => has(a, "--bootstrap"),
+            Grammar::Init
+            | Grammar::BackfillStart
+            | Grammar::BackfillPause
+            | Grammar::BackfillResume => dry_or_confirmed(a, "--dry-run", "--confirm"),
+            Grammar::BackfillRestart => confirmed(a, "--confirm"),
+            Grammar::DestinationAdd => {
+                positional_after_path(spec, a)
+                    && value_after(a, "--archive-root")
+                    && has(a, "--continuity-break")
+                    && value_after(a, "--from-seq")
+                    && dry_or_confirmed(a, "--dry-run", "--confirm-data-gap")
+            }
+            Grammar::DestinationPause | Grammar::DestinationResume => {
+                positional_after_path(spec, a) && dry_or_confirmed(a, "--dry-run", "--confirm")
+            }
+            Grammar::DestinationDetach => {
+                positional_after_path(spec, a) && confirmed(a, "--confirm")
+            }
+            Grammar::DestinationPromote | Grammar::DestinationRetire => {
+                positional_after_path(spec, a)
+                    && value_after(a, "--generation")
+                    && confirmed(a, "--confirm")
+            }
+            Grammar::DestinationVerify => {
+                positional_after_path(spec, a)
+                    && (!has(a, "--from-seq") || value_after(a, "--from-seq"))
+            }
+            Grammar::ArchiveReconstruct => {
+                positional_after_path(spec, a)
+                    && value_after(a, "--selector-fence")
+                    && value_after(a, "--output")
+            }
+            Grammar::ArchiveVerify => {
+                positional_after_path(spec, a)
+                    && value_after(a, "--selector-fence")
+                    && value_after(a, "--oracle-manifest")
+            }
+            Grammar::Replay => {
+                positional_after_path(spec, a)
+                    && exactly_one(a, &["--from-anchor", "--from-seq", "--since"])
+                    && ["--from-anchor", "--from-seq", "--since"]
+                        .iter()
+                        .all(|f| !has(a, f) || value_after(a, f))
+                    && value_after(a, "--new-generation")
+                    && dry_or_confirmed(a, "--dry-run", "--confirm-replay")
+            }
+            Grammar::JournalInspect => {
+                !has(a, "--explain") && (!has(a, "--event-id") || value_after(a, "--event-id"))
+            }
+            Grammar::JournalInspectExplain => has(a, "--explain") && value_after(a, "--event-id"),
+            Grammar::JournalGc => has(a, "--dry-run"),
+            Grammar::RecoverPromotion => {
+                positional_after_path(spec, a)
+                    && has(a, "--adopt-external-fence")
+                    && confirmed(a, "--confirm")
+            }
+            Grammar::RecoverReseed => {
+                if has(a, "--resume") {
+                    value_after(a, "--resume")
+                        && confirmed(a, "--confirm")
+                        && !has(a, "--confirm-data-gap")
+                        && !has(a, "--add-table")
+                        && !has(a, "--recreate-publication")
+                        && !has(a, "--recreate-slot")
+                } else {
+                    (!has(a, "--add-table") || value_after(a, "--add-table"))
+                        && !has(a, "--confirm")
+                        && has(a, "--recreate-publication")
+                        && has(a, "--recreate-slot")
+                        && confirmed(a, "--confirm-data-gap")
+                }
+            }
+        };
+        if ok {
+            Ok(())
+        } else {
+            Err(invalid(
+                "CLI_INVALID_INVOCATION",
+                "arguments do not match the command contract",
+            ))
+        }
     }
 }
 
 pub fn root_help() -> String {
     let mut out = String::from("boring-cdc\n\nCommands:\n");
     for s in COMMANDS {
-        out.push_str(&format!("  {:<30} {}\n", s.id, s.usage));
+        out.push_str(&format!("  {:<30} {}\n", s.id, s.grammar.usage()));
     }
     out.push_str("\nExit codes: 0 success; 2 invalid; 3 safety blocked; 4 unavailable; 5 integrity; 6 invariant.\n");
     out
@@ -1063,7 +1206,9 @@ pub fn root_help() -> String {
 pub fn command_help(spec: &CommandSpec) -> String {
     format!(
         "{}\nowner: {}\noperation: {}\n",
-        spec.usage, spec.owner_bead, spec.operation_variant
+        spec.grammar.usage(),
+        spec.owner_bead,
+        spec.operation_variant
     )
 }
 
@@ -1088,7 +1233,9 @@ pub fn redact_json(value: &mut Value) {
     match value {
         Value::Object(m) => {
             for (k, v) in m {
-                if REDACT.iter().any(|r| k.contains(r)) {
+                if k == "canonical_argv" || k == "argv" {
+                    *v = serde_json::json!(["[REDACTED:argv]"]);
+                } else if REDACT.iter().any(|r| k.contains(r)) {
                     *v = Value::String("[REDACTED]".into())
                 } else {
                     redact_json(v)
@@ -1161,7 +1308,11 @@ pub fn compatibility_fixture() -> Value {
         {"code":"destination_audit_stale","severity":"blocked","runbook_id":"RB-AUDIT-STALE","evidence_digest":null}
       ],
       "ownership_classes": ["none","live_owner","offline_eligible","maintenance"],
-      "terminal_trace": MutationTrace { before_snapshot_id:"snapshot-before".into(), plan_digest:"plan-digest".into(), immutable_intent_id:"intent-1".into(), external_effect_evidence_digest:Some("effect-digest".into()), after_snapshot_id:Some("snapshot-after".into()), safe_terminal_state:None },
+      "terminal_traces": [
+        MutationTrace { before_snapshot_id:"snapshot-before".into(), plan_digest:"plan-digest".into(), immutable_intent_id:"intent-1".into(), external_effect_evidence_digest:Some("effect-digest".into()), terminal:MutationTerminal::AfterSnapshot { after_snapshot_id:"snapshot-after".into() } },
+        MutationTrace { before_snapshot_id:"snapshot-before".into(), plan_digest:"plan-digest-safe".into(), immutable_intent_id:"intent-2".into(), external_effect_evidence_digest:None, terminal:MutationTerminal::SafeTerminal { safe_terminal_state:"aborted_by_restart".into() } }
+      ],
+      "authorization_matrix": ["unchanged_relevant_accept", "unrelated_progress_accept", "changed_revision_reject", "changed_fingerprint_reject", "expired_reject", "invalid_predicate_reject"],
       "forecast": ForecastResult { observed_snapshot_id:"snapshot-before".into(), profile_id:"synthetic-profile".into(), recoverable_until:None, assumptions:vec!["synthetic_only".into()], evidence_digest:"forecast-digest".into() },
       "attestation": AttestationResult { subject_id:"destination-1".into(), status:"unknown".into(), facts:BTreeMap::from([("audit_coverage".into(),"unavailable".into())]), evidence_digest:"attestation-digest".into() },
       "event_explanation": EventExplanation { event_id:"event-1".into(), locally_durable:"true".into(), destination_checkpoint_coverage:"covered".into(), current_audit_coverage:"unknown".into(), baseline_eligibility:"eligible".into(), candidate_eligibility:"unknown".into(), live_generation_selection:"selected".into(), unavailable_evidence:vec!["audit_gc_expired".into()], reason_codes:vec!["EXPLAIN_AUDIT_UNAVAILABLE".into()] }
@@ -1213,7 +1364,7 @@ pub mod tests {
             fixture["fact_freshness"],
             serde_json::json!(["fresh", "stale", "unknown"])
         );
-        assert_eq!(fixture["terminal_trace"]["plan_digest"], "plan-digest");
+        assert_eq!(fixture["terminal_traces"][0]["plan_digest"], "plan-digest");
         assert!(fixture["event_explanation"]["reason_codes"].is_array());
     }
 
@@ -1241,17 +1392,17 @@ pub mod tests {
             "run",
             "run --bootstrap",
             "status --json",
-            "backfill restart --confirm",
+            "backfill restart --confirm --confirm-token t",
             "destination add d --archive-root 'p' --continuity-break --from-seq 2 --dry-run",
-            "destination detach d --confirm",
+            "destination detach d --confirm --confirm-token t",
             "destination verify d --from-seq 1 --json",
             "archive reconstruct d --selector-fence 3 --output out",
-            "replay d --since now --new-generation 2 --confirm-replay",
+            "replay d --since now --new-generation 2 --confirm-replay --confirm-token t",
             "journal inspect --event-id e --explain --json",
             "journal gc --dry-run",
-            "recover promotion d --adopt-external-fence --confirm",
-            "recover reseed --add-table s.t --recreate-publication --recreate-slot --confirm-data-gap",
-            "recover reseed --resume r --confirm",
+            "recover promotion d --adopt-external-fence --confirm --confirm-token t",
+            "recover reseed --add-table s.t --recreate-publication --recreate-slot --confirm-data-gap --confirm-token t",
+            "recover reseed --resume r --confirm --confirm-token t",
         ] {
             assert!(parse(&args(s)).is_ok(), "{s}");
         }
@@ -1293,12 +1444,13 @@ pub mod tests {
     }
     #[test]
     fn redaction_is_recursive() {
-        let mut v = serde_json::json!({"confirm_token":"secret","nested":{"nonce_value":"n","dsn":"postgres://secret","safe":"ok"}});
+        let mut v = serde_json::json!({"confirm_token":"secret","canonical_argv":["destination","/private/path"],"nested":{"nonce_value":"n","dsn":"postgres://secret","safe":"ok"}});
         redact_json(&mut v);
         let s = v.to_string();
         assert!(!s.contains("secret"));
         assert!(!s.contains("postgres"));
         assert!(s.contains("ok"));
+        assert!(!s.contains("private"));
     }
     #[test]
     fn action_authorization_ignores_unrelated_observation_progress_but_rejects_relevant_change() {
@@ -1306,6 +1458,8 @@ pub mod tests {
             schema_version: 1,
             plan_id: "p".into(),
             plan_digest: "d".into(),
+            request_id: "request-1".into(),
+            canonical_payload_digest: "payload-digest".into(),
             command_id: "CMD-REPLAY".into(),
             observed_snapshot_id: "s1".into(),
             observed_state_revision: 10,
@@ -1347,14 +1501,67 @@ pub mod tests {
         assert!(plan.authorization_is_current(&revisions, &fp, "2026-09-09T11:00:00Z", true));
         let changed = BTreeMap::from([("destination_revision".into(), "8".into())]);
         assert!(!plan.authorization_is_current(&changed, &fp, "2026-09-09T11:00:00Z", true));
+        let changed_fp = BTreeMap::from([("source".into(), "changed".into())]);
+        assert!(!plan.authorization_is_current(
+            &revisions,
+            &changed_fp,
+            "2026-09-09T11:00:00Z",
+            true
+        ));
+        assert!(!plan.authorization_is_current(&revisions, &fp, "2026-09-09T11:00:00Z", false));
         assert!(!plan.authorization_is_current(&revisions, &fp, "2026-09-09T12:00:01Z", true));
         assert!(!plan.authorization_is_current(&revisions, &fp, "2026-09-09T11:00:00+01:00", true));
+        assert!(!plan.authorization_is_current(&revisions, &fp, "2026-99-99T99:99:99Z", true));
+        let attempt = ConfirmationAttempt {
+            confirm_token: "opaque".into(),
+            request_id: "request-1".into(),
+            canonical_payload_digest: "payload-digest".into(),
+            plan_digest: "d".into(),
+        };
+        assert!(plan.authorize_confirmation(
+            &attempt,
+            &revisions,
+            &fp,
+            "2026-09-09T11:00:00Z",
+            true,
+            |attempt, _| attempt.confirm_token == "opaque"
+        ));
+        let mut changed_attempt = attempt.clone();
+        changed_attempt.canonical_payload_digest = "changed".into();
+        assert!(!plan.authorize_confirmation(
+            &changed_attempt,
+            &revisions,
+            &fp,
+            "2026-09-09T11:00:00Z",
+            true,
+            |_, _| true
+        ));
         let direct_json = serde_json::to_value(&plan).unwrap();
         assert_eq!(direct_json["confirmation"]["confirm_token"], "secret");
         let mut artifact = direct_json;
         redact_json(&mut artifact);
         assert_eq!(artifact["confirmation"]["confirm_token"], "[REDACTED]");
     }
+    #[test]
+    fn terminal_mutation_requires_one_typed_causal_end() {
+        let spec = COMMANDS.iter().find(|s| s.id == "CMD-INIT").unwrap();
+        let mut result = unavailable(spec);
+        result.outcome = "success".into();
+        result.plan_digest = Some("plan".into());
+        result.postcondition_evidence_digest = Some("post".into());
+        assert!(!result.validate_for(spec));
+        result.mutation_trace = Some(MutationTrace {
+            before_snapshot_id: "before".into(),
+            plan_digest: "plan".into(),
+            immutable_intent_id: "intent".into(),
+            external_effect_evidence_digest: None,
+            terminal: MutationTerminal::SafeTerminal {
+                safe_terminal_state: "aborted_by_restart".into(),
+            },
+        });
+        assert!(result.validate_for(spec));
+    }
+
     #[test]
     fn forward_unknown_snapshot_fields_round_trip() {
         let input = serde_json::json!({"schema_version":1,"snapshot_id":"s","state_revision":1,"observed_at":"a","fresh_until":"b","freshness":"fresh","source_identity":null,"capture_epoch":null,"run_id":null,"ownership":{},"fingerprints":{},"durability_boundaries":{},"budgets":{},"destinations":[],"conditions":[],"blocked_by":[],"allowed_actions":[],"next_commands":[],"evidence_digest":"d","future_field":{"x":1}});
@@ -1382,5 +1589,9 @@ pub mod tests {
             assert!(text.contains(field));
         }
         assert!(!text.contains("\u{1b}["));
+        assert_eq!(ExitCode::Success as u8, 0);
+        assert_eq!(ExitCode::SafetyBlocked as u8, 3);
+        assert_eq!(ExitCode::Integrity as u8, 5);
+        assert_eq!(ExitCode::Invariant as u8, 6);
     }
 }

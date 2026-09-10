@@ -29,8 +29,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "check",
-    "usage": "check [--json]"
+    "grammar": "check"
   },
   {
     "id": "CMD-INIT",
@@ -73,8 +72,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "init",
-    "usage": "init [--dry-run|--confirm] [--json]"
+    "grammar": "init"
   },
   {
     "id": "CMD-RUN",
@@ -117,8 +115,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "run",
-    "usage": "run"
+    "grammar": "run"
   },
   {
     "id": "CMD-RUN-BOOTSTRAP",
@@ -161,8 +158,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "run_bootstrap",
-    "usage": "run --bootstrap"
+    "grammar": "run_bootstrap"
   },
   {
     "id": "CMD-STATUS",
@@ -194,8 +190,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "status",
-    "usage": "status [--json]"
+    "grammar": "status"
   },
   {
     "id": "CMD-BACKFILL-START",
@@ -241,8 +236,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "backfill_start",
-    "usage": "backfill start [--dry-run|--confirm] [--json]"
+    "grammar": "backfill_start"
   },
   {
     "id": "CMD-BACKFILL-PAUSE",
@@ -284,8 +278,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "backfill_pause",
-    "usage": "backfill pause [--dry-run|--confirm] [--json]"
+    "grammar": "backfill_pause"
   },
   {
     "id": "CMD-BACKFILL-RESUME",
@@ -327,8 +320,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "backfill_resume",
-    "usage": "backfill resume [--dry-run|--confirm] [--json]"
+    "grammar": "backfill_resume"
   },
   {
     "id": "CMD-BACKFILL-STATUS",
@@ -361,8 +353,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "backfill_status",
-    "usage": "backfill status [--json]"
+    "grammar": "backfill_status"
   },
   {
     "id": "CMD-BACKFILL-RESTART",
@@ -408,8 +399,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "backfill_restart",
-    "usage": "backfill restart --confirm [--json]"
+    "grammar": "backfill_restart"
   },
   {
     "id": "CMD-DESTINATION-LIST",
@@ -442,8 +432,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "destination_list",
-    "usage": "destination list [--json]"
+    "grammar": "destination_list"
   },
   {
     "id": "CMD-DESTINATION-ADD",
@@ -489,8 +478,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "destination_add",
-    "usage": "destination add DESTINATION --archive-root PATH --continuity-break --from-seq SEQ (--dry-run|--confirm-data-gap) [--json]"
+    "grammar": "destination_add"
   },
   {
     "id": "CMD-DESTINATION-PAUSE",
@@ -532,8 +520,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "destination_pause",
-    "usage": "destination pause DESTINATION [--dry-run|--confirm] [--json]"
+    "grammar": "destination_pause"
   },
   {
     "id": "CMD-DESTINATION-RESUME",
@@ -575,8 +562,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "destination_resume",
-    "usage": "destination resume DESTINATION [--dry-run|--confirm] [--json]"
+    "grammar": "destination_resume"
   },
   {
     "id": "CMD-DESTINATION-DETACH",
@@ -621,8 +607,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "destination_detach",
-    "usage": "destination detach DESTINATION --confirm [--json]"
+    "grammar": "destination_detach"
   },
   {
     "id": "CMD-DESTINATION-PROMOTE",
@@ -667,8 +652,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "destination_promote",
-    "usage": "destination promote DESTINATION --generation ID --confirm [--json]"
+    "grammar": "destination_promote"
   },
   {
     "id": "CMD-DESTINATION-RETIRE",
@@ -713,8 +697,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "destination_retire",
-    "usage": "destination retire DESTINATION --generation ID --confirm [--json]"
+    "grammar": "destination_retire"
   },
   {
     "id": "CMD-DESTINATION-VERIFY",
@@ -747,8 +730,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "destination_verify",
-    "usage": "destination verify DESTINATION [--from-seq SEQ] [--json]"
+    "grammar": "destination_verify"
   },
   {
     "id": "CMD-ARCHIVE-RECONSTRUCT",
@@ -781,8 +763,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "archive_reconstruct",
-    "usage": "archive reconstruct DESTINATION --selector-fence FENCE --output PATH [--json]"
+    "grammar": "archive_reconstruct"
   },
   {
     "id": "CMD-ARCHIVE-VERIFY",
@@ -815,8 +796,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "archive_verify",
-    "usage": "archive verify DESTINATION --selector-fence FENCE --oracle-manifest PATH [--json]"
+    "grammar": "archive_verify"
   },
   {
     "id": "CMD-REPLAY",
@@ -864,8 +844,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "replay",
-    "usage": "replay DESTINATION (--from-anchor ANCHOR|--from-seq SEQ|--since TIME) --new-generation ID (--dry-run|--confirm-replay) [--json]"
+    "grammar": "replay"
   },
   {
     "id": "CMD-JOURNAL-INSPECT",
@@ -898,8 +877,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "journal_inspect",
-    "usage": "journal inspect [--event-id ID] [--json]"
+    "grammar": "journal_inspect"
   },
   {
     "id": "CMD-JOURNAL-INSPECT-EXPLAIN",
@@ -932,8 +910,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "journal_inspect_explain",
-    "usage": "journal inspect --event-id ID --explain [--json]"
+    "grammar": "journal_inspect_explain"
   },
   {
     "id": "CMD-JOURNAL-VERIFY",
@@ -966,8 +943,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "journal_verify",
-    "usage": "journal verify [--json]"
+    "grammar": "journal_verify"
   },
   {
     "id": "CMD-JOURNAL-GC",
@@ -979,7 +955,7 @@
     "owner_bead": "boring-cdc-m5-gc",
     "class": "mutation",
     "ownership": "live_owner",
-    "confirmation": "dry_run_then_confirm",
+    "confirmation": "dry_run_only",
     "json": true,
     "exit_codes": [
       0,
@@ -1013,8 +989,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "journal_gc",
-    "usage": "journal gc --dry-run [--json]"
+    "grammar": "journal_gc"
   },
   {
     "id": "CMD-RECOVER-INSPECT",
@@ -1047,8 +1022,7 @@
     ],
     "control_revisions": [],
     "predicates": [],
-    "grammar": "recover_inspect",
-    "usage": "recover inspect [--json]"
+    "grammar": "recover_inspect"
   },
   {
     "id": "CMD-RECOVER-PROMOTION",
@@ -1093,8 +1067,7 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "recover_promotion",
-    "usage": "recover promotion DESTINATION --adopt-external-fence --confirm [--json]"
+    "grammar": "recover_promotion"
   },
   {
     "id": "CMD-RECOVER-RESEED",
@@ -1140,7 +1113,6 @@
       "fingerprints_match",
       "resources_sufficient"
     ],
-    "grammar": "recover_reseed",
-    "usage": "recover reseed [--add-table SCHEMA.TABLE|--resume RESEED_ID] --recreate-publication --recreate-slot (--confirm-data-gap|--confirm) [--json]"
+    "grammar": "recover_reseed"
   }
 ]

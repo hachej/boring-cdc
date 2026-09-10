@@ -11,6 +11,7 @@ snapshot() {
   } | sha256sum | cut -d' ' -f1
 }
 before=$(snapshot)
+printf '%s\n' "$before" > "$out/source-before.sha256"
 cargo build --locked --quiet
 bin=target/debug/boring-cdc
 $bin --help | grep -q CMD-JOURNAL-INSPECT-EXPLAIN
@@ -31,6 +32,7 @@ set -e
 [ "$code" -eq 4 ]; [ ! -s e2e.stderr ]; rm -f e2e.stderr
 printf '%s' "$json" | python3 -c 'import json,sys; x=json.load(sys.stdin); assert x["schema_version"]==1 and x["command"]=="CMD-STATUS" and x["code"]=="CLI_HANDLER_UNAVAILABLE"; assert set(["schema_version","command","outcome","code","message","request_id","run_id","capture_epoch","condition","runbook_id","data","warnings","next_commands"]) <= set(x)'
 after=$(snapshot)
+printf '%s\n' "$after" > "$out/source-after.sha256"
 [ "$before" = "$after" ]
 printf 'm1 cli e2e pass seed=%s help=28 json=versioned source_mutation=none store_mutation=none cleanup=complete\n' "$seed" | tee "$out/e2e.stdout"
 : > "$out/e2e.stderr"
