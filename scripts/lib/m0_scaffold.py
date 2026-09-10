@@ -179,6 +179,9 @@ def execute(out:Path)->None:
      observed_buildkit=subprocess.check_output(["docker","exec",buildkit_container,"buildkitd","--version"],env=env,text=True).strip()
      if "v0.24.0" not in observed_buildkit:raise RuntimeError(f"BuildKit mismatch: {observed_buildkit}")
      common.append(run_record(["docker","compose","-f","compose.yaml","pull","postgres","clickhouse"],proof,env));common.append(run_record(["docker","compose","-f","compose.yaml","up","-d","--no-build","--wait","--wait-timeout","120"],proof,env));common.append(run_record(["docker","compose","-f","compose.yaml","exec","-T","connector","boring-cdc","scaffold-check"],proof,env))
+     binary_record=run_record(["docker","run","--rm","--entrypoint","sha256sum",image,"/usr/local/bin/boring-cdc"],proof,env,display="docker run --rm --entrypoint sha256sum <tested-connector-image> /usr/local/bin/boring-cdc");common.append(binary_record)
+     binary_digest=binary_record["stdout"].read_text().split()[0]
+     if not re.fullmatch(r"[0-9a-f]{64}",binary_digest):raise RuntimeError("invalid tested binary digest")
      mutated=proof/"compose-mismatch.yaml";mutated.write_text(read("compose.yaml").decode().replace(PINS["postgres_index"],"sha256:"+"0"*64))
      scenarios["SCN-M0-SCAFFOLD-STATIC"]=[run_record(["python3","scripts/lib/m0_scaffold.py","probe","SCN-M0-SCAFFOLD-STATIC"],proof,env)]
      scenarios["SCN-M0-SCAFFOLD-DIGEST-MISMATCH"]=[run_record(["python3","scripts/lib/m0_scaffold.py","probe","SCN-M0-SCAFFOLD-DIGEST-MISMATCH","--path",str(mutated)],proof,env,78,"python3 scripts/lib/m0_scaffold.py probe SCN-M0-SCAFFOLD-DIGEST-MISMATCH --path <isolated-mutated-compose>")]
