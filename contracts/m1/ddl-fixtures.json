@@ -35,7 +35,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+        "SCN-M1-DDL-FULL-FINGERPRINT"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-CHANGE-A-COLUMN-TYPE",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -45,7 +45,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+        "SCN-M1-DDL-KEY-DELETE-SAFETY"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-DELETE-SUPPORT-AND-DESTINATION-SPECIFIC-DELETE-SEMANTICS",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -55,7 +55,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+        "SCN-M1-DDL-KEY-DELETE-SAFETY"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-PRIMARY-UNIQUE-KEYS-AND-POSTGRES-REPLICA-IDENTITY",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -65,7 +65,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+        "SCN-M1-DDL-KEY-DELETE-SAFETY"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-REMOVE-USABLE-REPLICA-IDENTITY",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -75,7 +75,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+        "SCN-M1-DDL-FULL-FINGERPRINT"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-SELECTED-TABLE-AND-COLUMN-TYPES",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -85,7 +85,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+        "SCN-M1-DDL-FULL-FINGERPRINT"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-SOURCE-TO-DESTINATION-SCHEMA-COMPATIBILITY",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -105,7 +105,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-WAITER-BOUND"
+        "SCN-M1-DDL-STALE-FENCE"
       ],
       "id": "SCN-DELAYED-STALE-PROMOTION-AFTER-NEWER-SWITCH",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -162,6 +162,22 @@
     {
       "expected": "changed Relation blocks following DML decode and transaction feedback until catalog validation",
       "id": "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+    },
+    {
+      "expected": "every catalog contract dimension changes the canonical fingerprint and unsupported changes require reseed",
+      "id": "SCN-M1-DDL-FULL-FINGERPRINT"
+    },
+    {
+      "expected": "type or effective replica identity changes block update/delete feedback",
+      "id": "SCN-M1-DDL-KEY-DELETE-SAFETY"
+    },
+    {
+      "expected": "a delayed fence from an older generation cannot release the current guard",
+      "id": "SCN-M1-DDL-STALE-FENCE"
+    },
+    {
+      "expected": "malformed catalog contracts and actual decoder rows remain blocked before feedback",
+      "id": "SCN-M1-DDL-VALIDATION-ERROR"
     }
   ],
   "catalog_fingerprint_fields": [

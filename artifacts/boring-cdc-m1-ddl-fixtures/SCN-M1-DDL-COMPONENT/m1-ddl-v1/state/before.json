@@ -1,7 +1,0 @@
-{
-  "capture_epoch": 1,
-  "feedback_checkpoint": "0/0",
-  "generation": 7,
-  "guard_phase": "before_export",
-  "locks": []
-}

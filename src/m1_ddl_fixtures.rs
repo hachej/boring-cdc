@@ -3,6 +3,8 @@
 //! Database adapters provide catalog facts and lock-waiter observations. This module owns the
 //! deterministic contract comparison and guard lifecycle, but deliberately performs no I/O.
 
+use crate::m1_decoder::{PgoutputEvent, RowKind};
+use crate::m1_transition_kernel::DurableSourceBoundary;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -154,8 +156,38 @@ pub enum GuardPhase {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct GuardState {
+pub struct DurableFenceProof {
+    capture_epoch: u64,
     generation: u64,
+    table_set_fingerprint: String,
+    nonce: u64,
+    _journal_boundary: DurableSourceBoundary,
+}
+impl DurableFenceProof {
+    /// Only the journal transaction owner can supply the durable boundary capability.
+    pub fn from_journal_commit(
+        capture_epoch: u64,
+        generation: u64,
+        table_set_fingerprint: String,
+        nonce: u64,
+        boundary: DurableSourceBoundary,
+    ) -> Self {
+        Self {
+            capture_epoch,
+            generation,
+            table_set_fingerprint,
+            nonce,
+            _journal_boundary: boundary,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GuardState {
+    capture_epoch: u64,
+    generation: u64,
+    table_set_fingerprint: String,
+    intended_fence_nonce: u64,
     phase: GuardPhase,
     locked: Vec<LogicalRelationId>,
     feedback_gate_open: bool,
@@ -163,10 +195,18 @@ pub struct GuardState {
 
 impl GuardState {
     pub fn acquire_before_export(
+        capture_epoch: u64,
         generation: u64,
+        table_set_fingerprint: String,
+        intended_fence_nonce: u64,
         mut relations: Vec<LogicalRelationId>,
     ) -> Result<Self, DdlFailure> {
-        if generation == 0 || relations.is_empty() {
+        if capture_epoch == 0
+            || generation == 0
+            || table_set_fingerprint.is_empty()
+            || intended_fence_nonce == 0
+            || relations.is_empty()
+        {
             return Err(DdlFailure::guard("DDL_GUARD_INPUT_INVALID"));
         }
         relations.sort();
@@ -174,7 +214,10 @@ impl GuardState {
             return Err(DdlFailure::guard("DDL_GUARD_DUPLICATE_RELATION"));
         }
         Ok(Self {
+            capture_epoch,
             generation,
+            table_set_fingerprint,
+            intended_fence_nonce,
             phase: GuardPhase::BeforeExport,
             locked: relations,
             feedback_gate_open: false,
@@ -202,12 +245,18 @@ impl GuardState {
         self.phase = next;
         Ok(())
     }
-    pub fn durable_fence_observed(&mut self, generation: u64) -> Result<(), DdlFailure> {
-        if generation != self.generation || self.phase != GuardPhase::AwaitingDurableFence {
+    pub fn durable_fence_observed(&mut self, proof: &DurableFenceProof) -> Result<(), DdlFailure> {
+        if proof.capture_epoch != self.capture_epoch
+            || proof.generation != self.generation
+            || proof.table_set_fingerprint != self.table_set_fingerprint
+            || proof.nonce != self.intended_fence_nonce
+            || self.phase != GuardPhase::AwaitingDurableFence
+        {
             return Err(DdlFailure::guard("DDL_GUARD_FENCE_MISMATCH"));
         }
         self.phase = GuardPhase::Released;
         self.feedback_gate_open = true;
+        self.locked.clear();
         Ok(())
     }
     pub fn observe_waiter(&mut self, waiter: &WaiterObservation) -> Result<(), DdlFailure> {
@@ -220,6 +269,7 @@ impl GuardState {
         {
             self.phase = GuardPhase::Invalid;
             self.feedback_gate_open = true;
+            self.locked.clear();
             return Err(DdlFailure::waiter());
         }
         Ok(())
@@ -227,6 +277,7 @@ impl GuardState {
     pub fn guard_session_lost(&mut self) -> DdlFailure {
         self.phase = GuardPhase::Invalid;
         self.feedback_gate_open = true;
+        self.locked.clear();
         DdlFailure::guard("DDL_GUARD_SESSION_LOST")
     }
 }
@@ -291,11 +342,18 @@ impl RelationValidationGate {
         expected: Option<&RelationContract>,
         active_generation: bool,
     ) -> Result<ContractDecision, DdlFailure> {
-        if !self.pending.remove(&relation_id) {
+        if !self.pending.contains(&relation_id) {
             self.blocked = true;
             return Err(DdlFailure::contract("RELATION_VALIDATION_NOT_PENDING"));
         }
-        let fp = contract.fingerprint()?;
+        let fp = match contract.fingerprint() {
+            Ok(value) => value,
+            Err(failure) => {
+                self.blocked = true;
+                return Err(failure);
+            }
+        };
+        self.pending.remove(&relation_id);
         let decision = expected.map_or(ContractDecision::Unchanged, |old| {
             old.compare(contract, active_generation)
         });
@@ -317,6 +375,25 @@ impl RelationValidationGate {
             Err(DdlFailure::contract("DML_BEFORE_RELATION_VALIDATION"))
         } else {
             Ok(())
+        }
+    }
+    /// Adapter boundary for actual decoder events: Relation arms synchronous catalog validation;
+    /// a row can cross only after that full contract has been admitted.
+    pub fn observe_decoder_event(&mut self, event: &PgoutputEvent) -> Result<(), DdlFailure> {
+        match event {
+            PgoutputEvent::RelationNeedsValidation(relation) => {
+                self.relation_message(relation.id, true);
+                Ok(())
+            }
+            PgoutputEvent::Row(change)
+                if matches!(
+                    change.kind,
+                    RowKind::Insert | RowKind::Update | RowKind::Delete
+                ) =>
+            {
+                self.require_dml(change.relation_id)
+            }
+            _ => Ok(()),
         }
     }
     pub fn feedback_allowed(&self) -> bool {
@@ -416,31 +493,56 @@ pub(crate) mod tests {
     // SCENARIO: SCN-DDL-IMMEDIATELY-BEFORE-AFTER-COPY-FENCE
     #[test]
     fn guard_spans_all_copy_boundaries_until_durable_fence() {
-        let mut g =
-            GuardState::acquire_before_export(7, vec![relation(2).identity, relation(1).identity])
-                .unwrap();
+        let mut g = GuardState::acquire_before_export(
+            1,
+            7,
+            "tables-v1".into(),
+            99,
+            vec![relation(2).identity, relation(1).identity],
+        )
+        .unwrap();
         assert_eq!(g.locked[0].relation_oid, 1);
         g.advance(GuardPhase::Exported).unwrap();
         g.advance(GuardPhase::Copying).unwrap();
         g.advance(GuardPhase::AwaitingDurableFence).unwrap();
         assert!(!g.feedback_gate_open());
-        g.durable_fence_observed(7).unwrap();
+        let proof = DurableFenceProof::from_journal_commit(
+            1,
+            7,
+            "tables-v1".into(),
+            99,
+            crate::m1_transition_kernel::synthetic_durable_boundary(
+                crate::m1_transition_kernel::ReceivedLsn::from_wire(8),
+                crate::m1_transition_kernel::JournalCursor::from_store(9),
+            ),
+        );
+        g.durable_fence_observed(&proof).unwrap();
         assert_eq!(g.phase(), GuardPhase::Released);
     }
     // SCENARIO: SCN-IMPORTER-DDL-GUARD-LOSS
     #[test]
     fn guard_loss_invalidates_and_releases_feedback_gate() {
-        let mut g = GuardState::acquire_before_export(1, vec![relation(1).identity]).unwrap();
+        let mut g = GuardState::acquire_before_export(
+            1,
+            1,
+            "tables-v1".into(),
+            99,
+            vec![relation(1).identity],
+        )
+        .unwrap();
         let e = g.guard_session_lost();
         assert_eq!(e.fingerprint, "DDL_GUARD_SESSION_LOST");
         assert_eq!(g.phase(), GuardPhase::Invalid);
         assert!(g.feedback_gate_open());
+        assert!(g.locked_relations().is_empty());
     }
     // SCENARIO: SCN-M1-DDL-WAITER-BOUND
     #[test]
     fn conflicting_waiter_at_bound_invalidates_and_releases() {
         let id = relation(1).identity;
-        let mut g = GuardState::acquire_before_export(1, vec![id.clone()]).unwrap();
+        let mut g =
+            GuardState::acquire_before_export(1, 1, "tables-v1".into(), 99, vec![id.clone()])
+                .unwrap();
         assert!(
             g.observe_waiter(&WaiterObservation {
                 relation: id.clone(),
@@ -458,6 +560,7 @@ pub(crate) mod tests {
             .unwrap_err();
         assert_eq!(e.fingerprint, "BACKFILL_DDL_WAITER");
         assert!(g.feedback_gate_open());
+        assert!(g.locked_relations().is_empty());
     }
     // SCENARIO: SCN-M1-DDL-IMMEDIATE-RELATION-DML
     #[test]
@@ -491,12 +594,139 @@ pub(crate) mod tests {
         );
         let id = relation(1).identity;
         assert_eq!(
-            GuardState::acquire_before_export(1, vec![id.clone(), id])
+            GuardState::acquire_before_export(1, 1, "tables-v1".into(), 99, vec![id.clone(), id])
                 .unwrap_err()
                 .fingerprint,
             "DDL_GUARD_DUPLICATE_RELATION"
         );
     }
+    // SCENARIO: SCN-M1-DDL-FULL-FINGERPRINT
+    #[test]
+    fn every_relation_contract_dimension_changes_the_fingerprint() {
+        let old = relation(1);
+        let base = old.fingerprint().unwrap();
+        let mut changed = Vec::new();
+        let mut x = old.clone();
+        x.namespace = "other".into();
+        changed.push(x);
+        let mut x = old.clone();
+        x.relation_name = "other".into();
+        changed.push(x);
+        let mut x = old.clone();
+        x.columns[0].type_oid = 23;
+        changed.push(x);
+        let mut x = old.clone();
+        x.columns[0].typmod = 8;
+        changed.push(x);
+        let mut x = old.clone();
+        x.columns[0].collation_oid = 101;
+        changed.push(x);
+        let mut x = old.clone();
+        x.columns[0].nullable = true;
+        changed.push(x);
+        let mut x = old.clone();
+        x.columns[0].generated_expression_hash = Some("generated".into());
+        changed.push(x);
+        let mut x = old.clone();
+        x.columns[0].identity_expression_hash = Some("identity".into());
+        changed.push(x);
+        let mut x = old.clone();
+        x.key.replica_identity_mode = "full".into();
+        changed.push(x);
+        let mut x = old.clone();
+        x.partition.routing = "root".into();
+        changed.push(x);
+        let mut x = old.clone();
+        x.publication_member = false;
+        changed.push(x);
+        let mut x = old.clone();
+        x.publication_attnums.clear();
+        changed.push(x);
+        assert!(changed.iter().all(|x| x.fingerprint().unwrap() != base
+            && matches!(
+                old.compare(x, false),
+                ContractDecision::BlockAndRequireReseed(_)
+            )));
+    }
+    // SCENARIO: SCN-M1-DDL-KEY-DELETE-SAFETY
+    #[test]
+    fn changed_type_or_removed_replica_identity_blocks_update_delete_safety() {
+        let old = relation(1);
+        let mut typed = old.clone();
+        typed.columns[0].type_oid = 25;
+        let mut no_key = old.clone();
+        no_key.key.primary_attnums.clear();
+        no_key.key.replica_identity_mode = "nothing".into();
+        assert!(matches!(
+            old.compare(&typed, false),
+            ContractDecision::BlockAndRequireReseed(_)
+        ));
+        assert!(matches!(
+            old.compare(&no_key, false),
+            ContractDecision::BlockAndRequireReseed(_)
+        ));
+    }
+    // SCENARIO: SCN-M1-DDL-STALE-FENCE
+    #[test]
+    fn stale_or_nonmatching_durable_fence_cannot_release_newer_guard() {
+        let boundary = crate::m1_transition_kernel::synthetic_durable_boundary(
+            crate::m1_transition_kernel::ReceivedLsn::from_wire(8),
+            crate::m1_transition_kernel::JournalCursor::from_store(9),
+        );
+        let stale = DurableFenceProof::from_journal_commit(1, 6, "tables-v1".into(), 99, boundary);
+        let mut g = GuardState::acquire_before_export(
+            1,
+            7,
+            "tables-v1".into(),
+            99,
+            vec![relation(1).identity],
+        )
+        .unwrap();
+        g.advance(GuardPhase::Exported).unwrap();
+        g.advance(GuardPhase::Copying).unwrap();
+        g.advance(GuardPhase::AwaitingDurableFence).unwrap();
+        assert_eq!(
+            g.durable_fence_observed(&stale).unwrap_err().fingerprint,
+            "DDL_GUARD_FENCE_MISMATCH"
+        );
+        assert!(!g.feedback_gate_open());
+        assert!(!g.locked_relations().is_empty());
+    }
+    // SCENARIO: SCN-M1-DDL-VALIDATION-ERROR
+    #[test]
+    fn malformed_catalog_validation_and_actual_decoder_row_remain_fail_closed() {
+        let mut gate = RelationValidationGate::default();
+        let mut malformed = relation(1);
+        malformed.columns.push(malformed.columns[0].clone());
+        gate.relation_message(1, true);
+        assert!(gate.admit_catalog(1, &malformed, None, false).is_err());
+        assert!(!gate.feedback_allowed());
+        assert!(gate.require_dml(1).is_err());
+        let decoder_relation = crate::m1_decoder::Relation {
+            id: 2,
+            namespace: "public".into(),
+            name: "t2".into(),
+            replica_identity: b'd',
+            columns: vec![],
+        };
+        gate.observe_decoder_event(&PgoutputEvent::RelationNeedsValidation(decoder_relation))
+            .unwrap();
+        let row = crate::m1_decoder::RowChange {
+            xid: 1,
+            ordinal: 0,
+            relation_id: 2,
+            kind: RowKind::Delete,
+            old_kind: None,
+            old: None,
+            new: None,
+        };
+        assert!(
+            gate.observe_decoder_event(&PgoutputEvent::Row(row))
+                .is_err()
+        );
+        assert!(!gate.feedback_allowed());
+    }
+
     #[test]
     fn provisional_bounds_and_matrix_are_explicit() {
         assert_eq!(SUPPORTED_POSTGRES_MAJORS, [15, 16, 17]);

@@ -6,6 +6,9 @@ if c.get('schema_version')!='boring-cdc/m1-ddl-fixtures/v1': errors.append('sche
 if c.get('owner_bead')!='boring-cdc-m1-ddl-fixtures': errors.append('owner')
 if [x.get('major') for x in c.get('postgres',[])] != [15,16,17]: errors.append('postgres_matrix')
 if len(c.get('catalog_fingerprint_fields',[]))!=28: errors.append('fingerprint_fields')
+e2e=(root/'scripts/e2e/m1_ddl_fixtures.sh').read_text()
+for field in c.get('catalog_fingerprint_fields',[]):
+ if field not in e2e: errors.append('catalog_query_missing:'+field)
 if c.get('canonical_lock_order')!=['database_oid','relation_oid','logical_table_id'] or c.get('lock_mode')!='ACCESS SHARE': errors.append('lock_contract')
 m=c.get('admitted_ddl_matrix',[])
 if len(m)!=6 or any(x.get('required_lock')!='AccessExclusiveLock' for x in m): errors.append('ddl_matrix')
