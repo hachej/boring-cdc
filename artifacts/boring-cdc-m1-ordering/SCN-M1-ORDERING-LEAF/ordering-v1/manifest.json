@@ -17,16 +17,16 @@
       "argv": "cargo test --locked m1_ordering::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-2.stderr",
-      "stderr_sha256": "36551aadc5d034f65be1128814b9520a8536c43adbfd49b2678590a344163a1f",
+      "stderr_sha256": "625b726366f8ad0b616ac3632105ec8c5967d312c104d374df9b52838e408101",
       "stdout_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-2.log",
-      "stdout_sha256": "c644113a5e3e33eba477df3d1e51176a74b59798fe24b96205b320e26781d07c",
+      "stdout_sha256": "c0e4676625f39bb1a1dd2239df9c8157d9134b7de5ed8e6f461512e17e97e988",
       "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
     },
     {
       "argv": "scripts/validate/m1_ordering.py",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-3.stderr",
-      "stderr_sha256": "01a54c2297d535053904aa31b3ce782e8d166bda75f82d9cff7253650479b038",
+      "stderr_sha256": "738aa66cd2e06da589305767e891c00ca24a2e3880c05d21b78c196e6d692d95",
       "stdout_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-3.log",
       "stdout_sha256": "d8321b1e3208d1cc312834d6e9350b368ae53eede8e4df8981c65eaf4a130074",
       "version": "python 3.13.3"
@@ -34,7 +34,7 @@
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "acb5b0ea054fb54c28eb363a16e34dd22e71631f",
+  "git_commit": "0c720a29b192a60e15e3960867a735d7fec3d8f7",
   "owner_bead": "boring-cdc-m1-ordering",
   "redaction": {
     "checked": true,
@@ -46,7 +46,7 @@
       "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/versions.json",
       "contracts/m1/ordering-cases.json"
     ],
-    "digest": "a0252423dcad58352bff8e0287168c792946e31a239e450990c85fb507f322b0",
+    "digest": "ad373cc58bb04f2289d8170c3aed28a913e30c1512d45ca95e95768802becf37",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"

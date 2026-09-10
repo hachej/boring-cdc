@@ -4,21 +4,24 @@
     "duplicate_conflict_property_samples": 64,
     "fixed_goldens": 5,
     "immutable_position_conflict": "blocked",
+    "key_change_incomplete_tuple": "blocked",
     "semantic_tests": 10,
     "stable_cases": 9
   },
-  "git_commit": "acb5b0ea054fb54c28eb363a16e34dd22e71631f",
+  "git_commit": "0c720a29b192a60e15e3960867a735d7fec3d8f7",
   "inputs": {
     "contracts/m1/ordering-cases.json": "f7907a6a50ad49664e6ef01f176bf1458452dc9ddeb4bb8a13eece11ee408e2d",
     "scripts/validate/m1_ordering.py": "1be559ab9307c37c6ce7c142243bac38a39ab23254f62e46aa518dba0d69ae45",
-    "src/m1_ordering.rs": "2a690e84743942352761657038d12b326f28d6fe467e18b69b4facc57f14354a",
-    "src/m1_source_identity.rs": "02e50b9363380ffb983a07cad0da8c1c5f5191e2dbbd8d7c5a18aebc4c6e7cea"
+    "src/m1_ordering.rs": "4dcc633e93a7d62962639c5380224b0d9b48b35f2a2289ed4a69d31937402b5b",
+    "src/m1_source_identity.rs": "3677c2c7341d170106b908f55eb6471b04ebd46952973f0e5960966564aff9e3"
   },
   "owner_bead": "boring-cdc-m1-ordering",
   "provisional_constants": [
     "WAL_EVENT_DOMAIN=boring-cdc/wal-event/v1",
     "SNAPSHOT_EVENT_DOMAIN=boring-cdc/snapshot-event/v1",
     "SOURCE_SLOT_DOMAIN=boring-cdc/source-slot/v1",
+    "LOGICAL_TABLE_DOMAIN=boring-cdc/logical-table/v1 (consumed shared type)",
+    "RELATION_SCHEMA_DOMAIN=boring-cdc/relation-schema/v1 (consumed shared type)",
     "PHYSICAL_KEY_DOMAIN=boring-cdc/physical-key/v1 (consumed shared type)",
     "VALUE_HASH_DOMAIN=boring-cdc/canonical-value/v1",
     "PAYLOAD_HASH_DOMAIN=boring-cdc/mutation-payload/v1",
