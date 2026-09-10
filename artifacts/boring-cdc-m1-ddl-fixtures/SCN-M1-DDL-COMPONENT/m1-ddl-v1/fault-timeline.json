@@ -1,0 +1,71 @@
+{
+  "faults": [
+    {
+      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "hook": "catalog_poll_fingerprint",
+      "outcome": "pass_fail_closed",
+      "sequence": 1
+    },
+    {
+      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "hook": "active_generation_change",
+      "outcome": "pass_fail_closed",
+      "sequence": 2
+    },
+    {
+      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "hook": "guard_lifecycle",
+      "outcome": "pass_fail_closed",
+      "sequence": 3
+    },
+    {
+      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "hook": "guard_session_lost",
+      "outcome": "pass_fail_closed",
+      "sequence": 4
+    },
+    {
+      "failure_fingerprint": "BACKFILL_DDL_WAITER",
+      "hook": "ddl_waiter_bound",
+      "outcome": "pass_fail_closed",
+      "sequence": 5
+    },
+    {
+      "failure_fingerprint": "DML_BEFORE_RELATION_VALIDATION",
+      "hook": "changed_relation_dml",
+      "outcome": "pass_fail_closed",
+      "sequence": 6
+    },
+    {
+      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "hook": "noncanonical_contract",
+      "outcome": "pass_fail_closed",
+      "sequence": 7
+    },
+    {
+      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "hook": "full_fingerprint",
+      "outcome": "pass_fail_closed",
+      "sequence": 8
+    },
+    {
+      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "hook": "key_delete_safety",
+      "outcome": "pass_fail_closed",
+      "sequence": 9
+    },
+    {
+      "failure_fingerprint": "DDL_GUARD_FENCE_MISMATCH",
+      "hook": "stale_durable_fence",
+      "outcome": "pass_fail_closed",
+      "sequence": 10
+    },
+    {
+      "failure_fingerprint": "DML_BEFORE_RELATION_VALIDATION",
+      "hook": "decoded_relation_admission",
+      "outcome": "pass_fail_closed",
+      "sequence": 11
+    }
+  ],
+  "schema_version": "fault-timeline/v1"
+}

@@ -1,0 +1,9 @@
+{
+  "boundary_conflicts": 12,
+  "capture_epoch": 1,
+  "feedback_checkpoint": "0/0",
+  "generation": 7,
+  "guard_phase": "released_after_durable_fence",
+  "matrix_conflicts": 18,
+  "waiters_released": 3
+}

@@ -1,0 +1,105 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo test --locked --workspace --all-targets",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/workspace.txt",
+      "stderr_sha256": "b9fcea248644e8830705fdde164738399807998e02918fa92046d09e75337202",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/workspace.txt",
+      "stdout_sha256": "633bdc1883b29ef9c6ef45ff9b7afb706d789a6043af37506e0b95deb5c6165b",
+      "version": "cargo"
+    },
+    {
+      "argv": "cargo test --locked m1_ddl_fixtures::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/targeted.txt",
+      "stderr_sha256": "625b726366f8ad0b616ac3632105ec8c5967d312c104d374df9b52838e408101",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/targeted.txt",
+      "stdout_sha256": "61cad3354e90f27e094f801e26dd83b1baf14aff941d0cc88c1d7ca7a0c9db1d",
+      "version": "cargo"
+    },
+    {
+      "argv": "scripts/e2e/m1_ddl_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/e2e-1.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/e2e-1.txt",
+      "stdout_sha256": "bc90b986d99e07852ad5d8aa28d8394275bdf230b5633dd87a6ce240aa5f1fa4",
+      "version": "fixture/v1"
+    },
+    {
+      "argv": "scripts/e2e/m1_ddl_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/e2e-2.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/e2e-2.txt",
+      "stdout_sha256": "bc90b986d99e07852ad5d8aa28d8394275bdf230b5633dd87a6ce240aa5f1fa4",
+      "version": "fixture/v1"
+    },
+    {
+      "argv": "scripts/faults/m1_ddl_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/faults-1.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/faults-1.txt",
+      "stdout_sha256": "a582324b608a3739635bb4478d4630cc0c5f0643b8ee82494afd23cdc9377618",
+      "version": "fixture/v1"
+    },
+    {
+      "argv": "scripts/faults/m1_ddl_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/faults-2.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/faults-2.txt",
+      "stdout_sha256": "a582324b608a3739635bb4478d4630cc0c5f0643b8ee82494afd23cdc9377618",
+      "version": "fixture/v1"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "component",
+  "git_commit": "1acb4975def5d2e7226b32dcc50800c233d04c8b",
+  "owner_bead": "boring-cdc-m1-ddl-fixtures",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/config.json",
+      "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/logs/boring-cdc.jsonl",
+      "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/state/before.json",
+      "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/state/after.json",
+      "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/fault-timeline.json"
+    ],
+    "digest": "d969e950064b0c361775eab5d17efab8151a83a74cbc19c31e654b9564fe95bb",
+    "product_faults": "Live PG15/16/17 one guarded export-import-copy-durable-fence lifecycle, finite DDL matrix, waiter release, exact admission and guarded decoder",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-DDL-COMPONENT",
+  "schema_version": "evidence/v1",
+  "seed": "m1-ddl-v1",
+  "source_preservation": {
+    "after_sha256": "5ad1ebe46fd486da9524c4f13fa9aa19d167649754cf3fcf83811488dedcb365",
+    "before_sha256": "5ad1ebe46fd486da9524c4f13fa9aa19d167649754cf3fcf83811488dedcb365",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": true
+  }
+}
