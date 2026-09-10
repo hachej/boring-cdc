@@ -22,6 +22,12 @@ for ident,root in dirs.items():
  binary=manifest.get('binary_sha256',''); cargo_lock=manifest.get('cargo_lock_sha256','')
  if not is_sha256(binary):fail(f"binary SHA-256 malformed: {ident}")
  if cargo_lock!=sha(ROOT/'Cargo.lock'):fail(f"Cargo.lock digest mismatch: {ident}")
+ for command in evidence.get('commands',[]):
+  for stream in ('stdout','stderr'):
+   capture=evidence_path(root,command.get(f'{stream}_path'))
+   if capture is None:fail(f"command {stream} path escape: {ident}")
+   if not is_sha256(command.get(f'{stream}_sha256')) or sha(capture)!=command[f'{stream}_sha256']:
+    fail(f"command {stream} digest mismatch: {ident}")
  binary_commands=[c for c in evidence.get('commands',[]) if c.get('argv')=='docker run --rm --entrypoint sha256sum <tested-connector-image> /usr/local/bin/boring-cdc']
  if len(binary_commands)!=2:fail(f"tested binary command mismatch: {ident}")
  for command in binary_commands:
