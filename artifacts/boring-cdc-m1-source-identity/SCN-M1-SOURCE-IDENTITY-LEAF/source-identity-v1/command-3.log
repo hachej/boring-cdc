@@ -1,1 +1,1 @@
-PASS source identity vectors=13 unique=13
+PASS source identity vectors=13 exact=true sqlite=false

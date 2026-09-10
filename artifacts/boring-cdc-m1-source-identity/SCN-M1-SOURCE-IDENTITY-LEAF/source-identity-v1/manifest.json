@@ -23,18 +23,18 @@
       "version": "cargo 1.95.0"
     },
     {
-      "argv": "python3 validate source-identity-cases.json",
+      "argv": "scripts/validate/m1_source_identity.py",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-3.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-3.log",
-      "stdout_sha256": "cadd075e1a4619d9de88a8de36e70772987552af6f12e6b6e64664c70d88ec88",
+      "stdout_sha256": "98fad8924564f3420be10f2d1e9fd07e95e64ead8145d9b4923d7942dd66f339",
       "version": "python 3"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "1a2417833ce3344c9c66a0e7b4c5dc7baa586135",
+  "git_commit": "3fd5f6059c681acabce51c3eea4c78f7d9d407d2",
   "owner_bead": "boring-cdc-m1-source-identity",
   "redaction": {
     "checked": true,
@@ -54,8 +54,8 @@
   "schema_version": "evidence/v1",
   "seed": "fixed pure startup vectors v1",
   "source_preservation": {
-    "after_sha256": "66be461bf6c13ae3fd7ea8559283a3ec668de320d2b044f15bc13a01588afd54",
-    "before_sha256": "66be461bf6c13ae3fd7ea8559283a3ec668de320d2b044f15bc13a01588afd54",
+    "after_sha256": "5b1baf66e1fd88f6b2dd433d5136ffcf6cee8c40790fa52c0a7de2efa528f2fd",
+    "before_sha256": "5b1baf66e1fd88f6b2dd433d5136ffcf6cee8c40790fa52c0a7de2efa528f2fd",
     "preserved": true
   },
   "tier_proof": {
