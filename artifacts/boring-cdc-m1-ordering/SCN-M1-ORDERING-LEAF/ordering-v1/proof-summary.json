@@ -1,0 +1,28 @@
+{
+  "assertions": {
+    "cross_epoch_ordering": "rejected",
+    "duplicate_conflict_property_samples": 64,
+    "fixed_goldens": 5,
+    "semantic_tests": 10,
+    "stable_cases": 9
+  },
+  "git_commit": "f4f64446e787aa808e04102f69594f286fa12501",
+  "inputs": {
+    "contracts/m1/ordering-cases.json": "a9b50b9f6d85936b055f84d6d01d5242cfdc8d7b9d6d930bf44ebb4190dcff83",
+    "scripts/validate/m1_ordering.py": "cc913357a2d37ac0f29632fe75feacb87dd0f8fb91ad6522701d33408496ba6d",
+    "src/m1_ordering.rs": "f3a0b2331d199d1994913068ef1cc729209613b436e65a206de677d8159b5c2d"
+  },
+  "owner_bead": "boring-cdc-m1-ordering",
+  "provisional_constants": [
+    "WAL_EVENT_DOMAIN=boring-cdc/wal-event/v1",
+    "SNAPSHOT_EVENT_DOMAIN=boring-cdc/snapshot-event/v1",
+    "SOURCE_SLOT_DOMAIN=boring-cdc/source-slot/v1",
+    "KEY_HASH_DOMAIN=boring-cdc/canonical-key/v1",
+    "VALUE_HASH_DOMAIN=boring-cdc/canonical-value/v1",
+    "PAYLOAD_HASH_DOMAIN=boring-cdc/mutation-payload/v1",
+    "SNAPSHOT_ORIGIN_RANK=0",
+    "WAL_ORIGIN_RANK=1",
+    "MAX_CANONICAL_KEY_COMPONENTS=32"
+  ],
+  "schema_version": "m1-ordering-proof/v1"
+}

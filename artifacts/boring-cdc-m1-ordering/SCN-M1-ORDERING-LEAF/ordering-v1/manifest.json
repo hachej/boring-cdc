@@ -1,0 +1,76 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-1.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    {
+      "argv": "cargo test --locked m1_ordering::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-2.stderr",
+      "stderr_sha256": "0a994fcf11c3686b94df429e41a6dd241069ebc0dc1ee47f77fbd06ecf674f1c",
+      "stdout_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-2.log",
+      "stdout_sha256": "e0f8f21ab61ab4950a7e3422a4c0a298e38a7deea90522ddc57d2d65365ea7bf",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    {
+      "argv": "scripts/validate/m1_ordering.py",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-3.stderr",
+      "stderr_sha256": "d2006dab1b88bf7e03b4d9236f4e6896ecae6bda362a889062343577cf90415c",
+      "stdout_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-3.log",
+      "stdout_sha256": "d8321b1e3208d1cc312834d6e9350b368ae53eede8e4df8981c65eaf4a130074",
+      "version": "python 3.13.3"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "leaf",
+  "git_commit": "f4f64446e787aa808e04102f69594f286fa12501",
+  "owner_bead": "boring-cdc-m1-ordering",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/proof-summary.json",
+      "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/versions.json",
+      "contracts/m1/ordering-cases.json"
+    ],
+    "digest": "6a678d3d3516529c4470b3604cccdb63c93d77db7ba180d3d5628bcd0e4d977d",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-ORDERING-LEAF",
+  "schema_version": "evidence/v1",
+  "seed": "ordering-v1 fixed vectors",
+  "source_preservation": {
+    "after_sha256": "a9b50b9f6d85936b055f84d6d01d5242cfdc8d7b9d6d930bf44ebb4190dcff83",
+    "before_sha256": "a9b50b9f6d85936b055f84d6d01d5242cfdc8d7b9d6d930bf44ebb4190dcff83",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": false,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": false,
+    "full_failure_matrix": true,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}
