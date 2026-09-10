@@ -28,8 +28,6 @@ const PAYLOAD_HASH_DOMAIN: &[u8] = b"boring-cdc/mutation-payload/v1";
 pub const SNAPSHOT_ORIGIN_RANK: u8 = 0;
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED origin rank: snapshot then WAL).
 pub const WAL_ORIGIN_RANK: u8 = 1;
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED canonical field framing: u64 big-endian byte length).
-const HASH_LENGTH_FRAMING: &str = "u64-be";
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED column-state tags).
 const COLUMN_ABSENT_TAG: u8 = 0;
 const COLUMN_NULL_TAG: u8 = 1;
@@ -72,9 +70,12 @@ fn hash_fields(domain: &[u8], fields: &[&[u8]]) -> Hash32 {
     }
     Hash32(h.finalize().into())
 }
+// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED canonical field framing: u64 big-endian byte length).
+fn canonical_length_bytes(len: usize) -> [u8; 8] {
+    (len as u64).to_be_bytes()
+}
 fn put_field(h: &mut Sha256, bytes: &[u8]) {
-    debug_assert_eq!(HASH_LENGTH_FRAMING, "u64-be");
-    h.update((bytes.len() as u64).to_be_bytes());
+    h.update(canonical_length_bytes(bytes.len()));
     h.update(bytes);
 }
 
@@ -117,7 +118,7 @@ impl ColumnState {
                 out.push(COLUMN_VALUE_TAG);
                 out.extend(value.type_oid.to_be_bytes());
                 out.extend(value.type_modifier.to_be_bytes());
-                out.extend((value.bytes.len() as u64).to_be_bytes());
+                out.extend(canonical_length_bytes(value.bytes.len()));
                 out.extend(&value.bytes);
             }
         }
@@ -237,7 +238,7 @@ impl MutationPayload {
             }
         }
         let mut columns = Vec::new();
-        columns.extend((self.columns.len() as u64).to_be_bytes());
+        columns.extend(canonical_length_bytes(self.columns.len()));
         for state in &self.columns {
             state.encode_into(&mut columns);
         }

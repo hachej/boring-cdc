@@ -16,7 +16,7 @@ for case in cases["cases"]:
 for marker in ("boring-cdc-d-event-id", "boring-cdc-d-keys"):
     assert f"M0-PROVISIONAL: {marker}" in source
 for provisional_literal in (
-    'HASH_LENGTH_FRAMING: &str = "u64-be"',
+    "fn canonical_length_bytes(len: usize) -> [u8; 8]",
     "COLUMN_ABSENT_TAG: u8 = 0",
     "COLUMN_NULL_TAG: u8 = 1",
     "COLUMN_UNCHANGED_TOAST_TAG: u8 = 2",
