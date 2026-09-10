@@ -5,6 +5,46 @@
         "fault_hook": "replay_identical",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "replay_identical",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "advance_to_102",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
         "capture_and_archive": "continue",
@@ -32,6 +72,46 @@
       "action": {
         "fault_hook": "same_event_different_payload",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "same_event_different_payload",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 1,
+          "current_rows": [],
+          "destination_state": "blocked_integrity",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
@@ -61,6 +141,46 @@
         "fault_hook": "wal_total_order",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "wal_total_order",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "advance_to_104",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
         "capture_and_archive": "continue",
@@ -88,6 +208,46 @@
       "action": {
         "fault_hook": "late_snapshot_loses_to_wal",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "late_snapshot_loses_to_wal",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "advance_to_104",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
@@ -117,6 +277,46 @@
         "fault_hook": "epoch_change",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "epoch_change",
+          "preserve": [],
+          "target": "generation_selectors_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_continuity",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
         "capture_and_archive": "continue",
@@ -144,6 +344,46 @@
       "action": {
         "fault_hook": "unchanged_toast_reconstruct",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "unchanged_toast_reconstruct",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "advance_to_104",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
@@ -173,6 +413,46 @@
         "fault_hook": "missing_explicit_predecessor",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "missing_explicit_predecessor",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_contract",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
         "capture_and_archive": "continue",
@@ -200,6 +480,46 @@
       "action": {
         "fault_hook": "explicit_null_replaces",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "explicit_null_replaces",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "advance_to_104",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
@@ -229,6 +549,46 @@
         "fault_hook": "delete_hides_row",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "delete_hides_row",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "advance_to_104",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
         "capture_and_archive": "continue",
@@ -256,6 +616,46 @@
       "action": {
         "fault_hook": "old_tombstone_new_upsert",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "old_tombstone_new_upsert",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "advance_to_104",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
@@ -285,6 +685,46 @@
         "fault_hook": "forbidden_patch",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "forbidden_patch",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_contract",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
         "capture_and_archive": "continue",
@@ -312,6 +752,46 @@
       "action": {
         "fault_hook": "absent_projects_null",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "absent_projects_null",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "advance_to_104",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
@@ -341,6 +821,46 @@
         "fault_hook": "schema_change_during_backfill",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "schema_change_during_backfill",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_reseed",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
         "capture_and_archive": "continue",
@@ -368,6 +888,46 @@
       "action": {
         "fault_hook": "type_change",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "type_change",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_reseed",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
@@ -397,6 +957,46 @@
         "fault_hook": "before_insert",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "before_insert",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
         "capture_and_archive": "continue",
@@ -424,6 +1024,46 @@
       "action": {
         "fault_hook": "after_insert_before_marker",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "after_insert_before_marker",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
@@ -453,6 +1093,46 @@
         "fault_hook": "after_marker_before_checkpoint",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "after_marker_before_checkpoint",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "advance_to_104",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
         "capture_and_archive": "continue",
@@ -480,6 +1160,46 @@
       "action": {
         "fault_hook": "rust_end_failed",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "rust_end_failed",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "retry_wait",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
@@ -509,6 +1229,46 @@
         "fault_hook": "marker_digest_differs",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "marker_digest_differs",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_integrity",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
         "capture_and_archive": "continue",
@@ -536,6 +1296,47 @@
       "action": {
         "fault_hook": "mutate_payload_keep_ids_hash_marker",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "mutate_payload_keep_ids_hash_marker",
+          "preserve": [
+            "connector_event_id",
+            "payload_hash",
+            "batch_marker"
+          ],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_integrity",
+          "journal_verified_range": [],
+          "mismatch_fingerprint": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
@@ -565,6 +1366,46 @@
         "fault_hook": "ddl_or_settings_fingerprint_differs",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "ddl_or_settings_fingerprint_differs",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_integrity",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
         "capture_and_archive": "continue",
@@ -592,6 +1433,43 @@
       "action": {
         "fault_hook": "pass_budget_exhausted",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "pass_budget_exhausted",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
@@ -621,6 +1499,46 @@
         "fault_hook": "event_exceeds_remaining_budget",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "event_exceeds_remaining_budget",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
         "capture_and_archive": "continue",
@@ -648,6 +1566,43 @@
       "action": {
         "fault_hook": "fresh_until_elapsed",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "fresh_until_elapsed",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
@@ -677,6 +1632,43 @@
         "fault_hook": "target_or_selector_changed",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "target_or_selector_changed",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
         "capture_and_archive": "continue",
@@ -704,6 +1696,46 @@
       "action": {
         "fault_hook": "lower_fence",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "lower_fence",
+          "preserve": [],
+          "target": "generation_selectors_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
@@ -733,6 +1765,46 @@
         "fault_hook": "same_fence_same_candidate",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "same_fence_same_candidate",
+          "preserve": [],
+          "target": "generation_selectors_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
         "capture_and_archive": "continue",
@@ -760,6 +1832,46 @@
       "action": {
         "fault_hook": "same_fence_different_candidate",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "same_fence_different_candidate",
+          "preserve": [],
+          "target": "generation_selectors_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 1,
+          "current_rows": [],
+          "destination_state": "blocked_integrity",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
@@ -789,6 +1901,46 @@
         "fault_hook": "higher_fence",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "higher_fence",
+          "preserve": [],
+          "target": "generation_selectors_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 8
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
         "capture_and_archive": "continue",
@@ -816,6 +1968,46 @@
       "action": {
         "fault_hook": "external_above_sqlite",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "external_above_sqlite",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_continuity",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
@@ -845,6 +2037,46 @@
         "fault_hook": "candidate_missing_table",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "candidate_missing_table",
+          "preserve": [],
+          "target": "generation_selectors_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_reseed",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
         "capture_and_archive": "continue",
@@ -872,6 +2104,46 @@
       "action": {
         "fault_hook": "candidate_not_promoted",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "candidate_not_promoted",
+          "preserve": [],
+          "target": "generation_selectors_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
@@ -901,6 +2173,46 @@
         "fault_hook": "history_bytes_at_warning",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "history_bytes_at_warning",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
         "capture_and_archive": "continue",
@@ -928,6 +2240,46 @@
       "action": {
         "fault_hook": "history_bytes_at_hard",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "history_bytes_at_hard",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_resource",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-ddl",
       "expected": {
@@ -957,6 +2309,46 @@
         "fault_hook": "retire_live_generation",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "retire_live_generation",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_configuration",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
         "capture_and_archive": "continue",
@@ -984,6 +2376,46 @@
       "action": {
         "fault_hook": "retire_before_grace",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "retire_before_grace",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_configuration",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
@@ -1013,6 +2445,46 @@
         "fault_hook": "retire_nonlive_after_grace_no_pins",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "retire_nonlive_after_grace_no_pins",
+          "preserve": [],
+          "target": "audit_or_resource_state"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": "golden_vectors.expected_current_rows",
+          "destination_state": "ready",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-promotion",
       "expected": {
         "capture_and_archive": "continue",
@@ -1040,6 +2512,46 @@
       "action": {
         "fault_hook": "restart_before_retry_due",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "restart_before_retry_due",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "retry_wait",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
@@ -1069,6 +2581,46 @@
         "fault_hook": "canonical_projection_failure",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "canonical_projection_failure",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_contract",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
         "capture_and_archive": "continue",
@@ -1097,6 +2649,46 @@
         "fault_hook": "attempt_ten_failed",
         "fault_once": true
       },
+      "execution": {
+        "fault": {
+          "operation": "attempt_ten_failed",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_exhausted",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
+      },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
         "capture_and_archive": "continue",
@@ -1124,6 +2716,46 @@
       "action": {
         "fault_hook": "resume_boundary_changed",
         "fault_once": true
+      },
+      "execution": {
+        "fault": {
+          "operation": "resume_boundary_changed",
+          "preserve": [],
+          "target": "event_history_v1"
+        },
+        "oracle": {
+          "checkpoint": "unchanged",
+          "conflict_count": 0,
+          "current_rows": [],
+          "destination_state": "blocked_contract",
+          "journal_verified_range": [
+            100,
+            104
+          ],
+          "mismatch_fingerprint": null,
+          "selector_generation": 7
+        },
+        "setup": {
+          "batch_marker": {
+            "batch_id": "8888888888888888888888888888888888888888888888888888888888888888",
+            "event_count": 4,
+            "first_journal_seq": 100,
+            "last_journal_seq": 104,
+            "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          },
+          "event_rows": "golden_vectors.events",
+          "selector_rows": [
+            {
+              "candidate_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+              "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+              "generation": 7,
+              "promotion_fence": 9,
+              "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666"
+            }
+          ]
+        }
       },
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
@@ -1154,122 +2786,146 @@
   "golden_vectors": {
     "events": [
       {
+        "before_key": "",
         "cells": [
           [
             1,
             "explicit_value",
+            25,
+            -1,
             "QQ=="
           ],
           [
             2,
             "explicit_value",
+            25,
+            -1,
             "Qg=="
           ]
         ],
         "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
         "id": "1111111111111111111111111111111111111111111111111111111111111111",
         "key": "k1",
+        "key_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "mutation_kind": "upsert",
         "op": "insert",
+        "relation_schema_fingerprint": "9999999999999999999999999999999999999999999999999999999999999999",
         "version": [
           1,
           4096,
           0,
           0,
-          0,
-          0,
-          0
+          "1111111111111111111111111111111111111111111111111111111111111111"
         ]
       },
       {
+        "before_key": "",
         "cells": [
           [
             1,
             "unchanged_toast",
+            25,
+            -1,
             ""
           ],
           [
             2,
             "explicit_null",
+            25,
+            -1,
             ""
           ]
         ],
         "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "id": "2222222222222222222222222222222222222222222222222222222222222222",
         "key": "k1",
+        "key_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "mutation_kind": "upsert",
         "op": "update",
+        "relation_schema_fingerprint": "9999999999999999999999999999999999999999999999999999999999999999",
         "version": [
           1,
           4097,
           0,
           0,
-          0,
-          0,
-          0
+          "2222222222222222222222222222222222222222222222222222222222222222"
         ]
       },
       {
+        "before_key": "",
         "cells": [
           [
             1,
             "unchanged_toast",
+            25,
+            -1,
             ""
           ],
           [
             2,
             "explicit_null",
+            25,
+            -1,
             ""
           ]
         ],
         "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "id": "2222222222222222222222222222222222222222222222222222222222222222",
         "key": "k1",
+        "key_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "mutation_kind": "upsert",
         "op": "update",
+        "relation_schema_fingerprint": "9999999999999999999999999999999999999999999999999999999999999999",
         "version": [
           1,
           4097,
           0,
           0,
-          0,
-          0,
-          0
+          "2222222222222222222222222222222222222222222222222222222222222222"
         ]
       },
       {
+        "before_key": "",
         "cells": [
           [
             1,
             "explicit_value",
+            25,
+            -1,
             "WA=="
           ]
         ],
         "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
         "id": "3333333333333333333333333333333333333333333333333333333333333333",
         "key": "k2",
+        "key_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "mutation_kind": "upsert",
         "op": "insert",
+        "relation_schema_fingerprint": "9999999999999999999999999999999999999999999999999999999999999999",
         "version": [
           0,
           0,
           0,
           0,
-          100,
-          0,
-          0
+          "3333333333333333333333333333333333333333333333333333333333333333"
         ]
       },
       {
+        "before_key": "",
         "cells": [],
         "hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "id": "4444444444444444444444444444444444444444444444444444444444444444",
         "key": "k2",
+        "key_hash": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "mutation_kind": "delete",
         "op": "delete",
+        "relation_schema_fingerprint": "9999999999999999999999999999999999999999999999999999999999999999",
         "version": [
           1,
           4098,
           0,
           0,
-          0,
-          0,
-          0
+          "4444444444444444444444444444444444444444444444444444444444444444"
         ]
       }
     ],
@@ -1281,11 +2937,15 @@
           {
             "column_id": 1,
             "state": "explicit_value",
+            "type_oid": 25,
+            "typmod": -1,
             "value_base64": "QQ=="
           },
           {
             "column_id": 2,
             "state": "explicit_null",
+            "type_oid": 25,
+            "typmod": -1,
             "value_base64": ""
           }
         ]

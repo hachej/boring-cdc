@@ -88,14 +88,30 @@
     ],
     "key_change": "old complete key delete plus new complete key upsert; unchanged_toast anywhere blocks",
     "source_order": [
+      "lsn_u64",
       "origin_rank",
-      "commit_lsn_u64",
       "transaction_ordinal",
       "mutation_ordinal",
-      "snapshot_anchor_seq",
-      "snapshot_chunk_ordinal",
-      "snapshot_row_ordinal",
       "connector_event_id"
+    ],
+    "stored_payload_hash_inputs": [
+      "capture_epoch",
+      "lsn_u64",
+      "origin_rank",
+      "transaction_ordinal",
+      "mutation_ordinal",
+      "connector_event_id",
+      "relation_schema_fingerprint",
+      "canonical_key",
+      "key_hash",
+      "operation",
+      "before_key",
+      "mutation_kind",
+      "columns.column_id",
+      "columns.state",
+      "columns.type_oid",
+      "columns.typmod",
+      "columns.value_base64"
     ],
     "toast": "latest explicit_value or explicit_null per column is carried through unchanged_toast; absent_for_schema projects null; missing predecessor blocks"
   },
@@ -189,6 +205,10 @@
   "fixture_path": "fixtures/m0/clickhouse/scenarios.json",
   "history_retention": {
     "ordinary_deletion": "forbidden",
+    "partition_key": [
+      "capture_epoch",
+      "generation"
+    ],
     "quota": {
       "emergency_free_bytes": 10737418240,
       "hard_action": "block ClickHouse only before insert; never delete history",
@@ -203,6 +223,7 @@
     ],
     "retirement_grace_seconds": 86400,
     "retirement_owner": "maintenance destination retire only",
+    "retirement_scope": "one DROP PARTITION removes all logical tables for exactly one epoch/generation before its generation-wide markers; selector history remains",
     "telemetry": [
       "history_bytes",
       "free_bytes",

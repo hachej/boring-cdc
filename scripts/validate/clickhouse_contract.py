@@ -28,10 +28,10 @@ def simulate(events):
   if latest['op']=='delete': continue
   cells={}
   for e in es:
-   for cid,state,value in e['cells']:
-    if state in ('explicit_value','explicit_null'): cells[cid]=(state,value)
+   for cid,state,type_oid,typmod,value in e['cells']:
+    if state in ('explicit_value','explicit_null'): cells[cid]=(state,type_oid,typmod,value)
     elif state=='unchanged_toast' and cid not in cells: raise ValueError('missing predecessor')
-  rows.append({'canonical_key':key,'columns':[{'column_id':k,'state':v[0],'value_base64':v[1]} for k,v in sorted(cells.items())]})
+  rows.append({'canonical_key':key,'columns':[{'column_id':k,'state':v[0],'type_oid':v[1],'typmod':v[2],'value_base64':v[3]} for k,v in sorted(cells.items())]})
  return sorted(rows,key=lambda x:x['canonical_key'])
 def validate():
  out=[]
@@ -54,9 +54,11 @@ def validate():
  if (c['pins']['server'],c['pins']['platform'])!=('25.8.2.29','linux/amd64') or '78b6f08' not in c['pins']['image']:add(out,'E_PIN','pins','server/platform/image pin changed')
  fp=c['consumes']['failure_policy']
  if (fp['version'],fp['base_delay_ms'],fp['cap_delay_ms'],fp['maximum_attempts'])!=(1,250,30000,10):add(out,'E_FAILURE_POLICY','consumes/failure_policy','confirmed retry literals changed')
- settings=c['insert_acceptance']['settings']
- if settings!={'async_insert':0,'wait_for_async_insert':1,'insert_quorum':1,'fsync_after_insert':1,'fsync_directories':1,'insert_deduplicate':0}:add(out,'E_DURABILITY_SETTINGS','insert_acceptance/settings','pinned settings changed')
  ddl=DDL.read_text(); query=Q.read_text(); retire=R.read_text()
+ settings=c['insert_acceptance']['settings']
+ for required in ('fsync_after_insert=1','fsync_directories=1'):
+  if ddl.count(required)<3:add(out,'E_DDL_DURABILITY','files/ddl','all durable tables must pin '+required)
+ if settings!={'async_insert':0,'wait_for_async_insert':1,'insert_quorum':1,'fsync_after_insert':1,'fsync_directories':1,'insert_deduplicate':0}:add(out,'E_DURABILITY_SETTINGS','insert_acceptance/settings','pinned settings changed')
  for obj in c['objects']['tables']+c['objects']['views']:
   if obj not in ddl:add(out,'E_DDL_OBJECT','files/ddl','missing '+obj)
  for forbidden in ('ReplacingMergeTree','CollapsingMergeTree','VersionedCollapsingMergeTree',' TTL '):
@@ -64,12 +66,14 @@ def validate():
  order=['persist immutable batch intent','insert event_history','Rust insert','read back exact event count','insert batch_markers','read back one identical marker','commit destination checkpoint']
  pos=[next((i for i,x in enumerate(c['insert_acceptance']['ordered_steps']) if t in x),-1) for t in order]
  if -1 in pos or pos!=sorted(pos):add(out,'E_ACCEPT_ORDER','insert_acceptance/ordered_steps','acceptance ordering incomplete')
- for term in ('argMax','payload_variants','operation != \'delete\'','ARRAY JOIN','promotion_fence'):
+ for term in ('argMax','payload_variants',"operation!='delete'",'ARRAY JOIN','promotion_fence'):
   if term not in query:add(out,'E_QUERY','files/canonical_query','missing '+term)
  if 'FINAL' in query and 'FINAL is intentionally absent' not in query:add(out,'E_FINAL','files/canonical_query','FINAL must not provide correctness')
- if 'DROP PARTITION' not in retire or 'generation_selectors_v1' in retire.split('-- Selector history')[0]:add(out,'E_RETIRE','files/retirement','retirement scope unsafe')
+ if 'DROP PARTITION' not in retire or re.search(r'ALTER TABLE\s+boring_cdc\.generation_selectors_v1',retire,re.I):add(out,'E_RETIRE','files/retirement','retirement scope unsafe')
  source=c['event_projection']['source_order']
- if source!=['origin_rank','commit_lsn_u64','transaction_ordinal','mutation_ordinal','snapshot_anchor_seq','snapshot_chunk_ordinal','snapshot_row_ordinal','connector_event_id']:add(out,'E_SOURCE_ORDER','event_projection/source_order','full source order changed')
+ if source!=['lsn_u64','origin_rank','transaction_ordinal','mutation_ordinal','connector_event_id']:add(out,'E_SOURCE_ORDER','event_projection/source_order','full source order changed')
+ required_hash={'capture_epoch','lsn_u64','origin_rank','transaction_ordinal','mutation_ordinal','connector_event_id','relation_schema_fingerprint','canonical_key','key_hash','operation','before_key','mutation_kind','columns.column_id','columns.state','columns.type_oid','columns.typmod','columns.value_base64'}
+ if set(c['event_projection']['stored_payload_hash_inputs'])!=required_hash:add(out,'E_PAYLOAD_FIELDS','event_projection/stored_payload_hash_inputs','stored event cannot reproduce payload hash')
  if c['event_projection']['cross_epoch_comparison']!='forbidden' or c['objects']['native_replacement_version']!='forbidden':add(out,'E_VERSION_NARROW','event_projection','epoch/native narrowing enabled')
  audit=c['audit']; b=audit['budgets']
  if audit['checkpoint_moves'] or any(b[k]<=0 for k in b) or 'actual' not in audit['payload_verification'] or 'stored payload_hash' not in audit['payload_only_corruption']:add(out,'E_AUDIT','audit','finite actual-payload audit weakened')
@@ -83,6 +87,9 @@ def validate():
  suffix={x.removeprefix('SCN-M0-CH-') for x in ids}
  if not required<=suffix:add(out,'E_FIXTURE_BRANCHES','fixtures/cases','required branches missing')
  for i,x in enumerate(f['cases']):
+  execution=x.get('execution',{}); oracle=execution.get('oracle',{}); fault=execution.get('fault',{})
+  if not execution.get('setup') or fault.get('operation')!=x['action']['fault_hook'] or oracle.get('destination_state')!=x['expected']['destination_state'] or oracle.get('checkpoint')!=x['expected']['checkpoint']:add(out,'E_EXECUTABLE_FIXTURE',f'cases/{i}','fixture lacks exact setup/fault/oracle binding')
+  if x['action']['fault_hook']=='mutate_payload_keep_ids_hash_marker' and fault.get('preserve')!=['connector_event_id','payload_hash','batch_marker']:add(out,'E_PAYLOAD_CORRUPTION_FIXTURE',f'cases/{i}','payload-only corruption does not preserve required identity')
   if not x['action']['fault_once'] or x['expected']['capture_and_archive']!='continue' or not x['expected']['redacted']:add(out,'E_FIXTURE_EXPECTED',f'cases/{i}','determinism/independence/redaction invalid')
   if x['expected']['destination_state'].startswith('blocked') and x['expected']['checkpoint']!='unchanged':add(out,'E_CHECKPOINT_SKIP',f'cases/{i}','blocked case advances checkpoint')
  try:

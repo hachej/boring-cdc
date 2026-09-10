@@ -22,6 +22,164 @@
             ],
             "type": "object"
           },
+          "execution": {
+            "additionalProperties": false,
+            "properties": {
+              "fault": {
+                "additionalProperties": false,
+                "properties": {
+                  "operation": {
+                    "type": "string"
+                  },
+                  "preserve": {
+                    "items": {},
+                    "type": "array"
+                  },
+                  "target": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "operation",
+                  "preserve",
+                  "target"
+                ],
+                "type": "object"
+              },
+              "oracle": {
+                "additionalProperties": false,
+                "properties": {
+                  "checkpoint": {
+                    "type": "string"
+                  },
+                  "conflict_count": {
+                    "type": "integer"
+                  },
+                  "current_rows": {
+                    "type": [
+                      "string",
+                      "array"
+                    ]
+                  },
+                  "destination_state": {
+                    "type": "string"
+                  },
+                  "journal_verified_range": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "mismatch_fingerprint": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "selector_generation": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "checkpoint",
+                  "conflict_count",
+                  "current_rows",
+                  "destination_state",
+                  "journal_verified_range",
+                  "mismatch_fingerprint",
+                  "selector_generation"
+                ],
+                "type": "object"
+              },
+              "setup": {
+                "additionalProperties": false,
+                "properties": {
+                  "batch_marker": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "batch_id": {
+                        "type": "string"
+                      },
+                      "event_count": {
+                        "type": "integer"
+                      },
+                      "first_journal_seq": {
+                        "type": "integer"
+                      },
+                      "last_journal_seq": {
+                        "type": "integer"
+                      },
+                      "object_fingerprint": {
+                        "type": "string"
+                      },
+                      "ordered_event_digest": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "batch_id",
+                      "event_count",
+                      "first_journal_seq",
+                      "last_journal_seq",
+                      "object_fingerprint",
+                      "ordered_event_digest"
+                    ],
+                    "type": "object"
+                  },
+                  "event_rows": {
+                    "type": "string"
+                  },
+                  "selector_rows": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "candidate_digest": {
+                          "type": "string"
+                        },
+                        "capture_epoch": {
+                          "type": "string"
+                        },
+                        "compatible_anchor_id": {
+                          "type": "string"
+                        },
+                        "generation": {
+                          "type": "integer"
+                        },
+                        "promotion_fence": {
+                          "type": "integer"
+                        },
+                        "table_set_fingerprint": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "candidate_digest",
+                        "capture_epoch",
+                        "compatible_anchor_id",
+                        "generation",
+                        "promotion_fence",
+                        "table_set_fingerprint"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "batch_marker",
+                  "event_rows",
+                  "selector_rows"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "fault",
+              "oracle",
+              "setup"
+            ],
+            "type": "object"
+          },
           "executor_id": {
             "type": "string"
           },
@@ -110,6 +268,7 @@
         },
         "required": [
           "action",
+          "execution",
           "executor_id",
           "expected",
           "fixture_id",
@@ -133,6 +292,9 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "before_key": {
+                "type": "string"
+              },
               "cells": {
                 "items": {
                   "items": {
@@ -141,11 +303,10 @@
                       "string"
                     ]
                   },
-                  "maxItems": 3,
-                  "minItems": 3,
+                  "maxItems": 5,
+                  "minItems": 5,
                   "type": "array"
                 },
-                "minItems": 0,
                 "type": "array"
               },
               "hash": {
@@ -157,22 +318,38 @@
               "key": {
                 "type": "string"
               },
+              "key_hash": {
+                "type": "string"
+              },
+              "mutation_kind": {
+                "type": "string"
+              },
               "op": {
+                "type": "string"
+              },
+              "relation_schema_fingerprint": {
                 "type": "string"
               },
               "version": {
                 "items": {
-                  "type": "integer"
+                  "type": [
+                    "integer",
+                    "string"
+                  ]
                 },
                 "type": "array"
               }
             },
             "required": [
+              "before_key",
               "cells",
               "hash",
               "id",
               "key",
+              "key_hash",
+              "mutation_kind",
               "op",
+              "relation_schema_fingerprint",
               "version"
             ],
             "type": "object"
@@ -200,6 +377,12 @@
                     "state": {
                       "type": "string"
                     },
+                    "type_oid": {
+                      "type": "integer"
+                    },
+                    "typmod": {
+                      "type": "integer"
+                    },
                     "value_base64": {
                       "type": "string"
                     }
@@ -207,6 +390,8 @@
                   "required": [
                     "column_id",
                     "state",
+                    "type_oid",
+                    "typmod",
                     "value_base64"
                   ],
                   "type": "object"
