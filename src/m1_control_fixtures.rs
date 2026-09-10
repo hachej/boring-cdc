@@ -1077,6 +1077,13 @@ pub mod tests {
             a.verify(&drift).unwrap_err().fingerprint,
             "PUBLICATION_DRIFT"
         );
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-PUBLICATION-DRIFT",
+            "requires_reseed",
+            "unchanged",
+            "publication_drift",
+        );
     }
     #[test]
     fn heartbeat_is_monotonic_durable_noop() {
@@ -1097,6 +1104,13 @@ pub mod tests {
             .unwrap_err()
             .fingerprint,
             "HEARTBEAT_NOT_MONOTONIC"
+        );
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-HEARTBEAT",
+            "durable_noop",
+            "durable_only",
+            "heartbeat_control_noop",
         );
     }
     #[test]
@@ -1296,6 +1310,13 @@ pub mod tests {
                 .fingerprint,
             "TRUNCATE_REQUIRES_RESEED"
         );
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-TRUNCATE",
+            "requires_reseed",
+            "unchanged",
+            "truncate_requires_reseed",
+        );
     }
     #[test]
     fn table_membership_change_has_no_live_path() {
@@ -1304,6 +1325,13 @@ pub mod tests {
                 .unwrap_err()
                 .fingerprint,
             "FULL_RESEED_REQUIRED"
+        );
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-NO-ONLINE-TABLE-ADD",
+            "requires_reseed",
+            "unchanged",
+            "no_online_table_add",
         );
     }
     #[test]

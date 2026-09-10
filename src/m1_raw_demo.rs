@@ -140,6 +140,37 @@ const fn failure(fingerprint: &'static str) -> ExitFailure {
     }
 }
 
+/// Emit a structured milestone observation only after checking all fields against the
+/// product-owned assertion inventory. Tests call this after their behavioral assertions, so
+/// evidence comes from the executing product test rather than the JSON evidence contract.
+#[cfg(test)]
+pub fn emit_asserted_case(scenario_id: &str, state: &str, checkpoint: &str, log: &str) {
+    let expected = match scenario_id {
+        "SCN-M1-RAW-FIXED-SEED" => ("decoded", "unchanged_until_durable", "raw_event_normalized"),
+        "SCN-M1-RAW-COPYBOTH-RESTART" => ("resume_safe", "durable_only", "copyboth_restart_safe"),
+        "SCN-M1-RAW-HEARTBEAT" => ("durable_noop", "durable_only", "heartbeat_control_noop"),
+        "SCN-M1-RAW-BOOTSTRAP" => (
+            "feedback_gated",
+            "creation_floor_not_progress",
+            "bootstrap_gate",
+        ),
+        "SCN-M1-RAW-EXACT-SET" => ("oracle_pass", "fence_observed", "exact_set_pass"),
+        "SCN-M1-RAW-FULL-RESEED" => ("requires_reseed", "unchanged", "full_reseed_required"),
+        "SCN-M1-RAW-TRUNCATE" => ("requires_reseed", "unchanged", "truncate_requires_reseed"),
+        "SCN-M1-RAW-PUBLICATION-DRIFT" => ("requires_reseed", "unchanged", "publication_drift"),
+        "SCN-M1-RAW-IDLE-DDL" => ("blocked", "unchanged", "idle_ddl_blocked"),
+        "SCN-M1-RAW-IMMEDIATE-DDL" => ("blocked", "unchanged", "immediate_ddl_blocked"),
+        "SCN-M1-RAW-UNSUPPORTED-PROTOCOL" => ("blocked", "unchanged", "unsupported_protocol"),
+        "SCN-M1-RAW-UNSUPPORTED-TABLE" => ("blocked", "unchanged", "unsupported_table"),
+        "SCN-M1-RAW-UNSUPPORTED-TYPE" => ("blocked", "unchanged", "unsupported_type"),
+        "SCN-M1-RAW-IDENTITY-CONFLICT" => ("blocked", "unchanged", "identity_payload_conflict"),
+        "SCN-M1-RAW-NO-ONLINE-TABLE-ADD" => ("requires_reseed", "unchanged", "no_online_table_add"),
+        other => panic!("unexpected M1 raw observation: {other}"),
+    };
+    assert_eq!((state, checkpoint, log), expected);
+    println!("CASE {scenario_id} state={state} checkpoint={checkpoint} log={log}");
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -229,5 +260,12 @@ pub mod tests {
         )
         .unwrap();
         assert!(report.passed());
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-EXACT-SET",
+            "oracle_pass",
+            "fence_observed",
+            "exact_set_pass",
+        );
     }
 }

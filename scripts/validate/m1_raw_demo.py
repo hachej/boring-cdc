@@ -42,6 +42,51 @@ def check_contract():
   assert token not in CASES.read_text()
  return data
 
+def parse_observations(kind, current, expected):
+ assertions={}
+ observed={}
+ for line_number,line in enumerate(current.decode().splitlines(),1):
+  match=re.fullmatch(r'ASSERT (SCN-M1-RAW-[A-Z0-9-]+) test=([^ ]+) exit=0(?: live_sql_fact=(true))? product_observation=true',line)
+  if match:
+   scenario_id,test,live=match.groups(); wanted=expected[scenario_id]
+   assert test==wanted['unit_test'],(scenario_id,test,wanted['unit_test'])
+   assertions[scenario_id]=(line_number,live=='true')
+   continue
+  match=re.fullmatch(r'CASE (SCN-M1-RAW-[A-Z0-9-]+) state=([^ ]+) checkpoint=([^ ]+) log=([^ ]+)',line)
+  if not match: continue
+  scenario_id,state,checkpoint,log=match.groups()
+  assert scenario_id in assertions and assertions[scenario_id][0] < line_number
+  if kind=='e2e': assert assertions[scenario_id][1],scenario_id
+  row={'scenario_id':scenario_id,'consumed_owner':expected[scenario_id]['consumed_owner'],'state':state,'checkpoint':checkpoint,'log':log,'assertion_test':expected[scenario_id]['unit_test'],'live_sql_fact':assertions[scenario_id][1]}
+  if scenario_id in observed:
+   prior=observed[scenario_id]; assert {k:v for k,v in prior.items() if k!='live_sql_fact'}=={k:v for k,v in row.items() if k!='live_sql_fact'}
+   prior['live_sql_fact'] = prior['live_sql_fact'] or row['live_sql_fact']
+  else: observed[scenario_id]=row
+ for scenario_id,item in observed.items():
+  wanted=expected[scenario_id]
+  assert (item['state'],item['checkpoint'],item['log'])==(wanted['expected_state'],wanted['expected_checkpoint'],wanted['expected_log'])
+ if kind in ('fault','milestone'): assert set(observed)==set(expected),(set(expected)-set(observed))
+ if kind == 'e2e': assert 'CLEANUP container_absent=true isolated_docker_resources_absent=true' in current.decode()
+ if kind == 'milestone': assert current.decode().count('CLEANUP container_absent=true isolated_docker_resources_absent=true') == 1
+ return observed
+
+def rejection_selftest():
+ data=check_contract(); expected={x['id']:x for x in data['cases']}
+ lines=[]
+ for item in data['cases']:
+  lines.append(f"ASSERT {item['id']} test={item['unit_test']} exit=0 product_observation=true")
+  lines.append(f"CASE {item['id']} state={item['expected_state']} checkpoint={item['expected_checkpoint']} log={item['expected_log']}")
+ valid=('\n'.join(lines)+'\n').encode()
+ assert len(parse_observations('fault',valid,expected))==15
+ for label,bad in (
+  ('missing',b'\n'.join(valid.splitlines()[:-2])+b'\n'),
+  ('mismatch',valid.replace(b' checkpoint=unchanged ',b' checkpoint=advanced ',1)),
+ ):
+  try: parse_observations('fault',bad,expected)
+  except AssertionError: continue
+  raise AssertionError(f'sealer accepted {label} product observation')
+ print('PASS m1 raw sealer rejects missing and mismatched product observations')
+
 def seal(kind, transcript):
  data=check_contract(); dest=DESTS[kind]; head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
  prior=[]
@@ -62,29 +107,7 @@ def seal(kind, transcript):
   commands.append({'argv':argv,'version':SEED,'exit_code':0,'stdout_path':str(out.relative_to(ROOT)),'stdout_sha256':sha(content),'stderr_path':str(err.relative_to(ROOT)),'stderr_sha256':sha(b'')})
  (dest/'commands.txt').write_text(''.join(argv+'\n' for _ in runs)); (dest/'command.stdout').write_bytes(current); (dest/'command.stderr').write_bytes(b'')
  expected={x['id']:x for x in data['cases']}
- assertions={}
- observed={}
- for line_number,line in enumerate(current.decode().splitlines(),1):
-  match=re.fullmatch(r'ASSERT (SCN-M1-RAW-[A-Z0-9-]+) test=([^ ]+) exit=0(?: live_sql_fact=(true))? checkpoint_and_state_asserted_by_test=true',line)
-  if match:
-   scenario_id,test,live=match.groups(); wanted=expected[scenario_id]
-   assert test==wanted['unit_test'],(scenario_id,test,wanted['unit_test'])
-   assertions[scenario_id]=(line_number,live=='true')
-   continue
-  match=re.fullmatch(r'CASE (SCN-M1-RAW-[A-Z0-9-]+) state=([^ ]+) checkpoint=([^ ]+) log=([^ ]+)',line)
-  if not match: continue
-  scenario_id,state,checkpoint,log=match.groups()
-  assert scenario_id in assertions and assertions[scenario_id][0] < line_number
-  if kind=='e2e': assert assertions[scenario_id][1],scenario_id
-  row={'scenario_id':scenario_id,'consumed_owner':expected[scenario_id]['consumed_owner'],'state':state,'checkpoint':checkpoint,'log':log,'assertion_test':expected[scenario_id]['unit_test'],'live_sql_fact':assertions[scenario_id][1]}
-  if scenario_id in observed:
-   prior=observed[scenario_id]; assert {k:v for k,v in prior.items() if k!='live_sql_fact'}=={k:v for k,v in row.items() if k!='live_sql_fact'}
-   prior['live_sql_fact'] = prior['live_sql_fact'] or row['live_sql_fact']
-  else: observed[scenario_id]=row
- for scenario_id,item in observed.items():
-  wanted=expected[scenario_id]
-  assert (item['state'],item['checkpoint'],item['log'])==(wanted['expected_state'],wanted['expected_checkpoint'],wanted['expected_log'])
- if kind in ('fault','milestone'): assert set(observed)==set(expected),(set(expected)-set(observed))
+ observed=parse_observations(kind,current,expected)
  case_summary=[observed[x] for x in sorted(observed)]
  (dest/'state'/'before.json').write_text('{"checkpoint":null,"state":"unobserved"}\n')
  (dest/'state'/'after.json').write_text(json.dumps({'checkpoint':'durable-only-or-unchanged','cases':case_summary},sort_keys=True,indent=2)+'\n')
@@ -97,7 +120,7 @@ def seal(kind, transcript):
  (dest/'logs'/'boring-cdc.jsonl').write_text(json.dumps(event,sort_keys=True)+'\n')
  files=sorted(p for p in dest.rglob('*') if p.is_file() and p.name not in ('manifest.json','sha256.txt'))
  deterministic=len(runs)==2 and runs[0]==runs[1]
- manifest={'schema_version':'evidence/v1','owner_bead':BEAD,'scenario_id':scenario,'seed':SEED,'git_commit':head,'evidence_tier':'milestone' if kind=='milestone' else 'leaf','evidence_profile':'runtime','commands':commands,'result':{'status':'pass','runtime_observed':True,'digest':sha(b''.join(p.read_bytes() for p in files)),'product_faults':'m1_fail_closed_matrix' if kind in ('fault','milestone') else 'actual_pgoutput_inspection','artifacts':[str(p.relative_to(ROOT)) for p in files]},'redaction':{'checked':True,'secrets_found':0},'cleanup':{'complete':True,'remaining_paths':[]},'source_preservation':{'preserved':True,'before_sha256':sha(CASES.read_bytes()),'after_sha256':sha(CASES.read_bytes())},'tier_proof':{'targeted_checks':True,'boundary_e2e':kind=='milestone','fault_suite':kind=='milestone','integration':True,'consumed_contract_vectors':len(data['consumed_evidence'])==6,'deterministic_rerun':deterministic,'clean_environment':True,'clean_clone':False,'exit_assertions':True,'full_failure_matrix':kind=='milestone','workspace_tests':kind=='milestone','endurance':False}}
+ manifest={'schema_version':'evidence/v1','owner_bead':BEAD,'scenario_id':scenario,'seed':SEED,'git_commit':head,'evidence_tier':'milestone' if kind=='milestone' else 'leaf','evidence_profile':'runtime','commands':commands,'result':{'status':'pass','runtime_observed':True,'digest':sha(b''.join(p.read_bytes() for p in files)),'product_faults':'m1_fail_closed_matrix' if kind in ('fault','milestone') else 'actual_pgoutput_inspection','artifacts':[str(p.relative_to(ROOT)) for p in files]},'redaction':{'checked':True,'secrets_found':0},'cleanup':{'complete':kind == 'fault' or 'CLEANUP container_absent=true isolated_docker_resources_absent=true' in current.decode(),'remaining_paths':[]},'source_preservation':{'preserved':True,'before_sha256':sha(CASES.read_bytes()),'after_sha256':sha(CASES.read_bytes())},'tier_proof':{'targeted_checks':True,'boundary_e2e':kind=='milestone','fault_suite':kind=='milestone','integration':True,'consumed_contract_vectors':len(data['consumed_evidence'])==6,'deterministic_rerun':deterministic,'clean_environment':True,'clean_clone':False,'exit_assertions':True,'full_failure_matrix':kind=='milestone','workspace_tests':kind=='milestone','endurance':False}}
  (dest/'manifest.json').write_text(json.dumps(manifest,sort_keys=True,indent=2)+'\n')
  allfiles=sorted(p for p in dest.rglob('*') if p.is_file() and p.name!='sha256.txt')
  (dest/'sha256.txt').write_text(''.join(f'{sha(p.read_bytes())}  {p.relative_to(dest)}\n' for p in allfiles))
@@ -114,5 +137,6 @@ if __name__=='__main__':
  if len(sys.argv)==2 and sys.argv[1]=='validate': validate()
  elif len(sys.argv)==2 and sys.argv[1]=='contract':
   print(f'PASS m1 raw contract cases={len(check_contract()["cases"])} unresolved=0')
+ elif len(sys.argv)==2 and sys.argv[1]=='selftest': rejection_selftest()
  elif len(sys.argv)==4 and sys.argv[1]=='seal' and sys.argv[2] in DESTS: seal(sys.argv[2],sys.argv[3])
- else: raise SystemExit('usage: m1_raw_demo.py validate|contract | seal e2e|fault|milestone TRANSCRIPT')
+ else: raise SystemExit('usage: m1_raw_demo.py validate|contract|selftest | seal e2e|fault|milestone TRANSCRIPT')

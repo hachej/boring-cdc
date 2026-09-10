@@ -1126,6 +1126,13 @@ pub mod tests {
                 ..
             }
         ));
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-FIXED-SEED",
+            "decoded",
+            "unchanged_until_durable",
+            "raw_event_normalized",
+        );
     }
     // SCENARIO: SCN-M1-DECODER-RELATION
     #[test]
@@ -1322,6 +1329,13 @@ pub mod tests {
         i.push(b'b');
         let e = d.decode_copy_data(&xlog(i)).unwrap_err();
         assert_eq!(e.fingerprint, "BINARY_TUPLE_UNSUPPORTED");
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-UNSUPPORTED-PROTOCOL",
+            "blocked",
+            "unchanged",
+            "unsupported_protocol",
+        );
     }
     // SCENARIO: SCN-M1-DECODER-BOUNDS
     #[test]
@@ -1426,6 +1440,13 @@ pub mod tests {
             }
         ));
         assert!(!d.is_feedback_blocked());
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-COPYBOTH-RESTART",
+            "resume_safe",
+            "durable_only",
+            "copyboth_restart_safe",
+        );
     }
     #[test]
     fn contract_inventory_exactly_matches_executable_scenarios() {

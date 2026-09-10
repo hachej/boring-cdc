@@ -1423,6 +1423,13 @@ mod tests {
             f.feedback(false).unwrap(),
             Some(ReceivedLsn::from_wire(120))
         );
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-BOOTSTRAP",
+            "feedback_gated",
+            "creation_floor_not_progress",
+            "bootstrap_gate",
+        );
     }
 
     #[test]
@@ -1707,6 +1714,13 @@ mod tests {
         assert!(
             f.remote_slot_exists,
             "state machine never silently drops the slot"
+        );
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-FULL-RESEED",
+            "requires_reseed",
+            "unchanged",
+            "full_reseed_required",
         );
     }
 

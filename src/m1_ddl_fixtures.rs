@@ -906,6 +906,13 @@ pub(crate) mod tests {
         );
         assert!(gate.require_dml(1).is_err());
         assert!(!gate.feedback_allowed());
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-IMMEDIATE-DDL",
+            "blocked",
+            "unchanged",
+            "immediate_ddl_blocked",
+        );
     }
     #[test]
     fn noncanonical_contracts_and_guard_order_fail_closed() {
@@ -968,6 +975,13 @@ pub(crate) mod tests {
         assert!(changed.iter().all(|x| x.fingerprint().unwrap() != base
             && old.compare(x, false)
                 == ContractDecision::BlockAndRequireReseed("RELATION_CONTRACT_CHANGED")));
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-IDLE-DDL",
+            "blocked",
+            "unchanged",
+            "idle_ddl_blocked",
+        );
     }
     // SCENARIO: SCN-M1-DDL-KEY-DELETE-SAFETY
     #[test]
@@ -985,6 +999,13 @@ pub(crate) mod tests {
         assert_eq!(
             old.compare(&no_key, false),
             ContractDecision::BlockAndRequireReseed("RELATION_CONTRACT_CHANGED")
+        );
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-UNSUPPORTED-TYPE",
+            "blocked",
+            "unchanged",
+            "unsupported_type",
         );
     }
     // SCENARIO: SCN-M1-DDL-STALE-FENCE
@@ -1105,6 +1126,13 @@ pub(crate) mod tests {
         assert_eq!(
             validate_relation_admission(&base, &p),
             AdmissionDecision::BlockCapture("PUBLICATION_PROJECTION_MISMATCH")
+        );
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-UNSUPPORTED-TABLE",
+            "blocked",
+            "unchanged",
+            "unsupported_table",
         );
     }
 

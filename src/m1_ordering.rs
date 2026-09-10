@@ -885,6 +885,13 @@ mod tests {
         }
         let failure = OrderingFailure::payload_conflict();
         assert_eq!(failure.failed_boundary, "before_checkpoint_and_feedback");
+
+        crate::m1_raw_demo::emit_asserted_case(
+            "SCN-M1-RAW-IDENTITY-CONFLICT",
+            "blocked",
+            "unchanged",
+            "identity_payload_conflict",
+        );
     }
 
     #[test]

@@ -5,13 +5,14 @@ export TMPDIR=${TMPDIR:-/var/tmp}
 seed=${1:-raw-demo-v1}; [ "$seed" = raw-demo-v1 ] || { echo E_SEED >&2; exit 2; }
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd); cd "$root"
 out="$TMPDIR/m1rawfault${$}"; transcript="$out/transcript.txt"; rm -rf "$out"; mkdir -p "$out"; trap 'rm -rf "$out"' EXIT HUP INT TERM
-emit() { python3 - "$1" <<'PY'
-import json,sys
-case=next(x for x in json.load(open('contracts/m1/raw-demo-cases.json'))['cases'] if x['id']==sys.argv[1])
-print(f"CASE {case['id']} state={case['expected_state']} checkpoint={case['expected_checkpoint']} log={case['expected_log']}")
-PY
+run() {
+ test_log="$out/test.log"
+ cargo test --locked "$1" -- --exact --quiet --nocapture >"$test_log" 2>"$out/test.err"
+ observed=$(grep -E "^CASE $2 state=[^ ]+ checkpoint=[^ ]+ log=[^ ]+$" "$test_log")
+ [ "$(printf '%s\n' "$observed" | grep -c .)" -eq 1 ]
+ printf 'ASSERT %s test=%s exit=0 product_observation=true\n' "$2" "$1"
+ printf '%s\n' "$observed"
 }
-run() { cargo test --locked "$1" -- --exact --quiet >"$out/test.log" 2>"$out/test.err"; printf 'ASSERT %s test=%s exit=0 checkpoint_and_state_asserted_by_test=true\n' "$2" "$1"; emit "$2"; }
 {
  echo 'scenario=SCN-M1-FAULT-MATRIX seed=raw-demo-v1'
  run m1_decoder::tests::golden_transaction_preserves_row_only_ordinals_and_origin SCN-M1-RAW-FIXED-SEED

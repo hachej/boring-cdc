@@ -14,6 +14,7 @@ run_once() {
   scripts/e2e/m1_raw_demo.sh raw-demo-v1
   scripts/faults/m1_raw_demo.sh raw-demo-v1
   scripts/validate/m1_raw_demo.py contract
+  scripts/validate/m1_raw_demo.py selftest
   echo 'PASS M1 raw inspection and fault suite'
  } > "$transcript" 2>&1
  cat "$transcript"
