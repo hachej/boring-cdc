@@ -41,7 +41,7 @@ try:
  if c['rearm']['result_enum']!=['rearmed','stale','conflict','forbidden'] or set(c['rearm']['recovery_predicates'])!={'transient_exhausted','configuration','integrity','ownership_lost','unsupported'}:fail()
  if set(c['fingerprint']['relevant_config_allowlist'])!={'capture','clickhouse','archive'} or any(set(v)!=( {'policy_version','component_contract_digest','capture_epoch'} if k=='capture' else {'policy_version','component_contract_digest','capture_epoch','generation'}) for k,v in c['fingerprint']['relevant_config_allowlist'].items()):fail()
  hooks=c['domain_hooks']; expected_hook_kinds=['failure_observed','retry_timer','completion','rearm','expected_close']
- if hooks['tag_key']!='kind' or [x['kind'] for x in hooks['input_variants']]!=expected_hook_kinds or len(hooks['output_fields'])!=9:fail()
+ if hooks['tag_key']!='kind' or [x['kind'] for x in hooks['input_variants']]!=expected_hook_kinds or len(hooks['output_fields'])!=10:fail()
  hook_rows=hooks['exhaustive_class_component_outputs']
  if len(hook_rows)!=24 or len({(x['component'],x['class']) for x in hook_rows})!=24 or {(x['component'],x['class']) for x in hook_rows}!={(a,b) for a in c['components'] for b in classes}:fail()
  if c['component_safe_states']!={'capture':'capture_safe_stopped','clickhouse':'destination_degraded','archive':'destination_degraded'}:fail()
