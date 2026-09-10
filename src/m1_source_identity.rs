@@ -229,6 +229,7 @@ pub enum StateValidationError {
     FeedbackDoesNotMatchEvidence,
     DurableAheadOfReceived,
     DurableBeforeCreationFloor,
+    EmptyActiveIntent,
 }
 
 #[derive(Clone, Debug)]
@@ -432,33 +433,42 @@ pub fn reconcile_startup(local: &LocalSourceState, live: &LiveSourceState) -> St
 #[derive(Clone, Debug)]
 pub struct VerifiedRetainedSlotContinuity {
     capture_epoch: CaptureEpoch,
+    active_intent_id: String,
     identity: SourceIdentity,
 }
 impl VerifiedRetainedSlotContinuity {
+    /// Match the entire persisted source identity and the active bootstrap intent. Partial
+    /// publication/slot matching cannot authorize retained-slot recovery.
     #[must_use]
     pub fn matches(
         &self,
         capture_epoch: CaptureEpoch,
-        slot_name: &str,
-        publication_fingerprint: Fingerprint,
-        protocol_fingerprint: Fingerprint,
+        active_intent_id: &str,
+        expected_identity: &SourceIdentity,
     ) -> bool {
         self.capture_epoch == capture_epoch
-            && self.identity.slot_name == slot_name
-            && self.identity.publication_fingerprint == publication_fingerprint
-            && self.identity.protocol_fingerprint == protocol_fingerprint
+            && self.active_intent_id == active_intent_id
+            && &self.identity == expected_identity
     }
 }
 
-/// Reconcile and mint retained-slot continuity only for a fully validated resumable source.
+/// Reconcile and mint retained-slot continuity only for a fully validated resumable source and
+/// the non-empty active bootstrap intent that will consume it.
 pub fn verify_retained_slot_continuity(
     local: &LocalSourceState,
     live: &LiveSourceState,
+    active_intent_id: &str,
 ) -> Result<VerifiedRetainedSlotContinuity, StartupDecision> {
+    if active_intent_id.is_empty() {
+        return Err(StartupDecision::BlockInvalidState {
+            reason: StateValidationError::EmptyActiveIntent,
+        });
+    }
     let decision = reconcile_startup(local, live);
     if matches!(decision, StartupDecision::Resume { .. }) {
         Ok(VerifiedRetainedSlotContinuity {
             capture_epoch: local.capture_epoch,
+            active_intent_id: active_intent_id.to_owned(),
             identity: live.identity.clone(),
         })
     } else {

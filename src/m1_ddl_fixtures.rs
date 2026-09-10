@@ -309,6 +309,33 @@ impl GuardState {
     pub fn feedback_gate_open(&self) -> bool {
         self.feedback_gate_open
     }
+    /// Fence dispatch is authorized only by the nonce and scope captured when this guard acquired
+    /// the canonical relation lock vector.
+    pub fn authorizes_fence_intent(
+        &self,
+        capture_epoch: u64,
+        generation: u64,
+        table_set_fingerprint: &str,
+        nonce: u64,
+    ) -> bool {
+        self.capture_epoch == capture_epoch
+            && self.generation == generation
+            && self.table_set_fingerprint == table_set_fingerprint
+            && self.intended_fence_nonce == nonce
+            && self.phase == GuardPhase::Copying
+            && self.catalog_fingerprint_verified
+            && !self.locked.is_empty()
+    }
+    /// Conservative owned allocation accounting for deterministic harness budgets.
+    pub fn owned_allocation_bytes(&self) -> usize {
+        self.table_set_fingerprint.capacity()
+            + self.locked.capacity() * std::mem::size_of::<LogicalRelationId>()
+            + self
+                .locked
+                .iter()
+                .map(|relation| relation.logical_table_id.capacity())
+                .sum::<usize>()
+    }
     /// Typed bootstrap consumers can verify this guard is bound and catalog-checked without
     /// re-owning DDL lock acquisition or fingerprint semantics.
     pub fn proves_bootstrap_binding(

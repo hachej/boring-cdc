@@ -54,7 +54,9 @@ fn main() {
             let update = decode_control_update(&messages, kind, nonce).unwrap();
             let mut writer = ControlWriterState::default();
             if kind == ControlKind::CaptureFence {
-                writer.intend_fence(nonce, intended_fence()).unwrap();
+                writer
+                    .intend_fence(nonce, "fixture-intent", intended_fence())
+                    .unwrap();
             }
             if mode == "fence-mismatch" {
                 let failure = writer.observe(&update, None).unwrap_err();
@@ -62,8 +64,8 @@ fn main() {
                 println!("PASS live_fence_identity_mismatch=block_before_feedback");
             } else {
                 let event = writer.observe(&update, None).unwrap();
-                assert!(!event.writes_user_row && !event.writes_benchmark_mutation);
-                assert!(!event.feedback_eligible);
+                assert!(!event.writes_user_row() && !event.writes_benchmark_mutation());
+                assert!(!event.feedback_eligible());
                 println!("PASS pgoutput_update=decoded_typed_noop feedback=awaits_durable_commit");
             }
         }

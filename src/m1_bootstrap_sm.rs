@@ -3,7 +3,7 @@
 //! This leaf models durable facts and typed completions only. PostgreSQL sessions, SQLite
 //! transactions, and runtime crash execution remain owned by M2/M3.
 
-use crate::m1_control_fixtures::JournalControlNoOp;
+use crate::m1_control_fixtures::JournaledFence;
 use crate::m1_ddl_fixtures::{DurableFenceProof, GuardPhase, GuardState};
 use crate::m1_source_identity::{Fingerprint, SourceIdentity, VerifiedRetainedSlotContinuity};
 use crate::m1_transition_kernel::{
@@ -102,6 +102,14 @@ pub enum ImporterPhase {
     ReadsComplete,
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum BackendSession {
+    Exporter,
+    Guard,
+    Importer(u16),
+    Capture,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ImporterState {
     pub assigned_range: String,
@@ -116,6 +124,7 @@ pub struct BootstrapFacts {
     pub generation: u64,
     pub slot_identity: String,
     pub publication_fingerprint: Fingerprint,
+    pub expected_source_identity: SourceIdentity,
     pub table_set_fingerprint: String,
     pub config_fingerprint: String,
     pub session_bounds: SessionBounds,
@@ -128,6 +137,9 @@ pub struct BootstrapFacts {
     snapshot_identifier: Option<ExportedSnapshotIdentifier>,
     pub source_identity: Option<SourceIdentity>,
     guard_state: Option<GuardState>,
+    pub dead_backends: BTreeSet<BackendSession>,
+    pub stale_backend_cleanup_required: bool,
+    continuity_verified: bool,
     pub creation_floor: Option<SlotCreationFloor>,
     pub snapshot_boundary: Option<SlotCreationFloor>,
     pub start_seq: Option<JournalCursor>,
@@ -170,6 +182,7 @@ pub struct PrepareInput {
     pub generation: u64,
     pub slot_identity: String,
     pub publication_fingerprint: Fingerprint,
+    pub expected_source_identity: SourceIdentity,
     pub table_set_fingerprint: String,
     pub config_fingerprint: String,
     pub importer_ranges: Vec<String>,
@@ -216,22 +229,15 @@ pub struct DurableFenceCompletion {
     boundary: DurableSourceBoundary,
 }
 impl DurableFenceCompletion {
-    pub fn from_published_control_transaction(
-        scope: OperationScope,
-        table_set_fingerprint: String,
-        nonce: u64,
-        boundary: DurableSourceBoundary,
-        control: JournalControlNoOp,
-    ) -> Result<Self, BootstrapFailure> {
-        if !control.proves_durable_fence(nonce) {
-            return Err(BootstrapFailure::deterministic(
-                "FENCE_CONTROL_TRANSACTION_UNPROVED",
-                "post_copy_fence",
-            ));
-        }
+    pub fn from_journaled_fence(fence: JournaledFence) -> Result<Self, BootstrapFailure> {
+        let (intent_id, identity, nonce, boundary) = fence.into_parts();
         Ok(Self {
-            scope,
-            table_set_fingerprint,
+            scope: OperationScope {
+                intent_id,
+                capture_epoch: CaptureEpoch::from_store(identity.capture_epoch),
+                generation: identity.generation,
+            },
+            table_set_fingerprint: identity.table_set_fingerprint,
             nonce,
             boundary,
         })
@@ -269,6 +275,10 @@ impl BootstrapFacts {
             || input.capture_epoch.get() == 0
             || input.generation == 0
             || input.slot_identity.is_empty()
+            || input.expected_source_identity.validate().is_err()
+            || input.expected_source_identity.slot_name != input.slot_identity
+            || input.expected_source_identity.publication_fingerprint
+                != input.publication_fingerprint
             || input.table_set_fingerprint.is_empty()
             || input.config_fingerprint.is_empty()
             || input.importer_ranges.is_empty()
@@ -323,8 +333,12 @@ impl BootstrapFacts {
             remote_slot_exists: false,
             snapshot_token_persisted: false,
             snapshot_identifier: None,
+            expected_source_identity: input.expected_source_identity,
             source_identity: None,
             guard_state: None,
+            dead_backends: BTreeSet::new(),
+            stale_backend_cleanup_required: false,
+            continuity_verified: false,
             creation_floor: None,
             snapshot_boundary: None,
             start_seq: None,
@@ -344,7 +358,10 @@ impl BootstrapFacts {
     }
 
     pub fn reacquire_ownership_locks(&mut self) -> Result<(), BootstrapFailure> {
-        if self.phase != IntentPhase::Prepared || self.remote_slot_exists {
+        if self.phase != IntentPhase::Prepared
+            || self.remote_slot_exists
+            || self.stale_backend_cleanup_required
+        {
             return Err(BootstrapFailure::deterministic(
                 "OWNERSHIP_REACQUIRE_INVALID",
                 "restart_reconciliation",
@@ -411,8 +428,7 @@ impl BootstrapFacts {
             || self.guard != GuardLiveness::Held
             || consistent_point.get() == 0
             || source_identity.validate().is_err()
-            || source_identity.slot_name != self.slot_identity
-            || source_identity.publication_fingerprint != self.publication_fingerprint
+            || source_identity != self.expected_source_identity
         {
             return Err(BootstrapFailure::deterministic(
                 "EXPORT_RESPONSE_NOT_DURABLE",
@@ -611,6 +627,11 @@ impl BootstrapFacts {
         }
         if self.durable_wal_end.is_some_and(|prior| {
             prior.transaction_end_lsn().get() > boundary.transaction_end_lsn().get()
+                || prior.journal_cursor().get() > boundary.journal_cursor().get()
+                || (prior.transaction_end_lsn().get() == boundary.transaction_end_lsn().get()
+                    && prior.journal_cursor().get() != boundary.journal_cursor().get())
+                || (prior.journal_cursor().get() == boundary.journal_cursor().get()
+                    && prior.transaction_end_lsn().get() != boundary.transaction_end_lsn().get())
         }) {
             return Err(BootstrapFailure::deterministic(
                 "DURABLE_WAL_REGRESSION",
@@ -752,6 +773,14 @@ impl BootstrapFacts {
             || nonce == 0
             || self.guard != GuardLiveness::Held
             || self.intended_fence_nonce.is_some()
+            || !self.guard_state.as_ref().is_some_and(|guard| {
+                guard.authorizes_fence_intent(
+                    self.capture_epoch.get(),
+                    self.generation,
+                    &self.table_set_fingerprint,
+                    nonce,
+                )
+            })
         {
             return Err(BootstrapFailure::deterministic(
                 "FENCE_INTENT_INVALID",
@@ -787,6 +816,28 @@ impl BootstrapFacts {
                 "post_copy_fence",
             ));
         }
+        let boundary_not_below = |lower: DurableSourceBoundary| {
+            completion.boundary.transaction_end_lsn().get() >= lower.transaction_end_lsn().get()
+                && completion.boundary.journal_cursor().get() >= lower.journal_cursor().get()
+        };
+        if self
+            .durable_wal_end
+            .is_some_and(|lower| !boundary_not_below(lower))
+            || self
+                .lower_stitch
+                .is_some_and(|lower| !boundary_not_below(lower))
+            || self
+                .start_seq
+                .is_some_and(|start| completion.boundary.journal_cursor().get() < start.get())
+            || self
+                .snapshot_boundary
+                .is_some_and(|floor| completion.boundary.transaction_end_lsn().get() < floor.get())
+        {
+            return Err(BootstrapFailure::deterministic(
+                "DURABLE_FENCE_BOUNDARY_REGRESSION",
+                "post_copy_fence",
+            ));
+        }
         let guard_proof = DurableFenceProof::from_journal_commit(
             self.capture_epoch.get(),
             self.generation,
@@ -817,8 +868,10 @@ impl BootstrapFacts {
         &mut self,
         proof: Option<VerifiedRetainedSlotContinuity>,
     ) -> RecoveryDecision {
-        if self.guard == GuardLiveness::Held && !self.snapshot_token_persisted {
-            self.guard = GuardLiveness::Lost;
+        let pretoken_guard_held =
+            self.guard == GuardLiveness::Held && !self.snapshot_token_persisted;
+        self.record_dead_sessions(true);
+        if pretoken_guard_held {
             self.guard_state = None;
             self.ownership_locks_held = false;
         }
@@ -846,14 +899,11 @@ impl BootstrapFacts {
             if proof.is_some_and(|proof| {
                 proof.matches(
                     self.capture_epoch,
-                    &self.slot_identity,
-                    self.publication_fingerprint,
-                    self.source_identity.as_ref().map_or_else(
-                        crate::m1_source_identity::supported_protocol_fingerprint,
-                        |identity| identity.protocol_fingerprint,
-                    ),
+                    &self.intent_id,
+                    &self.expected_source_identity,
                 )
             }) {
+                self.continuity_verified = true;
                 self.phase = IntentPhase::ExistingSlotGenerationRequired;
                 return RecoveryDecision::DrainRetainedWalThenExistingSlotSnapshot;
             }
@@ -869,6 +919,57 @@ impl BootstrapFacts {
         RecoveryDecision::ResumeEligibleGeneration
     }
 
+    /// Complete bounded reconciliation of every backend known dead before any replacement
+    /// snapshot/session is opened.
+    pub fn complete_stale_backend_cleanup(
+        &mut self,
+        scope: &OperationScope,
+        elapsed_ms: u64,
+        all_confirmed_terminated: bool,
+    ) -> Result<(), BootstrapFailure> {
+        let cleanup_bound = self
+            .session_bounds
+            .exporter_lifetime_ms
+            .max(self.session_bounds.importer_lifetime_ms)
+            .max(self.session_bounds.guard_lifetime_ms);
+        if !self.scope_matches(scope)
+            || !self.stale_backend_cleanup_required
+            || !all_confirmed_terminated
+            || elapsed_ms > cleanup_bound
+        {
+            return Err(BootstrapFailure::deterministic(
+                "STALE_BACKEND_CLEANUP_INCOMPLETE",
+                "restart_reconciliation",
+            ));
+        }
+        self.dead_backends.clear();
+        self.stale_backend_cleanup_required = false;
+        Ok(())
+    }
+
+    /// Lost-token recovery starts CopyBoth on the retained permanent slot, never on the dead
+    /// creation exporter. This path is intentionally distinct from snapshot-generation capture.
+    pub fn start_retained_slot_capture(
+        &mut self,
+        scope: &OperationScope,
+        separate_connection: bool,
+    ) -> Result<(), BootstrapFailure> {
+        if !self.scope_matches(scope)
+            || self.phase != IntentPhase::ExistingSlotGenerationRequired
+            || !self.continuity_verified
+            || self.stale_backend_cleanup_required
+            || self.capture_connection_started
+            || !separate_connection
+        {
+            return Err(BootstrapFailure::deterministic(
+                "RETAINED_SLOT_CAPTURE_NOT_AUTHORIZED",
+                "retained_slot_drain",
+            ));
+        }
+        self.capture_connection_started = true;
+        Ok(())
+    }
+
     pub fn retained_wal_drained(
         &mut self,
         scope: &OperationScope,
@@ -876,6 +977,9 @@ impl BootstrapFacts {
     ) -> Result<(), BootstrapFailure> {
         if !self.scope_matches(scope)
             || self.phase != IntentPhase::ExistingSlotGenerationRequired
+            || !self.continuity_verified
+            || !self.capture_connection_started
+            || self.stale_backend_cleanup_required
             || self.durable_wal_end != Some(lower_boundary)
         {
             return Err(BootstrapFailure::deterministic(
@@ -897,6 +1001,7 @@ impl BootstrapFacts {
         snapshot_identifier: ExportedSnapshotIdentifier,
     ) -> Result<(), BootstrapFailure> {
         if self.phase != IntentPhase::RetainedWalDrained
+            || self.stale_backend_cleanup_required
             || !guard.proves_bootstrap_binding(
                 self.capture_epoch.get(),
                 self.generation,
@@ -957,7 +1062,34 @@ impl BootstrapFacts {
         Ok(())
     }
 
+    fn record_dead_sessions(&mut self, include_capture: bool) {
+        if self.remote_slot_exists
+            && matches!(
+                self.exporter,
+                ExporterLiveness::CommandIdle | ExporterLiveness::Lost
+            )
+        {
+            self.dead_backends.insert(BackendSession::Exporter);
+            self.exporter = ExporterLiveness::Lost;
+        }
+        if matches!(self.guard, GuardLiveness::Held | GuardLiveness::Lost) {
+            self.dead_backends.insert(BackendSession::Guard);
+            self.guard = GuardLiveness::Lost;
+        }
+        for (&worker, importer) in &self.importers {
+            if importer.phase != ImporterPhase::ReadsComplete {
+                self.dead_backends.insert(BackendSession::Importer(worker));
+            }
+        }
+        if include_capture && self.capture_connection_started {
+            self.dead_backends.insert(BackendSession::Capture);
+            self.capture_connection_started = false;
+        }
+        self.stale_backend_cleanup_required = !self.dead_backends.is_empty();
+    }
+
     fn invalidate(&mut self, _reason: &'static str) {
+        self.record_dead_sessions(false);
         self.phase = IntentPhase::SnapshotUnusable;
         self.snapshot_events_promotable = false;
         self.importer_feedback_gate = false;
@@ -1051,9 +1183,11 @@ impl TransitionSystem for BootstrapDomain {
     }
     fn on_expiry(&self, facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {
         facts.invalidate("SESSION_LIFETIME_EXPIRED");
+        facts.record_dead_sessions(true);
     }
     fn on_cancel(&self, facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {
         facts.invalidate("GENERATION_CANCELLED");
+        facts.record_dead_sessions(true);
     }
     fn on_crash_restart(&self, facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {
         let _ = facts.restart_decision(None);
@@ -1074,6 +1208,8 @@ impl TransitionSystem for BootstrapDomain {
             + facts.slot_identity.capacity()
             + facts.table_set_fingerprint.capacity()
             + facts.config_fingerprint.capacity()
+            + facts.expected_source_identity.slot_name.capacity()
+            + facts.expected_source_identity.plugin.capacity()
             + facts.source_identity.as_ref().map_or(0, |identity| {
                 identity.slot_name.capacity() + identity.plugin.capacity()
             })
@@ -1081,13 +1217,13 @@ impl TransitionSystem for BootstrapDomain {
                 .snapshot_identifier
                 .as_ref()
                 .map_or(0, |v| v.0.capacity())
-            + facts.guard_state.as_ref().map_or(0, |guard| {
-                guard
-                    .locked_relations()
-                    .iter()
-                    .map(|r| std::mem::size_of_val(r) + r.logical_table_id.capacity())
-                    .sum()
-            })
+            + facts
+                .guard_state
+                .as_ref()
+                .map_or(0, GuardState::owned_allocation_bytes)
+            + facts.importers.len() * TREE_OVERHEAD_PER_ENTRY
+            + facts.dead_backends.len()
+                * (TREE_OVERHEAD_PER_ENTRY + std::mem::size_of::<BackendSession>())
             + facts
                 .importers
                 .values()
@@ -1138,6 +1274,7 @@ mod tests {
             generation: 1,
             slot_identity: "boring_slot".into(),
             publication_fingerprint: test_identity().publication_fingerprint,
+            expected_source_identity: test_identity(),
             table_set_fingerprint: "tables-fp".into(),
             config_fingerprint: "config-fp".into(),
             importer_ranges: (0..workers).map(|n| format!("range-{n}")).collect(),
@@ -1327,6 +1464,7 @@ mod tests {
         assert_eq!(after_guard.guard, GuardLiveness::Lost);
         assert!(!after_guard.ownership_locks_held);
         assert!(after_guard.slot_created("boring_slot").is_err());
+        cleanup(&mut after_guard, 1).unwrap();
         after_guard.reacquire_ownership_locks().unwrap();
         after_guard.acquire_guard(guard_proof()).unwrap();
 
@@ -1387,6 +1525,9 @@ mod tests {
             f.restart_decision(all_proof()),
             RecoveryDecision::DrainRetainedWalThenExistingSlotSnapshot
         );
+        cleanup(&mut f, 1).unwrap();
+        let scope = f.scope();
+        f.start_retained_slot_capture(&scope, true).unwrap();
         drain_retained(&mut f, boundary(120, 2)).unwrap();
         assert_eq!(
             f.transient_wal_event_ids,
@@ -1401,6 +1542,124 @@ mod tests {
         assert_eq!(f.phase, IntentPhase::ImportsPending);
         assert_eq!(f.exporter, ExporterLiveness::CommandIdle);
         assert!(!f.importer_feedback_gate);
+    }
+
+    #[test]
+    fn lost_creation_token_starts_retained_capture_and_replacement_snapshot() {
+        let mut f = prepared(1);
+        f.acquire_guard(guard_proof()).unwrap();
+        f.slot_created("boring_slot").unwrap();
+        assert_eq!(
+            f.restart_decision(no_proof()),
+            RecoveryDecision::BootstrapAmbiguousRequiresRestart
+        );
+        assert_eq!(
+            f.restart_decision(all_proof()),
+            RecoveryDecision::DrainRetainedWalThenExistingSlotSnapshot
+        );
+        assert!(f.start_retained_slot_capture(&f.scope(), true).is_err());
+        assert!(cleanup(&mut f, 60_001).is_err());
+        cleanup(&mut f, 60_000).unwrap();
+        let scope = f.scope();
+        assert!(f.start_retained_slot_capture(&scope, false).is_err());
+        f.start_retained_slot_capture(&scope, true).unwrap();
+        record(&mut f, boundary(120, 2), Some("retained-event")).unwrap();
+        drain_retained(&mut f, boundary(120, 2)).unwrap();
+        f.begin_existing_slot_snapshot(guard_for_facts(&f), snapshot_id())
+            .unwrap();
+        assert_eq!(f.phase, IntentPhase::ImportsPending);
+        assert_eq!(f.capture_epoch, CaptureEpoch::from_store(7));
+        assert_eq!(f.generation, 2);
+    }
+
+    #[test]
+    fn continuity_capability_binds_full_identity_and_active_intent() {
+        let mut wrong_identity = prepared(1);
+        wrong_identity.acquire_guard(guard_proof()).unwrap();
+        wrong_identity.slot_created("boring_slot").unwrap();
+        wrong_identity.restart_decision(no_proof());
+        let mut identity = test_identity();
+        identity.timeline = 2;
+        assert_eq!(
+            wrong_identity.restart_decision(proof_for(identity, "intent-1")),
+            RecoveryDecision::RequireConfirmedFullReseed
+        );
+
+        let mut wrong_intent = prepared(1);
+        wrong_intent.acquire_guard(guard_proof()).unwrap();
+        wrong_intent.slot_created("boring_slot").unwrap();
+        wrong_intent.restart_decision(no_proof());
+        assert_eq!(
+            wrong_intent.restart_decision(proof_for(test_identity(), "other-intent")),
+            RecoveryDecision::RequireConfirmedFullReseed
+        );
+    }
+
+    #[test]
+    fn fence_nonce_and_complete_boundary_fail_closed_before_anchor() {
+        let mut f = exported(1);
+        acknowledge_all(&mut f);
+        release(&mut f).unwrap();
+        finish_reads(&mut f, 0).unwrap();
+        f.mark_chunks_complete().unwrap();
+        assert_eq!(
+            f.intend_fence(78).unwrap_err().fingerprint,
+            "FENCE_INTENT_INVALID"
+        );
+        assert_eq!(f.phase, IntentPhase::ExporterReleased);
+        f.intend_fence(77).unwrap();
+        record(&mut f, boundary(160, 4), None).unwrap();
+        assert_eq!(
+            observe_fence(&mut f, 77, 159, 5).unwrap_err().fingerprint,
+            "DURABLE_FENCE_BOUNDARY_REGRESSION"
+        );
+        assert_eq!(
+            observe_fence(&mut f, 77, 160, 3).unwrap_err().fingerprint,
+            "DURABLE_FENCE_BOUNDARY_REGRESSION"
+        );
+        observe_fence(&mut f, 77, 160, 4).unwrap();
+    }
+
+    #[test]
+    fn durable_wal_rejects_lsn_and_journal_cursor_divergence() {
+        let mut f = exported(1);
+        record(&mut f, boundary(120, 2), None).unwrap();
+        assert_eq!(
+            record(&mut f, boundary(121, 1), None)
+                .unwrap_err()
+                .fingerprint,
+            "DURABLE_WAL_REGRESSION"
+        );
+        assert_eq!(
+            record(&mut f, boundary(120, 3), None)
+                .unwrap_err()
+                .fingerprint,
+            "DURABLE_WAL_REGRESSION"
+        );
+        assert_eq!(f.durable_wal_end, Some(boundary(120, 2)));
+    }
+
+    #[test]
+    fn harness_accounting_includes_guard_vector_capacity_and_dead_sessions() {
+        let mut relations = Vec::with_capacity(8);
+        relations.push(crate::m1_ddl_fixtures::LogicalRelationId {
+            database_oid: 1,
+            relation_oid: 1,
+            logical_table_id: "table-1".into(),
+        });
+        let mut guard =
+            GuardState::acquire_before_export(7, 1, "tables-fp".into(), 77, relations).unwrap();
+        guard.verify_catalog_fingerprint("tables-fp").unwrap();
+        let guard_allocated = guard.owned_allocation_bytes();
+        assert!(
+            guard_allocated >= 8 * std::mem::size_of::<crate::m1_ddl_fixtures::LogicalRelationId>()
+        );
+        let mut f = prepared(1);
+        f.acquire_guard(guard).unwrap();
+        let before = BootstrapDomain.facts_size_bytes(&f);
+        f.record_dead_sessions(true);
+        let after = BootstrapDomain.facts_size_bytes(&f);
+        assert!(after >= before + std::mem::size_of::<BackendSession>());
     }
 
     #[test]
@@ -1582,6 +1841,10 @@ mod tests {
             generation: 1,
             slot_identity: "slot".into(),
             publication_fingerprint: test_identity().publication_fingerprint,
+            expected_source_identity: SourceIdentity {
+                slot_name: "slot".into(),
+                ..test_identity()
+            },
             table_set_fingerprint: "tables".into(),
             config_fingerprint: "config".into(),
             importer_ranges: vec!["all".into()],
@@ -1664,6 +1927,10 @@ mod tests {
         let scope = f.scope();
         f.importer_lost(&scope, worker)
     }
+    fn cleanup(f: &mut BootstrapFacts, elapsed_ms: u64) -> Result<(), BootstrapFailure> {
+        let scope = f.scope();
+        f.complete_stale_backend_cleanup(&scope, elapsed_ms, true)
+    }
     fn drain_retained(
         f: &mut BootstrapFacts,
         boundary: DurableSourceBoundary,
@@ -1703,22 +1970,18 @@ mod tests {
             table_set_fingerprint: table_set_fingerprint.clone(),
         };
         let mut writer = crate::m1_control_fixtures::ControlWriterState::default();
-        writer.intend_fence(nonce, identity.clone()).unwrap();
+        writer
+            .intend_fence(nonce, &scope.intent_id, identity.clone())
+            .unwrap();
         let update = crate::m1_control_fixtures::ObservedControlUpdate::fence(nonce, identity);
-        let control = writer
-            .observe(
+        let journaled = writer
+            .observe_durable_fence(
                 &update,
-                Some(&crate::m1_control_fixtures::committed_for_fixture()),
+                boundary(lsn, seq),
+                &crate::m1_control_fixtures::committed_for_fixture(),
             )
             .unwrap();
-        DurableFenceCompletion::from_published_control_transaction(
-            scope,
-            table_set_fingerprint,
-            nonce,
-            boundary(lsn, seq),
-            control,
-        )
-        .unwrap()
+        DurableFenceCompletion::from_journaled_fence(journaled).unwrap()
     }
     fn observe_fence(
         f: &mut BootstrapFacts,
@@ -1767,6 +2030,30 @@ mod tests {
         synthetic_durable_boundary(ReceivedLsn::from_wire(lsn), JournalCursor::from_store(seq))
     }
 
+    fn proof_for(
+        identity: SourceIdentity,
+        intent_id: &str,
+    ) -> Option<VerifiedRetainedSlotContinuity> {
+        let local_identity = test_identity();
+        let local = crate::m1_source_identity::LocalSourceState {
+            capture_epoch: CaptureEpoch::from_store(7),
+            identity: local_identity,
+            bootstrap: crate::m1_source_identity::BootstrapProvenance::None,
+            creation_floor: None,
+            received_lsn: None,
+            durable_transaction: None,
+            feedback_position: crate::m1_source_identity::FeedbackPosition::ProtocolZero,
+        };
+        let live = crate::m1_source_identity::LiveSourceState {
+            identity,
+            slot_exists: true,
+            slot_valid: true,
+            resume_wal_available: true,
+            confirmed_flush_lsn: None,
+        };
+        crate::m1_source_identity::verify_retained_slot_continuity(&local, &live, intent_id).ok()
+    }
+
     fn all_proof() -> Option<VerifiedRetainedSlotContinuity> {
         let identity = test_identity();
         let local = crate::m1_source_identity::LocalSourceState {
@@ -1785,7 +2072,10 @@ mod tests {
             resume_wal_available: true,
             confirmed_flush_lsn: None,
         };
-        Some(crate::m1_source_identity::verify_retained_slot_continuity(&local, &live).unwrap())
+        Some(
+            crate::m1_source_identity::verify_retained_slot_continuity(&local, &live, "intent-1")
+                .unwrap(),
+        )
     }
     fn no_proof() -> Option<VerifiedRetainedSlotContinuity> {
         None

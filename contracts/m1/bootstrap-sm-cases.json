@@ -152,6 +152,46 @@
       "expected_state": "AnchorComplete",
       "expected_checkpoint": "fence=end:150,seq:3",
       "expected_log_outcome": "stale_scope_rejected"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-LOST-TOKEN-RECOVERY",
+      "clause": "lost creation response token reconciles dead backends, starts separate retained-slot capture, drains typed WAL, and opens same-epoch replacement snapshot",
+      "unit_test": "lost_creation_token_starts_retained_capture_and_replacement_snapshot",
+      "expected_state": "ImportsPending(existing-slot generation=2)",
+      "expected_checkpoint": "lower_stitch=end:120,seq:2",
+      "expected_log_outcome": "lost_token_retained_capture_recovered"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-CONTINUITY-CAPABILITY",
+      "clause": "retained-slot continuity capability binds full source identity and active bootstrap intent",
+      "unit_test": "continuity_capability_binds_full_identity_and_active_intent",
+      "expected_state": "FullReseedRequired",
+      "expected_checkpoint": "continuity_unproven",
+      "expected_log_outcome": "identity_or_intent_mismatch"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-FENCE-CAPABILITY",
+      "clause": "guard-bound nonce rejects before dispatch and atomic journaled fence scope plus complete boundary precede anchor",
+      "unit_test": "fence_nonce_and_complete_boundary_fail_closed_before_anchor",
+      "expected_state": "AnchorComplete",
+      "expected_checkpoint": "fence=end:160,seq:4",
+      "expected_log_outcome": "guard_nonce_and_boundary_bound"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-BOUNDARY-MONOTONIC",
+      "clause": "durable LSN and complete journal cursor advance as one monotonic boundary",
+      "unit_test": "durable_wal_rejects_lsn_and_journal_cursor_divergence",
+      "expected_state": "ImportsPending",
+      "expected_checkpoint": "durable=end:120,seq:2",
+      "expected_log_outcome": "DURABLE_WAL_REGRESSION"
+    },
+    {
+      "scenario_id": "SCN-M1-BOOTSTRAP-CAPACITY-ACCOUNTING",
+      "clause": "harness state accounting includes guard vector capacity and dead-backend collection entries",
+      "unit_test": "harness_accounting_includes_guard_vector_capacity_and_dead_sessions",
+      "expected_state": "Prepared",
+      "expected_checkpoint": "unchanged",
+      "expected_log_outcome": "owned_capacity_accounted"
     }
   ]
 }

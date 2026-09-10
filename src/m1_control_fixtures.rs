@@ -3,6 +3,7 @@
 //! The kernel is deliberately side-effect free. SQL/pgoutput adapters must feed observed facts
 //! through this one writer before feedback or an external mutation is allowed.
 
+use crate::m1_transition_kernel::DurableSourceBoundary;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
@@ -165,7 +166,40 @@ pub struct JournalControlNoOp {
     writes_benchmark_mutation: bool,
     feedback_eligible: bool,
 }
+
+/// Atomic capability emitted after the writer has matched an observed published fence to its
+/// active intent and committed it at one complete journal boundary.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JournaledFence {
+    intent_id: String,
+    identity: FenceIdentity,
+    nonce: u64,
+    boundary: DurableSourceBoundary,
+}
+impl JournaledFence {
+    pub fn into_parts(self) -> (String, FenceIdentity, u64, DurableSourceBoundary) {
+        (self.intent_id, self.identity, self.nonce, self.boundary)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct FenceIntent {
+    pub intent_id: String,
+    pub identity: FenceIdentity,
+}
 impl JournalControlNoOp {
+    #[must_use]
+    pub fn writes_user_row(&self) -> bool {
+        self.writes_user_row
+    }
+    #[must_use]
+    pub fn writes_benchmark_mutation(&self) -> bool {
+        self.writes_benchmark_mutation
+    }
+    #[must_use]
+    pub fn feedback_eligible(&self) -> bool {
+        self.feedback_eligible
+    }
     #[must_use]
     pub fn proves_durable_fence(&self, nonce: u64) -> bool {
         self.kind == ControlKind::CaptureFence
@@ -191,20 +225,25 @@ pub(crate) fn committed_for_fixture() -> JournalCommitProof {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct ControlHistorySnapshot {
     pub last_heartbeat_nonce: Option<u64>,
-    pub intended_fences: BTreeMap<u64, FenceIdentity>,
+    pub intended_fences: BTreeMap<u64, FenceIntent>,
     pub observed_fence_nonces: BTreeSet<u64>,
 }
 
 #[derive(Default)]
 pub struct ControlWriterState {
     last_heartbeat_nonce: Option<u64>,
-    intended_fences: BTreeMap<u64, FenceIdentity>,
+    intended_fences: BTreeMap<u64, FenceIntent>,
     observed_fence_nonces: BTreeSet<u64>,
 }
 impl ControlWriterState {
     /// Reconstructs writer state from the SQLite transaction owner's durable snapshot.
     pub fn from_persisted(snapshot: ControlHistorySnapshot) -> Result<Self, ProtocolFailure> {
         if snapshot.intended_fences.contains_key(&0)
+            || snapshot.intended_fences.values().any(|intent| {
+                intent.intent_id.is_empty()
+                    || intent.intent_id.len() > 256
+                    || !intent.intent_id.is_ascii()
+            })
             || !snapshot
                 .observed_fence_nonces
                 .iter()
@@ -225,9 +264,10 @@ impl ControlWriterState {
     pub fn intend_fence(
         &mut self,
         nonce: u64,
+        intent_id: &str,
         identity: FenceIdentity,
     ) -> Result<(), ProtocolFailure> {
-        if nonce == 0 {
+        if nonce == 0 || intent_id.is_empty() || intent_id.len() > 256 || !intent_id.is_ascii() {
             return Err(ProtocolFailure::blocked(
                 "FENCE_NONCE_NOT_UNIQUE",
                 "before_control_dispatch",
@@ -235,7 +275,10 @@ impl ControlWriterState {
         }
         match self.intended_fences.entry(nonce) {
             Entry::Vacant(entry) => {
-                entry.insert(identity);
+                entry.insert(FenceIntent {
+                    intent_id: intent_id.to_owned(),
+                    identity,
+                });
                 Ok(())
             }
             Entry::Occupied(_) => Err(ProtocolFailure::blocked(
@@ -309,7 +352,7 @@ impl ControlWriterState {
                 let intended = self.intended_fences.get(&update.nonce).ok_or_else(|| {
                     ProtocolFailure::blocked("FENCE_NONCE_UNBOUND", "before_feedback")
                 })?;
-                if update.fence_identity.as_ref() != Some(intended) {
+                if update.fence_identity.as_ref() != Some(&intended.identity) {
                     return Err(ProtocolFailure::blocked(
                         "FENCE_IDENTITY_MISMATCH",
                         "before_feedback",
@@ -327,6 +370,37 @@ impl ControlWriterState {
             writes_user_row: false,
             writes_benchmark_mutation: false,
             feedback_eligible: durable,
+        })
+    }
+
+    pub fn observe_durable_fence(
+        &mut self,
+        update: &ObservedControlUpdate,
+        boundary: DurableSourceBoundary,
+        commit_proof: &JournalCommitProof,
+    ) -> Result<JournaledFence, ProtocolFailure> {
+        if update.kind != ControlKind::CaptureFence {
+            return Err(ProtocolFailure::blocked(
+                "FENCE_CONTROL_TRANSACTION_UNPROVED",
+                "before_feedback",
+            ));
+        }
+        let control = self.observe(update, Some(commit_proof))?;
+        if !control.proves_durable_fence(update.nonce) {
+            return Err(ProtocolFailure::blocked(
+                "FENCE_CONTROL_TRANSACTION_UNPROVED",
+                "before_feedback",
+            ));
+        }
+        let intended = self
+            .intended_fences
+            .get(&update.nonce)
+            .expect("observe verified intent");
+        Ok(JournaledFence {
+            intent_id: intended.intent_id.clone(),
+            identity: intended.identity.clone(),
+            nonce: update.nonce,
+            boundary,
         })
     }
 
@@ -1007,7 +1081,7 @@ pub mod tests {
     #[test]
     fn repeated_fence_keeps_one_proof() {
         let mut s = ControlWriterState::default();
-        s.intend_fence(7, fence_identity()).unwrap();
+        s.intend_fence(7, "intent-1", fence_identity()).unwrap();
         s.observe(
             &ObservedControlUpdate::fence(7, fence_identity()),
             Some(&committed_for_fixture()),
@@ -1020,14 +1094,16 @@ pub mod tests {
         .unwrap();
         assert_eq!(s.fence_proof_count(), 1);
         assert_eq!(
-            s.intend_fence(7, fence_identity()).unwrap_err().fingerprint,
+            s.intend_fence(7, "intent-1", fence_identity())
+                .unwrap_err()
+                .fingerprint,
             "FENCE_NONCE_NOT_UNIQUE"
         );
     }
     #[test]
     fn fence_identity_must_match_persisted_intent() {
         let mut state = ControlWriterState::default();
-        state.intend_fence(7, fence_identity()).unwrap();
+        state.intend_fence(7, "intent-1", fence_identity()).unwrap();
         let mut wrong = fence_identity();
         wrong.generation = 2;
         assert_eq!(
@@ -1048,9 +1124,11 @@ pub mod tests {
         let original = fence_identity();
         let mut replacement = original.clone();
         replacement.generation = 2;
-        state.intend_fence(7, original.clone()).unwrap();
+        state.intend_fence(7, "intent-1", original.clone()).unwrap();
 
-        let duplicate = state.intend_fence(7, replacement.clone()).unwrap_err();
+        let duplicate = state
+            .intend_fence(7, "intent-1", replacement.clone())
+            .unwrap_err();
         assert_eq!(duplicate.fingerprint, "FENCE_NONCE_NOT_UNIQUE");
         assert_eq!(duplicate.failed_boundary, "before_control_dispatch");
 
@@ -1225,14 +1303,22 @@ pub mod tests {
     fn persisted_control_history_survives_restart() {
         let snapshot = ControlHistorySnapshot {
             last_heartbeat_nonce: Some(9),
-            intended_fences: [(7, fence_identity())].into_iter().collect(),
+            intended_fences: [(
+                7,
+                FenceIntent {
+                    intent_id: "intent-1".into(),
+                    identity: fence_identity(),
+                },
+            )]
+            .into_iter()
+            .collect(),
             observed_fence_nonces: [7].into_iter().collect(),
         };
         let mut restored = ControlWriterState::from_persisted(snapshot).unwrap();
         assert_eq!(restored.fence_proof_count(), 1);
         assert_eq!(
             restored
-                .intend_fence(7, fence_identity())
+                .intend_fence(7, "intent-1", fence_identity())
                 .unwrap_err()
                 .fingerprint,
             "FENCE_NONCE_NOT_UNIQUE"
