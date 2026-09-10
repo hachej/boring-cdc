@@ -25,9 +25,12 @@ def docker_psql(name: str, sql: str, *, check=True) -> subprocess.CompletedProce
     return p
 
 def wait_ready(name: str):
+    # The image's temporary init server accepts Unix connections before shutting
+    # down. Require the final postmaster (`listen_addresses=*`) rather than that
+    # transient readiness window.
     for _ in range(300):
-        p = run(["docker", "exec", name, "pg_isready", "-U", "postgres"], timeout=5)
-        if p.returncode == 0: return
+        p = run(["docker", "exec", name, "psql", "-XAt", "-U", "postgres", "-d", "postgres", "-c", "SHOW listen_addresses"], timeout=5)
+        if p.returncode == 0 and p.stdout.strip() == "*": return
         time.sleep(.1)
     raise RuntimeError("PostgreSQL health deadline exceeded")
 
@@ -65,7 +68,7 @@ def postgres_probe(name: str, fault: bool) -> dict:
     holder_sql = f"SELECT pg_advisory_lock({KEY}); SELECT pg_sleep(120);"
     holder = subprocess.Popen(
         ["docker", "exec", "-e", "PGAPPNAME=m2-owner", name, "psql", "-XAt", "-U", "postgres", "-d", "postgres", "-c", holder_sql],
-        cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
     )
     pid_sql = "SELECT pid FROM pg_stat_activity WHERE application_name='m2-owner' AND state='active' ORDER BY pid LIMIT 1"
     pid = ""
@@ -73,7 +76,8 @@ def postgres_probe(name: str, fault: bool) -> dict:
         q = docker_psql(name, pid_sql, check=False)
         if q.returncode == 0 and q.stdout.strip().isdigit(): pid = q.stdout.strip(); break
         if holder.poll() is not None:
-            raise RuntimeError(f"advisory owner process exited early ({holder.returncode})")
+            detail = holder.stderr.read().strip() if holder.stderr else ""
+            raise RuntimeError(f"advisory owner process exited early ({holder.returncode}): {detail}")
         time.sleep(.1)
     if not pid:
         holder.terminate(); holder.wait(timeout=5)
