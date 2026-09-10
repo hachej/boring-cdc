@@ -7,6 +7,7 @@ cargo test --locked m2_journal::tests::crash_before_and_after_commit_is_absent_o
 cargo test --locked m2_journal::tests::positional_duplicate_is_idempotent_but_conflict_blocks
 cargo test --locked m2_journal::tests::relation_schema_conflict_rolls_back_whole_source_commit
 cargo test --locked m2_journal::tests::slow_storage_hold_bound_rolls_back_without_partial_visibility
+cargo test --locked m2_journal::tests::saturated_real_writer_service_bounds_slow_capture_and_reserved_work
 scratch=$(mktemp -d /var/tmp/boring-cdc-m2-journal-fault.XXXXXX)
 trap 'rm -rf "$scratch"' EXIT INT TERM
 python3 scripts/lib/m2_journal_component.py fault

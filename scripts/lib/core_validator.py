@@ -181,8 +181,12 @@ def validate_evidence(obj, findings, args):
         exists=subprocess.run(["git","cat-file","-e",commit+"^{commit}"],cwd=ROOT,capture_output=True).returncode==0
         ancestor=exists and subprocess.run(["git","merge-base","--is-ancestor",commit,"HEAD"],cwd=ROOT,capture_output=True).returncode==0
         if not exists or not ancestor: add(findings,"E_GIT_OBJECT","/git_commit","commit must exist and be an ancestor of the validating checkout")
-        elif subprocess.run(["git","diff","--quiet",commit+"..HEAD","--","contracts","scripts","tests"],cwd=ROOT).returncode != 0:
-            add(findings,"E_EVIDENCE_STALE","/git_commit","owned implementation, contract, or fixture paths changed after the evidence commit")
+        else:
+            bound_paths = ["contracts", "scripts", "tests"]
+            if obj.get("owner_bead") == "boring-cdc-m2-journal":
+                bound_paths += ["src/m2_journal.rs", "src/m2_schema.rs", "src/lib.rs", "examples/m2_journal_component.rs"]
+            if subprocess.run(["git","diff","--quiet",commit+"..HEAD","--",*bound_paths],cwd=ROOT).returncode != 0:
+                add(findings,"E_EVIDENCE_STALE","/git_commit","owned implementation, contract, fixture, src, or example paths changed after the evidence commit")
     cmds=obj.get("commands")
     if not isinstance(cmds,list) or not cmds: add(findings,"E_COMMANDS_REQUIRED","/commands","at least one command record is required")
     else:

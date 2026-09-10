@@ -8,6 +8,9 @@ cargo test --locked m2_journal::tests::atomic_commit_publishes_complete_transact
 cargo test --locked m2_journal::tests::feedback_token_exists_only_after_commit_return
 cargo test --locked m2_journal::tests::bounded_range_copies_complete_transactions_and_releases_reader
 cargo test --locked m2_journal::tests::capture_priority_reserves_bounded_service_and_overload
+cargo test --locked m2_journal::tests::journal_command_boundaries_are_read_only_bounded_and_asserted
+cargo test --locked m2_journal::tests::complete_range_peak_accounts_for_simultaneous_live_data
+cargo test --locked m2_journal::tests::coverage_inventory_is_assertion_aware
 scratch=$(mktemp -d /var/tmp/boring-cdc-m2-journal-e2e.XXXXXX)
 trap 'rm -rf "$scratch"' EXIT INT TERM
 python3 scripts/lib/m2_journal_component.py e2e

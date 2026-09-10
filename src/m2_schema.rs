@@ -68,6 +68,49 @@ impl ReaderHandle {
         }
         Ok(values)
     }
+    pub fn query_one_bounded<T, F>(&self, sql: &str, map: F) -> rusqlite::Result<Option<T>>
+    where
+        F: FnOnce(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
+    {
+        if self.expired() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let mut statement = self.connection.prepare(sql)?;
+        if statement.column_count() == 0 {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let mut rows = statement.query([])?;
+        let value = match rows.next()? {
+            Some(row) => Some(map(row)?),
+            None => None,
+        };
+        if self.expired() || rows.next()?.is_some() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        Ok(value)
+    }
+    pub fn for_each_bounded<F>(&self, sql: &str, mut visit: F) -> rusqlite::Result<usize>
+    where
+        F: FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<()>,
+    {
+        if self.expired() {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let mut statement = self.connection.prepare(sql)?;
+        if statement.column_count() == 0 {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let mut rows = statement.query([])?;
+        let mut count = 0usize;
+        while let Some(row) = rows.next()? {
+            if self.expired() || count == self.max_rows {
+                return Err(rusqlite::Error::InvalidQuery);
+            }
+            visit(row)?;
+            count += 1;
+        }
+        Ok(count)
+    }
     pub fn expired(&self) -> bool {
         Instant::now() >= self.deadline
     }

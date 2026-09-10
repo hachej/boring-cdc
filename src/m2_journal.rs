@@ -491,6 +491,8 @@ pub struct CopiedRange {
 }
 
 /// Copies only whole complete transactions and drops the physical read handle before return.
+/// Rows stream directly into the result. The byte bound includes the result vector's elements
+/// and owned fields plus the one simultaneously-live transaction boundary and SQLite row.
 pub fn read_complete_range(
     path: &std::path::Path,
     after_seq: u64,
@@ -503,38 +505,34 @@ pub fn read_complete_range(
     }
     let reader = open_reader_with_limits(path, max_age, max_events)?;
     if after_seq > 0 {
-        let boundary: Vec<i64> = reader.query_bounded(
+        let boundary = reader.query_one_bounded(
             &format!("SELECT last_seq FROM source_transactions WHERE last_seq={after_seq}"),
-            |r| r.get(0),
+            |r| r.get::<_, i64>(0),
         )?;
-        if boundary != vec![after_seq as i64] {
+        if boundary != Some(after_seq as i64) {
             return Err(JournalError::Unavailable(
                 "requested position is not a complete transaction boundary",
             ));
         }
     }
-    let boundaries: Vec<(String,i64,i64)> = reader.query_bounded(
-        &format!("SELECT transaction_id,first_seq,last_seq FROM source_transactions WHERE state='committed' AND first_seq>{after_seq} ORDER BY first_seq LIMIT {max_events}"),
-        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
-    )?;
-    if boundaries.is_empty() {
-        return Ok(None);
-    }
-    if boundaries[0].1 != after_seq as i64 + 1 {
-        return Err(JournalError::Unavailable(
-            "requested range is no longer contiguous and retained",
-        ));
-    }
     let mut events = Vec::new();
     let mut copied = 0usize;
     let mut expected_first = after_seq as i64 + 1;
-    for (txid, first, last) in boundaries {
+    loop {
+        let boundary: Option<(String, i64, i64)> = reader.query_one_bounded(
+            &format!("SELECT transaction_id,first_seq,last_seq FROM source_transactions WHERE state='committed' AND first_seq>={expected_first} ORDER BY first_seq LIMIT 1"),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )?;
+        let Some((txid, first, last)) = boundary else {
+            break;
+        };
         if first != expected_first {
             return Err(JournalError::Unavailable(
-                "internal journal range is not contiguous and retained",
+                "requested range is no longer contiguous and retained",
             ));
         }
-        let expected = (last - first + 1) as usize;
+        let expected = usize::try_from(last - first + 1)
+            .map_err(|_| JournalError::Conflict("invalid transaction range"))?;
         if events
             .len()
             .checked_add(expected)
@@ -549,28 +547,30 @@ pub fn read_complete_range(
             break;
         }
         let escaped = txid.replace('\'', "''");
-        let measures: Vec<(i64,i64,Option<i64>,Option<i64>)> = reader.query_bounded(
+        let measure: Option<(i64, i64, Option<i64>, Option<i64>)> = reader.query_one_bounded(
             &format!("SELECT count(*),coalesce(sum(length(payload)+length(transaction_id)+length(event_id)+length(payload_hash)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id='{escaped}'"),
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )?;
-        let (count, tx_bytes, min_seq, max_seq) = measures
-            .into_iter()
-            .next()
-            .ok_or(JournalError::Conflict("missing transaction measures"))?;
+        let (count, field_bytes, min_seq, max_seq) =
+            measure.ok_or(JournalError::Conflict("missing transaction measures"))?;
         if count as usize != expected || min_seq != Some(first) || max_seq != Some(last) {
             return Err(JournalError::Conflict("incomplete committed transaction"));
         }
-        let allocation_bytes = (tx_bytes as usize)
+        let boundary_bytes = std::mem::size_of::<(String, i64, i64)>()
+            .checked_add(txid.len())
+            .ok_or(JournalError::Limit("copied bytes overflow"))?;
+        let result_bytes = (field_bytes as usize)
             .checked_add(
                 expected
                     .checked_mul(std::mem::size_of::<CopiedEvent>())
                     .ok_or(JournalError::Limit("copied bytes overflow"))?,
             )
             .ok_or(JournalError::Limit("copied bytes overflow"))?;
-        let next_bytes = copied
-            .checked_add(allocation_bytes)
+        let peak = copied
+            .checked_add(result_bytes)
+            .and_then(|v| v.checked_add(boundary_bytes))
             .ok_or(JournalError::Limit("copied bytes overflow"))?;
-        if next_bytes > max_bytes {
+        if peak > max_bytes {
             if events.is_empty() {
                 return Err(JournalError::Limit(
                     "next complete transaction exceeds byte bound",
@@ -578,21 +578,29 @@ pub fn read_complete_range(
             }
             break;
         }
-        let rows: Vec<(i64,String,String,Vec<u8>,String)> = reader.query_bounded(
+        let row_count = reader.for_each_bounded(
             &format!("SELECT journal_seq,transaction_id,event_id,payload,payload_hash FROM journal_events WHERE transaction_id='{escaped}' ORDER BY journal_seq"),
-            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+            |r| {
+                events.push(CopiedEvent {
+                    journal_seq: r.get::<_, i64>(0)? as u64,
+                    transaction_id: r.get(1)?,
+                    event_id: r.get(2)?,
+                    payload: r.get(3)?,
+                    payload_hash: r.get(4)?,
+                });
+                Ok(())
+            },
         )?;
-        for (seq, transaction_id, event_id, payload, payload_hash) in rows {
-            events.push(CopiedEvent {
-                journal_seq: seq as u64,
-                transaction_id,
-                event_id,
-                payload,
-                payload_hash,
-            });
+        if row_count != expected {
+            return Err(JournalError::Conflict("incomplete committed transaction"));
         }
-        copied = next_bytes;
+        copied = copied
+            .checked_add(result_bytes)
+            .ok_or(JournalError::Limit("copied bytes overflow"))?;
         expected_first = last + 1;
+    }
+    if events.is_empty() {
+        return Ok(None);
     }
     let first_seq = events[0].journal_seq;
     let last_seq = events.last().unwrap().journal_seq;
@@ -603,6 +611,109 @@ pub fn read_complete_range(
         last_seq,
         copied_bytes: copied,
     }))
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JournalInspection {
+    pub event_id: String,
+    pub transaction_id: String,
+    pub journal_seq: u64,
+    pub transaction_boundary: (u64, u64),
+    pub payload_hash: String,
+    pub durable_end_lsn: String,
+}
+
+/// Bounded read-only implementation boundary for CMD-JOURNAL-INSPECT-EVENT-ID-ID-EXPLAIN-JSON.
+pub fn journal_inspect_event(
+    path: &std::path::Path,
+    event_id: &str,
+    max_age: Duration,
+) -> Result<Option<JournalInspection>, JournalError> {
+    if event_id.is_empty() {
+        return Err(JournalError::Invalid("empty event ID"));
+    }
+    let escaped = event_id.replace('\'', "''");
+    let reader = open_reader_with_limits(path, max_age, 1)?;
+    let result = reader.query_one_bounded(
+        &format!("SELECT e.event_id,e.transaction_id,e.journal_seq,t.first_seq,t.last_seq,e.payload_hash,t.end_lsn FROM journal_events e JOIN source_transactions t ON t.transaction_id=e.transaction_id WHERE e.event_id='{escaped}' AND t.state='committed'"),
+        |r| Ok(JournalInspection { event_id:r.get(0)?, transaction_id:r.get(1)?, journal_seq:r.get::<_,i64>(2)? as u64, transaction_boundary:(r.get::<_,i64>(3)? as u64,r.get::<_,i64>(4)? as u64), payload_hash:r.get(5)?, durable_end_lsn:r.get(6)? }),
+    )?;
+    drop(reader);
+    Ok(result)
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct JournalVerification {
+    pub transaction_count: u64,
+    pub event_count: u64,
+    pub durable_seq: u64,
+}
+
+/// Bounded read-only implementation boundary for CMD-JOURNAL-VERIFY.
+pub fn journal_verify(
+    path: &std::path::Path,
+    max_age: Duration,
+) -> Result<JournalVerification, JournalError> {
+    let reader = open_reader_with_limits(path, max_age, 1)?;
+    let quick: Option<String> = reader.query_one_bounded("PRAGMA quick_check", |r| r.get(0))?;
+    if quick.as_deref() != Some("ok") {
+        return Err(JournalError::Conflict("SQLite quick_check failed"));
+    }
+    let summary: Option<(i64,i64,i64,i64,i64)> = reader.query_one_bounded(
+        "SELECT count(*),coalesce(sum(event_count),0),coalesce(min(first_seq),1),coalesce(max(last_seq),0),coalesce((SELECT durable_journal_seq FROM source_state WHERE singleton=1),0) FROM source_transactions WHERE state='committed'",
+        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+    )?;
+    let (transactions, expected_events, first, last, durable) =
+        summary.ok_or(JournalError::Conflict("missing verification summary"))?;
+    let actual: Option<i64> =
+        reader.query_one_bounded("SELECT count(*) FROM journal_events", |r| r.get(0))?;
+    if actual != Some(expected_events)
+        || (transactions > 0 && (first != 1 || last != expected_events || durable != last))
+    {
+        return Err(JournalError::Conflict(
+            "journal continuity or durable boundary mismatch",
+        ));
+    }
+    drop(reader);
+    Ok(JournalVerification {
+        transaction_count: transactions as u64,
+        event_count: expected_events as u64,
+        durable_seq: durable as u64,
+    })
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GcDryRun {
+    pub first_seq: Option<u64>,
+    pub last_seq: Option<u64>,
+    pub transaction_count: u64,
+    pub event_count: u64,
+}
+
+/// Inspection-only implementation boundary for CMD-JOURNAL-GC-DRY-RUN; it performs no write.
+pub fn journal_gc_dry_run(
+    path: &std::path::Path,
+    retain_from_seq: u64,
+    max_transactions: usize,
+    max_age: Duration,
+) -> Result<GcDryRun, JournalError> {
+    if max_transactions == 0 {
+        return Err(JournalError::Invalid("zero GC dry-run bound"));
+    }
+    let reader = open_reader_with_limits(path, max_age, 1)?;
+    let row: Option<(Option<i64>,Option<i64>,i64,i64)> = reader.query_one_bounded(
+        &format!("SELECT min(first_seq),max(last_seq),count(*),coalesce(sum(event_count),0) FROM (SELECT first_seq,last_seq,event_count FROM source_transactions WHERE state='committed' AND last_seq<{retain_from_seq} ORDER BY first_seq LIMIT {max_transactions})"),
+        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+    )?;
+    let (first, last, transactions, events) =
+        row.ok_or(JournalError::Conflict("missing GC dry-run summary"))?;
+    drop(reader);
+    Ok(GcDryRun {
+        first_seq: first.map(|v| v as u64),
+        last_seq: last.map(|v| v as u64),
+        transaction_count: transactions as u64,
+        event_count: events as u64,
+    })
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -690,37 +801,97 @@ impl<T> CapturePriorityScheduler<T> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub enum ServiceCommand {
-    /// Typed integration seam for a bounded control/checkpoint/GC writer turn.
-    /// Domain mutations are added as closed variants, never arbitrary closures.
-    Probe { max_writer_hold: Duration },
+    PersistFailureControl {
+        failure_id: String,
+        fingerprint: String,
+        max_writer_hold: Duration,
+    },
+    CheckpointWal {
+        max_writer_hold: Duration,
+    },
+    GcDryRun {
+        retain_from_seq: u64,
+        max_transactions: usize,
+        max_writer_hold: Duration,
+    },
 }
 impl ServiceCommand {
-    fn execute(self, writer: &mut WriterConnection) -> Result<(), JournalError> {
+    fn max_writer_hold(&self) -> Duration {
         match self {
-            Self::Probe { max_writer_hold } => {
-                if max_writer_hold.is_zero() {
-                    return Err(JournalError::Invalid("zero service hold bound"));
-                }
-                let started = Instant::now();
-                writer.connection().query_row("SELECT 1", [], |_| Ok(()))?;
-                if started.elapsed() > max_writer_hold {
-                    Err(JournalError::BusyBoundExceeded)
-                } else {
-                    Ok(())
-                }
+            Self::PersistFailureControl {
+                max_writer_hold, ..
             }
+            | Self::CheckpointWal { max_writer_hold }
+            | Self::GcDryRun {
+                max_writer_hold, ..
+            } => *max_writer_hold,
+        }
+    }
+    fn execute(self, writer: &mut WriterConnection) -> Result<(), JournalError> {
+        let max_writer_hold = self.max_writer_hold();
+        if max_writer_hold.is_zero() {
+            return Err(JournalError::Invalid("zero service hold bound"));
+        }
+        let started = Instant::now();
+        match self {
+            Self::PersistFailureControl {
+                failure_id,
+                fingerprint,
+                ..
+            } => {
+                writer.connection().execute(
+                    "INSERT INTO processing_failures(failure_id,destination_id,component,failure_class,fingerprint,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES(?1,NULL,'journal','control',?2,'deterministic',1,NULL,0,'fixture-time','fixture-time')",
+                    params![failure_id, fingerprint],
+                )?;
+            }
+            Self::CheckpointWal { .. } => {
+                let _: (i64, i64, i64) =
+                    writer
+                        .connection()
+                        .query_row("PRAGMA wal_checkpoint(PASSIVE)", [], |r| {
+                            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+                        })?;
+            }
+            Self::GcDryRun {
+                retain_from_seq,
+                max_transactions,
+                ..
+            } => {
+                if max_transactions == 0 {
+                    return Err(JournalError::Invalid("zero GC dry-run bound"));
+                }
+                let _: i64 = writer.connection().query_row(
+                    &format!("SELECT count(*) FROM (SELECT 1 FROM source_transactions WHERE state='committed' AND last_seq<{retain_from_seq} LIMIT {max_transactions})"),
+                    [], |r| r.get(0),
+                )?;
+            }
+        }
+        if started.elapsed() > max_writer_hold {
+            Err(JournalError::BusyBoundExceeded)
+        } else {
+            Ok(())
         }
     }
 }
 enum PendingWork {
     Capture(SourceCommit, CommitFault),
-    Service(WorkClass, ServiceCommand),
+    Service {
+        class: WorkClass,
+        command: ServiceCommand,
+        enqueued_at: Instant,
+    },
+}
+#[derive(Debug)]
+pub struct ServiceReport {
+    pub class: WorkClass,
+    pub queue_wait: Duration,
+    pub completed_in: Duration,
 }
 pub enum WorkOutcome {
     Durable(DurableCommit),
-    Serviced(WorkClass),
+    Serviced(ServiceReport),
 }
 /// Sole production writer entry point: every capture commit and sibling writer unit is
 /// admitted to one bounded fair queue and executed between complete atomic transactions.
@@ -750,14 +921,21 @@ impl JournalWriterService {
     pub fn enqueue_service(
         &mut self,
         class: WorkClass,
-        work: ServiceCommand,
+        command: ServiceCommand,
     ) -> Result<(), EnqueueError> {
         assert!(
             class != WorkClass::Capture,
             "capture work must use enqueue_capture"
         );
-        self.scheduler
-            .enqueue(class, PendingWork::Service(class, work))
+        let enqueued_at = Instant::now();
+        self.scheduler.enqueue(
+            class,
+            PendingWork::Service {
+                class,
+                command,
+                enqueued_at,
+            },
+        )
     }
     pub fn service_next(&mut self) -> Option<Result<WorkOutcome, JournalError>> {
         let (class, work, _tick) = self.scheduler.next()?;
@@ -766,12 +944,23 @@ impl JournalWriterService {
                 .store
                 .commit_atomic(&commit, fault)
                 .map(WorkOutcome::Durable),
-            PendingWork::Service(expected, work) => {
+            PendingWork::Service {
+                class: expected,
+                command,
+                enqueued_at,
+            } => {
                 if expected != class {
                     return Some(Err(JournalError::Conflict("scheduler class mismatch")));
                 }
-                work.execute(&mut self.store.writer)
-                    .map(|()| WorkOutcome::Serviced(class))
+                let queue_wait = enqueued_at.elapsed();
+                let started = Instant::now();
+                command.execute(&mut self.store.writer).map(|()| {
+                    WorkOutcome::Serviced(ServiceReport {
+                        class,
+                        queue_wait,
+                        completed_in: started.elapsed(),
+                    })
+                })
             }
         })
     }
@@ -1079,7 +1268,9 @@ pub mod tests {
         service
             .enqueue_service(
                 WorkClass::FailureControl,
-                ServiceCommand::Probe {
+                ServiceCommand::PersistFailureControl {
+                    failure_id: "failure-1".into(),
+                    fingerprint: "fingerprint-1".into(),
                     max_writer_hold: Duration::from_secs(1),
                 },
             )
@@ -1096,7 +1287,10 @@ pub mod tests {
         ));
         assert!(matches!(
             service.service_next().unwrap().unwrap(),
-            WorkOutcome::Serviced(WorkClass::FailureControl)
+            WorkOutcome::Serviced(ServiceReport {
+                class: WorkClass::FailureControl,
+                ..
+            })
         ));
         assert!(matches!(
             service.service_next().unwrap().unwrap(),
@@ -1129,6 +1323,240 @@ pub mod tests {
             s.commit_atomic(&c, CommitFault::None)
                 .unwrap()
                 .was_duplicate()
+        );
+    }
+    #[test]
+    fn saturated_real_writer_service_bounds_slow_capture_and_reserved_work() {
+        let (_p, store) = store("saturated-real-service");
+        let mut service = JournalWriterService::new(store, [4, 1, 1, 1], 1).unwrap();
+        for i in 1..=4 {
+            service
+                .enqueue_capture(
+                    commit(
+                        &format!("tx{i}"),
+                        &format!("{i:016X}"),
+                        vec![event(&format!("e{i}"), 0, b"payload")],
+                    ),
+                    if i == 1 {
+                        CommitFault::SlowSqliteCommit
+                    } else {
+                        CommitFault::None
+                    },
+                )
+                .unwrap();
+        }
+        service
+            .enqueue_service(
+                WorkClass::FailureControl,
+                ServiceCommand::PersistFailureControl {
+                    failure_id: "saturated-failure".into(),
+                    fingerprint: "saturated-fingerprint".into(),
+                    max_writer_hold: Duration::from_secs(1),
+                },
+            )
+            .unwrap();
+        service
+            .enqueue_service(
+                WorkClass::Checkpoint,
+                ServiceCommand::CheckpointWal {
+                    max_writer_hold: Duration::from_secs(1),
+                },
+            )
+            .unwrap();
+        service
+            .enqueue_service(
+                WorkClass::Gc,
+                ServiceCommand::GcDryRun {
+                    retain_from_seq: 5,
+                    max_transactions: 4,
+                    max_writer_hold: Duration::from_secs(1),
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            service.enqueue_capture(
+                commit(
+                    "overflow",
+                    "0000000000000005",
+                    vec![event("overflow", 0, b"x")]
+                ),
+                CommitFault::None
+            ),
+            Err(EnqueueError::Overloaded(WorkClass::Capture))
+        );
+        assert_eq!(
+            service.enqueue_service(
+                WorkClass::Gc,
+                ServiceCommand::GcDryRun {
+                    retain_from_seq: 5,
+                    max_transactions: 1,
+                    max_writer_hold: Duration::from_secs(1)
+                }
+            ),
+            Err(EnqueueError::Overloaded(WorkClass::Gc))
+        );
+        let started = Instant::now();
+        let mut serviced = Vec::new();
+        let mut durable = 0;
+        let mut ambiguous = 0;
+        while let Some(outcome) = service.service_next() {
+            match outcome {
+                Ok(WorkOutcome::Durable(_)) => durable += 1,
+                Ok(WorkOutcome::Serviced(report)) => {
+                    assert!(report.queue_wait < Duration::from_secs(1));
+                    assert!(report.completed_in < Duration::from_secs(1));
+                    serviced.push(report.class);
+                }
+                Err(JournalError::BusyBoundExceededAfterCommit) => ambiguous += 1,
+                Err(other) => panic!("unexpected saturated service outcome: {other:?}"),
+            }
+        }
+        assert!(started.elapsed() < Duration::from_secs(2));
+        assert_eq!(
+            serviced,
+            vec![
+                WorkClass::FailureControl,
+                WorkClass::Checkpoint,
+                WorkClass::Gc
+            ]
+        );
+        assert_eq!((durable, ambiguous), (3, 1));
+        assert_eq!(
+            service
+                .store
+                .writer
+                .connection()
+                .query_row("SELECT count(*) FROM source_transactions", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            4
+        );
+        assert_eq!(
+            service
+                .store
+                .writer
+                .connection()
+                .query_row(
+                    "SELECT count(*) FROM processing_failures WHERE failure_id='saturated-failure'",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn journal_command_boundaries_are_read_only_bounded_and_asserted() {
+        let (p, mut store) = store("commands");
+        store
+            .commit_atomic(
+                &commit("tx1", "0000000000000010", vec![event("event-1", 0, b"one")]),
+                CommitFault::None,
+            )
+            .unwrap();
+        store
+            .commit_atomic(
+                &commit("tx2", "0000000000000020", vec![event("event-2", 0, b"two")]),
+                CommitFault::None,
+            )
+            .unwrap();
+        drop(store);
+        let before = fs::metadata(&p).unwrap().len();
+        let inspect = journal_inspect_event(&p, "event-1", Duration::from_secs(1))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            (inspect.event_id.as_str(), inspect.transaction_boundary),
+            ("event-1", (1, 1))
+        );
+        let verify = journal_verify(&p, Duration::from_secs(1)).unwrap();
+        assert_eq!(
+            (
+                verify.transaction_count,
+                verify.event_count,
+                verify.durable_seq
+            ),
+            (2, 2, 2)
+        );
+        let gc = journal_gc_dry_run(&p, 2, 8, Duration::from_secs(1)).unwrap();
+        assert_eq!(
+            (
+                gc.first_seq,
+                gc.last_seq,
+                gc.transaction_count,
+                gc.event_count
+            ),
+            (Some(1), Some(1), 1, 1)
+        );
+        assert_eq!(fs::metadata(&p).unwrap().len(), before);
+        assert!(journal_inspect_event(&p, "", Duration::from_secs(1)).is_err());
+        assert!(journal_gc_dry_run(&p, 2, 0, Duration::from_secs(1)).is_err());
+    }
+
+    #[test]
+    fn complete_range_peak_accounts_for_simultaneous_live_data() {
+        let (p, mut store) = store("range-peak");
+        store
+            .commit_atomic(
+                &commit(
+                    "tx1",
+                    "0000000000000010",
+                    vec![event("event-1", 0, b"payload")],
+                ),
+                CommitFault::None,
+            )
+            .unwrap();
+        drop(store);
+        let full = read_complete_range(&p, 0, 1, 4096, Duration::from_secs(1))
+            .unwrap()
+            .unwrap();
+        assert!(full.copied_bytes > b"payload".len() + std::mem::size_of::<CopiedEvent>());
+        assert!(matches!(
+            read_complete_range(&p, 0, 1, full.copied_bytes, Duration::from_secs(1)),
+            Err(JournalError::Limit(
+                "next complete transaction exceeds byte bound"
+            ))
+        ));
+    }
+    #[test]
+    fn coverage_inventory_is_assertion_aware() {
+        let inventory: serde_json::Value =
+            serde_json::from_str(include_str!("../contracts/m2/journal-cases.json")).unwrap();
+        let cases = inventory["cases"].as_array().unwrap();
+        let canonical: serde_json::Value =
+            serde_json::from_str(include_str!("../contracts/coverage/plan-to-beads.json")).unwrap();
+        let required: std::collections::BTreeSet<_> = canonical["assignments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|a| a["owner_bead"] == "boring-cdc-m2-journal")
+            .map(|a| a["id"].as_str().unwrap())
+            .collect();
+        let actual: std::collections::BTreeSet<_> =
+            cases.iter().map(|c| c["id"].as_str().unwrap()).collect();
+        assert_eq!(actual, required);
+        for case in cases {
+            let assertion = case["assertion"].as_str().unwrap();
+            assert!(!assertion.contains("journal-owned projection executes or fail-closes"));
+            assert!(assertion.len() >= 40);
+        }
+        let by_id = |id: &str| {
+            cases.iter().find(|c| c["id"] == id).unwrap()["test"]
+                .as_str()
+                .unwrap()
+        };
+        assert_eq!(
+            by_id("CMD-JOURNAL-INSPECT-EVENT-ID-ID-EXPLAIN-JSON"),
+            "journal_command_boundaries_are_read_only_bounded_and_asserted"
+        );
+        assert_eq!(
+            by_id("CMD-JOURNAL-VERIFY"),
+            "journal_command_boundaries_are_read_only_bounded_and_asserted"
+        );
+        assert_eq!(
+            by_id("CMD-JOURNAL-GC-DRY-RUN"),
+            "journal_command_boundaries_are_read_only_bounded_and_asserted"
         );
     }
 }

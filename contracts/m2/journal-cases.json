@@ -5,268 +5,268 @@
   "cases": [
     {
       "id": "CMD-JOURNAL-GC-DRY-RUN",
-      "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "test": "journal_command_boundaries_are_read_only_bounded_and_asserted",
+      "assertion": "returns a bounded complete-transaction reclamation projection without modifying journal state"
     },
     {
       "id": "CMD-JOURNAL-INSPECT-EVENT-ID-ID-EXPLAIN-JSON",
-      "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "test": "journal_command_boundaries_are_read_only_bounded_and_asserted",
+      "assertion": "returns redacted positional event identity, transaction boundary, payload hash, and durable end without payload disclosure"
     },
     {
       "id": "CMD-JOURNAL-VERIFY",
-      "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "test": "journal_command_boundaries_are_read_only_bounded_and_asserted",
+      "assertion": "runs SQLite quick-check and rejects journal event-count, sequence-continuity, or durable-boundary mismatch"
     },
     {
       "id": "INV-DURABLE-BEFORE-FEEDBACK-POSTGRESQL-FLUSHLSN-AND-APPLYLSN",
       "test": "feedback_token_exists_only_after_commit_return",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "only a successful SQLite commit return constructs the feedback-eligible durable end token"
     },
     {
       "id": "INV-IDLE-PROGRESS-IS-PUBLISHED-NOT-INFERRED-INFORMATIONAL",
       "test": "feedback_token_exists_only_after_commit_return",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "only a successful SQLite commit return constructs the feedback-eligible durable end token"
     },
     {
       "id": "INV-JOURNAL-ORDER-IS-NOT-SOURCE-ORDER-JOURNALSEQ",
       "test": "positional_duplicate_is_idempotent_but_conflict_blocks",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "exact positional replay is idempotent while changed immutable event payload or metadata blocks"
     },
     {
       "id": "INV-ONE-SQLITE-DATABASE-JOURNALEVENTS-IS-THE-LOGICAL",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-BE-APPEND-ONLY-FOR-CAPTURED-EVENTS",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-BOUND-SQLITE-READER-LIFETIMES-AND-RANGE-SIZES",
-      "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "test": "complete_range_peak_accounts_for_simultaneous_live_data",
+      "assertion": "complete-range admission counts result storage plus simultaneously live boundary/row state and rejects one transaction before exceeding the copied-byte bound"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-COMMIT-EVENTS-AND-SOURCE-CHECKPOINT-CONSISTENTLY",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-DEFINE-WHAT-HAPPENS-WHEN-A-DESTINATION-FALLS",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-DETECT-JOURNAL-CORRUPTION-AND-UNAVAILABLE-REPLAY-POSITIONS",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-DISTINGUISH-PERSISTENT-DATABASE-SETTINGS-FROM-ACTUAL-WRITER",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-ENFORCE-AN-EXPLICIT-DISK-BUDGET-AND-REPLAY",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-ENTER-A-DOCUMENTED-SAFE-STOP-FAIL-LOUD",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-EXPOSE-LOCAL-BYTES-USED-OLDEST-NEWEST-REPLAY",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-STORE-INDEPENDENT-DESTINATION-CHECKPOINTS",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-SUPPORT-ORDERED-REPLAY-FROM-A-STABLE-JOURNAL",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "RISK-DELAYED-STALE-WORKER-PROMOTION-OR-LOCAL-STATE",
       "test": "writer_service_serializes_real_capture_and_reserved_work",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "the sole typed writer queue serializes capture and reserved non-capture work between atomic transactions"
     },
     {
       "id": "RISK-IDLE-SOURCE-RECEIVES-UNRELATED-WAL",
       "test": "feedback_token_exists_only_after_commit_return",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "only a successful SQLite commit return constructs the feedback-eligible durable end token"
     },
     {
       "id": "RISK-ROUTINE-CLI-OPENS-A-SECOND-SQLITE-WRITER",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     },
     {
       "id": "RISK-SLOT-CREATION-FLOOR-IS-MISTAKEN-FOR-A",
       "test": "feedback_token_exists_only_after_commit_return",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "only a successful SQLite commit return constructs the feedback-eligible durable end token"
     },
     {
       "id": "RISK-SQLITE-CORRUPTION-LOCAL-RESTORE-DIVERGENCE",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "RISK-SQLITE-SETTINGS-STORAGE-DO-NOT-HONOR-SYNC",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     },
     {
       "id": "RISK-SQLITE-WRITER-BOTTLENECKS-BEFORE-DECODING",
-      "test": "writer_service_serializes_real_capture_and_reserved_work",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "test": "saturated_real_writer_service_bounds_slow_capture_and_reserved_work",
+      "assertion": "under saturated slow capture, typed failure/control, WAL checkpoint, and GC dry-run turns complete within measured bounds; overload is typed and all capture rows remain atomic"
     },
     {
       "id": "SCN-CRASH-AFTER-SQLITE-COMMIT-BEFORE-POSTGRESQL-FEEDBACK",
       "test": "feedback_token_exists_only_after_commit_return",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "only a successful SQLite commit return constructs the feedback-eligible durable end token"
     },
     {
       "id": "SCN-CRASH-BEFORE-SQLITE-COMMIT",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     },
     {
       "id": "SCN-DETERMINISTIC-DESTINATION-POISON-RETRY-EXHAUSTION",
       "test": "writer_service_serializes_real_capture_and_reserved_work",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "the sole typed writer queue serializes capture and reserved non-capture work between atomic transactions"
     },
     {
       "id": "SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL",
       "test": "feedback_token_exists_only_after_commit_return",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "only a successful SQLite commit return constructs the feedback-eligible durable end token"
     },
     {
       "id": "SCN-JOURNAL-CORRUPTION-MISSING-SEQUENCE",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "SCN-JOURNAL-PRESSURE-TRANSITIONS",
       "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader"
     },
     {
       "id": "SCN-M2-JOURNAL-ATOMIC",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "transaction metadata, schemas, events and durable end become visible atomically"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     },
     {
       "id": "SCN-M2-JOURNAL-CRASH-BOUNDARY",
       "test": "crash_before_and_after_commit_is_absent_or_complete",
-      "assertion": "before-commit is absent and after-commit ambiguity reconciles to one complete transaction"
+      "assertion": "before-commit failure is absent and after-commit ambiguity reconciles to one complete positional transaction"
     },
     {
       "id": "SCN-M2-JOURNAL-DUPLICATE-CONFLICT",
       "test": "positional_duplicate_is_idempotent_but_conflict_blocks",
-      "assertion": "exact positional replay is idempotent and changed payload blocks"
+      "assertion": "exact positional replay is idempotent while changed immutable event payload or metadata blocks"
     },
     {
       "id": "SCN-M2-JOURNAL-FAIR-SERVICE",
-      "test": "capture_priority_reserves_bounded_service_and_overload",
-      "assertion": "capture bursts reserve bounded failure, checkpoint and GC service with explicit overload"
+      "test": "saturated_real_writer_service_bounds_slow_capture_and_reserved_work",
+      "assertion": "under saturated slow capture, typed failure/control, WAL checkpoint, and GC dry-run turns complete within measured bounds; overload is typed and all capture rows remain atomic"
     },
     {
       "id": "SCN-M2-JOURNAL-FEEDBACK-ORDER",
       "test": "feedback_token_exists_only_after_commit_return",
-      "assertion": "a feedback-eligible durable boundary exists only after successful SQLite commit return"
+      "assertion": "only a successful SQLite commit return constructs the feedback-eligible durable end token"
     },
     {
       "id": "SCN-M2-JOURNAL-INVALID-LIMIT",
       "test": "invalid_hash_order_lsn_and_limits_fail_before_visibility",
-      "assertion": "invalid hashes, ordinals, LSNs and limits publish no partial state"
+      "assertion": "invalid hash, ordinal, LSN, count, or copied-byte input fails before any journal visibility"
     },
     {
       "id": "SCN-M2-JOURNAL-RANGE",
-      "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "bounded reads copy only complete transaction ranges before releasing the SQLite reader"
+      "test": "complete_range_peak_accounts_for_simultaneous_live_data",
+      "assertion": "complete-range admission counts result storage plus simultaneously live boundary/row state and rejects one transaction before exceeding the copied-byte bound"
     },
     {
       "id": "SCN-M2-JOURNAL-SCHEMA-CONFLICT",
       "test": "relation_schema_conflict_rolls_back_whole_source_commit",
-      "assertion": "immutable schema fingerprint conflict rolls back the complete source transaction"
+      "assertion": "an immutable relation-schema conflict rolls back transaction events and durable source progress"
     },
     {
       "id": "SCN-M2-JOURNAL-SLOW-STORAGE",
-      "test": "slow_storage_hold_bound_rolls_back_without_partial_visibility",
-      "assertion": "an exceeded pre-commit writer-hold bound rolls back without partial visibility"
+      "test": "saturated_real_writer_service_bounds_slow_capture_and_reserved_work",
+      "assertion": "under saturated slow capture, typed failure/control, WAL checkpoint, and GC dry-run turns complete within measured bounds; overload is typed and all capture rows remain atomic"
     },
     {
       "id": "SCN-MULTI-TABLE-TRANSACTION",
       "test": "positional_duplicate_is_idempotent_but_conflict_blocks",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "exact positional replay is idempotent while changed immutable event payload or metadata blocks"
     },
     {
       "id": "SCN-OFFLINE-MUTATION-AND-STATUS-LISTENER-ABUSE",
       "test": "writer_service_serializes_real_capture_and_reserved_work",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "the sole typed writer queue serializes capture and reserved non-capture work between atomic transactions"
     },
     {
       "id": "SCN-PROCESS-JOURNAL-UPGRADE",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     },
     {
       "id": "SCN-READ-ONLY-CHECK",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     },
     {
       "id": "SCN-SLOT-AHEAD-OF-RESTORED-SQLITE",
       "test": "feedback_token_exists_only_after_commit_return",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "only a successful SQLite commit return constructs the feedback-eligible durable end token"
     },
     {
       "id": "SCN-SPOOL-SQLITE-ENOSPC",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     },
     {
       "id": "SCN-SQLITE-VACUUM-CHECKPOINT-LIFECYCLE",
-      "test": "writer_service_serializes_real_capture_and_reserved_work",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "test": "saturated_real_writer_service_bounds_slow_capture_and_reserved_work",
+      "assertion": "under saturated slow capture, typed failure/control, WAL checkpoint, and GC dry-run turns complete within measured bounds; overload is typed and all capture rows remain atomic"
     },
     {
       "id": "SCN-STABLE-IDENTITY-HASH-GOLDEN-VECTORS",
       "test": "positional_duplicate_is_idempotent_but_conflict_blocks",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "exact positional replay is idempotent while changed immutable event payload or metadata blocks"
     },
     {
       "id": "SCN-STALLED-SQLITE-READER-DURING-SUSTAINED-CAPTURE",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     },
     {
       "id": "SCN-TWO-RUNTIME-INSTANCES-SAME-SQLITE-PATH",
       "test": "writer_service_serializes_real_capture_and_reserved_work",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "the sole typed writer queue serializes capture and reserved non-capture work between atomic transactions"
     },
     {
       "id": "SCN-TWO-RUNTIMES-DIFFERENT-SQLITE-PATHS-SAME-SOURCE",
       "test": "writer_service_serializes_real_capture_and_reserved_work",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "the sole typed writer queue serializes capture and reserved non-capture work between atomic transactions"
     },
     {
       "id": "SCN-UNSUPPORTED-SQLITE-SETTINGS-FILESYSTEM",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     },
     {
       "id": "SCN-WRITER-VERSUS-OBSERVER-SQLITE-SETTINGS",
       "test": "atomic_commit_publishes_complete_transaction_and_durable_end",
-      "assertion": "journal-owned projection executes or fail-closes at the atomic writer/range boundary; downstream live integration remains with its named domain owner"
+      "assertion": "one SQLite commit atomically publishes transaction metadata, events, schema reference, and durable source boundary"
     }
   ]
 }
