@@ -41,6 +41,13 @@ for scenario in selected:
  packet=root/'artifacts/boring-cdc-m2-journal'/scenario/'journal-component-v1'
  if packet.exists():
   manifest=json.loads((packet/'manifest.json').read_text()); versions=json.loads((packet/'versions.json').read_text())
+  workspace_commands=[c for c in manifest['commands'] if c.get('argv')=='cargo test --locked --workspace --all-targets']
+  if len(workspace_commands)!=1: errors.append(f'{scenario} workspace command record missing or duplicated')
+  else:
+   workspace_stdout=(packet/'workspace-tests-stdout.txt').read_bytes()
+   workspace_stderr=(packet/'workspace-tests-stderr.txt').read_bytes()
+   if b'test result:' not in workspace_stdout or b'Finished ' not in workspace_stderr: errors.append(f'{scenario} workspace streams are not raw cargo test output')
+   if workspace_stdout.startswith(b'{"command"'): errors.append(f'{scenario} workspace stdout is synthesized')
   evidence_commit=manifest['git_commit']
   ancestor=subprocess.run(['git','merge-base','--is-ancestor',evidence_commit,head],cwd=root).returncode==0
   bound=['src','examples','contracts/m2/journal-cases.json','scripts/lib/m2_journal_component.py','scripts/validate/m2_journal.py','scripts/lib/core_validator.py','scripts/e2e/m2_journal.sh','scripts/faults/m2_journal.sh']

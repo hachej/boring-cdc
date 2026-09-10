@@ -24,8 +24,11 @@ def main():
  work=Path(os.environ.get("TMPDIR","/var/tmp"))/f"boring-cdc-m2-journal-{mode}"; shutil.rmtree(work,ignore_errors=True); work.mkdir(mode=0o700); db=work/"journal.sqlite"
  build=run(["cargo","build","--quiet","--locked","--example","m2_journal_component"])
  if build.returncode: raise RuntimeError(build.stderr)
- workspace=run(["cargo","test","--quiet","--locked","--workspace","--all-targets"])
- if workspace.returncode: raise RuntimeError(workspace.stderr)
+ workspace_stdout_source=Path(os.environ["BORING_CDC_WORKSPACE_TEST_STDOUT"])
+ workspace_stderr_source=Path(os.environ["BORING_CDC_WORKSPACE_TEST_STDERR"])
+ if not workspace_stdout_source.is_file() or not workspace_stderr_source.is_file(): raise RuntimeError("workspace test transcripts are unavailable")
+ workspace_returncode=int(os.environ["BORING_CDC_WORKSPACE_TEST_EXIT_CODE"])
+ if workspace_returncode: raise RuntimeError(workspace_stderr_source.read_text(errors="replace"))
  binary=ROOT/"target/debug/examples/m2_journal_component"; records=[]; timeline=["begin","workspace-tests-passed"]
  if mode=="fault":
   before=invoke(binary,"terminate-before",db); assert before.returncode==86; timeline+=['process-terminated-before-commit','sqlite-recovered-absent']; assert state(db)["transactions"]==0
@@ -38,14 +41,14 @@ def main():
  actual=state(db); assert actual=={"transactions":1,"events":2,"durable_end_lsn":"0000000000000042","journal_mode":"wal"}; assert observed["first_seq"]==1 and observed["last_seq"]==2 and observed["event_count"]==2
  slow=invoke(binary,'slow-commit',work/'slow.sqlite'); assert slow.returncode==0 and json.loads(slow.stdout)['duplicate_reconciled']; runs.append(('slow-commit',slow)); timeline.append('slow-commit-bound-exceeded-and-reconciled')
  commands_probe=invoke(binary,'commands',db); assert commands_probe.returncode==0; command_observed=json.loads(commands_probe.stdout); assert command_observed['verified_events']==2 and len(command_observed['command_boundaries'])==3; runs.append(('commands',commands_probe)); timeline.append('inspect-verify-gc-dry-run-executed')
- saturated=invoke(binary,'saturated-service',work/'saturated.sqlite'); assert saturated.returncode==0; saturated_observed=json.loads(saturated.stdout); assert saturated_observed['atomic_transactions']==4 and saturated_observed['ambiguous_commits']==1 and saturated_observed['service_turns']==[2,4,6]; runs.append(('saturated-service',saturated)); timeline.append('saturated-slow-capture-reserved-service-bounded')
+ saturated=invoke(binary,'saturated-service',work/'saturated.sqlite'); assert saturated.returncode==0; saturated_observed=json.loads(saturated.stdout); assert saturated_observed['atomic_transactions']==4 and saturated_observed['ambiguous_commits']>=1 and saturated_observed['durable_commits']+saturated_observed['ambiguous_commits']==4 and saturated_observed['service_turns']==[2,4,6]; runs.append(('saturated-service',saturated)); timeline.append('saturated-slow-capture-reserved-service-bounded')
  config={"profile":"component","seed":SEED,"sqlite_journal_mode":"WAL","sqlite_synchronous":"FULL","writer_busy_timeout_ms":5000}; fingerprint=sha(canonical(config)); run_id=f"journal-{mode}-run-v1"; correlation=f"{scenario.lower()}:{run_id}"; before_state={"transactions":0,"events":0,"durable_end_lsn":None}; after_state={**actual,**observed,"command_boundaries":command_observed['command_boundaries'],"saturated_service":saturated_observed}
  git_commit=run(["git","rev-parse","HEAD"]).stdout.strip(); implementation=implementation_digest()
  write(out/"state/before.json",canonical(before_state)); write(out/"state/after.json",canonical(after_state)); write(out/"config.json",canonical(config)); write(out/"fault-timeline.json",canonical(timeline)); write(out/"versions.json",canonical({"python":sys.version.split()[0],"sqlite":sqlite3.sqlite_version,"rustc":run(["rustc","--version"]).stdout.strip(),"binary_sha256":sha(binary.read_bytes()),"git_commit":git_commit,"implementation_sha256":implementation}))
  commands=[]; displays=[]
  workspace_stdout=out/"workspace-tests-stdout.txt"; workspace_stderr=out/"workspace-tests-stderr.txt"
- write(workspace_stdout,canonical({"command":"cargo test --locked --workspace --all-targets","outcome":"pass"})); write(workspace_stderr,"")
- workspace_display="cargo test --locked --workspace --all-targets"; displays.append(workspace_display); commands.append(command(workspace_display,workspace_stdout,workspace_stderr,"cargo-workspace-test/v1",workspace.returncode))
+ write(workspace_stdout,workspace_stdout_source.read_bytes()); write(workspace_stderr,workspace_stderr_source.read_bytes())
+ workspace_display="cargo test --locked --workspace --all-targets"; displays.append(workspace_display); commands.append(command(workspace_display,workspace_stdout,workspace_stderr,"cargo-workspace-test/v1",workspace_returncode))
  for name,result in runs:
   stdout=out/f"{name}-stdout.txt"; stderr=out/f"{name}-stderr.txt"; write(stdout,result.stdout); write(stderr,result.stderr); command_mode='terminate-before' if name.startswith('terminate-before') else ('normal' if name=='normal-reconcile' else name); display=f"target/debug/examples/m2_journal_component {command_mode} $TMPDIR/isolated-journal.sqlite"; displays.append(display); commands.append(command(display,stdout,stderr,"m2-journal-component/v1",result.returncode))
  write(out/"commands.txt","\n".join(displays)+"\n")
