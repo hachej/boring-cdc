@@ -68,6 +68,7 @@
     "source_free_disk_bytes": 21474836480,
     "source_tls_verified": true,
     "spill_counters_available": true,
+    "sqlite_writer_staging_bytes": 5000000,
     "staging_bytes": 67108864,
     "statement_timeout_ms": 10000,
     "streaming_option": "streaming=false",
@@ -88,8 +89,10 @@
     "filesystem": "ext4",
     "filesystem_capacities": {
       "state": {
-        "available_bytes": 700000000,
-        "configured_total_bytes": 1000000000
+        "archive_publication_bytes": 5000000,
+        "available_bytes": 710000000,
+        "configured_total_bytes": 1000000000,
+        "metadata_and_rounding_bytes": 5000000
       }
     },
     "journal_mode": "WAL",

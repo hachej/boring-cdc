@@ -2,7 +2,7 @@ use boring_cdc::m1_cli_contract::{
     ExitCode, command_help, error_envelope, parse, root_help, unavailable,
 };
 use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
-use boring_cdc::m1_preflight::{CheckStatus, PreflightObservation, envelope, evaluate};
+use boring_cdc::m1_preflight::{CheckStatus, PreflightObservation, envelope, evaluate_untrusted};
 use std::io::{self, Write};
 
 fn write_stdout(bytes: &[u8]) -> Result<(), ()> {
@@ -31,15 +31,11 @@ fn main() {
                             load_str_for(&config_text, &ProcessEnvironment, LoadPurpose::Check),
                             serde_json::from_str::<PreflightObservation>(&observation_text),
                         ) {
-                            (Ok(config), Ok(mut observation)) => {
-                                // A file is an untrusted transport, never a live collector attestation.
-                                observation.collector = "external-file-untrusted".into();
-                                Some(evaluate(
-                                    config.public(),
-                                    config.fingerprints().runtime.as_str(),
-                                    &observation,
-                                ))
-                            }
+                            (Ok(config), Ok(observation)) => Some(evaluate_untrusted(
+                                config.public(),
+                                config.fingerprints().runtime.as_str(),
+                                &observation,
+                            )),
                             _ => None,
                         }
                     }

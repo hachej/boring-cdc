@@ -78,6 +78,7 @@ pub struct SourceObservation {
     pub fixed_runtime_bytes: u64,
     pub telemetry_bytes: u64,
     pub command_headroom_bytes: u64,
+    pub sqlite_writer_staging_bytes: u64,
     pub process_limit_bytes: u64,
     pub cgroup_limit_bytes: Option<u64>,
     pub idle_in_transaction_session_timeout_ms: u64,
@@ -94,6 +95,8 @@ pub struct SourceObservation {
 pub struct FilesystemCapacity {
     pub configured_total_bytes: u64,
     pub available_bytes: u64,
+    pub metadata_and_rounding_bytes: u64,
+    pub archive_publication_bytes: u64,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -185,12 +188,31 @@ fn checked_sum(values: &[u64]) -> Option<u64> {
         .try_fold(0_u64, |sum, value| sum.checked_add(*value))
 }
 
-/// Classify a complete immutable observation. No mutation or I/O occurs here.
-pub fn evaluate(
+#[derive(Clone, Copy)]
+struct LiveCollectorCapability(());
+
+#[cfg(test)]
+fn test_live_collector_capability() -> LiveCollectorCapability {
+    LiveCollectorCapability(())
+}
+
+/// Classify untrusted/synthetic input. It can exercise every failure branch but can
+/// never attest writer settings, real-store immutability, or live health.
+pub fn evaluate_untrusted(
     config: &PublicConfig,
     expected_config_fingerprint: &str,
     observed: &PreflightObservation,
 ) -> PreflightReport {
+    evaluate_with_capability(config, expected_config_fingerprint, observed, None)
+}
+
+fn evaluate_with_capability(
+    config: &PublicConfig,
+    expected_config_fingerprint: &str,
+    observed: &PreflightObservation,
+    live_capability: Option<LiveCollectorCapability>,
+) -> PreflightReport {
+    let trusted_live = live_capability.is_some();
     let mut c = Vec::new();
     push(
         &mut c,
@@ -373,6 +395,7 @@ pub fn evaluate(
         observed.source.fixed_runtime_bytes,
         observed.source.telemetry_bytes,
         observed.source.command_headroom_bytes,
+        observed.source.sqlite_writer_staging_bytes,
     ]);
     let effective_limit = observed
         .source
@@ -433,13 +456,26 @@ pub fn evaluate(
         "PREFLIGHT_OWNERSHIP_RECOVERY_UNSAFE",
     );
 
-    push(
-        &mut c,
-        "SCN-M1-PREFLIGHT-NO-MUTATION",
-        valid_sha256(&observed.storage.before_state_sha256)
-            && observed.storage.before_state_sha256 == observed.storage.after_state_sha256,
-        "PREFLIGHT_STATE_MUTATED",
-    );
+    let hashes_equal = valid_sha256(&observed.storage.before_state_sha256)
+        && observed.storage.before_state_sha256 == observed.storage.after_state_sha256;
+    c.push(CheckResult {
+        scenario_id: "SCN-M1-PREFLIGHT-NO-MUTATION",
+        status: if !hashes_equal {
+            CheckStatus::Blocked
+        } else if trusted_live {
+            CheckStatus::Healthy
+        } else {
+            CheckStatus::Unverified
+        },
+        reason: if !hashes_equal {
+            "PREFLIGHT_STATE_MUTATED"
+        } else if trusted_live {
+            "PREFLIGHT_OK"
+        } else {
+            "PREFLIGHT_STATE_HASH_UNVERIFIED"
+        },
+        units: None,
+    });
     let sqlite_ok = observed.storage.journal_mode == config.storage.journal_mode
         && observed.storage.auto_vacuum == config.storage.auto_vacuum;
     push(
@@ -450,7 +486,8 @@ pub fn evaluate(
     );
     match &observed.storage.writer_attestation {
         Some(a)
-            if a.fresh
+            if trusted_live
+                && a.fresh
                 && observed.current_run_id.as_deref() == Some(a.run_id.as_str())
                 && observed.current_connection_generation == Some(a.connection_generation)
                 && a.connection_generation > 0
@@ -553,16 +590,30 @@ pub fn evaluate(
         "PREFLIGHT_REDACTION_POLICY_FAILED",
     );
 
+    let wal_growth = config
+        .wal
+        .production_bytes_per_second
+        .0
+        .checked_mul(config.wal.monitor_delay_ms.0)
+        .map(|v| v / 1_000);
+    let wal_required = wal_growth
+        .and_then(|v| v.checked_add(config.wal.reaction_reserve_bytes.0))
+        .and_then(|v| v.checked_add(config.wal.max_slot_wal_keep_bytes.0));
+    let source_disk_ok = observed
+        .source
+        .source_free_disk_bytes
+        .zip(wal_required)
+        .map(|(free, required)| free >= required);
     c.push(CheckResult {
         scenario_id: "SCN-M1-PREFLIGHT-SOURCE-FREE-DISK",
-        status: match observed.source.source_free_disk_bytes {
-            Some(v) if v >= config.wal.source_free_bytes.0 => CheckStatus::Healthy,
-            Some(_) => CheckStatus::Blocked,
+        status: match source_disk_ok {
+            Some(true) => CheckStatus::Healthy,
+            Some(false) => CheckStatus::Blocked,
             None => CheckStatus::Degraded,
         },
-        reason: match observed.source.source_free_disk_bytes {
-            Some(v) if v >= config.wal.source_free_bytes.0 => "PREFLIGHT_OK",
-            Some(_) => "PREFLIGHT_SOURCE_FREE_DISK_INSUFFICIENT",
+        reason: match source_disk_ok {
+            Some(true) => "PREFLIGHT_OK",
+            Some(false) => "PREFLIGHT_SOURCE_FREE_DISK_INSUFFICIENT",
             None => "PREFLIGHT_SOURCE_FREE_DISK_UNKNOWN",
         },
         units: Some("bytes"),
@@ -570,12 +621,12 @@ pub fn evaluate(
 
     c.push(CheckResult {
         scenario_id: "SCN-M1-PREFLIGHT-LIVE-COLLECTOR",
-        status: if observed.collector == "boring-cdc-live-preflight-v1" {
+        status: if trusted_live {
             CheckStatus::Healthy
         } else {
             CheckStatus::Unverified
         },
-        reason: if observed.collector == "boring-cdc-live-preflight-v1" {
+        reason: if trusted_live {
             "PREFLIGHT_OK"
         } else {
             "PREFLIGHT_LIVE_COLLECTION_UNVERIFIED"
@@ -688,6 +739,7 @@ fn evaluate_reason_inventory() -> Vec<&'static str> {
         "PREFLIGHT_SPILL_COUNTERS_UNAVAILABLE",
         "PREFLIGHT_SQLITE_PRAGMA_MISMATCH",
         "PREFLIGHT_STATE_MUTATED",
+        "PREFLIGHT_STATE_HASH_UNVERIFIED",
         "PREFLIGHT_TABLE_CONTRACT_MISMATCH",
         "PREFLIGHT_TIMEOUT_KEEPALIVE_INCOMPATIBLE",
         "PREFLIGHT_TYPE_UNSUPPORTED",
@@ -784,6 +836,7 @@ pub mod tests {
                 fixed_runtime_bytes: 20_000_000,
                 telemetry_bytes: 5_000_000,
                 command_headroom_bytes: 5_000_000,
+                sqlite_writer_staging_bytes: 5_000_000,
                 process_limit_bytes: 268_435_456,
                 cgroup_limit_bytes: Some(268_435_456),
                 idle_in_transaction_session_timeout_ms: 30_000,
@@ -808,7 +861,9 @@ pub mod tests {
                     "state".into(),
                     FilesystemCapacity {
                         configured_total_bytes: 1_000_000_000,
-                        available_bytes: 700_000_000,
+                        available_bytes: 710_000_000,
+                        metadata_and_rounding_bytes: 5_000_000,
+                        archive_publication_bytes: 5_000_000,
                     },
                 )]),
                 reader_budget_units: 1,
@@ -848,10 +903,11 @@ pub mod tests {
     #[test]
     fn supported_fixture_passes_without_mutation() {
         let cfg = config();
-        let report = evaluate(
+        let report = evaluate_with_capability(
             cfg.public(),
             cfg.fingerprints().runtime.as_str(),
             &supported(),
+            Some(test_live_collector_capability()),
         );
         assert_eq!(report.outcome, CheckStatus::Healthy);
         assert!(
@@ -869,7 +925,12 @@ pub mod tests {
         o.source.source_free_disk_bytes = None;
         o.source.spill_counters_available = false;
         o.storage.writer_attestation = None;
-        let report = evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o);
+        let report = evaluate_with_capability(
+            cfg.public(),
+            cfg.fingerprints().runtime.as_str(),
+            &o,
+            Some(test_live_collector_capability()),
+        );
         assert_eq!(report.outcome, CheckStatus::Degraded);
         assert!(reason(&report, "PREFLIGHT_SOURCE_FREE_DISK_UNKNOWN"));
         assert!(reason(&report, "PREFLIGHT_SPILL_COUNTERS_UNAVAILABLE"));
@@ -911,7 +972,12 @@ pub mod tests {
                 (o, "PREFLIGHT_TIMEOUT_KEEPALIVE_INCOMPATIBLE")
             },
         ] {
-            let report = evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o);
+            let report = evaluate_with_capability(
+                cfg.public(),
+                cfg.fingerprints().runtime.as_str(),
+                &o,
+                Some(test_live_collector_capability()),
+            );
             assert_eq!(report.outcome, CheckStatus::Blocked);
             assert!(reason(&report, expected), "{expected}");
         }
@@ -952,7 +1018,12 @@ pub mod tests {
                 (o, "PREFLIGHT_ARCHIVE_MAPPING_UNSUPPORTED")
             },
         ] {
-            let report = evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o);
+            let report = evaluate_with_capability(
+                cfg.public(),
+                cfg.fingerprints().runtime.as_str(),
+                &o,
+                Some(test_live_collector_capability()),
+            );
             assert_eq!(report.outcome, CheckStatus::Blocked);
             assert!(reason(&report, expected), "{expected}");
         }
@@ -965,7 +1036,12 @@ pub mod tests {
             let mut o = supported();
             o.source.control_rows_each = count;
             assert!(reason(
-                &evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o),
+                &evaluate_with_capability(
+                    cfg.public(),
+                    cfg.fingerprints().runtime.as_str(),
+                    &o,
+                    Some(test_live_collector_capability())
+                ),
                 "PREFLIGHT_CONTROL_ROW_CARDINALITY"
             ));
         }
@@ -978,13 +1054,23 @@ pub mod tests {
                 _ => o.source.control_select_key_only = false,
             }
             assert!(reason(
-                &evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o),
+                &evaluate_with_capability(
+                    cfg.public(),
+                    cfg.fingerprints().runtime.as_str(),
+                    &o,
+                    Some(test_live_collector_capability())
+                ),
                 "PREFLIGHT_CONTROL_PRIVILEGE_EXCESS"
             ));
         }
         let mut replayed = supported();
         replayed.current_connection_generation = Some(2);
-        let report = evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &replayed);
+        let report = evaluate_with_capability(
+            cfg.public(),
+            cfg.fingerprints().runtime.as_str(),
+            &replayed,
+            Some(test_live_collector_capability()),
+        );
         assert_eq!(report.outcome, CheckStatus::Degraded);
         assert!(reason(&report, "PREFLIGHT_WRITER_SYNCHRONOUS_UNVERIFIED"));
     }
@@ -1003,19 +1089,39 @@ pub mod tests {
                 _ => o.source.zombie_detection_bound_ms = 15_001,
             }
             assert!(reason(
-                &evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o),
+                &evaluate_with_capability(
+                    cfg.public(),
+                    cfg.fingerprints().runtime.as_str(),
+                    &o,
+                    Some(test_live_collector_capability())
+                ),
                 "PREFLIGHT_TIMEOUT_KEEPALIVE_INCOMPATIBLE"
             ));
         }
     }
 
     #[test]
-    fn scenario_inventory_exactly_matches_report() {
+    fn untrusted_transport_cannot_attest_writer_or_real_store() {
         let cfg = config();
-        let report = evaluate(
+        let report = evaluate_untrusted(
             cfg.public(),
             cfg.fingerprints().runtime.as_str(),
             &supported(),
+        );
+        assert_eq!(report.outcome, CheckStatus::Degraded);
+        assert!(reason(&report, "PREFLIGHT_WRITER_SYNCHRONOUS_UNVERIFIED"));
+        assert!(reason(&report, "PREFLIGHT_STATE_HASH_UNVERIFIED"));
+        assert!(reason(&report, "PREFLIGHT_LIVE_COLLECTION_UNVERIFIED"));
+    }
+
+    #[test]
+    fn scenario_inventory_exactly_matches_report() {
+        let cfg = config();
+        let report = evaluate_with_capability(
+            cfg.public(),
+            cfg.fingerprints().runtime.as_str(),
+            &supported(),
+            Some(test_live_collector_capability()),
         );
         let contract: Value =
             serde_json::from_str(include_str!("../contracts/m1/preflight-cases.json")).unwrap();
@@ -1036,10 +1142,11 @@ pub mod tests {
     #[test]
     fn envelope_is_cli_compatible_and_redacted() {
         let cfg = config();
-        let report = evaluate(
+        let report = evaluate_with_capability(
             cfg.public(),
             cfg.fingerprints().runtime.as_str(),
             &supported(),
+            Some(test_live_collector_capability()),
         );
         let value = serde_json::to_value(envelope(&report)).unwrap();
         assert_eq!(value["command"], "CMD-CHECK");
