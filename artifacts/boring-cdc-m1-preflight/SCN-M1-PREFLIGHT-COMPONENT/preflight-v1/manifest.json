@@ -43,7 +43,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "c367fd1ea46c84c7ddac42e400f636fdf70631b2",
+  "git_commit": "b6a99c6995073c027d7e9e09099060a0541d6698",
   "owner_bead": "boring-cdc-m1-preflight",
   "redaction": {
     "checked": true,
