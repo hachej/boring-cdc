@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
@@ -214,6 +214,26 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
             |r| r.get(0),
         )?;
         if checksum != MIGRATION_3_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        let has_v4: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=4)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v4 {
+            connection.execute_batch(MIGRATION_4)?;
+            connection.execute(
+                "INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(4,'audit-destination-identity-guard',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+                [MIGRATION_4_CHECKSUM],
+            )?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=4",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_4_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
         Ok(())
@@ -485,6 +505,26 @@ WHEN EXISTS(
    OR r.fresh_until<=NEW.freshness_window_started_at
    OR r.fresh_until>NEW.freshness_expires_at))
 BEGIN SELECT RAISE(ABORT,'audit update would retain out-of-bounds coverage'); END;
+"#;
+
+const MIGRATION_4_CHECKSUM: &str =
+    "sha256:0182fb965d47a7fe20a03eb9d379179bac29aa439b39f0958c4cf20dc42f7ee2";
+const MIGRATION_4: &str = r#"
+DROP TRIGGER audit_identity_change_requires_empty_coverage;
+CREATE TRIGGER audit_identity_change_requires_empty_coverage BEFORE UPDATE ON destination_audits
+WHEN (NEW.destination_id IS NOT OLD.destination_id
+   OR NEW.capture_epoch IS NOT OLD.capture_epoch
+   OR NEW.generation IS NOT OLD.generation
+   OR NEW.round_target_seq IS NOT OLD.round_target_seq
+   OR NEW.round_identity_digest IS NOT OLD.round_identity_digest
+   OR NEW.configuration_fingerprint IS NOT OLD.configuration_fingerprint
+   OR NEW.contract_digest IS NOT OLD.contract_digest
+   OR NEW.freshness_window_started_at IS NOT OLD.freshness_window_started_at
+   OR NEW.freshness_expires_at IS NOT OLD.freshness_expires_at)
+ AND (OLD.journal_verified_start_seq IS NOT NULL
+   OR OLD.self_consistent_start_seq IS NOT NULL
+   OR EXISTS(SELECT 1 FROM audit_coverage_subranges r WHERE r.audit_id=OLD.audit_id))
+BEGIN SELECT RAISE(ABORT,'audit coverage must be invalidated before round identity changes'); END;
 "#;
 
 #[cfg(test)]
@@ -808,7 +848,7 @@ pub mod tests {
             c.query_row("SELECT count(*) FROM schema_migrations", [], |r| r
                 .get::<_, i64>(0))
                 .unwrap(),
-            3
+            4
         );
         assert_eq!(
             c.query_row(
@@ -949,10 +989,12 @@ pub mod tests {
     fn audit_coverage_is_invalidated_and_bounded_by_frozen_round() {
         let (_p, w) = writer("audit-invalidation");
         w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','epoch',1)",[]).unwrap();
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d2','archive','cfg','epoch',1)",[]).unwrap();
         w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,journal_verified_start_seq,journal_verified_end_seq,self_cursor_seq,budget_bytes_used,budget_events_used,budget_ms_used,freshness_window_started_at,freshness_expires_at,contract_digest,revision,retained_history_start_seq,unverifiable_before_seq) VALUES('audit','d','cfg','epoch',1,20,'identity',10,10,20,10,0,0,0,'2026-01-01','2027-01-01','contract',0,5,10)",[]).unwrap();
         w.connection().execute("INSERT INTO audit_coverage_subranges VALUES('audit','journal_verified',10,20,'2026-06-01','proof')",[]).unwrap();
 
         for mutation in [
+            "destination_id='d2'",
             "capture_epoch='epoch2'",
             "generation=2",
             "round_target_seq=21",

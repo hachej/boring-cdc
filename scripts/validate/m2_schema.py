@@ -14,7 +14,7 @@ ids=[c['id'] for c in contract['cases']]
 if len(ids)!=len(set(ids)): errors.append('duplicate scenario IDs')
 for case in contract['cases']:
  if not re.search(r'fn\s+'+re.escape(case['test'])+r'\s*\(',src): errors.append(f"missing test {case['test']}")
-for version in (1,2,3):
+for version in (1,2,3,4):
  migration=re.search(rf'(?:pub )?const MIGRATION_{version}: &str = r#"(.*?)"#;',src,re.S).group(1)
  declared=re.search(rf'const MIGRATION_{version}_CHECKSUM: &str\s*=\s*"sha256:([0-9a-f]{{64}})";',src).group(1)
  import hashlib
