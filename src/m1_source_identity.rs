@@ -223,6 +223,7 @@ pub enum StateValidationError {
     NonterminalBootstrapMissingFloor,
     FeedbackDoesNotMatchEvidence,
     DurableAheadOfReceived,
+    DurableBeforeCreationFloor,
 }
 
 #[derive(Clone, Debug)]
@@ -271,6 +272,12 @@ impl LocalSourceState {
                 .is_none_or(|received| received.get() < durable.transaction_end_lsn().get())
         }) {
             return Err(StateValidationError::DurableAheadOfReceived);
+        }
+        if self.durable_transaction.is_some_and(|durable| {
+            self.creation_floor
+                .is_some_and(|floor| durable.transaction_end_lsn().get() < floor.get())
+        }) {
+            return Err(StateValidationError::DurableBeforeCreationFloor);
         }
         Ok(())
     }
@@ -906,6 +913,21 @@ mod tests {
         assert_eq!(
             state.validate(),
             Err(StateValidationError::DurableAheadOfReceived)
+        );
+
+        let mut state = local();
+        state.creation_floor = Some(SlotCreationFloor::from_server(200));
+        assert_eq!(
+            reconcile_startup(
+                &state,
+                &LiveSourceState {
+                    confirmed_flush_lsn: Some(ReceivedLsn::from_wire(150)),
+                    ..live()
+                }
+            ),
+            StartupDecision::BlockInvalidState {
+                reason: StateValidationError::DurableBeforeCreationFloor
+            }
         );
     }
 
