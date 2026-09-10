@@ -5,6 +5,7 @@
   "persistence_owners": ["boring-cdc-m2-schema", "boring-cdc-m2-reconcile"],
   "cases": [
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-MISMATCH","unit_test":"every_identity_mismatch_blocks_before_position_rules","expected":"block_identity_mismatch_before_position_rules"},
+    {"scenario_id":"SCN-M1-SOURCE-IDENTITY-UNSUPPORTED-PLUGIN","unit_test":"matching_unsupported_plugin_fails_closed_before_startup_decisions","expected":"matching_unsupported_plugin_blocks_before_resume"},
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-AMBIGUOUS","unit_test":"ambiguous_bootstrap_precedes_server_ahead","expected":"bootstrap_ambiguous_requires_restart"},
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-RETRY-CREATION","unit_test":"prepared_bootstrap_without_remote_slot_retries_creation","expected":"retry_prepared_bootstrap_slot_creation"},
     {"scenario_id":"SCN-M1-SOURCE-IDENTITY-FLOOR","unit_test":"creation_floor_null_and_equal_are_not_durable_progress","expected":"request_verified_creation_floor_without_durable_progress"},

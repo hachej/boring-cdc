@@ -11,6 +11,8 @@ use sha2::{Digest as _, Sha256};
 use std::cmp::Ordering;
 use std::fmt;
 
+// M0-PROVISIONAL: boring-cdc-d-pg-protocol
+const SUPPORTED_SOURCE_PLUGIN: &str = "pgoutput";
 // M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED protocol zero sentinel).
 pub const PROTOCOL_ZERO_SENTINEL: ReceivedLsn = ReceivedLsn::from_wire(0);
 // M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED origin policy).
@@ -88,6 +90,7 @@ pub enum IdentityValidationError {
     ZeroDatabaseIdentity,
     InvalidSlotName,
     InvalidPlugin,
+    UnsupportedPlugin,
     UnsupportedProtocolFingerprint,
 }
 
@@ -107,6 +110,9 @@ impl SourceIdentity {
         }
         if !is_pg_identifier(&self.plugin) {
             return Err(IdentityValidationError::InvalidPlugin);
+        }
+        if self.plugin != SUPPORTED_SOURCE_PLUGIN {
+            return Err(IdentityValidationError::UnsupportedPlugin);
         }
         if self.protocol_fingerprint != supported_protocol_fingerprint() {
             return Err(IdentityValidationError::UnsupportedProtocolFingerprint);
@@ -714,6 +720,25 @@ mod tests {
     }
 
     #[test]
+    fn matching_unsupported_plugin_fails_closed_before_startup_decisions() {
+        let mut local = local();
+        local.identity.plugin = "test_decoding".into();
+        let observed = LiveSourceState {
+            identity: local.identity.clone(),
+            ..live()
+        };
+
+        assert_eq!(
+            reconcile_startup(&local, &observed),
+            StartupDecision::BlockInvalidState {
+                reason: StateValidationError::LocalIdentity(
+                    IdentityValidationError::UnsupportedPlugin
+                )
+            }
+        );
+    }
+
+    #[test]
     fn every_identity_mismatch_blocks_before_position_rules() {
         let local = local();
         let mut variants = Vec::new();
@@ -1040,14 +1065,14 @@ mod tests {
                 .unwrap();
         assert_eq!(inventory["owner_bead"], "boring-cdc-m1-source-identity");
         assert_eq!(inventory["evidence_tier"], "leaf");
-        assert_eq!(inventory["cases"].as_array().unwrap().len(), 15);
+        assert_eq!(inventory["cases"].as_array().unwrap().len(), 16);
         let ids: std::collections::BTreeSet<_> = inventory["cases"]
             .as_array()
             .unwrap()
             .iter()
             .map(|case| case["scenario_id"].as_str().unwrap())
             .collect();
-        assert_eq!(ids.len(), 15);
+        assert_eq!(ids.len(), 16);
         assert!(
             ids.iter()
                 .all(|id| id.starts_with("SCN-M1-SOURCE-IDENTITY-"))

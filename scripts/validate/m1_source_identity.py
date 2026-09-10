@@ -6,6 +6,7 @@ from pathlib import Path
 
 EXPECTED = {
     "SCN-M1-SOURCE-IDENTITY-MISMATCH": ("every_identity_mismatch_blocks_before_position_rules", "block_identity_mismatch_before_position_rules"),
+    "SCN-M1-SOURCE-IDENTITY-UNSUPPORTED-PLUGIN": ("matching_unsupported_plugin_fails_closed_before_startup_decisions", "matching_unsupported_plugin_blocks_before_resume"),
     "SCN-M1-SOURCE-IDENTITY-AMBIGUOUS": ("ambiguous_bootstrap_precedes_server_ahead", "bootstrap_ambiguous_requires_restart"),
     "SCN-M1-SOURCE-IDENTITY-RETRY-CREATION": ("prepared_bootstrap_without_remote_slot_retries_creation", "retry_prepared_bootstrap_slot_creation"),
     "SCN-M1-SOURCE-IDENTITY-FLOOR": ("creation_floor_null_and_equal_are_not_durable_progress", "request_verified_creation_floor_without_durable_progress"),
