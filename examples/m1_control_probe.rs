@@ -3,6 +3,7 @@ use boring_cdc::m1_control_fixtures::{
     ControlKind, ControlWriterState, FenceIdentity, PublicationSpec, decode_control_update,
     decode_truncate,
 };
+use boring_cdc::m1_ddl_fixtures::{GuardPhase, GuardState, LogicalRelationId};
 
 fn decode_hex_messages(value: &str) -> Vec<Vec<u8>> {
     value
@@ -26,6 +27,38 @@ fn intended_fence() -> FenceIdentity {
         generation: 1,
         table_set_fingerprint: "a".repeat(64),
     }
+}
+
+fn fence_authorization(
+    identity: &FenceIdentity,
+    nonce: u64,
+) -> boring_cdc::m1_ddl_fixtures::GuardFenceAuthorization {
+    let relation = LogicalRelationId {
+        database_oid: 1,
+        relation_oid: 1,
+        logical_table_id: "fixture-table".into(),
+    };
+    let mut guard = GuardState::acquire_before_export(
+        identity.capture_epoch,
+        identity.generation,
+        identity.table_set_fingerprint.clone(),
+        nonce,
+        vec![relation],
+    )
+    .unwrap();
+    guard
+        .verify_catalog_fingerprint(&identity.table_set_fingerprint)
+        .unwrap();
+    guard.advance(GuardPhase::Exported).unwrap();
+    guard.advance(GuardPhase::Copying).unwrap();
+    guard
+        .authorize_fence_intent(
+            identity.capture_epoch,
+            identity.generation,
+            &identity.table_set_fingerprint,
+            nonce,
+        )
+        .unwrap()
 }
 
 fn expected_publication() -> PublicationSpec {
@@ -55,7 +88,10 @@ fn main() {
             let mut writer = ControlWriterState::default();
             if kind == ControlKind::CaptureFence {
                 writer
-                    .intend_fence(nonce, "fixture-intent", intended_fence())
+                    .intend_fence(
+                        "fixture-intent",
+                        fence_authorization(&intended_fence(), nonce),
+                    )
                     .unwrap();
             }
             if mode == "fence-mismatch" {

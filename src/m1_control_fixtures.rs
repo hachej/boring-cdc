@@ -3,6 +3,7 @@
 //! The kernel is deliberately side-effect free. SQL/pgoutput adapters must feed observed facts
 //! through this one writer before feedback or an external mutation is allowed.
 
+use crate::m1_ddl_fixtures::GuardFenceAuthorization;
 use crate::m1_transition_kernel::DurableSourceBoundary;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -263,16 +264,21 @@ impl ControlWriterState {
 
     pub fn intend_fence(
         &mut self,
-        nonce: u64,
         intent_id: &str,
-        identity: FenceIdentity,
+        authorization: GuardFenceAuthorization,
     ) -> Result<(), ProtocolFailure> {
-        if nonce == 0 || intent_id.is_empty() || intent_id.len() > 256 || !intent_id.is_ascii() {
+        let (capture_epoch, generation, table_set_fingerprint, nonce) = authorization.into_parts();
+        if intent_id.is_empty() || intent_id.len() > 256 || !intent_id.is_ascii() {
             return Err(ProtocolFailure::blocked(
-                "FENCE_NONCE_NOT_UNIQUE",
+                "FENCE_INTENT_INVALID",
                 "before_control_dispatch",
             ));
         }
+        let identity = FenceIdentity {
+            capture_epoch,
+            generation,
+            table_set_fingerprint,
+        };
         match self.intended_fences.entry(nonce) {
             Entry::Vacant(entry) => {
                 entry.insert(FenceIntent {
@@ -1003,6 +1009,38 @@ pub mod tests {
             table_set_fingerprint: "a".repeat(64),
         }
     }
+    fn fence_authorization(identity: &FenceIdentity, nonce: u64) -> GuardFenceAuthorization {
+        let relation = crate::m1_ddl_fixtures::LogicalRelationId {
+            database_oid: 1,
+            relation_oid: 1,
+            logical_table_id: "table-1".into(),
+        };
+        let mut guard = crate::m1_ddl_fixtures::GuardState::acquire_before_export(
+            identity.capture_epoch,
+            identity.generation,
+            identity.table_set_fingerprint.clone(),
+            nonce,
+            vec![relation],
+        )
+        .unwrap();
+        guard
+            .verify_catalog_fingerprint(&identity.table_set_fingerprint)
+            .unwrap();
+        guard
+            .advance(crate::m1_ddl_fixtures::GuardPhase::Exported)
+            .unwrap();
+        guard
+            .advance(crate::m1_ddl_fixtures::GuardPhase::Copying)
+            .unwrap();
+        guard
+            .authorize_fence_intent(
+                identity.capture_epoch,
+                identity.generation,
+                &identity.table_set_fingerprint,
+                nonce,
+            )
+            .unwrap()
+    }
     fn slot<'a>(
         ownership: &'a OwnershipLocks,
         intent: &'a PersistedSlotIntent,
@@ -1081,7 +1119,8 @@ pub mod tests {
     #[test]
     fn repeated_fence_keeps_one_proof() {
         let mut s = ControlWriterState::default();
-        s.intend_fence(7, "intent-1", fence_identity()).unwrap();
+        s.intend_fence("intent-1", fence_authorization(&fence_identity(), 7))
+            .unwrap();
         s.observe(
             &ObservedControlUpdate::fence(7, fence_identity()),
             Some(&committed_for_fixture()),
@@ -1094,7 +1133,7 @@ pub mod tests {
         .unwrap();
         assert_eq!(s.fence_proof_count(), 1);
         assert_eq!(
-            s.intend_fence(7, "intent-1", fence_identity())
+            s.intend_fence("intent-1", fence_authorization(&fence_identity(), 7))
                 .unwrap_err()
                 .fingerprint,
             "FENCE_NONCE_NOT_UNIQUE"
@@ -1103,7 +1142,9 @@ pub mod tests {
     #[test]
     fn fence_identity_must_match_persisted_intent() {
         let mut state = ControlWriterState::default();
-        state.intend_fence(7, "intent-1", fence_identity()).unwrap();
+        state
+            .intend_fence("intent-1", fence_authorization(&fence_identity(), 7))
+            .unwrap();
         let mut wrong = fence_identity();
         wrong.generation = 2;
         assert_eq!(
@@ -1124,10 +1165,12 @@ pub mod tests {
         let original = fence_identity();
         let mut replacement = original.clone();
         replacement.generation = 2;
-        state.intend_fence(7, "intent-1", original.clone()).unwrap();
+        state
+            .intend_fence("intent-1", fence_authorization(&original, 7))
+            .unwrap();
 
         let duplicate = state
-            .intend_fence(7, "intent-1", replacement.clone())
+            .intend_fence("intent-1", fence_authorization(&replacement, 7))
             .unwrap_err();
         assert_eq!(duplicate.fingerprint, "FENCE_NONCE_NOT_UNIQUE");
         assert_eq!(duplicate.failed_boundary, "before_control_dispatch");
@@ -1318,7 +1361,7 @@ pub mod tests {
         assert_eq!(restored.fence_proof_count(), 1);
         assert_eq!(
             restored
-                .intend_fence(7, "intent-1", fence_identity())
+                .intend_fence("intent-1", fence_authorization(&fence_identity(), 7))
                 .unwrap_err()
                 .fingerprint,
             "FENCE_NONCE_NOT_UNIQUE"

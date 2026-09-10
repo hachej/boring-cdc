@@ -4,7 +4,7 @@
 //! transactions, and runtime crash execution remain owned by M2/M3.
 
 use crate::m1_control_fixtures::JournaledFence;
-use crate::m1_ddl_fixtures::{DurableFenceProof, GuardPhase, GuardState};
+use crate::m1_ddl_fixtures::{DurableFenceProof, GuardFenceAuthorization, GuardPhase, GuardState};
 use crate::m1_source_identity::{Fingerprint, SourceIdentity, VerifiedRetainedSlotContinuity};
 use crate::m1_transition_kernel::{
     CaptureEpoch, DurableSourceBoundary, JournalCursor, ReceivedLsn, SlotCreationFloor,
@@ -768,37 +768,45 @@ impl BootstrapFacts {
         Ok(())
     }
 
-    pub fn intend_fence(&mut self, nonce: u64) -> Result<(), BootstrapFailure> {
+    pub fn intend_fence(
+        &mut self,
+        nonce: u64,
+    ) -> Result<GuardFenceAuthorization, BootstrapFailure> {
         if !self.chunks_complete
             || nonce == 0
             || self.guard != GuardLiveness::Held
             || self.intended_fence_nonce.is_some()
-            || !self.guard_state.as_ref().is_some_and(|guard| {
-                guard.authorizes_fence_intent(
-                    self.capture_epoch.get(),
-                    self.generation,
-                    &self.table_set_fingerprint,
-                    nonce,
-                )
-            })
         {
             return Err(BootstrapFailure::deterministic(
                 "FENCE_INTENT_INVALID",
                 "post_copy_fence",
             ));
         }
-        self.guard_state
-            .as_mut()
+        let authorization = self
+            .guard_state
+            .as_ref()
             .ok_or_else(|| {
                 BootstrapFailure::deterministic("DDL_GUARD_PROOF_MISSING", "post_copy_fence")
             })?
+            .authorize_fence_intent(
+                self.capture_epoch.get(),
+                self.generation,
+                &self.table_set_fingerprint,
+                nonce,
+            )
+            .map_err(|_| {
+                BootstrapFailure::deterministic("FENCE_INTENT_INVALID", "post_copy_fence")
+            })?;
+        self.guard_state
+            .as_mut()
+            .expect("guard authorization checked above")
             .advance(GuardPhase::AwaitingDurableFence)
             .map_err(|_| {
                 BootstrapFailure::deterministic("DDL_GUARD_PHASE_MISMATCH", "post_copy_fence")
             })?;
         self.intended_fence_nonce = Some(nonce);
         self.phase = IntentPhase::FencePending;
-        Ok(())
+        Ok(authorization)
     }
 
     pub fn observe_durable_fence(
@@ -1263,8 +1271,8 @@ mod tests {
     use super::*;
     use crate::m1_ddl_fixtures::GuardState;
     use crate::m1_transition_kernel::{
-        Harness, HarnessBudget, ScheduleSeed, ScheduledAction, ScheduledStep,
-        synthetic_durable_boundary,
+        Harness, HarnessBudget, ScheduleSeed, ScheduledAction, ScheduledStep, SplitMix64,
+        VirtualClock, synthetic_durable_boundary,
     };
 
     fn prepared(workers: usize) -> BootstrapFacts {
@@ -1554,7 +1562,7 @@ mod tests {
             RecoveryDecision::BootstrapAmbiguousRequiresRestart
         );
         assert_eq!(
-            f.restart_decision(all_proof()),
+            f.restart_decision(lost_token_proof()),
             RecoveryDecision::DrainRetainedWalThenExistingSlotSnapshot
         );
         assert!(f.start_retained_slot_capture(&f.scope(), true).is_err());
@@ -1607,17 +1615,21 @@ mod tests {
             "FENCE_INTENT_INVALID"
         );
         assert_eq!(f.phase, IntentPhase::ExporterReleased);
-        f.intend_fence(77).unwrap();
+        let authorization = f.intend_fence(77).unwrap();
         record(&mut f, boundary(160, 4), None).unwrap();
         assert_eq!(
-            observe_fence(&mut f, 77, 159, 5).unwrap_err().fingerprint,
+            observe_fence(&mut f, authorization.clone(), 77, 159, 5)
+                .unwrap_err()
+                .fingerprint,
             "DURABLE_FENCE_BOUNDARY_REGRESSION"
         );
         assert_eq!(
-            observe_fence(&mut f, 77, 160, 3).unwrap_err().fingerprint,
+            observe_fence(&mut f, authorization.clone(), 77, 160, 3)
+                .unwrap_err()
+                .fingerprint,
             "DURABLE_FENCE_BOUNDARY_REGRESSION"
         );
-        observe_fence(&mut f, 77, 160, 4).unwrap();
+        observe_fence(&mut f, authorization, 77, 160, 4).unwrap();
     }
 
     #[test]
@@ -1736,9 +1748,8 @@ mod tests {
             finish_reads(&mut f, id).unwrap();
         }
         f.mark_chunks_complete().unwrap();
-        f.intend_fence(77).unwrap();
-        assert!(observe_fence(&mut f, 78, 150, 3).is_err());
-        observe_fence(&mut f, 77, 150, 3).unwrap();
+        let authorization = f.intend_fence(77).unwrap();
+        observe_fence(&mut f, authorization, 77, 150, 3).unwrap();
         assert_eq!(f.phase, IntentPhase::AnchorComplete);
         assert_eq!(f.guard, GuardLiveness::Released);
         assert_eq!(f.invariant_violation(), None);
@@ -1765,11 +1776,13 @@ mod tests {
         release(&mut f).unwrap();
         finish_reads(&mut f, 0).unwrap();
         f.mark_chunks_complete().unwrap();
-        f.intend_fence(77).unwrap();
+        let authorization = f.intend_fence(77).unwrap();
         assert!(f.intend_fence(78).is_err());
-        let bad = fence_completion_with(stale, "wrong".into(), 77, 150, 3);
+        // A different guard can mint a stale capability, but bootstrap rejects its scoped journal proof.
+        let stale_authorization = fence_authorization_for(6, f.generation, "wrong", 77);
+        let bad = fence_completion_with(stale, "wrong".into(), stale_authorization, 77, 150, 3);
         assert!(f.observe_durable_fence(bad).is_err());
-        observe_fence(&mut f, 77, 150, 3).unwrap();
+        observe_fence(&mut f, authorization, 77, 150, 3).unwrap();
     }
 
     #[test]
@@ -1857,10 +1870,32 @@ mod tests {
         };
         assert!(BootstrapFacts::prepare(input.clone()).is_err());
         input.session_bounds.guard_keepalive_ms = 1;
-        let mut f = BootstrapFacts::prepare(input).unwrap();
-        f.invalidate("GENERATION_CANCELLED");
-        assert_eq!(f.phase, IntentPhase::SnapshotUnusable);
-        assert!(!f.importer_feedback_gate);
+        BootstrapFacts::prepare(input).unwrap();
+
+        let mut cancelled = exported(1);
+        let mut randomness = SplitMix64::new(1);
+        let clock = VirtualClock::new(0);
+        let mut context = TransitionContext {
+            clock: &clock,
+            randomness: &mut randomness,
+        };
+        BootstrapDomain.on_cancel(&mut cancelled, &mut context);
+        assert_eq!(cancelled.phase, IntentPhase::SnapshotUnusable);
+        assert!(cancelled.stale_backend_cleanup_required);
+        assert!(cancelled.dead_backends.contains(&BackendSession::Capture));
+        assert!(
+            cancelled
+                .begin_existing_slot_snapshot(guard_for_facts(&cancelled), snapshot_id())
+                .is_err()
+        );
+        cleanup(&mut cancelled, 1).unwrap();
+
+        let mut expired = exported(1);
+        BootstrapDomain.on_expiry(&mut expired, &mut context);
+        assert_eq!(expired.phase, IntentPhase::SnapshotUnusable);
+        assert!(expired.stale_backend_cleanup_required);
+        assert!(expired.dead_backends.contains(&BackendSession::Exporter));
+        assert!(expired.dead_backends.contains(&BackendSession::Guard));
     }
 
     fn begin(
@@ -1957,9 +1992,36 @@ mod tests {
             .unwrap();
         guard
     }
+    fn fence_authorization_for(
+        epoch: u64,
+        generation: u64,
+        table_fingerprint: &str,
+        nonce: u64,
+    ) -> GuardFenceAuthorization {
+        let relation = crate::m1_ddl_fixtures::LogicalRelationId {
+            database_oid: 1,
+            relation_oid: 1,
+            logical_table_id: "table-1".into(),
+        };
+        let mut guard = GuardState::acquire_before_export(
+            epoch,
+            generation,
+            table_fingerprint.into(),
+            nonce,
+            vec![relation],
+        )
+        .unwrap();
+        guard.verify_catalog_fingerprint(table_fingerprint).unwrap();
+        guard.advance(GuardPhase::Exported).unwrap();
+        guard.advance(GuardPhase::Copying).unwrap();
+        guard
+            .authorize_fence_intent(epoch, generation, table_fingerprint, nonce)
+            .unwrap()
+    }
     fn fence_completion_with(
         scope: OperationScope,
         table_set_fingerprint: String,
+        authorization: GuardFenceAuthorization,
         nonce: u64,
         lsn: u64,
         seq: u64,
@@ -1971,7 +2033,7 @@ mod tests {
         };
         let mut writer = crate::m1_control_fixtures::ControlWriterState::default();
         writer
-            .intend_fence(nonce, &scope.intent_id, identity.clone())
+            .intend_fence(&scope.intent_id, authorization)
             .unwrap();
         let update = crate::m1_control_fixtures::ObservedControlUpdate::fence(nonce, identity);
         let journaled = writer
@@ -1985,12 +2047,19 @@ mod tests {
     }
     fn observe_fence(
         f: &mut BootstrapFacts,
+        authorization: GuardFenceAuthorization,
         nonce: u64,
         lsn: u64,
         seq: u64,
     ) -> Result<(), BootstrapFailure> {
-        let completion =
-            fence_completion_with(f.scope(), f.table_set_fingerprint.clone(), nonce, lsn, seq);
+        let completion = fence_completion_with(
+            f.scope(),
+            f.table_set_fingerprint.clone(),
+            authorization,
+            nonce,
+            lsn,
+            seq,
+        );
         f.observe_durable_fence(completion)
     }
 
@@ -2038,7 +2107,7 @@ mod tests {
         let local = crate::m1_source_identity::LocalSourceState {
             capture_epoch: CaptureEpoch::from_store(7),
             identity: local_identity,
-            bootstrap: crate::m1_source_identity::BootstrapProvenance::None,
+            bootstrap: crate::m1_source_identity::BootstrapProvenance::PreparedWithoutPersistedFloorOrSnapshot,
             creation_floor: None,
             received_lsn: None,
             durable_transaction: None,
@@ -2052,6 +2121,10 @@ mod tests {
             confirmed_flush_lsn: None,
         };
         crate::m1_source_identity::verify_retained_slot_continuity(&local, &live, intent_id).ok()
+    }
+
+    fn lost_token_proof() -> Option<VerifiedRetainedSlotContinuity> {
+        proof_for(test_identity(), "intent-1")
     }
 
     fn all_proof() -> Option<VerifiedRetainedSlotContinuity> {

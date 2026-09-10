@@ -257,6 +257,25 @@ impl DurableFenceProof {
     }
 }
 
+/// Opaque one-shot authority proving the live DDL guard bound this exact fence before dispatch.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GuardFenceAuthorization {
+    capture_epoch: u64,
+    generation: u64,
+    table_set_fingerprint: String,
+    nonce: u64,
+}
+impl GuardFenceAuthorization {
+    pub fn into_parts(self) -> (u64, u64, String, u64) {
+        (
+            self.capture_epoch,
+            self.generation,
+            self.table_set_fingerprint,
+            self.nonce,
+        )
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct GuardState {
     capture_epoch: u64,
@@ -311,20 +330,29 @@ impl GuardState {
     }
     /// Fence dispatch is authorized only by the nonce and scope captured when this guard acquired
     /// the canonical relation lock vector.
-    pub fn authorizes_fence_intent(
+    pub fn authorize_fence_intent(
         &self,
         capture_epoch: u64,
         generation: u64,
         table_set_fingerprint: &str,
         nonce: u64,
-    ) -> bool {
-        self.capture_epoch == capture_epoch
-            && self.generation == generation
-            && self.table_set_fingerprint == table_set_fingerprint
-            && self.intended_fence_nonce == nonce
-            && self.phase == GuardPhase::Copying
-            && self.catalog_fingerprint_verified
-            && !self.locked.is_empty()
+    ) -> Result<GuardFenceAuthorization, DdlFailure> {
+        if self.capture_epoch != capture_epoch
+            || self.generation != generation
+            || self.table_set_fingerprint != table_set_fingerprint
+            || self.intended_fence_nonce != nonce
+            || self.phase != GuardPhase::Copying
+            || !self.catalog_fingerprint_verified
+            || self.locked.is_empty()
+        {
+            return Err(DdlFailure::guard("DDL_GUARD_FENCE_INTENT_MISMATCH"));
+        }
+        Ok(GuardFenceAuthorization {
+            capture_epoch,
+            generation,
+            table_set_fingerprint: table_set_fingerprint.to_owned(),
+            nonce,
+        })
     }
     /// Conservative owned allocation accounting for deterministic harness budgets.
     pub fn owned_allocation_bytes(&self) -> usize {

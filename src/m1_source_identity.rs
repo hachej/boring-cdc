@@ -465,7 +465,15 @@ pub fn verify_retained_slot_continuity(
         });
     }
     let decision = reconcile_startup(local, live);
-    if matches!(decision, StartupDecision::Resume { .. }) {
+    let lost_token_continuity =
+        matches!(decision, StartupDecision::BootstrapAmbiguousRequiresRestart)
+            && local.validate().is_ok()
+            && live.identity.validate().is_ok()
+            && first_identity_mismatch(&local.identity, &live.identity).is_none()
+            && live.slot_exists
+            && live.slot_valid
+            && live.resume_wal_available;
+    if matches!(decision, StartupDecision::Resume { .. }) || lost_token_continuity {
         Ok(VerifiedRetainedSlotContinuity {
             capture_epoch: local.capture_epoch,
             active_intent_id: active_intent_id.to_owned(),
