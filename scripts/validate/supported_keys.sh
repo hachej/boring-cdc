@@ -24,6 +24,18 @@ TYPES=[
  {'name':'bpchar','oid':1042,'constraints':{'collation':'C'},'payload':'original UTF-8 bytes'},
  {'name':'bytea','oid':17,'constraints':{'bytes_max':1024},'payload':'raw bytes'}]
 CODES=['KEY_NO_UNIQUE_NOT_NULL_INDEX','KEY_NULLABLE_COMPONENT','KEY_UNSUPPORTED_TYPE','KEY_UNSUPPORTED_COLLATION','KEY_ARITY_EXCEEDED','KEY_VALUE_TOO_LARGE','KEY_ENCODING_VERSION_UNSUPPORTED']
+GOLDEN_INPUTS=[
+ ('int2-min',[('int2',-32768)]),('int2-zero',[('int2',0)]),('int8-max',[('int8',9223372036854775807)]),
+ ('numeric-negative',[('numeric','-123.4500')]),('numeric-zero',[('numeric','0')]),
+ ('uuid-network',[('uuid','00112233-4455-6677-8899-aabbccddeeff')]),('date-epoch',[('date','2000-01-01')]),
+ ('timestamp-epoch',[('timestamp','2000-01-01T00:00:00.000000')]),('timestamptz-epoch',[('timestamptz','2000-01-01T00:00:00.000000Z')]),
+ ('text-original-utf8',[('text','é')]),('bpchar-spaces',[('bpchar','x  ')]),('bytea-limit',[('bytea','00ff')]),
+ ('composite-index-order',[('int4',7),('text','a')])]
+ORDER_GROUPS=[
+ {'case_id':'signed-integer-order','ordered_components':[('int4',-1),('int4',0),('int4',1)]},
+ {'case_id':'numeric-order','ordered_components':[('numeric','-10'),('numeric','-1.5'),('numeric','0'),('numeric','2'),('numeric','10')]},
+ {'case_id':'c-text-byte-order','ordered_components':[('text','A'),('text','a'),('text','á')]},
+ {'case_id':'composite-prefix-order','ordered_tuples':[[('int4',1),('text','z')],[('int4',2),('text','a')]]}]
 FAILURES=[
  ('no-unique-not-null-index',{'index':None},'KEY_NO_UNIQUE_NOT_NULL_INDEX'),
  ('nullable-index-component',{'nullable':True},'KEY_NULLABLE_COMPONENT'),
@@ -44,6 +56,33 @@ FAILURES=[
  ('bytea-over-limit',{'bytes':1025,'type':'bytea'},'KEY_VALUE_TOO_LARGE'),
  ('unknown-encoding-version',{'encoding_version':2},'KEY_ENCODING_VERSION_UNSUPPORTED')]
 def sha(p): return hashlib.sha256(p.read_bytes()).hexdigest()
+def numeric_parts(text):
+ from decimal import Decimal
+ d=Decimal(text); sign='-' if d.is_signed() and d else '+'
+ tup=d.copy_abs().as_tuple(); digits=''.join(map(str,tup.digits)) or '0'; exponent=tup.exponent
+ digits=digits.lstrip('0') or '0'
+ if digits=='0': return '+',0,'0'
+ while digits.endswith('0'): digits=digits[:-1]; exponent+=1
+ return sign,exponent,digits
+def component(name,value):
+ oid=next(x['oid'] for x in TYPES if x['name']==name)
+ if name in ('int2','int4','int8'):
+  width={'int2':2,'int4':4,'int8':8}[name]; raw=int(value).to_bytes(width,'big',signed=True); payload=bytes([raw[0]^0x80])+raw[1:]
+ elif name=='numeric':
+  sign,exponent,digits=numeric_parts(value); payload=sign.encode()+int(exponent).to_bytes(2,'big',signed=True)+bytes([len(digits)])+digits.encode()
+ elif name=='uuid': payload=bytes.fromhex(str(value).replace('-',''))
+ elif name=='date':
+  from datetime import date
+  days=(date.fromisoformat(value)-date(2000,1,1)).days; payload=days.to_bytes(4,'big',signed=True)
+ elif name in ('timestamp','timestamptz'):
+  from datetime import datetime,timezone
+  text=str(value).removesuffix('Z'); dt=datetime.fromisoformat(text); epoch=datetime(2000,1,1); micros=int((dt-epoch).total_seconds()*1_000_000); payload=micros.to_bytes(8,'big',signed=True)
+ elif name in ('text','varchar','bpchar'): payload=str(value).encode()
+ elif name=='bytea': payload=bytes.fromhex(value)
+ else: raise ValueError('unknown type')
+ return oid.to_bytes(4,'big')+len(payload).to_bytes(4,'big')+payload
+
+def encoded_tuple(items): return bytes([1,len(items)])+b''.join(component(*x) for x in items)
 def fail():
  print('{"code":"SUPPORTED_KEYS_FIXTURE_INVALID","outcome":"fail","phase":"validate_spec"}'); raise SystemExit(1)
 try:
@@ -55,22 +94,25 @@ try:
  if spec['fixed_seed']!={'ascii':'BCDC_KEYS_V01','hex':'0x424344435f4b4559535f563031'}: fail()
  if spec['supported_types']!=TYPES or spec['stable_rejection_codes']!=CODES: fail()
  if [(x['case_id'],x['input'],x['expected_code']) for x in spec['failure_vectors']]!=FAILURES: fail()
+ expected_golden=[{'case_id':case,'components':[{'type':n,'value':v} for n,v in items],'encoded_hex':encoded_tuple(items).hex(),'sha256':hashlib.sha256(encoded_tuple(items)).hexdigest()} for case,items in GOLDEN_INPUTS]
+ if spec['golden_vectors']!=expected_golden: fail()
+ if spec['order_vectors']!=[{'case_id':x['case_id'],'ordered_components':[{'type':n,'value':v} for n,v in x['ordered_components']]} if 'ordered_components' in x else {'case_id':x['case_id'],'ordered_tuples':[[{'type':n,'value':v} for n,v in row] for row in x['ordered_tuples']]} for x in ORDER_GROUPS]: fail()
  enc=spec['canonical_encoding']
- if enc!={'arity':{'maximum':8,'minimum':1,'order':'effective replica identity index order'},'component_frame':['length-delimited PostgreSQL OID/type','length-delimited canonical payload'],'tuple_frame':['encoding version','arity','components in index order'],'version':1}: fail()
+ if enc!={'arity':{'maximum':8,'minimum':1,'order':'effective replica identity index order','width':'u8'},'component_frame':['PostgreSQL OID as u32 big-endian','canonical payload length as u32 big-endian','canonical payload bytes'],'numeric_payload':['ASCII sign (+ or -)','signed i16 big-endian power-of-ten exponent applied to digit integer','u8 ASCII digit count','minimal ASCII digits; no leading or trailing zero except canonical zero +, exponent 0, digit 0'],'temporal_epoch':'2000-01-01T00:00:00; date uses signed i32 days and timestamps use signed i64 microseconds; PostgreSQL -infinity/+infinity use the minimum/maximum signed payload','tuple_frame':['encoding version as u8','arity as u8','components in index order'],'version':1}: fail()
  if spec['ordering']!={'collation':'PostgreSQL C for text, varchar, and bpchar','direction':'ascending','nulls':'forbidden','rule':'lexicographic PostgreSQL B-tree order over typed components; compare component values using their admitted PostgreSQL ascending operator class, then the next component'}: fail()
  if spec['rejected_types']!=['float4','float8','bool','arrays','domains','enums','composites','user-defined types']: fail()
  identity=spec['identity_contract']
  if identity['canonical_identity']!='one effective replica identity shared by snapshot keysets, WAL update/delete keys, checksums, and destination grouping' or identity['forbidden_component_states']!=['null','absent','partial','unchanged_toast']: fail()
  if spec['keyset_contract']!={'pagination':'half-open keyset predicate in canonical ascending tuple order','prohibited':['OFFSET','ctid'],'resume_rule':'last emitted complete canonical key is the exclusive lower bound'}: fail()
  if spec['mutable_key_contract']!={'complete_old_key_required':True,'complete_new_key_required':True,'new_tuple_required':True,'order':['old-key tombstone','new-key upsert'],'unchanged_toast_any_column':'block before feedback'}: fail()
- if spec['expected']['metrics']!={'failure_vector_count':{'unit':'vectors','value':18},'supported_type_count':{'unit':'types','value':12}}: fail()
+ if spec['expected']['metrics']!={'failure_vector_count':{'unit':'vectors','value':18},'golden_vector_count':{'unit':'vectors','value':13},'order_vector_count':{'unit':'vectors','value':4},'supported_type_count':{'unit':'types','value':12}}: fail()
  ids=[x['id'] for x in graph]
  if len(ids)!=len(set(ids)) or set(executors)-set(ids): fail()
  stable=next(x for x in registry['entries'] if x['id']==decision); covered=next(x for x in coverage['assignments'] if x['id']==decision)
  if stable['owner_bead']!=owner or covered!={'evidence_status':'pending','id':decision,'owner_bead':owner,'source':'docs/PLAN.md','source_digest':stable['source_digest']}: fail()
  if subprocess.run([str(root/'scripts/validate/plan_coverage.sh')],cwd=root,capture_output=True).returncode: fail()
  probe_rel='artifacts/m0/decisions/boring-cdc-d-keys/fixture-run.jsonl'; probe=[json.loads(x) for x in (root/probe_rel).read_text().splitlines()]
- expected_probe=[{'code':'SUPPORTED_KEYS_FIXTURE_VALID','failure_vectors':18,'outcome':'pass','phase':'validate_spec','supported_types':12}]
+ expected_probe=[{'code':'SUPPORTED_KEYS_FIXTURE_VALID','failure_vectors':18,'golden_vectors':13,'order_vectors':4,'outcome':'pass','phase':'validate_spec','supported_types':12}]
  if probe!=expected_probe or spec['execution_probe']!={'expected_lines':expected_probe,'path':probe_rel,'sha256':sha(root/probe_rel)}: fail()
  if spec['script']['path']!='scripts/validate/supported_keys.sh' or sha(root/spec['script']['path'])!=spec['script']['sha256']: fail()
  decision_row=next(x for x in decisions['decisions'] if x['id']==decision)
@@ -86,7 +128,7 @@ try:
  evidence_sha=evidence['git_commit']; guarded=[fixture_rel,'scripts/validate/supported_keys.sh','contracts/m0/decisions.json']
  if subprocess.run(['git','cat-file','-e',evidence_sha+'^{commit}'],cwd=root,capture_output=True).returncode or subprocess.run(['git','merge-base','--is-ancestor',evidence_sha,'HEAD'],cwd=root,capture_output=True).returncode or subprocess.run(['git','diff','--quiet',evidence_sha+'..HEAD','--',*guarded],cwd=root).returncode: fail()
 except (OSError,KeyError,ValueError,TypeError,StopIteration,json.JSONDecodeError): fail()
-if selected=='all': print('{"code":"SUPPORTED_KEYS_FIXTURE_VALID","failure_vectors":18,"outcome":"pass","phase":"validate_spec","supported_types":12}')
+if selected=='all': print('{"code":"SUPPORTED_KEYS_FIXTURE_VALID","failure_vectors":18,"golden_vectors":13,"order_vectors":4,"outcome":"pass","phase":"validate_spec","supported_types":12}')
 else:
  row=next((x for x in FAILURES if x[0]==selected),None)
  if row is None: fail()
