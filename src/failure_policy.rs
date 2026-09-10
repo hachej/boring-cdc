@@ -1045,11 +1045,15 @@ pub mod tests {
 
     impl ApprovedTestRandomness {
         fn seeded() -> Self {
-            let decoded = hex_seed_bytes(JITTER_TEST_SEED);
-            let mut seed = [0_u8; 32];
-            seed[..decoded.len()].copy_from_slice(&decoded);
-            Self(ChaCha20Rng::from_seed(seed))
+            Self(ChaCha20Rng::from_seed(approved_test_seed()))
         }
+    }
+
+    fn approved_test_seed() -> [u8; 32] {
+        let decoded = hex_seed_bytes(JITTER_TEST_SEED);
+        let mut seed = [0_u8; 32];
+        seed[..decoded.len()].copy_from_slice(&decoded);
+        seed
     }
 
     impl Default for ApprovedTestRandomness {
@@ -1748,10 +1752,8 @@ pub mod tests {
 
     #[test]
     fn approved_chacha20_seed_expansion_and_draw_order_match_golden_vectors() {
-        let decoded = hex_seed_bytes(JITTER_TEST_SEED);
-        assert_eq!(decoded, b"BCDC_RETRY_V01");
-        let mut expanded = [0_u8; 32];
-        expanded[..decoded.len()].copy_from_slice(&decoded);
+        assert_eq!(hex_seed_bytes(JITTER_TEST_SEED), b"BCDC_RETRY_V01");
+        let expanded = approved_test_seed();
         assert_eq!(
             expanded,
             [
@@ -1775,9 +1777,9 @@ pub mod tests {
             (9, 15_583_386_212_084_045_179, 30_000, 12_137),
             (10, 5_276_732_411_777_251_899, 30_000, 29_910),
         ];
-        let mut rng = ChaCha20Rng::from_seed(expanded);
+        let mut randomness = ApprovedTestRandomness::seeded();
         for (attempt, expected_sample, nominal, expected_delay) in expected {
-            let sample = rng.next_u64();
+            let sample = randomness.next_u64();
             assert_eq!(
                 sample, expected_sample,
                 "ChaCha20 draw for attempt {attempt}"

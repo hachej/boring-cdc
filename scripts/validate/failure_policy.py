@@ -47,6 +47,8 @@ expected_vectors=[
 actual_vectors=[(v.get('attempt'),v.get('sample_u64'),v.get('nominal_delay_ms'),v.get('delay_ms')) for v in contract.get('confirmed_literals',{}).get('jitter_golden_vectors',[])]
 if actual_vectors!=expected_vectors: errors.append('wrong ChaCha20 jitter golden vectors')
 if contract.get('confirmed_literals',{}).get('jitter_draw_order')!='one ChaCha20Rng::next_u64 draw per attempt in ascending attempt order before inclusive modulo': errors.append('wrong ChaCha20 draw order')
+for seam in ('ChaCha20Rng::from_seed(approved_test_seed())','let expanded = approved_test_seed();','let mut randomness = ApprovedTestRandomness::seeded();','let sample = randomness.next_u64();'):
+ if seam not in src: errors.append('golden vectors bypass approved randomness seam: '+seam)
 for attempt,sample,nominal,delay in expected_vectors:
  for literal in (f'({attempt}, {sample:_}', f'{nominal:_}, {delay:_})'):
   if literal not in src: errors.append('missing Rust jitter golden literal '+literal)
