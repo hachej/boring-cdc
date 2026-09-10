@@ -1,0 +1,237 @@
+{
+  "admitted_ddl_matrix": [
+    {
+      "id": "DDL-ADD-NULLABLE",
+      "required_lock": "AccessExclusiveLock",
+      "sql": "ALTER TABLE public.guarded ADD COLUMN optional text"
+    },
+    {
+      "id": "DDL-ADD-DEFAULT",
+      "required_lock": "AccessExclusiveLock",
+      "sql": "ALTER TABLE public.guarded ADD COLUMN defaulted integer DEFAULT 0"
+    },
+    {
+      "id": "DDL-ADD-NOT-NULL",
+      "required_lock": "AccessExclusiveLock",
+      "sql": "ALTER TABLE public.guarded ADD COLUMN required integer NOT NULL DEFAULT 0"
+    },
+    {
+      "id": "DDL-ALTER-TYPE",
+      "required_lock": "AccessExclusiveLock",
+      "sql": "ALTER TABLE public.guarded ALTER COLUMN payload TYPE varchar(64)"
+    },
+    {
+      "id": "DDL-DROP-COLUMN",
+      "required_lock": "AccessExclusiveLock",
+      "sql": "ALTER TABLE public.guarded DROP COLUMN payload"
+    },
+    {
+      "id": "DDL-REPLICA-IDENTITY",
+      "required_lock": "AccessExclusiveLock",
+      "sql": "ALTER TABLE public.guarded REPLICA IDENTITY FULL"
+    }
+  ],
+  "canonical_assignments": [
+    {
+      "evidence_status": "pending",
+      "executed_by": [
+        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+      ],
+      "id": "REQ-SCHEMA-AND-DELETE-SAFETY-CHANGE-A-COLUMN-TYPE",
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "source": "docs/REQUIREMENTS.md",
+      "source_digest": "03894e7baf2680876814f74ef6fce1f18785b9cfb209c43fbdb69745c8e30c9a"
+    },
+    {
+      "evidence_status": "pending",
+      "executed_by": [
+        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+      ],
+      "id": "REQ-SCHEMA-AND-DELETE-SAFETY-DELETE-SUPPORT-AND-DESTINATION-SPECIFIC-DELETE-SEMANTICS",
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "source": "docs/REQUIREMENTS.md",
+      "source_digest": "3f942c536fa4691ebeed3e9d9365a6e8917a31dab50de18ec5ac4dba358c4468"
+    },
+    {
+      "evidence_status": "pending",
+      "executed_by": [
+        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+      ],
+      "id": "REQ-SCHEMA-AND-DELETE-SAFETY-PRIMARY-UNIQUE-KEYS-AND-POSTGRES-REPLICA-IDENTITY",
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "source": "docs/REQUIREMENTS.md",
+      "source_digest": "a1efca44085ded0cad629f582c37c64035c7c2f18cbf6f8ed92157a970bfa374"
+    },
+    {
+      "evidence_status": "pending",
+      "executed_by": [
+        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+      ],
+      "id": "REQ-SCHEMA-AND-DELETE-SAFETY-REMOVE-USABLE-REPLICA-IDENTITY",
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "source": "docs/REQUIREMENTS.md",
+      "source_digest": "bde53f40d7a9cd6e7694ee5a9ed15bc6604ca19d5f97bafe34a19e734cc428f1"
+    },
+    {
+      "evidence_status": "pending",
+      "executed_by": [
+        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+      ],
+      "id": "REQ-SCHEMA-AND-DELETE-SAFETY-SELECTED-TABLE-AND-COLUMN-TYPES",
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "source": "docs/REQUIREMENTS.md",
+      "source_digest": "352390af9a51465f461dc55eda74cb190c7373b8c253e3deafb1c65e9dfefb90"
+    },
+    {
+      "evidence_status": "pending",
+      "executed_by": [
+        "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+      ],
+      "id": "REQ-SCHEMA-AND-DELETE-SAFETY-SOURCE-TO-DESTINATION-SCHEMA-COMPATIBILITY",
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "source": "docs/REQUIREMENTS.md",
+      "source_digest": "115b10965d21c46c7e377278e30f0ec0d843eb9796a68728499085c2959391e3"
+    },
+    {
+      "evidence_status": "pending",
+      "executed_by": [
+        "SCN-DDL-IMMEDIATELY-BEFORE-AFTER-COPY-FENCE"
+      ],
+      "id": "SCN-DDL-IMMEDIATELY-BEFORE-AFTER-COPY-FENCE",
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "source": "docs/PLAN.md",
+      "source_digest": "2e7d2189249a235f4dc861781a5bb4829ca776ed22a141b2d7fa945822ce9d50"
+    },
+    {
+      "evidence_status": "pending",
+      "executed_by": [
+        "SCN-M1-DDL-WAITER-BOUND"
+      ],
+      "id": "SCN-DELAYED-STALE-PROMOTION-AFTER-NEWER-SWITCH",
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "source": "docs/PLAN.md",
+      "source_digest": "9d59855a6eee6583d4a149906c915f0084af19e0298b3dac1b474f388bb7aa1b"
+    },
+    {
+      "evidence_status": "pending",
+      "executed_by": [
+        "SCN-IDLE-NO-ROW-DDL"
+      ],
+      "id": "SCN-IDLE-NO-ROW-DDL",
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "source": "docs/PLAN.md",
+      "source_digest": "7ed50437a3a329516d7a4339255f4e54eedeb52b5404844cf7876303f802a73a"
+    },
+    {
+      "evidence_status": "pending",
+      "executed_by": [
+        "SCN-IMPORTER-DDL-GUARD-LOSS"
+      ],
+      "id": "SCN-IMPORTER-DDL-GUARD-LOSS",
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "source": "docs/PLAN.md",
+      "source_digest": "ea5e369cb19f18c4fd19a6350933abeb4554c4848f8fab1e78662b94151bfc79"
+    }
+  ],
+  "canonical_lock_order": [
+    "database_oid",
+    "relation_oid",
+    "logical_table_id"
+  ],
+  "cases": [
+    {
+      "expected": "bounded catalog poll changes the fingerprint; nullable/no-default addition is the sole in-place admission outside a generation",
+      "id": "SCN-IDLE-NO-ROW-DDL"
+    },
+    {
+      "expected": "every admitted matrix operation waits on ACCESS SHARE on PostgreSQL 15/16/17",
+      "id": "SCN-DDL-DURING-ACTIVE-BACKFILL"
+    },
+    {
+      "expected": "guard is held before export, during export/copy, and until the matching fence is durable",
+      "id": "SCN-DDL-IMMEDIATELY-BEFORE-AFTER-COPY-FENCE"
+    },
+    {
+      "expected": "generation becomes invalid, feedback gate releases, old chunks cannot promote",
+      "id": "SCN-IMPORTER-DDL-GUARD-LOSS"
+    },
+    {
+      "expected": "a conflicting waiter at 5000 ms raises BACKFILL_DDL_WAITER and releases the lock queue",
+      "id": "SCN-M1-DDL-WAITER-BOUND"
+    },
+    {
+      "expected": "changed Relation blocks following DML decode and transaction feedback until catalog validation",
+      "id": "SCN-M1-DDL-IMMEDIATE-RELATION-DML"
+    }
+  ],
+  "catalog_fingerprint_fields": [
+    "logical_table_id",
+    "database_oid",
+    "relation_oid",
+    "schema_version",
+    "namespace",
+    "relation_name",
+    "attnum",
+    "logical_order",
+    "physical_order",
+    "column_name",
+    "dropped",
+    "type_oid",
+    "typmod",
+    "collation_oid",
+    "nullable",
+    "default_expression_hash",
+    "generated_expression_hash",
+    "identity_expression_hash",
+    "primary_attnums",
+    "unique_indexes",
+    "replica_identity_mode",
+    "replica_identity_index",
+    "partition_routing",
+    "partition_root",
+    "partition_key_hash",
+    "partition_bounds_hash",
+    "publication_member",
+    "publication_attnums"
+  ],
+  "lock_lifetime": "before snapshot export through durable matching capture fence",
+  "lock_mode": "ACCESS SHARE",
+  "owner_bead": "boring-cdc-m1-ddl-fixtures",
+  "postgres": [
+    {
+      "image": "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
+      "major": 15
+    },
+    {
+      "image": "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
+      "major": 16
+    },
+    {
+      "image": "postgres@sha256:c7526c0f6c3f30260a563d7bcf8ad778effac59a44f8ffa86678c35418338609",
+      "major": 17
+    }
+  ],
+  "provisional_constants": [
+    {
+      "provenance": "// M0-PROVISIONAL: boring-cdc-d-ddl",
+      "value": [
+        15,
+        16,
+        17
+      ]
+    },
+    {
+      "name": "catalog_poll_interval",
+      "provenance": "// M0-PROVISIONAL: boring-cdc-d-ddl",
+      "unit": "milliseconds",
+      "value": 5000
+    },
+    {
+      "name": "ddl_waiter_bound",
+      "provenance": "// M0-PROVISIONAL: boring-cdc-d-ddl",
+      "unit": "milliseconds",
+      "value": 5000
+    }
+  ],
+  "schema_version": "boring-cdc/m1-ddl-fixtures/v1"
+}

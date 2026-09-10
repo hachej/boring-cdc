@@ -2,6 +2,7 @@
 
 pub mod m1_config;
 pub mod m1_control_fixtures;
+pub mod m1_ddl_fixtures;
 pub mod m1_decoder;
 pub mod m1_preflight;
 pub mod m1_source_identity;
