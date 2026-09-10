@@ -208,6 +208,7 @@ pub struct SequenceDiagnostics {
 pub struct OracleReport {
     pub ledger_delivery: ProofDimension,
     pub business_event_delivery: ProofDimension,
+    pub fence_delivery: ProofDimension,
     pub final_state_convergence: ProofDimension,
     pub sequence: SequenceDiagnostics,
     pub ledger_sorted_digest: [u8; 32],
@@ -220,8 +221,16 @@ impl OracleReport {
     pub fn passed(&self) -> bool {
         self.ledger_delivery.status == ProofStatus::Pass
             && self.business_event_delivery.status == ProofStatus::Pass
+            && self.fence_delivery.status == ProofStatus::Pass
             && self.final_state_convergence.status == ProofStatus::Pass
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FenceObservation {
+    pub run_id: [u8; 16],
+    pub watermark: u64,
+    pub ledger_count: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -233,6 +242,7 @@ pub struct WorkloadFixture {
     pub business_events: Vec<BusinessObservation>,
     pub final_state: BTreeMap<(EntityTable, [u8; 32]), [u8; 32]>,
     pub watermark: u64,
+    pub fence: FenceObservation,
 }
 
 fn framed_hash(domain: &[u8], fields: &[&[u8]]) -> [u8; 32] {
@@ -423,6 +433,11 @@ pub fn deterministic_fixture(
         ledger,
         business_events,
         final_state,
+        fence: FenceObservation {
+            run_id,
+            watermark: 30,
+            ledger_count: specs.len(),
+        },
     })
 }
 
@@ -666,6 +681,7 @@ pub fn evaluate(
     expected: &WorkloadFixture,
     delivered_ledger: &[LedgerEntry],
     observed_business: Option<&[BusinessObservation]>,
+    observed_fence: Option<&FenceObservation>,
     observed_final_state: &BTreeMap<(EntityTable, [u8; 32]), [u8; 32]>,
 ) -> Result<OracleReport, OracleFailure> {
     expected.contracts.validate()?;
@@ -788,6 +804,26 @@ pub fn evaluate(
         }
     };
 
+    let fence_delivery = ProofDimension {
+        status: if observed_fence == Some(&expected.fence) {
+            ProofStatus::Pass
+        } else {
+            ProofStatus::Fail
+        },
+        expected_count: 1,
+        observed_count: usize::from(observed_fence.is_some()),
+        missing: if observed_fence.is_none() {
+            vec!["delivery_fence_missing".into()]
+        } else {
+            vec![]
+        },
+        unexpected: if observed_fence.is_some_and(|fence| fence != &expected.fence) {
+            vec!["delivery_fence_mismatch".into()]
+        } else {
+            vec![]
+        },
+    };
+
     let expected_checksum = state_checksum(&expected.final_state);
     let observed_checksum = state_checksum(observed_final_state);
     let final_state_convergence = ProofDimension {
@@ -832,6 +868,7 @@ pub fn evaluate(
     Ok(OracleReport {
         ledger_delivery,
         business_event_delivery,
+        fence_delivery,
         final_state_convergence,
         sequence: sequence_diagnostics(delivered_ledger),
         ledger_sorted_digest,
@@ -888,7 +925,14 @@ pub mod tests {
         let a = fixture();
         let b = fixture();
         assert_eq!(a, b);
-        let report = evaluate(&a, &a.ledger, Some(&a.business_events), &a.final_state).unwrap();
+        let report = evaluate(
+            &a,
+            &a.ledger,
+            Some(&a.business_events),
+            Some(&a.fence),
+            &a.final_state,
+        )
+        .unwrap();
         assert!(report.passed());
         eprintln!(
             "ledger={}",
@@ -933,6 +977,7 @@ pub mod tests {
             &fixture,
             &fixture.ledger,
             Some(&observed),
+            Some(&fixture.fence),
             &fixture.final_state,
         )
         .unwrap();
@@ -956,6 +1001,7 @@ pub mod tests {
             &fixture,
             &delivered,
             Some(&fixture.business_events),
+            Some(&fixture.fence),
             &fixture.final_state,
         )
         .unwrap();
@@ -974,6 +1020,7 @@ pub mod tests {
                 &fixture,
                 &fixture.ledger,
                 Some(&retries),
+                Some(&fixture.fence),
                 &fixture.final_state
             )
             .unwrap()
@@ -987,6 +1034,7 @@ pub mod tests {
                 &fixture,
                 &fixture.ledger,
                 Some(&retries),
+                Some(&fixture.fence),
                 &fixture.final_state
             )
             .unwrap()
@@ -999,11 +1047,34 @@ pub mod tests {
     #[test]
     fn missing_provider_event_boundary_is_never_a_pass() {
         let fixture = fixture();
-        let report = evaluate(&fixture, &fixture.ledger, None, &fixture.final_state).unwrap();
+        let report = evaluate(
+            &fixture,
+            &fixture.ledger,
+            None,
+            Some(&fixture.fence),
+            &fixture.final_state,
+        )
+        .unwrap();
         assert_eq!(
             report.business_event_delivery.status,
             ProofStatus::Unavailable
         );
+        assert!(!report.passed());
+    }
+
+    #[test]
+    fn independently_delivered_fence_is_required() {
+        let fixture = fixture();
+        let report = evaluate(
+            &fixture,
+            &fixture.ledger,
+            Some(&fixture.business_events),
+            None,
+            &fixture.final_state,
+        )
+        .unwrap();
+        assert_eq!(report.ledger_delivery.status, ProofStatus::Pass);
+        assert_eq!(report.fence_delivery.status, ProofStatus::Fail);
         assert!(!report.passed());
     }
 
@@ -1066,6 +1137,7 @@ pub mod tests {
                 &fixture,
                 &fixture.ledger,
                 Some(&too_many),
+                Some(&fixture.fence),
                 &fixture.final_state
             )
             .unwrap_err()
