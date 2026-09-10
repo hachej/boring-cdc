@@ -16,7 +16,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "9236c5f6c2bf8fd54aeee8cd60fede47cdb3d855",
+  "git_commit": "6d9cd033150e9e619762949e2c3fca5c37058acb",
   "owner_bead": "boring-cdc-m1-workload.2",
   "redaction": {
     "checked": true,
