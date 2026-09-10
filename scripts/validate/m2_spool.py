@@ -23,6 +23,8 @@ for scenario in selected:
  packet=root/'artifacts/boring-cdc-m2-spool'/scenario/'spool-component-v1'
  if not packet.exists():errors.append('missing packet '+scenario);continue
  manifest=json.loads((packet/'manifest.json').read_text());versions=json.loads((packet/'versions.json').read_text());evidence=manifest['git_commit']
+ workspace=[c for c in manifest['commands'] if c.get('argv')=='cargo test --locked --workspace --all-targets']
+ if len(workspace)!=1 or b'test result:' not in (packet/'workspace-tests-stdout.txt').read_bytes():errors.append('raw workspace proof missing '+scenario)
  unchanged=subprocess.run(['git','merge-base','--is-ancestor',evidence,head],cwd=root).returncode==0 and subprocess.run(['git','diff','--quiet',evidence+'..'+head,'--','src/m2_spool.rs','src/lib.rs','examples/m2_spool_component.rs','contracts/m2/spool-cases.json','scripts/lib/m2_spool_component.py','scripts/validate/m2_spool.py','scripts/e2e/m2_spool.sh','scripts/faults/m2_spool.sh'],cwd=root).returncode==0
  if not unchanged:errors.append('packet not bound to unchanged implementation '+scenario)
  if manifest['source_preservation']['before_sha256']!=implementation or versions.get('implementation_sha256')!=implementation:errors.append('implementation digest mismatch '+scenario)
@@ -35,5 +37,7 @@ for scenario in selected:
   text=json.dumps(event).lower()
   if any(x in text for x in ('postgres://','password=','canonical_key','dsn')):errors.append('redaction failure '+scenario)
 for script,mode in [('scripts/e2e/m2_spool.sh','e2e'),('scripts/faults/m2_spool.sh','fault')]:
- if (root/script).read_text().count(f'm2_spool_component.py {mode}')!=2:errors.append(script+' must execute deterministic rerun')
+ text=(root/script).read_text()
+ if text.count(f'm2_spool_component.py {mode}')!=2:errors.append(script+' must execute deterministic rerun')
+ if 'scripts/validate/evidence.sh' not in text:errors.append(script+' must execute generic evidence validator')
 print(json.dumps({'schema_version':'validation-result/v1','validator':'m2-spool/v1','valid':not errors,'findings':errors},sort_keys=True,separators=(',',':')));raise SystemExit(bool(errors))

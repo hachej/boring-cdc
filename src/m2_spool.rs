@@ -5,14 +5,18 @@
 //! allocation is admitted before it is made.
 
 use crate::failure_policy::{
-    Component, FailedBoundary, FailureClass, FailureObservation, FingerprintInput, SafeContextKey,
-    SafeContextValue, StableErrorCode, build_fingerprint,
+    Component, FailedBoundary, FailureClass, FailureObservation, FailureRecord, FingerprintInput,
+    PolicyAction, PolicyEvent, PreparedFailureOperation, SafeContextKey, SafeContextValue,
+    StableErrorCode, build_fingerprint, transition,
 };
+use crate::m1_transition_kernel::TransitionContext;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufReader, Read, Seek, SeekFrom, Write};
+use std::os::fd::AsRawFd;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
@@ -56,6 +60,7 @@ pub enum SpoolError {
     Checksum,
     Io(io::ErrorKind),
     Enospc,
+    StartupBlocked,
 }
 impl std::fmt::Display for SpoolError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -219,6 +224,17 @@ impl DiskAdmission {
     }
 }
 
+#[derive(Clone)]
+pub struct FilesystemAdmissionController(std::rc::Rc<RefCell<DiskAdmission>>);
+impl FilesystemAdmissionController {
+    pub fn new(admission: DiskAdmission) -> Self {
+        Self(std::rc::Rc::new(RefCell::new(admission)))
+    }
+    pub fn reserved(&self, filesystem: u64) -> u64 {
+        self.0.borrow().reserved(filesystem)
+    }
+}
+
 pub trait FreeSpace {
     fn available_bytes(&self, path: &Path) -> io::Result<u64>;
 }
@@ -274,9 +290,11 @@ pub struct TxnBuffer {
     header: Header,
     limits: SpoolLimits,
     memory: MemoryBudget,
-    disk: DiskAdmission,
+    disk: FilesystemAdmissionController,
     space: Box<dyn FreeSpace>,
     memory_events: Vec<Vec<u8>>,
+    metadata_reserved: usize,
+    memory_payload: usize,
     spool: Option<(File, PathBuf, u64, u64)>,
     bytes: u64,
     events: u64,
@@ -291,12 +309,15 @@ impl TxnBuffer {
         creation_run: String,
         limits: SpoolLimits,
         memory: MemoryBudget,
-        disk: DiskAdmission,
+        disk: FilesystemAdmissionController,
         space: Box<dyn FreeSpace>,
     ) -> Result<Self, SpoolError> {
         if capture_epoch.is_empty()
             || xid.is_empty()
             || creation_run.is_empty()
+            || capture_epoch.len() > 256
+            || xid.len() > 256
+            || creation_run.len() > 256
             || limits.max_frame_bytes == 0
             || limits.max_event_bytes == 0
             || limits.max_transaction_bytes == 0
@@ -306,9 +327,17 @@ impl TxnBuffer {
         }
         fs::create_dir_all(&directory)?;
         let dev = fs::metadata(&directory)?.dev();
-        if !disk.limits.contains_key(&dev) {
+        if !disk.0.borrow().limits.contains_key(&dev) {
             return Err(SpoolError::Invalid("spool filesystem budget missing"));
         }
+        let event_capacity = usize::try_from(limits.max_transaction_events)
+            .map_err(|_| SpoolError::Invalid("transaction event capacity overflow"))?;
+        let metadata_reserved = event_capacity
+            .checked_mul(std::mem::size_of::<Vec<u8>>())
+            .ok_or(SpoolError::Invalid("transaction event metadata overflow"))?;
+        let mut memory = memory;
+        memory.reserve(MemoryClass::Staging, metadata_reserved)?;
+        let memory_events = Vec::with_capacity(event_capacity);
         Ok(Self {
             directory,
             header: Header {
@@ -321,7 +350,9 @@ impl TxnBuffer {
             memory,
             disk,
             space,
-            memory_events: vec![],
+            memory_events,
+            metadata_reserved,
+            memory_payload: 0,
             spool: None,
             bytes: 0,
             events: 0,
@@ -341,6 +372,35 @@ impl TxnBuffer {
             return Err(SpoolError::FrameLimit {
                 limit: self.limits.max_frame_bytes,
                 observed: frame_len,
+            });
+        }
+        if frame_len > self.limits.max_event_bytes {
+            self.failed = true;
+            return Err(SpoolError::EventLimit {
+                limit: self.limits.max_event_bytes,
+                observed: frame_len,
+            });
+        }
+        let observed_bytes =
+            self.bytes
+                .checked_add(frame_len as u64)
+                .ok_or(SpoolError::TransactionBytesLimit {
+                    limit: self.limits.max_transaction_bytes,
+                    observed: u64::MAX,
+                })?;
+        if observed_bytes > self.limits.max_transaction_bytes {
+            self.failed = true;
+            return Err(SpoolError::TransactionBytesLimit {
+                limit: self.limits.max_transaction_bytes,
+                observed: observed_bytes,
+            });
+        }
+        let observed_events = self.events.saturating_add(1);
+        if observed_events > self.limits.max_transaction_events {
+            self.failed = true;
+            return Err(SpoolError::TransactionEventsLimit {
+                limit: self.limits.max_transaction_events,
+                observed: observed_events,
             });
         }
         self.memory.reserve(MemoryClass::Receive, frame_len)?;
@@ -404,13 +464,14 @@ impl TxnBuffer {
                 observed: next_events,
             });
         }
-        let staging = self.memory.used(MemoryClass::Staging);
         if self.spool.is_none()
-            && staging
+            && self
+                .memory_payload
                 .checked_add(frame.len())
                 .is_some_and(|n| n <= self.limits.memory_prefix_bytes)
         {
             self.memory.reserve(MemoryClass::Staging, frame.len())?;
+            self.memory_payload += frame.len();
             self.memory_events.push(frame);
         } else {
             self.ensure_spool()?;
@@ -433,54 +494,90 @@ impl TxnBuffer {
             .read(true)
             .write(true)
             .open(&path)?;
+        let header_bound = 64usize
+            .checked_add(self.header.capture_epoch.len())
+            .and_then(|v| v.checked_add(self.header.xid.len()))
+            .and_then(|v| v.checked_add(self.header.creation_run.len()))
+            .ok_or(SpoolError::MemoryLimit(MemoryClass::Decoder))?;
+        self.memory.reserve(MemoryClass::Decoder, header_bound)?;
         let header = serde_json::to_vec(&self.header)
             .map_err(|_| SpoolError::Invalid("spool header encoding"))?;
-        let mut prefix = Vec::with_capacity(12 + header.len() + 32);
-        prefix.extend_from_slice(MAGIC);
-        prefix.extend_from_slice(&(header.len() as u32).to_be_bytes());
-        prefix.extend_from_slice(&header);
-        prefix.extend_from_slice(&Sha256::digest(&header));
-        let dev = fs::metadata(&self.directory)?.dev();
-        self.preallocate_write(&mut file, dev, 0, &prefix)?;
-        self.spool = Some((file, path, prefix.len() as u64, dev));
-        let prior = std::mem::take(&mut self.memory_events);
-        for event in prior {
-            self.append_file(&event)?;
-            self.memory.release(MemoryClass::Staging, event.len());
+        if header.len() > header_bound {
+            self.memory.release(MemoryClass::Decoder, header_bound);
+            return Err(SpoolError::MemoryLimit(MemoryClass::Decoder));
         }
+        let header_len = (header.len() as u32).to_be_bytes();
+        let header_sum = Sha256::digest(&header);
+        let dev = fs::metadata(&self.directory)?.dev();
+        let prefix_len = self.preallocate_parts(
+            &mut file,
+            dev,
+            0,
+            &[MAGIC, &header_len, &header, &header_sum],
+        )?;
+        self.memory.release(MemoryClass::Decoder, header_bound);
+        self.spool = Some((file, path, prefix_len, dev));
+        let prior = std::mem::take(&mut self.memory_events);
+        let prior_payload: usize = prior.iter().map(Vec::len).sum();
+        for event in &prior {
+            self.append_file(event)?;
+        }
+        drop(prior);
+        self.memory.release(MemoryClass::Staging, prior_payload);
+        self.memory_payload = 0;
+        self.memory
+            .release(MemoryClass::Staging, self.metadata_reserved);
+        self.metadata_reserved = 0;
         Ok(())
     }
     fn append_file(&mut self, event: &[u8]) -> Result<(), SpoolError> {
-        let mut record = Vec::with_capacity(4 + event.len() + 32);
-        record.extend_from_slice(&(event.len() as u32).to_be_bytes());
-        record.extend_from_slice(event);
-        record.extend_from_slice(&Sha256::digest(event));
+        let event_len = (event.len() as u32).to_be_bytes();
+        let checksum = Sha256::digest(event);
         let (mut file, path, offset, dev) = self.spool.take().expect("spool exists");
-        let result = self.preallocate_write(&mut file, dev, offset, &record);
-        let next = offset + record.len() as u64;
+        let result =
+            self.preallocate_parts(&mut file, dev, offset, &[&event_len, event, &checksum]);
+        let next = result.as_ref().map_or(offset, |written| offset + written);
         self.spool = Some((file, path, next, dev));
-        result
+        result.map(|_| ())
     }
-    fn preallocate_write(
+    fn preallocate_parts(
         &mut self,
         file: &mut File,
         dev: u64,
         offset: u64,
-        data: &[u8],
-    ) -> Result<(), SpoolError> {
+        parts: &[&[u8]],
+    ) -> Result<u64, SpoolError> {
+        let bytes = parts
+            .iter()
+            .try_fold(0_u64, |total, p| total.checked_add(p.len() as u64))
+            .ok_or(SpoolError::DiskReserve {
+                filesystem: dev,
+                requested: u64::MAX,
+            })?;
         let available = self.space.available_bytes(&self.directory)?;
-        self.disk.admit(dev, available, data.len() as u64)?;
+        self.disk.0.borrow_mut().admit(dev, available, bytes)?;
         let result = (|| {
-            file.set_len(offset + data.len() as u64)?;
+            let code = unsafe {
+                libc::posix_fallocate(
+                    file.as_raw_fd(),
+                    offset as libc::off_t,
+                    bytes as libc::off_t,
+                )
+            };
+            if code != 0 {
+                return Err(io::Error::from_raw_os_error(code));
+            }
             file.seek(SeekFrom::Start(offset))?;
-            file.write_all(data)?;
+            for part in parts {
+                file.write_all(part)?;
+            }
             Ok::<_, io::Error>(())
         })();
         if let Err(error) = result {
-            self.disk.release(dev, data.len() as u64);
+            self.disk.0.borrow_mut().release(dev, bytes);
             return Err(error.into());
         }
-        Ok(())
+        Ok(bytes)
     }
     pub fn high_water(&self) -> MemoryHighWater {
         self.memory.high_water()
@@ -518,10 +615,30 @@ impl TxnBuffer {
             drop(file);
             fs::remove_file(path)?;
             sync_dir(&self.directory)?;
-            self.disk.release(dev, len);
+            self.disk.0.borrow_mut().release(dev, len);
         }
         Ok(())
     }
+    /// Runs the sole shared policy core and projects its exact CAS fences into the supplied
+    /// capture-priority writer operation. Execution remains with the sole writer.
+    pub fn apply_failure_policy(
+        &self,
+        error: &SpoolError,
+        end_lsn: Option<&str>,
+        config_fingerprint: &str,
+        current: Option<&FailureRecord>,
+        context: &mut TransitionContext<'_>,
+    ) -> (
+        CaptureAdmissionOutcome,
+        PolicyAction,
+        Option<PreparedFailureOperation>,
+    ) {
+        let (observation, outcome) = self.failure_observation(error, end_lsn, config_fingerprint);
+        let action = transition(current, PolicyEvent::Observe(observation), context);
+        let prepared = PreparedFailureOperation::from_policy_action(action.clone(), None);
+        (outcome, action, prepared)
+    }
+
     pub fn failure_observation(
         &self,
         error: &SpoolError,
@@ -734,7 +851,8 @@ pub enum StartupAction {
 /// Requires the caller to hold the repository's exclusive runtime state lock. Unknown entries are
 /// never deleted. Every malformed, unowned, or contradictory spool is quarantined and blocks.
 pub fn classify_startup_spools(
-    _lock: &crate::m2_ownership::StateLock,
+    lock: &crate::m2_ownership::StateLock,
+    store: &Path,
     directory: &Path,
     current_epoch: &str,
     current_run: &str,
@@ -743,6 +861,11 @@ pub fn classify_startup_spools(
     max_transaction_events: u64,
     mut existing: impl FnMut(&str, &str) -> ExistingTransaction,
 ) -> Result<Vec<StartupAction>, SpoolError> {
+    if !lock.protects_store(store) {
+        return Err(SpoolError::Invalid(
+            "startup lock does not protect state store",
+        ));
+    }
     if max_event_bytes == 0 || max_transaction_bytes == 0 || max_transaction_events == 0 {
         return Err(SpoolError::Invalid("zero startup scan bound"));
     }
@@ -814,6 +937,12 @@ pub fn classify_startup_spools(
     }
     sync_dir(directory)?;
     sync_dir(&quarantine)?;
+    if actions
+        .iter()
+        .any(|a| matches!(a, StartupAction::Quarantined(_)))
+    {
+        return Err(SpoolError::StartupBlocked);
+    }
     Ok(actions)
 }
 fn quarantine_file(path: &Path, dir: &Path) -> Result<StartupAction, SpoolError> {
@@ -828,9 +957,16 @@ fn quarantine_file(path: &Path, dir: &Path) -> Result<StartupAction, SpoolError>
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
     use crate::m2_ownership::StateLock;
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(1);
+    struct ZeroRandom;
+    impl Randomness for ZeroRandom {
+        fn next_u64(&mut self) -> u64 {
+            0
+        }
+    }
     struct FixedSpace(u64);
     impl FreeSpace for FixedSpace {
         fn available_bytes(&self, _: &Path) -> io::Result<u64> {
@@ -886,7 +1022,7 @@ pub mod tests {
                 memory_prefix_bytes: prefix,
             },
             mem,
-            disk,
+            FilesystemAdmissionController::new(disk),
             Box::new(FixedSpace(space)),
         )
         .unwrap()
@@ -908,7 +1044,7 @@ pub mod tests {
         let h = b.high_water();
         assert_eq!(
             (h.receive_bytes, h.decoder_bytes, h.staging_bytes),
-            (100, 100, 100)
+            (100, 100, 100 + 4 * std::mem::size_of::<Vec<u8>>())
         );
         assert!(h.aggregate_bytes <= 2048);
         b.finish().unwrap();
@@ -937,21 +1073,54 @@ pub mod tests {
             Err(SpoolError::FrameLimit { .. })
         ));
         assert!(b.commit_iter().is_err());
-        let (_, out) = b.failure_observation(
+        let mut event = setup("event-limit", 512, 4096);
+        event.limits.max_event_bytes = 2;
+        assert!(matches!(
+            event.admit_receive(3),
+            Err(SpoolError::EventLimit { observed: 3, .. })
+        ));
+        let mut bytes = setup("byte-limit", 512, 4096);
+        bytes.limits.max_transaction_bytes = 3;
+        push(&mut bytes, b"123").unwrap();
+        assert!(matches!(
+            bytes.admit_receive(1),
+            Err(SpoolError::TransactionBytesLimit { observed: 4, .. })
+        ));
+        let mut events = setup("event-count", 512, 4096);
+        events.limits.max_transaction_events = 1;
+        push(&mut events, b"1").unwrap();
+        assert!(matches!(
+            events.admit_receive(1),
+            Err(SpoolError::TransactionEventsLimit { observed: 2, .. })
+        ));
+        let clock = VirtualClock::new(1000);
+        let mut random = ZeroRandom;
+        let mut context = TransitionContext {
+            clock: &clock,
+            randomness: &mut random,
+        };
+        let (out, action, prepared) = b.apply_failure_policy(
             &SpoolError::TransactionBytesLimit {
                 limit: 1,
                 observed: 2,
             },
             Some("0000000000000010"),
             "cfg",
+            None,
+            &mut context,
         );
         assert!(matches!(
             out,
             CaptureAdmissionOutcome::SafeStopped {
                 feedback_permitted: false,
+                observed_bytes: 2,
                 ..
             }
         ));
+        assert!(
+            matches!(action, PolicyAction::Persist(_))
+                && matches!(prepared, Some(PreparedFailureOperation::StoreAndArm { .. }))
+        );
         b.finish().unwrap();
     }
     #[test]
@@ -961,6 +1130,27 @@ pub mod tests {
         assert!(matches!(e, SpoolError::DiskReserve { .. }));
         assert!(b.spool.as_ref().map(|x| x.2).unwrap_or(0) == 0);
         b.finish().unwrap();
+        let shared_dir = dir("shared-disk");
+        let dev = fs::metadata(&shared_dir).unwrap().dev();
+        let mut admission = DiskAdmission::default();
+        admission
+            .configure(
+                dev,
+                FilesystemLimit {
+                    total_budget: 1000,
+                    emergency_reserve: 100,
+                },
+            )
+            .unwrap();
+        admission.account_existing(dev, 100).unwrap();
+        let shared = FilesystemAdmissionController::new(admission);
+        shared.0.borrow_mut().admit(dev, 600, 400).unwrap();
+        assert_eq!(shared.clone().reserved(dev), 500);
+        assert!(matches!(
+            shared.0.borrow_mut().admit(dev, 600, 1),
+            Err(SpoolError::DiskReserve { .. })
+        ));
+        fs::remove_dir_all(shared_dir).ok();
     }
     #[test]
     fn checksum_failure_is_detected_by_commit_iterator() {
@@ -1014,7 +1204,7 @@ pub mod tests {
                     memory_prefix_bytes: 0,
                 },
                 mem,
-                disk,
+                FilesystemAdmissionController::new(disk),
                 Box::new(FixedSpace(4096)),
             )
             .unwrap()
@@ -1027,8 +1217,9 @@ pub mod tests {
         drop(bad);
         let malformed = store_dir.join("malformed.spool");
         fs::write(&malformed, b"bad").unwrap();
-        let actions = classify_startup_spools(
+        let blocked = classify_startup_spools(
             &lock,
+            &store,
             &store_dir,
             "epoch",
             "owner",
@@ -1042,21 +1233,19 @@ pub mod tests {
                     ExistingTransaction::Contradictory
                 }
             },
-        )
-        .unwrap();
+        );
+        assert!(matches!(blocked, Err(SpoolError::StartupBlocked)));
         assert_eq!(
-            actions
-                .iter()
-                .filter(|a| matches!(a, StartupAction::RemovedUncommitted(_)))
-                .count(),
-            1
+            fs::read_dir(store_dir.join("quarantine")).unwrap().count(),
+            2
         );
         assert_eq!(
-            actions
-                .iter()
-                .filter(|a| matches!(a, StartupAction::Quarantined(_)))
+            fs::read_dir(&store_dir)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|e| e.path().extension().and_then(|v| v.to_str()) == Some("spool"))
                 .count(),
-            2
+            0
         );
         drop(lock);
         fs::remove_dir_all(store_dir).ok();

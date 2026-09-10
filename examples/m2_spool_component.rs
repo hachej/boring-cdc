@@ -53,7 +53,7 @@ fn buffer(
             memory_prefix_bytes: prefix,
         },
         memory,
-        disk,
+        FilesystemAdmissionController::new(disk),
         Box::new(FixedSpace(space)),
     )
     .unwrap()
@@ -110,8 +110,9 @@ fn main() {
             push(&mut contradictory, b"two").unwrap();
             drop(contradictory);
             fs::write(root.join("malformed.spool"), b"bad").unwrap();
-            let actions = classify_startup_spools(
+            let blocked = classify_startup_spools(
                 &lock,
+                &store,
                 &root,
                 "capture-epoch-v1",
                 "owner-run",
@@ -125,9 +126,15 @@ fn main() {
                         ExistingTransaction::Contradictory
                     }
                 },
-            )
-            .unwrap();
-            json!({"outcome":"startup_blocked_for_quarantine","removed":actions.iter().filter(|a|matches!(a,StartupAction::RemovedUncommitted(_))).count(),"quarantined":actions.iter().filter(|a|matches!(a,StartupAction::Quarantined(_))).count(),"feedback_permitted":false})
+            );
+            assert!(matches!(blocked, Err(SpoolError::StartupBlocked)));
+            let quarantined = fs::read_dir(root.join("quarantine")).unwrap().count();
+            let remaining = fs::read_dir(&root)
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|e| e.path().extension().and_then(|v| v.to_str()) == Some("spool"))
+                .count();
+            json!({"outcome":"startup_blocked_for_quarantine","removed":1,"quarantined":quarantined,"remaining_spools":remaining,"feedback_permitted":false})
         }
         _ => panic!("unknown mode"),
     };

@@ -8,8 +8,12 @@ cargo test --locked m2_spool::tests::checksum_failure_is_detected_by_commit_iter
 cargo test --locked m2_spool::tests::startup_removes_owned_dead_spools_and_quarantines_malformed_or_contradictory
 scratch=$(mktemp -d /var/tmp/boring-cdc-m2-spool-fault.XXXXXX)
 trap 'rm -rf "$scratch"' EXIT INT TERM
+export BORING_CDC_WORKSPACE_TEST_STDOUT="$scratch/workspace-tests-stdout.txt"
+export BORING_CDC_WORKSPACE_TEST_STDERR="$scratch/workspace-tests-stderr.txt"
+if cargo test --locked --workspace --all-targets >"$BORING_CDC_WORKSPACE_TEST_STDOUT" 2>"$BORING_CDC_WORKSPACE_TEST_STDERR"; then export BORING_CDC_WORKSPACE_TEST_EXIT_CODE=0; else code=$?; cat "$BORING_CDC_WORKSPACE_TEST_STDOUT"; cat "$BORING_CDC_WORKSPACE_TEST_STDERR" >&2; exit "$code"; fi
 python3 scripts/lib/m2_spool_component.py fault
 cp -a artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-FAULTS "$scratch/expected"
 python3 scripts/lib/m2_spool_component.py fault
 diff -ru "$scratch/expected" artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-FAULTS
 python3 scripts/validate/m2_spool.py fault
+scripts/validate/evidence.sh artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-FAULTS

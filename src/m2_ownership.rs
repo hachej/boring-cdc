@@ -62,6 +62,8 @@ pub trait SourceLockSession {
 /// ownership covers reads, reconciliation and remote effects between transactions.
 pub struct StateLock {
     file: File,
+    lock_dev: u64,
+    lock_ino: u64,
     requires_reconciliation: bool,
 }
 impl StateLock {
@@ -127,9 +129,19 @@ impl StateLock {
         )?;
         file.sync_all()?;
         Ok(Self {
+            lock_dev: metadata.dev(),
+            lock_ino: metadata.ino(),
             file,
             requires_reconciliation,
         })
+    }
+
+    /// Proves this guard owns the sidecar derived from the supplied SQLite store.
+    pub fn protects_store(&self, store: &Path) -> bool {
+        store
+            .with_extension("ownership.lock")
+            .metadata()
+            .is_ok_and(|m| m.dev() == self.lock_dev && m.ino() == self.lock_ino)
     }
 
     fn mark_clean_release(&mut self) -> Result<(), OwnershipError> {
