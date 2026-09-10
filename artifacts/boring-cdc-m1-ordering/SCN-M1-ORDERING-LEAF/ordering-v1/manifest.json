@@ -30,11 +30,20 @@
       "stdout_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-3.log",
       "stdout_sha256": "cf754512f481b969ca133a49fc3661289916871d4377e6b7f4f9c6073604a7a5",
       "version": "Python 3.13.3"
+    },
+    {
+      "argv": "cargo test --locked m1_source_identity::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-4.stderr",
+      "stderr_sha256": "176e6177fd7b6e6f37e87dc1c0c58ca0d71162ecaf71ef338e54bda9c2e85942",
+      "stdout_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/command-4.log",
+      "stdout_sha256": "0f22707ec4dec67427bfd383a8d50e5e698a0e5f858837fdcedf845b543c4ffb",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "cadf8b1e5488e6f6e1f49393ae75673aa511e934",
+  "git_commit": "19f1f12c34ebe51e37ec9927a6d41cf5c07c9a2e",
   "owner_bead": "boring-cdc-m1-ordering",
   "redaction": {
     "checked": true,
@@ -46,7 +55,7 @@
       "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/versions.json",
       "contracts/m1/ordering-cases.json"
     ],
-    "digest": "b1079f8573af24136c82e024030650c5aa970581ded82ea355b7ba164d863d19",
+    "digest": "3bafbef1e13249715c26ca516eb5e07de7e3737f6b766e774babe31f50147c30",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
