@@ -3,7 +3,10 @@
 //! Database adapters provide catalog facts and lock-waiter observations. This module owns the
 //! deterministic contract comparison and guard lifecycle, but deliberately performs no I/O.
 
-use crate::m1_decoder::{PgoutputEvent, RowKind};
+use crate::m1_decoder::{
+    CopyBothEvent, DecodeFailure, Decoder, PgoutputEvent, RelationContract as WireRelationContract,
+    RowKind, WireLimits,
+};
 use crate::m1_transition_kernel::DurableSourceBoundary;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -111,7 +114,9 @@ impl RelationContract {
 }
 
 fn is_nullable_no_default_addition(old: &RelationContract, next: &RelationContract) -> bool {
-    if old.key != next.key
+    if old.namespace != next.namespace
+        || old.relation_name != next.relation_name
+        || old.key != next.key
         || old.partition != next.partition
         || old.publication_member != next.publication_member
     {
@@ -135,6 +140,68 @@ fn is_nullable_no_default_addition(old: &RelationContract, next: &RelationContra
                 .union(&BTreeSet::from([c.attnum]))
                 .copied()
                 .collect()
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AdmissionDecision {
+    Admit,
+    BlockCapture(&'static str),
+    BlockDestination(&'static str),
+}
+
+/// Fixture-level admission for the schema/delete-safety dimensions carried by the fingerprint.
+pub fn validate_relation_admission(
+    contract: &RelationContract,
+    capture_type_oids: &BTreeSet<u32>,
+    destination_type_oids: &BTreeSet<u32>,
+    destination_supports_delete: bool,
+) -> AdmissionDecision {
+    if !contract.publication_member {
+        return AdmissionDecision::BlockCapture("SELECTED_TABLE_NOT_PUBLISHED");
+    }
+    if contract
+        .columns
+        .iter()
+        .filter(|c| !c.dropped)
+        .any(|c| !capture_type_oids.contains(&c.type_oid))
+    {
+        return AdmissionDecision::BlockCapture("SOURCE_TYPE_UNSUPPORTED");
+    }
+    let effective_key = match contract.key.replica_identity_mode.as_str() {
+        "default" => Some(&contract.key.primary_attnums),
+        "index" => contract
+            .key
+            .replica_identity_index
+            .as_ref()
+            .and_then(|name| contract.key.unique_indexes.get(name)),
+        _ => None,
+    };
+    let Some(key) = effective_key else {
+        return AdmissionDecision::BlockCapture("REPLICA_IDENTITY_UNSUPPORTED");
+    };
+    if key.is_empty()
+        || key.iter().any(|attnum| {
+            contract
+                .columns
+                .iter()
+                .find(|c| c.attnum == *attnum)
+                .is_none_or(|c| c.nullable || c.dropped)
+        })
+    {
+        return AdmissionDecision::BlockCapture("REPLICA_IDENTITY_INCOMPLETE");
+    }
+    if !destination_supports_delete {
+        return AdmissionDecision::BlockDestination("DESTINATION_DELETE_UNSUPPORTED");
+    }
+    if contract
+        .columns
+        .iter()
+        .filter(|c| !c.dropped)
+        .any(|c| !destination_type_oids.contains(&c.type_oid))
+    {
+        return AdmissionDecision::BlockDestination("DESTINATION_TYPE_INCOMPATIBLE");
+    }
+    AdmissionDecision::Admit
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -165,7 +232,8 @@ pub struct DurableFenceProof {
 }
 impl DurableFenceProof {
     /// Only the journal transaction owner can supply the durable boundary capability.
-    pub fn from_journal_commit(
+    #[cfg(test)]
+    fn from_journal_commit(
         capture_epoch: u64,
         generation: u64,
         table_set_fingerprint: String,
@@ -398,6 +466,92 @@ impl RelationValidationGate {
     }
     pub fn feedback_allowed(&self) -> bool {
         !self.blocked && self.pending.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum GuardedDecodeFailure {
+    Catalog(DdlFailure),
+    Decoder(DecodeFailure),
+}
+
+/// Owns the decoder so no row or feedback API is reachable without full catalog admission.
+pub struct GuardedDecoder {
+    decoder: Decoder,
+    catalog: RelationValidationGate,
+    blocked: bool,
+}
+impl GuardedDecoder {
+    pub fn new(limits: WireLimits) -> Self {
+        Self {
+            decoder: Decoder::new(limits),
+            catalog: RelationValidationGate::default(),
+            blocked: false,
+        }
+    }
+    pub fn decode_copy_data(
+        &mut self,
+        frame: &[u8],
+    ) -> Result<CopyBothEvent, GuardedDecodeFailure> {
+        if self.blocked {
+            return Err(GuardedDecodeFailure::Catalog(DdlFailure::contract(
+                "GUARDED_DECODER_BLOCKED",
+            )));
+        }
+        let event = self
+            .decoder
+            .decode_copy_data(frame)
+            .map_err(GuardedDecodeFailure::Decoder)?;
+        if let CopyBothEvent::XLogData {
+            event: pgoutput, ..
+        } = &event
+        {
+            if let Err(failure) = self.catalog.observe_decoder_event(pgoutput) {
+                self.blocked = true;
+                return Err(GuardedDecodeFailure::Catalog(failure));
+            }
+        }
+        Ok(event)
+    }
+    pub fn admit_relation(
+        &mut self,
+        wire: WireRelationContract,
+        catalog: &RelationContract,
+        expected: Option<&RelationContract>,
+        active_generation: bool,
+    ) -> Result<ContractDecision, GuardedDecodeFailure> {
+        if self.blocked {
+            return Err(GuardedDecodeFailure::Catalog(DdlFailure::contract(
+                "GUARDED_DECODER_BLOCKED",
+            )));
+        }
+        let id = wire.relation.id;
+        let decision = self
+            .catalog
+            .admit_catalog(id, catalog, expected, active_generation)
+            .map_err(|failure| {
+                self.blocked = true;
+                GuardedDecodeFailure::Catalog(failure)
+            })?;
+        self.decoder.admit_relation(wire).map_err(|failure| {
+            self.blocked = true;
+            GuardedDecodeFailure::Decoder(failure)
+        })?;
+        Ok(decision)
+    }
+    pub fn standby_status(
+        &self,
+        boundary: DurableSourceBoundary,
+        unix_time_micros: i64,
+        reply_requested: bool,
+    ) -> Result<Vec<u8>, GuardedDecodeFailure> {
+        if self.blocked || !self.catalog.feedback_allowed() || self.decoder.is_feedback_blocked() {
+            return Err(GuardedDecodeFailure::Catalog(DdlFailure::contract(
+                "FEEDBACK_BEFORE_FULL_RELATION_VALIDATION",
+            )));
+        }
+        Decoder::standby_status(boundary, unix_time_micros, reply_requested)
+            .map_err(GuardedDecodeFailure::Decoder)
     }
 }
 
@@ -725,6 +879,128 @@ pub(crate) mod tests {
                 .is_err()
         );
         assert!(!gate.feedback_allowed());
+    }
+
+    // SCENARIO: SCN-M1-DDL-ADMISSION-COMPATIBILITY
+    #[test]
+    fn selected_types_keys_delete_and_destination_compatibility_fail_independently() {
+        let base = relation(1);
+        let capture = BTreeSet::from([20]);
+        let destination = BTreeSet::from([20]);
+        assert_eq!(
+            validate_relation_admission(&base, &capture, &destination, true),
+            AdmissionDecision::Admit
+        );
+        assert_eq!(
+            validate_relation_admission(&base, &BTreeSet::new(), &destination, true),
+            AdmissionDecision::BlockCapture("SOURCE_TYPE_UNSUPPORTED")
+        );
+        let mut unique = base.clone();
+        unique.key.primary_attnums.clear();
+        unique.key.replica_identity_mode = "index".into();
+        unique.key.replica_identity_index = Some("logical_key".into());
+        unique
+            .key
+            .unique_indexes
+            .insert("logical_key".into(), vec![1]);
+        assert_eq!(
+            validate_relation_admission(&unique, &capture, &destination, true),
+            AdmissionDecision::Admit
+        );
+        unique.columns[0].nullable = true;
+        assert_eq!(
+            validate_relation_admission(&unique, &capture, &destination, true),
+            AdmissionDecision::BlockCapture("REPLICA_IDENTITY_INCOMPLETE")
+        );
+        assert_eq!(
+            validate_relation_admission(&base, &capture, &destination, false),
+            AdmissionDecision::BlockDestination("DESTINATION_DELETE_UNSUPPORTED")
+        );
+        assert_eq!(
+            validate_relation_admission(&base, &capture, &BTreeSet::new(), true),
+            AdmissionDecision::BlockDestination("DESTINATION_TYPE_INCOMPATIBLE")
+        );
+        let mut absent = base.clone();
+        absent.publication_member = false;
+        assert_eq!(
+            validate_relation_admission(&absent, &capture, &destination, true),
+            AdmissionDecision::BlockCapture("SELECTED_TABLE_NOT_PUBLISHED")
+        );
+    }
+
+    // SCENARIO: SCN-M1-DDL-DECODED-RELATION-DML
+    #[test]
+    fn decoded_wire_relation_must_pass_full_catalog_before_row_and_feedback() {
+        fn xlog(payload: Vec<u8>) -> Vec<u8> {
+            let mut out = vec![b'w'];
+            out.extend(1u64.to_be_bytes());
+            out.extend(2u64.to_be_bytes());
+            out.extend(3i64.to_be_bytes());
+            out.extend(payload);
+            out
+        }
+        let mut rel = vec![b'R'];
+        rel.extend(1u32.to_be_bytes());
+        rel.extend(b"public\0t1\0");
+        rel.push(b'd');
+        rel.extend(1u16.to_be_bytes());
+        rel.push(1);
+        rel.extend(b"id\0");
+        rel.extend(20u32.to_be_bytes());
+        rel.extend((-1i32).to_be_bytes());
+        let mut guarded = GuardedDecoder::new(WireLimits::default());
+        assert!(guarded.decode_copy_data(&xlog(rel)).is_ok());
+        let boundary = crate::m1_transition_kernel::synthetic_durable_boundary(
+            crate::m1_transition_kernel::ReceivedLsn::from_wire(8),
+            crate::m1_transition_kernel::JournalCursor::from_store(9),
+        );
+        assert!(
+            guarded
+                .standby_status(boundary, 946_684_800_000_000, false)
+                .is_err()
+        );
+        let wire_relation = crate::m1_decoder::Relation {
+            id: 1,
+            namespace: "public".into(),
+            name: "t1".into(),
+            replica_identity: b'd',
+            columns: vec![crate::m1_decoder::Column {
+                key: true,
+                name: "id".into(),
+                type_oid: 20,
+                type_modifier: -1,
+            }],
+        };
+        guarded
+            .admit_relation(
+                WireRelationContract {
+                    relation: wire_relation,
+                    key_columns: vec![0],
+                    control: None,
+                },
+                &relation(1),
+                None,
+                false,
+            )
+            .unwrap();
+        let mut begin = vec![b'B'];
+        begin.extend(8u64.to_be_bytes());
+        begin.extend(0i64.to_be_bytes());
+        begin.extend(1u32.to_be_bytes());
+        guarded.decode_copy_data(&xlog(begin)).unwrap();
+        let mut insert = vec![b'I'];
+        insert.extend(1u32.to_be_bytes());
+        insert.push(b'N');
+        insert.extend(1u16.to_be_bytes());
+        insert.push(b't');
+        insert.extend(1u32.to_be_bytes());
+        insert.extend(b"1");
+        assert!(guarded.decode_copy_data(&xlog(insert)).is_ok());
+        assert!(
+            guarded
+                .standby_status(boundary, 946_684_800_000_000, false)
+                .is_ok()
+        );
     }
 
     #[test]

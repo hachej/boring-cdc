@@ -31,9 +31,9 @@ for major in 15 16 17; do
   'partition_root',(SELECT inhparent FROM pg_inherits WHERE inhrelid=c.oid LIMIT 1),'partition_key_hash',CASE WHEN c.relkind='p' THEN md5(pg_get_partkeydef(c.oid)) ELSE NULL END,
   'partition_bounds_hash',CASE WHEN c.relispartition THEN md5(pg_get_expr(c.relpartbound,c.oid)) ELSE NULL END,
   'publication_member',EXISTS(SELECT 1 FROM pg_publication_tables p WHERE p.pubname='ddl_pub' AND p.schemaname=n.nspname AND p.tablename=c.relname),
-  'publication_attnums',(SELECT jsonb_agg(a.attnum ORDER BY a.attnum) FROM pg_attribute a WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped))::text)
+  'publication_attnums',(SELECT jsonb_agg(a.attnum ORDER BY a.attnum) FROM pg_publication_tables p CROSS JOIN LATERAL unnest(p.attnames) projected(name) JOIN pg_attribute a ON a.attrelid=c.oid AND a.attname=projected.name WHERE p.pubname='ddl_pub' AND p.schemaname=n.nspname AND p.tablename=c.relname))::text)
  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='guarded'"; }
- psql "$dsn" -v ON_ERROR_STOP=1 -qc 'CREATE PUBLICATION ddl_pub FOR TABLE public.guarded'
+ psql "$dsn" -v ON_ERROR_STOP=1 -qc 'CREATE PUBLICATION ddl_pub FOR TABLE public.guarded (id,payload)'
  before=$(fingerprint)
  start_guard() {
   PGAPPNAME=boring_cdc_ddl_guard psql "$dsn" -v ON_ERROR_STOP=1 -qc 'BEGIN READ ONLY; LOCK TABLE public.guarded IN ACCESS SHARE MODE; SELECT pg_sleep(90)' >"$tmp/guard-$major.out" 2>"$tmp/guard-$major.err" & guard_pid=$!
@@ -50,8 +50,17 @@ for major in 15 16 17; do
   set +e; PGAPPNAME=boring_cdc_ddl_waiter psql "$dsn" -v ON_ERROR_STOP=1 -qc "SET lock_timeout='300ms'; $ddl" >/dev/null 2>"$err"; rc=$?; set -e
   [ "$rc" -ne 0 ] && grep -q 'lock timeout' "$err" || { echo "E_DDL_DID_NOT_CONFLICT major=$major case=$label" >&2; exit 1; }
  }
- # Execute a DDL conflict at each lifecycle boundary rather than merely labeling one lock.
- for phase in guard-before-export export copy durable-fence; do start_guard; conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' "$phase"; stop_guard; done
+ # Guard-before-export boundary.
+ start_guard; conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' guard-before-export; stop_guard
+ # Export boundary: a real command-idle exported snapshot coexists with the independent guard.
+ start_guard; PGAPPNAME=boring_cdc_snapshot_exporter psql "$dsn" -v ON_ERROR_STOP=1 -qc 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SELECT pg_export_snapshot(); SELECT pg_sleep(90)' >"$tmp/export-$major.out" 2>"$tmp/export-$major.err" & session_pid=$!
+ i=0; while [ "$i" -lt 60 ]; do [ "$(psql "$dsn" -Atqc "SELECT count(*) FROM pg_stat_activity WHERE application_name='boring_cdc_snapshot_exporter'")" = 1 ] && break; i=$((i+1)); sleep 1; done; [ "$i" -lt 60 ]; conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' export; psql "$dsn" -Atqc "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name='boring_cdc_snapshot_exporter'" | grep -qx t; wait "$session_pid" >/dev/null 2>&1 || true; stop_guard
+ # Copy boundary: a real repeatable-read importer has read the selected relation.
+ start_guard; PGAPPNAME=boring_cdc_snapshot_importer psql "$dsn" -v ON_ERROR_STOP=1 -qc 'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SELECT count(*) FROM public.guarded; SELECT pg_sleep(90)' >"$tmp/copy-$major.out" 2>"$tmp/copy-$major.err" & session_pid=$!
+ i=0; while [ "$i" -lt 60 ]; do [ "$(psql "$dsn" -Atqc "SELECT count(*) FROM pg_stat_activity WHERE application_name='boring_cdc_snapshot_importer'")" = 1 ] && break; i=$((i+1)); sleep 1; done; [ "$i" -lt 60 ]; conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' copy; psql "$dsn" -Atqc "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name='boring_cdc_snapshot_importer'" | grep -qx t; wait "$session_pid" >/dev/null 2>&1 || true; stop_guard
+ # Durable-fence boundary: fence state is committed and observed while the guard still conflicts.
+ psql "$dsn" -qc 'CREATE TABLE public.capture_fence(generation bigint PRIMARY KEY, nonce bigint NOT NULL); INSERT INTO public.capture_fence VALUES (7,99)'
+ start_guard; [ "$(psql "$dsn" -Atqc 'SELECT nonce FROM public.capture_fence WHERE generation=7')" = 99 ]; conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' durable-fence; stop_guard
  # Execute the complete admitted operation matrix under one guarded generation.
  start_guard; index=0
  matrix="$tmp/matrix-$major"; python3 -c 'import json; [print(x["sql"]) for x in json.load(open("contracts/m1/ddl-fixtures.json"))["admitted_ddl_matrix"]]' >"$matrix"

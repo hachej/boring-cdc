@@ -35,7 +35,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-FULL-FINGERPRINT"
+        "SCN-M1-DDL-ADMISSION-COMPATIBILITY"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-CHANGE-A-COLUMN-TYPE",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -45,7 +45,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-KEY-DELETE-SAFETY"
+        "SCN-M1-DDL-ADMISSION-COMPATIBILITY"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-DELETE-SUPPORT-AND-DESTINATION-SPECIFIC-DELETE-SEMANTICS",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -55,7 +55,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-KEY-DELETE-SAFETY"
+        "SCN-M1-DDL-ADMISSION-COMPATIBILITY"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-PRIMARY-UNIQUE-KEYS-AND-POSTGRES-REPLICA-IDENTITY",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -65,7 +65,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-KEY-DELETE-SAFETY"
+        "SCN-M1-DDL-ADMISSION-COMPATIBILITY"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-REMOVE-USABLE-REPLICA-IDENTITY",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -75,7 +75,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-FULL-FINGERPRINT"
+        "SCN-M1-DDL-ADMISSION-COMPATIBILITY"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-SELECTED-TABLE-AND-COLUMN-TYPES",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -85,7 +85,7 @@
     {
       "evidence_status": "pending",
       "executed_by": [
-        "SCN-M1-DDL-FULL-FINGERPRINT"
+        "SCN-M1-DDL-ADMISSION-COMPATIBILITY"
       ],
       "id": "REQ-SCHEMA-AND-DELETE-SAFETY-SOURCE-TO-DESTINATION-SCHEMA-COMPATIBILITY",
       "owner_bead": "boring-cdc-m1-ddl-fixtures",
@@ -178,6 +178,14 @@
     {
       "expected": "malformed catalog contracts and actual decoder rows remain blocked before feedback",
       "id": "SCN-M1-DDL-VALIDATION-ERROR"
+    },
+    {
+      "expected": "real decoded Relation frame requires full catalog admission before decoded row and standby feedback",
+      "id": "SCN-M1-DDL-DECODED-RELATION-DML"
+    },
+    {
+      "expected": "selected-table publication, source type, effective unique identity, destination type, and delete support block independently",
+      "id": "SCN-M1-DDL-ADMISSION-COMPATIBILITY"
     }
   ],
   "catalog_fingerprint_fields": [
