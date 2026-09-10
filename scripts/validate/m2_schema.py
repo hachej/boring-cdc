@@ -19,8 +19,10 @@ for version in (1,2,3,4):
  declared=re.search(rf'const MIGRATION_{version}_CHECKSUM: &str\s*=\s*"sha256:([0-9a-f]{{64}})";',src).group(1)
  import hashlib
  if hashlib.sha256(migration.encode()).hexdigest()!=declared: errors.append(f'migration {version} checksum mismatch')
-for literal in ('WRITER_BUSY_TIMEOUT','READER_MAX_AGE','READER_MAX_ROWS'):
+for literal in ('READER_MAX_AGE','READER_MAX_ROWS'):
  pos=src.find('pub const '+literal)
  if pos<0 or 'M0-PROVISIONAL: boring-cdc-m2-schema' not in src[max(0,pos-100):pos]: errors.append(f'missing provisional marker for {literal}')
+pos=src.find('pub const WRITER_BUSY_TIMEOUT')
+if pos<0 or 'M0-PROVISIONAL: boring-cdc-m2-schema' in src[max(0,pos-100):pos]: errors.append('writer busy timeout was not reconciled')
 print(json.dumps({'schema_version':'validation-result/v1','validator':'m2-schema/v1','valid':not errors,'findings':errors},sort_keys=True,separators=(',',':')))
 raise SystemExit(bool(errors))

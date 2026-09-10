@@ -2,7 +2,7 @@
   "schema_version": "m2-failure-policy-cases/v1",
   "owner_bead": "boring-cdc-m2.1",
   "policy_version": "failure-policy-v1",
-  "fixed_seed": "failure-policy-v1",
+  "fixed_seed": "0x424344435f52455452595f563031",
   "evidence_tier": "leaf",
   "test_doubles": [
     "StrictDomainHook"
@@ -13,37 +13,6 @@
     "boring-cdc-m4-durability",
     "boring-cdc-m5-loops"
   ],
-  "provisional_literals": {
-    "base_delay_ms": 1000,
-    "max_delay_ms": 300000,
-    "max_attempts": 8,
-    "jitter_basis_points": 2000,
-    "marker": "M0-PROVISIONAL: boring-cdc-m2.1",
-    "taxonomy": [
-      "transient",
-      "deterministic",
-      "integrity",
-      "continuity",
-      "configuration",
-      "resource_pressure",
-      "operator_blocked"
-    ],
-    "stable_error_codes": [
-      "transport_unavailable",
-      "deadline_exceeded",
-      "invalid_record",
-      "checksum_mismatch",
-      "history_unavailable",
-      "unsupported_configuration",
-      "resource_limit",
-      "operator_pause"
-    ],
-    "typed_hook_shapes": [
-      "capture",
-      "clickhouse",
-      "archive"
-    ]
-  },
   "cases": [
     {
       "id": "SCN-M2-FAILURE-ENUM",
@@ -110,5 +79,36 @@
       "test": "persistence_cas_projections_execute_inside_bounded_harness",
       "assertion": "bounded Harness schedules execute production observe, re-arm, clear, and supplied-transaction SQLite CAS projections"
     }
-  ]
+  ],
+  "confirmed_literals": {
+    "base_delay_ms": 250,
+    "max_delay_ms": 30000,
+    "max_attempts": 10,
+    "taxonomy": [
+      "transient_io",
+      "transient_source",
+      "transient_destination",
+      "rate_limited",
+      "integrity",
+      "unsupported",
+      "ownership_lost",
+      "configuration"
+    ],
+    "stable_error_codes": [
+      "BCDC_SHARED_TRANSPORT_UNAVAILABLE",
+      "BCDC_SHARED_DEADLINE_EXCEEDED",
+      "BCDC_SHARED_INVALID_RECORD",
+      "BCDC_SHARED_CHECKSUM_MISMATCH",
+      "BCDC_SHARED_HISTORY_UNAVAILABLE",
+      "BCDC_SHARED_UNSUPPORTED_CONFIGURATION",
+      "BCDC_SHARED_RESOURCE_LIMIT",
+      "BCDC_SHARED_OPERATOR_PAUSE"
+    ],
+    "typed_hook_shapes": [
+      "capture",
+      "clickhouse",
+      "archive"
+    ],
+    "jitter": "full [0,delay]"
+  }
 }

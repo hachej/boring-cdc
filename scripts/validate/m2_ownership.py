@@ -9,9 +9,10 @@ ids=[x['id'] for x in c['cases']]
 if len(ids)!=len(set(ids)): errors.append('duplicate scenario IDs')
 for x in c['cases']:
  if not re.search(r'fn\s+'+re.escape(x['test'])+r'\s*\(',src): errors.append('missing test '+x['test'])
-for symbol in ('MAX_COMMAND_BYTES','COMMAND_TIMEOUT'):
+for symbol,literal in (('MAX_COMMAND_BYTES','1024 * 1024'),('MAX_RESPONSE_BYTES','4 * 1024 * 1024'),('COMMAND_READ_TIMEOUT','Duration::from_secs(10)'),('COMMAND_WRITE_TIMEOUT','Duration::from_secs(30)')):
  p=src.find('pub const '+symbol)
- if p<0 or 'M0-PROVISIONAL: boring-cdc-d-security' not in src[max(0,p-100):p]: errors.append('missing provisional marker '+symbol)
+ if p<0 or literal not in src[p:p+140]: errors.append('confirmed literal mismatch '+symbol)
+if 'M0-PROVISIONAL: boring-cdc-d-security' in src: errors.append('reconciled security marker remains')
 for required in ('SourceLockSession','OwnershipGuard','AdminCredential','RequestWriter','expected_run_id: Option<String>','OfflineDryRun','OfflineConfirm','libc::SO_PEERCRED','open_directory_components_nofollow'):
  if required not in src: errors.append('missing reusable boundary '+required)
 if 'owner_uid' in src: errors.append('caller-supplied owner UID remains in authorization path')

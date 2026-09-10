@@ -1,0 +1,82 @@
+{
+  "schema_version": "m2-m0-provisional-reconciliation/v1",
+  "owner_bead": "boring-cdc-7fz",
+  "answered_cards": [
+    {
+      "question_id": "5a994cfd-e4e2-46a7-b512-5dae280acae0",
+      "submitted_at": "2026-09-10T14:03:30.910Z",
+      "values_sha256": "91da63153fb6eea5c3aee7e2697324217113b3104c5a7d37ad1aabc543fa4eef"
+    },
+    {
+      "question_id": "765bd3b2-4b68-4102-a9ec-43ca93357390",
+      "submitted_at": "2026-09-10T14:03:30.949Z",
+      "values_sha256": "05005015cb43d00a2248c0089285af1276d7820572cc6d9d37b69f7b0ec6cbcb"
+    }
+  ],
+  "confirmed": {
+    "security": {
+      "status_listen_addr": "127.0.0.1:8787",
+      "prometheus_listen_addr": "127.0.0.1:8788",
+      "socket_directory_mode": "0700",
+      "socket_mode": "0600",
+      "request_bytes_max": 1048576,
+      "response_bytes_max": 4194304,
+      "read_timeout_seconds": 10,
+      "write_timeout_seconds": 30
+    },
+    "canonical_key_components_max": 8,
+    "failure_policy": {
+      "version": "failure-policy-v1",
+      "test_seed": "0x424344435f52455452595f563031",
+      "base_delay_ms": 250,
+      "multiplier": 2,
+      "max_delay_ms": 30000,
+      "max_attempts": 10,
+      "jitter": "full [0,delay]",
+      "classes": [
+        "transient_io",
+        "transient_source",
+        "transient_destination",
+        "rate_limited",
+        "integrity",
+        "unsupported",
+        "ownership_lost",
+        "configuration"
+      ],
+      "stable_code_shape": "BCDC_<DOMAIN>_<CAUSE>",
+      "expected_close_identity": ["run_id", "capture_generation"]
+    },
+    "sqlite_writer_busy_timeout_ms": 5000
+  },
+  "mismatches_corrected": [
+    "security request bytes 65536 -> 1048576",
+    "security response bytes 65536 -> 4194304",
+    "security command timeout 5s -> read 10s and write 30s",
+    "canonical key arity 32 -> 8",
+    "failure base delay 1000ms -> 250ms",
+    "failure delay cap 300000ms -> 30000ms",
+    "failure attempts 8 -> 10",
+    "failure symmetric +/-20% jitter -> full [0,delay] jitter",
+    "failure seed failure-policy-v1/SplitMix literal -> approved ChaCha20 test seed",
+    "failure seven-class provisional taxonomy -> approved eight-class taxonomy",
+    "failure lowercase codes -> BCDC_<DOMAIN>_<CAUSE> codes",
+    "expected-close generation-only binding -> run_id plus capture generation"
+  ],
+  "answered_sections_without_marked_constants_on_this_branch": [
+    "supported_values",
+    "wal_cap",
+    "compose"
+  ],
+  "untouched_provisional_owners": [
+    "boring-cdc-d-archive-durability",
+    "boring-cdc-d-backfill",
+    "boring-cdc-d-ch-accept",
+    "boring-cdc-d-ddl",
+    "boring-cdc-d-event-id",
+    "boring-cdc-d-pg-protocol",
+    "boring-cdc-d-publication",
+    "boring-cdc-m1.6",
+    "boring-cdc-m2-schema:READER_MAX_AGE",
+    "boring-cdc-m2-schema:READER_MAX_ROWS"
+  ]
+}

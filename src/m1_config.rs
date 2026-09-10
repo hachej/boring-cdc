@@ -232,9 +232,7 @@ impl Default for Observability {
     fn default() -> Self {
         Self {
             log_level: "info".into(),
-            // M0-PROVISIONAL: boring-cdc-d-security (RECOMMENDED loopback default).
             status_listen_addr: "127.0.0.1:8787".into(),
-            // M0-PROVISIONAL: boring-cdc-d-security (RECOMMENDED loopback default).
             prometheus_listen_addr: "127.0.0.1:8788".into(),
             authentication: false,
             tls: false,
@@ -260,13 +258,12 @@ impl Default for OperatorEndpoint {
     fn default() -> Self {
         Self {
             socket_path: "run/boring-cdc/operator.sock".into(),
-            // M0-PROVISIONAL: boring-cdc-d-security (RECOMMENDED 0700/0600 endpoint).
             directory_mode: 0o700,
             socket_mode: 0o600,
             peer_credentials: true,
-            max_request_bytes: Bytes(65_536),
-            max_response_bytes: Bytes(65_536),
-            timeout_ms: Milliseconds(5_000),
+            max_request_bytes: Bytes(1_048_576),
+            max_response_bytes: Bytes(4_194_304),
+            timeout_ms: Milliseconds(10_000),
             result_retention_ms: Milliseconds(86_400_000),
             confirmation_expiry_ms: Milliseconds(300_000),
         }

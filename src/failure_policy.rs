@@ -9,69 +9,67 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 
-// M0-PROVISIONAL: boring-cdc-m2.1
 pub const POLICY_VERSION: &str = "failure-policy-v1";
-// M0-PROVISIONAL: boring-cdc-m2.1
-pub const JITTER_SEED: &str = "failure-policy-v1";
-// M0-PROVISIONAL: boring-cdc-m2.1
-pub const JITTER_SEED_U64: u64 = 0x6661_696c_7572_652d;
-// M0-PROVISIONAL: boring-cdc-m2.1
-pub const BASE_DELAY_MS: u64 = 1_000;
-// M0-PROVISIONAL: boring-cdc-m2.1
-pub const MAX_DELAY_MS: u64 = 300_000;
-// M0-PROVISIONAL: boring-cdc-m2.1
-pub const MAX_ATTEMPTS: u32 = 8;
-// M0-PROVISIONAL: boring-cdc-m2.1
-pub const JITTER_BASIS_POINTS: u16 = 2_000; // symmetric +/-20%
+pub const JITTER_TEST_SEED: &str = "0x424344435f52455452595f563031";
+// The transition harness accepts u64 randomness; this is the first eight bytes of the
+// approved ChaCha20 test seed. Production supplies OS-CSPRNG samples through Randomness.
+pub const JITTER_HARNESS_SEED_U64: u64 = 0x4243_4443_5f52_4554;
+pub const BASE_DELAY_MS: u64 = 250;
+pub const MAX_DELAY_MS: u64 = 30_000;
+pub const MAX_ATTEMPTS: u32 = 10;
 
-// M0-PROVISIONAL: boring-cdc-m2.1 -- closed taxonomy pending canonical M0 artifact
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FailureClass {
-    Transient,
-    Deterministic,
+    TransientIo,
+    TransientSource,
+    TransientDestination,
+    RateLimited,
     Integrity,
-    Continuity,
+    Unsupported,
+    OwnershipLost,
     Configuration,
-    ResourcePressure,
-    OperatorBlocked,
 }
 
 impl FailureClass {
-    pub const ALL: [Self; 7] = [
-        Self::Transient,
-        Self::Deterministic,
+    pub const ALL: [Self; 8] = [
+        Self::TransientIo,
+        Self::TransientSource,
+        Self::TransientDestination,
+        Self::RateLimited,
         Self::Integrity,
-        Self::Continuity,
+        Self::Unsupported,
+        Self::OwnershipLost,
         Self::Configuration,
-        Self::ResourcePressure,
-        Self::OperatorBlocked,
     ];
 
     pub const fn as_str(self) -> &'static str {
         match self {
-            Self::Transient => "transient",
-            Self::Deterministic => "deterministic",
+            Self::TransientIo => "transient_io",
+            Self::TransientSource => "transient_source",
+            Self::TransientDestination => "transient_destination",
+            Self::RateLimited => "rate_limited",
             Self::Integrity => "integrity",
-            Self::Continuity => "continuity",
+            Self::Unsupported => "unsupported",
+            Self::OwnershipLost => "ownership_lost",
             Self::Configuration => "configuration",
-            Self::ResourcePressure => "resource_pressure",
-            Self::OperatorBlocked => "operator_blocked",
         }
     }
 
     const fn persisted_retry_class(self) -> &'static str {
         match self {
-            Self::Transient | Self::ResourcePressure => "transient",
-            Self::Integrity | Self::Continuity => "integrity_mismatch",
-            Self::Deterministic | Self::Configuration | Self::OperatorBlocked => "deterministic",
+            Self::TransientIo
+            | Self::TransientSource
+            | Self::TransientDestination
+            | Self::RateLimited => "transient",
+            Self::Integrity | Self::OwnershipLost => "integrity_mismatch",
+            Self::Unsupported | Self::Configuration => "deterministic",
         }
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-// M0-PROVISIONAL: boring-cdc-m2.1 -- stable codes pending canonical M0 artifact
 pub enum StableErrorCode {
     TransportUnavailable,
     DeadlineExceeded,
@@ -86,14 +84,14 @@ pub enum StableErrorCode {
 impl StableErrorCode {
     const fn as_str(self) -> &'static str {
         match self {
-            Self::TransportUnavailable => "transport_unavailable",
-            Self::DeadlineExceeded => "deadline_exceeded",
-            Self::InvalidRecord => "invalid_record",
-            Self::ChecksumMismatch => "checksum_mismatch",
-            Self::HistoryUnavailable => "history_unavailable",
-            Self::UnsupportedConfiguration => "unsupported_configuration",
-            Self::ResourceLimit => "resource_limit",
-            Self::OperatorPause => "operator_pause",
+            Self::TransportUnavailable => "BCDC_SHARED_TRANSPORT_UNAVAILABLE",
+            Self::DeadlineExceeded => "BCDC_SHARED_DEADLINE_EXCEEDED",
+            Self::InvalidRecord => "BCDC_SHARED_INVALID_RECORD",
+            Self::ChecksumMismatch => "BCDC_SHARED_CHECKSUM_MISMATCH",
+            Self::HistoryUnavailable => "BCDC_SHARED_HISTORY_UNAVAILABLE",
+            Self::UnsupportedConfiguration => "BCDC_SHARED_UNSUPPORTED_CONFIGURATION",
+            Self::ResourceLimit => "BCDC_SHARED_RESOURCE_LIMIT",
+            Self::OperatorPause => "BCDC_SHARED_OPERATOR_PAUSE",
         }
     }
 }
@@ -489,7 +487,10 @@ fn observe(
 const fn is_automatic_retry(class: FailureClass) -> bool {
     matches!(
         class,
-        FailureClass::Transient | FailureClass::ResourcePressure
+        FailureClass::TransientIo
+            | FailureClass::TransientSource
+            | FailureClass::TransientDestination
+            | FailureClass::RateLimited
     )
 }
 
@@ -498,9 +499,7 @@ fn retry_delay_ms(sample: u64, attempt: u32) -> u64 {
     let nominal = BASE_DELAY_MS
         .saturating_mul(1_u64 << exponent)
         .min(MAX_DELAY_MS);
-    let width = nominal.saturating_mul(u64::from(JITTER_BASIS_POINTS)) / 10_000;
-    let span = width.saturating_mul(2).saturating_add(1);
-    nominal.saturating_sub(width).saturating_add(sample % span)
+    sample % nominal.saturating_add(1)
 }
 
 fn rearm(
@@ -524,12 +523,13 @@ fn rearm(
         return PolicyAction::RejectedRearm;
     }
     let allowed = match record.class {
-        FailureClass::Transient | FailureClass::ResourcePressure => false,
-        FailureClass::Deterministic | FailureClass::OperatorBlocked => {
-            request.explicit_operator_authorization
-        }
+        FailureClass::TransientIo
+        | FailureClass::TransientSource
+        | FailureClass::TransientDestination
+        | FailureClass::RateLimited => false,
+        FailureClass::Unsupported => request.explicit_operator_authorization,
         FailureClass::Integrity => request.integrity_recovery_proven,
-        FailureClass::Continuity => {
+        FailureClass::OwnershipLost => {
             request.continuity_recovery_proven && request.retained_wal_proven
         }
         FailureClass::Configuration => {
@@ -588,7 +588,6 @@ fn valid_configuration_change(record: &FailureRecord, proof: &RelevantConfigurat
             != proof.replacement.relevant_configuration_fingerprint
 }
 
-// M0-PROVISIONAL: boring-cdc-m2.1 -- typed hook variants pending canonical M0 artifact
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CaptureOutcome {
     SafeStopped,
@@ -611,6 +610,8 @@ pub enum DestinationOutcome {
 pub enum DomainHookInput {
     Capture {
         outcome: CaptureOutcome,
+        run_id: String,
+        expected_close_run_id: Option<String>,
         capture_epoch: String,
         connection_generation: u64,
         expected_close_generation: Option<u64>,
@@ -691,10 +692,14 @@ impl DomainRecoveryHook for StrictDomainHook {
             } => DomainProjection::RecoveryRequired,
             DomainHookInput::Capture {
                 outcome: CaptureOutcome::ExpectedClose,
+                run_id,
+                expected_close_run_id: Some(expected_run_id),
                 connection_generation,
-                expected_close_generation: Some(expected),
+                expected_close_generation: Some(expected_generation),
                 ..
-            } if connection_generation == expected => DomainProjection::ExpectedClose,
+            } if run_id == expected_run_id && connection_generation == expected_generation => {
+                DomainProjection::ExpectedClose
+            }
             DomainHookInput::Capture {
                 outcome: CaptureOutcome::ExpectedClose | CaptureOutcome::UnexpectedClose,
                 ..
@@ -956,13 +961,14 @@ pub fn load_failure(
 
 fn parse_class(value: &str) -> rusqlite::Result<FailureClass> {
     match value {
-        "transient" => Ok(FailureClass::Transient),
-        "deterministic" => Ok(FailureClass::Deterministic),
+        "transient_io" => Ok(FailureClass::TransientIo),
+        "transient_source" => Ok(FailureClass::TransientSource),
+        "transient_destination" => Ok(FailureClass::TransientDestination),
+        "rate_limited" => Ok(FailureClass::RateLimited),
         "integrity" => Ok(FailureClass::Integrity),
-        "continuity" => Ok(FailureClass::Continuity),
+        "unsupported" => Ok(FailureClass::Unsupported),
+        "ownership_lost" => Ok(FailureClass::OwnershipLost),
         "configuration" => Ok(FailureClass::Configuration),
-        "resource_pressure" => Ok(FailureClass::ResourcePressure),
-        "operator_blocked" => Ok(FailureClass::OperatorBlocked),
         _ => Err(rusqlite::Error::InvalidQuery),
     }
 }
@@ -1054,7 +1060,7 @@ pub mod tests {
         now_ms: u64,
     ) -> PolicyAction {
         let clock = VirtualClock::new(now_ms);
-        let mut randomness = SplitMix64::new(JITTER_SEED_U64);
+        let mut randomness = SplitMix64::new(JITTER_HARNESS_SEED_U64);
         let mut context = TransitionContext {
             clock: &clock,
             randomness: &mut randomness,
@@ -1263,7 +1269,7 @@ pub mod tests {
     fn shared_bounded_harness_replays_policy_vectors_deterministically() {
         let record = persisted(run_transition(
             None,
-            PolicyEvent::Observe(observation(FailureClass::Transient, 0)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 0)),
         ));
         let completion = CompletionToken {
             failure_id: record.failure_id.clone(),
@@ -1287,7 +1293,7 @@ pub mod tests {
             max_scheduled_payload_bytes: 4_096,
         })
         .unwrap();
-        let seed = ScheduleSeed::splitmix64(JITTER_SEED_U64);
+        let seed = ScheduleSeed::splitmix64(JITTER_HARNESS_SEED_U64);
         let one = harness
             .execute(
                 &PolicyHarnessDomain::default(),
@@ -1318,7 +1324,7 @@ pub mod tests {
             max_scheduled_payload_bytes: 8_192,
         })
         .unwrap();
-        let seed = ScheduleSeed::splitmix64(JITTER_SEED_U64);
+        let seed = ScheduleSeed::splitmix64(JITTER_HARNESS_SEED_U64);
 
         let observe_domain = PolicyHarnessDomain::default();
         harness
@@ -1342,7 +1348,7 @@ pub mod tests {
 
         let automatic = persisted(run_transition(
             None,
-            PolicyEvent::Observe(observation(FailureClass::Transient, 0)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 0)),
         ));
         let automatic_domain = PolicyHarnessDomain::default();
         harness
@@ -1424,7 +1430,7 @@ pub mod tests {
 
         let due_record = persisted(run_transition_at(
             None,
-            PolicyEvent::Observe(observation(FailureClass::Transient, 0)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 0)),
             0,
         ));
         let due_domain = PolicyHarnessDomain::default();
@@ -1481,7 +1487,7 @@ pub mod tests {
                 &[ScheduledStep::new(
                     "cleared-recurrence",
                     ScheduledAction::Event(PolicyEvent::Observe(observation(
-                        FailureClass::Transient,
+                        FailureClass::TransientIo,
                         0,
                     ))),
                 )],
@@ -1528,7 +1534,7 @@ pub mod tests {
             max_scheduled_payload_bytes: 4_096,
         })
         .unwrap();
-        let seed = ScheduleSeed::splitmix64(JITTER_SEED_U64);
+        let seed = ScheduleSeed::splitmix64(JITTER_HARNESS_SEED_U64);
         let observed = harness
             .execute(
                 &domain,
@@ -1624,13 +1630,14 @@ pub mod tests {
         assert_eq!(
             names,
             [
-                "transient",
-                "deterministic",
+                "transient_io",
+                "transient_source",
+                "transient_destination",
+                "rate_limited",
                 "integrity",
-                "continuity",
-                "configuration",
-                "resource_pressure",
-                "operator_blocked"
+                "unsupported",
+                "ownership_lost",
+                "configuration"
             ]
         );
         for class in FailureClass::ALL {
@@ -1640,38 +1647,54 @@ pub mod tests {
                 class
             );
         }
+        for class in [
+            FailureClass::TransientIo,
+            FailureClass::TransientSource,
+            FailureClass::TransientDestination,
+            FailureClass::RateLimited,
+        ] {
+            assert!(is_automatic_retry(class));
+        }
+        for class in [
+            FailureClass::Integrity,
+            FailureClass::Unsupported,
+            FailureClass::OwnershipLost,
+            FailureClass::Configuration,
+        ] {
+            assert!(!is_automatic_retry(class));
+        }
     }
 
     #[test]
     fn deterministic_schedule_caps_jitters_and_ignores_clock_rollback() {
         let first = persisted(run_transition(
             None,
-            PolicyEvent::Observe(observation(FailureClass::Transient, 10_000)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 10_000)),
         ));
-        assert!((800..=1_200).contains(&(first.next_retry_at_ms.unwrap() - 10_000)));
+        assert!((first.next_retry_at_ms.unwrap() - 10_000) <= 250);
         let replay = persisted(run_transition(
             None,
-            PolicyEvent::Observe(observation(FailureClass::Transient, 10_000)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 10_000)),
         ));
         assert_eq!(first, replay);
         let second = persisted(run_transition_at(
             Some(&first),
-            PolicyEvent::Observe(observation(FailureClass::Transient, 1)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 1)),
             1,
         ));
         assert_eq!(second.last_failed_at_ms, 10_000);
-        assert!((1_600..=2_400).contains(&(second.next_retry_at_ms.unwrap() - 10_000)));
+        assert!((second.next_retry_at_ms.unwrap() - 10_000) <= 500);
         let mut current = second;
         for _ in 2..MAX_ATTEMPTS {
             current = persisted(run_transition(
                 Some(&current),
-                PolicyEvent::Observe(observation(FailureClass::Transient, 10_000)),
+                PolicyEvent::Observe(observation(FailureClass::TransientIo, 10_000)),
             ));
         }
-        assert!(current.next_retry_at_ms.unwrap() - 10_000 <= 360_000);
+        assert!(current.next_retry_at_ms.unwrap() - 10_000 <= MAX_DELAY_MS);
         let exhausted = persisted(run_transition(
             Some(&current),
-            PolicyEvent::Observe(observation(FailureClass::Transient, 10_000)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 10_000)),
         ));
         assert_eq!(exhausted.attempt, MAX_ATTEMPTS + 1);
         assert_eq!(exhausted.next_retry_at_ms, None);
@@ -1681,7 +1704,7 @@ pub mod tests {
     fn restart_preserves_attempt_and_same_deterministic_failure_is_suppressed() {
         let record = persisted(run_transition(
             None,
-            PolicyEvent::Observe(observation(FailureClass::Deterministic, 50)),
+            PolicyEvent::Observe(observation(FailureClass::Unsupported, 50)),
         ));
         assert_eq!(
             run_transition(Some(&record), PolicyEvent::ProcessRestarted),
@@ -1690,7 +1713,7 @@ pub mod tests {
         assert_eq!(
             run_transition(
                 Some(&record),
-                PolicyEvent::Observe(observation(FailureClass::Deterministic, 60))
+                PolicyEvent::Observe(observation(FailureClass::Unsupported, 60))
             ),
             PolicyAction::Suppressed
         );
@@ -1730,9 +1753,9 @@ pub mod tests {
     fn rearm_requires_class_specific_proofs_and_rejects_unrelated_change() {
         for class in [
             FailureClass::Integrity,
-            FailureClass::Continuity,
+            FailureClass::OwnershipLost,
             FailureClass::Configuration,
-            FailureClass::OperatorBlocked,
+            FailureClass::Unsupported,
         ] {
             let record = persisted(run_transition(
                 None,
@@ -1755,7 +1778,7 @@ pub mod tests {
             let mut allowed = base;
             match class {
                 FailureClass::Integrity => allowed.integrity_recovery_proven = true,
-                FailureClass::Continuity => {
+                FailureClass::OwnershipLost => {
                     allowed.continuity_recovery_proven = true;
                     allowed.retained_wal_proven = true;
                 }
@@ -1769,7 +1792,7 @@ pub mod tests {
                         replacement,
                     });
                 }
-                FailureClass::OperatorBlocked => allowed.explicit_operator_authorization = true,
+                FailureClass::Unsupported => allowed.explicit_operator_authorization = true,
                 _ => unreachable!(),
             }
             assert!(matches!(
@@ -1783,7 +1806,7 @@ pub mod tests {
     fn stale_epoch_generation_attempt_and_fingerprint_completions_cannot_clear() {
         let record = persisted(run_transition(
             None,
-            PolicyEvent::Observe(observation(FailureClass::Transient, 0)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 0)),
         ));
         let valid = CompletionToken {
             failure_id: record.failure_id.clone(),
@@ -1832,7 +1855,7 @@ pub mod tests {
     fn retry_due_boundaries_and_cleared_recurrence_fail_closed() {
         let record = persisted(run_transition(
             None,
-            PolicyEvent::Observe(observation(FailureClass::Transient, 0)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 0)),
         ));
         let due = record.next_retry_at_ms.unwrap();
         assert_eq!(
@@ -1848,7 +1871,7 @@ pub mod tests {
         cleared.next_retry_at_ms = None;
         let recurrence = persisted(run_transition(
             Some(&cleared),
-            PolicyEvent::Observe(observation(FailureClass::Transient, due + 1)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, due + 1)),
         ));
         assert!(recurrence.armed);
         assert_eq!(recurrence.attempt, cleared.attempt + 1);
@@ -2021,8 +2044,8 @@ pub mod tests {
             Some(&record),
             PolicyEvent::Observe(FailureObservation {
                 fingerprint: FingerprintInput {
-                    class: FailureClass::Transient,
-                    ..observation(FailureClass::Transient, 0).fingerprint
+                    class: FailureClass::TransientIo,
+                    ..observation(FailureClass::TransientIo, 0).fingerprint
                 },
                 destination_id: Some("destination-a".into()),
             }),
@@ -2063,6 +2086,8 @@ pub mod tests {
         let hook = StrictDomainHook;
         let capture = DomainHookInput::Capture {
             outcome: CaptureOutcome::ExpectedClose,
+            run_id: "run-1".into(),
+            expected_close_run_id: Some("run-1".into()),
             capture_epoch: "epoch".into(),
             connection_generation: 4,
             expected_close_generation: Some(3),
@@ -2071,11 +2096,24 @@ pub mod tests {
         assert_eq!(
             hook.project(&DomainHookInput::Capture {
                 outcome: CaptureOutcome::ExpectedClose,
+                run_id: "run-1".into(),
+                expected_close_run_id: Some("run-1".into()),
                 capture_epoch: "epoch".into(),
                 connection_generation: 4,
                 expected_close_generation: Some(4),
             }),
             DomainProjection::ExpectedClose
+        );
+        assert_eq!(
+            hook.project(&DomainHookInput::Capture {
+                outcome: CaptureOutcome::ExpectedClose,
+                run_id: "run-2".into(),
+                expected_close_run_id: Some("run-1".into()),
+                capture_epoch: "epoch".into(),
+                connection_generation: 4,
+                expected_close_generation: Some(4),
+            }),
+            DomainProjection::OwnershipLost
         );
         assert_eq!(
             hook.project(&DomainHookInput::ClickHouse {
@@ -2113,7 +2151,7 @@ pub mod tests {
         writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','archive','config-a','epoch-a',7)", []).unwrap();
         let record = persisted(run_transition(
             None,
-            PolicyEvent::Observe(observation(FailureClass::Transient, 1_000)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 1_000)),
         ));
         let tx = writer.connection_mut().transaction().unwrap();
         PreparedFailureOperation::StoreAndArm {
@@ -2158,7 +2196,7 @@ pub mod tests {
         );
         let retry = persisted(run_transition(
             Some(&record),
-            PolicyEvent::Observe(observation(FailureClass::Transient, 2_000)),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 2_000)),
         ));
         let tx = writer.connection_mut().transaction().unwrap();
         PreparedFailureOperation::StoreAndArm {

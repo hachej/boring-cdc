@@ -16,10 +16,10 @@ use std::time::{Duration, Instant};
 
 pub const SOCKET_DIR_MODE: u32 = 0o700;
 pub const SOCKET_MODE: u32 = 0o600;
-// M0-PROVISIONAL: boring-cdc-d-security
-pub const MAX_COMMAND_BYTES: usize = 64 * 1024;
-// M0-PROVISIONAL: boring-cdc-d-security
-pub const COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
+pub const MAX_COMMAND_BYTES: usize = 1024 * 1024;
+pub const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+pub const COMMAND_READ_TIMEOUT: Duration = Duration::from_secs(10);
+pub const COMMAND_WRITE_TIMEOUT: Duration = Duration::from_secs(30);
 // v0.1 supports named Linux filesystems only; libc flags are used descriptor-relative.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -535,7 +535,7 @@ pub fn validate_socket(
     if bytes > MAX_COMMAND_BYTES {
         return Err("message_too_large");
     }
-    if elapsed > COMMAND_TIMEOUT {
+    if elapsed > COMMAND_READ_TIMEOUT {
         return Err("request_timeout");
     }
     Ok(())
@@ -1047,7 +1047,12 @@ pub(crate) mod tests {
             Err("message_too_large")
         );
         assert_eq!(
-            validate_socket(&p, &accepted, 1, COMMAND_TIMEOUT + Duration::from_millis(1)),
+            validate_socket(
+                &p,
+                &accepted,
+                1,
+                COMMAND_READ_TIMEOUT + Duration::from_millis(1)
+            ),
             Err("request_timeout")
         );
         drop(client);

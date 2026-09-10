@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 pub const SCHEMA_VERSION: i64 = 4;
-// M0-PROVISIONAL: boring-cdc-m2-schema
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
