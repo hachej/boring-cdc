@@ -16,5 +16,10 @@ case "$1" in
     [ $# -eq 0 ] || { echo "postgres-contract validator takes no extra options" >&2; exit 2; }
     exec python3 "$(dirname "$0")/postgres_contract.py"
     ;;
+  boring-cdc-m0-storage-model)
+    shift
+    [ $# -eq 0 ] || { echo "storage-model validator takes no extra options" >&2; exit 2; }
+    exec python3 "$(dirname "$0")/storage_contract.py"
+    ;;
 esac
 exec python3 "$(dirname "$0")/../lib/core_validator.py" artifact "$@"

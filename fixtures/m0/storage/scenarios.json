@@ -1,0 +1,1124 @@
+{
+  "cases": [
+    {
+      "executor_id": "boring-cdc-m2-journal",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_READY",
+        "redacted": true,
+        "state": "initialized",
+        "status_code": "BCDC_STORAGE_READY"
+      },
+      "fixture_id": "SCN-M0-STORAGE-FRESH-INIT",
+      "hook": "before_schema",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 1,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "fresh_path",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-journal",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_SQLITE_WRITER_PRAGMA_MISMATCH",
+        "redacted": true,
+        "state": "capture_safe_stopped",
+        "status_code": "BCDC_SQLITE_WRITER_PRAGMA_MISMATCH"
+      },
+      "fixture_id": "SCN-M0-STORAGE-WRITER-OFF-OBSERVER-FULL",
+      "hook": "writer_admission",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 2,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "writer_sync_off",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-journal",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_SQLITE_WRITER_ATTESTED",
+        "redacted": true,
+        "state": "writer_admitted",
+        "status_code": "BCDC_SQLITE_WRITER_ATTESTED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-REOPENED-WRITER",
+      "hook": "connection_reopen",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 3,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "pooled_writer_reopen",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-ownership",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_SQLITE_WRITER_ATTESTATION_STALE",
+        "redacted": true,
+        "state": "writer_unverified",
+        "status_code": "BCDC_SQLITE_WRITER_ATTESTATION_STALE"
+      },
+      "fixture_id": "SCN-M0-STORAGE-STALE-ATTESTATION",
+      "hook": "attestation_expiry",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 4,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "attestation_age_10001ms",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-preflight",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_CHECK_READONLY",
+        "redacted": true,
+        "state": "unchanged",
+        "status_code": "BCDC_STORAGE_CHECK_READONLY"
+      },
+      "fixture_id": "SCN-M0-STORAGE-READONLY-CHECK",
+      "hook": "check_real_store",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 5,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "existing_store",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-preflight",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_STORAGE_FILESYSTEM_UNSUPPORTED",
+        "redacted": true,
+        "state": "configuration_rejected",
+        "status_code": "BCDC_STORAGE_FILESYSTEM_UNSUPPORTED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-UNSUPPORTED-FS",
+      "hook": "filesystem_probe",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 6,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "tmpfs",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-reconcile",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_CRASH_RECOVERED",
+        "redacted": true,
+        "state": "recovered_last_ack",
+        "status_code": "BCDC_STORAGE_CRASH_RECOVERED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-EXT4-ABRUPT-HOST",
+      "hook": "host_power_cut",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 7,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "ext4_ordered_barrier",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-reconcile",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_CRASH_RECOVERED",
+        "redacted": true,
+        "state": "recovered_last_ack",
+        "status_code": "BCDC_STORAGE_CRASH_RECOVERED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-XFS-ABRUPT-HOST",
+      "hook": "host_power_cut",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 8,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "xfs_v5_barrier",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "xfs",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-reconcile",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_TXN_REPLAY",
+        "redacted": true,
+        "state": "replay_required",
+        "status_code": "BCDC_STORAGE_TXN_REPLAY"
+      },
+      "fixture_id": "SCN-M0-STORAGE-CRASH-BEFORE-COMMIT",
+      "hook": "before_sqlite_commit",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 9,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "transaction_open",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-reconcile",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_TXN_DURABLE",
+        "redacted": true,
+        "state": "duplicate_converges",
+        "status_code": "BCDC_STORAGE_TXN_DURABLE"
+      },
+      "fixture_id": "SCN-M0-STORAGE-CRASH-AFTER-COMMIT",
+      "hook": "after_sqlite_commit_before_feedback",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 10,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "transaction_committed",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_CHECKPOINT_BUSY",
+        "redacted": true,
+        "state": "bounded_deferred",
+        "status_code": "BCDC_STORAGE_CHECKPOINT_BUSY"
+      },
+      "fixture_id": "SCN-M0-STORAGE-CHECKPOINT-BUSY",
+      "hook": "wal_checkpoint_restart",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 11,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "reader_active",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_READER_EXPIRED",
+        "redacted": true,
+        "state": "reader_cancelled_pin_retained",
+        "status_code": "BCDC_STORAGE_READER_EXPIRED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-READER-OVERAGE",
+      "hook": "reader_deadline",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 12,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "reader_age_5001ms",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_PIN_ACTIVE",
+        "redacted": true,
+        "state": "history_retained",
+        "status_code": "BCDC_STORAGE_PIN_ACTIVE"
+      },
+      "fixture_id": "SCN-M0-STORAGE-PIN-LIFETIME",
+      "hook": "reader_release",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 13,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "destination_lag_pin",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_WAL_RECYCLED",
+        "redacted": true,
+        "state": "wal_recyclable",
+        "status_code": "BCDC_STORAGE_WAL_RECYCLED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-WAL-RECYCLING",
+      "hook": "checkpoint_after_reader_cancel",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 14,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "wal_pages_4096",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_VACUUM_PROGRESS",
+        "redacted": true,
+        "state": "vacuum_bounded",
+        "status_code": "BCDC_STORAGE_VACUUM_PROGRESS"
+      },
+      "fixture_id": "SCN-M0-STORAGE-INCREMENTAL-VACUUM",
+      "hook": "incremental_vacuum",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 15,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "freelist_pages_2048",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_STORAGE_FULL_VACUUM_FORBIDDEN",
+        "redacted": true,
+        "state": "operation_rejected",
+        "status_code": "BCDC_STORAGE_FULL_VACUUM_FORBIDDEN"
+      },
+      "fixture_id": "SCN-M0-STORAGE-NO-FULL-VACUUM",
+      "hook": "maintenance_dispatch",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 16,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "automatic_full_vacuum",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-spool",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_SPOOL_ORPHAN_RECLAIMED",
+        "redacted": true,
+        "state": "orphan_removed_dir_synced",
+        "status_code": "BCDC_SPOOL_ORPHAN_RECLAIMED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-SPOOL-ORPHAN-SAFE",
+      "hook": "startup_spool_reconcile",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 17,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "valid_closed_orphan",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-spool",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_SPOOL_ORPHAN_AMBIGUOUS",
+        "redacted": true,
+        "state": "capture_safe_stopped",
+        "status_code": "BCDC_SPOOL_ORPHAN_AMBIGUOUS"
+      },
+      "fixture_id": "SCN-M0-STORAGE-SPOOL-ORPHAN-AMBIGUOUS",
+      "hook": "startup_spool_reconcile",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 18,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "malformed_orphan",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_RESERVATION_ADMITTED",
+        "redacted": true,
+        "state": "admitted",
+        "status_code": "BCDC_STORAGE_RESERVATION_ADMITTED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-STATE-NEAR-LIMIT",
+      "hook": "allocation_admission",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 19,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "state_required_equals_free_minus_reserve",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_STORAGE_RESERVE_PROTECTED",
+        "redacted": true,
+        "state": "capture_safe_stopped",
+        "status_code": "BCDC_STORAGE_RESERVE_PROTECTED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-STATE-OVER-LIMIT",
+      "hook": "allocation_admission",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 20,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "state_required_plus_one",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_ARCHIVE_RESERVE_PROTECTED",
+        "redacted": true,
+        "state": "archive_blocked_capture_bounded",
+        "status_code": "BCDC_ARCHIVE_RESERVE_PROTECTED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-SEPARATE-ARCHIVE-FULL",
+      "hook": "archive_admission",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 21,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "archive_free_below_required",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_STORAGE_SHARED_BUDGET_VALID",
+        "redacted": true,
+        "state": "admitted",
+        "status_code": "BCDC_STORAGE_SHARED_BUDGET_VALID"
+      },
+      "fixture_id": "SCN-M0-STORAGE-SHARED-FS-COMBINED",
+      "hook": "shared_filesystem_admission",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 22,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "state_archive_combined",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 74,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_STORAGE_STATE_UNPERSISTABLE",
+        "redacted": true,
+        "state": "fatal_exit_74",
+        "status_code": "BCDC_STORAGE_STATE_UNPERSISTABLE"
+      },
+      "fixture_id": "SCN-M0-STORAGE-ENOSPC-PERSIST-FAIL",
+      "hook": "sqlite_write_enospc",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 23,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "reserve_breach_fault",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-spool",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_MEMORY_ADMISSION_OK",
+        "redacted": true,
+        "state": "admitted",
+        "status_code": "BCDC_MEMORY_ADMISSION_OK"
+      },
+      "fixture_id": "SCN-M0-STORAGE-MEMORY-AT-LIMIT",
+      "hook": "memory_admission",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 24,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "required_equals_cgroup",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-spool",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_MEMORY_ADMISSION_EXCEEDED",
+        "redacted": true,
+        "state": "configuration_rejected",
+        "status_code": "BCDC_MEMORY_ADMISSION_EXCEEDED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-MEMORY-OVER-LIMIT",
+      "hook": "memory_admission",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 25,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "required_plus_one",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-capture-runtime",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_WIRE_FRAME_LIMIT",
+        "redacted": true,
+        "state": "capture_safe_stopped",
+        "status_code": "BCDC_WIRE_FRAME_LIMIT"
+      },
+      "fixture_id": "SCN-M0-STORAGE-OVERSIZED-WIRE",
+      "hook": "wire_length_before_alloc",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 26,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "8388609",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-spool",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_TRANSACTION_BYTE_LIMIT",
+        "redacted": true,
+        "state": "capture_safe_stopped",
+        "status_code": "BCDC_TRANSACTION_BYTE_LIMIT"
+      },
+      "fixture_id": "SCN-M0-STORAGE-OVERSIZED-TRANSACTION",
+      "hook": "transaction_spool",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 27,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "1073741825",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-journal",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_WRITER_FAIR_SERVICE",
+        "redacted": true,
+        "state": "control_committed_within_250ms",
+        "status_code": "BCDC_WRITER_FAIR_SERVICE"
+      },
+      "fixture_id": "SCN-M0-STORAGE-WRITER-FAIRNESS",
+      "hook": "writer_scheduler",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 28,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "continuous_capture_accepted_control",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-journal",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_WRITER_QUEUE_SATURATED",
+        "redacted": true,
+        "state": "overload_safe_stop",
+        "status_code": "BCDC_WRITER_QUEUE_SATURATED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-WRITER-QUEUE-FULL",
+      "hook": "writer_queue_admission",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 29,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "1025_pending",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-ownership",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_COMMAND_IDEMPOTENT_REPLAY",
+        "redacted": true,
+        "state": "prior_result_returned",
+        "status_code": "BCDC_COMMAND_IDEMPOTENT_REPLAY"
+      },
+      "fixture_id": "SCN-M0-STORAGE-COMMAND-LOST-RESPONSE",
+      "hook": "command_result_commit",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 30,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "same_nonce_request_digest",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-ownership",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "last_complete_durable_only",
+        "log_code": "BCDC_COMMAND_ABORTED_BY_RESTART",
+        "redacted": true,
+        "state": "aborted_no_reexecute",
+        "status_code": "BCDC_COMMAND_ABORTED_BY_RESTART"
+      },
+      "fixture_id": "SCN-M0-STORAGE-COMMAND-RESTART-ABORT",
+      "hook": "startup_command_reconcile",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 31,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "prior_run_nonterminal",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-ownership",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_OWNERSHIP_STATE_LOCKED",
+        "redacted": true,
+        "state": "rejected",
+        "status_code": "BCDC_OWNERSHIP_STATE_LOCKED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-DIRECT-SECOND-WRITER",
+      "hook": "offline_mutation_locks",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 32,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "state_lock_held",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-ownership",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_OWNERSHIP_UNCERTAIN",
+        "redacted": true,
+        "state": "dispatch_fenced_exit",
+        "status_code": "BCDC_OWNERSHIP_UNCERTAIN"
+      },
+      "fixture_id": "SCN-M0-STORAGE-ADVISORY-UNCERTAIN",
+      "hook": "ownership_deadline",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 33,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "probe_uncertain_15001ms",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-reconcile",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_STORAGE_QUICK_CHECK_FAILED",
+        "redacted": true,
+        "state": "journal_corrupt_requires_reseed",
+        "status_code": "BCDC_STORAGE_QUICK_CHECK_FAILED"
+      },
+      "fixture_id": "SCN-M0-STORAGE-QUICK-CHECK-CORRUPT",
+      "hook": "startup_quick_check",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 34,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "corrupt_page",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-reconcile",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_STORAGE_CHECKSUM_MISMATCH",
+        "redacted": true,
+        "state": "journal_corrupt_requires_reseed",
+        "status_code": "BCDC_STORAGE_CHECKSUM_MISMATCH"
+      },
+      "fixture_id": "SCN-M0-STORAGE-CHECKSUM-MISMATCH",
+      "hook": "transaction_checksum_scan",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 35,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "sha256_mismatch",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-preflight",
+      "expected": {
+        "checkpoint": "never past complete transaction boundary",
+        "exit_code": 0,
+        "external_effect": "none unless named durable cleanup",
+        "feedback": "unchanged",
+        "log_code": "BCDC_STORAGE_PERMISSION_WEAK",
+        "redacted": true,
+        "state": "configuration_rejected",
+        "status_code": "BCDC_STORAGE_PERMISSION_WEAK"
+      },
+      "fixture_id": "SCN-M0-STORAGE-PERMISSION-WEAK",
+      "hook": "permission_check",
+      "inputs": {
+        "capture_epoch": "epoch-fixture-0001",
+        "case_seq": 36,
+        "connection_generation": 1,
+        "fault_once": true,
+        "free_bytes": 21474836480,
+        "precondition": "database_mode_0644",
+        "required_free_bytes": 10737418240,
+        "run_id": "run-fixture-0001"
+      },
+      "matrix": {
+        "filesystem": "ext4",
+        "page_size_bytes": 4096,
+        "sqlite_version": "3.45.3"
+      },
+      "seed": "0x53544f524147455f4d305f5631"
+    }
+  ],
+  "contract": "contracts/storage/storage-model.json",
+  "fixed_seed": "0x53544f524147455f4d305f5631",
+  "owner_bead": "boring-cdc-m0-storage-model",
+  "schema_version": "storage-fixtures/v1"
+}

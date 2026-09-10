@@ -1,0 +1,427 @@
+{
+  "admission": {
+    "filesystem_equation": "reserve + spool + sqlite_growth + sqlite_temp + backfill_count*chunk + archive_segment + publish_directory + metadata_rounding, with terms assigned once per physical fs and shared roots combined",
+    "limits": {
+      "archive_publish_and_directory_overhead_bytes": 67108864,
+      "backfill_worker_count": 2,
+      "fixed_metadata_and_rounding_headroom_bytes": 268435456,
+      "max_backfill_chunk_reservation_bytes": 268435456,
+      "max_backfill_worker_memory_bytes": 67108864,
+      "max_capture_spool_reservation_bytes": 2147483648,
+      "max_concurrent_archive_segment_reservation_bytes": 1073741824,
+      "max_event_bytes": 8388608,
+      "max_sqlite_main_and_wal_growth_bytes": 2147483648,
+      "max_sqlite_temp_reservation_bytes": 536870912,
+      "max_transaction_bytes": 1073741824,
+      "max_transaction_events": 100000,
+      "max_wire_frame_bytes": 8388608
+    },
+    "profiles": {
+      "archive": {
+        "action_free_bytes": 8053063680,
+        "critical_free_bytes": 6442450944,
+        "hard_free_bytes": 5368709120,
+        "reserved_free_bytes": 5368709120,
+        "warning_free_bytes": 9663676416
+      },
+      "state": {
+        "action_free_bytes": 15032385536,
+        "critical_free_bytes": 12884901888,
+        "hard_free_bytes": 10737418240,
+        "reserved_free_bytes": 10737418240,
+        "warning_free_bytes": 17179869184
+      }
+    },
+    "provisional": [
+      "// M0-PROVISIONAL: boring-cdc-d-admission",
+      "// M0-PROVISIONAL: boring-cdc-d-values",
+      "// M0-PROVISIONAL: boring-cdc-d-wal-cap"
+    ],
+    "reservation_rules": [
+      "stat filesystem identity, group roots by device id",
+      "compute every term conservatively before run and every bounded allocation",
+      "reserve before allocation",
+      "release only after durable cleanup and parent directory sync",
+      "equal-to boundary admitted; one byte over rejected",
+      "archive-only exhaustion blocks archive first while capture continues only within state/WAL budgets",
+      "state persistence ENOSPC exits 74 after redacted emergency status when possible"
+    ],
+    "runtime_memory": {
+      "admission": "required <= configured process/cgroup memory; adapter may not hide whole transaction or unbounded queue",
+      "destination_workers": {
+        "archive": 134217728,
+        "clickhouse": 134217728
+      },
+      "equation": "fixed_runtime_overhead_budget + copyboth + decoder_queue + event_staging + sqlite_writer + backfill_count*backfill_worker + sum(destination_workers) + telemetry_command",
+      "fixed_runtime_overhead_budget": 268435456,
+      "max_copyboth_receive_buffer_bytes": 16777216,
+      "max_decoder_queue_bytes": 67108864,
+      "max_in_memory_event_staging_bytes": 16777216,
+      "max_sqlite_writer_staging_bytes": 16777216,
+      "required_runtime_memory_bytes": 855638016,
+      "telemetry_and_command_headroom_bytes": 67108864
+    },
+    "source_wal_reaction_reserve_seconds": 120,
+    "units": "bytes unless suffixed _ms/_count"
+  },
+  "artifact_id": "ART-M0-STORAGE-MODEL",
+  "artifact_root": "artifacts/boring-cdc-m0-storage-model/spec",
+  "authority": {
+    "architecture": "docs/PLAN.md \u00a7\u00a78/11/13/16/19",
+    "owner_cards": [
+      "5a994cfd",
+      "765bd3b2"
+    ],
+    "requirements": "docs/REQUIREMENTS.md",
+    "status": "provisional engineering artifact; does not close decision Beads"
+  },
+  "executors": [
+    "boring-cdc-m1-preflight",
+    "boring-cdc-m2-capture-runtime",
+    "boring-cdc-m2-journal",
+    "boring-cdc-m2-ownership",
+    "boring-cdc-m2-pressure",
+    "boring-cdc-m2-reconcile",
+    "boring-cdc-m2-spool"
+  ],
+  "filesystem": {
+    "allowlist": [
+      {
+        "requirements": [
+          "ordered data mode",
+          "barriers enabled",
+          "local block device",
+          "working flock/fcntl"
+        ],
+        "type": "ext4"
+      },
+      {
+        "requirements": [
+          "v5 format",
+          "barriers enabled",
+          "local block device",
+          "working flock/fcntl"
+        ],
+        "type": "xfs"
+      }
+    ],
+    "denied": [
+      "nfs",
+      "smb",
+      "cifs",
+      "fuse",
+      "overlayfs as durable root",
+      "object store",
+      ":memory:",
+      "multi-host"
+    ],
+    "modes": {
+      "command_socket": "0600",
+      "database_and_sidecars": "0600",
+      "roots": "0700",
+      "spool_intents_manifests": "0600"
+    },
+    "ownership": "connector uid only; reject symlink, hardlink count != 1, type/uid/mode swaps",
+    "probe": "disposable child below each configured root; descriptor-relative no-follow operations; sync and remove then parent fsync",
+    "provisional": [
+      "// M0-PROVISIONAL: boring-cdc-d-sqlite",
+      "// M0-PROVISIONAL: boring-cdc-d-archive-durability",
+      "// M0-PROVISIONAL: boring-cdc-d-security"
+    ]
+  },
+  "fixture_ids": [
+    "SCN-M0-STORAGE-FRESH-INIT",
+    "SCN-M0-STORAGE-WRITER-OFF-OBSERVER-FULL",
+    "SCN-M0-STORAGE-REOPENED-WRITER",
+    "SCN-M0-STORAGE-STALE-ATTESTATION",
+    "SCN-M0-STORAGE-READONLY-CHECK",
+    "SCN-M0-STORAGE-UNSUPPORTED-FS",
+    "SCN-M0-STORAGE-EXT4-ABRUPT-HOST",
+    "SCN-M0-STORAGE-XFS-ABRUPT-HOST",
+    "SCN-M0-STORAGE-CRASH-BEFORE-COMMIT",
+    "SCN-M0-STORAGE-CRASH-AFTER-COMMIT",
+    "SCN-M0-STORAGE-CHECKPOINT-BUSY",
+    "SCN-M0-STORAGE-READER-OVERAGE",
+    "SCN-M0-STORAGE-PIN-LIFETIME",
+    "SCN-M0-STORAGE-WAL-RECYCLING",
+    "SCN-M0-STORAGE-INCREMENTAL-VACUUM",
+    "SCN-M0-STORAGE-NO-FULL-VACUUM",
+    "SCN-M0-STORAGE-SPOOL-ORPHAN-SAFE",
+    "SCN-M0-STORAGE-SPOOL-ORPHAN-AMBIGUOUS",
+    "SCN-M0-STORAGE-STATE-NEAR-LIMIT",
+    "SCN-M0-STORAGE-STATE-OVER-LIMIT",
+    "SCN-M0-STORAGE-SEPARATE-ARCHIVE-FULL",
+    "SCN-M0-STORAGE-SHARED-FS-COMBINED",
+    "SCN-M0-STORAGE-ENOSPC-PERSIST-FAIL",
+    "SCN-M0-STORAGE-MEMORY-AT-LIMIT",
+    "SCN-M0-STORAGE-MEMORY-OVER-LIMIT",
+    "SCN-M0-STORAGE-OVERSIZED-WIRE",
+    "SCN-M0-STORAGE-OVERSIZED-TRANSACTION",
+    "SCN-M0-STORAGE-WRITER-FAIRNESS",
+    "SCN-M0-STORAGE-WRITER-QUEUE-FULL",
+    "SCN-M0-STORAGE-COMMAND-LOST-RESPONSE",
+    "SCN-M0-STORAGE-COMMAND-RESTART-ABORT",
+    "SCN-M0-STORAGE-DIRECT-SECOND-WRITER",
+    "SCN-M0-STORAGE-ADVISORY-UNCERTAIN",
+    "SCN-M0-STORAGE-QUICK-CHECK-CORRUPT",
+    "SCN-M0-STORAGE-CHECKSUM-MISMATCH",
+    "SCN-M0-STORAGE-PERMISSION-WEAK"
+  ],
+  "fixture_path": "fixtures/m0/storage/scenarios.json",
+  "owner_bead": "boring-cdc-m0-storage-model",
+  "ownership_commands": {
+    "command_endpoint": {
+      "offline": "must acquire both state and source locks then reconcile",
+      "peer": "same effective uid via SO_PEERCRED",
+      "persistence": "request/result committed idempotently; same ID different digest rejects; restart reconciles intents then aborts nonterminal without reexecution",
+      "read_timeout_ms": 10000,
+      "request_identity": [
+        "server dry-run nonce",
+        "request_id",
+        "run_id",
+        "capture_epoch",
+        "config_fingerprint",
+        "table_set_fingerprint",
+        "anchor_id",
+        "generation",
+        "action_revision",
+        "expiry",
+        "canonical digest",
+        "peer uid"
+      ],
+      "request_max_bytes": 1048576,
+      "response_max_bytes": 4194304,
+      "socket_backlog": 16,
+      "transport": "Unix domain only; status TCP read-only",
+      "write_timeout_ms": 30000
+    },
+    "loss": "fence all dispatch and exit; no in-process reacquire or CopyBoth reopen",
+    "ownership_deadline_ms": 15000,
+    "probe_interval_ms": 5000,
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-security",
+    "source_lock": "dedicated non-pooled advisory backend PID + random nonce",
+    "state_lock": "exclusive nonblocking lock on state root",
+    "takeover_wait_ms": 90000
+  },
+  "pins_gc": {
+    "automatic_gc": "only whole contiguous complete source-transaction ranges older than every active pin/checkpoint/anchor",
+    "expired_pin": "owner reconciliation required before release; uncertainty retains history",
+    "gc_batch_max_ms": 50,
+    "gc_batch_max_transactions": 1000,
+    "logical_pin_fields": [
+      "pin_id",
+      "owner_kind",
+      "owner_id",
+      "capture_epoch",
+      "start_seq",
+      "end_seq",
+      "expires_at",
+      "state"
+    ],
+    "metadata_retention": {
+      "alerts_rows": 10000,
+      "audit_rows": 100000,
+      "completed_command_days": 30,
+      "invalid_generation_days": 30,
+      "retired_generation_days": 90
+    }
+  },
+  "provisional_markers": [
+    "// M0-PROVISIONAL: boring-cdc-d-sqlite",
+    "// M0-PROVISIONAL: boring-cdc-d-admission",
+    "// M0-PROVISIONAL: boring-cdc-d-security",
+    "// M0-PROVISIONAL: boring-cdc-d-archive-durability",
+    "// M0-PROVISIONAL: boring-cdc-d-values",
+    "// M0-PROVISIONAL: boring-cdc-d-wal-cap"
+  ],
+  "result_schema": "contracts/storage/storage-result.schema.json",
+  "safe_stop": {
+    "exit_codes": {
+      "configuration": 78,
+      "ownership_lost": 73,
+      "state_unpersistable": 74,
+      "temporary_dependency": 75
+    },
+    "feedback": "never advance beyond last complete durable safe LSN",
+    "redaction": "no payloads, keys, DSNs, credentials, nonces, raw driver errors, source identifiers, or absolute paths",
+    "states": [
+      "capture_safe_stopped",
+      "writer_unverified",
+      "journal_pressure_warning",
+      "journal_pressure_action",
+      "journal_pressure_critical",
+      "journal_pressure_hard",
+      "journal_corrupt_requires_reseed",
+      "unsafe_durability"
+    ],
+    "status_fields": [
+      "condition_code",
+      "state",
+      "last_safe_lsn",
+      "writer_attestation_age_ms",
+      "filesystem",
+      "free_bytes",
+      "required_free_bytes",
+      "oldest_reader_age_ms",
+      "checkpoint_busy",
+      "wal_bytes_unrecyclable",
+      "active_pin_count",
+      "writer_queue_depth"
+    ]
+  },
+  "schema_version": "storage-contract/v1",
+  "spool": {
+    "lifecycle": [
+      "reserve full canonical transaction before create",
+      "openat O_NOFOLLOW|O_CREAT|O_EXCL mode 0600",
+      "stream framed events and rolling SHA-256",
+      "fdatasync file",
+      "rename to immutable ready name",
+      "fsync parent",
+      "SQLite transaction imports complete spool and advances source checkpoint",
+      "commit",
+      "unlink spool",
+      "fsync parent",
+      "release reservation"
+    ],
+    "no_transaction_splitting": true,
+    "orphan_policy": "under exclusive lock, reclaim only cryptographically complete committed or provably pre-publication spools; malformed/ambiguous blocks",
+    "states": [
+      "allocating",
+      "writing",
+      "synced",
+      "ready",
+      "importing",
+      "committed",
+      "reclaimed",
+      "ambiguous_blocked"
+    ]
+  },
+  "sqlite": {
+    "actual_connection_attestation": {
+      "bound_fields": [
+        "run_id",
+        "connection_generation",
+        "backend_connection_id",
+        "observed_monotonic_ns"
+      ],
+      "freshness_ms": 10000,
+      "observer_may_certify_writer": false,
+      "stale_or_offline": "unverified",
+      "writer_applies_and_reads_back": [
+        "journal_mode",
+        "synchronous",
+        "auto_vacuum",
+        "foreign_keys",
+        "trusted_schema",
+        "wal_autocheckpoint"
+      ]
+    },
+    "connection_pragmas": {
+      "busy_timeout_ms": 5000,
+      "foreign_keys": "ON",
+      "synchronous": "FULL",
+      "temp_store": "FILE",
+      "trusted_schema": "OFF",
+      "wal_autocheckpoint_pages": 0
+    },
+    "connections": {
+      "external_io_while_read_txn": false,
+      "max_copied_batch_bytes": 8388608,
+      "max_reader_age_ms": 5000,
+      "max_reader_pages": 4096,
+      "max_readers": 16,
+      "sole_mutating_runtime": true
+    },
+    "crash_claim": {
+      "covered": [
+        "process crash",
+        "container crash",
+        "abrupt host or VM restart after successful sync"
+      ],
+      "excluded": [
+        "media/controller failure",
+        "filesystem corruption",
+        "hardware lying about flushes"
+      ],
+      "feedback_boundary": "events, source transaction, and durable source checkpoint committed atomically before feedback"
+    },
+    "init_order": [
+      "create parent 0700 and fsync parent",
+      "exclusive state lock",
+      "open with no-follow semantics",
+      "page_size=4096",
+      "auto_vacuum=INCREMENTAL",
+      "journal_mode=WAL",
+      "read back persistent values",
+      "create schema transaction",
+      "commit",
+      "fsync database and parent directory"
+    ],
+    "integrity": {
+      "maintenance_interval_seconds": 300,
+      "maintenance_rows_per_pass": 100000,
+      "missing_or_mismatch": "journal_corrupt_requires_reseed",
+      "recovery": "PRAGMA integrity_check",
+      "startup": "PRAGMA quick_check",
+      "startup_checksum_rows_per_batch": 4096,
+      "transaction_checksum": "SHA-256 over canonical transaction envelope and ordered event hashes"
+    },
+    "maintenance": {
+      "automatic_full_vacuum": "forbidden",
+      "checkpoint_busy_timeout_ms": 50,
+      "checkpoint_cadence_ms": 1000,
+      "checkpoint_max_wal_pages_per_attempt": 4096,
+      "checkpoint_mode": "RESTART",
+      "incremental_vacuum_cadence_ms": 1000,
+      "incremental_vacuum_max_pages": 1024,
+      "offline_full_vacuum": "stopped and backed-up store only",
+      "owner": "single run-owned maintenance scheduler",
+      "wal_autocheckpoint_pages": 0
+    },
+    "migration": {
+      "directory_sync_edges": [
+        "new database creation",
+        "new -wal/-shm lifecycle before durability claim",
+        "schema-version replacement/rename",
+        "spool create/remove/rename",
+        "intent/manifest create/rename/remove"
+      ],
+      "exclusive_locks": [
+        "filesystem state lock",
+        "source advisory lock"
+      ],
+      "failure": "block before run; never partially accept schema",
+      "preflight_backup_required": true,
+      "transactional": true
+    },
+    "page_size_bytes": 4096,
+    "payload_log_file": false,
+    "persistent_pragmas": {
+      "auto_vacuum": "INCREMENTAL",
+      "journal_mode": "WAL",
+      "page_size": 4096
+    },
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-sqlite",
+    "schema_path": "contracts/storage/sqlite-schema.sql",
+    "single_database": true,
+    "version": "3.45.3"
+  },
+  "writer_service": {
+    "blocking_worker_capacity": 4,
+    "capture_max_hold_ms": 50,
+    "essential_classes": [
+      "ownership/failure record",
+      "accepted operator command",
+      "destination checkpoint",
+      "eligible GC/checkpoint",
+      "feedback request/probe"
+    ],
+    "noncapture_max_wait_ms": 250,
+    "overload": "reject new nonessential work; safe-stop capture before essential deadline or reserve breach; never split source transaction",
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-admission",
+    "queue_capacity": 1024,
+    "scheduling": "capture-priority weighted round robin; after each capture transaction, service oldest essential due class before next capture if deadline would be missed",
+    "single_writer": true
+  }
+}

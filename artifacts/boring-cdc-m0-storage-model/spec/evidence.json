@@ -1,0 +1,22 @@
+{
+  "actual_connection_attestation": true,
+  "findings": [],
+  "fixture_count": 36,
+  "input_tree_sha256": "f8a208734f4586683d8a115c04c8d6f537f898755ffb6eaba589bbeca6d267be",
+  "inputs": {
+    "contracts/storage/sqlite-schema.sql": "4d20a9396fecd1b868a26c91ff8bc456bd99a8194cd14c199ae4c819a129e59c",
+    "contracts/storage/storage-fixtures.schema.json": "9b20458b7a7f5cc2c1ff4e5cf7e76ac9a4ae8d8e28ef2e44a5bede628bd8f3aa",
+    "contracts/storage/storage-model.json": "6e7d11d0ca777d362f3f39132ab5b9f04d027a73fc4d5d5edb370d6f75756799",
+    "contracts/storage/storage-model.schema.json": "408c68eec392414cbd0bf148b23ae20230601f8676fb2978e0446b2ce0964b75",
+    "contracts/storage/storage-result.schema.json": "844ff4da1b54ffc653ab79e489ba7eeb41814a05f434a0b3bb5688d3db43b266",
+    "fixtures/m0/storage/scenarios.json": "bf33aa2290ee4eda046dfb5ed610eab2a54a20366899c2c25a3dc6320ede6339"
+  },
+  "owner_bead": "boring-cdc-m0-storage-model",
+  "product_faults": "fault_not_applicable",
+  "runtime_observed": false,
+  "schema_version": "m0-storage-contract-evidence/v1",
+  "source_parent_git_commit": "574b026cfc848e97027157ed6e85bd3612f579a0",
+  "status": "pass",
+  "validator": "scripts/validate/storage_contract.py",
+  "validator_sha256": "e2383e99d75bbacee7b93772a3fa9e82933a82980915bfe984bf476decb8516a"
+}

@@ -188,6 +188,62 @@
       "path": "contracts/scaffold/m0-scaffold.json",
       "sha256": "5b00e384c3ea7f68635c8586021986f1ed01fef237d00ea133974ee01282cb32",
       "status": "complete"
+    },
+    {
+      "id": "ART-M0-STORAGE-EVIDENCE",
+      "owner_bead": "boring-cdc-m0-storage-model",
+      "path": "artifacts/boring-cdc-m0-storage-model/spec/evidence.json",
+      "sha256": "0b4f4d023e386e1815c2d835b432907885e32cee13a19a9448cc44cc5eb05277",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-STORAGE-FIXTURE-SCHEMA",
+      "owner_bead": "boring-cdc-m0-storage-model",
+      "path": "contracts/storage/storage-fixtures.schema.json",
+      "sha256": "9b20458b7a7f5cc2c1ff4e5cf7e76ac9a4ae8d8e28ef2e44a5bede628bd8f3aa",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-STORAGE-FIXTURES",
+      "owner_bead": "boring-cdc-m0-storage-model",
+      "path": "fixtures/m0/storage/scenarios.json",
+      "sha256": "bf33aa2290ee4eda046dfb5ed610eab2a54a20366899c2c25a3dc6320ede6339",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-STORAGE-MODEL",
+      "owner_bead": "boring-cdc-m0-storage-model",
+      "path": "contracts/storage/storage-model.json",
+      "sha256": "6e7d11d0ca777d362f3f39132ab5b9f04d027a73fc4d5d5edb370d6f75756799",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-STORAGE-RESULT-SCHEMA",
+      "owner_bead": "boring-cdc-m0-storage-model",
+      "path": "contracts/storage/storage-result.schema.json",
+      "sha256": "844ff4da1b54ffc653ab79e489ba7eeb41814a05f434a0b3bb5688d3db43b266",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-STORAGE-SCHEMA",
+      "owner_bead": "boring-cdc-m0-storage-model",
+      "path": "contracts/storage/storage-model.schema.json",
+      "sha256": "408c68eec392414cbd0bf148b23ae20230601f8676fb2978e0446b2ce0964b75",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-STORAGE-SQLITE-SCHEMA",
+      "owner_bead": "boring-cdc-m0-storage-model",
+      "path": "contracts/storage/sqlite-schema.sql",
+      "sha256": "4d20a9396fecd1b868a26c91ff8bc456bd99a8194cd14c199ae4c819a129e59c",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-STORAGE-VALIDATOR",
+      "owner_bead": "boring-cdc-m0-storage-model",
+      "path": "scripts/validate/storage_contract.py",
+      "sha256": "e2383e99d75bbacee7b93772a3fa9e82933a82980915bfe984bf476decb8516a",
+      "status": "complete"
     }
   ],
   "schema_version": "m0-artifacts/v1"
