@@ -8,18 +8,18 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/workspace.txt",
-      "stderr_sha256": "41689af1357ad22c7b2457b082b5f71a9b17515f0b25569a01b568b20a0b984b",
+      "stderr_sha256": "dda1da876430480d4e260ad8799f9ae725eb951cc9f322d47a648625c9244b97",
       "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/workspace.txt",
-      "stdout_sha256": "ce44582c2597f5249f1975546d183b04ee08d5e4c0b2562a4f5c441887282e52",
+      "stdout_sha256": "c95794a74f9ba1927f90e678241b45e80f452d9ee3d11139ba110cdbaea1f66c",
       "version": "cargo"
     },
     {
       "argv": "cargo test --locked m1_ddl_fixtures::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/targeted.txt",
-      "stderr_sha256": "625b726366f8ad0b616ac3632105ec8c5967d312c104d374df9b52838e408101",
+      "stderr_sha256": "0a994fcf11c3686b94df429e41a6dd241069ebc0dc1ee47f77fbd06ecf674f1c",
       "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/targeted.txt",
-      "stdout_sha256": "fd7a63dedd9891a64b3769fe82ffa4ee66630fce5f0deacfd6212ade6d6ee384",
+      "stdout_sha256": "3f05a8bd31ddf70937ba642b586383b338367a927c43a564803c9c88e99177fa",
       "version": "cargo"
     },
     {
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "672c92c51003784871980540ebbfdbded55857e1",
+  "git_commit": "460323296444d95b3233f372deea6906f7ea8f1f",
   "owner_bead": "boring-cdc-m1-ddl-fixtures",
   "redaction": {
     "checked": true,
