@@ -1,0 +1,14 @@
+{
+  "schema_version": "boring-cdc/failure-boundary-proof/v1",
+  "owner_bead": "boring-cdc-m2.1.1",
+  "git_commit": "f0c1511ab16af363c31489c4e7a6c503883bf926",
+  "assertions": [
+    "state-bound durable token chain rejects A-B-A authorization replay after reopen",
+    "re-arm and clear compare destination current failure, capture epoch, and generation before failure mutation",
+    "failed CAS commit leaves failure state and destination revision unchanged",
+    "binary length-framed boundary identity distinguishes delimiter adversaries",
+    "bounded deterministic Harness runs complete event inventory and SQLite Store/Rearm/Clear CAS projections"
+  ],
+  "policy_tests": 13,
+  "status": "pass"
+}
