@@ -75,39 +75,39 @@ impl Grammar {
     pub fn usage(self) -> &'static str {
         match self {
             Grammar::Check => "check [--json]",
-            Grammar::Init => "init [--dry-run|--confirm] --confirm-token TOKEN [--json]",
+            Grammar::Init => "init (--dry-run|--confirm --confirm-token TOKEN) [--json]",
             Grammar::Run => "run",
             Grammar::RunBootstrap => "run --bootstrap",
             Grammar::Status => "status [--json]",
             Grammar::BackfillStart => {
-                "backfill start [--dry-run|--confirm] --confirm-token TOKEN [--json]"
+                "backfill start (--dry-run|--confirm --confirm-token TOKEN) [--json]"
             }
             Grammar::BackfillPause => {
-                "backfill pause [--dry-run|--confirm] --confirm-token TOKEN [--json]"
+                "backfill pause (--dry-run|--confirm --confirm-token TOKEN) [--json]"
             }
             Grammar::BackfillResume => {
-                "backfill resume [--dry-run|--confirm] --confirm-token TOKEN [--json]"
+                "backfill resume (--dry-run|--confirm --confirm-token TOKEN) [--json]"
             }
             Grammar::BackfillStatus => "backfill status [--json]",
             Grammar::BackfillRestart => "backfill restart --confirm --confirm-token TOKEN [--json]",
             Grammar::DestinationList => "destination list [--json]",
             Grammar::DestinationAdd => {
-                "destination add DESTINATION --archive-root PATH --continuity-break --from-seq SEQ (--dry-run|--confirm-data-gap) [--json]"
+                "destination add DESTINATION --archive-root PATH --continuity-break --from-seq SEQ (--dry-run|--confirm-data-gap --confirm-token TOKEN) [--json]"
             }
             Grammar::DestinationPause => {
-                "destination pause DESTINATION [--dry-run|--confirm] [--json]"
+                "destination pause DESTINATION (--dry-run|--confirm --confirm-token TOKEN) [--json]"
             }
             Grammar::DestinationResume => {
-                "destination resume DESTINATION [--dry-run|--confirm] [--json]"
+                "destination resume DESTINATION (--dry-run|--confirm --confirm-token TOKEN) [--json]"
             }
             Grammar::DestinationDetach => {
                 "destination detach DESTINATION --confirm --confirm-token TOKEN [--json]"
             }
             Grammar::DestinationPromote => {
-                "destination promote DESTINATION --generation ID --confirm [--json]"
+                "destination promote DESTINATION --generation ID --confirm --confirm-token TOKEN [--json]"
             }
             Grammar::DestinationRetire => {
-                "destination retire DESTINATION --generation ID --confirm [--json]"
+                "destination retire DESTINATION --generation ID --confirm --confirm-token TOKEN [--json]"
             }
             Grammar::DestinationVerify => {
                 "destination verify DESTINATION [--from-seq SEQ] [--json]"
@@ -119,7 +119,7 @@ impl Grammar {
                 "archive verify DESTINATION --selector-fence FENCE --oracle-manifest PATH [--json]"
             }
             Grammar::Replay => {
-                "replay DESTINATION (--from-anchor ANCHOR|--from-seq SEQ|--since TIME) --new-generation ID (--dry-run|--confirm-replay) [--json]"
+                "replay DESTINATION (--from-anchor ANCHOR|--from-seq SEQ|--since TIME) --new-generation ID (--dry-run|--confirm-replay --confirm-token TOKEN) [--json]"
             }
             Grammar::JournalInspect => "journal inspect [--event-id ID] [--json]",
             Grammar::JournalInspectExplain => "journal inspect --event-id ID --explain [--json]",
@@ -127,10 +127,10 @@ impl Grammar {
             Grammar::JournalGc => "journal gc --dry-run [--json]",
             Grammar::RecoverInspect => "recover inspect [--json]",
             Grammar::RecoverPromotion => {
-                "recover promotion DESTINATION --adopt-external-fence --confirm [--json]"
+                "recover promotion DESTINATION --adopt-external-fence --confirm --confirm-token TOKEN [--json]"
             }
             Grammar::RecoverReseed => {
-                "recover reseed [--add-table SCHEMA.TABLE|--resume RESEED_ID] --recreate-publication --recreate-slot (--confirm-data-gap|--confirm) [--json]"
+                "recover reseed ([--add-table SCHEMA.TABLE] --recreate-publication --recreate-slot --confirm-data-gap --confirm-token TOKEN|--resume RESEED_ID --confirm --confirm-token TOKEN) [--json]"
             }
         }
     }
@@ -364,7 +364,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "CMD-DESTINATION-LIST",
         &["destination", "list"],
         "base",
-        "boring-cdc-m2-reconcile",
+        "boring-cdc-m5-ops-cli",
         ReadOnly,
         None,
         None,
@@ -377,7 +377,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "CMD-DESTINATION-ADD",
         &["destination", "add"],
         "base",
-        "boring-cdc-m5-loops",
+        "boring-cdc-m5-ops-cli",
         Mutation,
         LiveOwner,
         ConfirmDataGap,
@@ -390,7 +390,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "CMD-DESTINATION-PAUSE",
         &["destination", "pause"],
         "base",
-        "boring-cdc-m2-reconcile",
+        "boring-cdc-m5-ops-cli",
         Mutation,
         OfflineEligible,
         DryRunThenConfirm,
@@ -403,7 +403,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "CMD-DESTINATION-RESUME",
         &["destination", "resume"],
         "base",
-        "boring-cdc-m2-reconcile",
+        "boring-cdc-m5-ops-cli",
         Mutation,
         LiveOwner,
         DryRunThenConfirm,
@@ -416,7 +416,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "CMD-DESTINATION-DETACH",
         &["destination", "detach"],
         "base",
-        "boring-cdc-m2-reconcile",
+        "boring-cdc-m5-ops-cli",
         Mutation,
         OfflineEligible,
         Confirm,
@@ -429,7 +429,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "CMD-DESTINATION-PROMOTE",
         &["destination", "promote"],
         "base",
-        "boring-cdc-m4-promotion",
+        "boring-cdc-m5-ops-cli",
         Mutation,
         LiveOwner,
         Confirm,
@@ -442,7 +442,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "CMD-DESTINATION-RETIRE",
         &["destination", "retire"],
         "base",
-        "boring-cdc-m4-promotion",
+        "boring-cdc-m5-ops-cli",
         Mutation,
         Maintenance,
         Confirm,
@@ -455,7 +455,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "CMD-DESTINATION-VERIFY",
         &["destination", "verify"],
         "base",
-        "boring-cdc-m4-durability",
+        "boring-cdc-m5-ops-cli",
         ReadOnly,
         None,
         None,
@@ -547,12 +547,12 @@ pub static COMMANDS: &[CommandSpec] = &[
         &["journal", "gc"],
         "base",
         "boring-cdc-m5-gc",
-        Mutation,
-        LiveOwner,
+        ReadOnly,
+        None,
         DryRunOnly,
         true,
-        OWNER_SOURCE,
-        SAFE,
+        &[],
+        &[],
         JournalGc,
     ),
     spec!(
@@ -572,7 +572,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "CMD-RECOVER-PROMOTION",
         &["recover", "promotion"],
         "base",
-        "boring-cdc-m2-init-recovery",
+        "boring-cdc-m5-ops-cli",
         Mutation,
         Maintenance,
         Confirm,
@@ -845,7 +845,9 @@ impl CliEnvelope {
         if self.schema_version != CLI_SCHEMA_VERSION || self.command != spec.id {
             return false;
         }
-        if spec.class == CommandClass::Mutation && self.outcome == "success" {
+        if spec.class == CommandClass::Mutation
+            && matches!(self.outcome.as_str(), "success" | "failed" | "aborted")
+        {
             let Some(trace) = &self.mutation_trace else {
                 return false;
             };

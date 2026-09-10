@@ -408,7 +408,7 @@
       "list"
     ],
     "operation_variant": "base",
-    "owner_bead": "boring-cdc-m2-reconcile",
+    "owner_bead": "boring-cdc-m5-ops-cli",
     "class": "read_only",
     "ownership": "none",
     "confirmation": "none",
@@ -441,7 +441,7 @@
       "add"
     ],
     "operation_variant": "base",
-    "owner_bead": "boring-cdc-m5-loops",
+    "owner_bead": "boring-cdc-m5-ops-cli",
     "class": "mutation",
     "ownership": "live_owner",
     "confirmation": "confirm_data_gap",
@@ -487,7 +487,7 @@
       "pause"
     ],
     "operation_variant": "base",
-    "owner_bead": "boring-cdc-m2-reconcile",
+    "owner_bead": "boring-cdc-m5-ops-cli",
     "class": "mutation",
     "ownership": "offline_eligible",
     "confirmation": "dry_run_then_confirm",
@@ -529,7 +529,7 @@
       "resume"
     ],
     "operation_variant": "base",
-    "owner_bead": "boring-cdc-m2-reconcile",
+    "owner_bead": "boring-cdc-m5-ops-cli",
     "class": "mutation",
     "ownership": "live_owner",
     "confirmation": "dry_run_then_confirm",
@@ -571,7 +571,7 @@
       "detach"
     ],
     "operation_variant": "base",
-    "owner_bead": "boring-cdc-m2-reconcile",
+    "owner_bead": "boring-cdc-m5-ops-cli",
     "class": "mutation",
     "ownership": "offline_eligible",
     "confirmation": "confirm",
@@ -616,7 +616,7 @@
       "promote"
     ],
     "operation_variant": "base",
-    "owner_bead": "boring-cdc-m4-promotion",
+    "owner_bead": "boring-cdc-m5-ops-cli",
     "class": "mutation",
     "ownership": "live_owner",
     "confirmation": "confirm",
@@ -661,7 +661,7 @@
       "retire"
     ],
     "operation_variant": "base",
-    "owner_bead": "boring-cdc-m4-promotion",
+    "owner_bead": "boring-cdc-m5-ops-cli",
     "class": "mutation",
     "ownership": "maintenance",
     "confirmation": "confirm",
@@ -706,7 +706,7 @@
       "verify"
     ],
     "operation_variant": "base",
-    "owner_bead": "boring-cdc-m4-durability",
+    "owner_bead": "boring-cdc-m5-ops-cli",
     "class": "read_only",
     "ownership": "none",
     "confirmation": "none",
@@ -953,14 +953,13 @@
     ],
     "operation_variant": "base",
     "owner_bead": "boring-cdc-m5-gc",
-    "class": "mutation",
-    "ownership": "live_owner",
+    "class": "read_only",
+    "ownership": "none",
     "confirmation": "dry_run_only",
     "json": true,
     "exit_codes": [
       0,
       2,
-      3,
       4,
       5,
       6
@@ -975,20 +974,8 @@
       "raw_path",
       "raw_driver_error"
     ],
-    "control_revisions": [
-      "ownership_revision",
-      "run_id",
-      "source_identity",
-      "capture_epoch",
-      "configuration_fingerprint",
-      "table_set_fingerprint"
-    ],
-    "predicates": [
-      "ownership_current",
-      "plan_unexpired",
-      "fingerprints_match",
-      "resources_sufficient"
-    ],
+    "control_revisions": [],
+    "predicates": [],
     "grammar": "journal_gc"
   },
   {
@@ -1031,7 +1018,7 @@
       "promotion"
     ],
     "operation_variant": "base",
-    "owner_bead": "boring-cdc-m2-init-recovery",
+    "owner_bead": "boring-cdc-m5-ops-cli",
     "class": "mutation",
     "ownership": "maintenance",
     "confirmation": "confirm",
