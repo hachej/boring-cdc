@@ -163,7 +163,7 @@
         {
           "path": "events.jsonl.zst",
           "size_bytes": 66,
-          "sha256": "7935f91e1634a5a4d00ea6a9c199993e0aabfa9bf982fa8a5272c643e6e1cdf1",
+          "sha256": "203a180a85e1d76dc8817bf5dbf71b254137b9950c6a46fdf5b3ee2c3901d554",
           "format": "jsonl-zstd",
           "logical_table_id": "0000000000000000000000000000000000000000000000000000000000000000",
           "relation_schema_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
@@ -207,7 +207,7 @@
         "post_copy_journal_seq": 100
       }
     },
-    "golden_manifest_sha256": "de4519086195872108f10d877fece516a141c866f2953ea0ecd2952f364c042f",
+    "golden_manifest_sha256": "5dff5751fb2a7c38e6dae45df73df82380192d83eb87a43057ff47a14610ada6",
     "generation_ready_bytes": "UTF-8 bytes generation-manifest-sha256:{generation_manifest_sha256} followed by LF",
     "golden_generation_manifest": {
       "schema_version": "archive-generation-manifest/v1",
@@ -229,7 +229,7 @@
       "segment_manifests": [
         {
           "relative_path": "segments/r-00000000000000000100-00000000000000000120/i-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-          "manifest_sha256": "de4519086195872108f10d877fece516a141c866f2953ea0ecd2952f364c042f",
+          "manifest_sha256": "5dff5751fb2a7c38e6dae45df73df82380192d83eb87a43057ff47a14610ada6",
           "start_journal_seq": 100,
           "end_journal_seq": 120,
           "event_count": 2
@@ -246,17 +246,17 @@
         "no_gaps_or_overlaps": true
       }
     },
-    "golden_generation_manifest_sha256": "30de7a07b7e7cb756b75c7169dba11c27ab5a35ef34e3d552b42916f33632420",
+    "golden_generation_manifest_sha256": "beaf0c84efe35c7399ed71623ccdd925e8c411687345ba423bdc03e4ac4cdd58",
     "golden_selector": {
       "schema_version": "archive-selector/v1",
       "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "generation": 7,
       "promotion_fence": 9,
-      "generation_manifest_sha256": "30de7a07b7e7cb756b75c7169dba11c27ab5a35ef34e3d552b42916f33632420",
+      "generation_manifest_sha256": "beaf0c84efe35c7399ed71623ccdd925e8c411687345ba423bdc03e4ac4cdd58",
       "generation_relative_path": "v1/e-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/g-00000000000000000007"
     },
-    "golden_selector_sha256": "4b92a159cd85e5fcc723fec543592e2eed464927906b92c8739528839341321d",
-    "golden_generation_ready_base64": "Z2VuZXJhdGlvbi1tYW5pZmVzdC1zaGEyNTY6MzBkZTdhMDdiN2U3Y2I3NTZiNzVjNzE2OWRiYTExYzI3YWI1YTM1ZWYzNGUzZDU1MmI0MjkxNmYzMzYzMjQyMAo="
+    "golden_selector_sha256": "54fec9a24f3aaf725de96758082302fd2279568b544cd82a017ace079fb25b88",
+    "golden_generation_ready_base64": "Z2VuZXJhdGlvbi1tYW5pZmVzdC1zaGEyNTY6YmVhZjBjODRlZmUzNWM3Mzk5ZWQ3MTYyM2NjZGQ5MjVlOGM0MTE2ODczNDViYTQyM2JkYzAzZTRhYzRjZGQ1OAo="
   },
   "commit_protocol": {
     "intent_fields": [

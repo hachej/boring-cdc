@@ -267,7 +267,9 @@
             "canonical_utf8_sha256",
             "zstd_bytes_base64",
             "zstd_sha256",
-            "writer"
+            "writer",
+            "content_size_bytes",
+            "checksum_present"
           ],
           "properties": {
             "canonical_utf8_base64": {
@@ -284,6 +286,12 @@
             },
             "writer": {
               "type": "string"
+            },
+            "content_size_bytes": {
+              "type": "integer"
+            },
+            "checksum_present": {
+              "type": "boolean"
             }
           }
         },

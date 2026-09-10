@@ -4,21 +4,21 @@
       "id": "ART-M0-ARCHIVE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "artifacts/boring-cdc-m0-archive-model/spec/evidence.json",
-      "sha256": "729b2b911e7b28a610289fb8fd7f236a5cd07a98b4452c17b87537d56749da07",
+      "sha256": "41ac29d9e25ae3ecb8c63c53d9049738681028f8bb286bbdad77dea9c6286f4b",
       "status": "complete"
     },
     {
       "id": "ART-M0-ARCHIVE-FIXTURE-SCHEMA",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-fixtures.schema.json",
-      "sha256": "d0f3b2e0b742c126d2824f34fdedbc858817e4470f6ba4e5896ecf4baf3a84ee",
+      "sha256": "d30612ef3a4fddcc2e99aff383814610802c3966af49b1dbc413cc011f5e99a6",
       "status": "complete"
     },
     {
       "id": "ART-M0-ARCHIVE-FIXTURES",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "fixtures/m0/archive/scenarios.json",
-      "sha256": "d657c954159fed635bfa20656db2de1b23cd1c3f2e3325bde7347f8228a04cf4",
+      "sha256": "8b1f4f0561d9d06037f9985327064ec63c1c90afa1ab08705d3d6224bc0b8e69",
       "status": "complete"
     },
     {
@@ -32,7 +32,7 @@
       "id": "ART-M0-ARCHIVE-MODEL",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.json",
-      "sha256": "6fa9f016a45fe1142b7d0a30cbb54d346bdd60ebab16cd359da513dfe869acf3",
+      "sha256": "df4d5b5cf01f3f7b68ac5682d8d864e6074ec346e75227470e2b164b1d376f8e",
       "status": "complete"
     },
     {
@@ -74,14 +74,14 @@
       "id": "ART-M0-ARCHIVE-SEGMENT-MANIFEST-SCHEMA",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/segment-manifest.schema.json",
-      "sha256": "562f597faa463a021947acb0056dd039a48de23e3a16d12d70411080bbb08b63",
+      "sha256": "047aceed0b73ef36a1cfeb5f6746316caba917c7f16db020ded32e02af442dd0",
       "status": "complete"
     },
     {
       "id": "ART-M0-ARCHIVE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "scripts/validate/archive_contract.py",
-      "sha256": "ddb1686575b468a4e882afcf4a277a67334416b519328774557c53e2b06efea1",
+      "sha256": "daac4bd0eb3a23508623e273ee0ffc90db2bdfb81d6203bac6496fd10c2ee5e4",
       "status": "complete"
     },
     {

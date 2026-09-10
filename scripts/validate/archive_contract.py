@@ -3,6 +3,7 @@ import hashlib
 import importlib.util
 import json
 import subprocess
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -14,8 +15,8 @@ FS = ROOT / "contracts/archive/archive-fixtures.schema.json"
 RS = ROOT / "contracts/archive/archive-result.schema.json"
 SMS = ROOT / "contracts/archive/segment-manifest.schema.json"
 GMS = ROOT / "contracts/archive/generation-manifest.schema.json"
-EXPECTED_CONTRACT_SHA256 = "6fa9f016a45fe1142b7d0a30cbb54d346bdd60ebab16cd359da513dfe869acf3"
-EXPECTED_FIXTURES_SHA256 = "d657c954159fed635bfa20656db2de1b23cd1c3f2e3325bde7347f8228a04cf4"
+EXPECTED_CONTRACT_SHA256 = "df4d5b5cf01f3f7b68ac5682d8d864e6074ec346e75227470e2b164b1d376f8e"
+EXPECTED_FIXTURES_SHA256 = "8b1f4f0561d9d06037f9985327064ec63c1c90afa1ab08705d3d6224bc0b8e69"
 E = ROOT / "artifacts/boring-cdc-m0-archive-model/spec/evidence.json"
 M = ROOT / "contracts/m0/manifest.json"
 A = ROOT / "contracts/m0/artifacts.json"
@@ -39,6 +40,24 @@ def digest(path):
 
 def finding(out, code, path, message):
     out.append({"code": code, "path": path, "message": message})
+
+def validate_segment_manifest_semantics(manifest):
+    findings = []
+    display_ids = set(manifest.get("display_mappings", {}))
+    for index, item in enumerate(manifest.get("files", [])):
+        path = item.get("path", "")
+        if item.get("format") == "jsonl-zstd":
+            if path != "events.jsonl.zst" or item.get("logical_table_id") != "0" * 64 or item.get("relation_schema_fingerprint") != "0" * 64 or item.get("part_ordinal") != 0:
+                finding(findings, "E_JSONL_FILE_IDENTITY", f"files/{index}", "JSONL aggregate path and sentinel identity differ")
+        elif item.get("format") == "parquet-zstd":
+            match = re.fullmatch(r"t-([0-9a-f]{64})/s-([0-9a-f]{64})/part-([0-9]{6})\.parquet", path)
+            if not match or match.group(1) != item.get("logical_table_id") or match.group(2) != item.get("relation_schema_fingerprint") or int(match.group(3)) != item.get("part_ordinal"):
+                finding(findings, "E_PARQUET_FILE_IDENTITY", f"files/{index}", "Parquet path and identity fields differ")
+            elif item["logical_table_id"] not in display_ids:
+                finding(findings, "E_DISPLAY_MAPPING", f"files/{index}", "Parquet table has no hash-addressed display mapping")
+        else:
+            finding(findings, "E_FILE_FORMAT", f"files/{index}", "unknown archive format")
+    return findings
 
 def validate():
     out = []
@@ -81,6 +100,7 @@ def validate():
             positions.append(matches[0])
     if positions != sorted(positions) or -1 in positions:
         finding(out, "E_COMMIT_ORDER", "commit_protocol/ordered_steps", "durability/publication order is not monotonic")
+    out.extend(validate_segment_manifest_semantics(contract["hashes"]["golden_manifest"]))
     hashes = contract["hashes"]
     canonical = json.dumps(hashes["golden_manifest"], sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
     if hashlib.sha256(canonical).hexdigest() != hashes["golden_manifest_sha256"]:
@@ -111,6 +131,18 @@ def validate():
             finding(out, "E_GOLDEN_BYTES", f"golden_vectors/{name}", "golden bytes and SHA-256 differ")
     if hashlib.sha256(json.dumps(vectors["generation_manifest"], sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest() != vectors["generation_manifest_jcs_sha256"]:
         finding(out, "E_GOLDEN_GENERATION_MANIFEST", "golden_vectors/generation_manifest", "fixture generation manifest hash scope differs")
+    zstd_bytes = base64.b64decode(vectors["jsonl"]["zstd_bytes_base64"], validate=True)
+    if zstd_bytes[:4] != bytes.fromhex("28b52ffd"):
+        finding(out, "E_ZSTD_FRAME", "golden_vectors/jsonl", "bad Zstd magic")
+    else:
+        descriptor = zstd_bytes[4]
+        content_size_flag, single_segment, checksum = descriptor >> 6, bool(descriptor & 0x20), bool(descriptor & 0x04)
+        index = 5 + (0 if single_segment else 1) + (0 if descriptor & 0x03 == 0 else (1 if descriptor & 0x03 == 1 else 2 if descriptor & 0x03 == 2 else 4))
+        size_lengths = (1 if single_segment else 0, 2, 4, 8)
+        size_len = size_lengths[content_size_flag]
+        content_size = int.from_bytes(zstd_bytes[index:index + size_len], "little") if size_len else None
+        if not checksum or content_size != vectors["jsonl"]["content_size_bytes"]:
+            finding(out, "E_ZSTD_PARAMETERS", "golden_vectors/jsonl", "golden frame must carry checksum and exact content size")
     manifest_files = {item["format"]: item for item in vectors["segment_manifest"]["files"]}
     for name, format_name, bytes_key, hash_key in (("jsonl", "jsonl-zstd", "zstd_bytes_base64", "zstd_sha256"), ("parquet", "parquet-zstd", "bytes_base64", "sha256")):
         raw = base64.b64decode(vectors[name][bytes_key], validate=True)

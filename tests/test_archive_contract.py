@@ -15,6 +15,12 @@ class ArchiveContractTests(unittest.TestCase):
    if case['expected']['archive_state'].startswith('blocked'): self.assertEqual('unchanged',case['expected']['checkpoint'],case['fixture_id'])
  def test_path_and_selector_are_opaque_and_monotonic(self):
   c=m.load(m.C); self.assertIn('{intent64}',c['layout']['final']); self.assertIn('{fence20}',c['layout']['selector']); self.assertEqual('no-op',c['promotion']['lower_fence']); self.assertEqual('corruption block',c['promotion']['same_fence_different_state'])
+ def test_manifest_identity_semantics_reject_cross_field_mismatch(self):
+  import copy
+  manifest=copy.deepcopy(m.load(m.C)['hashes']['golden_manifest']); manifest['files'][1]['logical_table_id']='9'*64
+  self.assertTrue(m.validate_segment_manifest_semantics(manifest))
+  manifest=copy.deepcopy(m.load(m.C)['hashes']['golden_manifest']); manifest['files'][1]['format']='jsonl-zstd'
+  self.assertTrue(m.validate_segment_manifest_semantics(manifest))
  def test_no_provisional_markers_or_secrets(self):
   text=''.join(p.read_text() for p in (m.C,m.S,m.F,m.FS,m.RS)); self.assertNotIn('// M0-' + 'PROVISIONAL:',text); self.assertNotIn('postgres'+'://',text)
 if __name__=='__main__': unittest.main()
