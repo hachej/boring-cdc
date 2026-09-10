@@ -1,0 +1,1 @@
+{"schema_version":"boring-cdc/source-identity-proof/v1","owner_bead":"boring-cdc-m1-source-identity","cases":13,"targeted_tests":15,"sqlite_used":false,"postgresql_used":false,"persistence_owners":["boring-cdc-m2-schema","boring-cdc-m2-reconcile"],"status":"pass"}
