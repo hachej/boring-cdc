@@ -1,52 +1,27 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://boring-cdc.dev/contracts/event/event.schema.json",
-  "title": "Boring CDC public event v1",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["schema_version", "event_type", "connector_event_id", "capture_epoch", "source_version", "routing"],
-  "properties": {
-    "schema_version": {"const": "boring-cdc/event/v1"},
-    "event_type": {"enum": ["mutation", "control"]},
-    "connector_event_id": {"$ref": "#/$defs/hash"},
-    "capture_epoch": {"type": "integer", "minimum": 1},
-    "source_version": {"$ref": "#/$defs/sourceVersion"},
-    "routing": {"enum": ["business", "control"]},
-    "logical_table_id": {"$ref": "#/$defs/hash"},
-    "relation_fingerprint": {"$ref": "#/$defs/hash"},
-    "key_hash": {"$ref": "#/$defs/hash"},
-    "canonical_key": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"$ref": "#/$defs/keyComponent"}},
-    "mutation_kind": {"enum": ["delete", "upsert"]},
-    "columns": {"type": "array", "items": {"$ref": "#/$defs/column"}},
-    "payload_hash": {"$ref": "#/$defs/hash"},
-    "control": {"$ref": "#/$defs/control"}
-  },
-  "allOf": [
-    {"if": {"properties": {"event_type": {"const": "mutation"}}}, "then": {"required": ["logical_table_id", "relation_fingerprint", "key_hash", "canonical_key", "mutation_kind", "columns", "payload_hash"], "properties": {"routing": {"const": "business"}}, "not": {"required": ["control"]}}},
-    {"if": {"properties": {"event_type": {"const": "control"}}}, "then": {"required": ["control", "payload_hash"], "properties": {"routing": {"const": "control"}}, "not": {"anyOf": [{"required": ["canonical_key"]}, {"required": ["columns"]}, {"required": ["key_hash"]}, {"required": ["relation_fingerprint"]}]}}}
-  ],
-  "$defs": {
-    "hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
-    "sourceVersion": {
-      "type": "object", "additionalProperties": false,
-      "required": ["capture_epoch", "commit_lsn", "origin_rank", "transaction_id", "transaction_ordinal", "mutation_ordinal"],
-      "properties": {
-        "capture_epoch": {"type": "integer", "minimum": 1}, "commit_lsn": {"type": "integer", "minimum": 0},
-        "origin_rank": {"enum": [0,1]}, "transaction_id": {"type": "integer", "minimum": 0, "maximum": 4294967295},
-        "transaction_ordinal": {"type": "integer", "minimum": 0, "maximum": 4294967295}, "mutation_ordinal": {"type": "integer", "minimum": 0, "maximum": 255}
-      }
-    },
-    "keyComponent": {
-      "type": "object", "additionalProperties": false, "required": ["kind", "value"],
-      "properties": {"kind": {"enum": ["bool", "int64", "uint64", "bytes", "text"]}, "value": {}}
-    },
-    "column": {
-      "type": "object", "additionalProperties": false, "required": ["column_id", "state"],
-      "properties": {"column_id": {"type": "integer", "minimum": 0}, "state": {"enum": ["absent_for_schema", "explicit_null", "unchanged_toast", "explicit_value"]}, "type_oid": {"type": "integer", "minimum": 1}, "type_modifier": {"type": "integer"}, "bytes": {"type": "string", "pattern": "^[A-Za-z0-9_-]*$"}}
-    },
-    "control": {
-      "type": "object", "additionalProperties": false, "required": ["kind", "transaction_end_lsn"],
-      "properties": {"kind": {"enum": ["heartbeat", "snapshot_fence", "promotion_fence", "truncate_observed"]}, "transaction_end_lsn": {"type": "integer", "minimum": 0}, "generation": {"type": ["integer", "null"], "minimum": 1}}
-    }
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://boring-cdc.dev/contracts/event/event.schema.json",
+  "title":"Boring CDC public event v1",
+  "oneOf":[{"$ref":"#/$defs/mutation"},{"$ref":"#/$defs/controlEvent"}],
+  "$defs":{
+    "hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
+    "sourceVersion":{"type":"object","additionalProperties":false,"required":["lsn_u64","origin_rank","transaction_ordinal","mutation_ordinal","connector_event_id"],"properties":{"lsn_u64":{"type":"integer","minimum":0},"origin_rank":{"enum":[0,1]},"transaction_ordinal":{"type":"integer","minimum":0,"maximum":4294967295},"mutation_ordinal":{"type":"integer","minimum":0,"maximum":255},"connector_event_id":{"$ref":"#/$defs/hash"}}},
+    "key":{"type":"array","minItems":1,"maxItems":32,"items":{"oneOf":[
+      {"type":"object","additionalProperties":false,"required":["kind","value"],"properties":{"kind":{"const":"bool"},"value":{"type":"boolean"}}},
+      {"type":"object","additionalProperties":false,"required":["kind","value"],"properties":{"kind":{"const":"int64"},"value":{"type":"integer","minimum":-9223372036854775808,"maximum":9223372036854775807}}},
+      {"type":"object","additionalProperties":false,"required":["kind","value"],"properties":{"kind":{"const":"uint64"},"value":{"type":"integer","minimum":0}}},
+      {"type":"object","additionalProperties":false,"required":["kind","value"],"properties":{"kind":{"const":"bytes"},"value":{"type":"string","pattern":"^[A-Za-z0-9_-]*$","maxLength":1366}}},
+      {"type":"object","additionalProperties":false,"required":["kind","value"],"properties":{"kind":{"const":"text"},"value":{"type":"string","maxLength":1024}}}
+    ]}},
+    "column":{"oneOf":[
+      {"type":"object","additionalProperties":false,"required":["column_id","state"],"properties":{"column_id":{"type":"integer","minimum":0,"maximum":4294967295},"state":{"enum":["absent_for_schema","explicit_null","unchanged_toast"]}}},
+      {"type":"object","additionalProperties":false,"required":["column_id","state","type_oid","type_modifier","bytes"],"properties":{"column_id":{"type":"integer","minimum":0,"maximum":4294967295},"state":{"const":"explicit_value"},"type_oid":{"type":"integer","minimum":1,"maximum":4294967295},"type_modifier":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"bytes":{"type":"string","pattern":"^[A-Za-z0-9_-]*$"}}}
+    ]},
+    "baseProperties":{},
+    "mutation":{"type":"object","additionalProperties":false,"required":["schema_version","event_type","connector_event_id","journal_seq","capture_epoch","source_version","routing","operation","logical_table_id","relation_fingerprint","key_hash","canonical_key","mutation_kind","columns","payload_hash"],"properties":{
+      "schema_version":{"const":"boring-cdc/event/v1"},"event_type":{"const":"mutation"},"connector_event_id":{"$ref":"#/$defs/hash"},"journal_seq":{"type":"integer","minimum":1},"capture_epoch":{"type":"integer","minimum":1},"source_version":{"$ref":"#/$defs/sourceVersion"},"routing":{"const":"business"},"operation":{"enum":["snapshot","insert","update","delete"]},"logical_table_id":{"$ref":"#/$defs/hash"},"relation_fingerprint":{"$ref":"#/$defs/hash"},"key_hash":{"$ref":"#/$defs/hash"},"canonical_key":{"$ref":"#/$defs/key"},"before_key":{"anyOf":[{"$ref":"#/$defs/key"},{"type":"null"}]},"mutation_kind":{"enum":["delete","upsert"]},"columns":{"type":"array","items":{"$ref":"#/$defs/column"}},"payload_hash":{"$ref":"#/$defs/hash"},"captured_at":{"type":"string"}
+    }},
+    "control":{"type":"object","additionalProperties":false,"required":["kind","transaction_end_lsn","generation"],"properties":{"kind":{"enum":["heartbeat","capture_fence","promotion_fence","truncate_observed"]},"transaction_end_lsn":{"type":"integer","minimum":0},"generation":{"type":["integer","null"],"minimum":1}}},
+    "controlEvent":{"type":"object","additionalProperties":false,"required":["schema_version","event_type","connector_event_id","journal_seq","capture_epoch","source_version","routing","operation","control","payload_hash"],"properties":{"schema_version":{"const":"boring-cdc/event/v1"},"event_type":{"const":"control"},"connector_event_id":{"$ref":"#/$defs/hash"},"journal_seq":{"type":"integer","minimum":1},"capture_epoch":{"type":"integer","minimum":1},"source_version":{"$ref":"#/$defs/sourceVersion"},"routing":{"const":"control"},"operation":{"const":"control"},"control":{"$ref":"#/$defs/control"},"payload_hash":{"$ref":"#/$defs/hash"},"captured_at":{"type":"string"}}}
   }
 }

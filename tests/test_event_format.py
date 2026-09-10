@@ -23,7 +23,19 @@ class EventFormatContractTests(unittest.TestCase):
 
     def test_every_required_branch_has_an_exact_fixture(self):
         categories = {case["category"] for case in self.vectors["vectors"]}
-        self.assertEqual({"identity", "order", "types", "toast", "control_routing"}, categories)
+        self.assertEqual(
+            {
+                "identity",
+                "order",
+                "types",
+                "limits",
+                "toast",
+                "schema",
+                "stability",
+                "control_routing",
+            },
+            categories,
+        )
         self.assertEqual(set(self.contract["fixture_ids"]), {case["fixture_id"] for case in self.vectors["vectors"]})
 
     def test_golden_hashes_are_content_sensitive(self):

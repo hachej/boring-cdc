@@ -32,15 +32,19 @@
         "SCN-M0-EVENT-KEY-CHANGE-ORDER",
         "SCN-M0-EVENT-TYPE-CANONICAL",
         "SCN-M0-EVENT-TYPE-UNSUPPORTED",
+        "SCN-M0-EVENT-LIMIT-BOUNDARIES",
         "SCN-M0-EVENT-TOAST-STATES",
         "SCN-M0-EVENT-TOAST-KEY-CHANGE-BLOCK",
+        "SCN-M0-EVENT-ADDITIVE-OUTSIDE-BACKFILL",
+        "SCN-M0-EVENT-ADDITIVE-DURING-BACKFILL",
+        "SCN-M0-EVENT-RETRY-STABILITY",
         "SCN-M0-EVENT-CONTROL-HEARTBEAT",
         "SCN-M0-EVENT-CONTROL-FENCE"
       ],
       "id": "ART-M0-EVENT-FORMAT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",
-      "sha256": "6cfc9e0db325d6c5e2d9dfb503c803d34bb247bf3dfb94a5dfeccfb9fd18e744",
+      "sha256": "afe80ecf1b1ec48861c1763414d2966414a9c9eab1bd009a4f36b2a7c101ddb3",
       "status": "complete"
     }
   ],

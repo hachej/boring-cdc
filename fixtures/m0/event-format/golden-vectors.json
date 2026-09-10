@@ -6,6 +6,7 @@
     {
       "category": "identity",
       "event": {
+        "before_key": null,
         "canonical_key": [
           {
             "kind": "int64",
@@ -13,6 +14,7 @@
           }
         ],
         "capture_epoch": 7,
+        "captured_at": "2030-01-01T00:00:00Z",
         "columns": [
           {
             "bytes": "AAAAAAAAACo",
@@ -24,19 +26,20 @@
         ],
         "connector_event_id": "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9",
         "event_type": "mutation",
-        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "journal_seq": 1,
+        "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
         "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
         "mutation_kind": "upsert",
-        "payload_hash": "bbde242a35c00e04951f43bba0a4b0644ed76399c4bb84255b2768c3c070e4b2",
-        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
+        "operation": "insert",
+        "payload_hash": "0d2527c80fbf3b340a9f696d6dbf46ca7ffac5a40a52e1f4e2e0c8b96245e746",
+        "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
         "routing": "business",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "capture_epoch": 7,
-          "commit_lsn": 112,
+          "connector_event_id": "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9",
+          "lsn_u64": 112,
           "mutation_ordinal": 0,
           "origin_rank": 1,
-          "transaction_id": 8,
           "transaction_ordinal": 0
         }
       },
@@ -54,6 +57,7 @@
     {
       "category": "identity",
       "event": {
+        "before_key": null,
         "canonical_key": [
           {
             "kind": "int64",
@@ -61,6 +65,7 @@
           }
         ],
         "capture_epoch": 7,
+        "captured_at": "2030-01-01T00:00:00Z",
         "columns": [
           {
             "bytes": "AAAAAAAAACo",
@@ -70,39 +75,28 @@
             "type_oid": 20
           }
         ],
-        "connector_event_id": "e9b41ec5cb5a178adc6d60fad853a0103a7e1dc3194c4dfe2b3456563cc553ec",
+        "connector_event_id": "9b9de05649239ffba5889a2fb2f4484d337856312c2c9f8f3371e9b922c95127",
         "event_type": "mutation",
-        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "journal_seq": 20,
+        "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
         "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
         "mutation_kind": "upsert",
-        "payload_hash": "b5d0c35fa5b366d9e926dab6e07955aae52ddfd77389003c380460341bd9bc20",
-        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
+        "operation": "snapshot",
+        "payload_hash": "830aaa1f50cf23dc74049a56184aecebd69b2d9cf2a832d5173a771bf11bd5b4",
+        "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
         "routing": "business",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "capture_epoch": 7,
-          "commit_lsn": 80,
+          "connector_event_id": "9b9de05649239ffba5889a2fb2f4484d337856312c2c9f8f3371e9b922c95127",
+          "lsn_u64": 80,
           "mutation_ordinal": 0,
           "origin_rank": 0,
-          "transaction_id": 0,
           "transaction_ordinal": 0
         }
       },
       "expected_outcome": "emit",
       "fixture_id": "SCN-M0-EVENT-SNAPSHOT-IDENTITY",
       "identity_input": {
-        "capture_epoch": 7,
-        "chunk_id": 4,
-        "generation": 2,
-        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
-        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695"
-      },
-      "identity_kind": "snapshot"
-    },
-    {
-      "assertion": "lexicographic source_version within capture_epoch; different capture epochs incomparable",
-      "category": "order",
-      "event": {
         "canonical_key": [
           {
             "kind": "int64",
@@ -110,6 +104,47 @@
           }
         ],
         "capture_epoch": 7,
+        "chunk_id": 4,
+        "generation": 2,
+        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695"
+      },
+      "identity_kind": "snapshot"
+    },
+    {
+      "category": "order",
+      "comparison": {
+        "cross_epoch": "incomparable",
+        "expected": "less",
+        "grouping": [
+          "capture_epoch",
+          "logical_table_id",
+          "canonical_key"
+        ],
+        "left": [
+          112,
+          1,
+          0,
+          0,
+          "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9"
+        ],
+        "right": [
+          124,
+          1,
+          1,
+          0,
+          "633ee4f4ed84a032c11a33b98b935f5d9b01cf0c1daad0d424410ef6a5e2c750"
+        ]
+      },
+      "event": {
+        "before_key": null,
+        "canonical_key": [
+          {
+            "kind": "int64",
+            "value": 42
+          }
+        ],
+        "capture_epoch": 7,
+        "captured_at": "2030-01-01T00:00:00Z",
         "columns": [
           {
             "bytes": "AAAAAAAAACo",
@@ -119,21 +154,22 @@
             "type_oid": 20
           }
         ],
-        "connector_event_id": "da343972b47c53416131ef9792e14ecc94f64c3a3b44fee9a7103eeceda58f50",
+        "connector_event_id": "633ee4f4ed84a032c11a33b98b935f5d9b01cf0c1daad0d424410ef6a5e2c750",
         "event_type": "mutation",
-        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "journal_seq": 2,
+        "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
         "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
         "mutation_kind": "upsert",
-        "payload_hash": "a374c872fbe8b54f438588df11685a3b85133d32d662a01169de3fd249aa1bec",
-        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
+        "operation": "update",
+        "payload_hash": "f2f1742d59254bd88cb55b9fa26abb59822e1f8d04a7ae76e40d48dfecdc4247",
+        "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
         "routing": "business",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "capture_epoch": 7,
-          "commit_lsn": 112,
+          "connector_event_id": "633ee4f4ed84a032c11a33b98b935f5d9b01cf0c1daad0d424410ef6a5e2c750",
+          "lsn_u64": 124,
           "mutation_ordinal": 0,
           "origin_rank": 1,
-          "transaction_id": 8,
           "transaction_ordinal": 1
         }
       },
@@ -144,113 +180,208 @@
         "mutation_ordinal": 0,
         "row_ordinal": 1,
         "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
-        "transaction_end_lsn": 120
+        "transaction_end_lsn": 128
       },
       "identity_kind": "wal"
     },
     {
-      "assertion": "mutation ordinal 0 old-key delete precedes ordinal 1 new-key upsert",
+      "assertion": "old-key delete mutation 0 then complete new-key upsert mutation 1",
       "category": "order",
-      "event": {
-        "canonical_key": [
-          {
-            "kind": "int64",
-            "value": 42
-          }
-        ],
-        "capture_epoch": 7,
-        "columns": [
-          {
-            "bytes": "AAAAAAAAACo",
-            "column_id": 0,
-            "state": "explicit_value",
-            "type_modifier": -1,
-            "type_oid": 20
-          }
-        ],
-        "connector_event_id": "e74713974578a5a0772fb9beecc147527ae1e1eff277635ff81b889c3f2eaa2e",
-        "event_type": "mutation",
-        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
-        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
-        "mutation_kind": "upsert",
-        "payload_hash": "8b95b01e0d4e61799ad9c08a1f8c1b43424fab720dee00da097c38c4a66c5000",
-        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
-        "routing": "business",
-        "schema_version": "boring-cdc/event/v1",
-        "source_version": {
+      "events": [
+        {
+          "before_key": null,
+          "canonical_key": [
+            {
+              "kind": "int64",
+              "value": 41
+            }
+          ],
           "capture_epoch": 7,
-          "commit_lsn": 112,
-          "mutation_ordinal": 1,
-          "origin_rank": 1,
-          "transaction_id": 8,
-          "transaction_ordinal": 2
+          "captured_at": "2030-01-01T00:00:00Z",
+          "columns": [],
+          "connector_event_id": "ed98c956e6e2033be8c07141fc92eade0893d0b5438832b735d7e55f2c6d1ad3",
+          "event_type": "mutation",
+          "journal_seq": 3,
+          "key_hash": "cb4fc90a97db06a85fcce9099800321e09a1aa69487b9d45b9d0b89204894116",
+          "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+          "mutation_kind": "delete",
+          "operation": "update",
+          "payload_hash": "c1038c39742ee74410da667b843d16f5ce63cd0bfdc0ab7f4523da60dd8945e9",
+          "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
+          "routing": "business",
+          "schema_version": "boring-cdc/event/v1",
+          "source_version": {
+            "connector_event_id": "ed98c956e6e2033be8c07141fc92eade0893d0b5438832b735d7e55f2c6d1ad3",
+            "lsn_u64": 112,
+            "mutation_ordinal": 0,
+            "origin_rank": 1,
+            "transaction_ordinal": 2
+          }
+        },
+        {
+          "before_key": [
+            {
+              "kind": "int64",
+              "value": 41
+            }
+          ],
+          "canonical_key": [
+            {
+              "kind": "int64",
+              "value": 42
+            }
+          ],
+          "capture_epoch": 7,
+          "captured_at": "2030-01-01T00:00:00Z",
+          "columns": [
+            {
+              "bytes": "AAAAAAAAACo",
+              "column_id": 0,
+              "state": "explicit_value",
+              "type_modifier": -1,
+              "type_oid": 20
+            }
+          ],
+          "connector_event_id": "e74713974578a5a0772fb9beecc147527ae1e1eff277635ff81b889c3f2eaa2e",
+          "event_type": "mutation",
+          "journal_seq": 3,
+          "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
+          "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+          "mutation_kind": "upsert",
+          "operation": "update",
+          "payload_hash": "f81482669fcade813528617a54ce70a227ebac03d28e8435946de2c1a617afb2",
+          "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
+          "routing": "business",
+          "schema_version": "boring-cdc/event/v1",
+          "source_version": {
+            "connector_event_id": "e74713974578a5a0772fb9beecc147527ae1e1eff277635ff81b889c3f2eaa2e",
+            "lsn_u64": 112,
+            "mutation_ordinal": 1,
+            "origin_rank": 1,
+            "transaction_ordinal": 2
+          }
         }
-      },
-      "expected_outcome": "emit",
+      ],
+      "expected_outcome": "emit_sequence",
       "fixture_id": "SCN-M0-EVENT-KEY-CHANGE-ORDER",
-      "identity_input": {
-        "capture_epoch": 7,
-        "mutation_ordinal": 1,
-        "row_ordinal": 2,
-        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
-        "transaction_end_lsn": 120
-      },
+      "identity_inputs": [
+        {
+          "capture_epoch": 7,
+          "mutation_ordinal": 0,
+          "row_ordinal": 2,
+          "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+          "transaction_end_lsn": 120
+        },
+        {
+          "capture_epoch": 7,
+          "mutation_ordinal": 1,
+          "row_ordinal": 2,
+          "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+          "transaction_end_lsn": 120
+        }
+      ],
       "identity_kind": "wal"
     },
     {
-      "category": "types",
-      "event": {
-        "canonical_key": [
-          {
-            "kind": "int64",
-            "value": 42
-          }
-        ],
-        "capture_epoch": 7,
-        "columns": [
-          {
-            "bytes": "AQ",
-            "column_id": 0,
-            "state": "explicit_value",
-            "type_modifier": -1,
-            "type_oid": 16
-          },
-          {
-            "bytes": "aMOpbGxv",
-            "column_id": 1,
-            "state": "explicit_value",
-            "type_modifier": -1,
-            "type_oid": 25
-          }
-        ],
-        "connector_event_id": "06004c4a0b18bedd87c4fabd9102bbaf009e50ffecfea740528edeb68485d548",
-        "event_type": "mutation",
-        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
-        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
-        "mutation_kind": "upsert",
-        "payload_hash": "b2617fb11691ec43cf08757bedde33604b4dcb776d77606848c5f5929b949881",
-        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
-        "routing": "business",
-        "schema_version": "boring-cdc/event/v1",
-        "source_version": {
-          "capture_epoch": 7,
-          "commit_lsn": 112,
-          "mutation_ordinal": 0,
-          "origin_rank": 1,
-          "transaction_id": 8,
-          "transaction_ordinal": 3
+      "cases": [
+        {
+          "expected_hex": "01",
+          "input": true,
+          "kind": "bool",
+          "name": "bool-true"
+        },
+        {
+          "expected_hex": "fffe",
+          "input": -2,
+          "kind": "int2",
+          "name": "int2-negative"
+        },
+        {
+          "expected_hex": "00010001",
+          "input": 65537,
+          "kind": "int4",
+          "name": "int4"
+        },
+        {
+          "expected_hex": "ffffffffffffffff",
+          "input": -1,
+          "kind": "int8",
+          "name": "int8"
+        },
+        {
+          "expected_hex": "0000002a",
+          "input": 42,
+          "kind": "oid",
+          "name": "oid"
+        },
+        {
+          "expected_hex": "7fc00000",
+          "input": "NaN",
+          "kind": "float4",
+          "name": "float4-nan"
+        },
+        {
+          "expected_hex": "8000000000000000",
+          "input": "-0.0",
+          "kind": "float8",
+          "name": "float8-negative-zero"
+        },
+        {
+          "expected_hex": "2d3132332e3435",
+          "input": "-123.45",
+          "kind": "numeric",
+          "name": "numeric"
+        },
+        {
+          "expected_hex": "00000001",
+          "input": 1,
+          "kind": "date",
+          "name": "date"
+        },
+        {
+          "expected_hex": "0000000000000001",
+          "input": 1,
+          "kind": "timestamp",
+          "name": "timestamp"
+        },
+        {
+          "expected_hex": "ffffffffffffffff",
+          "input": -1,
+          "kind": "timestamptz",
+          "name": "timestamptz"
+        },
+        {
+          "expected_hex": "00112233445566778899aabbccddeeff",
+          "input": "00112233-4455-6677-8899-aabbccddeeff",
+          "kind": "uuid",
+          "name": "uuid"
+        },
+        {
+          "expected_hex": "68c3a96c6c6f",
+          "input": "h\u00e9llo",
+          "kind": "text",
+          "name": "text"
+        },
+        {
+          "expected_hex": "00ff",
+          "input": "00ff",
+          "kind": "bytea",
+          "name": "bytea"
+        },
+        {
+          "expected_hex": "000000020300000017ffffffff00000000000000040000000101",
+          "input": [
+            1,
+            null
+          ],
+          "kind": "array-int4",
+          "name": "array-int4"
         }
-      },
-      "expected_outcome": "emit",
+      ],
+      "category": "types",
+      "expected_outcome": "canonicalize",
       "fixture_id": "SCN-M0-EVENT-TYPE-CANONICAL",
-      "identity_input": {
-        "capture_epoch": 7,
-        "mutation_ordinal": 0,
-        "row_ordinal": 3,
-        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
-        "transaction_end_lsn": 120
-      },
-      "identity_kind": "wal"
+      "identity_kind": "none"
     },
     {
       "category": "types",
@@ -262,11 +393,42 @@
       "feedback": "unchanged",
       "fixture_id": "SCN-M0-EVENT-TYPE-UNSUPPORTED",
       "identity_kind": "none",
-      "recovery": "correct_schema_or_confirm_reseed"
+      "input": {
+        "type_oid": 3802,
+        "wire_value": "{}"
+      },
+      "recovery": "correct_contract_or_confirm_reseed"
+    },
+    {
+      "category": "limits",
+      "checkpoint": "unchanged",
+      "expected_outcome": "block",
+      "failed_boundary": "before_journal_checkpoint_and_source_feedback",
+      "failure_class": "deterministic_contract",
+      "failure_code": "BCDC_EVENT_VALUE_LIMIT",
+      "feedback": "unchanged",
+      "fixture_id": "SCN-M0-EVENT-LIMIT-BOUNDARIES",
+      "identity_kind": "none",
+      "input": {
+        "inclusive": {
+          "event_bytes": 8388608,
+          "key_component_bytes": 1024,
+          "row_bytes": 4194304,
+          "scalar_bytes": 1048576
+        },
+        "rejected": {
+          "event_bytes": 8388609,
+          "key_component_bytes": 1025,
+          "row_bytes": 4194305,
+          "scalar_bytes": 1048577
+        }
+      },
+      "recovery": "change_relevant_configuration_and_prove_retained_wal_or_confirm_reseed"
     },
     {
       "category": "toast",
       "event": {
+        "before_key": null,
         "canonical_key": [
           {
             "kind": "int64",
@@ -274,6 +436,7 @@
           }
         ],
         "capture_epoch": 7,
+        "captured_at": "2030-01-01T00:00:00Z",
         "columns": [
           {
             "bytes": "AAAAAAAAACo",
@@ -297,19 +460,20 @@
         ],
         "connector_event_id": "206f2a26c32e3c9ebe3ed60ed249314cbe3be79654fee36095264cca8d113312",
         "event_type": "mutation",
-        "key_hash": "0e766ec1d05442358845c83255176207ce2184dafaa8a1da954565d90364a295",
+        "journal_seq": 5,
+        "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
         "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
         "mutation_kind": "upsert",
-        "payload_hash": "5786a78b910022d0729028ff6e9793fa83609ecf1d58a67f74fc457d1f07dcb4",
-        "relation_fingerprint": "4397cdc8690a35635627c67e8651973f7062b4fde054d3bddafb9c69fbd44aba",
+        "operation": "update",
+        "payload_hash": "2058ea895efff133bbd8e9d91a1dd47a357c55d637a520f5a10f12ee496b12b4",
+        "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
         "routing": "business",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "capture_epoch": 7,
-          "commit_lsn": 112,
+          "connector_event_id": "206f2a26c32e3c9ebe3ed60ed249314cbe3be79654fee36095264cca8d113312",
+          "lsn_u64": 112,
           "mutation_ordinal": 0,
           "origin_rank": 1,
-          "transaction_id": 8,
           "transaction_ordinal": 4
         }
       },
@@ -334,13 +498,135 @@
       "feedback": "unchanged",
       "fixture_id": "SCN-M0-EVENT-TOAST-KEY-CHANGE-BLOCK",
       "identity_kind": "none",
+      "input": {
+        "before_key": [
+          {
+            "kind": "int64",
+            "value": 41
+          }
+        ],
+        "columns": [
+          {
+            "column_id": 2,
+            "state": "unchanged_toast"
+          }
+        ],
+        "key": [
+          {
+            "kind": "int64",
+            "value": 42
+          }
+        ]
+      },
       "recovery": "confirmed_full_reseed"
     },
     {
-      "assertion": "journal for durable progress; exclude business destinations",
+      "category": "schema",
+      "expected": {
+        "capture": "continue",
+        "older_projection": "absent_for_schema_to_destination_null",
+        "relation_fingerprint": "changes"
+      },
+      "expected_outcome": "admit",
+      "fixture_id": "SCN-M0-EVENT-ADDITIVE-OUTSIDE-BACKFILL",
+      "identity_kind": "none",
+      "input": {
+        "active_backfill": false,
+        "change": "add_column",
+        "generated": false,
+        "has_default": false,
+        "nullable": true
+      }
+    },
+    {
+      "category": "schema",
+      "checkpoint": "unchanged",
+      "expected_outcome": "block",
+      "failed_boundary": "before_journal_checkpoint_and_source_feedback",
+      "failure_class": "deterministic_contract",
+      "failure_code": "BCDC_EVENT_SCHEMA_REQUIRES_FRESH_GENERATION",
+      "feedback": "unchanged",
+      "fixture_id": "SCN-M0-EVENT-ADDITIVE-DURING-BACKFILL",
+      "identity_kind": "none",
+      "input": {
+        "active_backfill": true,
+        "change": "add_column",
+        "generated": false,
+        "has_default": false,
+        "nullable": true
+      },
+      "recovery": "invalidate_generation_and_full_reseed"
+    },
+    {
+      "assertion": "both contexts produce exact same connector_event_id and payload_hash",
+      "category": "stability",
+      "event": {
+        "before_key": null,
+        "canonical_key": [
+          {
+            "kind": "int64",
+            "value": 42
+          }
+        ],
+        "capture_epoch": 7,
+        "captured_at": "2030-01-01T00:00:00Z",
+        "columns": [
+          {
+            "bytes": "AAAAAAAAACo",
+            "column_id": 0,
+            "state": "explicit_value",
+            "type_modifier": -1,
+            "type_oid": 20
+          }
+        ],
+        "connector_event_id": "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9",
+        "event_type": "mutation",
+        "journal_seq": 1,
+        "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
+        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "mutation_kind": "upsert",
+        "operation": "insert",
+        "payload_hash": "0d2527c80fbf3b340a9f696d6dbf46ca7ffac5a40a52e1f4e2e0c8b96245e746",
+        "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
+        "routing": "business",
+        "schema_version": "boring-cdc/event/v1",
+        "source_version": {
+          "connector_event_id": "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9",
+          "lsn_u64": 112,
+          "mutation_ordinal": 0,
+          "origin_rank": 1,
+          "transaction_ordinal": 0
+        }
+      },
+      "execution_contexts": [
+        {
+          "captured_at": "2030-01-01T00:00:00Z",
+          "retry": 0,
+          "run_id": "run-a"
+        },
+        {
+          "captured_at": "2031-01-01T00:00:00Z",
+          "retry": 9,
+          "run_id": "run-b"
+        }
+      ],
+      "expected_outcome": "emit",
+      "fixture_id": "SCN-M0-EVENT-RETRY-STABILITY",
+      "identity_input": {
+        "capture_epoch": 7,
+        "mutation_ordinal": 0,
+        "row_ordinal": 0,
+        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "transaction_end_lsn": 120
+      },
+      "identity_kind": "wal"
+    },
+    {
+      "assertion": "journal for durable progress; exclude user tables and provider-neutral workload hash",
       "category": "control_routing",
       "event": {
         "capture_epoch": 7,
+        "captured_at": "2030-01-01T00:00:00Z",
         "connector_event_id": "76371732f3de7a3f0173bb828b38aa6f794f38225d1aceb696df5e13b79c9a02",
         "control": {
           "generation": null,
@@ -348,15 +634,16 @@
           "transaction_end_lsn": 128
         },
         "event_type": "control",
+        "journal_seq": 35,
+        "operation": "control",
         "payload_hash": "95a81cb80b9bfee16ef18bfd2cef699b1dd0bff184fef6686c90e8d8150cd8d0",
         "routing": "control",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "capture_epoch": 7,
-          "commit_lsn": 124,
+          "connector_event_id": "76371732f3de7a3f0173bb828b38aa6f794f38225d1aceb696df5e13b79c9a02",
+          "lsn_u64": 124,
           "mutation_ordinal": 0,
           "origin_rank": 1,
-          "transaction_id": 9,
           "transaction_ordinal": 5
         }
       },
@@ -372,26 +659,28 @@
       "identity_kind": "wal"
     },
     {
-      "assertion": "journal for durable progress; exclude business destinations",
+      "assertion": "journal for durable progress; exclude user tables and provider-neutral workload hash",
       "category": "control_routing",
       "event": {
         "capture_epoch": 7,
+        "captured_at": "2030-01-01T00:00:00Z",
         "connector_event_id": "67b5791a4c1f8d37c01127a378540fb69962bf81438518f90c3f0dd14cf60be9",
         "control": {
           "generation": 2,
-          "kind": "snapshot_fence",
+          "kind": "capture_fence",
           "transaction_end_lsn": 128
         },
         "event_type": "control",
-        "payload_hash": "811a89fc352cc22ba6be8e2ddf5a29d6852a7ca5f63f75dfcd24978469fa49dd",
+        "journal_seq": 36,
+        "operation": "control",
+        "payload_hash": "d4b950d5175a669a42945d6041daaa474e0d885031f5b98a5a0d9e8065d40644",
         "routing": "control",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "capture_epoch": 7,
-          "commit_lsn": 124,
+          "connector_event_id": "67b5791a4c1f8d37c01127a378540fb69962bf81438518f90c3f0dd14cf60be9",
+          "lsn_u64": 124,
           "mutation_ordinal": 0,
           "origin_rank": 1,
-          "transaction_id": 9,
           "transaction_ordinal": 6
         }
       },

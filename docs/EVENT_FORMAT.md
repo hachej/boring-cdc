@@ -6,11 +6,11 @@ The topology remains one PostgreSQL source, publication, and `pgoutput` slot fee
 
 ## Envelope and field grammar
 
-Every object has `schema_version = boring-cdc/event/v1`, `event_type`, lowercase 32-byte SHA-256 `connector_event_id`, positive `capture_epoch`, `source_version`, and `routing`. The closed JSON Schema rejects unknown fields.
+Every object has `schema_version = boring-cdc/event/v1`, `event_type`, lowercase 32-byte SHA-256 `connector_event_id`, positive local `journal_seq`, positive `capture_epoch`, `source_version`, `operation`, and `routing`. The closed JSON Schema rejects unknown fields. `journal_seq` and `captured_at` are transport/audit fields excluded from stable hashes.
 
 A mutation additionally has `logical_table_id`, `relation_fingerprint`, `key_hash`, nonempty `canonical_key`, `mutation_kind`, positional `columns`, and `payload_hash`; its route is `business`. A control event has `control`, `payload_hash`, and route `control`, and cannot carry a business key, relation, or columns. JSON numbers are transport renderings only: implementations must range-check them before fixed-width encoding. Canonical binary values are unpadded base64url in JSON.
 
-`source_version` is the tuple `(capture_epoch, commit_lsn, origin_rank, transaction_id, transaction_ordinal, mutation_ordinal, connector_event_id)`. `transaction_ordinal` is the zero-based decoded row ordinal. A mutable-key update expands into mutation ordinal 0 (old-key delete) and ordinal 1 (new-key upsert). Ordinary rows use ordinal 0.
+`source_version` is exactly `(lsn_u64, origin_rank, transaction_ordinal, mutation_ordinal, connector_event_id)`. The enclosing event supplies the grouping epoch, table, and canonical key; transaction XID and end LSN are source metadata rather than source-version comparison fields. `transaction_ordinal` is the zero-based decoded row ordinal. A mutable-key update expands into mutation ordinal 0 (old-key delete) and ordinal 1 (new-key upsert). Ordinary rows use ordinal 0.
 
 ## Canonical value encodings
 
@@ -24,17 +24,17 @@ Inclusive limits are scalar 1,048,576 bytes, reconstructed row 4,194,304 bytes, 
 
 Each hash field is framed by its u64-be octet length, including the domain. Hashes use SHA-256 and lowercase hex. `// M0-PROVISIONAL: boring-cdc-d-event-id`
 
-A WAL event ID hashes domain `boring-cdc/wal-event/v1` and `(capture_epoch, source_slot_identity, transaction_end_lsn, row_ordinal, mutation_ordinal)`. `source_slot_identity` hashes the source system identifier, database identity, slot name, and plugin under `boring-cdc/source-slot/v1`. A snapshot event ID hashes `boring-cdc/snapshot-event/v1` and `(capture_epoch, generation, logical_table_id, chunk_id, key_hash)`. Payload bytes, journal sequence, run ID, wall time, ingest time, cache timing, retries, and destination state are excluded from positional identity.
+A WAL event ID hashes domain `boring-cdc/wal-event/v1` and `(capture_epoch, source_slot_identity, transaction_end_lsn, row_ordinal, mutation_ordinal)`. `source_slot_identity` hashes the source system identifier, database identity, slot name, and plugin under `boring-cdc/source-slot/v1`. A snapshot event ID hashes `boring-cdc/snapshot-event/v1` and `(capture_epoch, generation, logical_table_id, chunk_id, canonical_key)`. The canonical key is encoded as u32-be component count followed by the exact tagged component encoding; the physical `key_hash` is not an identity input. Payload bytes, journal sequence, run ID, wall time, ingest time, cache timing, retries, and destination state are excluded from positional identity.
 
-Within one capture epoch, compare `(commit_lsn, origin_rank, transaction_ordinal, mutation_ordinal, connector_event_id)` lexicographically, with snapshot rank 0 and WAL rank 1. A snapshot has transaction ID and ordinal zero. Versions from different capture epochs are incomparable; they are never sorted against each other. Same ID and same version/payload hash is an accepted duplicate. Same ID with any different stable position or payload hash is `BCDC_EVENT_PAYLOAD_CONFLICT`, blocking checkpoint and feedback until inspection and correction or confirmed re-seed.
+Within one `(capture_epoch, logical_table_id, canonical_key)`, compare `(lsn_u64, origin_rank, transaction_ordinal, mutation_ordinal, connector_event_id)` lexicographically, with snapshot rank 0 and WAL rank 1. A snapshot has transaction and mutation ordinals zero. Versions from different capture epochs or correctness groups are incomparable; they are never sorted against each other. Same ID and same version/payload hash is an accepted duplicate. Same ID with any different stable position or payload hash is `BCDC_EVENT_PAYLOAD_CONFLICT`, blocking checkpoint and feedback until inspection and correction or confirmed re-seed.
 
 ## Relation and row identity
 
-`logical_table_id` is stable across relation OID/schema versions: hash `boring-cdc/logical-table/v1` over source system identifier, database identity, schema name, and table name. A `relation_fingerprint` hashes the logical table ID, current PostgreSQL relation OID, and the complete ordered admitted schema contract under `boring-cdc/relation-schema/v1`. The schema contract includes column position/name/type OID/typmod/nullability/generated/default state, effective replica identity positions, and publication actions.
+`logical_table_id` is stable across relation OID/schema versions: hash `boring-cdc/logical-table/v1` over source system identifier, database identity, schema name, and table name. A `relation_fingerprint` hashes the exact binary `relation_contract_encoding` in `contracts/event/event-format.json` under `boring-cdc/relation-schema/v1`. That closed encoding includes stable table plus versioned relation identity; every physical `attnum`, logical/physical order, name and dropped status; OID, typmod, collation and nullability; canonical hashes (or explicit empty values) for default/generated/identity expressions; primary/unique effective key, replica-identity mode/index; partition root/leaf routing, key and bounds; and publication membership/actions/row filter/column projection. Physical columns are ordered by ascending `attnum`; every optional input has the contract's explicit empty representation.
 
-Canonical row identity is exactly `(logical_table_id, key_hash)`. It is distinct from relation/schema identity and remains the correctness grouping key for snapshot keysets, WAL update/delete identity, checksums, and destination grouping. `key_hash` hashes a typed, length-safe encoding of all effective replica-identity components under `boring-cdc/physical-key/v1`. Supported key types are listed in the contract, maximum arity is 32, and each canonical component is at most 1,024 bytes. Empty, null, absent, partial, oversized, or unchanged-TOAST key states are forbidden. `// M0-PROVISIONAL: boring-cdc-d-keys`
+Canonical row correctness identity is exactly `(capture_epoch, logical_table_id, canonical_key)`. It is distinct from relation/schema identity and remains the grouping key for snapshot keysets, WAL update/delete identity, checksums, and destination state. `key_hash` hashes the same typed, length-safe effective replica-identity encoding under `boring-cdc/physical-key/v1`; it is only a physical sorting/sharding aid and cannot replace or establish correctness identity. Supported key types are listed in the contract, maximum arity is 32, and each canonical component is at most 1,024 bytes. Empty, null, absent, partial, oversized, or unchanged-TOAST key states are forbidden. `// M0-PROVISIONAL: boring-cdc-d-keys`
 
-The payload hash binds source version, positional ID, relation fingerprint, key hash, mutation kind, and every positional column state under `boring-cdc/mutation-payload/v1`. It excludes journal sequence, timestamps, run IDs, retries, caches, and destination-local fields.
+The payload hash binds enclosing capture epoch, the exact source-version tuple, positional ID, relation fingerprint, canonical key plus key hash, mutation kind, and every column's u32-be positional ID, state tag, admitted type identity, and canonical bytes under `boring-cdc/mutation-payload/v1`. It excludes journal sequence, timestamps, run IDs, retries, caches, and destination-local fields.
 
 ## TOAST and schema evolution
 
@@ -54,8 +54,10 @@ Control IDs use the same positional WAL identity grammar. A control payload hash
 
 - `SCN-M0-EVENT-WAL-IDENTITY`, `SCN-M0-EVENT-SNAPSHOT-IDENTITY`
 - `SCN-M0-EVENT-SAME-KEY-ORDER`, `SCN-M0-EVENT-KEY-CHANGE-ORDER`
-- `SCN-M0-EVENT-TYPE-CANONICAL`, `SCN-M0-EVENT-TYPE-UNSUPPORTED`
+- `SCN-M0-EVENT-TYPE-CANONICAL`, `SCN-M0-EVENT-TYPE-UNSUPPORTED`, `SCN-M0-EVENT-LIMIT-BOUNDARIES`
 - `SCN-M0-EVENT-TOAST-STATES`, `SCN-M0-EVENT-TOAST-KEY-CHANGE-BLOCK`
+- `SCN-M0-EVENT-ADDITIVE-OUTSIDE-BACKFILL`, `SCN-M0-EVENT-ADDITIVE-DURING-BACKFILL`
+- `SCN-M0-EVENT-RETRY-STABILITY`
 - `SCN-M0-EVENT-CONTROL-HEARTBEAT`, `SCN-M0-EVENT-CONTROL-FENCE`
 
 Later execution belongs to `boring-cdc-m1-ordering`, `boring-cdc-m1-decoder`, and `boring-cdc-m2-journal`. M0 validates the specification and exact vectors; it does not claim runtime results.

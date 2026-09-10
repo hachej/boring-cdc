@@ -1,11 +1,11 @@
 {
   "findings": [],
-  "fixture_count": 10,
+  "fixture_count": 14,
   "inputs": {
-    "contracts/event/event-format.json": "6cfc9e0db325d6c5e2d9dfb503c803d34bb247bf3dfb94a5dfeccfb9fd18e744",
-    "contracts/event/event.schema.json": "687ad9f11ae5ad96516b575ac2b5078461d1a76f5610dbd2e363807d1ca3be1f",
-    "docs/EVENT_FORMAT.md": "1a9e9385fc2df4fc28e6663e9a4fdee503d35741238c5f03485093b0d91a869f",
-    "fixtures/m0/event-format/golden-vectors.json": "3d943fb8a6e0f6dfc868e264b042a711bf6fb93db52a7d260f4fc385eebb02fa"
+    "contracts/event/event-format.json": "afe80ecf1b1ec48861c1763414d2966414a9c9eab1bd009a4f36b2a7c101ddb3",
+    "contracts/event/event.schema.json": "0d4de296eb67689f2277bf4352428d78ca63d066114aaaefcd2928e5bd65fce5",
+    "docs/EVENT_FORMAT.md": "05e82c11336527cea3d0edae894eb8d68c4ec5f5b7bc47cd85558a186ec41ecd",
+    "fixtures/m0/event-format/golden-vectors.json": "3747fe330d5c1b7ec13197a6394b2356b75cc58b65111610c0482e2898932e63"
   },
   "owner_bead": "boring-cdc-m0-event-format",
   "product_faults": "fault_not_applicable",

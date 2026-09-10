@@ -25,42 +25,42 @@
       "id": "ART-M0-EVENT-FORMAT-CONTRACT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",
-      "sha256": "6cfc9e0db325d6c5e2d9dfb503c803d34bb247bf3dfb94a5dfeccfb9fd18e744",
+      "sha256": "afe80ecf1b1ec48861c1763414d2966414a9c9eab1bd009a4f36b2a7c101ddb3",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-DOC",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "docs/EVENT_FORMAT.md",
-      "sha256": "1a9e9385fc2df4fc28e6663e9a4fdee503d35741238c5f03485093b0d91a869f",
+      "sha256": "05e82c11336527cea3d0edae894eb8d68c4ec5f5b7bc47cd85558a186ec41ecd",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-EVIDENCE",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "artifacts/boring-cdc-m0-event-format/spec/evidence.json",
-      "sha256": "3ca533769103d810c7fc1c6322e687b10b1d8ea2b85f6fc68857d24e671bf91d",
+      "sha256": "03eb77b92c7c5c2152c92ce533a3f8fd1b7c2c5b706496d9ca3e608e8373b42e",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-SCHEMA",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event.schema.json",
-      "sha256": "687ad9f11ae5ad96516b575ac2b5078461d1a76f5610dbd2e363807d1ca3be1f",
+      "sha256": "0d4de296eb67689f2277bf4352428d78ca63d066114aaaefcd2928e5bd65fce5",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-VALIDATOR",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "scripts/validate/event_format.py",
-      "sha256": "852aff5a919b2c157a88f1239f01117fa8d30f57e8a1f16520a967b646424ada",
+      "sha256": "15b6618d3b303e0ee510634a758b903943853fdd605ab9116bdcf663952fd58b",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-VECTORS",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "fixtures/m0/event-format/golden-vectors.json",
-      "sha256": "3d943fb8a6e0f6dfc868e264b042a711bf6fb93db52a7d260f4fc385eebb02fa",
+      "sha256": "3747fe330d5c1b7ec13197a6394b2356b75cc58b65111610c0482e2898932e63",
       "status": "complete"
     },
     {

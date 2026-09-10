@@ -55,7 +55,7 @@
     {"pg":"one-dimensional arrays of admitted non-array scalars","oid":"element-specific","canonical":"u32-be count, then each element as state tag plus u32-be OID, i32-be typmod, u64-be length and canonical bytes; lower bound must be 1"}
   ],
   "array_type_oids": {"bool":1000,"bytea":1001,"name":1003,"int2":1005,"int4":1007,"text":1009,"bpchar":1014,"varchar":1015,"int8":1016,"float4":1021,"float8":1022,"oid":1028,"timestamp":1115,"date":1182,"timestamptz":1185,"numeric":1231,"uuid":2951},
-  "relation_contract_encoding": "u32-be column count; for each position: u32-be ordinal and u64-length-framed UTF-8 name, u32-be OID, i32-be typmod, one-byte nullable, one-byte generated, one-byte has-default, one-byte effective-replica-identity; then one-byte publication action bits in INSERT=1 UPDATE=2 DELETE=4 TRUNCATE=8 order",
+  "relation_contract_encoding": "u64-length-framed logical_table_id; u32-be relation_id; u32-be physical-column count; each physical attnum ascending: i16-be attnum, u32-be logical ordinal (ffffffff if dropped), framed UTF-8 name (empty only if dropped), one-byte dropped, u32-be type OID, i32-be typmod, u32-be collation OID, one-byte nullable, framed SHA-256 default-expression hash or empty, framed SHA-256 generated-expression hash or empty, framed SHA-256 identity-expression hash or empty; one-byte replica mode d=0 n=1 f=2 i=3; framed replica-index definition hash or empty; framed primary/unique effective-key definition hash; framed partition-root logical_table_id or empty; framed partition-routing definition hash or empty; framed partition-key hash or empty; framed partition-bounds hash or empty; one-byte publication action bits INSERT=1 UPDATE=2 DELETE=4 TRUNCATE=8; one-byte publication membership; framed publication row-filter hash or empty; framed publication column-projection hash or empty",
   "value_types_provisional": "// M0-PROVISIONAL: boring-cdc-d-values",
   "key_types": ["bool", "int2", "int4", "int8", "oid", "uuid", "text", "varchar", "bpchar", "name", "bytea"],
   "key_types_provisional": "// M0-PROVISIONAL: boring-cdc-d-keys",
@@ -66,8 +66,12 @@
     "SCN-M0-EVENT-KEY-CHANGE-ORDER",
     "SCN-M0-EVENT-TYPE-CANONICAL",
     "SCN-M0-EVENT-TYPE-UNSUPPORTED",
+    "SCN-M0-EVENT-LIMIT-BOUNDARIES",
     "SCN-M0-EVENT-TOAST-STATES",
     "SCN-M0-EVENT-TOAST-KEY-CHANGE-BLOCK",
+    "SCN-M0-EVENT-ADDITIVE-OUTSIDE-BACKFILL",
+    "SCN-M0-EVENT-ADDITIVE-DURING-BACKFILL",
+    "SCN-M0-EVENT-RETRY-STABILITY",
     "SCN-M0-EVENT-CONTROL-HEARTBEAT",
     "SCN-M0-EVENT-CONTROL-FENCE"
   ],
