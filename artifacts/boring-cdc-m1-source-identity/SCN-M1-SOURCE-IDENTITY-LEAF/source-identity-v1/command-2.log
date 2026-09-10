@@ -1,23 +1,24 @@
 
-running 16 tests
-test m1_source_identity::tests::commit_and_end_lsn_roles_remain_distinct ... ok
+running 17 tests
 test m1_source_identity::tests::ambiguous_bootstrap_precedes_server_ahead ... ok
-test m1_source_identity::tests::feedback_uses_only_durable_transaction_end_for_all_three_positions ... ok
+test m1_source_identity::tests::commit_and_end_lsn_roles_remain_distinct ... ok
 test m1_source_identity::tests::compatible_positions_apply_postgresql_effective_max_rule ... ok
 test m1_source_identity::tests::creation_floor_null_and_equal_are_not_durable_progress ... ok
 test m1_source_identity::tests::creation_floor_still_requires_valid_slot_and_available_wal ... ok
+test m1_source_identity::tests::every_identity_mismatch_blocks_before_position_rules ... ok
+test m1_source_identity::tests::feedback_uses_only_durable_transaction_end_for_all_three_positions ... ok
 test m1_source_identity::tests::identity_validation_and_lock_derivation_are_canonical ... ok
 test m1_source_identity::tests::invalid_local_progress_relationships_fail_closed ... ok
-test m1_source_identity::tests::local_ahead_requests_durable_end_and_expects_duplicates ... ok
-test m1_source_identity::tests::invalid_slot_and_missing_wal_require_reseed ... ok
 test m1_source_identity::tests::prepared_bootstrap_without_remote_slot_retries_creation ... ok
-test m1_source_identity::tests::every_identity_mismatch_blocks_before_position_rules ... ok
-test m1_source_identity::tests::source_identity_case_inventory_is_complete ... ok
 test m1_source_identity::tests::server_ahead_requires_reseed_before_generic_slot_checks ... ok
+test m1_source_identity::tests::matching_unsupported_plugin_fails_closed_before_startup_decisions ... ok
+test m1_source_identity::tests::invalid_slot_and_missing_wal_require_reseed ... ok
+test m1_source_identity::tests::source_identity_case_inventory_is_complete ... ok
 test m1_source_identity::tests::source_versions_never_compare_across_capture_epochs ... ok
+test m1_source_identity::tests::local_ahead_requests_durable_end_and_expects_duplicates ... ok
 test m1_source_identity::tests::table_schema_and_row_identities_are_distinct_dimensions ... ok
 
-test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 77 filtered out; finished in 0.00s
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 77 filtered out; finished in 0.01s
 
 
 running 0 tests
