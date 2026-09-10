@@ -15,7 +15,7 @@ ASSERT SCN-M1-RAW-TRUNCATE test=m1_control_fixtures::tests::truncate_is_detectio
 CASE SCN-M1-RAW-TRUNCATE state=requires_reseed checkpoint=unchanged log=truncate_requires_reseed
 ASSERT SCN-M1-RAW-PUBLICATION-DRIFT test=m1_control_fixtures::tests::publication_fingerprint_is_exact_and_order_independent exit=0 checkpoint_and_state_asserted_by_test=true
 CASE SCN-M1-RAW-PUBLICATION-DRIFT state=requires_reseed checkpoint=unchanged log=publication_drift
-ASSERT SCN-M1-RAW-IDLE-DDL test=m1_ddl_fixtures::tests::catalog_poll_fingerprint_detects_idle_ddl_and_only_safe_addition_is_admitted exit=0 checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-IDLE-DDL test=m1_ddl_fixtures::tests::every_relation_contract_dimension_changes_the_fingerprint exit=0 checkpoint_and_state_asserted_by_test=true
 CASE SCN-M1-RAW-IDLE-DDL state=blocked checkpoint=unchanged log=idle_ddl_blocked
 ASSERT SCN-M1-RAW-IMMEDIATE-DDL test=m1_ddl_fixtures::tests::changed_relation_synchronously_blocks_following_dml_and_feedback exit=0 checkpoint_and_state_asserted_by_test=true
 CASE SCN-M1-RAW-IMMEDIATE-DDL state=blocked checkpoint=unchanged log=immediate_ddl_blocked

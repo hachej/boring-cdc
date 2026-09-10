@@ -13,9 +13,9 @@ PASS live_catalog=exact fingerprint=2ac597b232224b4d2cffcf4a815ad917a95e5afc1620
 PASS live_catalog_drift=publication_drift_requires_reseed
 ASSERT SCN-M1-RAW-PUBLICATION-DRIFT test=m1_control_fixtures::tests::publication_fingerprint_is_exact_and_order_independent exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
 CASE SCN-M1-RAW-PUBLICATION-DRIFT state=requires_reseed checkpoint=unchanged log=publication_drift
-ASSERT SCN-M1-RAW-IDLE-DDL test=m1_ddl_fixtures::tests::catalog_poll_fingerprint_detects_idle_ddl_and_only_safe_addition_is_admitted exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
+ASSERT SCN-M1-RAW-IDLE-DDL test=m1_ddl_fixtures::tests::every_relation_contract_dimension_changes_the_fingerprint exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
 CASE SCN-M1-RAW-IDLE-DDL state=blocked checkpoint=unchanged log=idle_ddl_blocked
-raw_pgoutput tags=B,R,I,C lengths=21,69,34,26 payload_values=redacted
+raw_pgoutput tags=B,R,I,C lengths=21,51,21,26 payload_values=redacted
 ASSERT SCN-M1-RAW-IMMEDIATE-DDL test=m1_ddl_fixtures::tests::changed_relation_synchronously_blocks_following_dml_and_feedback exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
 CASE SCN-M1-RAW-IMMEDIATE-DDL state=blocked checkpoint=unchanged log=immediate_ddl_blocked
 ASSERT SCN-M1-RAW-UNSUPPORTED-PROTOCOL test=m1_decoder::tests::unsupported_messages_and_binary_truncate_fail_closed exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true
