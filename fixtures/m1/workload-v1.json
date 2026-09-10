@@ -3,7 +3,6 @@
   "owner_bead": "boring-cdc-m1-workload.2",
   "seed": "workload-v1",
   "profile": "component-v1",
-  "compose_marker": "// M0-PROVISIONAL: boring-cdc-d-compose",
   "postgres_image": "docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
   "clickhouse_image": "docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f",
   "tables": [
@@ -35,5 +34,6 @@
     "keys": "30c14e8b953c11dfb9ab4ac10ccde0cbad9c7ae4d25097d62258e7d71d7a510d",
     "values": "b03d04460a78c4cd0b02817952e6bcc21d89c9b712b027b1b866cf5e62c7acc8",
     "oracle": "8b745babbe152ac65cc537c0e01f3e1814b785443d4a63aaddc08f56fba85774"
-  }
+  },
+  "compose_policy_source": "owner-card:765bd3b2-4b68-4102-a9ec-43ca93357390"
 }

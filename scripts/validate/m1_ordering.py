@@ -13,7 +13,7 @@ assert len(ids) == len(set(ids)) == 10
 assert all(value.startswith("SCN-M1-ORDERING-") for value in ids)
 for case in cases["cases"]:
     assert f"fn {case['unit_test']}" in source, case
-for marker in ("boring-cdc-d-event-id", "boring-cdc-d-keys"):
+for marker in ("boring-cdc-d-event-id",):
     assert f"M0-PROVISIONAL: {marker}" in source
 for provisional_literal in (
     "fn canonical_length_bytes(len: usize) -> [u8; 8]",
@@ -23,7 +23,7 @@ for provisional_literal in (
     "COLUMN_VALUE_TAG: u8 = 3",
     "MUTATION_DELETE_TAG: u8 = 0",
     "MUTATION_UPSERT_TAG: u8 = 1",
-    "MAX_CANONICAL_KEY_COMPONENTS: usize = 32",
+    "MAX_CANONICAL_KEY_COMPONENTS: usize = 8",
 ):
     assert provisional_literal in source
 for golden in (

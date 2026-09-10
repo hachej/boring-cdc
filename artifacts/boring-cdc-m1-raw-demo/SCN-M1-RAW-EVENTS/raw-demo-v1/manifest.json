@@ -25,7 +25,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "leaf",
-  "git_commit": "423fd7d9432ddbc21e45f36327120be70fd8eb26",
+  "git_commit": "609004a09bbfe82871e93cd9ad9f89fcf56f9d97",
   "owner_bead": "boring-cdc-m1-raw-demo",
   "redaction": {
     "checked": true,
@@ -48,7 +48,7 @@
       "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/state/before.json",
       "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/versions.json"
     ],
-    "digest": "2269e4f869132ab8821b6435a1bd0586df0e87474e826aa4cce3ac70db3df254",
+    "digest": "3f357b7a6d6301815825813d492ad9586f2b96ac95e331c645054ccb6f3ee217",
     "product_faults": "actual_pgoutput_inspection",
     "runtime_observed": true,
     "status": "pass"
@@ -57,8 +57,8 @@
   "schema_version": "evidence/v1",
   "seed": "raw-demo-v1",
   "source_preservation": {
-    "after_sha256": "08b5c10b5fb0f5db65e76a25f76a39d6c8b0d6e553e39cb35e1686eaeb9a8f1c",
-    "before_sha256": "08b5c10b5fb0f5db65e76a25f76a39d6c8b0d6e553e39cb35e1686eaeb9a8f1c",
+    "after_sha256": "f34166e9048e168fe2dae0641ee1ba8feee318b2aa1b8ea2e6b0929804c2da33",
+    "before_sha256": "f34166e9048e168fe2dae0641ee1ba8feee318b2aa1b8ea2e6b0929804c2da33",
     "preserved": true
   },
   "tier_proof": {

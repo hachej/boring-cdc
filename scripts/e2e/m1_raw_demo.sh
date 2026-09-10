@@ -5,7 +5,7 @@ export TMPDIR=${TMPDIR:-/var/tmp}
 seed=${1:-raw-demo-v1}; [ "$seed" = raw-demo-v1 ] || { echo 'E_SEED' >&2; exit 2; }
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd); cd "$root"
 name="m1raw${$}"; out="$TMPDIR/$name"; transcript="$out/transcript.txt"; mkdir -p "$out"
-# M0-PROVISIONAL: boring-cdc-d-compose (accepted workload PostgreSQL pin).
+# Compose image pin accepted by owner card 765bd3b2-4b68-4102-a9ec-43ca93357390.
 image='docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929'
 container_started=false
 cleanup() {

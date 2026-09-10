@@ -2,10 +2,10 @@
 """Deterministic transactional workload and independent ClickHouse oracle."""
 import hashlib, heapq, json, shutil, subprocess, sys, threading, time
 from pathlib import Path
-PG_IMAGE="docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929" # // M0-PROVISIONAL: boring-cdc-d-compose
-CH_IMAGE="docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f" # // M0-PROVISIONAL: boring-cdc-d-compose
-KEYS_DIGEST="30c14e8b953c11dfb9ab4ac10ccde0cbad9c7ae4d25097d62258e7d71d7a510d" # // M0-PROVISIONAL: boring-cdc-d-keys
-VALUES_DIGEST="b03d04460a78c4cd0b02817952e6bcc21d89c9b712b027b1b866cf5e62c7acc8" # // M0-PROVISIONAL: boring-cdc-d-values
+PG_IMAGE="docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929"
+CH_IMAGE="docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f"
+KEYS_DIGEST="30c14e8b953c11dfb9ab4ac10ccde0cbad9c7ae4d25097d62258e7d71d7a510d"
+VALUES_DIGEST="b03d04460a78c4cd0b02817952e6bcc21d89c9b712b027b1b866cf5e62c7acc8"
 FIXED_LEDGER_DIGEST='5fa4f2cc7510beecd5769943e1d05eb8eef29f1a8ab9020d43ec21e144aff39e'
 FIXED_BUSINESS_DIGEST='e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab'
 FIXED_STATE_DIGEST='3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af'
@@ -181,7 +181,7 @@ def evidence(project,root,dest):
  reader=(root/'reader.txt').read_text()
  packet={'schema_version':'m1-workload-packet/v2','observation_boundary':'ClickHouse delivered tables populated independently from PostgreSQL trigger stream, ledger, fence, and typed final state','contract_digests':{'keys':KEYS_DIGEST,'values':VALUES_DIGEST,'oracle':ORACLE_DIGEST},'correlation_fields':FIELDS,'clean':clean,'faults':faults,'reader':reader,'unavailable_boundary_error':(root/'boundary-unavailable.txt').read_text().strip() if faults else None}
  (dest/'oracle.json').write_text(json.dumps(packet,sort_keys=True,indent=2)+'\n')
- (dest/'versions.json').write_text(json.dumps({'docker_engine':'28.2.2','compose':'2.37.1','postgres_image':PG_IMAGE,'clickhouse_image':CH_IMAGE,'provenance':'// M0-PROVISIONAL: boring-cdc-d-compose'},sort_keys=True,indent=2)+'\n')
+ (dest/'versions.json').write_text(json.dumps({'docker_engine_policy':'28.3.3','compose_policy':'2.39.2','docker_engine_observed':subprocess.check_output(['docker','version','--format','{{.Server.Version}}'],text=True).strip(),'compose_observed':subprocess.check_output(['docker','compose','version','--short'],text=True).strip(),'postgres_image':PG_IMAGE,'clickhouse_image':CH_IMAGE,'policy_source':'owner-card:765bd3b2-4b68-4102-a9ec-43ca93357390'},sort_keys=True,indent=2)+'\n')
  (dest/'config.json').write_text(json.dumps({'profile':'component-v1','seed':'workload-v1'},sort_keys=True)+'\n')
  (dest/'state'/'before.json').write_text('{"rows":0}\n'); (dest/'state'/'after.json').write_text(json.dumps(clean,sort_keys=True)+'\n'); (dest/'state'/'reader.txt').write_text(reader)
  (dest/'fault-timeline.json').write_text(json.dumps(faults,sort_keys=True,indent=2)+'\n')

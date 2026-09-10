@@ -55,7 +55,7 @@
       "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/versions.json",
       "contracts/m1/ordering-cases.json"
     ],
-    "digest": "3bafbef1e13249715c26ca516eb5e07de7e3737f6b766e774babe31f50147c30",
+    "digest": "d1e591a2d8c6ac38a3f264888b885c4ffa8e9d8a6582560e63421effda8c30ae",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"

@@ -25,7 +25,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "6747b9b6aeea4cc9a6009da973cfb530aceec544",
+  "git_commit": "609004a09bbfe82871e93cd9ad9f89fcf56f9d97",
   "owner_bead": "boring-cdc-m1-workload.2",
   "redaction": {
     "checked": true,
@@ -49,7 +49,7 @@
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-CLEAN/workload-v1/state/reader.txt",
       "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-CLEAN/workload-v1/versions.json"
     ],
-    "digest": "e37012e5c1a3d11ae5836d8528924de3ed2c44068412f0210f87269bd0aa98a9",
+    "digest": "c17333a5a6cccf76193b655a3471b346cdc9b31f37363620a169f898ccf88408",
     "product_faults": "none_clean_scenario",
     "runtime_observed": true,
     "status": "pass"
@@ -58,8 +58,8 @@
   "schema_version": "evidence/v1",
   "seed": "workload-v1",
   "source_preservation": {
-    "after_sha256": "7a3369f5c2aa355c91ec87ddfcd6cdabef5929fdba88ce00156e4fe7f45adaa3",
-    "before_sha256": "7a3369f5c2aa355c91ec87ddfcd6cdabef5929fdba88ce00156e4fe7f45adaa3",
+    "after_sha256": "48b270382bce0c35688db8a78973f215715f4d301fbe054fcaf4cbeb02a7a4b7",
+    "before_sha256": "48b270382bce0c35688db8a78973f215715f4d301fbe054fcaf4cbeb02a7a4b7",
     "preserved": true
   },
   "tier_proof": {

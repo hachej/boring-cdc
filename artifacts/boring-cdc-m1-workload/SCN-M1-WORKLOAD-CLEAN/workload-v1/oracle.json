@@ -112,7 +112,7 @@
     }
   },
   "observation_boundary": "ClickHouse delivered tables populated independently from PostgreSQL trigger stream, ledger, fence, and typed final state",
-  "reader": "pre_transaction=2:tier1,events0\npost_transaction=6:tier3,events2\nintermediate_tier2_events1=absent\nsample_count=11\n",
+  "reader": "pre_transaction=1:tier1,events0\npost_transaction=7:tier3,events2\nintermediate_tier2_events1=absent\nsample_count=12\n",
   "schema_version": "m1-workload-packet/v2",
   "unavailable_boundary_error": "RuntimeError:clickhouse_observation_boundary_unavailable"
 }

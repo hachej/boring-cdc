@@ -1,8 +1,7 @@
 name: boring-cdc-m1-workload
-x-m0-provisional: "// M0-PROVISIONAL: boring-cdc-d-compose"
+x-compose-policy-source: "owner-card:765bd3b2-4b68-4102-a9ec-43ca93357390"
 services:
   postgres:
-    # // M0-PROVISIONAL: boring-cdc-d-compose
     image: docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
     platform: linux/amd64
     environment: { POSTGRES_PASSWORD: workload_fixture_only, POSTGRES_DB: workload }
@@ -14,7 +13,6 @@ services:
       retries: 12
       start_period: 30s
   clickhouse:
-    # // M0-PROVISIONAL: boring-cdc-d-compose
     image: docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f
     platform: linux/amd64
     healthcheck:

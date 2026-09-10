@@ -148,9 +148,9 @@
     },
     {
       "artifact_path": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-CLEAN/workload-v1/manifest.json",
-      "manifest_sha256": "ea6a29d71e1778c2a4a2a7311fb3d5339ff226a6b5b9494b1921a7abe8d66ff4",
+      "manifest_sha256": "9e72e61b2c979f18e4103145640cf8c65c277b022196a6bb9ecf0e63f2f8fa08",
       "owner_bead": "boring-cdc-m1-workload",
-      "result_digest": "e37012e5c1a3d11ae5836d8528924de3ed2c44068412f0210f87269bd0aa98a9"
+      "result_digest": "c17333a5a6cccf76193b655a3471b346cdc9b31f37363620a169f898ccf88408"
     },
     {
       "artifact_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/manifest.json",
@@ -160,9 +160,9 @@
     },
     {
       "artifact_path": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/manifest.json",
-      "manifest_sha256": "691c055448a3bf48dc0ce828db64d9fbceec531dae3b090daca8d702987e6ec2",
+      "manifest_sha256": "a6fd9fc5730d2d61db7c1af65da533d27a36a69e3b5effe8398432646ddedfdc",
       "owner_bead": "boring-cdc-m1-ordering",
-      "result_digest": "3bafbef1e13249715c26ca516eb5e07de7e3737f6b766e774babe31f50147c30"
+      "result_digest": "d1e591a2d8c6ac38a3f264888b885c4ffa8e9d8a6582560e63421effda8c30ae"
     }
   ],
   "execution_ownership": "milestone-consumer-only; leaf owners retain transition ownership",

@@ -36,8 +36,7 @@ const COLUMN_VALUE_TAG: u8 = 3;
 // M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED mutation-kind tags).
 const MUTATION_DELETE_TAG: u8 = 0;
 const MUTATION_UPSERT_TAG: u8 = 1;
-// M0-PROVISIONAL: boring-cdc-d-keys (RECOMMENDED maximum canonical key arity).
-const MAX_CANONICAL_KEY_COMPONENTS: usize = 32;
+const MAX_CANONICAL_KEY_COMPONENTS: usize = 8;
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Hash32([u8; 32]);

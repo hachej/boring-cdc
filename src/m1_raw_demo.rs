@@ -247,10 +247,10 @@ pub mod tests {
     #[test]
     fn fixed_seed_exact_set_oracle_smoke_passes() {
         use crate::m1_workload::{
-            Profile, deterministic_fixture, evaluate, provisional_contract_digests,
+            Profile, accepted_contract_digests, deterministic_fixture, evaluate,
         };
         let fixture =
-            deterministic_fixture(7, Profile::Smoke, provisional_contract_digests()).unwrap();
+            deterministic_fixture(7, Profile::Smoke, accepted_contract_digests()).unwrap();
         let report = evaluate(
             &fixture,
             &fixture.ledger,

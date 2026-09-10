@@ -1,6 +1,6 @@
 //! Provider-neutral deterministic workload and correctness oracle.
 //!
-//! Canonical key/value/oracle contracts are provisionally pinned to the owner-card recommendations.
+//! Canonical key/value contracts are pinned to accepted owner-card values; the oracle contract remains provisional.
 //! The executable component observes actual PostgreSQL trigger events independently from ledger
 //! writes. An unavailable event boundary is always a non-pass.
 
@@ -14,12 +14,10 @@ use std::path::Path;
 
 const DIGEST_DOMAIN: &[u8] = b"boring-cdc/workload-set/v1";
 const STATE_DOMAIN: &[u8] = b"boring-cdc/workload-state/v1";
-// M0-PROVISIONAL: boring-cdc-d-keys
 const KEYS_CONTRACT_DIGEST: [u8; 32] = [
     0x30, 0xc1, 0x4e, 0x8b, 0x95, 0x3c, 0x11, 0xdf, 0xb9, 0xab, 0x4a, 0xc1, 0x0c, 0xcd, 0xe0, 0xcb,
     0xad, 0x9c, 0x7a, 0xe4, 0xd2, 0x50, 0x97, 0xd6, 0x22, 0x58, 0xe7, 0xd7, 0x1d, 0x7a, 0x51, 0x0d,
 ];
-// M0-PROVISIONAL: boring-cdc-d-values
 const VALUES_CONTRACT_DIGEST: [u8; 32] = [
     0xb0, 0x3d, 0x04, 0x46, 0x0a, 0x78, 0xc4, 0xcd, 0x0b, 0x02, 0x81, 0x79, 0x52, 0xe6, 0xbc, 0xc2,
     0x1d, 0x89, 0xc9, 0xb7, 0x12, 0xb0, 0x27, 0xb1, 0xb8, 0x66, 0xcf, 0x5e, 0x62, 0xc7, 0xac, 0xc8,
@@ -31,7 +29,7 @@ const ORACLE_CONTRACT_DIGEST: [u8; 32] = [
 ];
 
 #[must_use]
-pub const fn provisional_contract_digests() -> ContractDigests {
+pub const fn accepted_contract_digests() -> ContractDigests {
     ContractDigests {
         keys: KEYS_CONTRACT_DIGEST,
         values: VALUES_CONTRACT_DIGEST,
@@ -55,7 +53,7 @@ impl ContractDigests {
                 "before_workload_generation",
             ));
         }
-        if self != provisional_contract_digests() {
+        if self != accepted_contract_digests() {
             return Err(OracleFailure::new(
                 "contract",
                 "WORKLOAD_CONTRACT_DIGEST_MISMATCH",
@@ -914,7 +912,7 @@ pub mod tests {
     use super::*;
 
     fn contracts() -> ContractDigests {
-        provisional_contract_digests()
+        accepted_contract_digests()
     }
     fn fixture() -> WorkloadFixture {
         deterministic_fixture(7, Profile::Smoke, contracts()).unwrap()

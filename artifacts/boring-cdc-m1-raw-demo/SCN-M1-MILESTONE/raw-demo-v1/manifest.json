@@ -25,7 +25,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "milestone",
-  "git_commit": "423fd7d9432ddbc21e45f36327120be70fd8eb26",
+  "git_commit": "609004a09bbfe82871e93cd9ad9f89fcf56f9d97",
   "owner_bead": "boring-cdc-m1-raw-demo",
   "redaction": {
     "checked": true,
@@ -48,7 +48,7 @@
       "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/state/before.json",
       "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/versions.json"
     ],
-    "digest": "970bf63568d597cc40f0fc5af2c16f7f05497cf8be85613d38a61256eafed6bc",
+    "digest": "e6f05054aca70908569463677e41a73575a8930d25f7e5194e64fcf1b85431ef",
     "product_faults": "m1_fail_closed_matrix",
     "runtime_observed": true,
     "status": "pass"
@@ -57,8 +57,8 @@
   "schema_version": "evidence/v1",
   "seed": "raw-demo-v1",
   "source_preservation": {
-    "after_sha256": "08b5c10b5fb0f5db65e76a25f76a39d6c8b0d6e553e39cb35e1686eaeb9a8f1c",
-    "before_sha256": "08b5c10b5fb0f5db65e76a25f76a39d6c8b0d6e553e39cb35e1686eaeb9a8f1c",
+    "after_sha256": "f34166e9048e168fe2dae0641ee1ba8feee318b2aa1b8ea2e6b0929804c2da33",
+    "before_sha256": "f34166e9048e168fe2dae0641ee1ba8feee318b2aa1b8ea2e6b0929804c2da33",
     "preserved": true
   },
   "tier_proof": {

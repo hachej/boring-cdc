@@ -1,4 +1,4 @@
-pre_transaction=2:tier1,events0
-post_transaction=6:tier3,events2
+pre_transaction=1:tier1,events0
+post_transaction=7:tier3,events2
 intermediate_tier2_events1=absent
-sample_count=11
+sample_count=12
