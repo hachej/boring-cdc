@@ -28,4 +28,5 @@ summary() { python3 -c 'import sys; xs=[bytes.fromhex(x) for x in sys.argv[1].sp
  echo 'PASS actual_sql=heartbeat,truncate,publication_drift checkpoint=unchanged cleanup=trap'
 } > "$transcript"
 cat "$transcript"
-scripts/validate/m1_raw_demo.py seal e2e "$transcript"
+scripts/validate/m1_raw_demo.py seal e2e "$transcript" >/dev/null
+echo 'PASS m1 raw e2e evidence sealed'

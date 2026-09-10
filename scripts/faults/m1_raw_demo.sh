@@ -26,4 +26,5 @@ run() { cargo test --locked "$1" -- --exact --quiet >/dev/null 2>&1; printf 'PAS
  echo 'PASS m1_fault_matrix cases=15 blocked_actions=status,recover_reseed cleanup=trap'
 } > "$transcript"
 cat "$transcript"
-scripts/validate/m1_raw_demo.py seal fault "$transcript"
+scripts/validate/m1_raw_demo.py seal fault "$transcript" >/dev/null
+echo 'PASS m1 raw fault evidence sealed'
