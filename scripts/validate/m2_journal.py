@@ -17,7 +17,8 @@ for case in contract['cases']:
  if len(assertion)<40 or 'journal-owned projection executes or fail-closes' in assertion: errors.append('non-specific assertion '+case['id'])
 coverage=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text())
 required={a['id'] for a in coverage['assignments'] if a.get('owner_bead')=='boring-cdc-m2-journal'}
-missing=required-set(ids); if missing: errors.append('missing canonical assignments: '+','.join(sorted(missing)))
+missing=required-set(ids)
+if missing: errors.append('missing canonical assignments: '+','.join(sorted(missing)))
 command_test='journal_command_boundaries_are_read_only_bounded_and_asserted'
 for cid in ('CMD-JOURNAL-GC-DRY-RUN','CMD-JOURNAL-INSPECT-EVENT-ID-ID-EXPLAIN-JSON','CMD-JOURNAL-VERIFY'):
  rows=[c for c in contract['cases'] if c['id']==cid]
