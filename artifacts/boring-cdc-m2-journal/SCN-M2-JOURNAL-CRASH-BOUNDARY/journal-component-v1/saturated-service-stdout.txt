@@ -1,0 +1,1 @@
+{"ambiguous_commits":1,"atomic_transactions":4,"durable_commits":3,"max_service_wait_lt_ms":1000,"overload":"Gc","service_turns":[2, 4, 6],"serviced":"FailureControl,Checkpoint,Gc"}

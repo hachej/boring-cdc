@@ -1,1 +1,1 @@
-{"binary_sha256":"f4c822f0a433b8308499dfd7010029e7919d3a38376b3a1f579841526552e688","python":"3.13.3","rustc":"rustc 1.95.0 (59807616e 2026-04-14)","sqlite":"3.46.1"}
+{"binary_sha256":"1687128baa2e415d168e1aeaad1e1db95ad136c22579dd1b51d7bdf70719aafc","git_commit":"ed2cfe9bb7d75bcdd7ebc6b6bb7025d41d2dbdb2","implementation_sha256":"7bd0323bffc14a06274e902c0c4bb1fb52e42dcef37d811fadd78d9796caa472","python":"3.13.3","rustc":"rustc 1.95.0 (59807616e 2026-04-14)","sqlite":"3.46.1"}

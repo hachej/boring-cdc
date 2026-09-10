@@ -1,1 +1,1 @@
-["begin","process-terminated-before-commit","sqlite-recovered-absent","process-terminated-after-commit","sqlite-recovered-complete","positional-replay-reconciled","complete-range-read","slow-commit-bound-exceeded-and-reconciled"]
+["begin","process-terminated-before-commit","sqlite-recovered-absent","process-terminated-after-commit","sqlite-recovered-complete","positional-replay-reconciled","complete-range-read","slow-commit-bound-exceeded-and-reconciled","inspect-verify-gc-dry-run-executed","saturated-slow-capture-reserved-service-bounded"]

@@ -1,0 +1,1 @@
+{"command_boundaries":["CMD-JOURNAL-INSPECT-EVENT-ID-ID-EXPLAIN-JSON","CMD-JOURNAL-VERIFY","CMD-JOURNAL-GC-DRY-RUN"],"event_id":"event-1","verified_events":2,"gc_dry_run_events":2}

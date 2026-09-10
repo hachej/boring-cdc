@@ -1,1 +1,1 @@
-["begin","before-commit-termination-probe-absent","sqlite-commit-returned","complete-range-read","slow-commit-bound-exceeded-and-reconciled"]
+["begin","before-commit-termination-probe-absent","sqlite-commit-returned","complete-range-read","slow-commit-bound-exceeded-and-reconciled","inspect-verify-gc-dry-run-executed","saturated-slow-capture-reserved-service-bounded"]
