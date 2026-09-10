@@ -1,4 +1,4 @@
-# Required frontend: docker/dockerfile:1.12.0@sha256:db1ff77fb637a5955317c7a3a62540196396d565f3dd5742e76dddbb6d75c4c5
+# syntax=docker/dockerfile:1.12.0@sha256:db1ff77fb637a5955317c7a3a62540196396d565f3dd5742e76dddbb6d75c4c5
 # // M0-PROVISIONAL: boring-cdc-d-compose
 # // M0-PROVISIONAL: boring-cdc-d-compose
 # linux/amd64 child sha256:c9ac3fa8945b61dede1e4500d25028aa8fd8a8fe46365fcf9c0422f8d999b9b0

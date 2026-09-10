@@ -36,6 +36,7 @@ services:
     volumes: ["chdata:/var/lib/clickhouse"]
 
   connector:
+    image: ${BORING_CDC_CONNECTOR_IMAGE:-boring-cdc-connector:local}
     build:
       context: .
       dockerfile: Dockerfile

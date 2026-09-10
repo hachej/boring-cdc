@@ -47,6 +47,10 @@
       "clickhouse",
       "connector"
     ],
+    "tool_digests": {
+      "buildkit": "sha256:6eceb8971ce4fceb3daca562832642706238b7eea72941fcf9896c93c3c4a53e",
+      "dockerfile_frontend": "sha256:db1ff77fb637a5955317c7a3a62540196396d565f3dd5742e76dddbb6d75c4c5"
+    },
     "tool_versions": {
       "buildkit": "0.24.0",
       "docker_compose": "2.39.2",
