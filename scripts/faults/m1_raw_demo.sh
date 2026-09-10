@@ -11,7 +11,7 @@ case=next(x for x in json.load(open('contracts/m1/raw-demo-cases.json'))['cases'
 print(f"CASE {case['id']} state={case['expected_state']} checkpoint={case['expected_checkpoint']} log={case['expected_log']}")
 PY
 }
-run() { cargo test --locked "$1" -- --exact --quiet >/dev/null 2>&1; emit "$2"; }
+run() { cargo test --locked "$1" -- --exact --quiet >"$out/test.log" 2>"$out/test.err"; printf 'ASSERT %s test=%s exit=0 checkpoint_and_state_asserted_by_test=true\n' "$2" "$1"; emit "$2"; }
 {
  echo 'scenario=SCN-M1-FAULT-MATRIX seed=raw-demo-v1'
  run m1_decoder::tests::golden_transaction_preserves_row_only_ordinals_and_origin SCN-M1-RAW-FIXED-SEED

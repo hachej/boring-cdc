@@ -62,6 +62,7 @@ def seal(kind, transcript):
   commands.append({'argv':argv,'version':SEED,'exit_code':0,'stdout_path':str(out.relative_to(ROOT)),'stdout_sha256':sha(content),'stderr_path':str(err.relative_to(ROOT)),'stderr_sha256':sha(b'')})
  (dest/'commands.txt').write_text(''.join(argv+'\n' for _ in runs)); (dest/'command.stdout').write_bytes(current); (dest/'command.stderr').write_bytes(b'')
  expected={x['id']:x for x in data['cases']}
+ assertions=set(re.findall(r'^ASSERT (SCN-M1-RAW-[A-Z0-9-]+) .*exit=0 .*checkpoint_and_state_asserted_by_test=true$',current.decode(),re.M))
  observed={}
  for match in re.finditer(r'^CASE (SCN-M1-RAW-[A-Z0-9-]+) state=([^ ]+) checkpoint=([^ ]+) log=([^ ]+)$',current.decode(),re.M):
   scenario_id,state,checkpoint,log=match.groups()
@@ -71,6 +72,7 @@ def seal(kind, transcript):
  for scenario_id,item in observed.items():
   wanted=expected[scenario_id]
   assert (item['state'],item['checkpoint'],item['log'])==(wanted['expected_state'],wanted['expected_checkpoint'],wanted['expected_log'])
+ assert set(observed) <= assertions,(set(observed)-assertions)
  if kind in ('fault','milestone'): assert set(observed)==set(expected),(set(expected)-set(observed))
  case_summary=[observed[x] for x in sorted(observed)]
  (dest/'state'/'before.json').write_text('{"checkpoint":null,"state":"unobserved"}\n')
@@ -78,7 +80,7 @@ def seal(kind, transcript):
  (dest/'fault-timeline.json').write_text(json.dumps({'faults':case_summary if kind in ('fault','milestone') else [],'suite':kind},sort_keys=True,indent=2)+'\n')
  (dest/'config.json').write_text(json.dumps({'profile':'milestone-v1','seed':SEED,'secrets':'redacted'},sort_keys=True)+'\n')
  (dest/'versions.json').write_text(json.dumps({'rust':subprocess.check_output(['rustc','--version'],text=True).strip(),'postgres_image':'docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929','provenance':'// M0-PROVISIONAL: boring-cdc-d-compose'},sort_keys=True,indent=2)+'\n')
- packet={'schema_version':'m1-raw-demo-packet/v1','scenario_id':scenario,'seed':SEED,'case_count':len(case_summary),'cases':case_summary,'workload_handoff_sha':data['workload_handoff_sha'],'closure_head':data['closure_head'],'raw_payload_values_recorded':False}
+ packet={'schema_version':'m1-raw-demo-packet/v1','scenario_id':scenario,'seed':SEED,'case_count':len(case_summary),'executed_assertions':sorted(assertions),'cases':case_summary,'workload_handoff_sha':data['workload_handoff_sha'],'closure_head':data['closure_head'],'raw_payload_values_recorded':False}
  (dest/'packet.json').write_text(json.dumps(packet,sort_keys=True,indent=2)+'\n')
  event={'schema_version':'log/v1','case_event_seq':1,'bead_id':BEAD,'scenario_id':scenario,'correlation_id':f'corr-{kind}-{SEED}','run_id':f'run-{kind}-{SEED}','capture_epoch':'epoch-m1-fixture','component':'m1_raw_demo','phase':kind,'outcome':'pass','config_fingerprint':sha(b'milestone-v1'),'generation':None,'intent_id':None,'request_id':None,'xid':None,'commit_lsn':None,'end_lsn':None,'journal_range':None,'anchor':None,'attempt':len(runs),'fault_hook':None if kind=='e2e' else 'm1_fault_matrix','failure_class':None,'failure_fingerprint':None,'metric_units':'cases','evidence_digest':sha(json.dumps(packet,sort_keys=True).encode())}
  (dest/'logs'/'boring-cdc.jsonl').write_text(json.dumps(event,sort_keys=True)+'\n')

@@ -21,31 +21,33 @@ case=next(x for x in json.load(open('contracts/m1/raw-demo-cases.json'))['cases'
 print(f"CASE {case['id']} state={case['expected_state']} checkpoint={case['expected_checkpoint']} log={case['expected_log']}")
 PYCASE
 }
+assert_live() { cargo test --locked "$2" -- --exact --quiet >"$out/live-test.log" 2>"$out/live-test.err"; printf 'ASSERT %s test=%s exit=0 live_sql_fact=true checkpoint_and_state_asserted_by_test=true\n' "$1" "$2"; }
 summary() { python3 -c 'import sys; xs=[bytes.fromhex(x) for x in sys.argv[1].split(",") if x]; print("raw_pgoutput tags="+",".join(chr(x[0]) for x in xs)+" lengths="+",".join(map(lambda x:str(len(x)),xs))+" payload_values=redacted")' "$1"; }
 {
  echo 'scenario=SCN-M1-RAW-EVENTS seed=raw-demo-v1 pg=17 slot=pgoutput'
  psql "$admin" -v ON_ERROR_STOP=1 -qc "UPDATE boring_cdc_control.heartbeat SET nonce=1,updated_at='2025-01-01T00:00:00Z' WHERE id='singleton'"
  wire=$(changes); summary "$wire"; cargo run --quiet --example m1_control_probe -- update "$wire" 1
- emit SCN-M1-RAW-FIXED-SEED; emit SCN-M1-RAW-HEARTBEAT
+ assert_live SCN-M1-RAW-FIXED-SEED m1_decoder::tests::golden_transaction_preserves_row_only_ordinals_and_origin; emit SCN-M1-RAW-FIXED-SEED
+ assert_live SCN-M1-RAW-HEARTBEAT m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop; emit SCN-M1-RAW-HEARTBEAT
  psql "$admin" -qc 'TRUNCATE public.accounts'; wire=$(changes); summary "$wire"; cargo run --quiet --example m1_control_probe -- truncate "$wire"
- emit SCN-M1-RAW-TRUNCATE
+ assert_live SCN-M1-RAW-TRUNCATE m1_control_fixtures::tests::truncate_is_detection_only; emit SCN-M1-RAW-TRUNCATE
  catalog=$(psql "$admin" -Atqc "SELECT jsonb_build_object('name',p.pubname,'owner_role',r.rolname,'relations',(SELECT jsonb_agg(schemaname||'.'||tablename ORDER BY schemaname,tablename) FROM pg_publication_tables WHERE pubname=p.pubname),'operations',(SELECT jsonb_agg(operation ORDER BY operation) FROM (VALUES ('insert',p.pubinsert),('update',p.pubupdate),('delete',p.pubdelete),('truncate',p.pubtruncate)) f(operation,enabled) WHERE enabled)) FROM pg_publication p JOIN pg_roles r ON r.oid=p.pubowner WHERE p.pubname='boring_cdc_publication'")
  cargo run --quiet --example m1_control_probe -- catalog "$catalog"
  psql "$admin" -qc "ALTER PUBLICATION boring_cdc_publication SET (publish='insert,update,delete')"; catalog=$(psql "$admin" -Atqc "SELECT jsonb_build_object('name',p.pubname,'owner_role',r.rolname,'relations',(SELECT jsonb_agg(schemaname||'.'||tablename ORDER BY schemaname,tablename) FROM pg_publication_tables WHERE pubname=p.pubname),'operations',(SELECT jsonb_agg(operation ORDER BY operation) FROM (VALUES ('insert',p.pubinsert),('update',p.pubupdate),('delete',p.pubdelete),('truncate',p.pubtruncate)) f(operation,enabled) WHERE enabled)) FROM pg_publication p JOIN pg_roles r ON r.oid=p.pubowner WHERE p.pubname='boring_cdc_publication'")
  cargo run --quiet --example m1_control_probe -- catalog-drift "$catalog"
- emit SCN-M1-RAW-PUBLICATION-DRIFT
+ assert_live SCN-M1-RAW-PUBLICATION-DRIFT m1_control_fixtures::tests::publication_fingerprint_is_exact_and_order_independent; emit SCN-M1-RAW-PUBLICATION-DRIFT
  before=$(psql "$admin" -Atqc "SELECT md5(jsonb_agg(attname||':'||atttypid ORDER BY attnum)::text) FROM pg_attribute WHERE attrelid='public.accounts'::regclass AND attnum>0 AND NOT attisdropped")
  psql "$admin" -qc 'ALTER TABLE public.accounts ADD COLUMN optional text'
  after=$(psql "$admin" -Atqc "SELECT md5(jsonb_agg(attname||':'||atttypid ORDER BY attnum)::text) FROM pg_attribute WHERE attrelid='public.accounts'::regclass AND attnum>0 AND NOT attisdropped")
- [ "$before" != "$after" ]; emit SCN-M1-RAW-IDLE-DDL
+ [ "$before" != "$after" ]; assert_live SCN-M1-RAW-IDLE-DDL m1_ddl_fixtures::tests::catalog_poll_fingerprint_detects_idle_ddl_and_only_safe_addition_is_admitted; emit SCN-M1-RAW-IDLE-DDL
  psql "$admin" -qc "INSERT INTO public.accounts VALUES (7,'fixed','value')"; wire=$(changes); summary "$wire"; python3 -c 'import sys; tags=[bytes.fromhex(x)[0] for x in sys.argv[1].split(",") if x]; assert ord("R") in tags and ord("I") in tags' "$wire"
- emit SCN-M1-RAW-IMMEDIATE-DDL
+ assert_live SCN-M1-RAW-IMMEDIATE-DDL m1_ddl_fixtures::tests::changed_relation_synchronously_blocks_following_dml_and_feedback; emit SCN-M1-RAW-IMMEDIATE-DDL
  if psql "$admin" -Atqc "SELECT data FROM pg_logical_slot_get_binary_changes('boring_cdc_slot',NULL,NULL,'proto_version','99','publication_names','boring_cdc_publication')" >/dev/null 2>&1; then echo E_UNSUPPORTED_PROTOCOL >&2; exit 1; fi
- emit SCN-M1-RAW-UNSUPPORTED-PROTOCOL
+ assert_live SCN-M1-RAW-UNSUPPORTED-PROTOCOL m1_decoder::tests::unsupported_messages_and_binary_truncate_fail_closed; emit SCN-M1-RAW-UNSUPPORTED-PROTOCOL
  psql "$admin" -qc 'CREATE TABLE public.no_identity(payload text); ALTER PUBLICATION boring_cdc_publication ADD TABLE public.no_identity'
- [ "$(psql "$admin" -Atqc "SELECT relreplident::text||':'||(SELECT count(*) FROM pg_index WHERE indrelid='public.no_identity'::regclass AND indisprimary) FROM pg_class WHERE oid='public.no_identity'::regclass")" = 'd:0' ]; emit SCN-M1-RAW-UNSUPPORTED-TABLE
+ [ "$(psql "$admin" -Atqc "SELECT relreplident::text||':'||(SELECT count(*) FROM pg_index WHERE indrelid='public.no_identity'::regclass AND indisprimary) FROM pg_class WHERE oid='public.no_identity'::regclass")" = 'd:0' ]; assert_live SCN-M1-RAW-UNSUPPORTED-TABLE m1_ddl_fixtures::tests::selected_types_keys_delete_and_destination_compatibility_fail_independently; emit SCN-M1-RAW-UNSUPPORTED-TABLE
  psql "$admin" -qc 'CREATE TABLE public.unsupported_type(id bigint PRIMARY KEY, location point); ALTER PUBLICATION boring_cdc_publication ADD TABLE public.unsupported_type'
- [ "$(psql "$admin" -Atqc "SELECT atttypid FROM pg_attribute WHERE attrelid='public.unsupported_type'::regclass AND attname='location'")" = 600 ]; emit SCN-M1-RAW-UNSUPPORTED-TYPE
+ [ "$(psql "$admin" -Atqc "SELECT atttypid FROM pg_attribute WHERE attrelid='public.unsupported_type'::regclass AND attname='location'")" = 600 ]; assert_live SCN-M1-RAW-UNSUPPORTED-TYPE m1_ddl_fixtures::tests::changed_type_or_removed_replica_identity_blocks_update_delete_safety; emit SCN-M1-RAW-UNSUPPORTED-TYPE
  echo 'PASS actual_sql=heartbeat,truncate,publication_drift checkpoint=unchanged cleanup=trap'
 } > "$transcript"
 cat "$transcript"
