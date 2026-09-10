@@ -13,3 +13,5 @@ pub mod m1_transition_kernel;
 pub mod m1_cli_contract;
 
 pub mod m2_schema;
+
+pub mod failure_policy;
