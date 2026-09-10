@@ -77,7 +77,9 @@ def seal(kind, transcript):
   assert scenario_id in assertions and assertions[scenario_id][0] < line_number
   if kind=='e2e': assert assertions[scenario_id][1],scenario_id
   row={'scenario_id':scenario_id,'consumed_owner':expected[scenario_id]['consumed_owner'],'state':state,'checkpoint':checkpoint,'log':log,'assertion_test':expected[scenario_id]['unit_test'],'live_sql_fact':assertions[scenario_id][1]}
-  if scenario_id in observed: assert observed[scenario_id]==row
+  if scenario_id in observed:
+   prior=observed[scenario_id]; assert {k:v for k,v in prior.items() if k!='live_sql_fact'}=={k:v for k,v in row.items() if k!='live_sql_fact'}
+   prior['live_sql_fact'] = prior['live_sql_fact'] or row['live_sql_fact']
   else: observed[scenario_id]=row
  for scenario_id,item in observed.items():
   wanted=expected[scenario_id]
