@@ -69,7 +69,7 @@
       "scenario_id": "SCN-M1-BOOTSTRAP-RETAINED-SLOT-TRANSIENT",
       "clause": "proved retained-slot drain preserves insert-delete and establishes lower stitch",
       "unit_test": "retained_slot_recovery_requires_all_proofs_and_preserves_transient_wal",
-      "expected_state": "RetainedWalDrained",
+      "expected_state": "ImportsPending(existing-slot generation=2)",
       "expected_checkpoint": "lower_stitch=end:120,seq:2",
       "expected_log_outcome": "insert_delete_retained"
     },

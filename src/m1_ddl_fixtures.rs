@@ -240,8 +240,7 @@ pub struct DurableFenceProof {
 }
 impl DurableFenceProof {
     /// Only the journal transaction owner can supply the durable boundary capability.
-    #[cfg(test)]
-    fn from_journal_commit(
+    pub fn from_journal_commit(
         capture_epoch: u64,
         generation: u64,
         table_set_fingerprint: String,

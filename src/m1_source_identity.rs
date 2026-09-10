@@ -428,6 +428,44 @@ pub fn reconcile_startup(local: &LocalSourceState, live: &LiveSourceState) -> St
     }
 }
 
+/// Capability produced only by the source-identity owner's complete reconciliation table.
+#[derive(Clone, Debug)]
+pub struct VerifiedRetainedSlotContinuity {
+    capture_epoch: CaptureEpoch,
+    identity: SourceIdentity,
+}
+impl VerifiedRetainedSlotContinuity {
+    #[must_use]
+    pub fn matches(
+        &self,
+        capture_epoch: CaptureEpoch,
+        slot_name: &str,
+        publication_fingerprint: Fingerprint,
+        protocol_fingerprint: Fingerprint,
+    ) -> bool {
+        self.capture_epoch == capture_epoch
+            && self.identity.slot_name == slot_name
+            && self.identity.publication_fingerprint == publication_fingerprint
+            && self.identity.protocol_fingerprint == protocol_fingerprint
+    }
+}
+
+/// Reconcile and mint retained-slot continuity only for a fully validated resumable source.
+pub fn verify_retained_slot_continuity(
+    local: &LocalSourceState,
+    live: &LiveSourceState,
+) -> Result<VerifiedRetainedSlotContinuity, StartupDecision> {
+    let decision = reconcile_startup(local, live);
+    if matches!(decision, StartupDecision::Resume { .. }) {
+        Ok(VerifiedRetainedSlotContinuity {
+            capture_epoch: local.capture_epoch,
+            identity: live.identity.clone(),
+        })
+    } else {
+        Err(decision)
+    }
+}
+
 fn max_lsn(left: Option<ReceivedLsn>, right: Option<ReceivedLsn>) -> Option<ReceivedLsn> {
     match (left, right) {
         (Some(left), Some(right)) => Some(if left.get() >= right.get() {

@@ -159,11 +159,21 @@ impl ProtocolFailure {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JournalControlNoOp {
-    pub kind: ControlKind,
-    pub nonce: u64,
-    pub writes_user_row: bool,
-    pub writes_benchmark_mutation: bool,
-    pub feedback_eligible: bool,
+    kind: ControlKind,
+    nonce: u64,
+    writes_user_row: bool,
+    writes_benchmark_mutation: bool,
+    feedback_eligible: bool,
+}
+impl JournalControlNoOp {
+    #[must_use]
+    pub fn proves_durable_fence(&self, nonce: u64) -> bool {
+        self.kind == ControlKind::CaptureFence
+            && self.nonce == nonce
+            && !self.writes_user_row
+            && !self.writes_benchmark_mutation
+            && self.feedback_eligible
+    }
 }
 
 /// Capability emitted only by the journal transaction owner after atomically persisting the
@@ -172,7 +182,7 @@ pub struct JournalCommitProof {
     _private: (),
 }
 #[cfg(test)]
-fn committed_for_fixture() -> JournalCommitProof {
+pub(crate) fn committed_for_fixture() -> JournalCommitProof {
     JournalCommitProof { _private: () }
 }
 
