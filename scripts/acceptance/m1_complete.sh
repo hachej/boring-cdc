@@ -120,7 +120,10 @@ for base in ('src','scripts','fixtures','contracts','config','artifacts','tests'
    if provisional_marker in text: fail(f'provisional marker reintroduced: {path.relative_to(root)}')
    for marker in markers:
     if f'M0-RECONCILED: {marker}' in text: fail(f'unreconciled marker {marker}: {path.relative_to(root)}')
-for path in (root/'Cargo.toml',root/'Dockerfile',root/'compose.yaml'):
+for path in (
+ root/'.env.example',root/'rust-toolchain.toml',root/'.dockerignore',
+ root/'Cargo.toml',root/'Dockerfile',root/'compose.yaml',
+):
  try: text=path.read_text()
  except (OSError,UnicodeDecodeError): continue
  if provisional_marker in text: fail(f'provisional marker reintroduced: {path.relative_to(root)}')

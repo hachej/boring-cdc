@@ -79,5 +79,23 @@ class ScaffoldTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("provisional marker reintroduced", result.stdout)
 
+    def test_m1_completion_rejects_marker_in_root_product_files(self):
+        for relative in (".env.example", "rust-toolchain.toml", ".dockerignore"):
+            with self.subTest(path=relative):
+                path = ROOT / relative
+                original = path.read_bytes()
+                path.write_bytes(original + b"\nM0-" + b"PROVISIONAL\n")
+                try:
+                    result = subprocess.run(
+                        ["scripts/acceptance/m1_complete.sh", "--probe"],
+                        cwd=ROOT,
+                        text=True,
+                        capture_output=True,
+                    )
+                finally:
+                    path.write_bytes(original)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(f"provisional marker reintroduced: {relative}", result.stdout)
+
 if __name__ == "__main__":
     unittest.main()
