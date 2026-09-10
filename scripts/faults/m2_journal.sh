@@ -14,3 +14,4 @@ python3 scripts/lib/m2_journal_component.py fault
 cp -a artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-CRASH-BOUNDARY/. "$scratch"/
 python3 scripts/lib/m2_journal_component.py fault
 diff -ru "$scratch" artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-CRASH-BOUNDARY
+python3 scripts/validate/m2_journal.py
