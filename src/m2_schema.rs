@@ -72,6 +72,18 @@ impl ReaderHandle {
     where
         F: FnOnce(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
     {
+        self.query_one_bounded_params(sql, [], map)
+    }
+    pub fn query_one_bounded_params<T, P, F>(
+        &self,
+        sql: &str,
+        params: P,
+        map: F,
+    ) -> rusqlite::Result<Option<T>>
+    where
+        P: rusqlite::Params,
+        F: FnOnce(&rusqlite::Row<'_>) -> rusqlite::Result<T>,
+    {
         if self.expired() {
             return Err(rusqlite::Error::InvalidQuery);
         }
@@ -79,7 +91,7 @@ impl ReaderHandle {
         if statement.column_count() == 0 {
             return Err(rusqlite::Error::InvalidQuery);
         }
-        let mut rows = statement.query([])?;
+        let mut rows = statement.query(params)?;
         let value = match rows.next()? {
             Some(row) => Some(map(row)?),
             None => None,
@@ -89,8 +101,20 @@ impl ReaderHandle {
         }
         Ok(value)
     }
-    pub fn for_each_bounded<F>(&self, sql: &str, mut visit: F) -> rusqlite::Result<usize>
+    pub fn for_each_bounded<F>(&self, sql: &str, visit: F) -> rusqlite::Result<usize>
     where
+        F: FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<()>,
+    {
+        self.for_each_bounded_params(sql, [], visit)
+    }
+    pub fn for_each_bounded_params<P, F>(
+        &self,
+        sql: &str,
+        params: P,
+        mut visit: F,
+    ) -> rusqlite::Result<usize>
+    where
+        P: rusqlite::Params,
         F: FnMut(&rusqlite::Row<'_>) -> rusqlite::Result<()>,
     {
         if self.expired() {
@@ -100,7 +124,7 @@ impl ReaderHandle {
         if statement.column_count() == 0 {
             return Err(rusqlite::Error::InvalidQuery);
         }
-        let mut rows = statement.query([])?;
+        let mut rows = statement.query(params)?;
         let mut count = 0usize;
         while let Some(row) = rows.next()? {
             if self.expired() || count == self.max_rows {

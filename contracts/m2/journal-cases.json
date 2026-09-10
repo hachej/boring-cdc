@@ -71,8 +71,8 @@
     },
     {
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-DETECT-JOURNAL-CORRUPTION-AND-UNAVAILABLE-REPLAY-POSITIONS",
-      "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader",
+      "test": "journal_command_boundaries_are_read_only_bounded_and_asserted",
+      "assertion": "journal verification rejects an actual missing event sequence and reports the journal continuity as corrupt instead of accepting transaction-table counts",
       "status": "executed"
     },
     {
@@ -137,8 +137,8 @@
     },
     {
       "id": "RISK-SQLITE-CORRUPTION-LOCAL-RESTORE-DIVERGENCE",
-      "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader",
+      "test": "journal_command_boundaries_are_read_only_bounded_and_asserted",
+      "assertion": "journal verification rejects an actual missing event sequence and reports the journal continuity as corrupt instead of accepting transaction-table counts",
       "status": "executed"
     },
     {
@@ -179,8 +179,8 @@
     },
     {
       "id": "SCN-JOURNAL-CORRUPTION-MISSING-SEQUENCE",
-      "test": "bounded_range_copies_complete_transactions_and_releases_reader",
-      "assertion": "bounded read returns contiguous complete transactions and fail-closes unavailable or non-boundary starts before releasing the reader",
+      "test": "journal_command_boundaries_are_read_only_bounded_and_asserted",
+      "assertion": "journal verification rejects an actual missing event sequence and reports the journal continuity as corrupt instead of accepting transaction-table counts",
       "status": "executed"
     },
     {

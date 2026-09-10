@@ -505,8 +505,9 @@ pub fn read_complete_range(
     }
     let reader = open_reader_with_limits(path, max_age, max_events)?;
     if after_seq > 0 {
-        let boundary = reader.query_one_bounded(
-            &format!("SELECT last_seq FROM source_transactions WHERE last_seq={after_seq}"),
+        let boundary = reader.query_one_bounded_params(
+            "SELECT last_seq FROM source_transactions WHERE last_seq=?1",
+            [after_seq as i64],
             |r| r.get::<_, i64>(0),
         )?;
         if boundary != Some(after_seq as i64) {
@@ -530,8 +531,9 @@ pub fn read_complete_range(
         .ok_or(JournalError::Limit("copied bytes overflow"))?;
     let mut expected_first = after_seq as i64 + 1;
     loop {
-        let boundary: Option<(String, i64, i64)> = reader.query_one_bounded(
-            &format!("SELECT transaction_id,first_seq,last_seq FROM source_transactions WHERE state='committed' AND first_seq>={expected_first} ORDER BY first_seq LIMIT 1"),
+        let boundary: Option<(String, i64, i64)> = reader.query_one_bounded_params(
+            "SELECT transaction_id,first_seq,last_seq FROM source_transactions WHERE state='committed' AND first_seq>=?1 ORDER BY first_seq LIMIT 1",
+            [expected_first],
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )?;
         let Some((txid, first, last)) = boundary else {
@@ -557,9 +559,9 @@ pub fn read_complete_range(
             }
             break;
         }
-        let escaped = txid.replace('\'', "''");
-        let measure: Option<(i64, i64, Option<i64>, Option<i64>)> = reader.query_one_bounded(
-            &format!("SELECT count(*),coalesce(sum(length(payload)+length(transaction_id)+length(event_id)+length(payload_hash)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id='{escaped}'"),
+        let measure: Option<(i64, i64, Option<i64>, Option<i64>)> = reader.query_one_bounded_params(
+            "SELECT count(*),coalesce(sum(length(payload)+length(transaction_id)+length(event_id)+length(payload_hash)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id=?1",
+            [txid.as_str()],
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )?;
         let (count, field_bytes, min_seq, max_seq) =
@@ -585,8 +587,9 @@ pub fn read_complete_range(
             }
             break;
         }
-        let row_count = reader.for_each_bounded(
-            &format!("SELECT journal_seq,transaction_id,event_id,payload,payload_hash FROM journal_events WHERE transaction_id='{escaped}' ORDER BY journal_seq"),
+        let row_count = reader.for_each_bounded_params(
+            "SELECT journal_seq,transaction_id,event_id,payload,payload_hash FROM journal_events WHERE transaction_id=?1 ORDER BY journal_seq",
+            [txid.as_str()],
             |r| {
                 events.push(CopiedEvent {
                     journal_seq: r.get::<_, i64>(0)? as u64,
