@@ -987,11 +987,29 @@ pub mod tests {
             })
             .unwrap();
             let mut ordinals = Vec::new();
+            let mut saw_begin = false;
+            let mut saw_origin = false;
+            let mut saw_commit = false;
+            let mut saw_keepalive = false;
             for frame in &frames[1..] {
                 match d
                     .decode_copy_data(&from_hex(frame.as_str().unwrap()))
                     .unwrap()
                 {
+                    CopyBothEvent::XLogData {
+                        event: PgoutputEvent::Begin { xid, .. },
+                        ..
+                    } => {
+                        assert_eq!(xid, vector["expected"]["xid"].as_u64().unwrap() as u32);
+                        saw_begin = true;
+                    }
+                    CopyBothEvent::XLogData {
+                        event: PgoutputEvent::Origin { name, .. },
+                        ..
+                    } => {
+                        assert_eq!(name, vector["expected"]["origin"].as_str().unwrap());
+                        saw_origin = true;
+                    }
                     CopyBothEvent::XLogData {
                         event: PgoutputEvent::Row(row),
                         ..
@@ -1010,14 +1028,24 @@ pub mod tests {
                             vector["expected"]["commit_lsn"].as_u64().unwrap()
                         );
                         assert_eq!(end_lsn, vector["expected"]["end_lsn"].as_u64().unwrap());
+                        saw_commit = true;
                     }
                     CopyBothEvent::Keepalive {
                         reply_requested, ..
-                    } => assert!(reply_requested),
+                    } => {
+                        assert_eq!(
+                            reply_requested,
+                            vector["expected"]["keepalive_reply_requested"]
+                                .as_bool()
+                                .unwrap()
+                        );
+                        saw_keepalive = true;
+                    }
                     _ => {}
                 }
             }
             assert_eq!(ordinals, vec![0, 1, 2]);
+            assert!(saw_begin && saw_origin && saw_commit && saw_keepalive);
         }
     }
 

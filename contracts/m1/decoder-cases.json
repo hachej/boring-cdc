@@ -1,18 +1,121 @@
 {
   "schema_version": "boring-cdc/m1-decoder-cases/v1",
   "owner_bead": "boring-cdc-m1-decoder",
-  "supported_postgres_majors": [15, 16, 17],
+  "supported_postgres_majors": [
+    15,
+    16,
+    17
+  ],
   "transport": "postgres-replication-copyboth-v1",
   "cases": [
-    {"id":"SCN-M1-DECODER-COPYBOTH","assertion":"Decode bounded XLogData and primary keepalive framing."},
-    {"id":"SCN-M1-DECODER-STATUS","assertion":"Emit all write/flush/apply LSN fields from one durable complete-transaction boundary and answer requested replies without copying wal_end."},
-    {"id":"SCN-M1-DECODER-TRANSACTION","assertion":"Decode Begin, Origin, Insert, Update, Delete, and Commit with row-only zero-based ordinals."},
-    {"id":"SCN-M1-DECODER-RELATION","assertion":"Require synchronous catalog admission for a new or changed Relation before following DML."},
-    {"id":"SCN-M1-DECODER-KEYS","assertion":"Reject null, absent, partial, or unchanged-TOAST canonical keys and unchanged TOAST anywhere in a key-changing update."},
-    {"id":"SCN-M1-DECODER-CONTROL","assertion":"Admit only UPDATE of the fixed control identity and reject insert, delete, key change, and unexpected column mutation before feedback."},
-    {"id":"SCN-M1-DECODER-UNSUPPORTED","assertion":"Reject Truncate application, streamed, two-phase, binary tuple, logical-message, type-message, and unknown protocol messages before feedback."},
-    {"id":"SCN-M1-DECODER-BOUNDS","assertion":"Reject truncated, oversized, overflowing, over-column, and over-tuple frames without panic or unbounded allocation."},
-    {"id":"SCN-M1-DECODER-RECONNECT","assertion":"Repeated identical Relation metadata and keepalives do not require a transaction or alter row ordinals."},
-    {"id":"SCN-M1-DECODER-PG-MATRIX","assertion":"The same golden corpus applies to explicitly admitted PostgreSQL 15, 16, and 17 protocol-v1 text output."}
+    {
+      "id": "SCN-M1-DECODER-COPYBOTH",
+      "assertion": "Decode bounded XLogData and primary keepalive framing."
+    },
+    {
+      "id": "SCN-M1-DECODER-STATUS",
+      "assertion": "Emit all write/flush/apply LSN fields from one durable complete-transaction boundary and answer requested replies without copying wal_end."
+    },
+    {
+      "id": "SCN-M1-DECODER-TRANSACTION",
+      "assertion": "Decode Begin, Origin, Insert, Update, Delete, and Commit with row-only zero-based ordinals."
+    },
+    {
+      "id": "SCN-M1-DECODER-RELATION",
+      "assertion": "Require synchronous catalog admission for a new or changed Relation before following DML."
+    },
+    {
+      "id": "SCN-M1-DECODER-KEYS",
+      "assertion": "Reject null, absent, partial, or unchanged-TOAST canonical keys and unchanged TOAST anywhere in a key-changing update."
+    },
+    {
+      "id": "SCN-M1-DECODER-CONTROL",
+      "assertion": "Admit only UPDATE of the fixed control identity and reject insert, delete, key change, and unexpected column mutation before feedback."
+    },
+    {
+      "id": "SCN-M1-DECODER-UNSUPPORTED",
+      "assertion": "Reject Truncate application, streamed, two-phase, binary tuple, logical-message, type-message, and unknown protocol messages before feedback."
+    },
+    {
+      "id": "SCN-M1-DECODER-BOUNDS",
+      "assertion": "Reject truncated, oversized, overflowing, over-column, and over-tuple frames without panic or unbounded allocation."
+    },
+    {
+      "id": "SCN-M1-DECODER-RECONNECT",
+      "assertion": "Repeated identical Relation metadata and keepalives do not require a transaction or alter row ordinals."
+    },
+    {
+      "id": "SCN-M1-DECODER-PG-MATRIX",
+      "assertion": "The same golden corpus applies to explicitly admitted PostgreSQL 15, 16, and 17 protocol-v1 text output."
+    }
+  ],
+  "canonical_assignments": [
+    {
+      "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-ACKNOWLEDGE-POSTGRES-ONLY-AFTER-THE-JOURNAL-APPEND",
+      "executed_by": [
+        "SCN-M1-DECODER-STATUS"
+      ]
+    },
+    {
+      "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-DECODE-PGOUTPUT-INSERTS-UPDATES-AND-DELETES",
+      "executed_by": [
+        "SCN-M1-DECODER-TRANSACTION",
+        "SCN-M1-DECODER-PG-MATRIX"
+      ]
+    },
+    {
+      "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-DISTINGUISH-TRANSIENT-ENVIRONMENTAL-FAILURES-FROM-DETERMINISTIC-PROTOCOL",
+      "executed_by": [
+        "SCN-M1-DECODER-UNSUPPORTED",
+        "SCN-M1-DECODER-BOUNDS"
+      ]
+    },
+    {
+      "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-PRESERVE-TRANSACTION-BOUNDARIES-AND-SOURCE-ORDERING-INFORMATION",
+      "executed_by": [
+        "SCN-M1-DECODER-TRANSACTION"
+      ]
+    },
+    {
+      "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-RECORD-SOURCE-RELATION-SCHEMA-METADATA-REQUIRED-TO",
+      "executed_by": [
+        "SCN-M1-DECODER-RELATION"
+      ]
+    },
+    {
+      "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-RESUME-AFTER-PROCESS-OR-NETWORK-FAILURE-WITHOUT",
+      "executed_by": [
+        "SCN-M1-DECODER-RECONNECT",
+        "SCN-M1-DECODER-STATUS"
+      ]
+    },
+    {
+      "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-SURFACE-UNSUPPORTED-PAYLOAD-SCHEMA-CASES-RATHER-THAN",
+      "executed_by": [
+        "SCN-M1-DECODER-KEYS",
+        "SCN-M1-DECODER-UNSUPPORTED"
+      ]
+    },
+    {
+      "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-TOLERATE-DUPLICATE-DELIVERY-AFTER-AMBIGUOUS-CRASHES",
+      "executed_by": [
+        "SCN-M1-DECODER-RECONNECT",
+        "SCN-M1-DECODER-TRANSACTION"
+      ]
+    },
+    {
+      "id": "REQ-CAPTURE-AND-EVENT-SEMANTICS-TRACK-LSN-PROGRESS-DURABLY",
+      "executed_by": [
+        "SCN-M1-DECODER-STATUS",
+        "SCN-M1-DECODER-TRANSACTION"
+      ]
+    },
+    {
+      "id": "SCN-LOGICAL-DECODING-SPILL-COMMIT-BURST",
+      "executed_by": [
+        "SCN-M1-DECODER-BOUNDS",
+        "SCN-M1-DECODER-UNSUPPORTED"
+      ]
+    }
   ]
 }
