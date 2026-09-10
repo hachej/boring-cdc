@@ -20,6 +20,7 @@ pub struct WireLimits {
     pub max_pgoutput_message_bytes: usize,
     pub max_columns: usize,
     pub max_tuple_bytes: usize,
+    pub max_relations: usize,
 }
 
 impl Default for WireLimits {
@@ -29,6 +30,8 @@ impl Default for WireLimits {
             max_pgoutput_message_bytes: 1_048_551,
             max_columns: 1_024,
             max_tuple_bytes: 1_048_576,
+            // M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED relation-cache bound).
+            max_relations: 4_096,
         }
     }
 }
@@ -339,6 +342,16 @@ impl Decoder {
             b'R' => {
                 let relation = decode_relation(&mut c, self.limits.max_columns)?;
                 c.finish()?;
+                if !self.relations.contains_key(&relation.id)
+                    && !self.pending_relations.contains_key(&relation.id)
+                    && self
+                        .relations
+                        .len()
+                        .saturating_add(self.pending_relations.len())
+                        >= self.limits.max_relations
+                {
+                    return self.block(fail(FailureClass::Wire, "RELATION_CACHE_LIMIT_EXCEEDED"));
+                }
                 if self
                     .relations
                     .get(&relation.id)
@@ -921,6 +934,8 @@ pub mod tests {
             .collect()
     }
 
+    // SCENARIO: SCN-M1-DECODER-COPYBOTH
+    // SCENARIO: SCN-M1-DECODER-STATUS
     #[test]
     fn copy_both_keepalive_and_complete_status_packet() {
         let mut d = Decoder::new(WireLimits::default());
@@ -957,6 +972,7 @@ pub mod tests {
             "KEEPALIVE_REPLY_FLAG_INVALID"
         );
     }
+    // SCENARIO: SCN-M1-DECODER-PG-MATRIX
     #[test]
     fn postgres_major_golden_wire_corpus_decodes() {
         let corpus: serde_json::Value = serde_json::from_str(include_str!(
@@ -1049,6 +1065,7 @@ pub mod tests {
         }
     }
 
+    // SCENARIO: SCN-M1-DECODER-TRANSACTION
     #[test]
     fn golden_transaction_preserves_row_only_ordinals_and_origin() {
         let mut d = admitted(false);
@@ -1110,6 +1127,7 @@ pub mod tests {
             }
         ));
     }
+    // SCENARIO: SCN-M1-DECODER-RELATION
     #[test]
     fn changed_relation_requires_synchronous_validation() {
         let mut d = admitted(false);
@@ -1133,6 +1151,7 @@ pub mod tests {
             .unwrap_err();
         assert_eq!(err.fingerprint, "RELATION_VALIDATION_REQUIRED");
     }
+    // SCENARIO: SCN-M1-DECODER-KEYS
     #[test]
     fn key_and_toast_failures_block_feedback() {
         for vals in [
@@ -1190,6 +1209,7 @@ pub mod tests {
             .unwrap_err();
         assert_eq!(e.fingerprint, "KEY_CHANGE_UNCHANGED_TOAST");
     }
+    // SCENARIO: SCN-M1-DECODER-CONTROL
     #[test]
     fn control_relation_allows_only_fixed_key_update_and_mutable_columns() {
         let valid = row(
@@ -1268,13 +1288,21 @@ pub mod tests {
             assert!(d.is_feedback_blocked());
         }
     }
+    // SCENARIO: SCN-M1-DECODER-UNSUPPORTED
     #[test]
     fn unsupported_messages_and_binary_truncate_fail_closed() {
         for (tag, code) in [
             (b'T', "TRUNCATE_REQUIRES_RESEED"),
             (b'S', "STREAMED_TRANSACTION_UNSUPPORTED"),
+            (b'E', "STREAMED_TRANSACTION_UNSUPPORTED"),
+            (b'c', "STREAMED_TRANSACTION_UNSUPPORTED"),
+            (b'A', "STREAMED_TRANSACTION_UNSUPPORTED"),
             (b'b', "TWO_PHASE_TRANSACTION_UNSUPPORTED"),
+            (b'P', "TWO_PHASE_TRANSACTION_UNSUPPORTED"),
+            (b'K', "TWO_PHASE_TRANSACTION_UNSUPPORTED"),
+            (b'r', "TWO_PHASE_TRANSACTION_UNSUPPORTED"),
             (b'M', "LOGICAL_MESSAGE_UNSUPPORTED"),
+            (b'Y', "TYPE_MESSAGE_UNSUPPORTED"),
             (b'?', "PGOUTPUT_MESSAGE_UNSUPPORTED"),
         ] {
             let mut d = Decoder::new(WireLimits::default());
@@ -1295,6 +1323,7 @@ pub mod tests {
         let e = d.decode_copy_data(&xlog(i)).unwrap_err();
         assert_eq!(e.fingerprint, "BINARY_TUPLE_UNSUPPORTED");
     }
+    // SCENARIO: SCN-M1-DECODER-BOUNDS
     #[test]
     fn malformed_and_bounded_frames_never_panic_or_ack() {
         for n in 0..80 {
@@ -1303,6 +1332,7 @@ pub mod tests {
                 max_pgoutput_message_bytes: 7,
                 max_columns: 2,
                 max_tuple_bytes: 2,
+                max_relations: 2,
             });
             let bytes = vec![0xff; n];
             let _ = d.decode_copy_data(&bytes);
@@ -1316,7 +1346,74 @@ pub mod tests {
             "COPY_DATA_LIMIT_EXCEEDED"
         );
         assert!(d.is_feedback_blocked());
+
+        let mut d = Decoder::new(WireLimits {
+            max_pgoutput_message_bytes: 1,
+            ..WireLimits::default()
+        });
+        assert_eq!(
+            d.decode_copy_data(&xlog(begin(1))).unwrap_err().fingerprint,
+            "PGOUTPUT_MESSAGE_LIMIT_EXCEEDED"
+        );
+        let mut d = Decoder::new(WireLimits {
+            max_columns: 2,
+            ..WireLimits::default()
+        });
+        assert_eq!(
+            d.decode_copy_data(&xlog(rel_wire(&relation(7, false))))
+                .unwrap_err()
+                .fingerprint,
+            "RELATION_COLUMN_LIMIT_EXCEEDED"
+        );
+        let mut d = admitted(false);
+        d.limits.max_columns = 2;
+        d.decode_copy_data(&xlog(begin(1))).unwrap();
+        assert_eq!(
+            d.decode_copy_data(&xlog(row(
+                b'I',
+                7,
+                b"N",
+                &[vec![text("a"), text("v"), text("g")]]
+            )))
+            .unwrap_err()
+            .fingerprint,
+            "TUPLE_COLUMN_LIMIT_EXCEEDED"
+        );
+        let mut d = admitted(false);
+        d.limits.max_tuple_bytes = 1;
+        d.decode_copy_data(&xlog(begin(1))).unwrap();
+        assert_eq!(
+            d.decode_copy_data(&xlog(row(
+                b'I',
+                7,
+                b"N",
+                &[vec![text("aa"), text("v"), text("g")]]
+            )))
+            .unwrap_err()
+            .fingerprint,
+            "TUPLE_BYTE_LIMIT_EXCEEDED"
+        );
+        let mut d = Decoder::new(WireLimits {
+            max_relations: 1,
+            ..WireLimits::default()
+        });
+        d.decode_copy_data(&xlog(rel_wire(&relation(7, false))))
+            .unwrap();
+        let mut second = relation(8, false);
+        second.name = "other".into();
+        assert_eq!(
+            d.decode_copy_data(&xlog(rel_wire(&second)))
+                .unwrap_err()
+                .fingerprint,
+            "RELATION_CACHE_LIMIT_EXCEEDED"
+        );
+        let mut d = Decoder::new(WireLimits::default());
+        assert_eq!(
+            d.decode_copy_data(b"w").unwrap_err().fingerprint,
+            "FRAME_TRUNCATED"
+        );
     }
+    // SCENARIO: SCN-M1-DECODER-RECONNECT
     #[test]
     fn reconnect_metadata_does_not_need_transaction_or_ordinal() {
         let mut d = admitted(false);

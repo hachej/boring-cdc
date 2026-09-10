@@ -25,7 +25,7 @@
         "origin": "upstream",
         "keepalive_reply_requested": true
       },
-      "source_release_tag": "REL_15_STABLE"
+      "source_release_tag": "REL_15_15"
     },
     {
       "postgres_major": 16,
@@ -51,7 +51,7 @@
         "origin": "upstream",
         "keepalive_reply_requested": true
       },
-      "source_release_tag": "REL_16_STABLE"
+      "source_release_tag": "REL_16_11"
     },
     {
       "postgres_major": 17,
@@ -77,13 +77,13 @@
         "origin": "upstream",
         "keepalive_reply_requested": true
       },
-      "source_release_tag": "REL_17_STABLE"
+      "source_release_tag": "REL_17_7"
     }
   ],
   "provenance": {
     "kind": "frozen_protocol_v1_contract_vector",
     "specification": "PostgreSQL logical replication message formats and protocol documentation",
     "source_code_path": "src/backend/replication/logical/proto.c",
-    "note": "proto_version=1 message bytes are intentionally identical across admitted majors; M3 owns live PostgreSQL execution"
+    "note": "proto_version=1 message bytes are intentionally identical across immutable admitted release tags; M3 owns live PostgreSQL execution"
   }
 }

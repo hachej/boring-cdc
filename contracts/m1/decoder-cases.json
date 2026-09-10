@@ -38,7 +38,7 @@
     },
     {
       "id": "SCN-M1-DECODER-BOUNDS",
-      "assertion": "Reject truncated, oversized, overflowing, over-column, and over-tuple frames without panic or unbounded allocation."
+      "assertion": "Reject truncated, oversized, over-column, over-tuple, and over-relation-cache frames without panic or unbounded allocation."
     },
     {
       "id": "SCN-M1-DECODER-RECONNECT",
