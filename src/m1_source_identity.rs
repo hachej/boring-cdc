@@ -229,6 +229,7 @@ pub enum StateValidationError {
     FeedbackDoesNotMatchEvidence,
     DurableAheadOfReceived,
     DurableBeforeCreationFloor,
+    EmptyActiveIntent,
 }
 
 #[derive(Clone, Debug)]
@@ -425,6 +426,61 @@ pub fn reconcile_startup(local: &LocalSourceState, live: &LiveSourceState) -> St
         duplicate_delivery_expected: live
             .confirmed_flush_lsn
             .is_some_and(|server| server.get() < requested_lsn.get()),
+    }
+}
+
+/// Capability produced only by the source-identity owner's complete reconciliation table.
+#[derive(Clone, Debug)]
+pub struct VerifiedRetainedSlotContinuity {
+    capture_epoch: CaptureEpoch,
+    active_intent_id: String,
+    identity: SourceIdentity,
+}
+impl VerifiedRetainedSlotContinuity {
+    /// Match the entire persisted source identity and the active bootstrap intent. Partial
+    /// publication/slot matching cannot authorize retained-slot recovery.
+    #[must_use]
+    pub fn matches(
+        &self,
+        capture_epoch: CaptureEpoch,
+        active_intent_id: &str,
+        expected_identity: &SourceIdentity,
+    ) -> bool {
+        self.capture_epoch == capture_epoch
+            && self.active_intent_id == active_intent_id
+            && &self.identity == expected_identity
+    }
+}
+
+/// Reconcile and mint retained-slot continuity only for a fully validated resumable source and
+/// the non-empty active bootstrap intent that will consume it.
+pub fn verify_retained_slot_continuity(
+    local: &LocalSourceState,
+    live: &LiveSourceState,
+    active_intent_id: &str,
+) -> Result<VerifiedRetainedSlotContinuity, StartupDecision> {
+    if active_intent_id.is_empty() {
+        return Err(StartupDecision::BlockInvalidState {
+            reason: StateValidationError::EmptyActiveIntent,
+        });
+    }
+    let decision = reconcile_startup(local, live);
+    let lost_token_continuity =
+        matches!(decision, StartupDecision::BootstrapAmbiguousRequiresRestart)
+            && local.validate().is_ok()
+            && live.identity.validate().is_ok()
+            && first_identity_mismatch(&local.identity, &live.identity).is_none()
+            && live.slot_exists
+            && live.slot_valid
+            && live.resume_wal_available;
+    if matches!(decision, StartupDecision::Resume { .. }) || lost_token_continuity {
+        Ok(VerifiedRetainedSlotContinuity {
+            capture_epoch: local.capture_epoch,
+            active_intent_id: active_intent_id.to_owned(),
+            identity: live.identity.clone(),
+        })
+    } else {
+        Err(decision)
     }
 }
 

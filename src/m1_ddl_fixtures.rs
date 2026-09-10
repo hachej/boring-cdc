@@ -240,8 +240,7 @@ pub struct DurableFenceProof {
 }
 impl DurableFenceProof {
     /// Only the journal transaction owner can supply the durable boundary capability.
-    #[cfg(test)]
-    fn from_journal_commit(
+    pub fn from_journal_commit(
         capture_epoch: u64,
         generation: u64,
         table_set_fingerprint: String,
@@ -255,6 +254,25 @@ impl DurableFenceProof {
             nonce,
             _journal_boundary: boundary,
         }
+    }
+}
+
+/// Opaque one-shot authority proving the live DDL guard bound this exact fence before dispatch.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GuardFenceAuthorization {
+    capture_epoch: u64,
+    generation: u64,
+    table_set_fingerprint: String,
+    nonce: u64,
+}
+impl GuardFenceAuthorization {
+    pub fn into_parts(self) -> (u64, u64, String, u64) {
+        (
+            self.capture_epoch,
+            self.generation,
+            self.table_set_fingerprint,
+            self.nonce,
+        )
     }
 }
 
@@ -309,6 +327,57 @@ impl GuardState {
     }
     pub fn feedback_gate_open(&self) -> bool {
         self.feedback_gate_open
+    }
+    /// Fence dispatch is authorized only by the nonce and scope captured when this guard acquired
+    /// the canonical relation lock vector.
+    pub fn authorize_fence_intent(
+        &self,
+        capture_epoch: u64,
+        generation: u64,
+        table_set_fingerprint: &str,
+        nonce: u64,
+    ) -> Result<GuardFenceAuthorization, DdlFailure> {
+        if self.capture_epoch != capture_epoch
+            || self.generation != generation
+            || self.table_set_fingerprint != table_set_fingerprint
+            || self.intended_fence_nonce != nonce
+            || self.phase != GuardPhase::Copying
+            || !self.catalog_fingerprint_verified
+            || self.locked.is_empty()
+        {
+            return Err(DdlFailure::guard("DDL_GUARD_FENCE_INTENT_MISMATCH"));
+        }
+        Ok(GuardFenceAuthorization {
+            capture_epoch,
+            generation,
+            table_set_fingerprint: table_set_fingerprint.to_owned(),
+            nonce,
+        })
+    }
+    /// Conservative owned allocation accounting for deterministic harness budgets.
+    pub fn owned_allocation_bytes(&self) -> usize {
+        self.table_set_fingerprint.capacity()
+            + self.locked.capacity() * std::mem::size_of::<LogicalRelationId>()
+            + self
+                .locked
+                .iter()
+                .map(|relation| relation.logical_table_id.capacity())
+                .sum::<usize>()
+    }
+    /// Typed bootstrap consumers can verify this guard is bound and catalog-checked without
+    /// re-owning DDL lock acquisition or fingerprint semantics.
+    pub fn proves_bootstrap_binding(
+        &self,
+        capture_epoch: u64,
+        generation: u64,
+        table_set_fingerprint: &str,
+    ) -> bool {
+        self.capture_epoch == capture_epoch
+            && self.generation == generation
+            && self.table_set_fingerprint == table_set_fingerprint
+            && self.phase == GuardPhase::BeforeExport
+            && self.catalog_fingerprint_verified
+            && !self.locked.is_empty()
     }
     /// Records a live catalog fingerprint read after this guard acquired its lock set.
     /// Export cannot begin until the read matches the fingerprint bound to the generation.
