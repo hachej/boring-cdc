@@ -74,5 +74,5 @@ required_states = {
 assert required_states <= set(re.findall(r"^    ([A-Z][A-Za-z]+),$", source, re.MULTILINE))
 for prohibited in ("rusqlite", "CREATE_REPLICATION_SLOT", "DROP_REPLICATION_SLOT", "START_REPLICATION"):
     assert prohibited not in source
-assert source.count("M0-PROVISIONAL:") == 4
+assert source.count("M0-RECONCILED:") == 4
 print(f"PASS bootstrap vectors={len(cases)} exact=true live_runtime=false m0_provisional=4")

@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Archive segment manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "intent_id",
+    "capture_epoch",
+    "generation",
+    "promotion_fence",
+    "range",
+    "compatible_anchor",
+    "config_fingerprint",
+    "writer_profile",
+    "writer_config_sha256",
+    "event_contract_sha256",
+    "enabled_formats",
+    "format_versions",
+    "event_count",
+    "schema_fingerprints",
+    "display_mappings",
+    "files"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "archive-segment-manifest/v1"
+    },
+    "intent_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "capture_epoch": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "promotion_fence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "range": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start_journal_seq",
+        "end_journal_seq",
+        "end_commit_lsn_u64"
+      ],
+      "properties": {
+        "start_journal_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_journal_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_commit_lsn_u64": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "compatible_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor_id",
+        "lower_journal_seq",
+        "post_copy_journal_seq"
+      ],
+      "properties": {
+        "anchor_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "lower_journal_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "post_copy_journal_seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "config_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "writer_config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event_contract_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "enabled_formats": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "jsonl-zstd",
+          "parquet-zstd"
+        ]
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true
+    },
+    "format_versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "jsonl",
+        "parquet"
+      ],
+      "properties": {
+        "jsonl": {
+          "type": "string"
+        },
+        "parquet": {
+          "type": "string"
+        }
+      }
+    },
+    "event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "schema_fingerprints": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "uniqueItems": true
+    },
+    "display_mappings": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[0-9a-f]{64}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_display",
+          "table_display"
+        ],
+        "properties": {
+          "schema_display": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "table_display": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "format",
+          "logical_table_id",
+          "relation_schema_fingerprint",
+          "part_ordinal",
+          "row_count",
+          "size_bytes",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(events\\.jsonl\\.zst|t-[0-9a-f]{64}/s-[0-9a-f]{64}/part-[0-9]{6}\\.parquet)$"
+          },
+          "format": {
+            "enum": [
+              "jsonl-zstd",
+              "parquet-zstd"
+            ]
+          },
+          "logical_table_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "relation_schema_fingerprint": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "part_ordinal": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "row_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "format": {
+                "const": "jsonl-zstd"
+              },
+              "path": {
+                "const": "events.jsonl.zst"
+              },
+              "logical_table_id": {
+                "const": "0000000000000000000000000000000000000000000000000000000000000000"
+              },
+              "relation_schema_fingerprint": {
+                "const": "0000000000000000000000000000000000000000000000000000000000000000"
+              },
+              "part_ordinal": {
+                "const": 0
+              }
+            }
+          },
+          {
+            "properties": {
+              "format": {
+                "const": "parquet-zstd"
+              },
+              "path": {
+                "type": "string",
+                "pattern": "^t-[0-9a-f]{64}/s-[0-9a-f]{64}/part-[0-9]{6}\\.parquet$"
+              }
+            }
+          }
+        ]
+      },
+      "minItems": 2
+    },
+    "writer_profile": {
+      "type": "string"
+    }
+  }
+}

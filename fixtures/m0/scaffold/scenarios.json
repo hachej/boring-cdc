@@ -1,0 +1,12 @@
+{
+  "schema_version": "m0-scaffold-scenarios/v1",
+  "owner_bead": "boring-cdc-m0-scaffold",
+  "seed": "0x424344435f434f4d504f53455f563031",
+  "scenarios": [
+    {"id": "SCN-M0-SCAFFOLD-STATIC", "expected_status": "pass", "expected_exit": 0, "checkpoint": null, "external_effect": "none", "code": "BCDC_COMPOSE_STATIC_VALID"},
+    {"id": "SCN-M0-SCAFFOLD-DIGEST-MISMATCH", "expected_status": "blocked", "expected_exit": 78, "checkpoint": null, "external_effect": "none", "code": "BCDC_COMPOSE_DIGEST_MISMATCH"},
+    {"id": "SCN-M0-SCAFFOLD-DEPENDENCY-DELAY", "expected_status": "retry_wait", "expected_exit": 75, "checkpoint": null, "external_effect": "none", "code": "BCDC_COMPOSE_DEPENDENCY_DELAY"},
+    {"id": "SCN-M0-SCAFFOLD-ZOMBIE-BOUND", "expected_status": "pass", "expected_exit": 0, "checkpoint": null, "external_effect": "none", "code": "BCDC_COMPOSE_ZOMBIE_BOUND"},
+    {"id": "SCN-M0-SCAFFOLD-AGENT-READONLY", "expected_status": "pass", "expected_exit": 0, "checkpoint": null, "external_effect": "none", "code": "BCDC_AGENT_READONLY"}
+  ]
+}

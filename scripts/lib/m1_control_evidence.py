@@ -24,7 +24,7 @@ FORBIDDEN = ("TBD", "TODO", "FIXME", "<unresolved>", "postgresql://", "capture_f
 SHA = re.compile(r"^[0-9a-f]{64}$")
 TRANSCRIPT_PATHS = {"stdout/validator-generic.txt", "stderr/validator-generic.txt", "stdout/validator-specific.txt", "stderr/validator-specific.txt"}
 SEALED_PAYLOAD_ROOT = "dfbcb28574aeb6f97a2ead1876e863ff4dfd2a26a9a26f66ae27d7499fe65ac3"
-SEALED_INVENTORY_ROOT = "7f544e0de2885f0f901e6d0fe18c4412a202b1775066034c31c4199fd51b7cd6"
+SEALED_INVENTORY_ROOT = "f9afdbe93c0dfed4967bc92d8a9848c16800238551a5aed9f7c1d0dc64e9a7a7"
 
 
 def sha(path):

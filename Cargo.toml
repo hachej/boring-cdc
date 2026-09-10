@@ -2,7 +2,10 @@
 name = "boring-cdc"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.89"
 license = "Apache-2.0"
+repository = "https://github.com/hachej/boring-cdc"
+description = "A bounded Postgres CDC experiment"
 publish = false
 
 [lib]
@@ -21,3 +24,9 @@ toml = "0.9.5"
 
 [dev-dependencies]
 trybuild = "1.0.110"
+
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1
+panic = "abort"

@@ -12,7 +12,7 @@ p=Path('contracts/m1/control-fixtures.json'); data=json.loads(p.read_text())
 assert data['schema_version']=='m1-control-fixtures/v2'
 assert data['owner_bead']=='boring-cdc-m1-control-fixtures'
 majors=data['supported_postgresql_majors']; assert majors and len({x['major'] for x in majors})==len(majors)
-for x in majors: assert x['provenance']=='// M0-PROVISIONAL: boring-cdc-d-pg-protocol'
+for x in majors: assert x['provenance']=='// M0-RECONCILED: boring-cdc-d-pg-protocol'
 scenarios=data['scenarios']; ids=[x['id'] for x in scenarios]
 assert len(ids)==len(set(ids)) and all(re.fullmatch(r'SCN-[A-Z0-9-]+',x) for x in ids)
 coverage={x['id']:x['owner_bead'] for x in json.loads(Path('contracts/coverage/plan-to-beads.json').read_text())['assignments']}

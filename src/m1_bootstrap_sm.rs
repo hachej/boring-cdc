@@ -14,13 +14,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-// M0-PROVISIONAL: boring-cdc-d-backfill (RECOMMENDED bounded importer count).
+// M0-RECONCILED: boring-cdc-d-backfill (RECOMMENDED bounded importer count).
 pub const MAX_IMPORTERS: usize = 16;
-// M0-PROVISIONAL: boring-cdc-d-backfill (RECOMMENDED explicit fresh-store boundary).
+// M0-RECONCILED: boring-cdc-d-backfill (RECOMMENDED explicit fresh-store boundary).
 pub const ZERO_START_SEQ: JournalCursor = JournalCursor::from_store(0);
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED snapshot/WAL origin ranks).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED snapshot/WAL origin ranks).
 pub const SNAPSHOT_ORIGIN_RANK: u8 = 0;
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED snapshot/WAL origin ranks).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED snapshot/WAL origin ranks).
 pub const WAL_ORIGIN_RANK: u8 = 1;
 const MAX_IDENTITY_BYTES: usize = 256;
 const MAX_SNAPSHOT_IDENTIFIER_BYTES: usize = 1_024;

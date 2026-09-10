@@ -3,7 +3,7 @@ set -eu
 [ "${1:-}" != "--help" ] || { echo 'Usage: scripts/e2e/m1_control_fixtures.sh [SEED]'; exit 0; }
 seed=${1:-m1-control-v1}; [ "$seed" = m1-control-v1 ] || { echo 'E_SEED: expected m1-control-v1' >&2; exit 2; }
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd); cd "$root"
-# M0-PROVISIONAL: boring-cdc-d-pg-protocol (recommended supported majors and image digests).
+# M0-RECONCILED: boring-cdc-d-pg-protocol (recommended supported majors and image digests).
 for major in 15 16 17; do
   case "$major" in
     15) image='postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b' ;;

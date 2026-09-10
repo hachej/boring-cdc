@@ -197,17 +197,17 @@
     {
       "image": "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
       "major": 15,
-      "provenance": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol"
+      "provenance": "// M0-RECONCILED: boring-cdc-d-pg-protocol"
     },
     {
       "image": "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
       "major": 16,
-      "provenance": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol"
+      "provenance": "// M0-RECONCILED: boring-cdc-d-pg-protocol"
     },
     {
       "image": "postgres@sha256:c7526c0f6c3f30260a563d7bcf8ad778effac59a44f8ffa86678c35418338609",
       "major": 17,
-      "provenance": "// M0-PROVISIONAL: boring-cdc-d-pg-protocol"
+      "provenance": "// M0-RECONCILED: boring-cdc-d-pg-protocol"
     }
   ]
 }

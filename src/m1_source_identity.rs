@@ -10,30 +10,30 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
 use std::fmt;
 
-// M0-PROVISIONAL: boring-cdc-d-pg-protocol
+// M0-RECONCILED: boring-cdc-d-pg-protocol
 const SUPPORTED_SOURCE_PLUGIN: &str = "pgoutput";
-// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED protocol zero sentinel).
+// M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED protocol zero sentinel).
 pub const PROTOCOL_ZERO_SENTINEL: ReceivedLsn = ReceivedLsn::from_wire(0);
-// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED origin policy).
+// M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED origin policy).
 pub const ORIGIN_POLICY: &str = "any";
-// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED non-streamed pgoutput options).
+// M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED non-streamed pgoutput options).
 pub const START_REPLICATION_OPTIONS: [&str; 4] = [
     "proto_version=1",
     "streaming=false",
     "two_phase=false",
     "binary=false",
 ];
-// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED canonical lock-key domain/version).
+// M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED canonical lock-key domain/version).
 const ADVISORY_LOCK_DOMAIN: &[u8] = b"boring-cdc/source-advisory-lock/v1";
-// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED canonical protocol fingerprint domain).
+// M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED canonical protocol fingerprint domain).
 const PROTOCOL_FINGERPRINT_DOMAIN: &[u8] = b"boring-cdc/pgoutput-protocol/v1";
-// M0-PROVISIONAL: boring-cdc-d-publication (RECOMMENDED canonical publication fingerprint domain).
+// M0-RECONCILED: boring-cdc-d-publication (RECOMMENDED canonical publication fingerprint domain).
 const PUBLICATION_FINGERPRINT_DOMAIN: &[u8] = b"boring-cdc/publication-definition/v1";
-// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED stable logical-table identity domain).
+// M0-RECONCILED: boring-cdc-d-ddl (RECOMMENDED stable logical-table identity domain).
 const LOGICAL_TABLE_DOMAIN: &[u8] = b"boring-cdc/logical-table/v1";
-// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED relation-schema identity domain).
+// M0-RECONCILED: boring-cdc-d-ddl (RECOMMENDED relation-schema identity domain).
 const RELATION_SCHEMA_DOMAIN: &[u8] = b"boring-cdc/relation-schema/v1";
-// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED canonical physical-key hash domain).
+// M0-RECONCILED: boring-cdc-d-ddl (RECOMMENDED canonical physical-key hash domain).
 const PHYSICAL_KEY_DOMAIN: &[u8] = b"boring-cdc/physical-key/v1";
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]

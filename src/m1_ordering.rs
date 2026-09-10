@@ -14,26 +14,26 @@ use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 use std::fmt;
 
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
 const WAL_EVENT_DOMAIN: &[u8] = b"boring-cdc/wal-event/v1";
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED source/slot identity domain).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED source/slot identity domain).
 const SOURCE_SLOT_DOMAIN: &[u8] = b"boring-cdc/source-slot/v1";
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
 const SNAPSHOT_EVENT_DOMAIN: &[u8] = b"boring-cdc/snapshot-event/v1";
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
 const VALUE_HASH_DOMAIN: &[u8] = b"boring-cdc/canonical-value/v1";
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED SHA-256 domain/version literals).
 const PAYLOAD_HASH_DOMAIN: &[u8] = b"boring-cdc/mutation-payload/v1";
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED origin rank: snapshot then WAL).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED origin rank: snapshot then WAL).
 pub const SNAPSHOT_ORIGIN_RANK: u8 = 0;
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED origin rank: snapshot then WAL).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED origin rank: snapshot then WAL).
 pub const WAL_ORIGIN_RANK: u8 = 1;
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED column-state tags).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED column-state tags).
 const COLUMN_ABSENT_TAG: u8 = 0;
 const COLUMN_NULL_TAG: u8 = 1;
 const COLUMN_UNCHANGED_TOAST_TAG: u8 = 2;
 const COLUMN_VALUE_TAG: u8 = 3;
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED mutation-kind tags).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED mutation-kind tags).
 const MUTATION_DELETE_TAG: u8 = 0;
 const MUTATION_UPSERT_TAG: u8 = 1;
 const MAX_CANONICAL_KEY_COMPONENTS: usize = 8;
@@ -69,7 +69,7 @@ fn hash_fields(domain: &[u8], fields: &[&[u8]]) -> Hash32 {
     }
     Hash32(h.finalize().into())
 }
-// M0-PROVISIONAL: boring-cdc-d-event-id (RECOMMENDED canonical field framing: u64 big-endian byte length).
+// M0-RECONCILED: boring-cdc-d-event-id (RECOMMENDED canonical field framing: u64 big-endian byte length).
 fn canonical_length_bytes(len: usize) -> [u8; 8] {
     (len as u64).to_be_bytes()
 }
@@ -227,14 +227,13 @@ pub struct MutationPayload {
 impl MutationPayload {
     pub fn hash(&self, version: MutationVersion) -> Result<Hash32, OrderingFailure> {
         let key_hash = canonical_key_hash(&self.key)?;
-        if let Some(binding) = version.snapshot_binding {
-            if binding.logical_table_id != self.relation.logical_table
-                || binding.key_hash != key_hash
-            {
-                return Err(OrderingFailure::contract(
-                    "SNAPSHOT_PAYLOAD_IDENTITY_MISMATCH",
-                ));
-            }
+        if let Some(binding) = version.snapshot_binding
+            && (binding.logical_table_id != self.relation.logical_table
+                || binding.key_hash != key_hash)
+        {
+            return Err(OrderingFailure::contract(
+                "SNAPSHOT_PAYLOAD_IDENTITY_MISMATCH",
+            ));
         }
         let mut columns = Vec::new();
         columns.extend(canonical_length_bytes(self.columns.len()));

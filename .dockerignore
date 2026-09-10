@@ -1,0 +1,7 @@
+target
+.git
+.beads
+.handoff
+artifacts
+.secrets
+.env*

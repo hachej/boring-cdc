@@ -1,0 +1,30 @@
+name: quality
+on:
+  pull_request:
+  push:
+    branches: [master, "epic/**"]
+permissions:
+  contents: read
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.89.0
+        with: {components: "clippy,rustfmt"}
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Lint
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Test
+        run: cargo test --locked --workspace --all-targets
+      - name: Scaffold contract
+        run: scripts/validate/m0_scaffold.sh
+      - name: License metadata
+        run: scripts/validate/scaffold_license.sh
+      - name: Secret patterns
+        run: scripts/validate/scaffold_secrets.sh
+      - name: Dependency audit
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit --deny warnings

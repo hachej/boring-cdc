@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Archive generation manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "capture_epoch",
+    "generation",
+    "promotion_fence",
+    "compatible_anchor",
+    "table_set_fingerprint",
+    "config_fingerprint",
+    "writer_config_sha256",
+    "enabled_formats",
+    "segment_manifests",
+    "complete_checkpoint",
+    "verification"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "archive-generation-manifest/v1"
+    },
+    "capture_epoch": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "promotion_fence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "compatible_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor_id",
+        "lower_journal_seq",
+        "post_copy_journal_seq"
+      ],
+      "properties": {
+        "anchor_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "lower_journal_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "post_copy_journal_seq": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "table_set_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "config_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "writer_config_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "enabled_formats": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "jsonl-zstd",
+          "parquet-zstd"
+        ]
+      },
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true
+    },
+    "segment_manifests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relative_path",
+          "manifest_sha256",
+          "start_journal_seq",
+          "end_journal_seq",
+          "event_count"
+        ],
+        "properties": {
+          "relative_path": {
+            "type": "string",
+            "pattern": "^segments/r-[0-9]{20}-[0-9]{20}/i-[0-9a-f]{64}$"
+          },
+          "manifest_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "start_journal_seq": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end_journal_seq": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "event_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "complete_checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journal_seq",
+        "commit_lsn_u64"
+      ],
+      "properties": {
+        "journal_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "commit_lsn_u64": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor",
+        "watermark",
+        "formats_semantically_equal",
+        "no_gaps_or_overlaps"
+      ],
+      "properties": {
+        "anchor": {
+          "const": true
+        },
+        "watermark": {
+          "const": true
+        },
+        "formats_semantically_equal": {
+          "const": true
+        },
+        "no_gaps_or_overlaps": {
+          "const": true
+        }
+      }
+    }
+  }
+}

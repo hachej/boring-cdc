@@ -237,7 +237,7 @@
   ],
   "provisional_constants": [
     {
-      "provenance": "// M0-PROVISIONAL: boring-cdc-d-ddl",
+      "provenance": "// M0-RECONCILED: boring-cdc-d-ddl",
       "value": [
         15,
         16,
@@ -246,13 +246,13 @@
     },
     {
       "name": "catalog_poll_interval",
-      "provenance": "// M0-PROVISIONAL: boring-cdc-d-ddl",
+      "provenance": "// M0-RECONCILED: boring-cdc-d-ddl",
       "unit": "milliseconds",
       "value": 5000
     },
     {
       "name": "ddl_waiter_bound",
-      "provenance": "// M0-PROVISIONAL: boring-cdc-d-ddl",
+      "provenance": "// M0-RECONCILED: boring-cdc-d-ddl",
       "unit": "milliseconds",
       "value": 5000
     }

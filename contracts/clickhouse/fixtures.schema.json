@@ -1,0 +1,725 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cases": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "additionalProperties": false,
+            "properties": {
+              "fault_hook": {
+                "type": "string"
+              },
+              "fault_once": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "fault_hook",
+              "fault_once"
+            ],
+            "type": "object"
+          },
+          "execution": {
+            "additionalProperties": false,
+            "properties": {
+              "fault": {
+                "additionalProperties": false,
+                "properties": {
+                  "mutation": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "field": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "replacement": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "row_index": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "kind",
+                      "replacement",
+                      "row_index"
+                    ],
+                    "type": "object"
+                  },
+                  "operation": {
+                    "type": "string"
+                  },
+                  "preserve": {
+                    "items": {},
+                    "type": "array"
+                  },
+                  "target": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "mutation",
+                  "operation",
+                  "preserve",
+                  "target"
+                ],
+                "type": "object"
+              },
+              "oracle": {
+                "additionalProperties": false,
+                "properties": {
+                  "checkpoint": {
+                    "type": "string"
+                  },
+                  "conflict_count": {
+                    "type": "integer"
+                  },
+                  "current_rows": {
+                    "type": [
+                      "string",
+                      "array"
+                    ]
+                  },
+                  "destination_state": {
+                    "type": "string"
+                  },
+                  "journal_verified_range": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array"
+                  },
+                  "mismatch_fingerprint": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "selector_generation": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "checkpoint",
+                  "conflict_count",
+                  "current_rows",
+                  "destination_state",
+                  "journal_verified_range",
+                  "mismatch_fingerprint",
+                  "selector_generation"
+                ],
+                "type": "object"
+              },
+              "setup": {
+                "additionalProperties": false,
+                "properties": {
+                  "audit": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "budgets": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bytes": {
+                            "type": "integer"
+                          },
+                          "events": {
+                            "type": "integer"
+                          },
+                          "milliseconds": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "bytes",
+                          "events",
+                          "milliseconds"
+                        ],
+                        "type": "object"
+                      },
+                      "cursor": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "column_offset": {
+                            "type": "integer"
+                          },
+                          "connector_event_id": {
+                            "type": "string"
+                          },
+                          "journal_seq": {
+                            "type": "integer"
+                          },
+                          "logical_table_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "column_offset",
+                          "connector_event_id",
+                          "journal_seq",
+                          "logical_table_id"
+                        ],
+                        "type": "object"
+                      },
+                      "fresh_until_unix_ms": {
+                        "type": "integer"
+                      },
+                      "observed_unix_ms": {
+                        "type": "integer"
+                      },
+                      "target_checkpoint": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "budgets",
+                      "cursor",
+                      "fresh_until_unix_ms",
+                      "observed_unix_ms",
+                      "target_checkpoint"
+                    ],
+                    "type": "object"
+                  },
+                  "batch_markers": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "batch_id": {
+                          "type": "string"
+                        },
+                        "event_count": {
+                          "type": "integer"
+                        },
+                        "first_journal_seq": {
+                          "type": "integer"
+                        },
+                        "last_journal_seq": {
+                          "type": "integer"
+                        },
+                        "object_fingerprint": {
+                          "type": "string"
+                        },
+                        "ordered_event_digest": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "batch_id",
+                        "event_count",
+                        "first_journal_seq",
+                        "last_journal_seq",
+                        "object_fingerprint",
+                        "ordered_event_digest"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "candidate_table_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "history_events": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "before_key": {
+                          "type": "string"
+                        },
+                        "cells": {
+                          "items": {
+                            "items": {
+                              "type": [
+                                "integer",
+                                "string"
+                              ]
+                            },
+                            "maxItems": 5,
+                            "minItems": 5,
+                            "type": "array"
+                          },
+                          "type": "array"
+                        },
+                        "hash": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "key_hash": {
+                          "type": "string"
+                        },
+                        "mutation_kind": {
+                          "type": "string"
+                        },
+                        "op": {
+                          "type": "string"
+                        },
+                        "relation_schema_fingerprint": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "items": {
+                            "type": [
+                              "integer",
+                              "string"
+                            ]
+                          },
+                          "maxItems": 5,
+                          "minItems": 5,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "before_key",
+                        "cells",
+                        "hash",
+                        "id",
+                        "key",
+                        "key_hash",
+                        "mutation_kind",
+                        "op",
+                        "relation_schema_fingerprint",
+                        "version"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "quota": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "free_bytes": {
+                        "type": "integer"
+                      },
+                      "history_bytes": {
+                        "type": "integer"
+                      },
+                      "temporary_part_bytes": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "free_bytes",
+                      "history_bytes",
+                      "temporary_part_bytes"
+                    ],
+                    "type": "object"
+                  },
+                  "retirement": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "elapsed_seconds": {
+                        "type": "integer"
+                      },
+                      "live_generation": {
+                        "type": "integer"
+                      },
+                      "pins": {
+                        "items": {},
+                        "type": "array"
+                      },
+                      "target_generation": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "elapsed_seconds",
+                      "live_generation",
+                      "pins",
+                      "target_generation"
+                    ],
+                    "type": "object"
+                  },
+                  "retry": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "attempt": {
+                        "type": "integer"
+                      },
+                      "due_unix_ms": {
+                        "type": "integer"
+                      },
+                      "failed_boundary": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "capture_epoch": {
+                            "type": "string"
+                          },
+                          "first_journal_seq": {
+                            "type": "integer"
+                          },
+                          "generation": {
+                            "type": "integer"
+                          },
+                          "last_journal_seq": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "capture_epoch",
+                          "first_journal_seq",
+                          "generation",
+                          "last_journal_seq"
+                        ],
+                        "type": "object"
+                      },
+                      "now_unix_ms": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "attempt",
+                      "due_unix_ms",
+                      "failed_boundary",
+                      "now_unix_ms"
+                    ],
+                    "type": "object"
+                  },
+                  "selected_table_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "selector_rows": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "candidate_digest": {
+                          "type": "string"
+                        },
+                        "capture_epoch": {
+                          "type": "string"
+                        },
+                        "compatible_anchor_id": {
+                          "type": "string"
+                        },
+                        "generation": {
+                          "type": "integer"
+                        },
+                        "promotion_fence": {
+                          "type": "integer"
+                        },
+                        "table_set_fingerprint": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "candidate_digest",
+                        "capture_epoch",
+                        "compatible_anchor_id",
+                        "generation",
+                        "promotion_fence",
+                        "table_set_fingerprint"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "sqlite": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "checkpoint_journal_seq": {
+                        "type": "integer"
+                      },
+                      "highest_external_fence": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "checkpoint_journal_seq",
+                      "highest_external_fence"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "audit",
+                  "batch_markers",
+                  "candidate_table_ids",
+                  "history_events",
+                  "quota",
+                  "retirement",
+                  "retry",
+                  "selected_table_ids",
+                  "selector_rows",
+                  "sqlite"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "fault",
+              "oracle",
+              "setup"
+            ],
+            "type": "object"
+          },
+          "executor_id": {
+            "type": "string"
+          },
+          "expected": {
+            "additionalProperties": false,
+            "properties": {
+              "capture_and_archive": {
+                "type": "string"
+              },
+              "checkpoint": {
+                "type": "string"
+              },
+              "destination_state": {
+                "type": "string"
+              },
+              "exit_code": {
+                "type": "integer"
+              },
+              "log_code": {
+                "type": "string"
+              },
+              "redacted": {
+                "type": "boolean"
+              },
+              "status_code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "capture_and_archive",
+              "checkpoint",
+              "destination_state",
+              "exit_code",
+              "log_code",
+              "redacted",
+              "status_code"
+            ],
+            "type": "object"
+          },
+          "fixture_id": {
+            "type": "string"
+          },
+          "pre_state": {
+            "additionalProperties": false,
+            "properties": {
+              "capture_epoch": {
+                "type": "string"
+              },
+              "checkpoint_journal_seq": {
+                "type": "integer"
+              },
+              "compatible_anchor_id": {
+                "type": "string"
+              },
+              "generation": {
+                "type": "integer"
+              },
+              "object_fingerprint": {
+                "type": "string"
+              },
+              "promotion_fence": {
+                "type": "integer"
+              },
+              "table_set_fingerprint": {
+                "type": "string"
+              },
+              "target_journal_seq": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "capture_epoch",
+              "checkpoint_journal_seq",
+              "compatible_anchor_id",
+              "generation",
+              "object_fingerprint",
+              "promotion_fence",
+              "table_set_fingerprint",
+              "target_journal_seq"
+            ],
+            "type": "object"
+          },
+          "seed": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "execution",
+          "executor_id",
+          "expected",
+          "fixture_id",
+          "pre_state",
+          "seed"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "contract": {
+      "type": "string"
+    },
+    "fixed_seed": {
+      "type": "string"
+    },
+    "golden_vectors": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "before_key": {
+                "type": "string"
+              },
+              "cells": {
+                "items": {
+                  "items": {
+                    "type": [
+                      "integer",
+                      "string"
+                    ]
+                  },
+                  "maxItems": 5,
+                  "minItems": 5,
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              "hash": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "key_hash": {
+                "type": "string"
+              },
+              "mutation_kind": {
+                "type": "string"
+              },
+              "op": {
+                "type": "string"
+              },
+              "relation_schema_fingerprint": {
+                "type": "string"
+              },
+              "version": {
+                "items": {
+                  "type": [
+                    "integer",
+                    "string"
+                  ]
+                },
+                "maxItems": 5,
+                "minItems": 5,
+                "type": "array"
+              }
+            },
+            "required": [
+              "before_key",
+              "cells",
+              "hash",
+              "id",
+              "key",
+              "key_hash",
+              "mutation_kind",
+              "op",
+              "relation_schema_fingerprint",
+              "version"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "expected_conflicts": {
+          "items": {},
+          "type": "array"
+        },
+        "expected_current_rows": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "canonical_key": {
+                "type": "string"
+              },
+              "columns": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "column_id": {
+                      "type": "integer"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "type_oid": {
+                      "type": "integer"
+                    },
+                    "typmod": {
+                      "type": "integer"
+                    },
+                    "value_base64": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "column_id",
+                    "state",
+                    "type_oid",
+                    "typmod",
+                    "value_base64"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "canonical_key",
+              "columns"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "events",
+        "expected_conflicts",
+        "expected_current_rows"
+      ],
+      "type": "object"
+    },
+    "owner_bead": {
+      "const": "boring-cdc-m0-ch-model"
+    },
+    "schema_version": {
+      "const": "clickhouse-fixtures/v1"
+    }
+  },
+  "required": [
+    "cases",
+    "contract",
+    "fixed_seed",
+    "golden_vectors",
+    "owner_bead",
+    "schema_version"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+"""Emit a schema-valid handoff bound to the canonical world state, without mutation."""
+from __future__ import annotations
+import hashlib,json,subprocess,sys
+from pathlib import Path
+ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT/'scripts/lib'))
+import agent_context as context
+def git(*a): return subprocess.check_output(["git",*a],cwd=ROOT,text=True).strip()
+bead=sys.argv[1] if len(sys.argv)>1 else "boring-cdc-m0-scaffold"
+head=git("rev-parse","HEAD"); parents=git("rev-list","--parents","-n","1",head).split();base=parents[1] if len(parents)>1 else head
+world=context.world(bead); world_digest=context.digest_bytes(context.canonical(world).encode())
+paths=context.dirty_state()[0]
+out={"schema_version":"handoff/v1","bead_id":bead,"world_state_digest":world_digest,"base_sha":base,"head_sha":head,"dirty":{"is_dirty":bool(paths),"paths":paths},"changed_paths":paths,"touched_ids":[],"checks":{"completed":[],"failed":[],"stale":[]},"facts":["world_state_digest binds Git, dirty contents, Beads, dependency closure, and contracts"],"observations":[],"hypotheses":[],"intents":{"active":[],"ambiguous":[]},"risks":[],"unsafe_repeats":["do not claim, commit, push, or close through this read-only helper"],"next_safe_command":f"scripts/agent/context {bead}","log_references":[],"redaction":{"checked":True,"secrets_found":0}}
+print(json.dumps(out,sort_keys=True))

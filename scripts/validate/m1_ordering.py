@@ -14,7 +14,7 @@ assert all(value.startswith("SCN-M1-ORDERING-") for value in ids)
 for case in cases["cases"]:
     assert f"fn {case['unit_test']}" in source, case
 for marker in ("boring-cdc-d-event-id",):
-    assert f"M0-PROVISIONAL: {marker}" in source
+    assert f"M0-RECONCILED: {marker}" in source
 for provisional_literal in (
     "fn canonical_length_bytes(len: usize) -> [u8; 8]",
     "COLUMN_ABSENT_TAG: u8 = 0",

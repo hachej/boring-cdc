@@ -19,7 +19,7 @@ cov=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text())
 owned=[x['id'] for x in cov['assignments'] if x.get('owner_bead')=='boring-cdc-m1-ddl-fixtures']
 ca=c.get('canonical_assignments',[])
 if [x.get('id') for x in ca]!=owned or any(not x.get('executed_by') or not set(x['executed_by'])<=set(ids) for x in ca): errors.append('coverage_map')
-for marker in ['// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED catalog poll interval).','// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED DDL waiter source-impact bound).','// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED supported PostgreSQL majors).']:
+for marker in ['// M0-RECONCILED: boring-cdc-d-ddl (RECOMMENDED catalog poll interval).','// M0-RECONCILED: boring-cdc-d-ddl (RECOMMENDED DDL waiter source-impact bound).','// M0-RECONCILED: boring-cdc-d-ddl (RECOMMENDED supported PostgreSQL majors).']:
  if marker not in src: errors.append('provisional_marker')
 if re.search(r'\b(TBD|TODO|FIXME)\b',src+json.dumps(c)):errors.append('unresolved')
 fault_script=(root/'scripts/faults/m1_ddl_fixtures.sh').read_text()

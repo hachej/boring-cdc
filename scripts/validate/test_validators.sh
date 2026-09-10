@@ -34,9 +34,12 @@ rows=[json.loads(line) for line in (root/'.beads/issues.jsonl').read_text().spli
 if len([row for row in rows if row.get('issue_type')=='decision']) < 25:
  raise SystemExit('E_DECISION_INVENTORY')
 assignments=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text())['assignments']
-if len(assignments)!=418 or len({row.get('id') for row in assignments})!=418:
+stable_ids=json.loads((root/'contracts/agent/stable-ids.json').read_text())['entries']
+assignment_ids=[row.get('id') for row in assignments]; expected_ids={row.get('id') for row in stable_ids}
+if len(assignment_ids)!=len(set(assignment_ids)) or set(assignment_ids)!=expected_ids:
  raise SystemExit('E_ASSIGNMENT_INVENTORY')
 if not all(isinstance(row.get('owner_bead'),str) for row in assignments):
  raise SystemExit('E_ASSIGNMENT_OWNER')
 PY
-printf 'm0 aggregate validator corpus pass seed=%s leaves=3 state=neutral assignments=418\n' "$seed"
+assignments=$(python3 -c 'import json; print(len(json.load(open("contracts/coverage/plan-to-beads.json"))["assignments"]))')
+printf 'm0 aggregate validator corpus pass seed=%s leaves=3 state=neutral assignments=%s\n' "$seed" "$assignments"

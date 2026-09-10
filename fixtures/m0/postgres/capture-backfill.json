@@ -1,0 +1,2273 @@
+{
+  "cases": [
+    {
+      "executor_id": "boring-cdc-m1-decoder",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "bidirectional CopyData accepted",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-COPYBOTH-FRAMES\"}=1",
+        "state": "streaming",
+        "status_code": "pg_copyboth_frames"
+      },
+      "fixture_id": "SCN-M0-PG-COPYBOTH-FRAMES",
+      "hook": "copyboth_frame",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "expected_xlog": {
+          "pgoutput_hex": "4200000000016b6d0000000000000003e80000002a",
+          "server_time_micros": 123456,
+          "wal_end_u64": 23817472,
+          "wal_start_u64": 23817296
+        },
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "copyboth_frame",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "server_copyboth_response_hex": "5700000007000000",
+        "slot_name": "boring_cdc_slot",
+        "start_replication_hex": "53544152545f5245504c49434154494f4e20534c4f5420626f72696e675f6364635f736c6f74204c4f474943414c20302f31364236433530202870726f746f5f76657273696f6e202731272c207075626c69636174696f6e5f6e616d65732027626f72696e675f636463272c2062696e617279202766616c7365272c206d65737361676573202774727565272c2073747265616d696e67202766616c7365272c2074776f5f7068617365202766616c7365272c206f726967696e2027616e792729",
+        "start_replication_utf8": "START_REPLICATION SLOT boring_cdc_slot LOGICAL 0/16B6C50 (proto_version '1', publication_names 'boring_cdc', binary 'false', messages 'true', streaming 'false', two_phase 'false', origin 'any')",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+        "xlog_copydata_payload_hex": "7700000000016b6c5000000000016b6d00000000000001e2404200000000016b6d0000000000000003e80000002a"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-decoder",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-ORIGIN-ORDINAL\"}=1",
+        "state": "streaming",
+        "status_code": "pg_origin_ordinal"
+      },
+      "fixture_id": "SCN-M0-PG-ORIGIN-ORDINAL",
+      "hook": "origin_message",
+      "inputs": {
+        "begin_hex": "4200000000016b6d0000000000000003e80000002a",
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "expected_row_ordinals": {
+          "after_insert": 1,
+          "after_origin": 0,
+          "before_origin": 0
+        },
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "origin_message",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "insert_hex": "49000040014e0001740000000131",
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "origin_hex": "4f00000000016b6c506f726967696e5f6100",
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-capture-runtime",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "one status packet",
+        "feedback": "last_durable_boundary",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-KEEPALIVE-REPLY\"}=1",
+        "state": "streaming",
+        "status_code": "pg_keepalive_reply"
+      },
+      "fixture_id": "SCN-M0-PG-KEEPALIVE-REPLY",
+      "hook": "keepalive_reply_requested",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "client_time_micros": 123456789,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "expected_status_packet_bytes": 34,
+        "expected_status_packet_hex": "7200000000016b6d0000000000016b6d0000000000016b6d0000000000075bcd1500",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "keepalive_reply_requested",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "keepalive_wal_end": "0/16C0000",
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "outgoing_reply_requested": false,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "received_lsn": "0/16B7000",
+        "reply_requested": true,
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-decoder",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-RESTART-MAX\"}=1",
+        "state": "streaming",
+        "status_code": "pg_restart_max"
+      },
+      "fixture_id": "SCN-M0-PG-RESTART-MAX",
+      "hook": "restart_request",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "confirmed_flush_lsn": "0/16B6D00",
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "expected_effective_lsn": "0/16B6D00",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "restart_request",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "requested_lsn": "0/16B6C50",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CREATION-FLOOR-NULL\"}=1",
+        "state": "imports_pending",
+        "status_code": "pg_creation_floor_null"
+      },
+      "fixture_id": "SCN-M0-PG-CREATION-FLOOR-NULL",
+      "hook": "startup_reconcile",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": null,
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "startup_reconcile",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "matching_nonterminal_bootstrap": true,
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "resume_wal_available": true,
+        "run_id": "run-fixture-0001",
+        "server_confirmed_flush_lsn": null,
+        "slot_creation_floor_lsn": "0/16B6C50",
+        "slot_name": "boring_cdc_slot",
+        "slot_valid": true,
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CREATION-FLOOR-EQUAL\"}=1",
+        "state": "imports_pending",
+        "status_code": "pg_creation_floor_equal"
+      },
+      "fixture_id": "SCN-M0-PG-CREATION-FLOOR-EQUAL",
+      "hook": "startup_reconcile",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": null,
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "startup_reconcile",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "matching_nonterminal_bootstrap": true,
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "resume_wal_available": true,
+        "run_id": "run-fixture-0001",
+        "server_confirmed_flush_lsn": "0/16B6C50",
+        "slot_creation_floor_lsn": "0/16B6C50",
+        "slot_name": "boring_cdc_slot",
+        "slot_valid": true,
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 78,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CREATION-FLOOR-INVALID-SLOT\"}=1",
+        "state": "requires_reseed",
+        "status_code": "pg_creation_floor_invalid_slot"
+      },
+      "fixture_id": "SCN-M0-PG-CREATION-FLOOR-INVALID-SLOT",
+      "hook": "startup_reconcile",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": null,
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "startup_reconcile",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "matching_nonterminal_bootstrap": true,
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "resume_wal_available": true,
+        "run_id": "run-fixture-0001",
+        "server_confirmed_flush_lsn": null,
+        "slot_creation_floor_lsn": "0/16B6C50",
+        "slot_name": "boring_cdc_slot",
+        "slot_valid": false,
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 78,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CREATION-FLOOR-WAL-UNAVAILABLE\"}=1",
+        "state": "requires_reseed",
+        "status_code": "pg_creation_floor_wal_unavailable"
+      },
+      "fixture_id": "SCN-M0-PG-CREATION-FLOOR-WAL-UNAVAILABLE",
+      "hook": "startup_reconcile",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": null,
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "startup_reconcile",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "matching_nonterminal_bootstrap": true,
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "resume_wal_available": false,
+        "run_id": "run-fixture-0001",
+        "server_confirmed_flush_lsn": "0/16B6C50",
+        "slot_creation_floor_lsn": "0/16B6C50",
+        "slot_name": "boring_cdc_slot",
+        "slot_valid": true,
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-restart",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 75,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-AMBIGUOUS-SLOT\"}=1",
+        "state": "bootstrap_ambiguous_requires_restart",
+        "status_code": "pg_ambiguous_slot"
+      },
+      "fixture_id": "SCN-M0-PG-AMBIGUOUS-SLOT",
+      "hook": "after_slot_server_response",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_slot_server_response",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "after_slot_server_response",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-capture-runtime",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-SAFE-STOP-CLOSE\"}=1",
+        "state": "capture_safe_stopped",
+        "status_code": "pg_safe_stop_close"
+      },
+      "fixture_id": "SCN-M0-PG-SAFE-STOP-CLOSE",
+      "hook": "after_safe_stop_persist_before_close",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_safe_stop_persist_before_close",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "after_safe_stop_persist_before_close",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-capture-runtime",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 75,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-UNEXPECTED-COPYBOTH-LOSS\"}=1",
+        "state": "ownership_lost",
+        "status_code": "pg_unexpected_copyboth_loss"
+      },
+      "fixture_id": "SCN-M0-PG-UNEXPECTED-COPYBOTH-LOSS",
+      "hook": "unexpected_copyboth_eof",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "unexpected_copyboth_eof",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "unexpected_copyboth_eof",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-capture-runtime",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "requested reply packet",
+        "feedback": "prior_durable_boundary",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-SLOW-COMMIT-REQUESTED-REPLY\"}=1",
+        "state": "streaming",
+        "status_code": "pg_slow_commit_requested_reply"
+      },
+      "fixture_id": "SCN-M0-PG-SLOW-COMMIT-REQUESTED-REPLY",
+      "hook": "during_spool_before_commit",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "during_spool_before_commit",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "during_spool_before_commit",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-control-fixtures",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 78,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-PUBLICATION-DRIFT\"}=1",
+        "state": "publication_drift_requires_reseed",
+        "status_code": "pg_publication_drift"
+      },
+      "fixture_id": "SCN-M0-PG-PUBLICATION-DRIFT",
+      "hook": "catalog_poll",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "catalog_poll_age_ms": 30000,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "expected_publication_fingerprint": "3333333333333333333333333333333333333333333333333333333333333333",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "catalog_poll",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "observed_publication_fingerprint": "4444444444444444444444444444444444444444444444444444444444444444",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "catalog_poll",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-control-fixtures",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 78,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CONTROL-CARDINALITY\"}=1",
+        "state": "capture_safe_stopped",
+        "status_code": "pg_control_cardinality"
+      },
+      "fixture_id": "SCN-M0-PG-CONTROL-CARDINALITY",
+      "hook": "control_update_row_count",
+      "inputs": {
+        "attempted_affected_row_counts": [
+          0,
+          2
+        ],
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "control_relation": "boring_cdc_control.heartbeat",
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "control_update_row_count",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "control_update_row_count",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "required_affected_rows": 1,
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-preflight",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 78,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CONTROL-PRIVILEGES\"}=1",
+        "state": "preflight_blocked",
+        "status_code": "pg_control_privileges"
+      },
+      "fixture_id": "SCN-M0-PG-CONTROL-PRIVILEGES",
+      "hook": "roles_sql_probe",
+      "inputs": {
+        "attempted_statements": [
+          "INSERT",
+          "DELETE",
+          "UPDATE id",
+          "SELECT nonce"
+        ],
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "expected_sqlstates": [
+          "42501",
+          "42501",
+          "42501",
+          "42501"
+        ],
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "roles_sql_probe",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "roles_sql_probe",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-ddl-fixtures",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-DDL-CONFLICT-MATRIX\"}=1",
+        "state": "guard_held",
+        "status_code": "pg_ddl_conflict_matrix"
+      },
+      "fixture_id": "SCN-M0-PG-DDL-CONFLICT-MATRIX",
+      "hook": "before_snapshot_export",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "ddl_operation": "ALTER TABLE public.orders ADD COLUMN note text",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_snapshot_export",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "held_guard_lock": "ACCESS SHARE",
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "observed": "waiter_blocked",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "before_snapshot_export",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "requested_lock": "ACCESS EXCLUSIVE",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-ddl-fixtures",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 78,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-DDL-IDLE-POLL\"}=1",
+        "state": "schema_requires_reseed",
+        "status_code": "pg_ddl_idle_poll"
+      },
+      "fixture_id": "SCN-M0-PG-DDL-IDLE-POLL",
+      "hook": "catalog_poll",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "catalog_poll_age_ms": 30000,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "expected_relation_fingerprint": "5555555555555555555555555555555555555555555555555555555555555555",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "catalog_poll",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "observed_relation_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "catalog_poll",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-ddl-fixtures",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-DDL-IMMEDIATE-DML\"}=1",
+        "state": "capture_paused_for_schema",
+        "status_code": "pg_ddl_immediate_dml"
+      },
+      "fixture_id": "SCN-M0-PG-DDL-IMMEDIATE-DML",
+      "hook": "relation_then_dml",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "catalog_validation": "changed_requires_reseed",
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "relation_then_dml",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "following_message": "Insert",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "relation_then_dml",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "relation_message_relation_id": 16385,
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-schema-guard",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-DDL-WAITER-INVALIDATE\"}=1",
+        "state": "snapshot_unusable",
+        "status_code": "pg_ddl_waiter_invalidate"
+      },
+      "fixture_id": "SCN-M0-PG-DDL-WAITER-INVALIDATE",
+      "hook": "ddl_waiter_limit",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "ddl_waiter_limit",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "ddl_waiter_limit",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111",
+        "wait_age_ms": 15000,
+        "waiting_lock": "ACCESS EXCLUSIVE",
+        "waiting_pid": 4201,
+        "waiting_relation_oid": 16385
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-BOOTSTRAP-IMPORTS\"}=1",
+        "state": "anchor_pending_fence",
+        "status_code": "pg_bootstrap_imports"
+      },
+      "fixture_id": "SCN-M0-PG-BOOTSTRAP-IMPORTS",
+      "hook": "after_import_ack",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_import_ack",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "after_import_ack",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-faults",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-BOOTSTRAP-EXPORTER-LOSS\"}=1",
+        "state": "snapshot_unusable",
+        "status_code": "pg_bootstrap_exporter_loss"
+      },
+      "fixture_id": "SCN-M0-PG-BOOTSTRAP-EXPORTER-LOSS",
+      "hook": "before_all_import_ack",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "disconnect_backend_pid": 4101,
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_all_import_ack",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 1,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "before_all_import_ack",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-restart",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-EXISTING-SLOT-STITCH\"}=1",
+        "state": "copying_snapshot",
+        "status_code": "pg_existing_slot_stitch"
+      },
+      "fixture_id": "SCN-M0-PG-EXISTING-SLOT-STITCH",
+      "hook": "after_lower_stitch_persist",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_lower_stitch_persist",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "after_lower_stitch_persist",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "advanced_to_fence_transaction",
+        "exit_code": 0,
+        "external_effect": "durable anchor proof",
+        "feedback": "eligible_durable_boundary",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CAPTURE-FENCE\"}=1",
+        "state": "anchor_complete",
+        "status_code": "pg_capture_fence"
+      },
+      "fixture_id": "SCN-M0-PG-CAPTURE-FENCE",
+      "hook": "after_fence_journal_before_anchor",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_fence_journal_before_anchor",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "after_fence_journal_before_anchor",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-restart",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-RETAINED-SLOT-RECOVERY\"}=1",
+        "state": "existing_slot_generation_required",
+        "status_code": "pg_retained_slot_recovery"
+      },
+      "fixture_id": "SCN-M0-PG-RETAINED-SLOT-RECOVERY",
+      "hook": "after_slot_server_response",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_lsn": "0/16B6D00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failed_boundary": "0/16B6E00",
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_slot_server_response",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "phase": "after_slot_server_response",
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-pressure",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-WAL-HEADROOM\"}=1",
+        "state": "wal_headroom_action",
+        "status_code": "pg_wal_headroom"
+      },
+      "fixture_id": "SCN-M0-PG-WAL-HEADROOM",
+      "hook": "wal_metric_sample",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "wal_metric_sample",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "metric_observed_age_seconds": 0,
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "rate_samples_bytes_per_second": [
+          1048576,
+          1048576,
+          1048576,
+          1048576,
+          1048576
+        ],
+        "retained_wal_bytes": 67645734912,
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "source_free_bytes": 2147483648,
+        "source_reserved_free_bytes": 1073741824,
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-BEFORE-SLOT-CREATE\"}=1",
+        "state": "prepared",
+        "status_code": "pg_before_slot_create"
+      },
+      "fixture_id": "SCN-M0-PG-BEFORE-SLOT-CREATE",
+      "hook": "before_slot_create",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_slot_create",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-TOKEN-PERSIST\"}=1",
+        "state": "snapshot_exported",
+        "status_code": "pg_token_persist"
+      },
+      "fixture_id": "SCN-M0-PG-TOKEN-PERSIST",
+      "hook": "after_snapshot_token_persist",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_snapshot_token_persist",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-EXPORTER-RELEASE-BEFORE\"}=1",
+        "state": "exporter_release_permitted",
+        "status_code": "pg_exporter_release_before"
+      },
+      "fixture_id": "SCN-M0-PG-EXPORTER-RELEASE-BEFORE",
+      "hook": "before_exporter_release",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_exporter_release",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-EXPORTER-RELEASE-AFTER\"}=1",
+        "state": "exporter_released",
+        "status_code": "pg_exporter_release_after"
+      },
+      "fixture_id": "SCN-M0-PG-EXPORTER-RELEASE-AFTER",
+      "hook": "after_exporter_release",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_exporter_release",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m1-decoder",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-START-REPLICATION\"}=1",
+        "state": "streaming",
+        "status_code": "pg_start_replication"
+      },
+      "fixture_id": "SCN-M0-PG-START-REPLICATION",
+      "hook": "before_start_replication",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_start_replication",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-capture-runtime",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "creation_floor_repeat",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-FIRST-FEEDBACK\"}=1",
+        "state": "streaming",
+        "status_code": "pg_first_feedback"
+      },
+      "fixture_id": "SCN-M0-PG-FIRST-FEEDBACK",
+      "hook": "before_first_feedback",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_first_feedback",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-spool",
+      "expected": {
+        "checkpoint": "advanced_to_fence_transaction",
+        "exit_code": 75,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-COMMIT-FEEDBACK-CRASH\"}=1",
+        "state": "streaming",
+        "status_code": "pg_commit_feedback_crash"
+      },
+      "fixture_id": "SCN-M0-PG-COMMIT-FEEDBACK-CRASH",
+      "hook": "after_journal_commit_before_feedback",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_journal_commit_before_feedback",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-capture-runtime",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-SAFE-STOP-PERSIST-BEFORE\"}=1",
+        "state": "capture_block_pending",
+        "status_code": "pg_safe_stop_persist_before"
+      },
+      "fixture_id": "SCN-M0-PG-SAFE-STOP-PERSIST-BEFORE",
+      "hook": "before_safe_stop_persist",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_safe_stop_persist",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-ownership",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-EXPECTED-CLOSE-TOKEN\"}=1",
+        "state": "capture_safe_stopped",
+        "status_code": "pg_expected_close_token"
+      },
+      "fixture_id": "SCN-M0-PG-EXPECTED-CLOSE-TOKEN",
+      "hook": "after_expected_close_token",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_expected_close_token",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m2-ownership",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 75,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-ADVISORY-PROBE-LATE\"}=1",
+        "state": "ownership_lost",
+        "status_code": "pg_advisory_probe_late"
+      },
+      "fixture_id": "SCN-M0-PG-ADVISORY-PROBE-LATE",
+      "hook": "advisory_probe_late",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "advisory_probe_late",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-SNAPSHOT-EXPORT-AFTER-GUARD\"}=1",
+        "state": "guard_held",
+        "status_code": "pg_snapshot_export_after_guard"
+      },
+      "fixture_id": "SCN-M0-PG-SNAPSHOT-EXPORT-AFTER-GUARD",
+      "hook": "before_snapshot_export",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_snapshot_export",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CHUNK-COMMIT\"}=1",
+        "state": "copying_snapshot",
+        "status_code": "pg_chunk_commit"
+      },
+      "fixture_id": "SCN-M0-PG-CHUNK-COMMIT",
+      "hook": "after_chunk_commit",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_chunk_commit",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-FENCE-UPDATE-BEFORE\"}=1",
+        "state": "fence_intent_persisted",
+        "status_code": "pg_fence_update_before"
+      },
+      "fixture_id": "SCN-M0-PG-FENCE-UPDATE-BEFORE",
+      "hook": "before_fence_update",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "before_fence_update",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-bootstrap",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-FENCE-UPDATE-AFTER\"}=1",
+        "state": "anchor_pending_fence",
+        "status_code": "pg_fence_update_after"
+      },
+      "fixture_id": "SCN-M0-PG-FENCE-UPDATE-AFTER",
+      "hook": "after_fence_update_before_observe",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "after_fence_update_before_observe",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    },
+    {
+      "executor_id": "boring-cdc-m3-schema-guard",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effect": "none",
+        "feedback": "unchanged",
+        "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-GUARD-LOSS\"}=1",
+        "state": "snapshot_unusable",
+        "status_code": "pg_guard_loss"
+      },
+      "fixture_id": "SCN-M0-PG-GUARD-LOSS",
+      "hook": "guard_connection_loss",
+      "inputs": {
+        "capture_connection_generation": 3,
+        "capture_epoch": 7,
+        "creation_floor_lsn": "0/16B6C00",
+        "disconnect_backend_pid": 4102,
+        "durable_fence_observed": false,
+        "durable_transaction_end_lsn": "0/16B6D00",
+        "expected_close_token": "close-run-fixture-0001-gen-3",
+        "exporter_backend_pid": 4101,
+        "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fault_action": "inject_once_before_named_effect",
+        "fault_phase": "guard_connection_loss",
+        "fence_nonce_hex": "00112233445566778899aabbccddeeff",
+        "generation": 11,
+        "guard_backend_pid": 4102,
+        "importer_acknowledged": 2,
+        "importer_backend_pids": [
+          4103,
+          4104
+        ],
+        "importer_expected": 2,
+        "journal_checkpoint_seq": 101,
+        "last_feedback_lsn": "0/16B6C50",
+        "operation_deadline_ms": 1000,
+        "ownership_deadline_remaining_ms": 9000,
+        "pre_state": "fixture_precondition_ready",
+        "publication_name": "boring_cdc",
+        "run_id": "run-fixture-0001",
+        "slot_name": "boring_cdc_slot",
+        "table_set_fingerprint": "1111111111111111111111111111111111111111111111111111111111111111"
+      },
+      "preconditions": [
+        "exclusive local and source ownership unless fixture asserts loss",
+        "contract fingerprint matches"
+      ],
+      "redaction": [
+        "dsn absent",
+        "password absent",
+        "absolute paths absent"
+      ],
+      "seed": "0x50474344434d305631"
+    }
+  ],
+  "contract_path": "contracts/postgres/capture-backfill.json",
+  "owner_bead": "boring-cdc-m0-pg-contract",
+  "schema_version": "m0-postgres-fixtures/v1"
+}

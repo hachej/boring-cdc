@@ -1,0 +1,322 @@
+{
+  "artifact_id": "ART-M0-CLICKHOUSE-MODEL",
+  "artifact_root": "artifacts/boring-cdc-m0-ch-model/spec",
+  "audit": {
+    "budgets": {
+      "cadence_seconds": 300,
+      "freshness_seconds": 900,
+      "max_bytes_per_pass": 67108864,
+      "max_events_per_pass": 100000,
+      "max_milliseconds_per_pass": 5000
+    },
+    "checkpoint_moves": false,
+    "cursor": [
+      "logical_table_id",
+      "journal_seq",
+      "connector_event_id",
+      "column_offset"
+    ],
+    "gap_or_expiry": "publish partial/unknown with explicit unverifiable boundary; never bridge or renew by assertion",
+    "identity": [
+      "capture_epoch",
+      "generation",
+      "promotion_fence",
+      "target_clickhouse_checkpoint",
+      "object_fingerprint",
+      "event_contract_sha256"
+    ],
+    "identity_change": "discard incomplete round and restart",
+    "journal_verified_range": "only contiguous completed unexpired subranges",
+    "mismatch": "persist evidence and block ClickHouse only; capture and archive continue",
+    "oversized_unit": "persist column offset plus hash-state version and resume; reject if one encoded scalar exceeds event contract",
+    "payload_only_corruption": "must be detected even when connector_event_id, stored payload_hash and batch marker are unchanged",
+    "payload_verification": "read actual stored key, operation, full source version, relation schema and tagged column values; recompute canonical payload hash; compare recomputed hash with stored payload_hash and retained journal hash",
+    "read_only": true,
+    "target": "frozen finite checkpoint and selector/object identity"
+  },
+  "authority": {
+    "architecture": "docs/PLAN.md \u00a7\u00a79.3/16/19",
+    "owner_cards": [
+      "5a994cfd",
+      "765bd3b2"
+    ],
+    "owner_confirmation_date": "2026-09-10",
+    "requirements": "docs/REQUIREMENTS.md \u00a76"
+  },
+  "consumes": {
+    "confirmation": {
+      "cards": [
+        "5a994cfd",
+        "765bd3b2"
+      ],
+      "date": "2026-09-10",
+      "scope": "every pre-filled RECOMMENDED default accepted exactly"
+    },
+    "event_contract": {
+      "path": "contracts/event/event-format.json",
+      "sha256": "ec09bf8ab2df2fd9fc035ee6021297a0b5c31551cc183c2d26e4d91f0a918547"
+    },
+    "failure_policy": {
+      "base_delay_ms": 250,
+      "cap_delay_ms": 30000,
+      "confirmed_projection_source": "contracts/scaffold/m0-scaffold.json",
+      "decision_id": "boring-cdc-d-failure-policy",
+      "maximum_attempts": 10,
+      "source_sha256": "a96ac9a4afcb2cbdfc708b731c0b7e96838b6dce77eb31ff6ca2d13e901d15fd",
+      "version": 1
+    },
+    "promotion": {
+      "confirmed_projection_source": "contracts/storage/storage-model.json",
+      "decision_id": "boring-cdc-d-promotion",
+      "source_sha256": "45dc34e9b1e90fe60a626bbbde8707487c67a804c285c03ad5e2128878f1713a"
+    }
+  },
+  "event_projection": {
+    "canonical_dimensions": [
+      "capture_epoch",
+      "generation",
+      "logical_table_id",
+      "relation_schema_fingerprint",
+      "canonical_key"
+    ],
+    "cross_epoch_comparison": "forbidden",
+    "dedup": "same connector_event_id and payload_hash collapses logically; same ID with multiple hashes blocks",
+    "delete": "latest event delete hides row but tombstone remains in history",
+    "event_identity": [
+      "connector_event_id",
+      "payload_hash"
+    ],
+    "key_change": "old complete key delete plus new complete key upsert; unchanged_toast anywhere blocks",
+    "source_order": [
+      "lsn_u64",
+      "origin_rank",
+      "transaction_ordinal",
+      "mutation_ordinal",
+      "connector_event_id"
+    ],
+    "stored_payload_hash_inputs": [
+      "capture_epoch",
+      "lsn_u64",
+      "origin_rank",
+      "transaction_ordinal",
+      "mutation_ordinal",
+      "connector_event_id",
+      "relation_schema_fingerprint",
+      "canonical_key",
+      "key_hash",
+      "operation",
+      "before_key",
+      "mutation_kind",
+      "columns.column_id",
+      "columns.state",
+      "columns.type_oid",
+      "columns.typmod",
+      "columns.value_base64"
+    ],
+    "toast": "latest explicit_value or explicit_null per column is carried through unchanged_toast; absent_for_schema projects null; missing predecessor blocks"
+  },
+  "executors": [
+    "boring-cdc-m4-ddl",
+    "boring-cdc-m4-durability",
+    "boring-cdc-m4-promotion"
+  ],
+  "failure_and_observability": {
+    "deterministic_or_exhausted": "block without hot-loop/checkpoint skip",
+    "exit_codes": {
+      "configuration": 78,
+      "continuity": 66,
+      "integrity": 65,
+      "temporary": 75
+    },
+    "redaction": "never payload, canonical key, raw identifier, DSN, credential, raw error, nonce or absolute path",
+    "resume": "explicit; corrected cause plus unchanged failed boundary revalidated",
+    "shared_policy": "reference processing_failures; no second schedule",
+    "status_fields": [
+      "state",
+      "generation",
+      "promotion_fence",
+      "checkpoint",
+      "lag_events",
+      "retry_attempt",
+      "retry_due_at",
+      "failure_class",
+      "failure_fingerprint",
+      "failed_boundary",
+      "journal_verified_range",
+      "audit_fresh_until",
+      "object_fingerprint",
+      "history_bytes",
+      "free_bytes",
+      "temporary_part_bytes",
+      "merge_queue_parts",
+      "merge_amplification_ratio",
+      "quota_state"
+    ],
+    "transient": "persist attempt/due across restart"
+  },
+  "files": {
+    "canonical_query": "contracts/clickhouse/canonical-query.sql",
+    "ddl": "contracts/clickhouse/ddl.sql",
+    "retirement": "contracts/clickhouse/retire-generation.sql"
+  },
+  "fixture_ids": [
+    "SCN-M0-CH-DUPLICATE-IDENTICAL",
+    "SCN-M0-CH-DUPLICATE-CONFLICT",
+    "SCN-M0-CH-SOURCE-ORDER-WAL",
+    "SCN-M0-CH-SOURCE-ORDER-SNAPSHOT-LATE",
+    "SCN-M0-CH-NO-CROSS-EPOCH-COMPARE",
+    "SCN-M0-CH-TOAST-PREDECESSOR",
+    "SCN-M0-CH-TOAST-MISSING-PREDECESSOR",
+    "SCN-M0-CH-EXPLICIT-NULL",
+    "SCN-M0-CH-TOMBSTONE",
+    "SCN-M0-CH-KEY-CHANGE",
+    "SCN-M0-CH-KEY-CHANGE-UNCHANGED-TOAST",
+    "SCN-M0-CH-ADDITIVE-NULLABLE",
+    "SCN-M0-CH-ADDITIVE-ACTIVE-BACKFILL",
+    "SCN-M0-CH-INCOMPATIBLE-SCHEMA",
+    "SCN-M0-CH-BATCH-CRASH-BEFORE-INSERT",
+    "SCN-M0-CH-BATCH-CRASH-AFTER-INSERT",
+    "SCN-M0-CH-BATCH-CRASH-AFTER-MARKER",
+    "SCN-M0-CH-INSERT-FINALIZATION-ERROR",
+    "SCN-M0-CH-MARKER-MISMATCH",
+    "SCN-M0-CH-PAYLOAD-ONLY-CORRUPTION",
+    "SCN-M0-CH-OBJECT-DRIFT",
+    "SCN-M0-CH-AUDIT-FINITE",
+    "SCN-M0-CH-AUDIT-UNIT-RESUME",
+    "SCN-M0-CH-AUDIT-FRESHNESS-EXPIRED",
+    "SCN-M0-CH-AUDIT-IDENTITY-CHANGE",
+    "SCN-M0-CH-LOWER-FENCE-NOOP",
+    "SCN-M0-CH-SAME-FENCE-IDENTICAL",
+    "SCN-M0-CH-SAME-FENCE-CONFLICT",
+    "SCN-M0-CH-HIGHER-FENCE-WINS",
+    "SCN-M0-CH-EXTERNAL-FENCE-AHEAD",
+    "SCN-M0-CH-INCOMPLETE-ANCHOR",
+    "SCN-M0-CH-SNAPSHOT-BEFORE-ANCHOR",
+    "SCN-M0-CH-QUOTA-WARNING",
+    "SCN-M0-CH-QUOTA-HARD-BLOCK",
+    "SCN-M0-CH-RETIRE-LIVE-FORBIDDEN",
+    "SCN-M0-CH-RETIRE-GRACE",
+    "SCN-M0-CH-RETIRE-ELIGIBLE",
+    "SCN-M0-CH-TRANSIENT-RESTART",
+    "SCN-M0-CH-DETERMINISTIC-POISON",
+    "SCN-M0-CH-RETRY-EXHAUSTED",
+    "SCN-M0-CH-RESUME-CHANGED-BOUNDARY"
+  ],
+  "fixture_path": "fixtures/m0/clickhouse/scenarios.json",
+  "history_retention": {
+    "ordinary_deletion": "forbidden",
+    "partition_key": [
+      "capture_epoch",
+      "generation"
+    ],
+    "quota": {
+      "emergency_free_bytes": 10737418240,
+      "hard_action": "block ClickHouse only before insert; never delete history",
+      "hard_history_bytes": 85899345920,
+      "warning_history_bytes": 68719476736
+    },
+    "required_proof": [
+      "generation is not unique greatest live selector",
+      "grace elapsed",
+      "no replay, audit, anchor, intent or reader pin",
+      "candidate/live replacement complete"
+    ],
+    "retirement_grace_seconds": 86400,
+    "retirement_owner": "maintenance destination retire only",
+    "retirement_scope": "one DROP PARTITION removes all logical tables for exactly one epoch/generation before its generation-wide markers; selector history remains",
+    "telemetry": [
+      "history_bytes",
+      "free_bytes",
+      "temporary_part_bytes",
+      "active_parts",
+      "merge_queue_parts",
+      "merge_bytes_pending",
+      "merge_amplification_ratio",
+      "retired_generation_bytes",
+      "quota_state"
+    ],
+    "ttl": "forbidden"
+  },
+  "insert_acceptance": {
+    "ambiguous": "no marker means replay exact intent; valid marker means adopt; conflicting marker/history blocks",
+    "checkpoint": "never advances before marker readback and never skips a failed journal transaction",
+    "ordered_steps": [
+      "persist immutable batch intent and exact complete-transaction journal range",
+      "insert event_history_v1 with pinned settings and query_id=batch_id",
+      "drive Rust insert future/body to successful end-of-stream finalization",
+      "read back exact event count, unique IDs, ordered event digest and zero ID/hash conflicts",
+      "insert batch_markers_v1 only after verification",
+      "read back one identical marker and object fingerprint",
+      "commit destination checkpoint and finalized intent atomically in SQLite"
+    ],
+    "settings": {
+      "async_insert": 0,
+      "fsync_after_insert": 1,
+      "fsync_directories": 1,
+      "insert_deduplicate": 0,
+      "insert_quorum": 1,
+      "wait_for_async_insert": 1
+    }
+  },
+  "lookup_behavior": {
+    "canonical_join": "query-time joins only among pinned local ClickHouse objects in the same capture_epoch/generation",
+    "display_names": "non-correctness metadata only; logical_table_id and column_id drive grouping",
+    "external_dictionaries": "forbidden for correctness and TOAST reconstruction",
+    "missing_lookup": "block contract/integrity; never substitute defaults",
+    "postgres_joins": "forbidden",
+    "source_repair_queries": "forbidden"
+  },
+  "objects": {
+    "database": "boring_cdc",
+    "final_required": false,
+    "history_engine": "MergeTree append-only",
+    "materialized_view_policy": "none: correctness is computed from append-only history; no independently failing derived write is accepted",
+    "materialized_views": [],
+    "native_replacement_version": "forbidden",
+    "ordinary_run_ddl": false,
+    "tables": [
+      "event_history_v1",
+      "batch_markers_v1",
+      "generation_selectors_v1"
+    ],
+    "views": [
+      "selector_conflicts_v1",
+      "live_generation_v1",
+      "event_identity_conflicts_v1"
+    ]
+  },
+  "owner_bead": "boring-cdc-m0-ch-model",
+  "pins": {
+    "client_protocol": "native",
+    "image": "clickhouse/clickhouse-server@sha256:78b6f08a2520267329a21893b70d7a43f90eaab2c5573b513e5afb7084e33c21",
+    "platform": "linux/amd64",
+    "rust_client_crate": "clickhouse 0.13.3",
+    "server": "25.8.2.29",
+    "topology": "one non-replicated server; no HA"
+  },
+  "promotion": {
+    "candidate_requirements": [
+      "compatible complete anchor",
+      "all selected logical_table_id values",
+      "table_set_fingerprint exact",
+      "post-copy capture fence",
+      "exact watermark/count/digest",
+      "zero selector conflicts"
+    ],
+    "ddl_switch": "forbidden",
+    "external_ahead": "block allocation until maintenance verifies/adopts highest external fence or rejects",
+    "lower_fence": "no-op",
+    "same_fence_different_candidate": "integrity block",
+    "same_fence_same_candidate": "idempotent",
+    "selector": "append-only generation_selectors_v1; canonical queries resolve unique greatest promotion_fence"
+  },
+  "result_schema": "contracts/clickhouse/result.schema.json",
+  "schema_evolution": {
+    "active_backfill": "invalidate candidate and require fresh generation",
+    "compatible": "nullable non-generated no-default addition outside active backfill only; older absent_for_schema projects null",
+    "incompatible": "block whole ClickHouse destination at failed transaction and require complete fresh generation/reseed",
+    "migration": "maintenance creates versioned objects; dual-read verifies before contract-fingerprint adoption",
+    "mutation_commands": "UPDATE, DELETE, OPTIMIZE FINAL CLEANUP and TTL on history are forbidden"
+  },
+  "schema_version": "clickhouse-contract/v1"
+}
