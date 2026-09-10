@@ -10,6 +10,13 @@ fixture_rel='fixtures/m0/decisions/boring-cdc-d-security.json'
 executors=['boring-cdc-m1-preflight','boring-cdc-m1-cli-contract','boring-cdc-m2-ownership','boring-cdc-m2-fault-status','boring-cdc-m5.1','boring-cdc-m6-metrics','boring-cdc-m6-failure-matrix']
 proposed='Status and metrics are read-only and loopback-bound by default; non-loopback exposure requires authentication and verified TLS (minimum TLS 1.2, TLS 1.3 preferred); PostgreSQL and ClickHouse TLS certificates are verified; the mutating endpoint is Unix-domain-only under a 0700 directory with a 0600 socket, Linux peer credentials, 1 MiB requests, 4 MiB responses, 10 second reads, and 30 second writes; confirmations expire after 5 minutes and bind a 128-bit CSPRNG base64url-unpadded nonce to RFC 8785 JCS canonical payloads with SHA-256; state, spool, and archive directories are 0700 and secret-bearing files are 0600 or stricter; administration credentials exist only around the sole maintenance-owner request and readback; recursive redaction is bounded to depth 8 and 64 KiB and covers driver authentication errors, DSN/URL strings, TLS handshake errors, nested cause chains, SQLSTATE detail, and filesystem paths.'
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
+def reference_redact(corpus, depth, byte_length, recipe):
+ prefix=recipe['prefix_template'].format(corpus=corpus).encode(recipe['encoding'])
+ if len(prefix)>byte_length: raise ValueError('redaction prefix exceeds vector size')
+ raw=prefix + recipe['fill_byte'].encode(recipe['encoding']) * (byte_length-len(prefix))
+ if len(raw)!=byte_length or b'CREDENTIAL_MARKER' not in raw: raise ValueError('invalid generated redaction input')
+ depth_truncated=depth>8; bytes_truncated=len(raw)>65536
+ return {'bytes_truncated':bytes_truncated,'case_id':f'{corpus}-depth-{depth}-bytes-{byte_length}','code':'SECURITY_REDACTION_LIMITED' if depth_truncated or bytes_truncated else 'SECURITY_REDACTED','consumed_bytes':min(len(raw),65536),'contains_input_markers':False,'depth_processed':min(depth,8),'depth_truncated':depth_truncated,'redacted_corpus':corpus,'sanitized_value':'<redacted>'}
 def fail():
  print('{"code":"SECURITY_EXPOSURE_FIXTURE_INVALID","outcome":"fail","phase":"validate_spec"}'); raise SystemExit(1)
 try:
@@ -41,6 +48,11 @@ try:
   if not vectors[name].get('redaction_assertions'): fail()
  rv=vectors['redacted_nested_driver_error']
  if rv['inputs'].get('depth_boundary')!=[8,9] or rv['inputs'].get('byte_boundary')!=[65536,65537] or set(rv['inputs'].get('corpus',[]))!=set(boundary['redaction']['corpus']): fail()
+ recipe=rv['inputs']['generator']; generated=[]
+ for corpus in boundary['redaction']['corpus']:
+  for depth in rv['inputs']['depth_boundary']:
+   for size in rv['inputs']['byte_boundary']: generated.append(reference_redact(corpus,depth,size,recipe))
+ if generated!=rv['expected']['output']['sanitized_vectors'] or any(x['contains_input_markers'] or x['consumed_bytes']>65536 or x['depth_processed']>8 for x in generated): fail()
  registration=spec['operation_registration_contract']
  if registration!={'registry_owner':'boring-cdc-m1-cli-contract','planning_inventory_combined_command':'traceability_only_not_cli_registry','required_entries':[{'operation_key':'journal_inspect','runtime_executor':'boring-cdc-m2-reconcile','mutation_class':'read_only','result_kind':'bounded_event_inspection'},{'operation_key':'journal_inspect_explain','runtime_executor':'boring-cdc-m5.1','mutation_class':'read_only','result_kind':'evidence_qualified_redacted_explanation'}],'separate_operation_ids_required':True,'combined_registration_forbidden':True}: fail()
  if selected_case!='all' and selected_case not in vectors: fail()
