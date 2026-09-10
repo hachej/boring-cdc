@@ -1,27 +1,593 @@
 {
-  "$schema":"https://json-schema.org/draft/2020-12/schema",
-  "$id":"https://boring-cdc.dev/contracts/event/event.schema.json",
-  "title":"Boring CDC public event v1",
-  "oneOf":[{"$ref":"#/$defs/mutation"},{"$ref":"#/$defs/controlEvent"}],
-  "$defs":{
-    "hash":{"type":"string","pattern":"^[0-9a-f]{64}$"},
-    "sourceVersion":{"type":"object","additionalProperties":false,"required":["lsn_u64","origin_rank","transaction_ordinal","mutation_ordinal","connector_event_id"],"properties":{"lsn_u64":{"type":"integer","minimum":0},"origin_rank":{"enum":[0,1]},"transaction_ordinal":{"type":"integer","minimum":0,"maximum":4294967295},"mutation_ordinal":{"type":"integer","minimum":0,"maximum":255},"connector_event_id":{"$ref":"#/$defs/hash"}}},
-    "key":{"type":"array","minItems":1,"maxItems":32,"items":{"oneOf":[
-      {"type":"object","additionalProperties":false,"required":["kind","value"],"properties":{"kind":{"const":"bool"},"value":{"type":"boolean"}}},
-      {"type":"object","additionalProperties":false,"required":["kind","value"],"properties":{"kind":{"const":"int64"},"value":{"type":"integer","minimum":-9223372036854775808,"maximum":9223372036854775807}}},
-      {"type":"object","additionalProperties":false,"required":["kind","value"],"properties":{"kind":{"const":"uint64"},"value":{"type":"integer","minimum":0}}},
-      {"type":"object","additionalProperties":false,"required":["kind","value"],"properties":{"kind":{"const":"bytes"},"value":{"type":"string","pattern":"^[A-Za-z0-9_-]*$","maxLength":1366}}},
-      {"type":"object","additionalProperties":false,"required":["kind","value"],"properties":{"kind":{"const":"text"},"value":{"type":"string","maxLength":1024}}}
-    ]}},
-    "column":{"oneOf":[
-      {"type":"object","additionalProperties":false,"required":["column_id","state"],"properties":{"column_id":{"type":"integer","minimum":0,"maximum":4294967295},"state":{"enum":["absent_for_schema","explicit_null","unchanged_toast"]}}},
-      {"type":"object","additionalProperties":false,"required":["column_id","state","type_oid","type_modifier","bytes"],"properties":{"column_id":{"type":"integer","minimum":0,"maximum":4294967295},"state":{"const":"explicit_value"},"type_oid":{"type":"integer","minimum":1,"maximum":4294967295},"type_modifier":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"bytes":{"type":"string","pattern":"^[A-Za-z0-9_-]*$"}}}
-    ]},
-    "baseProperties":{},
-    "mutation":{"type":"object","additionalProperties":false,"required":["schema_version","event_type","connector_event_id","journal_seq","capture_epoch","source_version","routing","operation","logical_table_id","relation_fingerprint","key_hash","canonical_key","mutation_kind","columns","payload_hash"],"properties":{
-      "schema_version":{"const":"boring-cdc/event/v1"},"event_type":{"const":"mutation"},"connector_event_id":{"$ref":"#/$defs/hash"},"journal_seq":{"type":"integer","minimum":1},"capture_epoch":{"type":"integer","minimum":1},"source_version":{"$ref":"#/$defs/sourceVersion"},"routing":{"const":"business"},"operation":{"enum":["snapshot","insert","update","delete"]},"logical_table_id":{"$ref":"#/$defs/hash"},"relation_fingerprint":{"$ref":"#/$defs/hash"},"key_hash":{"$ref":"#/$defs/hash"},"canonical_key":{"$ref":"#/$defs/key"},"before_key":{"anyOf":[{"$ref":"#/$defs/key"},{"type":"null"}]},"mutation_kind":{"enum":["delete","upsert"]},"columns":{"type":"array","items":{"$ref":"#/$defs/column"}},"payload_hash":{"$ref":"#/$defs/hash"},"captured_at":{"type":"string"}
-    }},
-    "control":{"type":"object","additionalProperties":false,"required":["kind","transaction_end_lsn","generation"],"properties":{"kind":{"enum":["heartbeat","capture_fence","promotion_fence","truncate_observed"]},"transaction_end_lsn":{"type":"integer","minimum":0},"generation":{"type":["integer","null"],"minimum":1}}},
-    "controlEvent":{"type":"object","additionalProperties":false,"required":["schema_version","event_type","connector_event_id","journal_seq","capture_epoch","source_version","routing","operation","control","payload_hash"],"properties":{"schema_version":{"const":"boring-cdc/event/v1"},"event_type":{"const":"control"},"connector_event_id":{"$ref":"#/$defs/hash"},"journal_seq":{"type":"integer","minimum":1},"capture_epoch":{"type":"integer","minimum":1},"source_version":{"$ref":"#/$defs/sourceVersion"},"routing":{"const":"control"},"operation":{"const":"control"},"control":{"$ref":"#/$defs/control"},"payload_hash":{"$ref":"#/$defs/hash"},"captured_at":{"type":"string"}}}
-  }
+  "$defs": {
+    "column": {
+      "$comment": "// M0-PROVISIONAL: boring-cdc-d-toast",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "column_id": {
+              "maximum": 4294967295,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "state": {
+              "enum": [
+                "absent_for_schema",
+                "explicit_null",
+                "unchanged_toast"
+              ]
+            }
+          },
+          "required": [
+            "column_id",
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "bytes": {
+              "maxLength": 1398102,
+              "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-]{2}|[A-Za-z0-9_-]{3})?$",
+              "type": "string"
+            },
+            "column_id": {
+              "maximum": 4294967295,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "state": {
+              "const": "explicit_value"
+            },
+            "type_modifier": {
+              "maximum": 2147483647,
+              "minimum": -2147483648,
+              "type": "integer"
+            },
+            "type_oid": {
+              "maximum": 4294967295,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "column_id",
+            "state",
+            "type_oid",
+            "type_modifier",
+            "bytes"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "control": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "heartbeat",
+            "capture_fence",
+            "promotion_fence",
+            "truncate_observed"
+          ]
+        },
+        "transaction_end_lsn": {
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "transaction_end_lsn",
+        "generation"
+      ],
+      "type": "object"
+    },
+    "controlEvent": {
+      "$comment": "// M0-PROVISIONAL: boring-cdc-d-event-id",
+      "additionalProperties": false,
+      "properties": {
+        "capture_epoch": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "captured_at": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$",
+          "type": "string"
+        },
+        "connector_event_id": {
+          "$ref": "#/$defs/hash"
+        },
+        "control": {
+          "$ref": "#/$defs/control"
+        },
+        "event_type": {
+          "const": "control"
+        },
+        "journal_seq": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "operation": {
+          "const": "control"
+        },
+        "payload_hash": {
+          "$ref": "#/$defs/hash"
+        },
+        "routing": {
+          "const": "control"
+        },
+        "schema_version": {
+          "const": "boring-cdc/event/v1"
+        },
+        "source_version": {
+          "$ref": "#/$defs/sourceVersion"
+        }
+      },
+      "required": [
+        "schema_version",
+        "event_type",
+        "connector_event_id",
+        "journal_seq",
+        "capture_epoch",
+        "source_version",
+        "routing",
+        "operation",
+        "control",
+        "payload_hash"
+      ],
+      "type": "object"
+    },
+    "hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "key": {
+      "$comment": "// M0-PROVISIONAL: boring-cdc-d-keys",
+      "items": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "bool"
+              },
+              "type_modifier": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "type_oid": {
+                "enum": [
+                  16
+                ],
+                "type": "integer"
+              },
+              "value": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "kind",
+              "type_oid",
+              "type_modifier",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "int64"
+              },
+              "type_modifier": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "type_oid": {
+                "enum": [
+                  21,
+                  23,
+                  20
+                ],
+                "type": "integer"
+              },
+              "value": {
+                "maximum": 9223372036854775807,
+                "minimum": -9223372036854775808,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "kind",
+              "type_oid",
+              "type_modifier",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "uint64"
+              },
+              "type_modifier": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "type_oid": {
+                "enum": [
+                  26
+                ],
+                "type": "integer"
+              },
+              "value": {
+                "maximum": 18446744073709551615,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "kind",
+              "type_oid",
+              "type_modifier",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "bytes"
+              },
+              "type_modifier": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "type_oid": {
+                "enum": [
+                  17,
+                  2950
+                ],
+                "type": "integer"
+              },
+              "value": {
+                "maxLength": 1366,
+                "minLength": 2,
+                "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-]{2}|[A-Za-z0-9_-]{3})?$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "type_oid",
+              "type_modifier",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "text"
+              },
+              "type_modifier": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "type_oid": {
+                "enum": [
+                  25,
+                  1043,
+                  1042,
+                  19
+                ],
+                "type": "integer"
+              },
+              "value": {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "type_oid",
+              "type_modifier",
+              "value"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "type": "array"
+    },
+    "mutation": {
+      "$comment": "// M0-PROVISIONAL: boring-cdc-d-event-id",
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "before_key": {
+                  "type": "null"
+                },
+                "mutation_kind": {
+                  "const": "upsert"
+                },
+                "operation": {
+                  "const": "snapshot"
+                },
+                "source_version": {
+                  "properties": {
+                    "origin_rank": {
+                      "const": 0
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            {
+              "properties": {
+                "before_key": {
+                  "type": "null"
+                },
+                "mutation_kind": {
+                  "const": "upsert"
+                },
+                "operation": {
+                  "const": "insert"
+                },
+                "source_version": {
+                  "properties": {
+                    "origin_rank": {
+                      "const": 1
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            {
+              "properties": {
+                "before_key": {
+                  "type": "null"
+                },
+                "columns": {
+                  "maxItems": 0
+                },
+                "mutation_kind": {
+                  "const": "delete"
+                },
+                "operation": {
+                  "const": "delete"
+                },
+                "source_version": {
+                  "properties": {
+                    "origin_rank": {
+                      "const": 1
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            {
+              "properties": {
+                "before_key": {
+                  "type": "null"
+                },
+                "columns": {
+                  "maxItems": 0
+                },
+                "mutation_kind": {
+                  "const": "delete"
+                },
+                "operation": {
+                  "const": "update"
+                },
+                "source_version": {
+                  "properties": {
+                    "origin_rank": {
+                      "const": 1
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            {
+              "properties": {
+                "mutation_kind": {
+                  "const": "upsert"
+                },
+                "operation": {
+                  "const": "update"
+                },
+                "source_version": {
+                  "properties": {
+                    "origin_rank": {
+                      "const": 1
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "properties": {
+        "before_key": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/key"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "canonical_key": {
+          "$ref": "#/$defs/key"
+        },
+        "capture_epoch": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "captured_at": {
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?Z$",
+          "type": "string"
+        },
+        "columns": {
+          "items": {
+            "$ref": "#/$defs/column"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "connector_event_id": {
+          "$ref": "#/$defs/hash"
+        },
+        "event_type": {
+          "const": "mutation"
+        },
+        "journal_seq": {
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "key_hash": {
+          "$ref": "#/$defs/hash"
+        },
+        "logical_table_id": {
+          "$ref": "#/$defs/hash"
+        },
+        "mutation_kind": {
+          "enum": [
+            "delete",
+            "upsert"
+          ]
+        },
+        "operation": {
+          "enum": [
+            "snapshot",
+            "insert",
+            "update",
+            "delete"
+          ]
+        },
+        "payload_hash": {
+          "$ref": "#/$defs/hash"
+        },
+        "relation_fingerprint": {
+          "$ref": "#/$defs/hash"
+        },
+        "routing": {
+          "const": "business"
+        },
+        "schema_version": {
+          "const": "boring-cdc/event/v1"
+        },
+        "source_version": {
+          "$ref": "#/$defs/sourceVersion"
+        }
+      },
+      "required": [
+        "schema_version",
+        "event_type",
+        "connector_event_id",
+        "journal_seq",
+        "capture_epoch",
+        "source_version",
+        "routing",
+        "operation",
+        "logical_table_id",
+        "relation_fingerprint",
+        "key_hash",
+        "canonical_key",
+        "mutation_kind",
+        "columns",
+        "payload_hash",
+        "before_key"
+      ],
+      "type": "object"
+    },
+    "sourceVersion": {
+      "additionalProperties": false,
+      "properties": {
+        "connector_event_id": {
+          "$ref": "#/$defs/hash"
+        },
+        "lsn_u64": {
+          "$comment": "// M0-PROVISIONAL: boring-cdc-d-event-id",
+          "maximum": 18446744073709551615,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mutation_ordinal": {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "origin_rank": {
+          "enum": [
+            0,
+            1
+          ]
+        },
+        "transaction_ordinal": {
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lsn_u64",
+        "origin_rank",
+        "transaction_ordinal",
+        "mutation_ordinal",
+        "connector_event_id"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://boring-cdc.dev/contracts/event/event.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/mutation"
+    },
+    {
+      "$ref": "#/$defs/controlEvent"
+    }
+  ],
+  "title": "Boring CDC public event v1"
 }

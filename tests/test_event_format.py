@@ -38,6 +38,21 @@ class EventFormatContractTests(unittest.TestCase):
         )
         self.assertEqual(set(self.contract["fixture_ids"]), {case["fixture_id"] for case in self.vectors["vectors"]})
 
+    def test_foundational_identity_inputs_are_derived(self):
+        primitives = self.vectors["identity_primitives"]
+        self.assertEqual(
+            primitives["source_slot"]["expected_sha256"],
+            event_format.source_slot_identity(primitives["source_slot"]["input"]),
+        )
+        self.assertEqual(
+            primitives["logical_table"]["expected_sha256"],
+            event_format.logical_table_id(primitives["logical_table"]["input"]),
+        )
+        self.assertEqual(
+            primitives["relation_fingerprint"]["expected_sha256"],
+            event_format.relation_fingerprint(primitives["relation_fingerprint"]["input"]),
+        )
+
     def test_golden_hashes_are_content_sensitive(self):
         wal = self.vectors["vectors"][0]
         self.assertEqual(wal["event"]["connector_event_id"], event_format.wal_id(wal["identity_input"]))
@@ -46,11 +61,19 @@ class EventFormatContractTests(unittest.TestCase):
         self.assertNotEqual(wal["event"]["payload_hash"], event_format.payload_hash(changed))
         self.assertEqual(wal["event"]["connector_event_id"], changed["connector_event_id"])
 
+        key_change = next(
+            case for case in self.vectors["vectors"] if case["fixture_id"] == "SCN-M0-EVENT-KEY-CHANGE-ORDER"
+        )["events"][1]
+        for field, value in (("operation", "insert"), ("before_key", [{"kind": "int64", "type_oid": 20, "type_modifier": -1, "value": 40}])):
+            changed = json.loads(json.dumps(key_change))
+            changed[field] = value
+            self.assertNotEqual(key_change["payload_hash"], event_format.payload_hash(changed))
+
     def test_key_component_boundaries_are_unambiguous(self):
-        left = [{"kind":"bytes","value":"YWI"},{"kind":"bytes","value":"Yw"}]
-        right = [{"kind":"bytes","value":"YQ"},{"kind":"bytes","value":"YmM"}]
+        left = [{"kind":"bytes","type_oid":17,"type_modifier":-1,"value":"YWI"},{"kind":"bytes","type_oid":17,"type_modifier":-1,"value":"Yw"}]
+        right = [{"kind":"bytes","type_oid":17,"type_modifier":-1,"value":"YQ"},{"kind":"bytes","type_oid":17,"type_modifier":-1,"value":"YmM"}]
         self.assertNotEqual(event_format.key_hash(left), event_format.key_hash(right))
-        self.assertNotEqual(event_format.key_hash([{"kind":"int64","value":1}]), event_format.key_hash([{"kind":"text","value":"1"}]))
+        self.assertNotEqual(event_format.key_hash([{"kind":"int64","type_oid":20,"type_modifier":-1,"value":1}]), event_format.key_hash([{"kind":"text","type_oid":25,"type_modifier":-1,"value":"1"}]))
 
     def test_control_events_are_not_business_payloads(self):
         controls = [c["event"] for c in self.vectors["vectors"] if c["category"] == "control_routing"]

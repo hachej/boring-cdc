@@ -1,4 +1,65 @@
 {
+  "identity_primitives": {
+    "logical_table": {
+      "expected_sha256": "dbbed1fad80b6ea17ea77aa048f61d230a6d550ddf9d1e5d087ece447e7a0dbb",
+      "input": {
+        "database_identity": "database-oid:16384",
+        "schema": "public",
+        "system_identifier": 72623859790382856,
+        "table": "orders"
+      }
+    },
+    "relation_components": [
+      {
+        "definition": "primary key (id)",
+        "expected_sha256": "3ef04da4f8598d5b4e4bb5236abb26d3a6f087defc562588a362e476a887502e",
+        "kind": "effective_key_definition"
+      }
+    ],
+    "relation_fingerprint": {
+      "expected_sha256": "2ad9e1e3f9bec8c0937ca4ba2da2187ce4d344cca886f0f5358cda0799a557e8",
+      "input": {
+        "columns": [
+          {
+            "attnum": 1,
+            "collation_oid": 0,
+            "default_expression_hash": null,
+            "dropped": false,
+            "generated_expression_hash": null,
+            "identity_expression_hash": null,
+            "logical_ordinal": 0,
+            "name": "id",
+            "nullable": false,
+            "type_oid": 20,
+            "typmod": -1
+          }
+        ],
+        "effective_key_definition_hash": "3ef04da4f8598d5b4e4bb5236abb26d3a6f087defc562588a362e476a887502e",
+        "logical_table_id": "dbbed1fad80b6ea17ea77aa048f61d230a6d550ddf9d1e5d087ece447e7a0dbb",
+        "partition_bounds_hash": null,
+        "partition_key_hash": null,
+        "partition_root_logical_table_id": null,
+        "partition_routing_definition_hash": null,
+        "publication_action_bits": 15,
+        "publication_column_projection_hash": null,
+        "publication_member": true,
+        "publication_row_filter_hash": null,
+        "relation_id": 24576,
+        "replica_index_definition_hash": null,
+        "replica_mode": "default"
+      }
+    },
+    "source_slot": {
+      "expected_sha256": "0866ae1e68b00cb1757bad5882bf4e37ff721f24e37e599cd7019b90110ce3a0",
+      "input": {
+        "database_identity": "database-oid:16384",
+        "plugin": "pgoutput",
+        "slot": "boring_cdc",
+        "system_identifier": 72623859790382856,
+        "timeline": 1
+      }
+    }
+  },
   "owner_bead": "boring-cdc-m0-event-format",
   "schema_version": "m0-event-format-vectors/v1",
   "seed": "event-format-v1",
@@ -10,6 +71,8 @@
         "canonical_key": [
           {
             "kind": "int64",
+            "type_modifier": -1,
+            "type_oid": 20,
             "value": 42
           }
         ],
@@ -24,19 +87,19 @@
             "type_oid": 20
           }
         ],
-        "connector_event_id": "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9",
+        "connector_event_id": "6126b68191032f39c1297c27676e3c72edf380beeae43320b0fdcc99ee42894b",
         "event_type": "mutation",
         "journal_seq": 1,
-        "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
-        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "key_hash": "caaac49276a19876e1824d4dc6d94eec79ee684e6ca4655eb3984cc0a17bafda",
+        "logical_table_id": "dbbed1fad80b6ea17ea77aa048f61d230a6d550ddf9d1e5d087ece447e7a0dbb",
         "mutation_kind": "upsert",
         "operation": "insert",
-        "payload_hash": "0d2527c80fbf3b340a9f696d6dbf46ca7ffac5a40a52e1f4e2e0c8b96245e746",
-        "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
+        "payload_hash": "b5e85cc699949361f66a0933506739f647bea584cf9f5ffc512aa2bd6a4e2ef3",
+        "relation_fingerprint": "2ad9e1e3f9bec8c0937ca4ba2da2187ce4d344cca886f0f5358cda0799a557e8",
         "routing": "business",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "connector_event_id": "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9",
+          "connector_event_id": "6126b68191032f39c1297c27676e3c72edf380beeae43320b0fdcc99ee42894b",
           "lsn_u64": 112,
           "mutation_ordinal": 0,
           "origin_rank": 1,
@@ -49,7 +112,7 @@
         "capture_epoch": 7,
         "mutation_ordinal": 0,
         "row_ordinal": 0,
-        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "source_slot_identity": "0866ae1e68b00cb1757bad5882bf4e37ff721f24e37e599cd7019b90110ce3a0",
         "transaction_end_lsn": 120
       },
       "identity_kind": "wal"
@@ -61,6 +124,8 @@
         "canonical_key": [
           {
             "kind": "int64",
+            "type_modifier": -1,
+            "type_oid": 20,
             "value": 42
           }
         ],
@@ -75,19 +140,19 @@
             "type_oid": 20
           }
         ],
-        "connector_event_id": "9b9de05649239ffba5889a2fb2f4484d337856312c2c9f8f3371e9b922c95127",
+        "connector_event_id": "f131550b33ddc3aecbe9ba43010dc71c4ac078b4a0f2d0521e43d7ac1de08c3e",
         "event_type": "mutation",
         "journal_seq": 20,
-        "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
-        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "key_hash": "caaac49276a19876e1824d4dc6d94eec79ee684e6ca4655eb3984cc0a17bafda",
+        "logical_table_id": "dbbed1fad80b6ea17ea77aa048f61d230a6d550ddf9d1e5d087ece447e7a0dbb",
         "mutation_kind": "upsert",
         "operation": "snapshot",
-        "payload_hash": "830aaa1f50cf23dc74049a56184aecebd69b2d9cf2a832d5173a771bf11bd5b4",
-        "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
+        "payload_hash": "8dc104943cec229568d30620d181e03c9a8a9b3eec9bdcd3c23d9b27a872a98f",
+        "relation_fingerprint": "2ad9e1e3f9bec8c0937ca4ba2da2187ce4d344cca886f0f5358cda0799a557e8",
         "routing": "business",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "connector_event_id": "9b9de05649239ffba5889a2fb2f4484d337856312c2c9f8f3371e9b922c95127",
+          "connector_event_id": "f131550b33ddc3aecbe9ba43010dc71c4ac078b4a0f2d0521e43d7ac1de08c3e",
           "lsn_u64": 80,
           "mutation_ordinal": 0,
           "origin_rank": 0,
@@ -100,13 +165,15 @@
         "canonical_key": [
           {
             "kind": "int64",
+            "type_modifier": -1,
+            "type_oid": 20,
             "value": 42
           }
         ],
         "capture_epoch": 7,
         "chunk_id": 4,
         "generation": 2,
-        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695"
+        "logical_table_id": "dbbed1fad80b6ea17ea77aa048f61d230a6d550ddf9d1e5d087ece447e7a0dbb"
       },
       "identity_kind": "snapshot"
     },
@@ -125,14 +192,14 @@
           1,
           0,
           0,
-          "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9"
+          "6126b68191032f39c1297c27676e3c72edf380beeae43320b0fdcc99ee42894b"
         ],
         "right": [
           124,
           1,
           1,
           0,
-          "633ee4f4ed84a032c11a33b98b935f5d9b01cf0c1daad0d424410ef6a5e2c750"
+          "628d35f4d0cb60dfceb635c52c9ac74e59c37ddacfbb62436ad0f0d82d09bdf4"
         ]
       },
       "event": {
@@ -140,6 +207,8 @@
         "canonical_key": [
           {
             "kind": "int64",
+            "type_modifier": -1,
+            "type_oid": 20,
             "value": 42
           }
         ],
@@ -154,19 +223,19 @@
             "type_oid": 20
           }
         ],
-        "connector_event_id": "633ee4f4ed84a032c11a33b98b935f5d9b01cf0c1daad0d424410ef6a5e2c750",
+        "connector_event_id": "628d35f4d0cb60dfceb635c52c9ac74e59c37ddacfbb62436ad0f0d82d09bdf4",
         "event_type": "mutation",
         "journal_seq": 2,
-        "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
-        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "key_hash": "caaac49276a19876e1824d4dc6d94eec79ee684e6ca4655eb3984cc0a17bafda",
+        "logical_table_id": "dbbed1fad80b6ea17ea77aa048f61d230a6d550ddf9d1e5d087ece447e7a0dbb",
         "mutation_kind": "upsert",
         "operation": "update",
-        "payload_hash": "f2f1742d59254bd88cb55b9fa26abb59822e1f8d04a7ae76e40d48dfecdc4247",
-        "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
+        "payload_hash": "5e19e9b7aa70b7cf73edbe8ee1c541cd425980f1bcd05f188e8cc90028b20d2f",
+        "relation_fingerprint": "2ad9e1e3f9bec8c0937ca4ba2da2187ce4d344cca886f0f5358cda0799a557e8",
         "routing": "business",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "connector_event_id": "633ee4f4ed84a032c11a33b98b935f5d9b01cf0c1daad0d424410ef6a5e2c750",
+          "connector_event_id": "628d35f4d0cb60dfceb635c52c9ac74e59c37ddacfbb62436ad0f0d82d09bdf4",
           "lsn_u64": 124,
           "mutation_ordinal": 0,
           "origin_rank": 1,
@@ -179,7 +248,7 @@
         "capture_epoch": 7,
         "mutation_ordinal": 0,
         "row_ordinal": 1,
-        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "source_slot_identity": "0866ae1e68b00cb1757bad5882bf4e37ff721f24e37e599cd7019b90110ce3a0",
         "transaction_end_lsn": 128
       },
       "identity_kind": "wal"
@@ -193,25 +262,27 @@
           "canonical_key": [
             {
               "kind": "int64",
+              "type_modifier": -1,
+              "type_oid": 20,
               "value": 41
             }
           ],
           "capture_epoch": 7,
           "captured_at": "2030-01-01T00:00:00Z",
           "columns": [],
-          "connector_event_id": "ed98c956e6e2033be8c07141fc92eade0893d0b5438832b735d7e55f2c6d1ad3",
+          "connector_event_id": "37ab9cac33c08a06aaf4404ed48912b5e83ae56f220890612e8f5e52cc49a9d3",
           "event_type": "mutation",
           "journal_seq": 3,
-          "key_hash": "cb4fc90a97db06a85fcce9099800321e09a1aa69487b9d45b9d0b89204894116",
-          "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+          "key_hash": "b65fad7118482fd13a7d25f388e5ed5531c033d744b31d85c46a0345bc73ffe0",
+          "logical_table_id": "dbbed1fad80b6ea17ea77aa048f61d230a6d550ddf9d1e5d087ece447e7a0dbb",
           "mutation_kind": "delete",
           "operation": "update",
-          "payload_hash": "c1038c39742ee74410da667b843d16f5ce63cd0bfdc0ab7f4523da60dd8945e9",
-          "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
+          "payload_hash": "1ae8cdd9d8eca0d657c08298d12c2dd3659aa31ac49d8ef93bf70f3a77ecccd2",
+          "relation_fingerprint": "2ad9e1e3f9bec8c0937ca4ba2da2187ce4d344cca886f0f5358cda0799a557e8",
           "routing": "business",
           "schema_version": "boring-cdc/event/v1",
           "source_version": {
-            "connector_event_id": "ed98c956e6e2033be8c07141fc92eade0893d0b5438832b735d7e55f2c6d1ad3",
+            "connector_event_id": "37ab9cac33c08a06aaf4404ed48912b5e83ae56f220890612e8f5e52cc49a9d3",
             "lsn_u64": 112,
             "mutation_ordinal": 0,
             "origin_rank": 1,
@@ -222,12 +293,16 @@
           "before_key": [
             {
               "kind": "int64",
+              "type_modifier": -1,
+              "type_oid": 20,
               "value": 41
             }
           ],
           "canonical_key": [
             {
               "kind": "int64",
+              "type_modifier": -1,
+              "type_oid": 20,
               "value": 42
             }
           ],
@@ -242,19 +317,19 @@
               "type_oid": 20
             }
           ],
-          "connector_event_id": "e74713974578a5a0772fb9beecc147527ae1e1eff277635ff81b889c3f2eaa2e",
+          "connector_event_id": "e5bb298d85521225b5ba83ff8a22f938d8f8038ebb732eb41bf96585e57ef422",
           "event_type": "mutation",
           "journal_seq": 3,
-          "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
-          "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+          "key_hash": "caaac49276a19876e1824d4dc6d94eec79ee684e6ca4655eb3984cc0a17bafda",
+          "logical_table_id": "dbbed1fad80b6ea17ea77aa048f61d230a6d550ddf9d1e5d087ece447e7a0dbb",
           "mutation_kind": "upsert",
           "operation": "update",
-          "payload_hash": "f81482669fcade813528617a54ce70a227ebac03d28e8435946de2c1a617afb2",
-          "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
+          "payload_hash": "d826da50ee1498560bd2696ac669ca9c31118913395bcf4784384b343e657175",
+          "relation_fingerprint": "2ad9e1e3f9bec8c0937ca4ba2da2187ce4d344cca886f0f5358cda0799a557e8",
           "routing": "business",
           "schema_version": "boring-cdc/event/v1",
           "source_version": {
-            "connector_event_id": "e74713974578a5a0772fb9beecc147527ae1e1eff277635ff81b889c3f2eaa2e",
+            "connector_event_id": "e5bb298d85521225b5ba83ff8a22f938d8f8038ebb732eb41bf96585e57ef422",
             "lsn_u64": 112,
             "mutation_ordinal": 1,
             "origin_rank": 1,
@@ -269,14 +344,14 @@
           "capture_epoch": 7,
           "mutation_ordinal": 0,
           "row_ordinal": 2,
-          "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+          "source_slot_identity": "0866ae1e68b00cb1757bad5882bf4e37ff721f24e37e599cd7019b90110ce3a0",
           "transaction_end_lsn": 120
         },
         {
           "capture_epoch": 7,
           "mutation_ordinal": 1,
           "row_ordinal": 2,
-          "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+          "source_slot_identity": "0866ae1e68b00cb1757bad5882bf4e37ff721f24e37e599cd7019b90110ce3a0",
           "transaction_end_lsn": 120
         }
       ],
@@ -432,6 +507,8 @@
         "canonical_key": [
           {
             "kind": "int64",
+            "type_modifier": -1,
+            "type_oid": 20,
             "value": 42
           }
         ],
@@ -458,19 +535,19 @@
             "state": "absent_for_schema"
           }
         ],
-        "connector_event_id": "206f2a26c32e3c9ebe3ed60ed249314cbe3be79654fee36095264cca8d113312",
+        "connector_event_id": "6553a023a66797a2c686bee441f7780f57bc76a2e56c4868fa83668870a4e943",
         "event_type": "mutation",
         "journal_seq": 5,
-        "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
-        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "key_hash": "caaac49276a19876e1824d4dc6d94eec79ee684e6ca4655eb3984cc0a17bafda",
+        "logical_table_id": "dbbed1fad80b6ea17ea77aa048f61d230a6d550ddf9d1e5d087ece447e7a0dbb",
         "mutation_kind": "upsert",
         "operation": "update",
-        "payload_hash": "2058ea895efff133bbd8e9d91a1dd47a357c55d637a520f5a10f12ee496b12b4",
-        "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
+        "payload_hash": "f06a334216f488bc31c6e6003bf9712003d8087e37b5db57fbb9537467dfdbd6",
+        "relation_fingerprint": "2ad9e1e3f9bec8c0937ca4ba2da2187ce4d344cca886f0f5358cda0799a557e8",
         "routing": "business",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "connector_event_id": "206f2a26c32e3c9ebe3ed60ed249314cbe3be79654fee36095264cca8d113312",
+          "connector_event_id": "6553a023a66797a2c686bee441f7780f57bc76a2e56c4868fa83668870a4e943",
           "lsn_u64": 112,
           "mutation_ordinal": 0,
           "origin_rank": 1,
@@ -483,7 +560,7 @@
         "capture_epoch": 7,
         "mutation_ordinal": 0,
         "row_ordinal": 4,
-        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "source_slot_identity": "0866ae1e68b00cb1757bad5882bf4e37ff721f24e37e599cd7019b90110ce3a0",
         "transaction_end_lsn": 120
       },
       "identity_kind": "wal"
@@ -502,6 +579,8 @@
         "before_key": [
           {
             "kind": "int64",
+            "type_modifier": -1,
+            "type_oid": 20,
             "value": 41
           }
         ],
@@ -514,6 +593,8 @@
         "key": [
           {
             "kind": "int64",
+            "type_modifier": -1,
+            "type_oid": 20,
             "value": 42
           }
         ]
@@ -565,6 +646,8 @@
         "canonical_key": [
           {
             "kind": "int64",
+            "type_modifier": -1,
+            "type_oid": 20,
             "value": 42
           }
         ],
@@ -579,19 +662,19 @@
             "type_oid": 20
           }
         ],
-        "connector_event_id": "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9",
+        "connector_event_id": "6126b68191032f39c1297c27676e3c72edf380beeae43320b0fdcc99ee42894b",
         "event_type": "mutation",
         "journal_seq": 1,
-        "key_hash": "8e722e773d8ff855371a49166d21eacff20504a382cd93773c033b93809802bf",
-        "logical_table_id": "5c6b99659bb6676895a8216476653bcb5e6525e07d7ac02178fb8de65d2fa695",
+        "key_hash": "caaac49276a19876e1824d4dc6d94eec79ee684e6ca4655eb3984cc0a17bafda",
+        "logical_table_id": "dbbed1fad80b6ea17ea77aa048f61d230a6d550ddf9d1e5d087ece447e7a0dbb",
         "mutation_kind": "upsert",
         "operation": "insert",
-        "payload_hash": "0d2527c80fbf3b340a9f696d6dbf46ca7ffac5a40a52e1f4e2e0c8b96245e746",
-        "relation_fingerprint": "2179e0c38d54f74e86084076746d163f35799f36c94b9bfd0367669122b49c01",
+        "payload_hash": "b5e85cc699949361f66a0933506739f647bea584cf9f5ffc512aa2bd6a4e2ef3",
+        "relation_fingerprint": "2ad9e1e3f9bec8c0937ca4ba2da2187ce4d344cca886f0f5358cda0799a557e8",
         "routing": "business",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "connector_event_id": "12669b012b150370708ff7bf729c52f9a3117f368f5a92f4be79bb1153e149a9",
+          "connector_event_id": "6126b68191032f39c1297c27676e3c72edf380beeae43320b0fdcc99ee42894b",
           "lsn_u64": 112,
           "mutation_ordinal": 0,
           "origin_rank": 1,
@@ -616,7 +699,7 @@
         "capture_epoch": 7,
         "mutation_ordinal": 0,
         "row_ordinal": 0,
-        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "source_slot_identity": "0866ae1e68b00cb1757bad5882bf4e37ff721f24e37e599cd7019b90110ce3a0",
         "transaction_end_lsn": 120
       },
       "identity_kind": "wal"
@@ -627,7 +710,7 @@
       "event": {
         "capture_epoch": 7,
         "captured_at": "2030-01-01T00:00:00Z",
-        "connector_event_id": "76371732f3de7a3f0173bb828b38aa6f794f38225d1aceb696df5e13b79c9a02",
+        "connector_event_id": "6f89b61f11ffdd8a74183bcf56cba063810d06e74603e9cdb19d558ba49f6f0f",
         "control": {
           "generation": null,
           "kind": "heartbeat",
@@ -636,11 +719,11 @@
         "event_type": "control",
         "journal_seq": 35,
         "operation": "control",
-        "payload_hash": "95a81cb80b9bfee16ef18bfd2cef699b1dd0bff184fef6686c90e8d8150cd8d0",
+        "payload_hash": "5fecb63d49201b286b5c3917d0a82d09f5e35de2724465fd091182166126275b",
         "routing": "control",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "connector_event_id": "76371732f3de7a3f0173bb828b38aa6f794f38225d1aceb696df5e13b79c9a02",
+          "connector_event_id": "6f89b61f11ffdd8a74183bcf56cba063810d06e74603e9cdb19d558ba49f6f0f",
           "lsn_u64": 124,
           "mutation_ordinal": 0,
           "origin_rank": 1,
@@ -653,7 +736,7 @@
         "capture_epoch": 7,
         "mutation_ordinal": 0,
         "row_ordinal": 5,
-        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "source_slot_identity": "0866ae1e68b00cb1757bad5882bf4e37ff721f24e37e599cd7019b90110ce3a0",
         "transaction_end_lsn": 128
       },
       "identity_kind": "wal"
@@ -664,7 +747,7 @@
       "event": {
         "capture_epoch": 7,
         "captured_at": "2030-01-01T00:00:00Z",
-        "connector_event_id": "67b5791a4c1f8d37c01127a378540fb69962bf81438518f90c3f0dd14cf60be9",
+        "connector_event_id": "4aeb7c8f89dc12ec8f7ceae03e31ff3d3e4405befc69e96e2c93512bf436aaaa",
         "control": {
           "generation": 2,
           "kind": "capture_fence",
@@ -673,11 +756,11 @@
         "event_type": "control",
         "journal_seq": 36,
         "operation": "control",
-        "payload_hash": "d4b950d5175a669a42945d6041daaa474e0d885031f5b98a5a0d9e8065d40644",
+        "payload_hash": "1fa4e7d6fb050dfadaccc94473a44501f370b894f1f395ffcbb4c6249c5663fa",
         "routing": "control",
         "schema_version": "boring-cdc/event/v1",
         "source_version": {
-          "connector_event_id": "67b5791a4c1f8d37c01127a378540fb69962bf81438518f90c3f0dd14cf60be9",
+          "connector_event_id": "4aeb7c8f89dc12ec8f7ceae03e31ff3d3e4405befc69e96e2c93512bf436aaaa",
           "lsn_u64": 124,
           "mutation_ordinal": 0,
           "origin_rank": 1,
@@ -690,7 +773,7 @@
         "capture_epoch": 7,
         "mutation_ordinal": 0,
         "row_ordinal": 6,
-        "source_slot_identity": "b885397845c875ee4aa7ef5fce8ddf03193e66ed8aedd0811b19b6351a6a79ef",
+        "source_slot_identity": "0866ae1e68b00cb1757bad5882bf4e37ff721f24e37e599cd7019b90110ce3a0",
         "transaction_end_lsn": 128
       },
       "identity_kind": "wal"

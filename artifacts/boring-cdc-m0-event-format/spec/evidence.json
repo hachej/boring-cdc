@@ -2,10 +2,10 @@
   "findings": [],
   "fixture_count": 14,
   "inputs": {
-    "contracts/event/event-format.json": "afe80ecf1b1ec48861c1763414d2966414a9c9eab1bd009a4f36b2a7c101ddb3",
-    "contracts/event/event.schema.json": "0d4de296eb67689f2277bf4352428d78ca63d066114aaaefcd2928e5bd65fce5",
-    "docs/EVENT_FORMAT.md": "05e82c11336527cea3d0edae894eb8d68c4ec5f5b7bc47cd85558a186ec41ecd",
-    "fixtures/m0/event-format/golden-vectors.json": "3747fe330d5c1b7ec13197a6394b2356b75cc58b65111610c0482e2898932e63"
+    "contracts/event/event-format.json": "eb717eab29d2a80d40345d29ed3a2aa58b2fd0b0a48b2082a4d9e67f13e57989",
+    "contracts/event/event.schema.json": "36ff7bbbe4f774fe8d0620b019ce69b5222c639e465e190d0caacdf22eca39f2",
+    "docs/EVENT_FORMAT.md": "44eb393b0faa73dc663c1694198934326c1ac0d8224f845546df55982d2cfb41",
+    "fixtures/m0/event-format/golden-vectors.json": "98ed0c59f6e4735463484648e981b258a0077e4fc2facd458bce46b1cfaeed93"
   },
   "owner_bead": "boring-cdc-m0-event-format",
   "product_faults": "fault_not_applicable",

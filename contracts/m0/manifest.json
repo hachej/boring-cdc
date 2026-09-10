@@ -44,7 +44,7 @@
       "id": "ART-M0-EVENT-FORMAT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",
-      "sha256": "afe80ecf1b1ec48861c1763414d2966414a9c9eab1bd009a4f36b2a7c101ddb3",
+      "sha256": "eb717eab29d2a80d40345d29ed3a2aa58b2fd0b0a48b2082a4d9e67f13e57989",
       "status": "complete"
     }
   ],

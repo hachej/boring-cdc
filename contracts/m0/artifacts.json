@@ -25,42 +25,42 @@
       "id": "ART-M0-EVENT-FORMAT-CONTRACT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",
-      "sha256": "afe80ecf1b1ec48861c1763414d2966414a9c9eab1bd009a4f36b2a7c101ddb3",
+      "sha256": "eb717eab29d2a80d40345d29ed3a2aa58b2fd0b0a48b2082a4d9e67f13e57989",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-DOC",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "docs/EVENT_FORMAT.md",
-      "sha256": "05e82c11336527cea3d0edae894eb8d68c4ec5f5b7bc47cd85558a186ec41ecd",
+      "sha256": "44eb393b0faa73dc663c1694198934326c1ac0d8224f845546df55982d2cfb41",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-EVIDENCE",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "artifacts/boring-cdc-m0-event-format/spec/evidence.json",
-      "sha256": "03eb77b92c7c5c2152c92ce533a3f8fd1b7c2c5b706496d9ca3e608e8373b42e",
+      "sha256": "a3901976e6fcd78e30afad446a2fe2eca874c655e5c48b3f0814e23d473914b8",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-SCHEMA",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event.schema.json",
-      "sha256": "0d4de296eb67689f2277bf4352428d78ca63d066114aaaefcd2928e5bd65fce5",
+      "sha256": "36ff7bbbe4f774fe8d0620b019ce69b5222c639e465e190d0caacdf22eca39f2",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-VALIDATOR",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "scripts/validate/event_format.py",
-      "sha256": "15b6618d3b303e0ee510634a758b903943853fdd605ab9116bdcf663952fd58b",
+      "sha256": "bc9cb280fd1a0de0ef920d0400b9238d09f0e829f3db40193c1915d197af0099",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-VECTORS",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "fixtures/m0/event-format/golden-vectors.json",
-      "sha256": "3747fe330d5c1b7ec13197a6394b2356b75cc58b65111610c0482e2898932e63",
+      "sha256": "98ed0c59f6e4735463484648e981b258a0077e4fc2facd458bce46b1cfaeed93",
       "status": "complete"
     },
     {
