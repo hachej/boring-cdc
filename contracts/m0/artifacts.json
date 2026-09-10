@@ -85,6 +85,83 @@
       "status": "complete"
     },
     {
+      "id": "ART-M0-CLICKHOUSE-CANONICAL-QUERY",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "contracts/clickhouse/canonical-query.sql",
+      "sha256": "e8a8f4400b8c06ac77f784e206143c23d1390472060a6af563b456458c28fe96",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-CLICKHOUSE-DDL",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "contracts/clickhouse/ddl.sql",
+      "sha256": "f013fea17d1a2eea8a5a6007568a2892c6ffb9d69b9c4a1a5a866687c1ef5fec",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-CLICKHOUSE-DOC",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "docs/CLICKHOUSE_MODEL.md",
+      "sha256": "eccb3f8484cec3f1cd42640a630df86be6bdcb286515d60c359deef3a2367c84",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-CLICKHOUSE-EVIDENCE",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
+      "sha256": "20864dfc399a3bbeae1439ed199d347fb600e7b320b9eb79e7f27384c6fdf8d4",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-CLICKHOUSE-FIXTURE-SCHEMA",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "contracts/clickhouse/fixtures.schema.json",
+      "sha256": "659371fa433c5ff9b7818a8c671ed9852c361df22e2f971075474fea6f8c3aa4",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-CLICKHOUSE-FIXTURES",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "fixtures/m0/clickhouse/scenarios.json",
+      "sha256": "888548adc101f676e21b8f46a132324fbd5719b466ef0e47d138164cc6490605",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-CLICKHOUSE-MODEL",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "contracts/clickhouse/model.json",
+      "sha256": "90cf17b112142d57ae89f209cd4514abbcef1c59410c468ab873b8856580de6a",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-CLICKHOUSE-MODEL-SCHEMA",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "contracts/clickhouse/model.schema.json",
+      "sha256": "abe5145583dc1da2ee2e68f8ebefa068d287190edcbdb0823ed920dfa6d4790d",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-CLICKHOUSE-RESULT-SCHEMA",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "contracts/clickhouse/result.schema.json",
+      "sha256": "80ad19fb794e6b6caba1dd45bbcfe63f75c83f6ae7c2d0b81b16da404b8ace8e",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-CLICKHOUSE-RETIREMENT",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "contracts/clickhouse/retire-generation.sql",
+      "sha256": "d2b3a2f955059c3729328a280eb7199ea9f6e948c784288590e8ab4958e6ba0c",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-CLICKHOUSE-VALIDATOR",
+      "owner_bead": "boring-cdc-m0-ch-model",
+      "path": "scripts/validate/clickhouse_contract.py",
+      "sha256": "b9bb5717170880ae4b1da127f4756ee89c165f6558eecfd85dc46c2a15900d0a",
+      "status": "complete"
+    },
+    {
       "id": "ART-M0-EVENT-FORMAT-CONTRACT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",

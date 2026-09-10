@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cases": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "additionalProperties": false,
+            "properties": {
+              "fault_hook": {
+                "type": "string"
+              },
+              "fault_once": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "fault_hook",
+              "fault_once"
+            ],
+            "type": "object"
+          },
+          "executor_id": {
+            "type": "string"
+          },
+          "expected": {
+            "additionalProperties": false,
+            "properties": {
+              "capture_and_archive": {
+                "type": "string"
+              },
+              "checkpoint": {
+                "type": "string"
+              },
+              "destination_state": {
+                "type": "string"
+              },
+              "exit_code": {
+                "type": "integer"
+              },
+              "log_code": {
+                "type": "string"
+              },
+              "redacted": {
+                "type": "boolean"
+              },
+              "status_code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "capture_and_archive",
+              "checkpoint",
+              "destination_state",
+              "exit_code",
+              "log_code",
+              "redacted",
+              "status_code"
+            ],
+            "type": "object"
+          },
+          "fixture_id": {
+            "type": "string"
+          },
+          "pre_state": {
+            "additionalProperties": false,
+            "properties": {
+              "capture_epoch": {
+                "type": "string"
+              },
+              "checkpoint_journal_seq": {
+                "type": "integer"
+              },
+              "compatible_anchor_id": {
+                "type": "string"
+              },
+              "generation": {
+                "type": "integer"
+              },
+              "object_fingerprint": {
+                "type": "string"
+              },
+              "promotion_fence": {
+                "type": "integer"
+              },
+              "table_set_fingerprint": {
+                "type": "string"
+              },
+              "target_journal_seq": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "capture_epoch",
+              "checkpoint_journal_seq",
+              "compatible_anchor_id",
+              "generation",
+              "object_fingerprint",
+              "promotion_fence",
+              "table_set_fingerprint",
+              "target_journal_seq"
+            ],
+            "type": "object"
+          },
+          "seed": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "executor_id",
+          "expected",
+          "fixture_id",
+          "pre_state",
+          "seed"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "contract": {
+      "type": "string"
+    },
+    "fixed_seed": {
+      "type": "string"
+    },
+    "golden_vectors": {
+      "additionalProperties": false,
+      "properties": {
+        "events": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "cells": {
+                "items": {
+                  "items": {
+                    "type": [
+                      "integer",
+                      "string"
+                    ]
+                  },
+                  "maxItems": 3,
+                  "minItems": 3,
+                  "type": "array"
+                },
+                "minItems": 0,
+                "type": "array"
+              },
+              "hash": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "key": {
+                "type": "string"
+              },
+              "op": {
+                "type": "string"
+              },
+              "version": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "cells",
+              "hash",
+              "id",
+              "key",
+              "op",
+              "version"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "expected_conflicts": {
+          "items": {},
+          "type": "array"
+        },
+        "expected_current_rows": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "canonical_key": {
+                "type": "string"
+              },
+              "columns": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "column_id": {
+                      "type": "integer"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "value_base64": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "column_id",
+                    "state",
+                    "value_base64"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "canonical_key",
+              "columns"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "events",
+        "expected_conflicts",
+        "expected_current_rows"
+      ],
+      "type": "object"
+    },
+    "owner_bead": {
+      "const": "boring-cdc-m0-ch-model"
+    },
+    "schema_version": {
+      "const": "clickhouse-fixtures/v1"
+    }
+  },
+  "required": [
+    "cases",
+    "contract",
+    "fixed_seed",
+    "golden_vectors",
+    "owner_bead",
+    "schema_version"
+  ],
+  "type": "object"
+}

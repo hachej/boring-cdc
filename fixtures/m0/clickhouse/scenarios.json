@@ -1,0 +1,1297 @@
+{
+  "cases": [
+    {
+      "action": {
+        "fault_hook": "replay_identical",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "advance_to_102",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_DUPLICATE_IDENTICAL",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-DUPLICATE-IDENTICAL",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "same_event_different_payload",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_integrity",
+        "exit_code": 65,
+        "log_code": "BCDC_CH_DUPLICATE_CONFLICT",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_integrity"
+      },
+      "fixture_id": "SCN-M0-CH-DUPLICATE-CONFLICT",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "wal_total_order",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "advance_to_104",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_SOURCE_ORDER_WAL",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-SOURCE-ORDER-WAL",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "late_snapshot_loses_to_wal",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "advance_to_104",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_SOURCE_ORDER_SNAPSHOT_LATE",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-SOURCE-ORDER-SNAPSHOT-LATE",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "epoch_change",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_continuity",
+        "exit_code": 66,
+        "log_code": "BCDC_CH_NO_CROSS_EPOCH_COMPARE",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_continuity"
+      },
+      "fixture_id": "SCN-M0-CH-NO-CROSS-EPOCH-COMPARE",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "unchanged_toast_reconstruct",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "advance_to_104",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_TOAST_PREDECESSOR",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-TOAST-PREDECESSOR",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "missing_explicit_predecessor",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_contract",
+        "exit_code": 65,
+        "log_code": "BCDC_CH_TOAST_MISSING_PREDECESSOR",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_contract"
+      },
+      "fixture_id": "SCN-M0-CH-TOAST-MISSING-PREDECESSOR",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "explicit_null_replaces",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "advance_to_104",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_EXPLICIT_NULL",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-EXPLICIT-NULL",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "delete_hides_row",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "advance_to_104",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_TOMBSTONE",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-TOMBSTONE",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "old_tombstone_new_upsert",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "advance_to_104",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_KEY_CHANGE",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-KEY-CHANGE",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "forbidden_patch",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_contract",
+        "exit_code": 65,
+        "log_code": "BCDC_CH_KEY_CHANGE_UNCHANGED_TOAST",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_contract"
+      },
+      "fixture_id": "SCN-M0-CH-KEY-CHANGE-UNCHANGED-TOAST",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "absent_projects_null",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "advance_to_104",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_ADDITIVE_NULLABLE",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-ADDITIVE-NULLABLE",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "schema_change_during_backfill",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_reseed",
+        "exit_code": 66,
+        "log_code": "BCDC_CH_ADDITIVE_ACTIVE_BACKFILL",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_reseed"
+      },
+      "fixture_id": "SCN-M0-CH-ADDITIVE-ACTIVE-BACKFILL",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "type_change",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_reseed",
+        "exit_code": 66,
+        "log_code": "BCDC_CH_INCOMPATIBLE_SCHEMA",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_reseed"
+      },
+      "fixture_id": "SCN-M0-CH-INCOMPATIBLE-SCHEMA",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "before_insert",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 75,
+        "log_code": "BCDC_CH_BATCH_CRASH_BEFORE_INSERT",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-BATCH-CRASH-BEFORE-INSERT",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "after_insert_before_marker",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 75,
+        "log_code": "BCDC_CH_BATCH_CRASH_AFTER_INSERT",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-BATCH-CRASH-AFTER-INSERT",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "after_marker_before_checkpoint",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "advance_to_104",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_BATCH_CRASH_AFTER_MARKER",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-BATCH-CRASH-AFTER-MARKER",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "rust_end_failed",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "retry_wait",
+        "exit_code": 75,
+        "log_code": "BCDC_CH_INSERT_FINALIZATION_ERROR",
+        "redacted": true,
+        "status_code": "clickhouse_retry_wait"
+      },
+      "fixture_id": "SCN-M0-CH-INSERT-FINALIZATION-ERROR",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "marker_digest_differs",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_integrity",
+        "exit_code": 65,
+        "log_code": "BCDC_CH_MARKER_MISMATCH",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_integrity"
+      },
+      "fixture_id": "SCN-M0-CH-MARKER-MISMATCH",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "mutate_payload_keep_ids_hash_marker",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_integrity",
+        "exit_code": 65,
+        "log_code": "BCDC_CH_PAYLOAD_ONLY_CORRUPTION",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_integrity"
+      },
+      "fixture_id": "SCN-M0-CH-PAYLOAD-ONLY-CORRUPTION",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "ddl_or_settings_fingerprint_differs",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_integrity",
+        "exit_code": 65,
+        "log_code": "BCDC_CH_OBJECT_DRIFT",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_integrity"
+      },
+      "fixture_id": "SCN-M0-CH-OBJECT-DRIFT",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "pass_budget_exhausted",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_AUDIT_FINITE",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-AUDIT-FINITE",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "event_exceeds_remaining_budget",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_AUDIT_UNIT_RESUME",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-AUDIT-UNIT-RESUME",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "fresh_until_elapsed",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_AUDIT_FRESHNESS_EXPIRED",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-AUDIT-FRESHNESS-EXPIRED",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "target_or_selector_changed",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_AUDIT_IDENTITY_CHANGE",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-AUDIT-IDENTITY-CHANGE",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "lower_fence",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_LOWER_FENCE_NOOP",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-LOWER-FENCE-NOOP",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "same_fence_same_candidate",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_SAME_FENCE_IDENTICAL",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-SAME-FENCE-IDENTICAL",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "same_fence_different_candidate",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_integrity",
+        "exit_code": 65,
+        "log_code": "BCDC_CH_SAME_FENCE_CONFLICT",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_integrity"
+      },
+      "fixture_id": "SCN-M0-CH-SAME-FENCE-CONFLICT",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "higher_fence",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_HIGHER_FENCE_WINS",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-HIGHER-FENCE-WINS",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "external_above_sqlite",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_continuity",
+        "exit_code": 66,
+        "log_code": "BCDC_CH_EXTERNAL_FENCE_AHEAD",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_continuity"
+      },
+      "fixture_id": "SCN-M0-CH-EXTERNAL-FENCE-AHEAD",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "candidate_missing_table",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_reseed",
+        "exit_code": 66,
+        "log_code": "BCDC_CH_INCOMPLETE_ANCHOR",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_reseed"
+      },
+      "fixture_id": "SCN-M0-CH-INCOMPLETE-ANCHOR",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "candidate_not_promoted",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_SNAPSHOT_BEFORE_ANCHOR",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-SNAPSHOT-BEFORE-ANCHOR",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "history_bytes_at_warning",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_QUOTA_WARNING",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-QUOTA-WARNING",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "history_bytes_at_hard",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-ddl",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_resource",
+        "exit_code": 75,
+        "log_code": "BCDC_CH_QUOTA_HARD_BLOCK",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_resource"
+      },
+      "fixture_id": "SCN-M0-CH-QUOTA-HARD-BLOCK",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "retire_live_generation",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_configuration",
+        "exit_code": 78,
+        "log_code": "BCDC_CH_RETIRE_LIVE_FORBIDDEN",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_configuration"
+      },
+      "fixture_id": "SCN-M0-CH-RETIRE-LIVE-FORBIDDEN",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "retire_before_grace",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_configuration",
+        "exit_code": 78,
+        "log_code": "BCDC_CH_RETIRE_GRACE",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_configuration"
+      },
+      "fixture_id": "SCN-M0-CH-RETIRE-GRACE",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "retire_nonlive_after_grace_no_pins",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-promotion",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "ready",
+        "exit_code": 0,
+        "log_code": "BCDC_CH_RETIRE_ELIGIBLE",
+        "redacted": true,
+        "status_code": "clickhouse_ready"
+      },
+      "fixture_id": "SCN-M0-CH-RETIRE-ELIGIBLE",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "restart_before_retry_due",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "retry_wait",
+        "exit_code": 75,
+        "log_code": "BCDC_CH_TRANSIENT_RESTART",
+        "redacted": true,
+        "status_code": "clickhouse_retry_wait"
+      },
+      "fixture_id": "SCN-M0-CH-TRANSIENT-RESTART",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "canonical_projection_failure",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_contract",
+        "exit_code": 65,
+        "log_code": "BCDC_CH_DETERMINISTIC_POISON",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_contract"
+      },
+      "fixture_id": "SCN-M0-CH-DETERMINISTIC-POISON",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "attempt_ten_failed",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_exhausted",
+        "exit_code": 65,
+        "log_code": "BCDC_CH_RETRY_EXHAUSTED",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_exhausted"
+      },
+      "fixture_id": "SCN-M0-CH-RETRY-EXHAUSTED",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    },
+    {
+      "action": {
+        "fault_hook": "resume_boundary_changed",
+        "fault_once": true
+      },
+      "executor_id": "boring-cdc-m4-durability",
+      "expected": {
+        "capture_and_archive": "continue",
+        "checkpoint": "unchanged",
+        "destination_state": "blocked_contract",
+        "exit_code": 78,
+        "log_code": "BCDC_CH_RESUME_CHANGED_BOUNDARY",
+        "redacted": true,
+        "status_code": "clickhouse_blocked_contract"
+      },
+      "fixture_id": "SCN-M0-CH-RESUME-CHANGED-BOUNDARY",
+      "pre_state": {
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "checkpoint_journal_seq": 99,
+        "compatible_anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "generation": 7,
+        "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "promotion_fence": 9,
+        "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+        "target_journal_seq": 104
+      },
+      "seed": "0x424344435f43485f4d4f44454c5f5631"
+    }
+  ],
+  "contract": "contracts/clickhouse/model.json",
+  "fixed_seed": "0x424344435f43485f4d4f44454c5f5631",
+  "golden_vectors": {
+    "events": [
+      {
+        "cells": [
+          [
+            1,
+            "explicit_value",
+            "QQ=="
+          ],
+          [
+            2,
+            "explicit_value",
+            "Qg=="
+          ]
+        ],
+        "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "id": "1111111111111111111111111111111111111111111111111111111111111111",
+        "key": "k1",
+        "op": "insert",
+        "version": [
+          1,
+          4096,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cells": [
+          [
+            1,
+            "unchanged_toast",
+            ""
+          ],
+          [
+            2,
+            "explicit_null",
+            ""
+          ]
+        ],
+        "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "id": "2222222222222222222222222222222222222222222222222222222222222222",
+        "key": "k1",
+        "op": "update",
+        "version": [
+          1,
+          4097,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cells": [
+          [
+            1,
+            "unchanged_toast",
+            ""
+          ],
+          [
+            2,
+            "explicit_null",
+            ""
+          ]
+        ],
+        "hash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "id": "2222222222222222222222222222222222222222222222222222222222222222",
+        "key": "k1",
+        "op": "update",
+        "version": [
+          1,
+          4097,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "cells": [
+          [
+            1,
+            "explicit_value",
+            "WA=="
+          ]
+        ],
+        "hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "id": "3333333333333333333333333333333333333333333333333333333333333333",
+        "key": "k2",
+        "op": "insert",
+        "version": [
+          0,
+          0,
+          0,
+          0,
+          100,
+          0,
+          0
+        ]
+      },
+      {
+        "cells": [],
+        "hash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "id": "4444444444444444444444444444444444444444444444444444444444444444",
+        "key": "k2",
+        "op": "delete",
+        "version": [
+          1,
+          4098,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "expected_conflicts": [],
+    "expected_current_rows": [
+      {
+        "canonical_key": "k1",
+        "columns": [
+          {
+            "column_id": 1,
+            "state": "explicit_value",
+            "value_base64": "QQ=="
+          },
+          {
+            "column_id": 2,
+            "state": "explicit_null",
+            "value_base64": ""
+          }
+        ]
+      }
+    ]
+  },
+  "owner_bead": "boring-cdc-m0-ch-model",
+  "schema_version": "clickhouse-fixtures/v1"
+}

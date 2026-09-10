@@ -21,6 +21,11 @@ case "$1" in
     [ $# -eq 0 ] || { echo "archive-model validator takes no extra options" >&2; exit 2; }
     exec python3 "$(dirname "$0")/archive_contract.py"
     ;;
+  boring-cdc-m0-ch-model)
+    shift
+    [ $# -eq 0 ] || { echo "clickhouse-model validator takes no extra options" >&2; exit 2; }
+    exec python3 "$(dirname "$0")/clickhouse_contract.py"
+    ;;
   boring-cdc-m0-storage-model)
     shift
     [ $# -eq 0 ] || { echo "storage-model validator takes no extra options" >&2; exit 2; }

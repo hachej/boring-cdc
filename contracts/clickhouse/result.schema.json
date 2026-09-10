@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "executor_id": {
+      "enum": [
+        "boring-cdc-m4-ddl",
+        "boring-cdc-m4-durability",
+        "boring-cdc-m4-promotion"
+      ]
+    },
+    "fixture_id": {
+      "pattern": "^SCN-M0-CH-[A-Z0-9-]+$",
+      "type": "string"
+    },
+    "observed": {
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_journal_seq": {
+          "type": "integer"
+        },
+        "destination_state": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "integer"
+        },
+        "journal_verified_range": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 2,
+          "type": "array"
+        },
+        "mismatch_fingerprint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "object_fingerprint": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "promotion_fence": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "destination_state",
+        "checkpoint_journal_seq",
+        "generation",
+        "promotion_fence",
+        "object_fingerprint",
+        "journal_verified_range",
+        "mismatch_fingerprint"
+      ],
+      "type": "object"
+    },
+    "redacted": {
+      "const": true
+    },
+    "schema_version": {
+      "const": "clickhouse-result/v1"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "fail"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "executor_id",
+    "status",
+    "observed",
+    "redacted"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,24 @@
+{
+  "findings": [],
+  "fixture_count": 41,
+  "input_tree_sha256": "089fe8c815385e30c534145db88219971bff39aa0bbef363eb3569d01372a25f",
+  "inputs": {
+    "contracts/clickhouse/canonical-query.sql": "e8a8f4400b8c06ac77f784e206143c23d1390472060a6af563b456458c28fe96",
+    "contracts/clickhouse/ddl.sql": "f013fea17d1a2eea8a5a6007568a2892c6ffb9d69b9c4a1a5a866687c1ef5fec",
+    "contracts/clickhouse/fixtures.schema.json": "659371fa433c5ff9b7818a8c671ed9852c361df22e2f971075474fea6f8c3aa4",
+    "contracts/clickhouse/model.json": "90cf17b112142d57ae89f209cd4514abbcef1c59410c468ab873b8856580de6a",
+    "contracts/clickhouse/model.schema.json": "abe5145583dc1da2ee2e68f8ebefa068d287190edcbdb0823ed920dfa6d4790d",
+    "contracts/clickhouse/result.schema.json": "80ad19fb794e6b6caba1dd45bbcfe63f75c83f6ae7c2d0b81b16da404b8ace8e",
+    "contracts/clickhouse/retire-generation.sql": "d2b3a2f955059c3729328a280eb7199ea9f6e948c784288590e8ab4958e6ba0c",
+    "docs/CLICKHOUSE_MODEL.md": "eccb3f8484cec3f1cd42640a630df86be6bdcb286515d60c359deef3a2367c84",
+    "fixtures/m0/clickhouse/scenarios.json": "888548adc101f676e21b8f46a132324fbd5719b466ef0e47d138164cc6490605"
+  },
+  "owner_bead": "boring-cdc-m0-ch-model",
+  "product_faults": "fault_not_applicable",
+  "runtime_observed": false,
+  "schema_version": "m0-clickhouse-contract-evidence/v1",
+  "source_parent_git_commit": "fcf45734ce55c9baceddfa921f68033fd15dc740",
+  "status": "pass",
+  "validator": "scripts/validate/clickhouse_contract.py",
+  "validator_sha256": "b9bb5717170880ae4b1da127f4756ee89c165f6558eecfd85dc46c2a15900d0a"
+}
