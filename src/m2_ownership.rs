@@ -6,7 +6,7 @@
 use sha2::{Digest, Sha256};
 use std::fs::{File, OpenOptions, TryLockError};
 use std::io::{Read, Seek, Write};
-use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
+use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -62,9 +62,17 @@ pub struct StateLock {
 impl StateLock {
     pub fn acquire(store: &Path, run_id: &str, nonce: &str) -> Result<Self, OwnershipError> {
         let path = store.with_extension("ownership.lock");
-        path.parent()
+        let parent = path
+            .parent()
             .ok_or_else(|| OwnershipError::Io("lock parent".into()))?;
         let process_uid = std::fs::metadata("/proc/self")?.uid();
+        let parent_metadata = parent.metadata()?;
+        if !parent_metadata.is_dir()
+            || parent_metadata.uid() != process_uid
+            || parent_metadata.permissions().mode() & 0o077 != 0
+        {
+            return Err(OwnershipError::Io("unsafe lock parent".into()));
+        }
         let mut file = OpenOptions::new()
             .read(true)
             .write(true)
@@ -77,9 +85,13 @@ impl StateLock {
             TryLockError::Error(error) => error.into(),
         })?;
         let metadata = file.metadata()?;
+        let path_metadata = path.symlink_metadata()?;
         if !metadata.file_type().is_file()
             || metadata.permissions().mode() & 0o777 != SOCKET_MODE
             || metadata.uid() != process_uid
+            || metadata.nlink() != 1
+            || metadata.dev() != path_metadata.dev()
+            || metadata.ino() != path_metadata.ino()
         {
             return Err(OwnershipError::Io("unsafe lock file".into()));
         }
@@ -192,7 +204,10 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
         self.fenced = true;
         OwnershipError::UnexpectedTransportLoss
     }
-    pub fn dispatch_allowed(&self) -> bool {
+    pub fn dispatch_allowed(&mut self) -> bool {
+        if !self.fenced && !self.source_identity_is_live() {
+            self.fenced = true;
+        }
         !self.fenced
     }
     pub fn backend_pid(&self) -> i32 {
@@ -397,23 +412,20 @@ pub fn validate_socket(
     elapsed: Duration,
 ) -> Result<(), &'static str> {
     let dir = path.parent().ok_or("socket_parent_missing")?;
-    if dir
-        .metadata()
+    let process_uid = std::fs::metadata("/proc/self")
         .map_err(|_| "socket_metadata")?
-        .permissions()
-        .mode()
-        & 0o777
-        != SOCKET_DIR_MODE
+        .uid();
+    let dir_metadata = dir.symlink_metadata().map_err(|_| "socket_metadata")?;
+    if !dir_metadata.is_dir()
+        || dir_metadata.uid() != process_uid
+        || dir_metadata.permissions().mode() & 0o777 != SOCKET_DIR_MODE
     {
         return Err("socket_dir_mode");
     }
-    if path
-        .metadata()
-        .map_err(|_| "socket_metadata")?
-        .permissions()
-        .mode()
-        & 0o777
-        != SOCKET_MODE
+    let socket_metadata = path.symlink_metadata().map_err(|_| "socket_metadata")?;
+    if !socket_metadata.file_type().is_socket()
+        || socket_metadata.uid() != process_uid
+        || socket_metadata.permissions().mode() & 0o777 != SOCKET_MODE
     {
         return Err("socket_mode");
     }
@@ -497,7 +509,10 @@ pub(crate) mod tests {
         }
     }
     fn path(tag: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("boring-cdc-own-{}-{}", std::process::id(), tag))
+        let root = std::env::temp_dir().join(format!("boring-cdc-own-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+        root.join(tag)
     }
     fn session(n: &str) -> Session {
         Session {
@@ -640,6 +655,7 @@ pub(crate) mod tests {
             Err(OwnershipError::DeadlineCannotFit)
         );
         health.store(false, Ordering::SeqCst);
+        assert!(!g.dispatch_allowed());
         assert_eq!(
             g.probe(Duration::from_secs(1)),
             Err(OwnershipError::SourceSessionLost)
@@ -903,7 +919,7 @@ pub(crate) mod tests {
         let p = d.join("command.sock");
         fs::create_dir_all(&d).unwrap();
         fs::set_permissions(&d, fs::Permissions::from_mode(0o700)).unwrap();
-        fs::write(&p, []).unwrap();
+        let _listener = std::os::unix::net::UnixListener::bind(&p).unwrap();
         fs::set_permissions(&p, fs::Permissions::from_mode(0o600)).unwrap();
         assert_eq!(validate_socket(&p, 100, 100, 1, Duration::ZERO), Ok(()));
         assert_eq!(
