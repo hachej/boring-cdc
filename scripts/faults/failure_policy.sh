@@ -8,3 +8,4 @@ cargo test --locked failure_policy::tests::shared_bounded_harness_replays_policy
 cargo test --locked failure_policy::tests::prepared_adapter_persists_reopens_and_clears_via_supplied_transaction
 cargo test --locked failure_policy::tests::fingerprint_changes_only_for_allowed_canonical_inputs_and_contains_no_raw_data
 cargo test --locked failure_policy::tests::complete_policy_vector_inventory_uses_bounded_harness_schedules
+cargo test --locked failure_policy::tests::persistence_cas_projections_execute_inside_bounded_harness

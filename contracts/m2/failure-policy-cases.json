@@ -104,6 +104,11 @@
       "id": "SCN-M2-FAILURE-COMPLETE-HARNESS-INVENTORY",
       "test": "complete_policy_vector_inventory_uses_bounded_harness_schedules",
       "assertion": "observe, explicit and automatic re-arm, configuration proof, stale completion, restart, expiry, cancel, and persistence-CAS projections use production transitions under bounded deterministic harness schedules"
+    },
+    {
+      "id": "SCN-M2-FAILURE-HARNESS-PERSISTENCE-CAS",
+      "test": "persistence_cas_projections_execute_inside_bounded_harness",
+      "assertion": "bounded Harness schedules execute production observe, re-arm, clear, and supplied-transaction SQLite CAS projections"
     }
   ]
 }

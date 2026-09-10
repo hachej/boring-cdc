@@ -351,11 +351,18 @@ pub struct RelevantConfigurationChange {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RearmAuthorizationToken {
+    /// Opaque command identity. Callers must not put secrets or payloads here.
+    pub token_id: String,
+    /// State-bound predecessor makes replay fail permanently after any later token is consumed.
+    pub expected_last_rearm_token_digest: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RearmRequest {
     pub expected_failure_id: String,
     pub expected_fingerprint: String,
-    /// Opaque, single-use authorization identity supplied by the owning command/runtime.
-    pub authorization_token: String,
+    pub authorization_token: RearmAuthorizationToken,
     pub relevant_configuration_change: Option<RelevantConfigurationChange>,
     pub retained_wal_proven: bool,
     pub integrity_recovery_proven: bool,
@@ -506,7 +513,9 @@ fn rearm(
     };
     if request.expected_failure_id != record.failure_id
         || request.expected_fingerprint != record.fingerprint
-        || request.authorization_token.is_empty()
+        || request.authorization_token.token_id.is_empty()
+        || request.authorization_token.expected_last_rearm_token_digest
+            != record.last_rearm_token_digest
     {
         return PolicyAction::RejectedRearm;
     }
@@ -547,13 +556,20 @@ fn rearm(
     }
 }
 
-fn rearm_token_digest(record: &FailureRecord, authorization_token: &str) -> String {
+fn rearm_token_digest(
+    record: &FailureRecord,
+    authorization_token: &RearmAuthorizationToken,
+) -> String {
     let mut hasher = Sha256::new();
     for value in [
         "failure-rearm-token-v1",
         &record.failure_id,
         &record.fingerprint,
-        authorization_token,
+        &authorization_token.token_id,
+        authorization_token
+            .expected_last_rearm_token_digest
+            .as_deref()
+            .unwrap_or("none"),
     ] {
         hash_framed(&mut hasher, value);
     }
@@ -798,13 +814,6 @@ impl PreparedFailureOperation {
                 let Some(consumed_token) = record.last_rearm_token_digest.as_deref() else {
                     return Err(rusqlite::Error::InvalidQuery);
                 };
-                transaction.execute(
-                    "UPDATE processing_failures SET last_failed_at=?1 WHERE failure_id=?2 AND fingerprint=?3 AND attempt=?4 AND armed=1 AND last_failed_at=?5",
-                    params![persisted_last_failed_at(record.last_failed_at_ms, Some(consumed_token)), record.failure_id, record.fingerprint, record.attempt, persisted_last_failed_at(*expected_last_failed_at_ms, expected_last_rearm_token_digest.as_deref())],
-                )?;
-                if transaction.changes() != 1 {
-                    return Err(rusqlite::Error::QueryReturnedNoRows);
-                }
                 if let Some(destination_id) = &record.destination_id {
                     let FailedBoundary::Destination {
                         capture_epoch,
@@ -814,6 +823,8 @@ impl PreparedFailureOperation {
                     else {
                         return Err(rusqlite::Error::InvalidQuery);
                     };
+                    // Fence destination identity first. This no-op CAS has no partial state to
+                    // commit if the subsequent failure-row CAS rejects.
                     transaction.execute(
                         "UPDATE destinations SET revision=revision+1 WHERE destination_id=?1 AND current_failure_id=?2 AND capture_epoch=?3 AND generation=?4",
                         params![destination_id, record.failure_id, capture_epoch, generation],
@@ -821,6 +832,13 @@ impl PreparedFailureOperation {
                     if transaction.changes() != 1 {
                         return Err(rusqlite::Error::QueryReturnedNoRows);
                     }
+                }
+                transaction.execute(
+                    "UPDATE processing_failures SET last_failed_at=?1 WHERE failure_id=?2 AND fingerprint=?3 AND attempt=?4 AND armed=1 AND last_failed_at=?5",
+                    params![persisted_last_failed_at(record.last_failed_at_ms, Some(consumed_token)), record.failure_id, record.fingerprint, record.attempt, persisted_last_failed_at(*expected_last_failed_at_ms, expected_last_rearm_token_digest.as_deref())],
+                )?;
+                if transaction.changes() != 1 {
+                    return Err(rusqlite::Error::QueryReturnedNoRows);
                 }
             }
             Self::Clear {
@@ -831,6 +849,19 @@ impl PreparedFailureOperation {
                 capture_epoch,
                 generation,
             } => {
+                if let Some(destination_id) = destination_id {
+                    let Some(generation) = generation else {
+                        return Err(rusqlite::Error::InvalidQuery);
+                    };
+                    // Validate the exact destination boundary before disarming or unlinking.
+                    transaction.execute(
+                        "UPDATE destinations SET revision=revision+1 WHERE destination_id=?1 AND current_failure_id=?2 AND capture_epoch=?3 AND generation=?4",
+                        params![destination_id, failure_id, capture_epoch, generation],
+                    )?;
+                    if transaction.changes() != 1 {
+                        return Err(rusqlite::Error::QueryReturnedNoRows);
+                    }
+                }
                 transaction.execute(
                     "UPDATE processing_failures SET armed=0,retry_class=CASE WHEN retry_class='transient' THEN 'exhausted' ELSE retry_class END,next_retry_at=NULL WHERE failure_id=?1 AND fingerprint=?2 AND attempt=?3 AND armed=1",
                     params![failure_id, fingerprint, attempt],
@@ -839,9 +870,6 @@ impl PreparedFailureOperation {
                     return Err(rusqlite::Error::QueryReturnedNoRows);
                 }
                 if let Some(destination_id) = destination_id {
-                    let Some(generation) = generation else {
-                        return Err(rusqlite::Error::InvalidQuery);
-                    };
                     transaction.execute(
                         "UPDATE destinations SET current_failure_id=NULL,revision=revision+1 WHERE destination_id=?1 AND current_failure_id=?2 AND capture_epoch=?3 AND generation=?4",
                         params![destination_id, failure_id, capture_epoch, generation],
@@ -973,7 +1001,7 @@ pub mod tests {
         Harness, HarnessBudget, ScheduleSeed, ScheduledAction, ScheduledStep, SplitMix64,
         TransitionSystem, VirtualClock,
     };
-    use crate::m2_schema::open_writer;
+    use crate::m2_schema::{WriterConnection, open_writer};
     use std::cell::RefCell;
     use std::fs;
     use std::path::PathBuf;
@@ -999,6 +1027,13 @@ pub mod tests {
                 relevant_configuration_fingerprint: "config-a".into(),
                 context: BTreeMap::from([(SafeContextKey::Operation, SafeContextValue::Publish)]),
             },
+        }
+    }
+
+    fn rearm_authorization(record: &FailureRecord, token_id: &str) -> RearmAuthorizationToken {
+        RearmAuthorizationToken {
+            token_id: token_id.into(),
+            expected_last_rearm_token_digest: record.last_rearm_token_digest.clone(),
         }
     }
 
@@ -1084,6 +1119,112 @@ pub mod tests {
         }
         fn invariant_violation(&self, _facts: &Self::Facts) -> Option<String> {
             None
+        }
+        fn redacted_state(&self, facts: &Self::Facts) -> String {
+            facts.as_ref().map_or_else(
+                || "clear".into(),
+                |record| format!("armed={};attempt={}", record.armed, record.attempt),
+            )
+        }
+        fn facts_size_bytes(&self, facts: &Self::Facts) -> usize {
+            facts
+                .as_ref()
+                .map_or(0, |_| std::mem::size_of::<FailureRecord>())
+        }
+        fn event_size_bytes(&self, _event: &Self::Event) -> usize {
+            std::mem::size_of::<PolicyEvent>()
+        }
+        fn completion_size_bytes(&self, _completion: &Self::Completion) -> usize {
+            std::mem::size_of::<CompletionToken>()
+        }
+    }
+
+    struct PolicyPersistenceHarnessDomain {
+        writer: RefCell<WriterConnection>,
+        effects: RefCell<Vec<PolicyAction>>,
+        sql_error: RefCell<Option<String>>,
+    }
+
+    impl PolicyPersistenceHarnessDomain {
+        fn new(writer: WriterConnection) -> Self {
+            Self {
+                writer: RefCell::new(writer),
+                effects: RefCell::new(Vec::new()),
+                sql_error: RefCell::new(None),
+            }
+        }
+
+        fn apply(
+            &self,
+            facts: &mut Option<FailureRecord>,
+            action: PolicyAction,
+        ) -> Vec<PolicyAction> {
+            let expected_current = facts.as_ref().and_then(|record| {
+                record
+                    .destination_id
+                    .as_ref()
+                    .map(|_| record.failure_id.clone())
+            });
+            if let Some(operation) =
+                PreparedFailureOperation::from_policy_action(action.clone(), expected_current)
+            {
+                let mut writer = self.writer.borrow_mut();
+                let result = (|| {
+                    let transaction = writer.connection_mut().transaction()?;
+                    operation.execute(&transaction)?;
+                    transaction.commit()
+                })();
+                if let Err(error) = result {
+                    *self.sql_error.borrow_mut() = Some(format!("persistence-cas:{error}"));
+                    return vec![action];
+                }
+            }
+            match &action {
+                PolicyAction::Persist(record)
+                | PolicyAction::RetryNow(record)
+                | PolicyAction::Rearmed { record, .. } => *facts = Some(record.clone()),
+                PolicyAction::Clear { .. } => *facts = None,
+                PolicyAction::Suppressed
+                | PolicyAction::StaleCompletion
+                | PolicyAction::RejectedRearm
+                | PolicyAction::Noop => {}
+            }
+            self.effects.borrow_mut().push(action.clone());
+            vec![action]
+        }
+    }
+
+    impl TransitionSystem for PolicyPersistenceHarnessDomain {
+        type Facts = Option<FailureRecord>;
+        type Event = PolicyEvent;
+        type Effect = PolicyAction;
+        type Completion = CompletionToken;
+
+        fn on_event(
+            &self,
+            facts: &mut Self::Facts,
+            event: Self::Event,
+            context: &mut TransitionContext<'_>,
+        ) -> Vec<Self::Effect> {
+            self.apply(facts, transition(facts.as_ref(), event, context))
+        }
+
+        fn on_completion(
+            &self,
+            facts: &mut Self::Facts,
+            completion: Self::Completion,
+            context: &mut TransitionContext<'_>,
+        ) -> Vec<Self::Effect> {
+            self.on_event(facts, PolicyEvent::Completed(completion), context)
+        }
+
+        fn on_expiry(&self, _facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {}
+        fn on_cancel(&self, _facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {}
+        fn on_crash_restart(&self, facts: &mut Self::Facts, context: &mut TransitionContext<'_>) {
+            let _ = self.on_event(facts, PolicyEvent::ProcessRestarted, context);
+        }
+        fn invariant_violation(&self, _facts: &Self::Facts) -> Option<String> {
+            self.sql_error.borrow().clone()
         }
         fn redacted_state(&self, facts: &Self::Facts) -> String {
             facts.as_ref().map_or_else(
@@ -1206,7 +1347,7 @@ pub mod tests {
                     ScheduledAction::Event(PolicyEvent::Rearm(RearmRequest {
                         expected_failure_id: automatic.failure_id.clone(),
                         expected_fingerprint: automatic.fingerprint.clone(),
-                        authorization_token: "automatic-token".into(),
+                        authorization_token: rearm_authorization(&automatic, "automatic-token"),
                         relevant_configuration_change: None,
                         retained_wal_proven: true,
                         integrity_recovery_proven: true,
@@ -1229,7 +1370,7 @@ pub mod tests {
                 ScheduledAction::Event(PolicyEvent::Rearm(RearmRequest {
                     expected_failure_id: record.failure_id.clone(),
                     expected_fingerprint: record.fingerprint.clone(),
-                    authorization_token: "configuration-token".into(),
+                    authorization_token: rearm_authorization(&record, "configuration-token"),
                     relevant_configuration_change: Some(RelevantConfigurationChange {
                         previous: observation(FailureClass::Configuration, 0).fingerprint,
                         replacement,
@@ -1363,6 +1504,114 @@ pub mod tests {
     }
 
     #[test]
+    fn persistence_cas_projections_execute_inside_bounded_harness() {
+        let path = temp_path();
+        let writer = open_writer(&path, "harness-run", 1, 0).unwrap();
+        writer.connection().execute(
+            "INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','archive','config-a','epoch-a',7)",
+            [],
+        ).unwrap();
+        let domain = PolicyPersistenceHarnessDomain::new(writer);
+        let harness = Harness::new(HarnessBudget {
+            max_steps: 4,
+            max_trace_entries: 4,
+            max_minimizer_runs: 4,
+            max_redacted_bytes: 256,
+            max_state_bytes: 4_096,
+            max_scheduled_payload_bytes: 4_096,
+        })
+        .unwrap();
+        let seed = ScheduleSeed::splitmix64(JITTER_SEED_U64);
+        let observed = harness
+            .execute(
+                &domain,
+                None,
+                &[ScheduledStep::new(
+                    "persist-observe",
+                    ScheduledAction::Event(PolicyEvent::Observe(observation(
+                        FailureClass::Integrity,
+                        0,
+                    ))),
+                )],
+                seed.clone(),
+            )
+            .unwrap();
+        assert!(observed.violation.is_none());
+        let record = match domain.effects.borrow().last().cloned().unwrap() {
+            PolicyAction::Persist(record) => record,
+            other => panic!("expected persisted harness effect, got {other:?}"),
+        };
+        assert!(
+            load_failure(
+                domain.writer.borrow().connection(),
+                &record.failure_id,
+                boundary(),
+            )
+            .unwrap()
+            .is_some()
+        );
+
+        let rearm_steps = [
+            ScheduledStep::new("advance", ScheduledAction::AdvanceClock(20_000)),
+            ScheduledStep::new(
+                "rearm-cas",
+                ScheduledAction::Event(PolicyEvent::Rearm(RearmRequest {
+                    expected_failure_id: record.failure_id.clone(),
+                    expected_fingerprint: record.fingerprint.clone(),
+                    authorization_token: rearm_authorization(&record, "harness-rearm"),
+                    relevant_configuration_change: None,
+                    retained_wal_proven: false,
+                    integrity_recovery_proven: true,
+                    continuity_recovery_proven: false,
+                    explicit_operator_authorization: false,
+                })),
+            ),
+        ];
+        let rearmed_trace = harness
+            .execute(&domain, Some(record.clone()), &rearm_steps, seed.clone())
+            .unwrap();
+        assert!(rearmed_trace.violation.is_none());
+        let rearmed = load_failure(
+            domain.writer.borrow().connection(),
+            &record.failure_id,
+            boundary(),
+        )
+        .unwrap()
+        .unwrap();
+        assert!(rearmed.last_rearm_token_digest.is_some());
+
+        let completion = CompletionToken {
+            failure_id: rearmed.failure_id.clone(),
+            fingerprint: rearmed.fingerprint.clone(),
+            capture_epoch: "epoch-a".into(),
+            generation: Some(7),
+            attempt: rearmed.attempt,
+        };
+        let cleared = harness
+            .execute(
+                &domain,
+                Some(rearmed),
+                &[ScheduledStep::new(
+                    "clear-cas",
+                    ScheduledAction::Completion(completion),
+                )],
+                seed,
+            )
+            .unwrap();
+        assert!(cleared.violation.is_none());
+        let stored: (i64, Option<String>) = domain.writer.borrow().connection().query_row(
+            "SELECT f.armed,d.current_failure_id FROM processing_failures f JOIN destinations d ON d.destination_id=f.destination_id WHERE f.failure_id=?1",
+            [&record.failure_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).unwrap();
+        assert_eq!(stored, (0, None));
+        drop(domain);
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(path.with_extension("sqlite-wal"));
+        let _ = fs::remove_file(path.with_extension("sqlite-shm"));
+    }
+
+    #[test]
     fn exhaustive_classes_have_closed_stable_serialization() {
         let names: Vec<_> = FailureClass::ALL.iter().map(|c| c.as_str()).collect();
         assert_eq!(
@@ -1485,7 +1734,7 @@ pub mod tests {
             let base = RearmRequest {
                 expected_failure_id: record.failure_id.clone(),
                 expected_fingerprint: record.fingerprint.clone(),
-                authorization_token: format!("rearm-{class:?}"),
+                authorization_token: rearm_authorization(&record, &format!("rearm-{class:?}")),
                 relevant_configuration_change: None,
                 retained_wal_proven: false,
                 integrity_recovery_proven: false,
@@ -1599,7 +1848,7 @@ pub mod tests {
         let automatic_rearm = RearmRequest {
             expected_failure_id: recurrence.failure_id.clone(),
             expected_fingerprint: recurrence.fingerprint.clone(),
-            authorization_token: "automatic-rearm".into(),
+            authorization_token: rearm_authorization(&recurrence, "automatic-rearm"),
             relevant_configuration_change: None,
             retained_wal_proven: true,
             integrity_recovery_proven: true,
@@ -1636,7 +1885,7 @@ pub mod tests {
         let request = RearmRequest {
             expected_failure_id: record.failure_id.clone(),
             expected_fingerprint: record.fingerprint.clone(),
-            authorization_token: "integrity-rearm-1".into(),
+            authorization_token: rearm_authorization(&record, "integrity-rearm-1"),
             relevant_configuration_change: None,
             retained_wal_proven: false,
             integrity_recovery_proven: true,
@@ -1644,7 +1893,7 @@ pub mod tests {
             explicit_operator_authorization: false,
         };
         let (rearmed, expected_last_failed_at_ms, expected_last_rearm_token_digest) =
-            match run_transition_at(Some(&record), PolicyEvent::Rearm(request), 20_000) {
+            match run_transition_at(Some(&record), PolicyEvent::Rearm(request.clone()), 20_000) {
                 PolicyAction::Rearmed {
                     record,
                     expected_last_failed_at_ms,
@@ -1681,12 +1930,19 @@ pub mod tests {
             prepared_rearm.execute(&tx).is_err(),
             "one durable token may be consumed only once"
         );
-        tx.rollback().unwrap();
+        tx.commit().unwrap();
+        assert_eq!(
+            load_failure(writer.connection(), &record.failure_id, boundary())
+                .unwrap()
+                .unwrap()
+                .last_rearm_token_digest,
+            rearmed.last_rearm_token_digest
+        );
 
         let second_request = RearmRequest {
             expected_failure_id: reopened.failure_id.clone(),
             expected_fingerprint: reopened.fingerprint.clone(),
-            authorization_token: "integrity-rearm-2".into(),
+            authorization_token: rearm_authorization(&reopened, "integrity-rearm-2"),
             relevant_configuration_change: None,
             retained_wal_proven: false,
             integrity_recovery_proven: true,
@@ -1723,6 +1979,17 @@ pub mod tests {
                 [],
             )
             .unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        stale_destination_rearm.execute(&tx).unwrap();
+        tx.commit().unwrap();
+        let twice_rearmed = load_failure(writer.connection(), &record.failure_id, boundary())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            run_transition_at(Some(&twice_rearmed), PolicyEvent::Rearm(request), 23_000,),
+            PolicyAction::RejectedRearm,
+            "token A remains consumed after token B is consumed"
+        );
 
         let newer = persisted(run_transition(
             Some(&record),
@@ -1905,7 +2172,7 @@ pub mod tests {
             .execute(&tx)
             .is_err()
         );
-        tx.rollback().unwrap();
+        tx.commit().unwrap();
         assert_eq!(
             writer
                 .connection()
