@@ -1,0 +1,115 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/postgres/capture-backfill-fixtures.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cases": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "executor_id": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "expected": {
+            "additionalProperties": false,
+            "properties": {
+              "checkpoint": {
+                "enum": [
+                  "unchanged",
+                  "advanced_to_fence_transaction"
+                ]
+              },
+              "exit_code": {
+                "type": "integer"
+              },
+              "external_effect": {
+                "type": "string"
+              },
+              "feedback": {
+                "type": "string"
+              },
+              "metric": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "status_code": {
+                "pattern": "^pg_[a-z0-9_]+$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "state",
+              "exit_code",
+              "checkpoint",
+              "feedback",
+              "external_effect",
+              "status_code",
+              "metric"
+            ],
+            "type": "object"
+          },
+          "fixture_id": {
+            "pattern": "^SCN-M0-PG-[A-Z0-9-]+$",
+            "type": "string"
+          },
+          "hook": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "inputs": {
+            "type": "object"
+          },
+          "preconditions": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "redaction": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 3,
+            "type": "array"
+          },
+          "seed": {
+            "const": "0x50474344434d305631"
+          }
+        },
+        "required": [
+          "fixture_id",
+          "executor_id",
+          "seed",
+          "inputs",
+          "preconditions",
+          "hook",
+          "expected",
+          "redaction"
+        ],
+        "type": "object"
+      },
+      "minItems": 20,
+      "type": "array"
+    },
+    "contract_path": {
+      "const": "contracts/postgres/capture-backfill.json"
+    },
+    "owner_bead": {
+      "const": "boring-cdc-m0-pg-contract"
+    },
+    "schema_version": {
+      "const": "m0-postgres-fixtures/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "owner_bead",
+    "contract_path",
+    "cases"
+  ],
+  "type": "object"
+}
