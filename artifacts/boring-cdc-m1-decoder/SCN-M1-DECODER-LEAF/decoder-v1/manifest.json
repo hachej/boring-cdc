@@ -17,9 +17,9 @@
       "argv": "cargo test --locked m1_decoder::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/command-2.stderr",
-      "stderr_sha256": "0a994fcf11c3686b94df429e41a6dd241069ebc0dc1ee47f77fbd06ecf674f1c",
+      "stderr_sha256": "625b726366f8ad0b616ac3632105ec8c5967d312c104d374df9b52838e408101",
       "stdout_path": "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/command-2.log",
-      "stdout_sha256": "068bd3f1bc49049884e30cdc6fb255ff9d33a6b2d30804e7bc40b94232f307de",
+      "stdout_sha256": "b1f873b50238a5cac6fc68d342286df1f4b96d85363ee6966ae808036cb02a7d",
       "version": "cargo 1.95.0"
     },
     {
@@ -34,7 +34,7 @@
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "leaf",
-  "git_commit": "cee0a7002193c7340089c0a9cb4bb73b10825188",
+  "git_commit": "dbb723c41e73e715282d8983e71eb70dbd27802d",
   "owner_bead": "boring-cdc-m1-decoder",
   "redaction": {
     "checked": true,
@@ -46,7 +46,7 @@
       "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/versions.json",
       "tests/fixtures/m1_decoder/pgoutput-v1.json"
     ],
-    "digest": "03e36a94ca0b23a9414cb3ddf447219e0d67240562afb40143eb9604adac7240",
+    "digest": "d9d527fd7ea44216b153c25d6e3feda74fd77300355ace182faa80e76f9bf6ba",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -55,8 +55,8 @@
   "schema_version": "evidence/v1",
   "seed": "pgoutput-v1 fixed wire corpus",
   "source_preservation": {
-    "after_sha256": "d42bcf49cb82fb1fa1bd539d5bb6eebf6028ff154663c6aa19d0560bbebca8c5",
-    "before_sha256": "d42bcf49cb82fb1fa1bd539d5bb6eebf6028ff154663c6aa19d0560bbebca8c5",
+    "after_sha256": "37188150fe6390e16f767017e56eecec233fd768503a8533ea5a2ed0a0fa3b63",
+    "before_sha256": "37188150fe6390e16f767017e56eecec233fd768503a8533ea5a2ed0a0fa3b63",
     "preserved": true
   },
   "tier_proof": {
