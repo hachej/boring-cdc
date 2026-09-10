@@ -1,0 +1,1 @@
+m1 ddl fault pass seed=m1-ddl-fault-v1 hooks=7 checkpoint=unchanged feedback=blocked-or-released-on-invalidation cleanup=trap

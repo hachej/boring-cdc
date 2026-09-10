@@ -1,0 +1,23 @@
+
+running 8 tests
+test m1_ddl_fixtures::tests::provisional_bounds_and_matrix_are_explicit ... ok
+test m1_ddl_fixtures::tests::all_contract_changes_invalidate_active_generation ... ok
+test m1_ddl_fixtures::tests::noncanonical_contracts_and_guard_order_fail_closed ... ok
+test m1_ddl_fixtures::tests::catalog_poll_fingerprint_detects_idle_ddl_and_only_safe_addition_is_admitted ... ok
+test m1_ddl_fixtures::tests::guard_spans_all_copy_boundaries_until_durable_fence ... ok
+test m1_ddl_fixtures::tests::conflicting_waiter_at_bound_invalidates_and_releases ... ok
+test m1_ddl_fixtures::tests::guard_loss_invalidates_and_releases_feedback_gate ... ok
+test m1_ddl_fixtures::tests::changed_relation_synchronously_blocks_following_dml_and_feedback ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 105 filtered out; finished in 0.01s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

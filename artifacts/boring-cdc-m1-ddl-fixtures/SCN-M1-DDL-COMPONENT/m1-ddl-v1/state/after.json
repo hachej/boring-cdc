@@ -1,0 +1,8 @@
+{
+  "capture_epoch": 1,
+  "feedback_checkpoint": "0/0",
+  "generation": 7,
+  "guard_phase": "released",
+  "idle_fingerprint_changed": true,
+  "matrix_conflicts": 18
+}
