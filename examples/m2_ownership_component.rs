@@ -5,6 +5,7 @@ use std::fs::{self, File, OpenOptions, TryLockError};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
+use std::process::{Child, Command};
 use std::time::Duration;
 
 struct FileSession {
@@ -48,6 +49,155 @@ impl SourceLockSession for FileSession {
         self.file.unlock().map_err(Into::into)
     }
 }
+struct DockerPgSession {
+    container: String,
+    nonce: String,
+    pid: i32,
+    child: Child,
+}
+impl DockerPgSession {
+    fn open(container: &str, nonce: &str) -> Self {
+        let app = format!("m2-guard-{nonce}");
+        let child = Command::new("docker")
+            .args([
+                "exec",
+                "-e",
+                &format!("PGAPPNAME={app}"),
+                container,
+                "psql",
+                "-XAt",
+                "-U",
+                "postgres",
+                "-d",
+                "postgres",
+                "-c",
+                "SELECT pg_advisory_lock(72420260910); SELECT pg_sleep(120)",
+            ])
+            .spawn()
+            .unwrap();
+        let mut pid = 0;
+        for _ in 0..300 {
+            let out=Command::new("docker").args(["exec",container,"psql","-XAt","-U","postgres","-d","postgres","-c",&format!("SELECT pid FROM pg_stat_activity WHERE application_name='{app}' ORDER BY pid LIMIT 1")]).output().unwrap();
+            pid = String::from_utf8_lossy(&out.stdout)
+                .trim()
+                .parse()
+                .unwrap_or(0);
+            if pid > 0 {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(pid > 0, "PostgreSQL ownership backend missing");
+        Self {
+            container: container.into(),
+            nonce: nonce.into(),
+            pid,
+            child,
+        }
+    }
+    fn sql(&self, sql: &str) -> String {
+        let out = Command::new("docker")
+            .args([
+                "exec",
+                &self.container,
+                "psql",
+                "-XAt",
+                "-U",
+                "postgres",
+                "-d",
+                "postgres",
+                "-c",
+                sql,
+            ])
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        String::from_utf8_lossy(&out.stdout).trim().into()
+    }
+}
+impl SourceLockSession for DockerPgSession {
+    fn backend_pid(&self) -> i32 {
+        self.pid
+    }
+    fn connection_nonce(&self) -> &str {
+        &self.nonce
+    }
+    fn advisory_lock_key(&self) -> i64 {
+        72420260910
+    }
+    fn try_lock(&mut self) -> Result<bool, OwnershipError> {
+        Ok(self.healthy())
+    }
+    fn healthy(&mut self) -> bool {
+        self.sql(&format!(
+            "SELECT count(*) FROM pg_stat_activity WHERE pid={} AND application_name='m2-guard-{}'",
+            self.pid, self.nonce
+        )) == "1"
+    }
+    fn unlock(&mut self) -> Result<(), OwnershipError> {
+        let _ = self.sql(&format!("SELECT pg_terminate_backend({})", self.pid));
+        let _ = self.child.wait();
+        Ok(())
+    }
+}
+impl Drop for DockerPgSession {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+    }
+}
+fn postgres_guard_probe(root: &Path, container: &str) {
+    let store = root.join("pg-state.db");
+    let mut owner = OwnershipGuard::acquire(
+        &store,
+        "pg-owner".into(),
+        OwnerKind::Runtime,
+        Duration::from_secs(5),
+        DockerPgSession::open(container, "owner"),
+    )
+    .unwrap();
+    let pid = owner.backend_pid();
+    let out = Command::new("docker")
+        .args([
+            "exec",
+            container,
+            "psql",
+            "-XAt",
+            "-U",
+            "postgres",
+            "-d",
+            "postgres",
+            "-c",
+            &format!("SELECT pg_terminate_backend({pid})"),
+        ])
+        .output()
+        .unwrap();
+    assert!(out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "t");
+    assert!(!owner.dispatch_allowed());
+    drop(owner);
+    assert!(
+        fs::read_to_string(store.with_extension("ownership.lock"))
+            .unwrap()
+            .contains("clean_release=pending")
+    );
+    let mut successor = OwnershipGuard::acquire(
+        &store,
+        "pg-successor".into(),
+        OwnerKind::Runtime,
+        Duration::from_secs(5),
+        DockerPgSession::open(container, "successor"),
+    )
+    .unwrap();
+    successor
+        .admit_source_mutation(Duration::from_millis(1))
+        .unwrap();
+    drop(successor);
+    assert_eq!(
+        fs::read_to_string(store.with_extension("ownership.lock")).unwrap(),
+        "clean_release=proved\n"
+    );
+}
+
 fn socket_probe(root: &Path) {
     let dir = root.join("socket");
     fs::create_dir_all(&dir).unwrap();
@@ -130,5 +280,8 @@ fn main() {
     fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
     socket_probe(&root);
     crash_probe(&root);
+    if let Some(container) = args.get(2) {
+        postgres_guard_probe(&root, container);
+    }
     println!("production_ownership_component=pass");
 }

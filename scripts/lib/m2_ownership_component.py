@@ -102,8 +102,10 @@ def emit(mode: str, observed: dict, image_id: str):
     out = ARTIFACT_ROOT / scenario / SEED
     if out.exists(): shutil.rmtree(out)
     (out / "logs").mkdir(parents=True); (out / "state").mkdir()
+    product_stdout = observed.pop("_product_stdout")
+    product_stderr = observed.pop("_product_stderr")
     before = {"owner": None, "dispatch_allowed": False, "source_lock": "free"}
-    after = {"owner": "successor", "dispatch_allowed": True, "source_lock": "held", **observed}
+    after = {"owner": "successor", "dispatch_allowed": "verified_before_release", "source_lock": "released_cleanly", **observed}
     write(out / "state/before.json", canonical(before)); write(out / "state/after.json", canonical(after))
     write(out / "fault-timeline.json", canonical(["owner-acquired", "contender-rejected", "backend-terminated", "successor-reconciled"]))
     write(out / "config.json", canonical({"advisory_key": KEY, "image": IMAGE, "profile": "component", "seed": SEED}))
@@ -116,18 +118,22 @@ def emit(mode: str, observed: dict, image_id: str):
     write(out / "logs/boring-cdc.jsonl", b"".join(canonical(x) for x in events))
     docker_version = run(["docker", "version", "--format", "{{.Server.Version}}"])
     write(out / "stdout.txt", docker_version.stdout); write(out / "stderr.txt", docker_version.stderr)
+    write(out / "product-stdout.txt", product_stdout); write(out / "product-stderr.txt", product_stderr)
     write(out / "state/product-probe.json", canonical(observed["product_probe"]))
     inventory_files = sorted(p for p in out.rglob("*") if p.is_file())
     write(out / "sha256.txt", "".join(f"{sha(p.read_bytes())}  {p.relative_to(out).as_posix()}\n" for p in inventory_files))
     result_paths = [out / "state/after.json", out / "fault-timeline.json", out / "logs/boring-cdc.jsonl", out / "state/product-probe.json"]
     source_digest = sha(canonical({"source":"postgres-component-fixture-v1"}))
-    cmd = command_record("docker version", out / "stdout.txt", out / "stderr.txt", "docker-component-v1")
+    commands = [
+      command_record("docker version", out / "stdout.txt", out / "stderr.txt", "docker-component-v1"),
+      command_record("cargo run --quiet --locked --example m2_ownership_component", out / "product-stdout.txt", out / "product-stderr.txt", "m2-ownership-component/v1"),
+    ]
     secret_pattern = re.compile(r"(?i)(password\s*[=:]|api[_-]?key\s*[=:]|secret\s*[=:]|token\s*[=:]|postgres(?:ql)?://[^\s:@]+:[^\s@]+@)")
     if any(secret_pattern.search(p.read_text(errors="replace")) for p in out.rglob("*") if p.is_file()):
         raise RuntimeError("redaction scan found secret-like content")
     manifest = {"schema_version":"evidence/v1","owner_bead":"boring-cdc-m2-ownership","scenario_id":scenario,
       "evidence_profile":"runtime","evidence_tier":"component","seed":SEED,
-      "git_commit":run(["git","rev-parse","HEAD"]).stdout.strip(),"commands":[cmd],
+      "git_commit":run(["git","rev-parse","HEAD"]).stdout.strip(),"commands":commands,
       "source_preservation":{"before_sha256":source_digest,"after_sha256":source_digest,"preserved":True},
       "cleanup":{"complete":True,"remaining_paths":[]},"redaction":{"checked":True,"secrets_found":0},
       "tier_proof":{"targeted_checks":True,"boundary_e2e":True,"fault_suite":True,"deterministic_rerun":True,
@@ -150,10 +156,10 @@ def main():
         pg=postgres_probe(name, args.mode == "fault")
         peer=unix_peer_probe(work)
         image_id=run(["docker","image","inspect","--format","{{.Id}}",IMAGE]).stdout.strip()
-        product = run(["cargo", "run", "--quiet", "--locked", "--example", "m2_ownership_component", "--", str(work / "product")], timeout=120)
+        product = run(["cargo", "run", "--quiet", "--locked", "--example", "m2_ownership_component", "--", str(work / "product"), name], timeout=180)
         if product.returncode != 0 or product.stdout.strip() != "production_ownership_component=pass":
             raise RuntimeError(f"production ownership probe failed: {product.stderr.strip()}")
-        observed={"postgres":pg,"unix_peer":peer,"product_probe":{"ownership_guard":True,"socket_validation":True,"crash_restart":True,"reconciliation_marker":True},"mode":args.mode}
+        observed={"postgres":pg,"unix_peer":peer,"product_probe":{"ownership_guard":True,"socket_validation":True,"crash_restart":True,"postgres_backend_death_fenced":True,"successor_reconciled_and_admitted":True},"mode":args.mode,"_product_stdout":product.stdout,"_product_stderr":product.stderr}
     finally:
         stop_postgres(name); shutil.rmtree(work, ignore_errors=True)
     emit(args.mode, observed, image_id)
