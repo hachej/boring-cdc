@@ -9,6 +9,15 @@ if contract.get('owner_bead')!='boring-cdc-m2.1': errors.append('wrong owner')
 if contract.get('fixed_seed')!='0x424344435f52455452595f563031': errors.append('wrong fixed seed')
 ids=[c['id'] for c in contract.get('cases',[])]
 if len(ids)!=len(set(ids)): errors.append('duplicate scenario IDs')
+expected_assertions={
+ 'SCN-M2-FAILURE-ENUM':'all eight confirmed failure classes serialize through one closed enum and only the four transient/rate classes auto-retry',
+ 'SCN-M2-FAILURE-SCHEDULE':'approved ChaCha20-seeded exponential schedule is deterministic, capped, full-jittered over [0,delay], and monotonic under clock rollback',
+ 'SCN-M2-FAILURE-REARM':'integrity, ownership_lost, configuration, and unsupported classes require their typed stronger proof',
+ 'SCN-M2-FAILURE-HOOKS':'synthetic typed domain hook accepts expected close only for matching run_id and connection generation',
+}
+for case_id,assertion in expected_assertions.items():
+ case=next((item for item in contract.get('cases',[]) if item.get('id')==case_id),None)
+ if not case or case.get('assertion')!=assertion: errors.append('stale assertion '+case_id)
 for case in contract.get('cases',[]):
  if not re.search(r'fn\s+'+re.escape(case['test'])+r'\s*\(',src): errors.append('missing test '+case['test'])
 for name,value in [('BASE_DELAY_MS',250),('MAX_DELAY_MS',30000),('MAX_ATTEMPTS',10)]:

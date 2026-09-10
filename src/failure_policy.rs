@@ -2136,7 +2136,7 @@ pub mod tests {
     }
 
     #[test]
-    fn synthetic_hooks_fail_closed_on_close_generation_mismatch() {
+    fn synthetic_hooks_fail_closed_on_close_run_and_generation_mismatch() {
         let hook = StrictDomainHook;
         let capture = DomainHookInput::Capture {
             outcome: CaptureOutcome::ExpectedClose,

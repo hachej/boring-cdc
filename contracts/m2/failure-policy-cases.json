@@ -17,12 +17,12 @@
     {
       "id": "SCN-M2-FAILURE-ENUM",
       "test": "exhaustive_classes_have_closed_stable_serialization",
-      "assertion": "all seven failure classes serialize through one closed enum"
+      "assertion": "all eight confirmed failure classes serialize through one closed enum and only the four transient/rate classes auto-retry"
     },
     {
       "id": "SCN-M2-FAILURE-SCHEDULE",
       "test": "deterministic_schedule_caps_jitters_and_ignores_clock_rollback",
-      "assertion": "fixed-seed exponential schedule is deterministic, capped, bounded-jittered, and monotonic under clock rollback"
+      "assertion": "approved ChaCha20-seeded exponential schedule is deterministic, capped, full-jittered over [0,delay], and monotonic under clock rollback"
     },
     {
       "id": "SCN-M2-FAILURE-RESTART-SUPPRESS",
@@ -37,7 +37,7 @@
     {
       "id": "SCN-M2-FAILURE-REARM",
       "test": "rearm_requires_class_specific_proofs_and_rejects_unrelated_change",
-      "assertion": "integrity, continuity, configuration, and operator classes require their typed stronger proof"
+      "assertion": "integrity, ownership_lost, configuration, and unsupported classes require their typed stronger proof"
     },
     {
       "id": "SCN-M2-FAILURE-STALE",
@@ -46,8 +46,8 @@
     },
     {
       "id": "SCN-M2-FAILURE-HOOKS",
-      "test": "synthetic_hooks_fail_closed_on_close_generation_mismatch",
-      "assertion": "synthetic typed domain hook accepts expected close only for the matching connection generation"
+      "test": "synthetic_hooks_fail_closed_on_close_run_and_generation_mismatch",
+      "assertion": "synthetic typed domain hook accepts expected close only for matching run_id and connection generation"
     },
     {
       "id": "SCN-M2-FAILURE-PERSISTENCE",
