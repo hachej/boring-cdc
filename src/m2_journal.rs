@@ -1257,7 +1257,7 @@ pub mod tests {
             .unwrap();
         drop(w);
         assert!(matches!(
-            read_complete_range(&p, 2, 2, 100, Duration::from_secs(1)),
+            read_complete_range(&p, 2, 2, 1000, Duration::from_secs(1)),
             Err(JournalError::Unavailable(_))
         ));
         fs::remove_file(p).ok();
