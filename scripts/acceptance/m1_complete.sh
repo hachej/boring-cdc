@@ -2,7 +2,7 @@
 set -eu
 export TMPDIR="${TMPDIR:-/var/tmp}"
 case "${1:---write}" in
-  --write|--verify) mode=$1 ;;
+  --write|--verify|--probe) mode=$1 ;;
   *) echo "usage: $0 [--write|--verify]" >&2; exit 2 ;;
 esac
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
@@ -143,16 +143,20 @@ summary={
 encoded=json.dumps(summary,sort_keys=True,indent=2)+'\n'
 if errors:
  print(encoded,end=''); raise SystemExit(1)
-if mode=='--write':
+if mode=='--probe':
+ print(encoded,end='')
+elif mode=='--write':
  gate=evidence_path.parent; gate.mkdir(parents=True,exist_ok=True)
  (gate/'completion-summary.json').write_text(encoded)
- (gate/'run-1.log').write_text(json.dumps(summary,sort_keys=True)+'\n')
- (gate/'run-2.log').write_text(json.dumps(summary,sort_keys=True)+'\n')
  head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
- command=[]
+ command=[]; outputs=[]
  for index in (1,2):
-  log=gate/f'run-{index}.log'; empty=gate/f'run-{index}.stderr'; empty.write_text('')
-  command.append({'argv':'scripts/acceptance/m1_complete.sh --verify','version':'m1-complete/v1','exit_code':0,'stdout_path':str(log.relative_to(root)),'stdout_sha256':sha(log),'stderr_path':str(empty.relative_to(root)),'stderr_sha256':sha(empty)})
+  run=subprocess.run(['scripts/acceptance/m1_complete.sh','--probe'],text=True,capture_output=True)
+  log=gate/f'run-{index}.log'; empty=gate/f'run-{index}.stderr'
+  log.write_text(run.stdout); empty.write_text(run.stderr); outputs.append((run.stdout,run.stderr))
+  if run.returncode != 0: raise SystemExit(f'completion probe {index} failed: {run.stdout} {run.stderr}')
+  command.append({'argv':'scripts/acceptance/m1_complete.sh --probe','version':'m1-complete/v1','exit_code':run.returncode,'stdout_path':str(log.relative_to(root)),'stdout_sha256':sha(log),'stderr_path':str(empty.relative_to(root)),'stderr_sha256':sha(empty)})
+ if outputs[0] != outputs[1]: raise SystemExit('completion probes were not byte-identical')
  artifacts=[coverage_path,reconciliation_path,gate/'completion-summary.json']
  source_digest=hashlib.sha256(coverage_path.read_bytes()+reconciliation_path.read_bytes()).hexdigest()
  evidence={'schema_version':'evidence/v1','owner_bead':'boring-cdc-m1-complete','scenario_id':'SCN-M1-COMPLETION-BARRIER','evidence_profile':'runtime','evidence_tier':'milestone','seed':'m1-complete-v1','git_commit':head,'commands':command,'source_preservation':{'before_sha256':source_digest,'after_sha256':source_digest,'preserved':True},'cleanup':{'complete':True,'remaining_paths':[]},'redaction':{'checked':True,'secrets_found':0},'tier_proof':{'targeted_checks':True,'boundary_e2e':True,'fault_suite':True,'deterministic_rerun':True,'consumed_contract_vectors':True,'workspace_tests':True,'integration':True,'clean_environment':True,'exit_assertions':True,'endurance':False,'full_failure_matrix':False,'clean_clone':False},'result':{'status':'pass','digest':hashlib.sha256(b''.join(p.read_bytes() for p in artifacts)).hexdigest(),'artifacts':[str(p.relative_to(root)) for p in artifacts],'product_faults':'all M1 leaf fault suites validated by manifest','runtime_observed':True}}
@@ -162,14 +166,31 @@ else:
  if not evidence_path.is_file(): fail('gate evidence missing')
  else:
   evidence=load(evidence_path)
-  for entry in evidence.get('commands',[]):
-   path=root/entry.get('stdout_path','')
+  commands=evidence.get('commands',[])
+  if len(commands)!=2: fail('gate must contain exactly two command executions')
+  observed=[]
+  for entry in commands:
+   path=root/entry.get('stdout_path',''); stderr=root/entry.get('stderr_path','')
+   if entry.get('argv')!='scripts/acceptance/m1_complete.sh --probe' or entry.get('exit_code')!=0: fail('gate command was not a successful completion probe')
    if not path.is_file() or sha(path)!=entry.get('stdout_sha256'): fail('gate command stdout digest mismatch')
+   if not stderr.is_file() or sha(stderr)!=entry.get('stderr_sha256'): fail('gate command stderr digest mismatch')
+   if path.is_file():
+    observed.append((path.read_bytes(),stderr.read_bytes()))
+    try:
+     if json.loads(path.read_text()).get('status')!='pass': fail('gate command output is not pass')
+    except Exception: fail('gate command output is not valid completion JSON')
+  if len(observed)==2 and observed[0]!=observed[1]: fail('gate command executions are not byte-identical')
+  commit=evidence.get('git_commit','')
+  exists=subprocess.run(['git','cat-file','-e',str(commit)+'^{commit}'],capture_output=True).returncode==0
+  ancestor=exists and subprocess.run(['git','merge-base','--is-ancestor',str(commit),'HEAD'],capture_output=True).returncode==0
+  clean_inputs=ancestor and subprocess.run(['git','diff','--quiet',str(commit)+'..HEAD','--','contracts','scripts','tests']).returncode==0
+  if not (exists and ancestor and clean_inputs): fail('gate git_commit is missing, non-ancestor, or stale')
+  if evidence.get('result',{}).get('status')!='pass': fail('gate result is not pass')
   paths=[root/p for p in evidence.get('result',{}).get('artifacts',[])]
   if not all(p.is_file() for p in paths) or hashlib.sha256(b''.join(p.read_bytes() for p in paths)).hexdigest()!=evidence.get('result',{}).get('digest'):
    fail('gate result digest mismatch')
-  run=subprocess.run(['python3','scripts/lib/core_validator.py','schema',str(evidence_path.relative_to(root)),'--schema','contracts/evidence.schema.json'],text=True,capture_output=True)
-  if run.returncode: fail(f'gate evidence schema invalid: {run.stdout.strip()} {run.stderr.strip()}')
+  run=subprocess.run(['scripts/validate/evidence.sh',str(evidence_path.relative_to(root))],text=True,capture_output=True)
+  if run.returncode: fail(f'gate evidence invalid: {run.stdout.strip()} {run.stderr.strip()}')
  if errors:
   summary['status']='fail'; summary['findings']=errors; print(json.dumps(summary,sort_keys=True,indent=2)); raise SystemExit(1)
  print(encoded,end='')
