@@ -27,6 +27,7 @@ exercised=[{'hook': hook, 'failure_fingerprint': fingerprint} for _,hook,fingerp
 timeline=json.loads((root/'artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/fault-timeline.json').read_text())
 recorded=[{'hook': row.get('hook'), 'failure_fingerprint': row.get('failure_fingerprint')} for row in timeline.get('faults',[])]
 if len(recorded)!=11 or recorded!=exercised: errors.append('fault_timeline_exactness')
+if 'fault_timeline_matches_failures_exercised_from_code' not in fault_script or 'assert_eq!(recorded, exercised)' not in src: errors.append('fault_timeline_code_binding')
 artifact_root=root/'artifacts/boring-cdc-m1-ddl-fixtures'
 if artifact_root.exists():
  corpus='\n'.join(x.read_text(errors='replace') for x in artifact_root.rglob('*') if x.is_file())

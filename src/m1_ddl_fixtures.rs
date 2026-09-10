@@ -719,19 +719,19 @@ pub(crate) mod tests {
         );
         let mut bad = add.clone();
         bad.columns[1].default_expression_hash = Some("sha256:default".into());
-        assert!(matches!(
+        assert_eq!(
             old.compare(&bad, false),
-            ContractDecision::BlockAndRequireReseed(_)
-        ));
+            ContractDecision::BlockAndRequireReseed("RELATION_CONTRACT_CHANGED")
+        );
     }
     // SCENARIO: SCN-DDL-DURING-ACTIVE-BACKFILL
     #[test]
     fn all_contract_changes_invalidate_active_generation() {
         let old = relation(10);
-        assert!(matches!(
+        assert_eq!(
             old.compare(&nullable_add(&old), true),
-            ContractDecision::InvalidateGeneration(_)
-        ));
+            ContractDecision::InvalidateGeneration("ACTIVE_GENERATION_SCHEMA_DRIFT")
+        );
     }
     // SCENARIO: SCN-DDL-IMMEDIATELY-BEFORE-AFTER-COPY-FENCE
     #[test]
@@ -897,10 +897,8 @@ pub(crate) mod tests {
         x.publication_attnums.clear();
         changed.push(x);
         assert!(changed.iter().all(|x| x.fingerprint().unwrap() != base
-            && matches!(
-                old.compare(x, false),
-                ContractDecision::BlockAndRequireReseed(_)
-            )));
+            && old.compare(x, false)
+                == ContractDecision::BlockAndRequireReseed("RELATION_CONTRACT_CHANGED")));
     }
     // SCENARIO: SCN-M1-DDL-KEY-DELETE-SAFETY
     #[test]
@@ -911,14 +909,14 @@ pub(crate) mod tests {
         let mut no_key = old.clone();
         no_key.key.primary_attnums.clear();
         no_key.key.replica_identity_mode = "nothing".into();
-        assert!(matches!(
+        assert_eq!(
             old.compare(&typed, false),
-            ContractDecision::BlockAndRequireReseed(_)
-        ));
-        assert!(matches!(
+            ContractDecision::BlockAndRequireReseed("RELATION_CONTRACT_CHANGED")
+        );
+        assert_eq!(
             old.compare(&no_key, false),
-            ContractDecision::BlockAndRequireReseed(_)
-        ));
+            ContractDecision::BlockAndRequireReseed("RELATION_CONTRACT_CHANGED")
+        );
     }
     // SCENARIO: SCN-M1-DDL-STALE-FENCE
     #[test]
@@ -1121,6 +1119,130 @@ pub(crate) mod tests {
                 .standby_status(boundary, 946_684_800_000_000, false)
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn fault_timeline_matches_failures_exercised_from_code() {
+        fn decision_code(decision: ContractDecision) -> &'static str {
+            match decision {
+                ContractDecision::InvalidateGeneration(code)
+                | ContractDecision::BlockAndRequireReseed(code) => code,
+                _ => panic!("expected blocking decision"),
+            }
+        }
+        let base = relation(1);
+        let mut bad = nullable_add(&base);
+        bad.columns[1].default_expression_hash = Some("sha256:default".into());
+        let mut guard = GuardState::acquire_before_export(
+            1,
+            7,
+            "tables-v1".into(),
+            99,
+            vec![base.identity.clone()],
+        )
+        .unwrap();
+        let guard_fp = guard
+            .verify_catalog_fingerprint("tables-v2")
+            .unwrap_err()
+            .fingerprint;
+        let guard_loss_fp = guard.guard_session_lost().fingerprint;
+        let mut waiter_guard = GuardState::acquire_before_export(
+            1,
+            7,
+            "tables-v1".into(),
+            99,
+            vec![base.identity.clone()],
+        )
+        .unwrap();
+        let waiter_fp = waiter_guard
+            .observe_waiter(&WaiterObservation {
+                relation: base.identity.clone(),
+                age_ms: DDL_WAITER_BOUND_MS,
+                conflicts: true,
+            })
+            .unwrap_err()
+            .fingerprint;
+        let mut gate = RelationValidationGate::default();
+        gate.relation_message(1, true);
+        let dml_fp = gate.require_dml(1).unwrap_err().fingerprint;
+        let mut malformed = base.clone();
+        malformed.columns.push(malformed.columns[0].clone());
+        let malformed_fp = malformed.fingerprint().unwrap_err().fingerprint;
+        let mut namespace_changed = base.clone();
+        namespace_changed.namespace = "other".into();
+        let mut type_changed = base.clone();
+        type_changed.columns[0].type_oid = 25;
+        let boundary = crate::m1_transition_kernel::synthetic_durable_boundary(
+            crate::m1_transition_kernel::ReceivedLsn::from_wire(8),
+            crate::m1_transition_kernel::JournalCursor::from_store(9),
+        );
+        let stale = DurableFenceProof::from_journal_commit(1, 6, "tables-v1".into(), 99, boundary);
+        let mut fence_guard = GuardState::acquire_before_export(
+            1,
+            7,
+            "tables-v1".into(),
+            99,
+            vec![base.identity.clone()],
+        )
+        .unwrap();
+        fence_guard.verify_catalog_fingerprint("tables-v1").unwrap();
+        fence_guard.advance(GuardPhase::Exported).unwrap();
+        fence_guard.advance(GuardPhase::Copying).unwrap();
+        fence_guard
+            .advance(GuardPhase::AwaitingDurableFence)
+            .unwrap();
+        let fence_fp = fence_guard
+            .durable_fence_observed(&stale)
+            .unwrap_err()
+            .fingerprint;
+        let mut malformed_gate = RelationValidationGate::default();
+        malformed_gate.relation_message(1, true);
+        let admission_fp = malformed_gate
+            .admit_catalog(1, &malformed, None, false)
+            .unwrap_err()
+            .fingerprint;
+        let exercised = vec![
+            (
+                "catalog_poll_fingerprint",
+                decision_code(base.compare(&bad, false)),
+            ),
+            (
+                "active_generation_change",
+                decision_code(base.compare(&nullable_add(&base), true)),
+            ),
+            ("guard_lifecycle", guard_fp),
+            ("guard_session_lost", guard_loss_fp),
+            ("ddl_waiter_bound", waiter_fp),
+            ("changed_relation_dml", dml_fp),
+            ("noncanonical_contract", malformed_fp),
+            (
+                "full_fingerprint",
+                decision_code(base.compare(&namespace_changed, false)),
+            ),
+            (
+                "key_delete_safety",
+                decision_code(base.compare(&type_changed, false)),
+            ),
+            ("stale_durable_fence", fence_fp),
+            ("decoded_relation_admission", admission_fp),
+        ];
+        let timeline: serde_json::Value = serde_json::from_str(include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/fault-timeline.json"
+        )))
+        .unwrap();
+        let recorded = timeline["faults"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                (
+                    row["hook"].as_str().unwrap(),
+                    row["failure_fingerprint"].as_str().unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(recorded, exercised);
     }
 
     #[test]

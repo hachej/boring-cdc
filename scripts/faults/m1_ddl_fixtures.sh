@@ -22,5 +22,7 @@ while IFS='|' read -r test hook fingerprint; do
  cargo test --locked "m1_ddl_fixtures::tests::$test" -- --exact >/dev/null 2>&1
  printf 'fault hook=%s fingerprint=%s outcome=pass_fail_closed\n' "$hook" "$fingerprint"
 done <"$faults"
+# This test derives all 11 fingerprints from actual return values and compares the timeline.
+cargo test --locked "m1_ddl_fixtures::tests::fault_timeline_matches_failures_exercised_from_code" -- --exact >/dev/null 2>&1
 scripts/validate/m1_ddl_fixtures.py >/dev/null
 printf 'm1 ddl fault pass seed=%s hooks=11 checkpoint=unchanged feedback=blocked-or-released-on-invalidation cleanup=trap\n' "$seed"
