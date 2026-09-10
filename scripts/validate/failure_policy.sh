@@ -39,14 +39,20 @@ try:
  fp=c['fingerprint']; allow={'relation_id','destination_id','operation','SQLSTATE','errno','HTTP status','generation'}
  if fp['version']!=1 or fp['hash']!='SHA-256' or fp['canonicalization']!='RFC 8785 JCS UTF-8' or set(fp['context_allowlist'])!=allow or not {'payloads','DSNs','tokens','source identifiers','absolute paths','messages','credentials'}.issubset(fp['excluded']):fail()
  if c['rearm']['result_enum']!=['rearmed','stale','conflict','forbidden'] or set(c['rearm']['recovery_predicates'])!={'transient_exhausted','configuration','integrity','ownership_lost','unsupported'}:fail()
+ if set(c['fingerprint']['relevant_config_allowlist'])!={'capture','clickhouse','archive'} or any(set(v)!=( {'policy_version','component_contract_digest','capture_epoch'} if k=='capture' else {'policy_version','component_contract_digest','capture_epoch','generation'}) for k,v in c['fingerprint']['relevant_config_allowlist'].items()):fail()
+ hooks=c['domain_hooks']; expected_hook_kinds=['failure_observed','retry_timer','completion','rearm','expected_close']
+ if hooks['tag_key']!='kind' or [x['kind'] for x in hooks['input_variants']]!=expected_hook_kinds or len(hooks['output_fields'])!=9:fail()
+ hook_rows=hooks['exhaustive_class_component_outputs']
+ if len(hook_rows)!=24 or len({(x['component'],x['class']) for x in hook_rows})!=24 or {(x['component'],x['class']) for x in hook_rows}!={(a,b) for a in c['components'] for b in classes}:fail()
  if c['component_safe_states']!={'capture':'capture_safe_stopped','clickhouse':'destination_degraded','archive':'destination_degraded'}:fail()
  if c['expected_close']['token_fields']!=['run_id','capture_generation','advisory_session_id'] or 'no reconnect' not in c['expected_close']['persistence_failure'] or c['expected_close']['reconnect'].split(';')[0]!='never in-process':fail()
  if c['observability']['metric']!={'name':'boring_cdc_failures_total','labels':['component','class','code'],'increment':'once per persisted failure occurrence'} or c['observability']['code_pattern']!='BCDC_<DOMAIN>_<CAUSE>':fail()
  if c['later_executors']!=executors or set(c['executor_ownership'])!=set(executors):fail()
  if f['schema_version']!='m0-decision-fixture/v1' or f['fixture_id']!=did or f['owner_bead']!=owner or f['contract_sha256']!=sha(root/contract_rel) or f['fixed_seed']!={'ascii':'BCDC_RETRY_V01','hex':'0x'+seed} or f['later_executors']!=executors:fail()
  vectors=f['golden_vectors']; ids=[v['case_id'] for v in vectors]
- required_ids={'class-'+x for x in classes}|{f'schedule-attempt-{x}' for x in (1,7,8,9,10)}|{'restart-preserves-attempt','clock-forward-does-not-shorten','clock-backward-extends','timer-at-boundary','same-fingerprint-suppressed','different-fingerprint-new-incident','unrelated-config-forbidden','relevant-config-rearmed','rearm-stale-nonce','rearm-boundary-conflict','integrity-without-reseed-forbidden','integrity-new-epoch-rearmed','stale-completion','cross-epoch-retry-forbidden','capture-hook-safe-stop','destination-hook-degraded','expected-close-delayed-eof','expected-close-unmatched-eof','expected-close-persistence-failure','expected-close-advisory-loss-race','redaction-excludes-secret-context'}
- if len(ids)!=len(set(ids)) or set(ids)!=required_ids or f['vector_inventory']!={'classes':8,'total':34,'required_kinds':['clock','completion','expected_close','failure','fingerprint','hook','rearm','redaction','restart','schedule','timer']}:fail()
+ required_ids={'class-'+x for x in classes}|{f'schedule-attempt-{x}' for x in (1,7,8,9,10)}|{'restart-preserves-attempt','clock-forward-does-not-shorten','clock-backward-extends','timer-at-boundary','same-fingerprint-suppressed','different-fingerprint-new-incident','unrelated-config-forbidden','relevant-config-rearmed','rearm-stale-nonce','rearm-boundary-conflict','integrity-without-reseed-forbidden','integrity-new-epoch-rearmed','stale-completion','cross-epoch-retry-forbidden','capture-hook-safe-stop','destination-hook-degraded','expected-close-delayed-eof','expected-close-unmatched-eof','expected-close-persistence-failure','expected-close-advisory-loss-race','redaction-excludes-secret-context','attempt-nine-failure-exhausts','attempt-ten-remains-saturated','timer-before-boundary','ownership-without-proof-forbidden','ownership-new-generation-rearmed','unsupported-rearm-forbidden','expected-close-generation-mismatch','expected-close-advisory-loss-after-match'}
+ if len(ids)!=len(set(ids)) or set(ids)!=required_ids or f['vector_inventory']!={'classes':8,'total':42,'required_kinds':['clock','completion','expected_close','failure','fingerprint','hook','rearm','redaction','restart','schedule','timer']}:fail()
+ if hashlib.sha256(json.dumps(vectors,sort_keys=True,separators=(',',':')).encode()).hexdigest()!='3fe294bd4da6268bff764d9dfe7c29830a00bf4ee5e4507968de2a6b11f01e49':fail()
  by={v['case_id']:v for v in vectors}
  for a in (1,7,8,9,10):
   if by[f'schedule-attempt-{a}']['expected']!={'raw_delay_ms':delay(a),'jitter_ms':jitter(a),'inclusive_range':[0,delay(a)]}:fail()
@@ -55,10 +61,17 @@ try:
   if e.get('checkpoint_advance') is not False or e.get('feedback_advance') is not False:fail()
  if by['class-transient_io']['expected']['state']!='retry_wait' or by['class-integrity']['expected']['state']!='requires_reseed' or by['class-unsupported']['expected']['state']!='fatal':fail()
  if by['restart-preserves-attempt']['expected']['attempt']!=6 or by['clock-forward-does-not-shorten']['expected']['effective_remaining_ms']!=19000 or by['clock-backward-extends']['expected']['effective_remaining_ms']!=25000:fail()
+ if by['attempt-nine-failure-exhausts']['expected']['state']!='requires_operator' or by['attempt-ten-remains-saturated']['expected']['attempt']!=10 or by['timer-before-boundary']['expected']!={'state':'retry_wait','executions':0}:fail()
+ if by['ownership-without-proof-forbidden']['expected']['result']!='forbidden' or by['ownership-new-generation-rearmed']['expected']['result']!='rearmed' or by['unsupported-rearm-forbidden']['expected']['state']!='fatal':fail()
+ if by['expected-close-generation-mismatch']['expected']['class']!='ownership_lost':fail()
  if by['expected-close-delayed-eof']['expected']!={'state':'capture_safe_stopped','class':None,'reconnect':False} or by['expected-close-advisory-loss-race']['expected']['class']!='ownership_lost':fail()
  if selected!='all' and selected not in by:fail('FAILURE_POLICY_CASE_UNKNOWN')
  graph_ids=[x['id'] for x in graph]
  if len(graph_ids)!=len(set(graph_ids)) or set(executors)-set(graph_ids):fail()
+ contract_digest=sha(root/contract_rel)
+ for dep in ('boring-cdc-d-pg-protocol','boring-cdc-d-ch-accept','boring-cdc-d-archive-durability'):
+  record=next(x for x in graph if x['id']==dep); text=json.dumps(record,sort_keys=True)
+  if contract_digest not in text or 'No second taxonomy/schedule/fingerprint/re-arm policy is permitted.' not in text:fail()
  stable=next(x for x in registry['entries'] if x['id']==did); covered=next(x for x in coverage['assignments'] if x['id']==did)
  if stable['owner_bead']!=owner or covered!={'evidence_status':'pending','id':did,'owner_bead':owner,'source':'docs/PLAN.md','source_digest':stable['source_digest']}:fail()
  if subprocess.run([str(root/'scripts/validate/plan_coverage.sh')],cwd=root,capture_output=True).returncode:fail()
@@ -78,6 +91,7 @@ try:
  guarded=[contract_rel,fixture_rel,'scripts/validate/failure_policy.sh','contracts/m0/decisions.json']
  if subprocess.run(['git','cat-file','-e',ev['git_commit']+'^{commit}'],cwd=root,capture_output=True).returncode or subprocess.run(['git','merge-base','--is-ancestor',ev['git_commit'],'HEAD'],cwd=root,capture_output=True).returncode or subprocess.run(['git','diff','--quiet',ev['git_commit']+'..HEAD','--',*guarded],cwd=root).returncode:fail()
 except (OSError,KeyError,ValueError,TypeError,StopIteration,json.JSONDecodeError):fail()
-if selected=='all':print(json.dumps({'code':'FAILURE_POLICY_FIXTURE_VALID','class_count':8,'outcome':'pass','phase':'validate_spec','vector_count':34},sort_keys=True,separators=(',',':')))
-else:print(json.dumps({'case_id':selected,'code':'FAILURE_POLICY_CASE_VALID','outcome':'pass','phase':'validate_spec'},sort_keys=True,separators=(',',':')))
+if selected=='all':print(json.dumps({'code':'FAILURE_POLICY_FIXTURE_VALID','class_count':8,'outcome':'pass','phase':'validate_spec','vector_count':42},sort_keys=True,separators=(',',':')))
+else:
+ v=by[selected];print(json.dumps({'case_id':selected,'code':'FAILURE_POLICY_CASE_VALID','kind':v['kind'],'expected':v['expected'],'outcome':'pass','phase':'validate_spec'},sort_keys=True,separators=(',',':')))
 PY
