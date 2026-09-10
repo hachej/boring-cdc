@@ -10,7 +10,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-1.stdout",
-      "stdout_sha256": "4d0cb85e02d46804f18b7ce45d7032ce7556a2c8749150da52c9c5bbb236aa95",
+      "stdout_sha256": "b4f2a498bd631bad48463638ac337079894a4d6be64f863ce8ed27b031810be4",
       "version": "preflight-v1"
     },
     {
@@ -19,7 +19,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-2.stdout",
-      "stdout_sha256": "4d0cb85e02d46804f18b7ce45d7032ce7556a2c8749150da52c9c5bbb236aa95",
+      "stdout_sha256": "b4f2a498bd631bad48463638ac337079894a4d6be64f863ce8ed27b031810be4",
       "version": "preflight-v1"
     },
     {
@@ -28,7 +28,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-1.stdout",
-      "stdout_sha256": "ed92d22e18df73035d257ddd023336079eb8248768d1eb6ec9739dde1a1d0742",
+      "stdout_sha256": "35eb7a21903810e6f1fb8d90e5ec3427757adc6947541964541d2a887f4db60d",
       "version": "preflight-v1"
     },
     {
@@ -37,13 +37,13 @@
       "stderr_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/fault-2.stdout",
-      "stdout_sha256": "ed92d22e18df73035d257ddd023336079eb8248768d1eb6ec9739dde1a1d0742",
+      "stdout_sha256": "35eb7a21903810e6f1fb8d90e5ec3427757adc6947541964541d2a887f4db60d",
       "version": "preflight-v1"
     }
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "3815e16445d1d4507f6b509f33c503513f6bec77",
+  "git_commit": "36c6e131556d5e9aad784bc176a77aa027ad07d4",
   "owner_bead": "boring-cdc-m1-preflight",
   "redaction": {
     "checked": true,
@@ -67,8 +67,8 @@
       "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/state/after.json",
       "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/state/before.json"
     ],
-    "digest": "135d2794a6b8ccc7e3c7fd0ded36192cabbf5326242f28f8a8b1107d35012d18",
-    "product_faults": "protocol_fingerprint,state_mutation,mutating_route",
+    "digest": "74198392a3e08b9e9a40ff02c6e0b2836571ee7bc4a262a7732d4671ac759df5",
+    "product_faults": "all_41_contract_cases",
     "runtime_observed": true,
     "status": "pass"
   },
@@ -89,7 +89,7 @@
     "endurance": false,
     "exit_assertions": true,
     "fault_suite": true,
-    "full_failure_matrix": false,
+    "full_failure_matrix": true,
     "integration": true,
     "targeted_checks": true,
     "workspace_tests": true
