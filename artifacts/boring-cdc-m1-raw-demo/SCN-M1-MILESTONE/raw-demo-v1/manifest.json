@@ -10,7 +10,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/command-run-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/command-run-1.stdout",
-      "stdout_sha256": "34a3dd32f6174e6c4a3202f34118384568f89342092825a462c444df47c3c752",
+      "stdout_sha256": "92371147c435530800104fa619d2b3286dea6319c85cedc36d80d4a4f44a4b10",
       "version": "raw-demo-v1"
     },
     {
@@ -19,13 +19,13 @@
       "stderr_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/command-run-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/command-run-2.stdout",
-      "stdout_sha256": "34a3dd32f6174e6c4a3202f34118384568f89342092825a462c444df47c3c752",
+      "stdout_sha256": "92371147c435530800104fa619d2b3286dea6319c85cedc36d80d4a4f44a4b10",
       "version": "raw-demo-v1"
     }
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "milestone",
-  "git_commit": "c0edcf879293698b4f666bca2f5a7487b679ccfa",
+  "git_commit": "8c8f8c345523ca4a7f01e28d9cf770ea11ab82d7",
   "owner_bead": "boring-cdc-m1-raw-demo",
   "redaction": {
     "checked": true,
@@ -48,7 +48,7 @@
       "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/state/before.json",
       "artifacts/boring-cdc-m1-raw-demo/SCN-M1-MILESTONE/raw-demo-v1/versions.json"
     ],
-    "digest": "8c4ef03973cfd5c810a9f5565c31d3159c94dc65d2eaa0b67aae34cb6041db0e",
+    "digest": "9407abd46d5a66f5cec7ecd6103d92d4b07e4cdc69e5b8edd354cee0c1a8dadc",
     "product_faults": "m1_fail_closed_matrix",
     "runtime_observed": true,
     "status": "pass"
@@ -57,8 +57,8 @@
   "schema_version": "evidence/v1",
   "seed": "raw-demo-v1",
   "source_preservation": {
-    "after_sha256": "5967950e3db7e0d3efd5133d8bd82dfc32d6058fb2b34e437c6bdc5a7c8860c1",
-    "before_sha256": "5967950e3db7e0d3efd5133d8bd82dfc32d6058fb2b34e437c6bdc5a7c8860c1",
+    "after_sha256": "7b5e5c412c48adaece54fa0e43b2fc21af52c323751a4dbe4d7b9d217b23c0df",
+    "before_sha256": "7b5e5c412c48adaece54fa0e43b2fc21af52c323751a4dbe4d7b9d217b23c0df",
     "preserved": true
   },
   "tier_proof": {

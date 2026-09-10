@@ -10,7 +10,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-1.stdout",
-      "stdout_sha256": "8f618b25cf0d1bf215e6748774e9675933a4059abfa39a3d2a3f6480c4dcf016",
+      "stdout_sha256": "c4b4f5c80d13abb39d854f45bbb1035ca969f0dd3b355d199604c68c53f09fe4",
       "version": "raw-demo-v1"
     },
     {
@@ -19,13 +19,13 @@
       "stderr_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-2.stdout",
-      "stdout_sha256": "8f618b25cf0d1bf215e6748774e9675933a4059abfa39a3d2a3f6480c4dcf016",
+      "stdout_sha256": "c4b4f5c80d13abb39d854f45bbb1035ca969f0dd3b355d199604c68c53f09fe4",
       "version": "raw-demo-v1"
     }
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "leaf",
-  "git_commit": "c0edcf879293698b4f666bca2f5a7487b679ccfa",
+  "git_commit": "8c8f8c345523ca4a7f01e28d9cf770ea11ab82d7",
   "owner_bead": "boring-cdc-m1-raw-demo",
   "redaction": {
     "checked": true,
@@ -48,7 +48,7 @@
       "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/state/before.json",
       "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/versions.json"
     ],
-    "digest": "fb963dc3a87a02ca17f9fc51488569f9df756ad5921b0742bdf4d973d08de252",
+    "digest": "55b89ddc775b3b20bf29a426f116f832c3fd0377a47e0ce5daa46f19cf3b7abb",
     "product_faults": "actual_pgoutput_inspection",
     "runtime_observed": true,
     "status": "pass"
@@ -57,8 +57,8 @@
   "schema_version": "evidence/v1",
   "seed": "raw-demo-v1",
   "source_preservation": {
-    "after_sha256": "5967950e3db7e0d3efd5133d8bd82dfc32d6058fb2b34e437c6bdc5a7c8860c1",
-    "before_sha256": "5967950e3db7e0d3efd5133d8bd82dfc32d6058fb2b34e437c6bdc5a7c8860c1",
+    "after_sha256": "7b5e5c412c48adaece54fa0e43b2fc21af52c323751a4dbe4d7b9d217b23c0df",
+    "before_sha256": "7b5e5c412c48adaece54fa0e43b2fc21af52c323751a4dbe4d7b9d217b23c0df",
     "preserved": true
   },
   "tier_proof": {

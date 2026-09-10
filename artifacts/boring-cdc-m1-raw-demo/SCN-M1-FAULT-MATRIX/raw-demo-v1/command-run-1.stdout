@@ -1,16 +1,17 @@
 scenario=SCN-M1-FAULT-MATRIX seed=raw-demo-v1
-PASS copyboth_restart checkpoint=unchanged
-PASS keepalive_reply_durable_only checkpoint=unchanged
-PASS bootstrap_feedback_gate checkpoint=unchanged
-PASS exact_set_oracle checkpoint=unchanged
-PASS full_reseed checkpoint=unchanged
-PASS truncate_requires_reseed checkpoint=unchanged
-PASS publication_drift checkpoint=unchanged
-PASS idle_ddl checkpoint=unchanged
-PASS immediate_ddl checkpoint=unchanged
-PASS unsupported_protocol checkpoint=unchanged
-PASS unsupported_table checkpoint=unchanged
-PASS unsupported_type checkpoint=unchanged
-PASS identity_conflict checkpoint=unchanged
-PASS no_online_table_add checkpoint=unchanged
+CASE SCN-M1-RAW-FIXED-SEED state=decoded checkpoint=unchanged_until_durable log=raw_event_normalized
+CASE SCN-M1-RAW-COPYBOTH-RESTART state=resume_safe checkpoint=durable_only log=copyboth_restart_safe
+CASE SCN-M1-RAW-HEARTBEAT state=durable_noop checkpoint=durable_only log=heartbeat_control_noop
+CASE SCN-M1-RAW-BOOTSTRAP state=feedback_gated checkpoint=creation_floor_not_progress log=bootstrap_gate
+CASE SCN-M1-RAW-EXACT-SET state=oracle_pass checkpoint=fence_observed log=exact_set_pass
+CASE SCN-M1-RAW-FULL-RESEED state=requires_reseed checkpoint=unchanged log=full_reseed_required
+CASE SCN-M1-RAW-TRUNCATE state=requires_reseed checkpoint=unchanged log=truncate_requires_reseed
+CASE SCN-M1-RAW-PUBLICATION-DRIFT state=requires_reseed checkpoint=unchanged log=publication_drift
+CASE SCN-M1-RAW-IDLE-DDL state=blocked checkpoint=unchanged log=idle_ddl_blocked
+CASE SCN-M1-RAW-IMMEDIATE-DDL state=blocked checkpoint=unchanged log=immediate_ddl_blocked
+CASE SCN-M1-RAW-UNSUPPORTED-PROTOCOL state=blocked checkpoint=unchanged log=unsupported_protocol
+CASE SCN-M1-RAW-UNSUPPORTED-TABLE state=blocked checkpoint=unchanged log=unsupported_table
+CASE SCN-M1-RAW-UNSUPPORTED-TYPE state=blocked checkpoint=unchanged log=unsupported_type
+CASE SCN-M1-RAW-IDENTITY-CONFLICT state=blocked checkpoint=unchanged log=identity_payload_conflict
+CASE SCN-M1-RAW-NO-ONLINE-TABLE-ADD state=requires_reseed checkpoint=unchanged log=no_online_table_add
 PASS m1_fault_matrix cases=15 blocked_actions=status,recover_reseed cleanup=trap
