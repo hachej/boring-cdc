@@ -1,4 +1,4 @@
-PASS pg=15 matrix=6 boundaries=4 waiter=observed-released lock=AccessExclusiveLock idle-poll=full-fingerprint-changed
-PASS pg=16 matrix=6 boundaries=4 waiter=observed-released lock=AccessExclusiveLock idle-poll=full-fingerprint-changed
-PASS pg=17 matrix=6 boundaries=4 waiter=observed-released lock=AccessExclusiveLock idle-poll=full-fingerprint-changed
+PASS pg=15 matrix=6 boundaries=4 waiter=observed-released lock=AccessExclusiveLock guarded-fingerprint=verified-through-durable-fence idle-poll=full-fingerprint-changed
+PASS pg=16 matrix=6 boundaries=4 waiter=observed-released lock=AccessExclusiveLock guarded-fingerprint=verified-through-durable-fence idle-poll=full-fingerprint-changed
+PASS pg=17 matrix=6 boundaries=4 waiter=observed-released lock=AccessExclusiveLock guarded-fingerprint=verified-through-durable-fence idle-poll=full-fingerprint-changed
 m1 ddl e2e pass seed=m1-ddl-v1 pg_majors=3 cleanup=trap

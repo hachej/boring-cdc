@@ -4,6 +4,9 @@
   "feedback_checkpoint": "0/0",
   "generation": 7,
   "guard_phase": "released_after_durable_fence",
+  "guarded_catalog_verifications": 3,
+  "malformed_wire_key_indexes_blocked": 1,
   "matrix_conflicts": 18,
+  "replica_identity_mismatches_blocked": 1,
   "waiters_released": 3
 }
