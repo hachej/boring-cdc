@@ -3,6 +3,7 @@
 //! Domain runtimes provide clocks, lifecycle fencing, recovery proofs, and the sole SQLite
 //! writer. This module does not sleep, reconnect, advance boundaries, or open a database.
 
+use crate::m1_transition_kernel::TransitionContext;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -10,6 +11,8 @@ use std::collections::BTreeMap;
 
 pub const POLICY_VERSION: &str = "failure-policy-v1";
 pub const JITTER_SEED: &str = "failure-policy-v1";
+// M0-PROVISIONAL: boring-cdc-m2.1
+pub const JITTER_SEED_U64: u64 = 0x6661_696c_7572_652d;
 // M0-PROVISIONAL: boring-cdc-m2.1
 pub const BASE_DELAY_MS: u64 = 1_000;
 // M0-PROVISIONAL: boring-cdc-m2.1
@@ -19,6 +22,7 @@ pub const MAX_ATTEMPTS: u32 = 8;
 // M0-PROVISIONAL: boring-cdc-m2.1
 pub const JITTER_BASIS_POINTS: u16 = 2_000; // symmetric +/-20%
 
+// M0-PROVISIONAL: boring-cdc-m2.1 -- closed taxonomy pending canonical M0 artifact
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FailureClass {
@@ -65,6 +69,7 @@ impl FailureClass {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+// M0-PROVISIONAL: boring-cdc-m2.1 -- stable codes pending canonical M0 artifact
 pub enum StableErrorCode {
     TransportUnavailable,
     DeadlineExceeded,
@@ -287,7 +292,6 @@ pub struct FailureRecord {
 pub struct FailureObservation {
     pub fingerprint: FingerprintInput,
     pub destination_id: Option<String>,
-    pub observed_at_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -302,7 +306,7 @@ pub struct CompletionToken {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PolicyEvent {
     Observe(FailureObservation),
-    RetryDue { now_ms: u64 },
+    RetryDue,
     Completed(CompletionToken),
     ProcessRestarted,
     Rearm(RearmRequest),
@@ -317,7 +321,6 @@ pub struct RearmRequest {
     pub integrity_recovery_proven: bool,
     pub continuity_recovery_proven: bool,
     pub explicit_operator_authorization: bool,
-    pub now_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -325,21 +328,31 @@ pub enum PolicyAction {
     Persist(FailureRecord),
     RetryNow(FailureRecord),
     Suppressed,
-    Clear { failure_id: String },
+    Clear {
+        failure_id: String,
+        fingerprint: String,
+        attempt: u32,
+        destination_id: Option<String>,
+    },
     StaleCompletion,
     RejectedRearm,
+    Rearmed(FailureRecord),
     Noop,
 }
 
-pub fn transition(current: Option<&FailureRecord>, event: PolicyEvent) -> PolicyAction {
+pub fn transition(
+    current: Option<&FailureRecord>,
+    event: PolicyEvent,
+    context: &mut TransitionContext<'_>,
+) -> PolicyAction {
     match event {
-        PolicyEvent::Observe(observation) => observe(current, observation),
-        PolicyEvent::RetryDue { now_ms } => match current {
+        PolicyEvent::Observe(observation) => observe(current, observation, context),
+        PolicyEvent::RetryDue => match current {
             Some(record)
                 if record.armed
                     && record
                         .next_retry_at_ms
-                        .is_some_and(|next_retry| now_ms >= next_retry) =>
+                        .is_some_and(|next_retry| context.clock.now() >= next_retry) =>
             {
                 PolicyAction::RetryNow(record.clone())
             }
@@ -355,6 +368,9 @@ pub fn transition(current: Option<&FailureRecord>, event: PolicyEvent) -> Policy
             {
                 PolicyAction::Clear {
                     failure_id: record.failure_id.clone(),
+                    fingerprint: record.fingerprint.clone(),
+                    attempt: record.attempt,
+                    destination_id: record.destination_id.clone(),
                 }
             }
             _ => PolicyAction::StaleCompletion,
@@ -363,13 +379,18 @@ pub fn transition(current: Option<&FailureRecord>, event: PolicyEvent) -> Policy
             .cloned()
             .map(PolicyAction::Persist)
             .unwrap_or(PolicyAction::Noop),
-        PolicyEvent::Rearm(request) => rearm(current, request),
+        PolicyEvent::Rearm(request) => rearm(current, request, context),
     }
 }
 
-fn observe(current: Option<&FailureRecord>, observation: FailureObservation) -> PolicyAction {
+fn observe(
+    current: Option<&FailureRecord>,
+    observation: FailureObservation,
+    context: &mut TransitionContext<'_>,
+) -> PolicyAction {
     let fingerprint = build_fingerprint(&observation.fingerprint);
     if let Some(record) = current
+        && record.armed
         && record.fingerprint == fingerprint
         && !is_automatic_retry(record.class)
     {
@@ -377,21 +398,21 @@ fn observe(current: Option<&FailureRecord>, observation: FailureObservation) -> 
     }
     let same = current.filter(|record| record.fingerprint == fingerprint);
     let attempt = same.map_or(1, |record| record.attempt.saturating_add(1));
-    let first_failed_at_ms = same.map_or(observation.observed_at_ms, |record| {
-        record.first_failed_at_ms
-    });
-    let effective_now = same.map_or(observation.observed_at_ms, |record| {
-        observation.observed_at_ms.max(record.last_failed_at_ms)
-    });
+    let now_ms = context.clock.now();
+    let first_failed_at_ms = same.map_or(now_ms, |record| record.first_failed_at_ms);
+    let effective_now = same.map_or(now_ms, |record| now_ms.max(record.last_failed_at_ms));
     let class = observation.fingerprint.class;
     let exhausted = is_automatic_retry(class) && attempt > MAX_ATTEMPTS;
     let next_retry_at_ms = if is_automatic_retry(class) && !exhausted {
-        Some(effective_now.saturating_add(retry_delay_ms(&fingerprint, attempt)))
+        Some(effective_now.saturating_add(retry_delay_ms(context.randomness.next_u64(), attempt)))
     } else {
         None
     };
     let failure_id = same.map_or_else(
-        || format!("failure-{}", &fingerprint[7..]),
+        || {
+            let boundary_digest = Sha256::digest(observation.fingerprint.boundary.canonical());
+            format!("failure-{boundary_digest:x}-{}", &fingerprint[7..])
+        },
         |record| record.failure_id.clone(),
     );
     PolicyAction::Persist(FailureRecord {
@@ -416,23 +437,21 @@ const fn is_automatic_retry(class: FailureClass) -> bool {
     )
 }
 
-fn retry_delay_ms(fingerprint: &str, attempt: u32) -> u64 {
+fn retry_delay_ms(sample: u64, attempt: u32) -> u64 {
     let exponent = attempt.saturating_sub(1).min(62);
     let nominal = BASE_DELAY_MS
         .saturating_mul(1_u64 << exponent)
         .min(MAX_DELAY_MS);
     let width = nominal.saturating_mul(u64::from(JITTER_BASIS_POINTS)) / 10_000;
-    let mut hasher = Sha256::new();
-    hasher.update(JITTER_SEED.as_bytes());
-    hasher.update(fingerprint.as_bytes());
-    hasher.update(attempt.to_be_bytes());
-    let bytes = hasher.finalize();
-    let sample = u64::from_be_bytes(bytes[..8].try_into().expect("fixed digest width"));
     let span = width.saturating_mul(2).saturating_add(1);
     nominal.saturating_sub(width).saturating_add(sample % span)
 }
 
-fn rearm(current: Option<&FailureRecord>, request: RearmRequest) -> PolicyAction {
+fn rearm(
+    current: Option<&FailureRecord>,
+    request: RearmRequest,
+    context: &mut TransitionContext<'_>,
+) -> PolicyAction {
     let Some(record) = current else {
         return PolicyAction::RejectedRearm;
     };
@@ -462,21 +481,25 @@ fn rearm(current: Option<&FailureRecord>, request: RearmRequest) -> PolicyAction
         return PolicyAction::RejectedRearm;
     }
     let mut rearmed = record.clone();
-    rearmed.attempt = 1;
+    rearmed.attempt = record.attempt;
     rearmed.armed = true;
-    rearmed.last_failed_at_ms = request.now_ms.max(record.last_failed_at_ms);
-    rearmed.next_retry_at_ms = Some(
-        rearmed
-            .last_failed_at_ms
-            .saturating_add(retry_delay_ms(&record.fingerprint, 1)),
-    );
-    PolicyAction::Persist(rearmed)
+    rearmed.last_failed_at_ms = context.clock.now().max(record.last_failed_at_ms);
+    rearmed.next_retry_at_ms = if is_automatic_retry(record.class) {
+        Some(
+            rearmed
+                .last_failed_at_ms
+                .saturating_add(retry_delay_ms(context.randomness.next_u64(), 1)),
+        )
+    } else {
+        None
+    };
+    PolicyAction::Rearmed(rearmed)
 }
 
+// M0-PROVISIONAL: boring-cdc-m2.1 -- typed hook variants pending canonical M0 artifact
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum DomainOutcome {
-    CaptureSafeStopped,
-    DestinationBlocked,
+pub enum CaptureOutcome {
+    SafeStopped,
     RetryEligible,
     IntegrityRecoveryRequired,
     ContinuityRecoveryRequired,
@@ -485,11 +508,31 @@ pub enum DomainOutcome {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DomainHookInput {
-    pub outcome: DomainOutcome,
-    pub capture_epoch: String,
-    pub connection_generation: u64,
-    pub expected_close_generation: Option<u64>,
+pub enum DestinationOutcome {
+    Blocked,
+    RetryEligible,
+    IntegrityRecoveryRequired,
+    ContinuityRecoveryRequired,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DomainHookInput {
+    Capture {
+        outcome: CaptureOutcome,
+        capture_epoch: String,
+        connection_generation: u64,
+        expected_close_generation: Option<u64>,
+    },
+    ClickHouse {
+        outcome: DestinationOutcome,
+        capture_epoch: String,
+        generation: u64,
+    },
+    Archive {
+        outcome: DestinationOutcome,
+        capture_epoch: String,
+        generation: u64,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -511,20 +554,59 @@ pub struct StrictDomainHook;
 
 impl DomainRecoveryHook for StrictDomainHook {
     fn project(&self, input: &DomainHookInput) -> DomainProjection {
-        match input.outcome {
-            DomainOutcome::CaptureSafeStopped => DomainProjection::SafeStopped,
-            DomainOutcome::DestinationBlocked => DomainProjection::Blocked,
-            DomainOutcome::RetryEligible => DomainProjection::RetryEligible,
-            DomainOutcome::IntegrityRecoveryRequired
-            | DomainOutcome::ContinuityRecoveryRequired => DomainProjection::RecoveryRequired,
-            DomainOutcome::ExpectedClose
-                if input.expected_close_generation == Some(input.connection_generation) =>
-            {
-                DomainProjection::ExpectedClose
+        match input {
+            DomainHookInput::Capture {
+                outcome: CaptureOutcome::SafeStopped,
+                ..
+            } => DomainProjection::SafeStopped,
+            DomainHookInput::Capture {
+                outcome: CaptureOutcome::RetryEligible,
+                ..
             }
-            DomainOutcome::ExpectedClose | DomainOutcome::UnexpectedClose => {
-                DomainProjection::OwnershipLost
+            | DomainHookInput::ClickHouse {
+                outcome: DestinationOutcome::RetryEligible,
+                ..
             }
+            | DomainHookInput::Archive {
+                outcome: DestinationOutcome::RetryEligible,
+                ..
+            } => DomainProjection::RetryEligible,
+            DomainHookInput::ClickHouse {
+                outcome: DestinationOutcome::Blocked,
+                ..
+            }
+            | DomainHookInput::Archive {
+                outcome: DestinationOutcome::Blocked,
+                ..
+            } => DomainProjection::Blocked,
+            DomainHookInput::Capture {
+                outcome:
+                    CaptureOutcome::IntegrityRecoveryRequired
+                    | CaptureOutcome::ContinuityRecoveryRequired,
+                ..
+            }
+            | DomainHookInput::ClickHouse {
+                outcome:
+                    DestinationOutcome::IntegrityRecoveryRequired
+                    | DestinationOutcome::ContinuityRecoveryRequired,
+                ..
+            }
+            | DomainHookInput::Archive {
+                outcome:
+                    DestinationOutcome::IntegrityRecoveryRequired
+                    | DestinationOutcome::ContinuityRecoveryRequired,
+                ..
+            } => DomainProjection::RecoveryRequired,
+            DomainHookInput::Capture {
+                outcome: CaptureOutcome::ExpectedClose,
+                connection_generation,
+                expected_close_generation: Some(expected),
+                ..
+            } if connection_generation == expected => DomainProjection::ExpectedClose,
+            DomainHookInput::Capture {
+                outcome: CaptureOutcome::ExpectedClose | CaptureOutcome::UnexpectedClose,
+                ..
+            } => DomainProjection::OwnershipLost,
         }
     }
 }
@@ -534,6 +616,8 @@ pub enum PreparedFailureOperation {
     StoreAndArm(FailureRecord),
     Clear {
         failure_id: String,
+        fingerprint: String,
+        attempt: u32,
         destination_id: Option<String>,
     },
 }
@@ -551,9 +635,12 @@ impl PreparedFailureOperation {
                         record.class.persisted_retry_class()
                     };
                 transaction.execute(
-                    "INSERT INTO processing_failures(failure_id,destination_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13) ON CONFLICT(failure_id) DO UPDATE SET retry_class=excluded.retry_class,attempt=excluded.attempt,next_retry_at=excluded.next_retry_at,armed=excluded.armed,last_failed_at=excluded.last_failed_at",
+                    "INSERT INTO processing_failures(failure_id,destination_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13) ON CONFLICT(failure_id) DO UPDATE SET retry_class=excluded.retry_class,attempt=excluded.attempt,next_retry_at=excluded.next_retry_at,armed=excluded.armed,last_failed_at=excluded.last_failed_at WHERE processing_failures.fingerprint=excluded.fingerprint AND (processing_failures.attempt+1=excluded.attempt OR (processing_failures.attempt=excluded.attempt AND processing_failures.armed=excluded.armed AND processing_failures.next_retry_at IS excluded.next_retry_at AND processing_failures.last_failed_at=excluded.last_failed_at))",
                     params![record.failure_id,record.destination_id,record.component,record.class.as_str(),record.fingerprint,start,end,retry_class,record.attempt,record.next_retry_at_ms.map(timestamp),i64::from(record.armed),timestamp(record.first_failed_at_ms),timestamp(record.last_failed_at_ms)],
                 )?;
+                if transaction.changes() != 1 {
+                    return Err(rusqlite::Error::InvalidQuery);
+                }
                 if let Some(destination_id) = &record.destination_id {
                     transaction.execute(
                         "UPDATE destinations SET current_failure_id=?1,revision=revision+1 WHERE destination_id=?2",
@@ -566,8 +653,17 @@ impl PreparedFailureOperation {
             }
             Self::Clear {
                 failure_id,
+                fingerprint,
+                attempt,
                 destination_id,
             } => {
+                transaction.execute(
+                    "UPDATE processing_failures SET armed=0,retry_class=CASE WHEN retry_class='transient' THEN 'exhausted' ELSE retry_class END,next_retry_at=NULL WHERE failure_id=?1 AND fingerprint=?2 AND attempt=?3 AND armed=1",
+                    params![failure_id, fingerprint, attempt],
+                )?;
+                if transaction.changes() != 1 {
+                    return Err(rusqlite::Error::QueryReturnedNoRows);
+                }
                 if let Some(destination_id) = destination_id {
                     transaction.execute(
                         "UPDATE destinations SET current_failure_id=NULL,revision=revision+1 WHERE destination_id=?1 AND current_failure_id=?2",
@@ -576,13 +672,6 @@ impl PreparedFailureOperation {
                     if transaction.changes() != 1 {
                         return Err(rusqlite::Error::QueryReturnedNoRows);
                     }
-                }
-                transaction.execute(
-                    "UPDATE processing_failures SET armed=0,retry_class=CASE WHEN retry_class='transient' THEN 'exhausted' ELSE retry_class END,next_retry_at=NULL WHERE failure_id=?1",
-                    [failure_id],
-                )?;
-                if transaction.changes() != 1 {
-                    return Err(rusqlite::Error::QueryReturnedNoRows);
                 }
             }
         }
@@ -632,7 +721,10 @@ pub fn load_failure(
     else {
         return Ok(None);
     };
-    if boundary.seq_range() != (start, end) {
+    let boundary_digest = format!("{:x}", Sha256::digest(boundary.canonical()));
+    if boundary.seq_range() != (start, end)
+        || !failure_id.starts_with(&format!("failure-{boundary_digest}-"))
+    {
         return Err(rusqlite::Error::InvalidQuery);
     }
     Ok(Some(FailureRecord {
@@ -677,6 +769,7 @@ fn timestamp(ms: u64) -> String {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::m1_transition_kernel::{SplitMix64, VirtualClock};
     use crate::m2_schema::open_writer;
     use std::fs;
     use std::path::PathBuf;
@@ -691,10 +784,9 @@ pub mod tests {
         }
     }
 
-    fn observation(class: FailureClass, at: u64) -> FailureObservation {
+    fn observation(class: FailureClass, _at: u64) -> FailureObservation {
         FailureObservation {
             destination_id: Some("destination-a".into()),
-            observed_at_ms: at,
             fingerprint: FingerprintInput {
                 component: Component::Archive,
                 class,
@@ -704,6 +796,24 @@ pub mod tests {
                 context: BTreeMap::from([(SafeContextKey::Operation, SafeContextValue::Publish)]),
             },
         }
+    }
+
+    fn run_transition(current: Option<&FailureRecord>, event: PolicyEvent) -> PolicyAction {
+        run_transition_at(current, event, 10_000)
+    }
+
+    fn run_transition_at(
+        current: Option<&FailureRecord>,
+        event: PolicyEvent,
+        now_ms: u64,
+    ) -> PolicyAction {
+        let clock = VirtualClock::new(now_ms);
+        let mut randomness = SplitMix64::new(JITTER_SEED_U64);
+        let mut context = TransitionContext {
+            clock: &clock,
+            randomness: &mut randomness,
+        };
+        transition(current, event, &mut context)
     }
 
     fn persisted(action: PolicyAction) -> FailureRecord {
@@ -739,31 +849,32 @@ pub mod tests {
 
     #[test]
     fn deterministic_schedule_caps_jitters_and_ignores_clock_rollback() {
-        let first = persisted(transition(
+        let first = persisted(run_transition(
             None,
             PolicyEvent::Observe(observation(FailureClass::Transient, 10_000)),
         ));
         assert!((800..=1_200).contains(&(first.next_retry_at_ms.unwrap() - 10_000)));
-        let replay = persisted(transition(
+        let replay = persisted(run_transition(
             None,
             PolicyEvent::Observe(observation(FailureClass::Transient, 10_000)),
         ));
         assert_eq!(first, replay);
-        let second = persisted(transition(
+        let second = persisted(run_transition_at(
             Some(&first),
             PolicyEvent::Observe(observation(FailureClass::Transient, 1)),
+            1,
         ));
         assert_eq!(second.last_failed_at_ms, 10_000);
         assert!((1_600..=2_400).contains(&(second.next_retry_at_ms.unwrap() - 10_000)));
         let mut current = second;
         for _ in 2..MAX_ATTEMPTS {
-            current = persisted(transition(
+            current = persisted(run_transition(
                 Some(&current),
                 PolicyEvent::Observe(observation(FailureClass::Transient, 10_000)),
             ));
         }
         assert!(current.next_retry_at_ms.unwrap() - 10_000 <= 360_000);
-        let exhausted = persisted(transition(
+        let exhausted = persisted(run_transition(
             Some(&current),
             PolicyEvent::Observe(observation(FailureClass::Transient, 10_000)),
         ));
@@ -773,16 +884,16 @@ pub mod tests {
 
     #[test]
     fn restart_preserves_attempt_and_same_deterministic_failure_is_suppressed() {
-        let record = persisted(transition(
+        let record = persisted(run_transition(
             None,
             PolicyEvent::Observe(observation(FailureClass::Deterministic, 50)),
         ));
         assert_eq!(
-            transition(Some(&record), PolicyEvent::ProcessRestarted),
+            run_transition(Some(&record), PolicyEvent::ProcessRestarted),
             PolicyAction::Persist(record.clone())
         );
         assert_eq!(
-            transition(
+            run_transition(
                 Some(&record),
                 PolicyEvent::Observe(observation(FailureClass::Deterministic, 60))
             ),
@@ -813,7 +924,7 @@ pub mod tests {
             FailureClass::Configuration,
             FailureClass::OperatorBlocked,
         ] {
-            let record = persisted(transition(
+            let record = persisted(run_transition(
                 None,
                 PolicyEvent::Observe(observation(class, 100)),
             ));
@@ -825,10 +936,9 @@ pub mod tests {
                 integrity_recovery_proven: false,
                 continuity_recovery_proven: false,
                 explicit_operator_authorization: false,
-                now_ms: 200,
             };
             assert_eq!(
-                transition(Some(&record), PolicyEvent::Rearm(base.clone())),
+                run_transition(Some(&record), PolicyEvent::Rearm(base.clone())),
                 PolicyAction::RejectedRearm
             );
             let mut allowed = base;
@@ -847,15 +957,15 @@ pub mod tests {
                 _ => unreachable!(),
             }
             assert!(matches!(
-                transition(Some(&record), PolicyEvent::Rearm(allowed)),
-                PolicyAction::Persist(_)
+                run_transition(Some(&record), PolicyEvent::Rearm(allowed)),
+                PolicyAction::Rearmed(_)
             ));
         }
     }
 
     #[test]
     fn stale_epoch_generation_attempt_and_fingerprint_completions_cannot_clear() {
-        let record = persisted(transition(
+        let record = persisted(run_transition(
             None,
             PolicyEvent::Observe(observation(FailureClass::Transient, 0)),
         ));
@@ -867,9 +977,12 @@ pub mod tests {
             attempt: 1,
         };
         assert_eq!(
-            transition(Some(&record), PolicyEvent::Completed(valid.clone())),
+            run_transition(Some(&record), PolicyEvent::Completed(valid.clone())),
             PolicyAction::Clear {
-                failure_id: record.failure_id.clone()
+                failure_id: record.failure_id.clone(),
+                fingerprint: record.fingerprint.clone(),
+                attempt: record.attempt,
+                destination_id: record.destination_id.clone(),
             }
         );
         for stale in [
@@ -891,28 +1004,134 @@ pub mod tests {
             },
         ] {
             assert_eq!(
-                transition(Some(&record), PolicyEvent::Completed(stale)),
+                run_transition(Some(&record), PolicyEvent::Completed(stale)),
                 PolicyAction::StaleCompletion
             );
         }
     }
 
     #[test]
+    fn retry_due_boundaries_and_cleared_recurrence_fail_closed() {
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::Transient, 0)),
+        ));
+        let due = record.next_retry_at_ms.unwrap();
+        assert_eq!(
+            run_transition_at(Some(&record), PolicyEvent::RetryDue, due - 1),
+            PolicyAction::Noop
+        );
+        assert_eq!(
+            run_transition_at(Some(&record), PolicyEvent::RetryDue, due),
+            PolicyAction::RetryNow(record.clone())
+        );
+        let mut cleared = record;
+        cleared.armed = false;
+        cleared.next_retry_at_ms = None;
+        let recurrence = persisted(run_transition(
+            Some(&cleared),
+            PolicyEvent::Observe(observation(FailureClass::Transient, due + 1)),
+        ));
+        assert!(recurrence.armed);
+        assert_eq!(recurrence.attempt, cleared.attempt + 1);
+    }
+
+    #[test]
+    fn non_transient_rearm_is_persistable_and_stale_operations_are_rejected() {
+        let path = temp_path();
+        let mut writer = open_writer(&path, "run", 1, 0).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','archive','config-a','epoch-a',7)", []).unwrap();
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::Integrity, 0)),
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm(record.clone())
+            .execute(&tx)
+            .unwrap();
+        tx.commit().unwrap();
+        let request = RearmRequest {
+            expected_failure_id: record.failure_id.clone(),
+            expected_fingerprint: record.fingerprint.clone(),
+            new_failure_fingerprint_for_relevant_configuration: None,
+            retained_wal_proven: false,
+            integrity_recovery_proven: true,
+            continuity_recovery_proven: false,
+            explicit_operator_authorization: false,
+        };
+        let rearmed = match run_transition(Some(&record), PolicyEvent::Rearm(request)) {
+            PolicyAction::Rearmed(record) => record,
+            other => panic!("expected rearm, got {other:?}"),
+        };
+        assert_eq!(rearmed.next_retry_at_ms, None);
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm(rearmed)
+            .execute(&tx)
+            .unwrap();
+        tx.commit().unwrap();
+        let newer = persisted(run_transition(
+            Some(&record),
+            PolicyEvent::Observe(FailureObservation {
+                fingerprint: FingerprintInput {
+                    class: FailureClass::Transient,
+                    ..observation(FailureClass::Transient, 0).fingerprint
+                },
+                destination_id: Some("destination-a".into()),
+            }),
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        // A different fingerprint receives a different immutable failure id.
+        PreparedFailureOperation::StoreAndArm(newer)
+            .execute(&tx)
+            .unwrap();
+        tx.commit().unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        let stale_clear = PreparedFailureOperation::Clear {
+            failure_id: record.failure_id.clone(),
+            fingerprint: record.fingerprint.clone(),
+            attempt: record.attempt + 1,
+            destination_id: record.destination_id.clone(),
+        };
+        assert!(stale_clear.execute(&tx).is_err());
+        tx.rollback().unwrap();
+        drop(writer);
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
     fn synthetic_hooks_fail_closed_on_close_generation_mismatch() {
         let hook = StrictDomainHook;
-        let input = DomainHookInput {
-            outcome: DomainOutcome::ExpectedClose,
+        let capture = DomainHookInput::Capture {
+            outcome: CaptureOutcome::ExpectedClose,
             capture_epoch: "epoch".into(),
             connection_generation: 4,
             expected_close_generation: Some(3),
         };
-        assert_eq!(hook.project(&input), DomainProjection::OwnershipLost);
+        assert_eq!(hook.project(&capture), DomainProjection::OwnershipLost);
         assert_eq!(
-            hook.project(&DomainHookInput {
+            hook.project(&DomainHookInput::Capture {
+                outcome: CaptureOutcome::ExpectedClose,
+                capture_epoch: "epoch".into(),
+                connection_generation: 4,
                 expected_close_generation: Some(4),
-                ..input
             }),
             DomainProjection::ExpectedClose
+        );
+        assert_eq!(
+            hook.project(&DomainHookInput::ClickHouse {
+                outcome: DestinationOutcome::IntegrityRecoveryRequired,
+                capture_epoch: "epoch".into(),
+                generation: 7,
+            }),
+            DomainProjection::RecoveryRequired
+        );
+        assert_eq!(
+            hook.project(&DomainHookInput::Archive {
+                outcome: DestinationOutcome::Blocked,
+                capture_epoch: "epoch".into(),
+                generation: 7,
+            }),
+            DomainProjection::Blocked
         );
     }
 
@@ -932,7 +1151,7 @@ pub mod tests {
         let path = temp_path();
         let mut writer = open_writer(&path, "run", 1, 0).unwrap();
         writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','archive','config-a','epoch-a',7)", []).unwrap();
-        let record = persisted(transition(
+        let record = persisted(run_transition(
             None,
             PolicyEvent::Observe(observation(FailureClass::Transient, 1_000)),
         ));
@@ -962,10 +1181,28 @@ pub mod tests {
             )
             .is_err()
         );
+        let retry = persisted(run_transition(
+            Some(&record),
+            PolicyEvent::Observe(observation(FailureClass::Transient, 2_000)),
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm(retry.clone())
+            .execute(&tx)
+            .unwrap();
+        tx.commit().unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        assert!(
+            PreparedFailureOperation::StoreAndArm(record.clone())
+                .execute(&tx)
+                .is_err()
+        );
+        tx.rollback().unwrap();
         let tx = writer.connection_mut().transaction().unwrap();
         PreparedFailureOperation::Clear {
-            failure_id: record.failure_id.clone(),
-            destination_id: record.destination_id.clone(),
+            failure_id: retry.failure_id.clone(),
+            fingerprint: retry.fingerprint.clone(),
+            attempt: retry.attempt,
+            destination_id: retry.destination_id.clone(),
         }
         .execute(&tx)
         .unwrap();

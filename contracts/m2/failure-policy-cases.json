@@ -4,23 +4,96 @@
   "policy_version": "failure-policy-v1",
   "fixed_seed": "failure-policy-v1",
   "evidence_tier": "leaf",
-  "test_doubles": ["StrictDomainHook"],
-  "downstream_real_adapter_owners": ["boring-cdc-m2-capture-runtime", "boring-cdc-m2-jsonl", "boring-cdc-m4-durability", "boring-cdc-m5-loops"],
+  "test_doubles": [
+    "StrictDomainHook"
+  ],
+  "downstream_real_adapter_owners": [
+    "boring-cdc-m2-capture-runtime",
+    "boring-cdc-m2-jsonl",
+    "boring-cdc-m4-durability",
+    "boring-cdc-m5-loops"
+  ],
   "provisional_literals": {
     "base_delay_ms": 1000,
     "max_delay_ms": 300000,
     "max_attempts": 8,
     "jitter_basis_points": 2000,
-    "marker": "M0-PROVISIONAL: boring-cdc-m2.1"
+    "marker": "M0-PROVISIONAL: boring-cdc-m2.1",
+    "taxonomy": [
+      "transient",
+      "deterministic",
+      "integrity",
+      "continuity",
+      "configuration",
+      "resource_pressure",
+      "operator_blocked"
+    ],
+    "stable_error_codes": [
+      "transport_unavailable",
+      "deadline_exceeded",
+      "invalid_record",
+      "checksum_mismatch",
+      "history_unavailable",
+      "unsupported_configuration",
+      "resource_limit",
+      "operator_pause"
+    ],
+    "typed_hook_shapes": [
+      "capture",
+      "clickhouse",
+      "archive"
+    ]
   },
   "cases": [
-    {"id":"SCN-M2-FAILURE-ENUM","test":"exhaustive_classes_have_closed_stable_serialization","assertion":"all seven failure classes serialize through one closed enum"},
-    {"id":"SCN-M2-FAILURE-SCHEDULE","test":"deterministic_schedule_caps_jitters_and_ignores_clock_rollback","assertion":"fixed-seed exponential schedule is deterministic, capped, bounded-jittered, and monotonic under clock rollback"},
-    {"id":"SCN-M2-FAILURE-RESTART-SUPPRESS","test":"restart_preserves_attempt_and_same_deterministic_failure_is_suppressed","assertion":"restart preserves persisted attempts and same deterministic fingerprint cannot hot-loop"},
-    {"id":"SCN-M2-FAILURE-FINGERPRINT","test":"fingerprint_changes_only_for_allowed_canonical_inputs_and_contains_no_raw_data","assertion":"length-framed SHA-256 fingerprint consumes only closed nonsecret context and emits no raw context or epoch"},
-    {"id":"SCN-M2-FAILURE-REARM","test":"rearm_requires_class_specific_proofs_and_rejects_unrelated_change","assertion":"integrity, continuity, configuration, and operator classes require their typed stronger proof"},
-    {"id":"SCN-M2-FAILURE-STALE","test":"stale_epoch_generation_attempt_and_fingerprint_completions_cannot_clear","assertion":"stale completion identity cannot clear a current failure"},
-    {"id":"SCN-M2-FAILURE-HOOKS","test":"synthetic_hooks_fail_closed_on_close_generation_mismatch","assertion":"synthetic typed domain hook accepts expected close only for the matching connection generation"},
-    {"id":"SCN-M2-FAILURE-PERSISTENCE","test":"prepared_adapter_persists_reopens_and_clears_via_supplied_transaction","assertion":"prepared operations execute only through a supplied transaction, survive reopen, validate boundary context, and preserve destination current_failure_id"}
+    {
+      "id": "SCN-M2-FAILURE-ENUM",
+      "test": "exhaustive_classes_have_closed_stable_serialization",
+      "assertion": "all seven failure classes serialize through one closed enum"
+    },
+    {
+      "id": "SCN-M2-FAILURE-SCHEDULE",
+      "test": "deterministic_schedule_caps_jitters_and_ignores_clock_rollback",
+      "assertion": "fixed-seed exponential schedule is deterministic, capped, bounded-jittered, and monotonic under clock rollback"
+    },
+    {
+      "id": "SCN-M2-FAILURE-RESTART-SUPPRESS",
+      "test": "restart_preserves_attempt_and_same_deterministic_failure_is_suppressed",
+      "assertion": "restart preserves persisted attempts and same deterministic fingerprint cannot hot-loop"
+    },
+    {
+      "id": "SCN-M2-FAILURE-FINGERPRINT",
+      "test": "fingerprint_changes_only_for_allowed_canonical_inputs_and_contains_no_raw_data",
+      "assertion": "length-framed SHA-256 fingerprint consumes only closed nonsecret context and emits no raw context or epoch"
+    },
+    {
+      "id": "SCN-M2-FAILURE-REARM",
+      "test": "rearm_requires_class_specific_proofs_and_rejects_unrelated_change",
+      "assertion": "integrity, continuity, configuration, and operator classes require their typed stronger proof"
+    },
+    {
+      "id": "SCN-M2-FAILURE-STALE",
+      "test": "stale_epoch_generation_attempt_and_fingerprint_completions_cannot_clear",
+      "assertion": "stale completion identity cannot clear a current failure"
+    },
+    {
+      "id": "SCN-M2-FAILURE-HOOKS",
+      "test": "synthetic_hooks_fail_closed_on_close_generation_mismatch",
+      "assertion": "synthetic typed domain hook accepts expected close only for the matching connection generation"
+    },
+    {
+      "id": "SCN-M2-FAILURE-PERSISTENCE",
+      "test": "prepared_adapter_persists_reopens_and_clears_via_supplied_transaction",
+      "assertion": "prepared operations execute only through a supplied transaction, survive reopen, validate boundary context, and preserve destination current_failure_id"
+    },
+    {
+      "id": "SCN-M2-FAILURE-DUE-RECURRENCE",
+      "test": "retry_due_boundaries_and_cleared_recurrence_fail_closed",
+      "assertion": "retry fires exactly at its persisted boundary and a cleared same-fingerprint recurrence re-arms with a higher attempt"
+    },
+    {
+      "id": "SCN-M2-FAILURE-PERSISTENCE-CAS",
+      "test": "non_transient_rearm_is_persistable_and_stale_operations_are_rejected",
+      "assertion": "non-transient re-arm satisfies schema constraints and stale transactional clears fail closed"
+    }
   ]
 }
