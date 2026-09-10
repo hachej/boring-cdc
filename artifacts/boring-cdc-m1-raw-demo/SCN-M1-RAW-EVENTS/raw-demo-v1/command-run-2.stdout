@@ -1,0 +1,8 @@
+scenario=SCN-M1-RAW-EVENTS seed=raw-demo-v1 pg=17 slot=pgoutput
+raw_pgoutput tags=B,R,U,C lengths=21,84,55,26 payload_values=redacted
+PASS pgoutput_update=decoded_typed_noop feedback=awaits_durable_commit
+raw_pgoutput tags=B,R,T,C lengths=21,51,10,26 payload_values=redacted
+PASS pgoutput_truncate=decoded_block_before_feedback
+PASS live_catalog=exact fingerprint=2ac597b232224b4d2cffcf4a815ad917a95e5afc1620b4eefc66a7d92441dd52
+PASS live_catalog_drift=publication_drift_requires_reseed
+PASS actual_sql=heartbeat,truncate,publication_drift checkpoint=unchanged cleanup=trap

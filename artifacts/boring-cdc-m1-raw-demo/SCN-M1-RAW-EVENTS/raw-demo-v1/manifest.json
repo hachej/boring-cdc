@@ -1,0 +1,78 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/e2e/m1_raw_demo.sh raw-demo-v1",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-1.stdout",
+      "stdout_sha256": "8f618b25cf0d1bf215e6748774e9675933a4059abfa39a3d2a3f6480c4dcf016",
+      "version": "raw-demo-v1"
+    },
+    {
+      "argv": "scripts/e2e/m1_raw_demo.sh raw-demo-v1",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-2.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-2.stdout",
+      "stdout_sha256": "8f618b25cf0d1bf215e6748774e9675933a4059abfa39a3d2a3f6480c4dcf016",
+      "version": "raw-demo-v1"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "leaf",
+  "git_commit": "c0edcf879293698b4f666bca2f5a7487b679ccfa",
+  "owner_bead": "boring-cdc-m1-raw-demo",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-1.stderr",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-1.stdout",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-2.stderr",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command-run-2.stdout",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command.stderr",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/command.stdout",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/commands.txt",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/config.json",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/fault-timeline.json",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/logs/boring-cdc.jsonl",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/packet.json",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/state/after.json",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/state/before.json",
+      "artifacts/boring-cdc-m1-raw-demo/SCN-M1-RAW-EVENTS/raw-demo-v1/versions.json"
+    ],
+    "digest": "fb963dc3a87a02ca17f9fc51488569f9df756ad5921b0742bdf4d973d08de252",
+    "product_faults": "actual_pgoutput_inspection",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-RAW-EVENTS",
+  "schema_version": "evidence/v1",
+  "seed": "raw-demo-v1",
+  "source_preservation": {
+    "after_sha256": "5967950e3db7e0d3efd5133d8bd82dfc32d6058fb2b34e437c6bdc5a7c8860c1",
+    "before_sha256": "5967950e3db7e0d3efd5133d8bd82dfc32d6058fb2b34e437c6bdc5a7c8860c1",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": false,
+    "full_failure_matrix": false,
+    "integration": true,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

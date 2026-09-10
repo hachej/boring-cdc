@@ -1,0 +1,110 @@
+{
+  "faults": [
+    {
+      "checkpoint": "unchanged_until_durable",
+      "consumed_owner": "boring-cdc-m1-decoder",
+      "log": "raw_event_normalized",
+      "scenario_id": "SCN-M1-RAW-FIXED-SEED",
+      "state": "decoded"
+    },
+    {
+      "checkpoint": "durable_only",
+      "consumed_owner": "boring-cdc-m1-decoder",
+      "log": "copyboth_restart_safe",
+      "scenario_id": "SCN-M1-RAW-COPYBOTH-RESTART",
+      "state": "resume_safe"
+    },
+    {
+      "checkpoint": "durable_only",
+      "consumed_owner": "boring-cdc-m1-control-fixtures",
+      "log": "heartbeat_control_noop",
+      "scenario_id": "SCN-M1-RAW-HEARTBEAT",
+      "state": "durable_noop"
+    },
+    {
+      "checkpoint": "creation_floor_not_progress",
+      "consumed_owner": "boring-cdc-m1-bootstrap-sm",
+      "log": "bootstrap_gate",
+      "scenario_id": "SCN-M1-RAW-BOOTSTRAP",
+      "state": "feedback_gated"
+    },
+    {
+      "checkpoint": "fence_observed",
+      "consumed_owner": "boring-cdc-m1-workload",
+      "log": "exact_set_pass",
+      "scenario_id": "SCN-M1-RAW-EXACT-SET",
+      "state": "oracle_pass"
+    },
+    {
+      "checkpoint": "unchanged",
+      "consumed_owner": "boring-cdc-m1-bootstrap-sm",
+      "log": "full_reseed_required",
+      "scenario_id": "SCN-M1-RAW-FULL-RESEED",
+      "state": "requires_reseed"
+    },
+    {
+      "checkpoint": "unchanged",
+      "consumed_owner": "boring-cdc-m1-control-fixtures",
+      "log": "truncate_requires_reseed",
+      "scenario_id": "SCN-M1-RAW-TRUNCATE",
+      "state": "requires_reseed"
+    },
+    {
+      "checkpoint": "unchanged",
+      "consumed_owner": "boring-cdc-m1-control-fixtures",
+      "log": "publication_drift",
+      "scenario_id": "SCN-M1-RAW-PUBLICATION-DRIFT",
+      "state": "requires_reseed"
+    },
+    {
+      "checkpoint": "unchanged",
+      "consumed_owner": "boring-cdc-m1-ddl-fixtures",
+      "log": "idle_ddl_blocked",
+      "scenario_id": "SCN-M1-RAW-IDLE-DDL",
+      "state": "blocked"
+    },
+    {
+      "checkpoint": "unchanged",
+      "consumed_owner": "boring-cdc-m1-ddl-fixtures",
+      "log": "immediate_ddl_blocked",
+      "scenario_id": "SCN-M1-RAW-IMMEDIATE-DDL",
+      "state": "blocked"
+    },
+    {
+      "checkpoint": "unchanged",
+      "consumed_owner": "boring-cdc-m1-decoder",
+      "log": "unsupported_protocol",
+      "scenario_id": "SCN-M1-RAW-UNSUPPORTED-PROTOCOL",
+      "state": "blocked"
+    },
+    {
+      "checkpoint": "unchanged",
+      "consumed_owner": "boring-cdc-m1-ddl-fixtures",
+      "log": "unsupported_table",
+      "scenario_id": "SCN-M1-RAW-UNSUPPORTED-TABLE",
+      "state": "blocked"
+    },
+    {
+      "checkpoint": "unchanged",
+      "consumed_owner": "boring-cdc-m1-ddl-fixtures",
+      "log": "unsupported_type",
+      "scenario_id": "SCN-M1-RAW-UNSUPPORTED-TYPE",
+      "state": "blocked"
+    },
+    {
+      "checkpoint": "unchanged",
+      "consumed_owner": "boring-cdc-m1-ordering",
+      "log": "identity_payload_conflict",
+      "scenario_id": "SCN-M1-RAW-IDENTITY-CONFLICT",
+      "state": "blocked"
+    },
+    {
+      "checkpoint": "unchanged",
+      "consumed_owner": "boring-cdc-m1-control-fixtures",
+      "log": "no_online_table_add",
+      "scenario_id": "SCN-M1-RAW-NO-ONLINE-TABLE-ADD",
+      "state": "requires_reseed"
+    }
+  ],
+  "suite": "fault"
+}

@@ -1,0 +1,16 @@
+scenario=SCN-M1-FAULT-MATRIX seed=raw-demo-v1
+PASS copyboth_restart checkpoint=unchanged
+PASS keepalive_reply_durable_only checkpoint=unchanged
+PASS bootstrap_feedback_gate checkpoint=unchanged
+PASS exact_set_oracle checkpoint=unchanged
+PASS full_reseed checkpoint=unchanged
+PASS truncate_requires_reseed checkpoint=unchanged
+PASS publication_drift checkpoint=unchanged
+PASS idle_ddl checkpoint=unchanged
+PASS immediate_ddl checkpoint=unchanged
+PASS unsupported_protocol checkpoint=unchanged
+PASS unsupported_table checkpoint=unchanged
+PASS unsupported_type checkpoint=unchanged
+PASS identity_conflict checkpoint=unchanged
+PASS no_online_table_add checkpoint=unchanged
+PASS m1_fault_matrix cases=15 blocked_actions=status,recover_reseed cleanup=trap

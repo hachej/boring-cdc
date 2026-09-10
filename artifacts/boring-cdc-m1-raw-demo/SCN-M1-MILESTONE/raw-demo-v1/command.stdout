@@ -1,0 +1,30 @@
+PASS cargo test --locked --workspace --all-targets
+PASS cargo test --locked m1_raw_demo::tests cases=5
+scenario=SCN-M1-RAW-EVENTS seed=raw-demo-v1 pg=17 slot=pgoutput
+raw_pgoutput tags=B,R,U,C lengths=21,84,55,26 payload_values=redacted
+PASS pgoutput_update=decoded_typed_noop feedback=awaits_durable_commit
+raw_pgoutput tags=B,R,T,C lengths=21,51,10,26 payload_values=redacted
+PASS pgoutput_truncate=decoded_block_before_feedback
+PASS live_catalog=exact fingerprint=2ac597b232224b4d2cffcf4a815ad917a95e5afc1620b4eefc66a7d92441dd52
+PASS live_catalog_drift=publication_drift_requires_reseed
+PASS actual_sql=heartbeat,truncate,publication_drift checkpoint=unchanged cleanup=trap
+PASS m1 raw e2e evidence sealed
+scenario=SCN-M1-FAULT-MATRIX seed=raw-demo-v1
+PASS copyboth_restart checkpoint=unchanged
+PASS keepalive_reply_durable_only checkpoint=unchanged
+PASS bootstrap_feedback_gate checkpoint=unchanged
+PASS exact_set_oracle checkpoint=unchanged
+PASS full_reseed checkpoint=unchanged
+PASS truncate_requires_reseed checkpoint=unchanged
+PASS publication_drift checkpoint=unchanged
+PASS idle_ddl checkpoint=unchanged
+PASS immediate_ddl checkpoint=unchanged
+PASS unsupported_protocol checkpoint=unchanged
+PASS unsupported_table checkpoint=unchanged
+PASS unsupported_type checkpoint=unchanged
+PASS identity_conflict checkpoint=unchanged
+PASS no_online_table_add checkpoint=unchanged
+PASS m1_fault_matrix cases=15 blocked_actions=status,recover_reseed cleanup=trap
+PASS m1 raw fault evidence sealed
+PASS m1 raw contract cases=15 unresolved=0
+PASS M1 raw inspection and fault suite; rerun once for deterministic_rerun=1
