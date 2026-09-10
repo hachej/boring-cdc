@@ -82,6 +82,8 @@ pub enum CommitFault {
     TerminateBeforeSqliteCommit,
     /// Component-only abrupt process termination immediately after SQLite commit returns.
     TerminateAfterSqliteCommit,
+    /// Deterministic component hook that delays the SQLite commit syscall path.
+    SlowSqliteCommit,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -320,6 +322,9 @@ impl JournalStore {
         if fault == CommitFault::TerminateBeforeSqliteCommit {
             std::process::exit(86);
         }
+        if fault == CommitFault::SlowSqliteCommit {
+            std::thread::sleep(Duration::from_millis(5));
+        }
         transaction.commit()?;
         if fault == CommitFault::AfterSqliteCommit {
             return Err(JournalError::AmbiguousAfterCommit);
@@ -514,7 +519,13 @@ pub fn read_complete_range(
     }
     let mut events = Vec::new();
     let mut copied = 0usize;
+    let mut expected_first = after_seq as i64 + 1;
     for (txid, first, last) in boundaries {
+        if first != expected_first {
+            return Err(JournalError::Unavailable(
+                "internal journal range is not contiguous and retained",
+            ));
+        }
         let expected = (last - first + 1) as usize;
         if events
             .len()
@@ -566,6 +577,7 @@ pub fn read_complete_range(
             });
         }
         copied = next_bytes;
+        expected_first = last + 1;
     }
     let first_seq = events[0].journal_seq;
     let last_seq = events.last().unwrap().journal_seq;
@@ -663,15 +675,57 @@ impl<T> CapturePriorityScheduler<T> {
     }
 }
 
-pub trait WriterServiceWork: Send {
-    fn execute(self: Box<Self>, writer: &mut WriterConnection) -> Result<(), JournalError>;
+#[derive(Clone, Copy)]
+pub struct ServiceDeadline {
+    started: Instant,
+    max_hold: Duration,
 }
-impl<F> WriterServiceWork for F
+impl ServiceDeadline {
+    pub fn exceeded(self) -> bool {
+        self.started.elapsed() > self.max_hold
+    }
+    pub fn check(self) -> Result<(), JournalError> {
+        if self.exceeded() {
+            Err(JournalError::BusyBoundExceeded)
+        } else {
+            Ok(())
+        }
+    }
+}
+pub trait WriterServiceWork: Send {
+    fn max_writer_hold(&self) -> Duration;
+    fn execute(
+        self: Box<Self>,
+        writer: &mut WriterConnection,
+        deadline: ServiceDeadline,
+    ) -> Result<(), JournalError>;
+}
+pub struct BoundedWriterWork<F> {
+    max_hold: Duration,
+    work: F,
+}
+impl<F> BoundedWriterWork<F> {
+    pub fn new(max_hold: Duration, work: F) -> Result<Self, JournalError> {
+        if max_hold.is_zero() {
+            Err(JournalError::Invalid("zero service hold bound"))
+        } else {
+            Ok(Self { max_hold, work })
+        }
+    }
+}
+impl<F> WriterServiceWork for BoundedWriterWork<F>
 where
-    F: FnOnce(&mut WriterConnection) -> Result<(), JournalError> + Send,
+    F: FnOnce(&mut WriterConnection, ServiceDeadline) -> Result<(), JournalError> + Send,
 {
-    fn execute(self: Box<Self>, writer: &mut WriterConnection) -> Result<(), JournalError> {
-        (*self)(writer)
+    fn max_writer_hold(&self) -> Duration {
+        self.max_hold
+    }
+    fn execute(
+        self: Box<Self>,
+        writer: &mut WriterConnection,
+        deadline: ServiceDeadline,
+    ) -> Result<(), JournalError> {
+        (self.work)(writer, deadline)
     }
 }
 enum PendingWork {
@@ -729,8 +783,14 @@ impl JournalWriterService {
                 if expected != class {
                     return Some(Err(JournalError::Conflict("scheduler class mismatch")));
                 }
-                work.execute(&mut self.store.writer)
-                    .map(|()| WorkOutcome::Serviced(class))
+                let deadline = ServiceDeadline {
+                    started: Instant::now(),
+                    max_hold: work.max_writer_hold(),
+                };
+                match work.execute(&mut self.store.writer, deadline) {
+                    Ok(()) => deadline.check().map(|()| WorkOutcome::Serviced(class)),
+                    Err(error) => Err(error),
+                }
             }
         })
     }
@@ -945,6 +1005,11 @@ pub mod tests {
             CommitFault::None,
         )
         .unwrap();
+        s.commit_atomic(
+            &commit("tx3", "0000000000000030", vec![event("e4", 0, b"4")]),
+            CommitFault::None,
+        )
+        .unwrap();
         drop(s);
         assert!(matches!(
             read_complete_range(&p, 0, 1, 100, Duration::from_secs(1)),
@@ -954,12 +1019,24 @@ pub mod tests {
             .unwrap()
             .unwrap();
         assert_eq!((r.first_seq, r.last_seq, r.copied_bytes), (1, 2, 3));
-        let r2 = read_complete_range(&p, 2, 2, 3, Duration::from_secs(1))
+        let r2 = read_complete_range(&p, 2, 1, 3, Duration::from_secs(1))
             .unwrap()
             .unwrap();
         assert_eq!((r2.first_seq, r2.last_seq), (3, 3));
         assert!(matches!(
             read_complete_range(&p, 1, 2, 100, Duration::from_secs(1)),
+            Err(JournalError::Unavailable(_))
+        ));
+        let w = open_writer(&p, "gc", 2, 2).unwrap();
+        w.connection()
+            .execute(
+                "UPDATE source_transactions SET state='gc_removed' WHERE transaction_id='tx2'",
+                [],
+            )
+            .unwrap();
+        drop(w);
+        assert!(matches!(
+            read_complete_range(&p, 2, 2, 100, Duration::from_secs(1)),
             Err(JournalError::Unavailable(_))
         ));
         fs::remove_file(p).ok();
@@ -1008,10 +1085,14 @@ pub mod tests {
         service
             .enqueue_service(
                 WorkClass::FailureControl,
-                |writer: &mut WriterConnection| {
-                    writer.connection().query_row("SELECT 1", [], |_| Ok(()))?;
-                    Ok(())
-                },
+                BoundedWriterWork::new(
+                    Duration::from_secs(1),
+                    |writer: &mut WriterConnection, deadline: ServiceDeadline| {
+                        writer.connection().query_row("SELECT 1", [], |_| Ok(()))?;
+                        deadline.check()
+                    },
+                )
+                .unwrap(),
             )
             .unwrap();
         service
@@ -1049,6 +1130,16 @@ pub mod tests {
                     .get::<_, i64>(0))
                 .unwrap(),
             0
+        );
+        s.limits.max_writer_hold = Duration::from_millis(1);
+        assert_eq!(
+            s.commit_atomic(&c, CommitFault::SlowSqliteCommit),
+            Err(JournalError::BusyBoundExceededAfterCommit)
+        );
+        assert!(
+            s.commit_atomic(&c, CommitFault::None)
+                .unwrap()
+                .was_duplicate()
         );
     }
 }

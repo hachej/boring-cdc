@@ -6,6 +6,10 @@ ids=[c['id'] for c in contract['cases']]
 if len(ids)!=len(set(ids)): errors.append('duplicate scenario IDs')
 for case in contract['cases']:
  if not re.search(r'fn\s+'+re.escape(case['test'])+r'\s*\(',src): errors.append('missing test '+case['test'])
+coverage=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text())
+required={a['id'] for a in coverage['assignments'] if a.get('owner_bead')=='boring-cdc-m2-journal'}
+missing=required-set(ids)
+if missing: errors.append('missing canonical assignments: '+','.join(sorted(missing)))
 for symbol in ('JournalStore','DurableCommit','CommitFault','read_complete_range','CapturePriorityScheduler','BusyBoundExceededAfterCommit'):
  if symbol not in src: errors.append('missing journal boundary '+symbol)
 if 'WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5)' not in (root/'src/m2_schema.rs').read_text(): errors.append('confirmed sqlite writer timeout changed')

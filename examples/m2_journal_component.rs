@@ -52,7 +52,11 @@ fn main() {
         CommitLimits {
             max_events: 16,
             max_copied_bytes: 4096,
-            max_writer_hold: Duration::from_secs(5),
+            max_writer_hold: if mode == "slow-commit" {
+                Duration::from_millis(1)
+            } else {
+                Duration::from_secs(5)
+            },
         },
     )
     .unwrap();
@@ -61,9 +65,14 @@ fn main() {
     let injected = match mode.as_str() {
         "terminate-before" => CommitFault::TerminateBeforeSqliteCommit,
         "terminate-after" => CommitFault::TerminateAfterSqliteCommit,
+        "slow-commit" => CommitFault::SlowSqliteCommit,
         _ => CommitFault::None,
     };
-    service.enqueue_capture(commit, injected).unwrap();
+    service.enqueue_capture(commit.clone(), injected).unwrap();
+    if mode == "slow-commit" {
+        assert!(service.service_next().unwrap().is_err());
+        service.enqueue_capture(commit, CommitFault::None).unwrap();
+    }
     let durable = match service.service_next().unwrap().unwrap() {
         WorkOutcome::Durable(d) => d,
         WorkOutcome::Serviced(_) => unreachable!(),
