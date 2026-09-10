@@ -2,7 +2,9 @@ use boring_cdc::m1_cli_contract::{
     ExitCode, command_help, error_envelope, parse, root_help, unavailable,
 };
 use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
-use boring_cdc::m1_preflight::{CheckStatus, PreflightObservation, envelope, evaluate_untrusted};
+use boring_cdc::m1_preflight::{
+    CheckStatus, PreflightObservation, envelope, evaluate_untrusted, input_failure,
+};
 use std::io::{self, Write};
 
 fn write_stdout(bytes: &[u8]) -> Result<(), ()> {
@@ -23,24 +25,42 @@ fn main() {
         }
         Ok(parsed) => {
             let check_result = if parsed.spec.id == "CMD-CHECK" {
-                let config_text = std::fs::read_to_string("boring-cdc.toml");
-                let observation_text = std::fs::read_to_string("preflight-observation.json");
-                match (config_text, observation_text) {
-                    (Ok(config_text), Ok(observation_text)) => {
-                        match (
-                            load_str_for(&config_text, &ProcessEnvironment, LoadPurpose::Check),
-                            serde_json::from_str::<PreflightObservation>(&observation_text),
-                        ) {
-                            (Ok(config), Ok(observation)) => Some(evaluate_untrusted(
-                                config.public(),
-                                config.fingerprints().runtime.as_str(),
-                                &observation,
-                            )),
-                            _ => None,
+                Some(match std::fs::read_to_string("boring-cdc.toml") {
+                    Err(_) => input_failure(
+                        "SCN-M1-PREFLIGHT-CONFIG-INPUT",
+                        "PREFLIGHT_CONFIG_UNAVAILABLE",
+                    ),
+                    Ok(config_text) => {
+                        match load_str_for(&config_text, &ProcessEnvironment, LoadPurpose::Check) {
+                            Err(error) => {
+                                input_failure("SCN-M1-PREFLIGHT-CONFIG-INPUT", error.code)
+                            }
+                            Ok(config) => {
+                                match std::fs::read_to_string("preflight-observation.json") {
+                                    Err(_) => input_failure(
+                                        "SCN-M1-PREFLIGHT-OBSERVATION-INPUT",
+                                        "PREFLIGHT_OBSERVATION_UNAVAILABLE",
+                                    ),
+                                    Ok(observation_text) => {
+                                        match serde_json::from_str::<PreflightObservation>(
+                                            &observation_text,
+                                        ) {
+                                            Err(_) => input_failure(
+                                                "SCN-M1-PREFLIGHT-SCHEMA",
+                                                "PREFLIGHT_OBSERVATION_SCHEMA_UNSUPPORTED",
+                                            ),
+                                            Ok(observation) => evaluate_untrusted(
+                                                config.public(),
+                                                config.fingerprints().runtime.as_str(),
+                                                &observation,
+                                            ),
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                    _ => None,
-                }
+                })
             } else {
                 None
             };

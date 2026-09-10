@@ -448,7 +448,9 @@ fn evaluate_with_capability(
     });
 
     let timeout_ok = observed.source.idle_in_transaction_session_timeout_ms
-        > config.backfill.guard_keepalive_ms.0
+        == config.backfill.session_timeout_ms.0
+        && observed.source.idle_in_transaction_session_timeout_ms
+            > config.backfill.guard_keepalive_ms.0
         && observed.source.statement_timeout_ms >= config.source.maximum_operation_ms.0
         && observed.source.lock_timeout_ms <= config.backfill.ddl_waiter_bound_ms.0
         && observed.source.tcp_keepalive_ms <= config.source.heartbeat_cadence_ms.0
@@ -664,6 +666,22 @@ fn evaluate_with_capability(
         schema_version: PREFLIGHT_SCHEMA_VERSION,
         outcome,
         checks: c,
+    }
+}
+
+/// Build a fail-closed report for input/configuration failures that occur before
+/// an observation can be evaluated. Public callers must not mislabel these as an
+/// unimplemented command handler.
+pub fn input_failure(scenario_id: &'static str, reason: &'static str) -> PreflightReport {
+    PreflightReport {
+        schema_version: PREFLIGHT_SCHEMA_VERSION,
+        outcome: CheckStatus::Blocked,
+        checks: vec![CheckResult {
+            scenario_id,
+            status: CheckStatus::Blocked,
+            reason,
+            units: None,
+        }],
     }
 }
 
@@ -1096,14 +1114,15 @@ pub mod tests {
     #[test]
     fn every_timeout_and_keepalive_boundary_is_enforced() {
         let cfg = config();
-        for mutation in 0..6 {
+        for mutation in 0..7 {
             let mut o = supported();
             match mutation {
                 0 => o.source.idle_in_transaction_session_timeout_ms = 5_000,
-                1 => o.source.statement_timeout_ms = 9_999,
-                2 => o.source.lock_timeout_ms = 5_001,
-                3 => o.source.tcp_keepalive_ms = 5_001,
-                4 => o.source.client_connection_check_interval_ms = 5_001,
+                1 => o.source.idle_in_transaction_session_timeout_ms = 30_001,
+                2 => o.source.statement_timeout_ms = 9_999,
+                3 => o.source.lock_timeout_ms = 5_001,
+                4 => o.source.tcp_keepalive_ms = 5_001,
+                5 => o.source.client_connection_check_interval_ms = 5_001,
                 _ => o.source.zombie_detection_bound_ms = 15_001,
             }
             assert!(reason(
