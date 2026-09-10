@@ -1,0 +1,21 @@
+{
+  "faults": [
+    {
+      "hook": "guard_session_lost",
+      "outcome": "invalid_released"
+    },
+    {
+      "hook": "ddl_waiter_bound",
+      "outcome": "BACKFILL_DDL_WAITER_released"
+    },
+    {
+      "hook": "stale_fence",
+      "outcome": "DDL_GUARD_FENCE_MISMATCH"
+    },
+    {
+      "hook": "changed_relation",
+      "outcome": "feedback_blocked"
+    }
+  ],
+  "schema_version": "fault-timeline/v1"
+}
