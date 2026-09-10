@@ -163,6 +163,16 @@ fn validated_production_commit(
     }
 }
 
+/// Test-only durable boundary for sibling domain fixtures.
+#[cfg(test)]
+#[must_use]
+pub(crate) fn synthetic_durable_boundary(
+    received_lsn: ReceivedLsn,
+    journal_cursor: JournalCursor,
+) -> DurableSourceBoundary {
+    DurableSourceBoundary::from_commit(validated_production_commit(received_lsn, journal_cursor))
+}
+
 /// Unmistakably test-only evidence constructors.
 pub mod synthetic {
     use super::{JournalCursor, PhantomData, ReceivedLsn, ValidatedCommit, evidence_kind};
