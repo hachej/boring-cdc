@@ -1,0 +1,22 @@
+{
+  "schema_version": "m2-spool-cases/v1",
+  "owner_bead": "boring-cdc-m2-spool",
+  "evidence_tier": "component",
+  "cases": [
+    {"id":"SCN-M2-SPOOL-AGGREGATE-MEMORY","test":"memory_equation_and_high_water_are_aggregate","assertion":"The fixed runtime plus receive, decoder, and staging reservations fit the supplied process limit and each named peak is measured."},
+    {"id":"SCN-M2-SPOOL-INCREMENTAL-OVERFLOW","test":"incremental_overflow_has_one_iterator_and_no_whole_transaction_collection","assertion":"Incremental frames cross one bounded memory prefix into exactly one overflow file and expose one storage-independent commit iterator."},
+    {"id":"SCN-M2-SPOOL-LIMIT-SAFE-STOP","test":"frame_event_transaction_limits_poison_and_never_permit_feedback","assertion":"Frame, event, transaction-byte, and transaction-event checks occur before allocation; rejection poisons commit and emits no feedback permit."},
+    {"id":"SCN-M2-SPOOL-FILESYSTEM-RESERVE","test":"filesystem_reserve_rejects_before_write_and_preserves_emergency_space","assertion":"Per-filesystem budget and emergency reserve reject preallocation before bytes are written."},
+    {"id":"SCN-M2-SPOOL-ENOSPC-ADMISSION","test":"filesystem_reserve_rejects_before_write_and_preserves_emergency_space","assertion":"An environmental disk-space refusal safe-stops without producing a feedback-eligible transaction; the broader canonical SCN-SPOOL-SQLITE-ENOSPC remains owned by boring-cdc-m2-journal."},
+    {"id":"SCN-M2-SPOOL-CHECKSUM","test":"checksum_failure_is_detected_by_commit_iterator","assertion":"A changed overflow frame checksum is detected before the commit consumer can publish it."},
+    {"id":"SCN-M2-SPOOL-STARTUP-CLASSIFICATION","test":"startup_removes_owned_dead_spools_and_quarantines_malformed_or_contradictory","assertion":"Only after exclusive state lock, owned dead uncommitted spools are removed while malformed and contradictory files quarantine and block."},
+    {"id":"SCN-M2-SPOOL-NEAR-LIMIT-BURST","component_mode":"near-limit","assertion":"A just-at-limit commit burst uses file spill, reports positive spill and zero stream delta, and remains commit-ready without itself granting feedback."},
+    {"id":"SCN-M2-SPOOL-OVERSIZED-FINGERPRINT","component_mode":"oversized","assertion":"An over-limit transaction stays bounded and emits capture epoch, XID, final LSN, observed limits, stable fingerprint, and feedback_permitted=false."},
+    {"id":"SCN-M2-SPOOL-ORPHAN-MALFORMED","component_mode":"startup","assertion":"Startup removes one owned dead-run spool, quarantines malformed and contradictory spools, and blocks source admission."}
+  ],
+  "confirmation_inventory": {
+    "confirmed_consumed": ["failure-policy-v1", "failure base_delay_ms=250", "failure max_delay_ms=30000", "failure max_attempts=10", "sqlite_writer_busy_timeout_ms=5000"],
+    "provisional_owned": ["spool format version=1 pending boring-cdc-d-admission"],
+    "unrelated_provisional_markers": "preserved unchanged via contracts/m2/m0-provisional-reconciliation.json"
+  }
+}
