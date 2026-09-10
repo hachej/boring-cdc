@@ -31,8 +31,14 @@ fn main() {
                             load_str_for(&config_text, &ProcessEnvironment, LoadPurpose::Check),
                             serde_json::from_str::<PreflightObservation>(&observation_text),
                         ) {
-                            (Ok(config), Ok(observation)) => {
-                                Some(evaluate(config.public(), &observation))
+                            (Ok(config), Ok(mut observation)) => {
+                                // A file is an untrusted transport, never a live collector attestation.
+                                observation.collector = "external-file-untrusted".into();
+                                Some(evaluate(
+                                    config.public(),
+                                    config.fingerprints().runtime.as_str(),
+                                    &observation,
+                                ))
                             }
                             _ => None,
                         }
@@ -60,7 +66,16 @@ fn main() {
                     std::process::exit(0)
                 }
             } else if parsed.spec.id == "CMD-CHECK" {
-                let text = format!("{}: {}\n", result.code, result.message);
+                let mut text = format!("{}: {}\n", result.code, result.message);
+                if let Some(report) = &check_result {
+                    for check in report
+                        .checks
+                        .iter()
+                        .filter(|check| check.reason != "PREFLIGHT_OK")
+                    {
+                        text.push_str(&format!("{}: {}\n", check.scenario_id, check.reason));
+                    }
+                }
                 if write_stdout(text.as_bytes()).is_err() {
                     std::process::exit(0);
                 }

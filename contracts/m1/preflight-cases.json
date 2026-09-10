@@ -9,6 +9,14 @@
       "unit_target": "m1_preflight::tests"
     },
     {
+      "blocked_or_unknown_reason": "PREFLIGHT_OBSERVATION_PROVENANCE_MISMATCH",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-PROVENANCE",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
       "blocked_or_unknown_reason": "PREFLIGHT_POSTGRES_VERSION_UNSUPPORTED",
       "checkpoint_assertion": "not_applicable_read_only",
       "id": "SCN-M1-PREFLIGHT-PG-VERSION",
@@ -73,9 +81,41 @@
       "unit_target": "m1_preflight::tests"
     },
     {
+      "blocked_or_unknown_reason": "PREFLIGHT_SLOT_STATE_UNSAFE",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SLOT-STATE",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_PUBLICATION_SHAPE_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-PUBLICATION-SHAPE",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_SOURCE_POLICY_MISMATCH",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SOURCE-POLICY",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
       "blocked_or_unknown_reason": "PREFLIGHT_TABLE_CONTRACT_MISMATCH",
       "checkpoint_assertion": "not_applicable_read_only",
       "id": "SCN-M1-PREFLIGHT-TABLES",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_DDL_POLICY_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-DDL",
       "log_assertion": "stable_reason_only",
       "state_assertion": "before_state_sha256 == after_state_sha256",
       "unit_target": "m1_preflight::tests"
@@ -276,6 +316,14 @@
       "blocked_or_unknown_reason": "PREFLIGHT_SOURCE_FREE_DISK_UNKNOWN",
       "checkpoint_assertion": "not_applicable_read_only",
       "id": "SCN-M1-PREFLIGHT-SOURCE-FREE-DISK",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_LIVE_COLLECTION_UNVERIFIED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-LIVE-COLLECTOR",
       "log_assertion": "stable_reason_only",
       "state_assertion": "before_state_sha256 == after_state_sha256",
       "unit_target": "m1_preflight::tests"

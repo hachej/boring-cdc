@@ -7,6 +7,7 @@ use crate::m1_cli_contract::{CLI_SCHEMA_VERSION, CliEnvelope, NextCommand};
 use crate::m1_config::PublicConfig;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 
 pub const PREFLIGHT_SCHEMA_VERSION: &str = "m1-preflight/v1";
 
@@ -44,7 +45,17 @@ pub struct SourceObservation {
     pub slot_plugin: String,
     pub slot_intent_no_drop_bound: bool,
     pub slot_positions_valid: bool,
+    pub slot_active_state_safe: bool,
+    pub slot_wal_status_safe: bool,
+    pub max_slot_wal_keep_size_matches: bool,
+    pub publication_row_filters_absent: bool,
+    pub publication_column_lists_absent: bool,
+    pub publication_truncate_policy_matches: bool,
+    pub origin_policy_matches: bool,
+    pub source_tls_verified: bool,
+    pub advisory_lock_derivation_matches: bool,
     pub table_contracts_match: bool,
+    pub ddl_policy_matches: bool,
     pub keys_supported: bool,
     pub types_supported: bool,
     pub partitions_supported: bool,
@@ -63,6 +74,10 @@ pub struct SourceObservation {
     pub decoder_bytes: u64,
     pub staging_bytes: u64,
     pub worker_bytes: u64,
+    pub destination_worker_bytes: u64,
+    pub fixed_runtime_bytes: u64,
+    pub telemetry_bytes: u64,
+    pub command_headroom_bytes: u64,
     pub process_limit_bytes: u64,
     pub cgroup_limit_bytes: Option<u64>,
     pub idle_in_transaction_session_timeout_ms: u64,
@@ -76,6 +91,13 @@ pub struct SourceObservation {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
+pub struct FilesystemCapacity {
+    pub configured_total_bytes: u64,
+    pub available_bytes: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StorageObservation {
     pub before_state_sha256: String,
     pub after_state_sha256: String,
@@ -84,9 +106,7 @@ pub struct StorageObservation {
     pub auto_vacuum: String,
     pub filesystem: String,
     pub disposable_probe_succeeded: bool,
-    pub sqlite_budget_bytes: u64,
-    pub spool_budget_bytes: u64,
-    pub archive_budget_bytes: u64,
+    pub filesystem_capacities: BTreeMap<String, FilesystemCapacity>,
     pub reader_budget_units: u64,
     pub scheduler_budget_units: u64,
     pub audit_budget_units: u64,
@@ -121,6 +141,10 @@ pub struct SecurityObservation {
 #[serde(deny_unknown_fields)]
 pub struct PreflightObservation {
     pub schema_version: String,
+    pub collector: String,
+    pub config_fingerprint: String,
+    pub current_run_id: Option<String>,
+    pub current_connection_generation: Option<u64>,
     pub source: SourceObservation,
     pub storage: StorageObservation,
     pub destination: DestinationObservation,
@@ -162,13 +186,24 @@ fn checked_sum(values: &[u64]) -> Option<u64> {
 }
 
 /// Classify a complete immutable observation. No mutation or I/O occurs here.
-pub fn evaluate(config: &PublicConfig, observed: &PreflightObservation) -> PreflightReport {
+pub fn evaluate(
+    config: &PublicConfig,
+    expected_config_fingerprint: &str,
+    observed: &PreflightObservation,
+) -> PreflightReport {
     let mut c = Vec::new();
     push(
         &mut c,
         "SCN-M1-PREFLIGHT-SCHEMA",
         observed.schema_version == PREFLIGHT_SCHEMA_VERSION,
         "PREFLIGHT_OBSERVATION_SCHEMA_UNSUPPORTED",
+    );
+    push(
+        &mut c,
+        "SCN-M1-PREFLIGHT-PROVENANCE",
+        observed.config_fingerprint == expected_config_fingerprint
+            && !observed.collector.is_empty(),
+        "PREFLIGHT_OBSERVATION_PROVENANCE_MISMATCH",
     );
     push(
         &mut c,
@@ -224,9 +259,39 @@ pub fn evaluate(config: &PublicConfig, observed: &PreflightObservation) -> Prefl
     );
     push(
         &mut c,
+        "SCN-M1-PREFLIGHT-SLOT-STATE",
+        observed.source.slot_active_state_safe
+            && observed.source.slot_wal_status_safe
+            && observed.source.max_slot_wal_keep_size_matches,
+        "PREFLIGHT_SLOT_STATE_UNSAFE",
+    );
+    push(
+        &mut c,
+        "SCN-M1-PREFLIGHT-PUBLICATION-SHAPE",
+        observed.source.publication_row_filters_absent
+            && observed.source.publication_column_lists_absent
+            && observed.source.publication_truncate_policy_matches,
+        "PREFLIGHT_PUBLICATION_SHAPE_UNSUPPORTED",
+    );
+    push(
+        &mut c,
+        "SCN-M1-PREFLIGHT-SOURCE-POLICY",
+        observed.source.origin_policy_matches
+            && observed.source.source_tls_verified
+            && observed.source.advisory_lock_derivation_matches,
+        "PREFLIGHT_SOURCE_POLICY_MISMATCH",
+    );
+    push(
+        &mut c,
         "SCN-M1-PREFLIGHT-TABLES",
         observed.source.table_contracts_match,
         "PREFLIGHT_TABLE_CONTRACT_MISMATCH",
+    );
+    push(
+        &mut c,
+        "SCN-M1-PREFLIGHT-DDL",
+        observed.source.ddl_policy_matches,
+        "PREFLIGHT_DDL_POLICY_UNSUPPORTED",
     );
     push(
         &mut c,
@@ -300,7 +365,14 @@ pub fn evaluate(config: &PublicConfig, observed: &PreflightObservation) -> Prefl
         observed.source.copy_both_receive_bytes,
         observed.source.decoder_bytes,
         observed.source.staging_bytes,
-        observed.source.worker_bytes,
+        observed
+            .source
+            .worker_bytes
+            .saturating_mul(config.backfill.concurrency),
+        observed.source.destination_worker_bytes,
+        observed.source.fixed_runtime_bytes,
+        observed.source.telemetry_bytes,
+        observed.source.command_headroom_bytes,
     ]);
     let effective_limit = observed
         .source
@@ -364,7 +436,7 @@ pub fn evaluate(config: &PublicConfig, observed: &PreflightObservation) -> Prefl
     push(
         &mut c,
         "SCN-M1-PREFLIGHT-NO-MUTATION",
-        !observed.storage.before_state_sha256.is_empty()
+        valid_sha256(&observed.storage.before_state_sha256)
             && observed.storage.before_state_sha256 == observed.storage.after_state_sha256,
         "PREFLIGHT_STATE_MUTATED",
     );
@@ -379,7 +451,8 @@ pub fn evaluate(config: &PublicConfig, observed: &PreflightObservation) -> Prefl
     match &observed.storage.writer_attestation {
         Some(a)
             if a.fresh
-                && !a.run_id.is_empty()
+                && observed.current_run_id.as_deref() == Some(a.run_id.as_str())
+                && observed.current_connection_generation == Some(a.connection_generation)
                 && a.connection_generation > 0
                 && a.synchronous == config.storage.synchronous =>
         {
@@ -399,10 +472,23 @@ pub fn evaluate(config: &PublicConfig, observed: &PreflightObservation) -> Prefl
             && observed.storage.disposable_probe_succeeded,
         "PREFLIGHT_FILESYSTEM_UNSUPPORTED",
     );
-    let budgets_ok = observed.storage.sqlite_budget_bytes > 0
-        && observed.storage.spool_budget_bytes > 0
-        && observed.storage.archive_budget_bytes > 0
-        && observed.storage.reader_budget_units > 0
+    let budgets_ok = config.budgets.iter().all(|budget| {
+        observed
+            .storage
+            .filesystem_capacities
+            .get(&budget.name)
+            .is_some_and(|capacity| {
+                let admitted = checked_sum(&[
+                    budget.reserved_free_bytes.0,
+                    budget.sqlite_wal_temp_bytes.0,
+                    budget.capture_spool_bytes.0,
+                    budget.concurrent_backfill_bytes.0,
+                    budget.archive_segment_bytes.0,
+                ]);
+                capacity.configured_total_bytes == budget.total_bytes.0
+                    && admitted.is_some_and(|required| capacity.available_bytes >= required)
+            })
+    }) && observed.storage.reader_budget_units > 0
         && observed.storage.scheduler_budget_units > 0
         && observed.storage.audit_budget_units > 0;
     c.push(CheckResult {
@@ -482,6 +568,20 @@ pub fn evaluate(config: &PublicConfig, observed: &PreflightObservation) -> Prefl
         units: Some("bytes"),
     });
 
+    c.push(CheckResult {
+        scenario_id: "SCN-M1-PREFLIGHT-LIVE-COLLECTOR",
+        status: if observed.collector == "boring-cdc-live-preflight-v1" {
+            CheckStatus::Healthy
+        } else {
+            CheckStatus::Unverified
+        },
+        reason: if observed.collector == "boring-cdc-live-preflight-v1" {
+            "PREFLIGHT_OK"
+        } else {
+            "PREFLIGHT_LIVE_COLLECTION_UNVERIFIED"
+        },
+        units: None,
+    });
     let outcome = if c.iter().any(|x| x.status == CheckStatus::Blocked) {
         CheckStatus::Blocked
     } else if c
@@ -546,6 +646,10 @@ pub fn stable_reason_inventory() -> Value {
     json!(evaluate_reason_inventory())
 }
 
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
 fn evaluate_reason_inventory() -> Vec<&'static str> {
     vec![
         "PREFLIGHT_ARCHIVE_MAPPING_UNSUPPORTED",
@@ -558,13 +662,16 @@ fn evaluate_reason_inventory() -> Vec<&'static str> {
         "PREFLIGHT_KEY_UNSUPPORTED",
         "PREFLIGHT_LISTENER_POLICY_MISMATCH",
         "PREFLIGHT_MEMORY_BUDGET_INSUFFICIENT",
+        "PREFLIGHT_LIVE_COLLECTION_UNVERIFIED",
         "PREFLIGHT_MUTATING_OBSERVABILITY_ROUTE",
+        "PREFLIGHT_OBSERVATION_PROVENANCE_MISMATCH",
         "PREFLIGHT_OBSERVATION_SCHEMA_UNSUPPORTED",
         "PREFLIGHT_OPERATOR_SOCKET_UNSAFE",
         "PREFLIGHT_OWNERSHIP_RECOVERY_UNSAFE",
         "PREFLIGHT_PARTITION_UNSUPPORTED",
         "PREFLIGHT_POSTGRES_VERSION_UNSUPPORTED",
         "PREFLIGHT_PROTOCOL_FINGERPRINT_MISMATCH",
+        "PREFLIGHT_PUBLICATION_SHAPE_UNSUPPORTED",
         "PREFLIGHT_PUBLICATION_FINGERPRINT_MISMATCH",
         "PREFLIGHT_PUBLICATION_PRIVILEGE_UNSAFE",
         "PREFLIGHT_REDACTION_POLICY_FAILED",
@@ -572,7 +679,10 @@ fn evaluate_reason_inventory() -> Vec<&'static str> {
         "PREFLIGHT_REPLICATION_PRIVILEGE_MISSING",
         "PREFLIGHT_REQUIRED_GRANT_MISSING",
         "PREFLIGHT_SLOT_BINDING_MISMATCH",
+        "PREFLIGHT_SLOT_STATE_UNSAFE",
         "PREFLIGHT_SLOT_INTENT_NOT_BOUND",
+        "PREFLIGHT_SOURCE_POLICY_MISMATCH",
+        "PREFLIGHT_DDL_POLICY_UNSUPPORTED",
         "PREFLIGHT_SOURCE_FREE_DISK_INSUFFICIENT",
         "PREFLIGHT_SOURCE_FREE_DISK_UNKNOWN",
         "PREFLIGHT_SPILL_COUNTERS_UNAVAILABLE",
@@ -623,6 +733,10 @@ pub mod tests {
     pub fn supported() -> PreflightObservation {
         PreflightObservation {
             schema_version: PREFLIGHT_SCHEMA_VERSION.into(),
+            collector: "boring-cdc-live-preflight-v1".into(),
+            config_fingerprint: config().fingerprints().runtime.clone(),
+            current_run_id: Some("run-fixture".into()),
+            current_connection_generation: Some(1),
             source: SourceObservation {
                 server_major: 16,
                 wal_level: "logical".into(),
@@ -637,7 +751,17 @@ pub mod tests {
                 slot_plugin: "pgoutput".into(),
                 slot_intent_no_drop_bound: true,
                 slot_positions_valid: true,
+                slot_active_state_safe: true,
+                slot_wal_status_safe: true,
+                max_slot_wal_keep_size_matches: true,
+                publication_row_filters_absent: true,
+                publication_column_lists_absent: true,
+                publication_truncate_policy_matches: true,
+                origin_policy_matches: true,
+                source_tls_verified: true,
+                advisory_lock_derivation_matches: true,
                 table_contracts_match: true,
+                ddl_policy_matches: true,
                 keys_supported: true,
                 types_supported: true,
                 partitions_supported: true,
@@ -655,7 +779,11 @@ pub mod tests {
                 copy_both_receive_bytes: 1_048_576,
                 decoder_bytes: 67_108_864,
                 staging_bytes: 67_108_864,
-                worker_bytes: 67_108_864,
+                worker_bytes: 20_000_000,
+                destination_worker_bytes: 20_000_000,
+                fixed_runtime_bytes: 20_000_000,
+                telemetry_bytes: 5_000_000,
+                command_headroom_bytes: 5_000_000,
                 process_limit_bytes: 268_435_456,
                 cgroup_limit_bytes: Some(268_435_456),
                 idle_in_transaction_session_timeout_ms: 30_000,
@@ -667,16 +795,22 @@ pub mod tests {
                 source_free_disk_bytes: Some(21_474_836_480),
             },
             storage: StorageObservation {
-                before_state_sha256: "same".into(),
-                after_state_sha256: "same".into(),
+                before_state_sha256:
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+                after_state_sha256:
+                    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
                 journal_mode: "WAL".into(),
                 synchronous: "FULL".into(),
                 auto_vacuum: "INCREMENTAL".into(),
                 filesystem: "ext4".into(),
                 disposable_probe_succeeded: true,
-                sqlite_budget_bytes: 1,
-                spool_budget_bytes: 1,
-                archive_budget_bytes: 1,
+                filesystem_capacities: BTreeMap::from([(
+                    "state".into(),
+                    FilesystemCapacity {
+                        configured_total_bytes: 1_000_000_000,
+                        available_bytes: 700_000_000,
+                    },
+                )]),
                 reader_budget_units: 1,
                 scheduler_budget_units: 1,
                 audit_budget_units: 1,
@@ -714,7 +848,11 @@ pub mod tests {
     #[test]
     fn supported_fixture_passes_without_mutation() {
         let cfg = config();
-        let report = evaluate(cfg.public(), &supported());
+        let report = evaluate(
+            cfg.public(),
+            cfg.fingerprints().runtime.as_str(),
+            &supported(),
+        );
         assert_eq!(report.outcome, CheckStatus::Healthy);
         assert!(
             report
@@ -731,7 +869,7 @@ pub mod tests {
         o.source.source_free_disk_bytes = None;
         o.source.spill_counters_available = false;
         o.storage.writer_attestation = None;
-        let report = evaluate(cfg.public(), &o);
+        let report = evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o);
         assert_eq!(report.outcome, CheckStatus::Degraded);
         assert!(reason(&report, "PREFLIGHT_SOURCE_FREE_DISK_UNKNOWN"));
         assert!(reason(&report, "PREFLIGHT_SPILL_COUNTERS_UNAVAILABLE"));
@@ -773,7 +911,7 @@ pub mod tests {
                 (o, "PREFLIGHT_TIMEOUT_KEEPALIVE_INCOMPATIBLE")
             },
         ] {
-            let report = evaluate(cfg.public(), &o);
+            let report = evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o);
             assert_eq!(report.outcome, CheckStatus::Blocked);
             assert!(reason(&report, expected), "{expected}");
         }
@@ -814,16 +952,95 @@ pub mod tests {
                 (o, "PREFLIGHT_ARCHIVE_MAPPING_UNSUPPORTED")
             },
         ] {
-            let report = evaluate(cfg.public(), &o);
+            let report = evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o);
             assert_eq!(report.outcome, CheckStatus::Blocked);
             assert!(reason(&report, expected), "{expected}");
         }
     }
 
     #[test]
+    fn zero_multiple_each_forbidden_grant_and_replayed_attestation_fail() {
+        let cfg = config();
+        for count in [0, 2] {
+            let mut o = supported();
+            o.source.control_rows_each = count;
+            assert!(reason(
+                &evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o),
+                "PREFLIGHT_CONTROL_ROW_CARDINALITY"
+            ));
+        }
+        for mutation in 0..4 {
+            let mut o = supported();
+            match mutation {
+                0 => o.source.control_insert = true,
+                1 => o.source.control_delete = true,
+                2 => o.source.control_update_key = true,
+                _ => o.source.control_select_key_only = false,
+            }
+            assert!(reason(
+                &evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o),
+                "PREFLIGHT_CONTROL_PRIVILEGE_EXCESS"
+            ));
+        }
+        let mut replayed = supported();
+        replayed.current_connection_generation = Some(2);
+        let report = evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &replayed);
+        assert_eq!(report.outcome, CheckStatus::Degraded);
+        assert!(reason(&report, "PREFLIGHT_WRITER_SYNCHRONOUS_UNVERIFIED"));
+    }
+
+    #[test]
+    fn every_timeout_and_keepalive_boundary_is_enforced() {
+        let cfg = config();
+        for mutation in 0..6 {
+            let mut o = supported();
+            match mutation {
+                0 => o.source.idle_in_transaction_session_timeout_ms = 5_000,
+                1 => o.source.statement_timeout_ms = 9_999,
+                2 => o.source.lock_timeout_ms = 5_001,
+                3 => o.source.tcp_keepalive_ms = 5_001,
+                4 => o.source.client_connection_check_interval_ms = 5_001,
+                _ => o.source.zombie_detection_bound_ms = 15_001,
+            }
+            assert!(reason(
+                &evaluate(cfg.public(), cfg.fingerprints().runtime.as_str(), &o),
+                "PREFLIGHT_TIMEOUT_KEEPALIVE_INCOMPATIBLE"
+            ));
+        }
+    }
+
+    #[test]
+    fn scenario_inventory_exactly_matches_report() {
+        let cfg = config();
+        let report = evaluate(
+            cfg.public(),
+            cfg.fingerprints().runtime.as_str(),
+            &supported(),
+        );
+        let contract: Value =
+            serde_json::from_str(include_str!("../contracts/m1/preflight-cases.json")).unwrap();
+        let expected = contract["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|x| x["id"].as_str().unwrap())
+            .collect::<std::collections::BTreeSet<_>>();
+        let actual = report
+            .checks
+            .iter()
+            .map(|x| x.scenario_id)
+            .collect::<std::collections::BTreeSet<_>>();
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
     fn envelope_is_cli_compatible_and_redacted() {
         let cfg = config();
-        let report = evaluate(cfg.public(), &supported());
+        let report = evaluate(
+            cfg.public(),
+            cfg.fingerprints().runtime.as_str(),
+            &supported(),
+        );
         let value = serde_json::to_value(envelope(&report)).unwrap();
         assert_eq!(value["command"], "CMD-CHECK");
         assert_eq!(value["code"], "PREFLIGHT_HEALTHY");
