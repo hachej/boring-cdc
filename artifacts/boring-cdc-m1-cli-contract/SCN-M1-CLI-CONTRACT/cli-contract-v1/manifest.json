@@ -25,7 +25,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "leaf",
-  "git_commit": "1ba5d15bba2248e92d17aa2274afd14898f4c9d3",
+  "git_commit": "7ac1f1236e43c50106dc9e15c3e60dbfec420487",
   "owner_bead": "boring-cdc-m1-cli-contract",
   "redaction": {
     "checked": true,
@@ -38,7 +38,7 @@
       "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/registry-v1.json",
       "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/envelopes-v1.json"
     ],
-    "digest": "e17e6081d23c4dfb0a9ea09cb262c320f8bc08b2bc5aca7751aa65602055a42d",
+    "digest": "d845be01bc3f86698b92c8f5310f67ce9ecfe09f8202f00b2d3bf5268b323246",
     "product_faults": "invalid,ambiguous,redaction,path,broken_pipe",
     "runtime_observed": true,
     "status": "pass"
@@ -47,8 +47,8 @@
   "schema_version": "evidence/v1",
   "seed": "cli-contract-v1",
   "source_preservation": {
-    "after_sha256": "28e2b3c65153287462a684580a30d7c979427e480ff20f6f2d7ee19b6825a251",
-    "before_sha256": "28e2b3c65153287462a684580a30d7c979427e480ff20f6f2d7ee19b6825a251",
+    "after_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "preserved": true
   },
   "tier_proof": {

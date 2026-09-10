@@ -7,6 +7,14 @@
     "status": "unknown",
     "subject_id": "destination-1"
   },
+  "authorization_matrix": [
+    "unchanged_relevant_accept",
+    "unrelated_progress_accept",
+    "changed_revision_reject",
+    "changed_fingerprint_reject",
+    "expired_reject",
+    "invalid_predicate_reject"
+  ],
   "concurrent_conditions": [
     {
       "code": "journal_pressure",
@@ -57,12 +65,28 @@
     "maintenance"
   ],
   "schema_version": 1,
-  "terminal_trace": {
-    "after_snapshot_id": "snapshot-after",
-    "before_snapshot_id": "snapshot-before",
-    "external_effect_evidence_digest": "effect-digest",
-    "immutable_intent_id": "intent-1",
-    "plan_digest": "plan-digest",
-    "safe_terminal_state": null
-  }
+  "terminal_traces": [
+    {
+      "before_snapshot_id": "snapshot-before",
+      "external_effect_evidence_digest": "effect-digest",
+      "immutable_intent_id": "intent-1",
+      "plan_digest": "plan-digest",
+      "terminal": {
+        "after_snapshot": {
+          "after_snapshot_id": "snapshot-after"
+        }
+      }
+    },
+    {
+      "before_snapshot_id": "snapshot-before",
+      "external_effect_evidence_digest": null,
+      "immutable_intent_id": "intent-2",
+      "plan_digest": "plan-digest-safe",
+      "terminal": {
+        "safe_terminal": {
+          "safe_terminal_state": "aborted_by_restart"
+        }
+      }
+    }
+  ]
 }
