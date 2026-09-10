@@ -1,0 +1,17 @@
+{
+  "schema_version": "m2-ownership-cases/v1",
+  "owner_bead": "boring-cdc-m2-ownership",
+  "cases": [
+    {"id":"SCN-M2-OWN-SAME-STORE","test":"two_processes_same_store_fail_closed","assertion":"a direct second state owner is refused before effects"},
+    {"id":"SCN-M2-OWN-SAME-SOURCE","test":"two_state_paths_same_source_fail_closed","assertion":"the source-derived advisory lock fences distinct state paths"},
+    {"id":"SCN-M2-OWN-SESSION-LOSS","test":"deadline_and_session_loss_fence_without_reacquire","assertion":"backend loss and deadline-fit failure fence dispatch without reacquire"},
+    {"id":"SCN-M2-OWN-COPYBOTH-LOSS","test":"unexpected_copyboth_loss_always_fences","assertion":"unexpected replication EOF exits the ownership generation"},
+    {"id":"SCN-M2-OWN-RESEED-PHASES","test":"startup_phase_machine_blocks_only_ambiguous_maintenance","assertion":"ambiguous phases block and verified imported/later phases resume visibly incomplete"},
+    {"id":"SCN-M2-OWN-NONCE-REPLAY","test":"nonce_identity_lost_response_replay_and_later_repeat","assertion":"lost response is idempotent while later issuance has a distinct ID"},
+    {"id":"SCN-M2-OWN-OFFLINE-RACE","test":"offline_plan_and_races_revalidate_every_bound_predicate","assertion":"offline expected_run_id null becomes stale after runtime ownership or relevant revision changes"},
+    {"id":"SCN-M2-OWN-CONFIRM-USABILITY","test":"shell_renderer_handles_hostile_arguments","assertion":"shell rendering preserves spaces quotes Unicode leading dashes and hostile text"},
+    {"id":"SCN-M2-OWN-ADMIN-SECRET","test":"credential_permissions_are_strict_and_value_is_not_debuggable","assertion":"admin credentials require strict permissions and remain short-lived"},
+    {"id":"SCN-M2-OWN-SOCKET-BOUNDS","test":"command_endpoint_rejects_peer_mode_message_and_time_bounds","assertion":"0700/0600 peer message and request-time limits fail closed"},
+    {"id":"SCN-M2-OWN-ABORT-RESTART","test":"restart_reconciles_then_aborts_nonterminal_requests","assertion":"prior-run nonterminal requests abort after reconciliation and never auto-execute"}
+  ]
+}
