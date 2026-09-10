@@ -5,7 +5,7 @@ use std::fs::{self, File, OpenOptions, TryLockError};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command};
+use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 struct FileSession {
@@ -59,6 +59,8 @@ impl DockerPgSession {
     fn open(container: &str, nonce: &str) -> Self {
         let app = format!("m2-guard-{nonce}");
         let child = Command::new("docker")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
             .args([
                 "exec",
                 "-e",
