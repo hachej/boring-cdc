@@ -1,0 +1,21 @@
+{
+  "assertions": [
+    "typed boundaries are non-interchangeable at compile time",
+    "durable boundaries cannot be deserialized or minted from a crate-wide raw-value API",
+    "synthetic commit evidence cannot construct a durable source boundary",
+    "same validated seed and resolved fixture references replay identical synthetic outcomes",
+    "minimization preserves the complete bounded violation identity and emits a validated fixture",
+    "step, trace, state, payload, fixture-reference, and diagnostic budgets fail closed",
+    "schema syntax plus valid/invalid fixture compatibility are checked locally"
+  ],
+  "contract_digests": {
+    "contracts/m1/execution-trace.schema.json": "27d5cbdbdcf14a107d56c4e85a93866fad6b75acb83bcbb0e1bcb4422c0fd370",
+    "contracts/m1/schedule-seed.schema.json": "3a2643f922cbbfa480aa12c7dea098628aa37ba02cf1db6486dd0a0ea7969b45",
+    "contracts/m1/transition-fixture.schema.json": "d7d03e5f3eee2a43c944a0b180eba82d4566fb67155099813995abb4e3c43c67"
+  },
+  "git_commit": "4c75d371a8de480e540eb0bc03c37ee15f3372ec",
+  "outcome": "pass",
+  "owner_bead": "boring-cdc-m1.1",
+  "scenario_id": "SCN-M1-TRANSITION-KERNEL",
+  "schema_version": "boring-cdc/m1-transition-proof/v1"
+}

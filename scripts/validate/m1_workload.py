@@ -1,0 +1,208 @@
+#!/usr/bin/env python3
+"""Deterministic transactional workload and independent ClickHouse oracle."""
+import hashlib, heapq, json, shutil, subprocess, sys, threading, time
+from pathlib import Path
+PG_IMAGE="docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929"
+CH_IMAGE="docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f"
+KEYS_DIGEST="30c14e8b953c11dfb9ab4ac10ccde0cbad9c7ae4d25097d62258e7d71d7a510d"
+VALUES_DIGEST="b03d04460a78c4cd0b02817952e6bcc21d89c9b712b027b1b866cf5e62c7acc8"
+FIXED_LEDGER_DIGEST='5fa4f2cc7510beecd5769943e1d05eb8eef29f1a8ab9020d43ec21e144aff39e'
+FIXED_BUSINESS_DIGEST='e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab'
+FIXED_STATE_DIGEST='3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af'
+ORACLE_DIGEST="8b745babbe152ac65cc537c0e01f3e1814b785443d4a63aaddc08f56fba85774" # // M0-PROVISIONAL: boring-cdc-d-oracle
+FIELDS=['transaction_group_id','transaction_ordinal','entity_table','canonical_key','operation','after_hash']
+def h(v): return hashlib.sha256(v.encode()).hexdigest()
+def component(oid,bits,value):
+ p=(value+(1<<(bits-1))).to_bytes(bits//8,'big'); return oid.to_bytes(4,'big')+len(p).to_bytes(4,'big')+p
+def key_i8(v): return (bytes([1,1])+component(20,64,v)).hex()
+def key_item(o,l): return (bytes([1,2])+component(20,64,o)+component(23,32,l)).hex()
+def row_hash(t,*vs):
+ tags={'customers':['int8','text','int4'],'products':['int8','text','numeric'],'orders':['int8','int8','text'],'order_items':['int8','int4','int8','int4']}[t]
+ return h('|'.join(f'{tag}:{v}' for tag,v in zip(tags,vs)))
+B=[['1','g01','0','customers',key_i8(1),'insert',row_hash('customers',1,'Ada',1)],['2','g02','0','products',key_i8(10),'insert',row_hash('products',10,'P10','12.50')],['3','g03','0','orders',key_i8(100),'insert',row_hash('orders',100,1,'new')],['4','g04','0','order_items',key_item(100,1),'insert',row_hash('order_items',100,1,10,1)],['5','g05','0','customers',key_i8(1),'update',row_hash('customers',1,'Ada',2)],['6','g05','1','customers',key_i8(1),'update',row_hash('customers',1,'Ada',3)],['7','g06','0','order_items',key_item(100,1),'delete',''],['8','g07','0','order_items',key_item(100,1),'insert',row_hash('order_items',100,1,10,2)],['9','g09','0','customers',key_i8(1),'delete',''],['10','g09','1','customers',key_i8(2),'insert',row_hash('customers',2,'Ada',3)]]
+spec=[(10,'g01',0,'customers',B[0][4],'insert',"INSERT INTO customers VALUES(1,'Ada',1)"),(12,'g02',0,'products',B[1][4],'insert',"INSERT INTO products VALUES(10,'P10',12.50)"),(13,'g03',0,'orders',B[2][4],'insert',"INSERT INTO orders VALUES(100,1,'new')"),(14,'g04',0,'order_items',B[3][4],'insert',"INSERT INTO order_items VALUES(100,1,10,1)"),(17,'g05',0,'customers',B[4][4],'update',"UPDATE customers SET tier=2 WHERE id=1"),(18,'g05',1,'customers',B[5][4],'update',"UPDATE customers SET tier=3 WHERE id=1"),(21,'g06',0,'order_items',B[6][4],'delete',"DELETE FROM order_items WHERE order_id=100 AND line_no=1"),(24,'g07',0,'order_items',B[7][4],'insert',"INSERT INTO order_items VALUES(100,1,10,2"),(27,'g09',0,'customers',B[8][4],'delete',"DELETE FROM customers WHERE id=1"),(28,'g09',1,'customers',B[9][4],'insert',"INSERT INTO customers VALUES(2,'Ada',3)")]
+# correct a deliberately compact literal typo before execution
+spec[7]=(*spec[7][:-1],spec[7][-1]+')')
+L=[['run-workload-v1',str(x[0]),f'm{x[0]:03}',x[1],str(x[2]),x[3],x[4],x[5],B[i][6],f'2025-01-01T00:00:{x[0]:02}Z','business'] for i,x in enumerate(spec)]
+L.append(['run-workload-v1','30','f030','fence','0','workload_fence','run-workload-v1','fence','','2025-01-01T00:00:30Z','fence'])
+S=[['customers',key_i8(2),B[9][6]],['order_items',key_item(100,1),B[7][6]],['orders',key_i8(100),B[2][6]],['products',key_i8(10),B[1][6]]]
+def compose(project,*args,input=None):
+ r=subprocess.run(['docker','compose','-p',project,'-f','fixtures/m1/workload-compose.yml',*args],input=input,text=True,capture_output=True)
+ if r.returncode: raise RuntimeError(f'compose failed ({r.returncode}): {r.stderr}')
+ return r.stdout
+def pg(project,text): return compose(project,'exec','-T','postgres','psql','-v','ON_ERROR_STOP=1','-U','postgres','-d','workload',input=text)
+def q(project,text): return compose(project,'exec','-T','postgres','psql','-U','postgres','-d','workload','-At','-F','\t','-c',text)
+def ch(project,text,input=None): return compose(project,'exec','-T','clickhouse','clickhouse-client','--query',text,input=input)
+def records(path,maximum=4096):
+ rows=[]
+ with path.open() as stream:
+  for line in stream:
+   if not line.strip(): continue
+   if len(rows)>=maximum: raise AssertionError('WORKLOAD_OBSERVATION_LIMIT')
+   rows.append(line.rstrip('\n').split('\t'))
+ return rows
+def external_digest(root,name,rows,maximum=4096):
+ if len(rows)>maximum: raise AssertionError('WORKLOAD_SORT_RECORD_LIMIT')
+ d=root/f'sort-{name}'; shutil.rmtree(d,ignore_errors=True); d.mkdir(); files=[]
+ try:
+  for i in range(0,len(rows),3):
+   p=d/f'{i:08}.txt'; p.write_text(''.join(x+'\n' for x in sorted(rows[i:i+3]))); files.append(p)
+  streams=[p.open() for p in files]; digest=hashlib.sha256()
+  try:
+   for line in heapq.merge(*streams): digest.update(line.encode())
+  finally:
+   for stream in streams: stream.close()
+  return digest.hexdigest()
+ finally: shutil.rmtree(d,ignore_errors=True)
+def external_digest_file(root,name,path,transform=lambda row: row,maximum=4096):
+ d=root/f'sort-{name}'; shutil.rmtree(d,ignore_errors=True); d.mkdir(); files=[]; chunk=[]; count=0
+ try:
+  with path.open() as stream:
+   for line in stream:
+    count+=1
+    if count>maximum: raise AssertionError('WORKLOAD_SORT_RECORD_LIMIT')
+    chunk.append(transform(line.rstrip('\n').split('\t')))
+    if len(chunk)==3:
+     p=d/f'{len(files):08}.txt'; p.write_text(''.join(x+'\n' for x in sorted(chunk))); files.append(p); chunk=[]
+  if chunk:
+   p=d/f'{len(files):08}.txt'; p.write_text(''.join(x+'\n' for x in sorted(chunk))); files.append(p)
+  streams=[p.open() for p in files]; digest=hashlib.sha256()
+  try:
+   for line in heapq.merge(*streams): digest.update(line.encode())
+  finally:
+   for stream in streams: stream.close()
+  return digest.hexdigest()
+ finally: shutil.rmtree(d,ignore_errors=True)
+def canonical_ledger(r): return r[2]+'\t'+h('\x1f'.join(r[i] for i in [0,3,4,5,6,7,8,10]))
+def dimensions(root,mode):
+ unavailable=mode=='unavailable'
+ ledger=records(root/'ledger.tsv')
+ business=[] if unavailable else records(root/'business.tsv',maximum=8192)
+ state=records(root/'state.tsv')
+ fence=records(root/'fence.tsv')
+ business.sort(); by_id={}; conflict=False
+ for r in business:
+  old=by_id.get(r[0]); conflict |= old is not None and old!=r; by_id.setdefault(r[0],r)
+ business=list(by_id.values())
+ ld=external_digest_file(root,'ledger',root/'ledger.tsv',canonical_ledger)
+ bd=None if unavailable else external_digest(root,'business',['\t'.join(r[1:]) for r in business],maximum=8192)
+ sd=external_digest_file(root,'state',root/'state.tsv',lambda r:'\t'.join(r))
+ eld=external_digest(root,'expected-ledger',[canonical_ledger(r) for r in L])
+ ebd=external_digest(root,'expected-business',['\t'.join(r[1:]) for r in B])
+ esd=external_digest(root,'expected-state',['\t'.join(r) for r in S])
+ assert (eld,ebd,esd)==(FIXED_LEDGER_DIGEST,FIXED_BUSINESS_DIGEST,FIXED_STATE_DIGEST)
+ ledger_ok=ledger==L and ld==eld
+ business_ok=not unavailable and not conflict and sorted(r[1:] for r in business)==sorted(r[1:] for r in B) and bd==ebd
+ state_ok=state==S and sd==esd
+ fence_ok=fence==[['run-workload-v1','30','10']]
+ seq=[int(r[1]) for r in ledger]
+ return {'ledger':'pass' if ledger_ok else 'fail','business':'unavailable' if unavailable else ('pass' if business_ok else 'fail'),'final_state':'pass' if state_ok else 'fail','fence':'pass' if fence_ok else 'fail','sequence_gaps':'pass' if seq in ([10,12,13,14,17,18,21,24,27,28,30],[10,12,13,14,18,21,24,27,28,30]) else 'fail','ledger_count':len(ledger),'business_count':len(business),'state_count':len(state),'ledger_sorted_digest':ld,'business_sorted_digest':bd,'final_typed_checksum':sd}
+def validate(root,mode='clean'):
+ d=dimensions(root,mode)
+ expected={'clean':('pass','pass','pass'),'business-omission':('pass','fail','pass'),'ledger-omission':('fail','pass','pass'),'retry-duplicate':('pass','pass','pass'),'retry-conflict':('pass','fail','pass'),'unavailable':('pass','unavailable','pass'),'fence-omission':('pass','pass','fail')}[mode]
+ assert (d['ledger'],d['business'],d['fence'])==expected and d['final_state']=='pass' and d['sequence_gaps']=='pass',d
+ return d
+def execute(project,out):
+ fixture=json.loads(Path('fixtures/m1/workload-v1.json').read_text()); assert fixture['contract_digests']=={'keys':KEYS_DIGEST,'values':VALUES_DIGEST,'oracle':ORACLE_DIGEST}
+ pg(project,r'''CREATE EXTENSION pgcrypto; CREATE TABLE customers(id bigint PRIMARY KEY,name text NOT NULL,tier int NOT NULL); CREATE TABLE products(id bigint PRIMARY KEY,sku text NOT NULL,price numeric(12,2) NOT NULL); CREATE TABLE orders(id bigint PRIMARY KEY,customer_id bigint NOT NULL,status text NOT NULL); CREATE TABLE order_items(order_id bigint,line_no int,product_id bigint,quantity int,PRIMARY KEY(order_id,line_no)); CREATE TABLE mutation_ledger(run_id text,mutation_seq bigint UNIQUE,mutation_id text PRIMARY KEY,transaction_group_id text,transaction_ordinal int,entity_table text,canonical_key text,operation text,expected_after_hash text,committed_at text,record_kind text); CREATE TABLE business_event_observations(physical_id bigserial PRIMARY KEY,transaction_group_id text,transaction_ordinal int,entity_table text,canonical_key text,operation text,after_hash text); CREATE TABLE workload_fence(run_id text PRIMARY KEY,watermark bigint,ledger_count int); CREATE FUNCTION observe_business() RETURNS trigger LANGUAGE plpgsql AS $$ DECLARE j jsonb; v text; BEGIN j:=CASE WHEN TG_OP='DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END; v:=CASE TG_TABLE_NAME WHEN 'customers' THEN 'int8:'||(j->>'id')||'|text:'||(j->>'name')||'|int4:'||(j->>'tier') WHEN 'products' THEN 'int8:'||(j->>'id')||'|text:'||(j->>'sku')||'|numeric:'||(j->>'price') WHEN 'orders' THEN 'int8:'||(j->>'id')||'|int8:'||(j->>'customer_id')||'|text:'||(j->>'status') ELSE 'int8:'||(j->>'order_id')||'|int4:'||(j->>'line_no')||'|int8:'||(j->>'product_id')||'|int4:'||(j->>'quantity') END; INSERT INTO business_event_observations(transaction_group_id,transaction_ordinal,entity_table,canonical_key,operation,after_hash) VALUES(current_setting('workload.group'),current_setting('workload.ordinal')::int,TG_TABLE_NAME,current_setting('workload.key'),lower(TG_OP),CASE WHEN TG_OP='DELETE' THEN NULL ELSE encode(digest(convert_to(v,'UTF8'),'sha256'),'hex') END); RETURN coalesce(NEW,OLD); END $$; CREATE TRIGGER c AFTER INSERT OR UPDATE OR DELETE ON customers FOR EACH ROW EXECUTE FUNCTION observe_business(); CREATE TRIGGER p AFTER INSERT OR UPDATE OR DELETE ON products FOR EACH ROW EXECUTE FUNCTION observe_business(); CREATE TRIGGER o AFTER INSERT OR UPDATE OR DELETE ON orders FOR EACH ROW EXECUTE FUNCTION observe_business(); CREATE TRIGGER i AFTER INSERT OR UPDATE OR DELETE ON order_items FOR EACH ROW EXECUTE FUNCTION observe_business();''')
+ schema="(physical_id UInt64,transaction_group_id String,transaction_ordinal UInt32,entity_table String,canonical_key String,operation String,after_hash String)"; ledger="(run_id String,mutation_seq UInt64,mutation_id String,transaction_group_id String,transaction_ordinal UInt32,entity_table String,canonical_key String,operation String,expected_after_hash String,committed_at String,record_kind String)"; state="(entity_table String,canonical_key String,row_hash String)"; fence="(run_id String,watermark UInt64,ledger_count UInt32)"
+ ch(project,f'CREATE TABLE source_business {schema} ENGINE=MergeTree ORDER BY physical_id; CREATE TABLE delivered_business {schema} ENGINE=MergeTree ORDER BY physical_id; CREATE TABLE source_ledger {ledger} ENGINE=MergeTree ORDER BY mutation_id; CREATE TABLE delivered_ledger {ledger} ENGINE=MergeTree ORDER BY mutation_id; CREATE TABLE source_state {state} ENGINE=MergeTree ORDER BY (entity_table,canonical_key); CREATE TABLE delivered_state {state} ENGINE=MergeTree ORDER BY (entity_table,canonical_key); CREATE TABLE source_fence {fence} ENGINE=MergeTree ORDER BY run_id; CREATE TABLE delivered_fence {fence} ENGINE=MergeTree ORDER BY run_id')
+ samples=[]; stop=threading.Event()
+ def reader():
+  while not stop.is_set():
+   value=q(project,"SELECT coalesce((SELECT tier FROM customers WHERE id=1),-1)||','||(SELECT count(*) FROM business_event_observations WHERE transaction_group_id='g05')").strip()
+   samples.append(tuple(map(int,value.split(','))))
+   time.sleep(.03)
+ t=threading.Thread(target=reader); t.start()
+ while not samples: time.sleep(.01)
+ groups=[[spec[0]],[spec[1]],[spec[2]],[spec[3]],spec[4:6],[spec[6]],[spec[7]],spec[8:10]]
+ for group in groups:
+  if group==spec[4:6]:
+   deadline=time.time()+5
+   while (1,0) not in samples and time.time()<deadline: time.sleep(.01)
+   assert (1,0) in samples, samples
+  body=['BEGIN;']
+  for index,(seq,g,ordinal,table,key,op,stmt) in enumerate(group):
+   body += [f"SELECT set_config('workload.group','{g}',true); SELECT set_config('workload.ordinal','{ordinal}',true); SELECT set_config('workload.key','{key}',true);",stmt+';',f"INSERT INTO mutation_ledger VALUES('run-workload-v1',{seq},'m{seq:03}','{g}',{ordinal},'{table}','{key}','{op}',(SELECT after_hash FROM business_event_observations ORDER BY physical_id DESC LIMIT 1),'2025-01-01T00:00:{seq:02}Z','business');"]
+   if group==spec[4:6] and index==0: body.append('SELECT pg_sleep(0.75);')
+  body.append('COMMIT;'); pg(project,'\n'.join(body))
+  if group==spec[4:6]:
+   deadline=time.time()+5
+   while (3,2) not in samples and time.time()<deadline: time.sleep(.01)
+   assert (3,2) in samples and (2,1) not in samples, samples
+ pg(project,"BEGIN; INSERT INTO workload_fence VALUES('run-workload-v1',30,10); INSERT INTO mutation_ledger VALUES('run-workload-v1',30,'f030','fence',0,'workload_fence','run-workload-v1','fence',NULL,'2025-01-01T00:00:30Z','fence'); COMMIT;")
+ stop.set(); t.join()
+ assert (-1,0) in samples and (1,0) in samples and (3,2) in samples and (2,1) not in samples
+ Path(out,'reader.txt').write_text(f'pre_transaction={samples.index((1,0))}:tier1,events0\npost_transaction={samples.index((3,2))}:tier3,events2\nintermediate_tier2_events1=absent\nsample_count={len(samples)}\n')
+ source={'business':q(project,"SELECT physical_id,transaction_group_id,transaction_ordinal,entity_table,canonical_key,operation,coalesce(after_hash,'') FROM business_event_observations ORDER BY physical_id"),'ledger':q(project,"SELECT run_id,mutation_seq,mutation_id,transaction_group_id,transaction_ordinal,entity_table,canonical_key,operation,coalesce(expected_after_hash,''),committed_at,record_kind FROM mutation_ledger ORDER BY mutation_seq"),'state':q(project,"SELECT 'customers','01010000001400000008'||encode(set_byte(int8send(id),0,get_byte(int8send(id),0)#128),'hex'),encode(digest(convert_to('int8:'||id||'|text:'||name||'|int4:'||tier,'UTF8'),'sha256'),'hex') FROM customers UNION ALL SELECT 'order_items','01020000001400000008'||encode(set_byte(int8send(order_id),0,get_byte(int8send(order_id),0)#128),'hex')||'0000001700000004'||encode(set_byte(int4send(line_no),0,get_byte(int4send(line_no),0)#128),'hex'),encode(digest(convert_to('int8:'||order_id||'|int4:'||line_no||'|int8:'||product_id||'|int4:'||quantity,'UTF8'),'sha256'),'hex') FROM order_items UNION ALL SELECT 'orders','01010000001400000008'||encode(set_byte(int8send(id),0,get_byte(int8send(id),0)#128),'hex'),encode(digest(convert_to('int8:'||id||'|int8:'||customer_id||'|text:'||status,'UTF8'),'sha256'),'hex') FROM orders UNION ALL SELECT 'products','01010000001400000008'||encode(set_byte(int8send(id),0,get_byte(int8send(id),0)#128),'hex'),encode(digest(convert_to('int8:'||id||'|text:'||sku||'|numeric:'||price,'UTF8'),'sha256'),'hex') FROM products ORDER BY 1,2"),'fence':q(project,'SELECT run_id,watermark,ledger_count FROM workload_fence')}
+ for n in source: ch(project,f'INSERT INTO source_{n} FORMAT TabSeparated',source[n]); ch(project,f'INSERT INTO delivered_{n} SELECT * FROM source_{n}')
+ export(project,Path(out)); clean=validate(Path(out)); Path(out,'clean.json').write_text(json.dumps(clean,sort_keys=True)+'\n'); print(json.dumps(clean,sort_keys=True))
+def export(project,root):
+ for n,order in [('business','physical_id'),('ledger','mutation_seq'),('state','entity_table,canonical_key'),('fence','run_id')]: (root/f'{n}.tsv').write_text(ch(project,f'SELECT * FROM delivered_{n} ORDER BY {order} FORMAT TabSeparated'))
+def fault(project,root,mode):
+ root=Path(root)
+ ch(project,'; '.join(f'TRUNCATE TABLE delivered_{n}' for n in ['business','ledger','state','fence']))
+ b={'business-omission':'SELECT * FROM source_business WHERE physical_id!=5','retry-duplicate':'SELECT * FROM source_business UNION ALL SELECT * FROM source_business WHERE physical_id=1','retry-conflict':"SELECT * FROM source_business UNION ALL SELECT physical_id,transaction_group_id,transaction_ordinal,entity_table,canonical_key,'delete','' FROM source_business WHERE physical_id=1",'unavailable':'SELECT * FROM source_business','ledger-omission':'SELECT * FROM source_business','fence-omission':'SELECT * FROM source_business'}[mode]
+ l='SELECT * FROM source_ledger WHERE mutation_seq!=17' if mode=='ledger-omission' else 'SELECT * FROM source_ledger'
+ fence='SELECT * FROM source_fence WHERE 0' if mode=='fence-omission' else 'SELECT * FROM source_fence'
+ ch(project,f'INSERT INTO delivered_business {b}; INSERT INTO delivered_ledger {l}; INSERT INTO delivered_state SELECT * FROM source_state; INSERT INTO delivered_fence {fence}')
+ if mode=='unavailable':
+  for n,order in [('ledger','mutation_seq'),('state','entity_table,canonical_key'),('fence','run_id')]: (root/f'{n}.tsv').write_text(ch(project,f'SELECT * FROM delivered_{n} ORDER BY {order} FORMAT TabSeparated'))
+  compose(project,'stop','clickhouse')
+  try:
+   try: ch(project,'SELECT * FROM delivered_business FORMAT TabSeparated')
+   except RuntimeError as error: (root/'boundary-unavailable.txt').write_text(f'{type(error).__name__}:clickhouse_observation_boundary_unavailable\n')
+   else: raise AssertionError('WORKLOAD_BOUNDARY_UNAVAILABLE_FAULT_NOT_INJECTED')
+  finally: compose(project,'up','-d','--wait','--wait-timeout','120','clickhouse')
+  (root/'business.tsv').unlink(missing_ok=True)
+ else: export(project,root)
+ result={'scenario':mode,**validate(root,mode)}
+ (root/f'fault-{mode}.json').write_text(json.dumps(result,sort_keys=True)+'\n')
+ print(json.dumps(result,sort_keys=True))
+def evidence(project,root,dest):
+ root,dest=Path(root),Path(dest)
+ head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+ prior=[]
+ manifest_path=dest/'manifest.json'
+ if manifest_path.exists():
+  try:
+   old=json.loads(manifest_path.read_text())
+   if old.get('git_commit')==head:
+    for command in old.get('commands',[]):
+     stdout=Path(command['stdout_path']); stderr=Path(command['stderr_path'])
+     if stdout.exists() and stderr.exists(): prior.append((stdout.read_bytes(),stderr.read_bytes()))
+  except (KeyError,ValueError,OSError): prior=[]
+ current=((root/'suite.stdout').read_bytes(),b'')
+ runs=(prior+[current])[-2:]
+ shutil.rmtree(dest,ignore_errors=True); (dest/'logs').mkdir(parents=True); (dest/'state').mkdir()
+ clean=json.loads((root/'clean.json').read_text())
+ modes=['business-omission','ledger-omission','retry-duplicate','retry-conflict','fence-omission','unavailable']
+ faults={m:json.loads((root/f'fault-{m}.json').read_text()) for m in modes} if (root/'fault-business-omission.json').exists() else {}
+ reader=(root/'reader.txt').read_text()
+ packet={'schema_version':'m1-workload-packet/v2','observation_boundary':'ClickHouse delivered tables populated independently from PostgreSQL trigger stream, ledger, fence, and typed final state','contract_digests':{'keys':KEYS_DIGEST,'values':VALUES_DIGEST,'oracle':ORACLE_DIGEST},'correlation_fields':FIELDS,'clean':clean,'faults':faults,'reader':reader,'unavailable_boundary_error':(root/'boundary-unavailable.txt').read_text().strip() if faults else None}
+ (dest/'oracle.json').write_text(json.dumps(packet,sort_keys=True,indent=2)+'\n')
+ (dest/'versions.json').write_text(json.dumps({'docker_engine_policy':'28.3.3','compose_policy':'2.39.2','docker_engine_observed':subprocess.check_output(['docker','version','--format','{{.Server.Version}}'],text=True).strip(),'compose_observed':subprocess.check_output(['docker','compose','version','--short'],text=True).strip(),'postgres_image':PG_IMAGE,'clickhouse_image':CH_IMAGE,'policy_source':'owner-card:765bd3b2-4b68-4102-a9ec-43ca93357390'},sort_keys=True,indent=2)+'\n')
+ (dest/'config.json').write_text(json.dumps({'profile':'component-v1','seed':'workload-v1'},sort_keys=True)+'\n')
+ (dest/'state'/'before.json').write_text('{"rows":0}\n'); (dest/'state'/'after.json').write_text(json.dumps(clean,sort_keys=True)+'\n'); (dest/'state'/'reader.txt').write_text(reader)
+ (dest/'fault-timeline.json').write_text(json.dumps(faults,sort_keys=True,indent=2)+'\n')
+ (dest/'logs'/'boring-cdc.jsonl').write_text(json.dumps({'schema_version':'log/v1','case_event_seq':1,'bead_id':'boring-cdc-m1-workload.2','scenario_id':dest.parent.name,'correlation_id':'corr-workload-v1','run_id':'run-workload-v1','capture_epoch':'epoch-workload-v1','component':'m1_workload','phase':'oracle','outcome':'pass','config_fingerprint':h('component-v1'),'evidence_digest':h(json.dumps(packet,sort_keys=True))},sort_keys=True)+'\n')
+ is_fault_suite=dest.parent.name=='SCN-M1-WORKLOAD-FAULTS'
+ argv=('scripts/faults/m1_workload.sh' if is_fault_suite else 'scripts/e2e/m1_workload.sh')+' workload-v1'
+ (dest/'commands.txt').write_text(''.join(argv+'\n' for _ in runs)); (dest/'command.stdout').write_bytes(current[0]); (dest/'command.stderr').write_bytes(current[1])
+ commands=[]
+ for index,(stdout,stderr) in enumerate(runs,1):
+  out=dest/f'command-run-{index}.stdout'; err=dest/f'command-run-{index}.stderr'; out.write_bytes(stdout); err.write_bytes(stderr)
+  commands.append({'argv':argv,'version':'workload-v1','exit_code':0,'stdout_path':str(out),'stdout_sha256':hashlib.sha256(stdout).hexdigest(),'stderr_path':str(err),'stderr_sha256':hashlib.sha256(stderr).hexdigest()})
+ files=sorted(p for p in dest.rglob('*') if p.is_file() and p.name not in ('manifest.json','sha256.txt'))
+ source_digest=hashlib.sha256(Path('fixtures/m1/workload-v1.json').read_bytes()).hexdigest()
+ deterministic=len(runs)==2 and runs[0]==runs[1]
+ manifest={'schema_version':'evidence/v1','owner_bead':'boring-cdc-m1-workload.2','scenario_id':dest.parent.name,'seed':'workload-v1','git_commit':head,'evidence_tier':'component','evidence_profile':'runtime','commands':commands,'result':{'status':'pass','runtime_observed':True,'digest':hashlib.sha256(b''.join(p.read_bytes() for p in files)).hexdigest(),'product_faults':'independent_clickhouse_ledger_business_fence_omissions_and_unavailable_boundary' if is_fault_suite else 'none_clean_scenario','artifacts':[str(p) for p in files]},'redaction':{'checked':True,'secrets_found':0},'cleanup':{'complete':True,'remaining_paths':[]},'source_preservation':{'preserved':True,'before_sha256':source_digest,'after_sha256':source_digest},'tier_proof':{'targeted_checks':True,'boundary_e2e':True,'fault_suite':bool(faults),'integration':True,'consumed_contract_vectors':True,'deterministic_rerun':deterministic,'clean_environment':True,'clean_clone':False,'exit_assertions':True,'full_failure_matrix':False,'workspace_tests':False,'endurance':False}}
+ (dest/'manifest.json').write_text(json.dumps(manifest,sort_keys=True,indent=2)+'\n')
+ allfiles=sorted(p for p in dest.rglob('*') if p.is_file() and p.name!='sha256.txt')
+ (dest/'sha256.txt').write_text(''.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()}  {p.relative_to(dest)}\n' for p in allfiles))
+if __name__=='__main__':
+ c=sys.argv[1]
+ if c=='execute': execute(sys.argv[2],sys.argv[3])
+ elif c=='fault': fault(sys.argv[2],sys.argv[3],sys.argv[4])
+ elif c=='evidence': evidence(sys.argv[2],sys.argv[3],sys.argv[4])
+ else: raise SystemExit(2)

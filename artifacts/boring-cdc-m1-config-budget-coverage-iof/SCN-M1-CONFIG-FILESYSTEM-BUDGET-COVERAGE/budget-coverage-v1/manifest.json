@@ -1,0 +1,111 @@
+{
+  "schema_version": "evidence/v1",
+  "owner_bead": "boring-cdc-m1-config-budget-coverage-iof",
+  "scenario_id": "SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE",
+  "git_commit": "bff4a2d8d8a7d993e228fb1e44df34bffeb98197",
+  "evidence_profile": "documentation",
+  "evidence_tier": "leaf",
+  "seed": "shared root plus four separate most-specific state/temp/spool/archive roots",
+  "commands": [
+    {
+      "argv": "cargo fmt --check",
+      "version": "cargo 1.95.0",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-1.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": "cargo test --locked m1_config::tests",
+      "version": "cargo 1.95.0",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-2.log",
+      "stdout_sha256": "d6dd80aaa16e21f76acc109646afad2e1c92e15b16e0e87c74e8905806c55fa2",
+      "stderr_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-2.stderr",
+      "stderr_sha256": "f250cb9a720adcce88ab38383cf2a3cd126569ce0e30a90838ff385f77ef30c3"
+    },
+    {
+      "argv": "cargo clippy --locked --all-targets -- -D warnings",
+      "version": "cargo/clippy 1.95.0",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-3.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-3.stderr",
+      "stderr_sha256": "4f27ac380b22e1d975eee20ce727fa8cbc09061177f6253af0777fd4de7b7506"
+    },
+    {
+      "argv": "python3 -m json.tool contracts/m1/config-cases.json",
+      "version": "python 3.13.3",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-4.log",
+      "stdout_sha256": "c7bd0a490431b39dbf740b736dbbef636918cbc6644464c48aec0e829862785c",
+      "stderr_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-4.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": "scripts/validate/plan_coverage.sh",
+      "version": "plan-coverage/v1",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-5.log",
+      "stdout_sha256": "8329ee055d9e7681ca6ef0673692ed4ba21ae6001a3490869f9cbdb91f92abc2",
+      "stderr_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-5.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": "br lint",
+      "version": "br 0.2.16",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-6.log",
+      "stdout_sha256": "aec2265655820ef7d982a4347ea6787daa446602af84c59247c4a8704da2c224",
+      "stderr_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-6.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "argv": "python3 -c duplicate-id-scan",
+      "version": "python 3.13.3",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-7.log",
+      "stdout_sha256": "2c0c9f10d893e544692d1471609c7cdc8ccbc48537833e9d50076c6cb6a0c851",
+      "stderr_path": "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/command-7.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "result": {
+    "status": "pass",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "artifacts": [
+      "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/proof-summary.json",
+      "artifacts/boring-cdc-m1-config-budget-coverage-iof/SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE/budget-coverage-v1/versions.json"
+    ],
+    "digest": "2c925d0e11702bf5cb88858ba892b2e979a4c46117c2a923816b5f337f962036"
+  },
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "source_preservation": {
+    "preserved": true,
+    "before_sha256": "d7645989c660d47802c7893120e437f7bca80d3534283528c0ecab5acb29dca6",
+    "after_sha256": "d7645989c660d47802c7893120e437f7bca80d3534283528c0ecab5acb29dca6"
+  },
+  "tier_proof": {
+    "targeted_checks": true,
+    "boundary_e2e": false,
+    "clean_environment": true,
+    "consumed_contract_vectors": false,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": false,
+    "full_failure_matrix": false,
+    "integration": false,
+    "workspace_tests": false,
+    "clean_clone": false
+  }
+}

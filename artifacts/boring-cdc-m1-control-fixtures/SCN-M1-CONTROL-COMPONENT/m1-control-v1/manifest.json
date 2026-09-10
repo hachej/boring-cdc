@@ -1,0 +1,105 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo test --locked --workspace --all-targets",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/workspace.txt",
+      "stderr_sha256": "31449c794c25fe71a8ab3e57411c057a076cb8311b3d731a0fa6d3552ec5799d",
+      "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/workspace.txt",
+      "stdout_sha256": "1f4dd370b7e746bf249489d0eff3c51dc257178f612bc5b78592399aa580458e",
+      "version": "cargo"
+    },
+    {
+      "argv": "cargo test --locked m1_control_fixtures::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/targeted.txt",
+      "stderr_sha256": "01a54c2297d535053904aa31b3ce782e8d166bda75f82d9cff7253650479b038",
+      "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/targeted.txt",
+      "stdout_sha256": "91de53906b669ad8fb9be18f07bfae8ce27bc3ed45d69e2c40e1abc90b6aecf8",
+      "version": "cargo"
+    },
+    {
+      "argv": "scripts/e2e/m1_control_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/e2e-1.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/e2e-1.txt",
+      "stdout_sha256": "9f562ea7248792097bab51dab89d937c8723ac9f389cd77e342df13547b280cb",
+      "version": "fixture/v1"
+    },
+    {
+      "argv": "scripts/e2e/m1_control_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/e2e-2.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/e2e-2.txt",
+      "stdout_sha256": "9f562ea7248792097bab51dab89d937c8723ac9f389cd77e342df13547b280cb",
+      "version": "fixture/v1"
+    },
+    {
+      "argv": "scripts/faults/m1_control_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/faults-1.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/faults-1.txt",
+      "stdout_sha256": "323433ad31f34e7772cc28363ddbed795e56ca8953aaf574ba20286458295161",
+      "version": "fixture/v1"
+    },
+    {
+      "argv": "scripts/faults/m1_control_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stderr/faults-2.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/stdout/faults-2.txt",
+      "stdout_sha256": "323433ad31f34e7772cc28363ddbed795e56ca8953aaf574ba20286458295161",
+      "version": "fixture/v1"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "component",
+  "git_commit": "d576e0f98070f2a2325590a385373d426cbd8acd",
+  "owner_bead": "boring-cdc-m1-control-fixtures",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/config.json",
+      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/logs/boring-cdc.jsonl",
+      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/state/before.json",
+      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/state/after.json",
+      "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/fault-timeline.json"
+    ],
+    "digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
+    "product_faults": "Live PG 15/16/17 Relation/Update/Truncate tuple decoding, independently intended full fence-identity binding, and observed catalog operation/owner/membership drift; M2 adapters are not claimed",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-CONTROL-COMPONENT",
+  "schema_version": "evidence/v1",
+  "seed": "m1-control-v1",
+  "source_preservation": {
+    "after_sha256": "5dd9ffc68d78649321593ddfdab927f1b9153b7a7ef0667315737efad908de69",
+    "before_sha256": "5dd9ffc68d78649321593ddfdab927f1b9153b7a7ef0667315737efad908de69",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": true
+  }
+}

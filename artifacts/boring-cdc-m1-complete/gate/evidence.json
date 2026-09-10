@@ -1,0 +1,67 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/acceptance/m1_complete.sh --probe",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-complete/gate/run-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-complete/gate/run-1.log",
+      "stdout_sha256": "ef5ff0d64695579ca8d050f5e98e03c8c73d3005155be242425e3e8630c40a26",
+      "version": "m1-complete/v1"
+    },
+    {
+      "argv": "scripts/acceptance/m1_complete.sh --probe",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-complete/gate/run-2.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-complete/gate/run-2.log",
+      "stdout_sha256": "ef5ff0d64695579ca8d050f5e98e03c8c73d3005155be242425e3e8630c40a26",
+      "version": "m1-complete/v1"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "milestone",
+  "git_commit": "7f47902d6aea79924a076e2b104994f66c44fe1c",
+  "owner_bead": "boring-cdc-m1-complete",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "contracts/coverage/m1.json",
+      "contracts/coverage/m1-owner-reconciliation.json",
+      "artifacts/boring-cdc-m1-complete/gate/completion-summary.json"
+    ],
+    "digest": "12e3beebda8a7d47039b19738aba2d5251653a69b442b4f3e85dace2bf967f63",
+    "product_faults": "all M1 leaf fault suites validated by manifest",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-COMPLETION-BARRIER",
+  "schema_version": "evidence/v1",
+  "seed": "m1-complete-v1",
+  "source_preservation": {
+    "after_sha256": "1c027cd20447ddb9c76bfbf129414f22d201fd4788155b5bf46f590b09265a26",
+    "before_sha256": "1c027cd20447ddb9c76bfbf129414f22d201fd4788155b5bf46f590b09265a26",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": true,
+    "targeted_checks": true,
+    "workspace_tests": true
+  }
+}

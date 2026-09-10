@@ -1,0 +1,10 @@
+{
+  "binary_sha256": "f86ee1ff2364a13473ba6e14b87b6f1c90b1a0301b75c9dfb82cc16557b0b9fb",
+  "git_commit": "460323296444d95b3233f372deea6906f7ea8f1f",
+  "postgres_images": [
+    "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
+    "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
+    "postgres@sha256:c7526c0f6c3f30260a563d7bcf8ad778effac59a44f8ffa86678c35418338609"
+  ],
+  "schema_version": "m1-ddl-versions/v1"
+}

@@ -1,0 +1,264 @@
+{
+  "owner_bead": "boring-cdc-m1-complete",
+  "owner_reconciliation": "contracts/coverage/m1-owner-reconciliation.json",
+  "plan_coverage": "contracts/coverage/plan-to-beads.json",
+  "required_leaves": [
+    {
+      "component_and_fault_scripts": [
+        "scripts/validate/m1_bootstrap_sm.py"
+      ],
+      "contract_ids": [
+        "bootstrap-state-machine/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1-bootstrap-sm/SCN-M1-BOOTSTRAP-LEAF/bootstrap-v1/manifest.json",
+          "sha256": "550ba39eaf30078ee8363e243793555aee83580dedacd1389af287fc6bbea94c"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-BOOTSTRAP-LEAF"
+      ],
+      "owner_bead": "boring-cdc-m1-bootstrap-sm",
+      "structured_log_event_codes": [
+        "BOOTSTRAP_TRANSITION_REJECTED"
+      ],
+      "unit_target": "m1_bootstrap_sm::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "cargo test --locked m1_config::tests"
+      ],
+      "contract_ids": [
+        "m1-config-cases/v2"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/manifest.json",
+          "sha256": "7b16f417590813dd9a87506a161d06ed78b5e2080ef131b41ac6a8ecc10c29d4"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-CONFIG-BOUNDARY"
+      ],
+      "owner_bead": "boring-cdc-m1-config",
+      "structured_log_event_codes": [
+        "CONFIG_ZERO_BOUND"
+      ],
+      "unit_target": "m1_config::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m1_control_fixtures.sh",
+        "scripts/faults/m1_control_fixtures.sh"
+      ],
+      "contract_ids": [
+        "m1-control-fixtures/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
+          "sha256": "ac6cfc2f81333bab6437b7350aad2332d890c3a29c0e6d94631afa592762bfcc"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-CONTROL-COMPONENT"
+      ],
+      "owner_bead": "boring-cdc-m1-control-fixtures",
+      "structured_log_event_codes": [
+        "CONTROL_PREFLIGHT_REJECTED"
+      ],
+      "unit_target": "m1_control_fixtures::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m1_ddl_fixtures.sh",
+        "scripts/faults/m1_ddl_fixtures.sh"
+      ],
+      "contract_ids": [
+        "m1-ddl-fixtures/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/manifest.json",
+          "sha256": "f6717dcac64fd7cb498759278e8fc2789baa0034d3dcb25d930e91a133837332"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-DDL-COMPONENT"
+      ],
+      "owner_bead": "boring-cdc-m1-ddl-fixtures",
+      "structured_log_event_codes": [
+        "DDL_GUARD_LOST"
+      ],
+      "unit_target": "m1_ddl_fixtures::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/validate/m1_decoder.py"
+      ],
+      "contract_ids": [
+        "m1-decoder-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/manifest.json",
+          "sha256": "b029c09ff7312f74a9c7f778100cf667e3da76f9f3adc2dd30f6ed1c21c115c4"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-DECODER-LEAF"
+      ],
+      "owner_bead": "boring-cdc-m1-decoder",
+      "structured_log_event_codes": [
+        "PGOUTPUT_PROTOCOL_ERROR"
+      ],
+      "unit_target": "m1_decoder::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/validate/m1_ordering.py"
+      ],
+      "contract_ids": [
+        "m1-ordering-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1-ordering/SCN-M1-ORDERING-LEAF/ordering-v1/manifest.json",
+          "sha256": "a6fd9fc5730d2d61db7c1af65da533d27a36a69e3b5effe8398432646ddedfdc"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-ORDERING-LEAF"
+      ],
+      "owner_bead": "boring-cdc-m1-ordering",
+      "structured_log_event_codes": [
+        "PAYLOAD_IDENTITY_MISMATCH"
+      ],
+      "unit_target": "m1_ordering::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m1_preflight.sh",
+        "scripts/faults/m1_preflight.sh"
+      ],
+      "contract_ids": [
+        "m1-preflight-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/manifest.json",
+          "sha256": "2f60bd3b3f6f4803972a41105e40a007e58d819a45e3f3fbcc1f1693a7cb1ee5"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-PREFLIGHT-COMPONENT"
+      ],
+      "owner_bead": "boring-cdc-m1-preflight",
+      "structured_log_event_codes": [
+        "PREFLIGHT_REJECTED"
+      ],
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/validate/m1_source_identity.py"
+      ],
+      "contract_ids": [
+        "m1-source-identity/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/manifest.json",
+          "sha256": "198da2dd8b8aff92696a8edcbefdba0478238d366963e4e6c543e2f868767ec3"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-SOURCE-IDENTITY-LEAF"
+      ],
+      "owner_bead": "boring-cdc-m1-source-identity",
+      "structured_log_event_codes": [
+        "SOURCE_IDENTITY_MISMATCH"
+      ],
+      "unit_target": "m1_source_identity::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m1_workload.sh",
+        "scripts/faults/m1_workload.sh"
+      ],
+      "contract_ids": [
+        "m1-workload-fixture/v2"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-CLEAN/workload-v1/manifest.json",
+          "sha256": "9e72e61b2c979f18e4103145640cf8c65c277b022196a6bb9ecf0e63f2f8fa08"
+        },
+        {
+          "manifest": "artifacts/boring-cdc-m1-workload/SCN-M1-WORKLOAD-FAULTS/workload-v1/manifest.json",
+          "sha256": "35a1a71d481ab7b1c60a6e3934b791e8a8789b87603dfee078c2f98c9693cd6a"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-WORKLOAD-CLEAN",
+        "SCN-M1-WORKLOAD-FAULTS"
+      ],
+      "owner_bead": "boring-cdc-m1-workload",
+      "structured_log_event_codes": [
+        "WORKLOAD_BOUNDARY_UNAVAILABLE"
+      ],
+      "unit_target": "m1_workload::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m1_cli_contract.sh",
+        "scripts/faults/m1_cli_contract.sh"
+      ],
+      "contract_ids": [
+        "m1-cli-contract/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/manifest.json",
+          "sha256": "eecf9b2042520373652fd631248ff6b4c77983c3cd167676e428b1212f8702a3"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-CLI-CONTRACT"
+      ],
+      "owner_bead": "boring-cdc-m1-cli-contract",
+      "structured_log_event_codes": [
+        "CLI_CONTRACT_REJECTED"
+      ],
+      "unit_target": "m1_cli_contract::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/validate/m1_transition_contracts.py"
+      ],
+      "contract_ids": [
+        "m1-transition-contracts/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/manifest.json",
+          "sha256": "e7f6455e592c5924b3b29b2b02afd8aa7a02c091a37e886d9977b7abef2d1f70"
+        }
+      ],
+      "feature_ids": [
+        "SCN-M1-TRANSITION-KERNEL"
+      ],
+      "owner_bead": "boring-cdc-m1.1",
+      "structured_log_event_codes": [
+        "TRANSITION_REJECTED"
+      ],
+      "unit_target": "transition_contracts::tests"
+    }
+  ],
+  "schema_version": "m1-coverage/v1",
+  "terminal_proof": {
+    "bead": "boring-cdc-m1-raw-demo",
+    "role": "downstream-proof-excluded-from-barrier-inputs"
+  }
+}

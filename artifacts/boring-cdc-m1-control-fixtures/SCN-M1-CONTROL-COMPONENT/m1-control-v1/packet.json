@@ -1,0 +1,43 @@
+{
+  "assertions": [
+    "SCN-M1-CONTROL-FIXED-ROW-ABUSE",
+    "SCN-M1-CONTROL-HEARTBEAT-OUTAGE",
+    "SCN-M1-CONTROL-IDLE-HEARTBEAT",
+    "SCN-M1-CONTROL-INTERNAL-NOOP",
+    "SCN-M1-CONTROL-TRUNCATE-DETECTION",
+    "SCN-EXTERNAL-LIVE-PUBLICATION-MUTATION",
+    "SCN-TIMELINE-SOURCE-PUBLICATION-SLOT-MISMATCH",
+    "SCN-CONTROL-FENCE-REPEATED-NONCE",
+    "SCN-CONTROL-FENCE-UNBOUND-NONCE",
+    "SCN-CONTROL-SLOT-GUARD",
+    "SCN-M1-CONTROL-ADMIN-LIFETIME",
+    "SCN-CRASH-DURING-TABLE-ADD-RE-SEED"
+  ],
+  "bead_id": "boring-cdc-m1-control-fixtures",
+  "configuration_fingerprint": "5dd9ffc68d78649321593ddfdab927f1b9153b7a7ef0667315737efad908de69",
+  "failure_fingerprint": null,
+  "git_commit": "7116687fae9a79a1fd774252b030768647081c30",
+  "image_digests": {
+    "15": "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
+    "16": "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
+    "17": "postgres@sha256:c7526c0f6c3f30260a563d7bcf8ad778effac59a44f8ffa86678c35418338609"
+  },
+  "implementation_paths": [
+    "Cargo.lock",
+    "Cargo.toml",
+    "examples/m1_control_probe.rs",
+    "src/lib.rs",
+    "src/m1_config.rs",
+    "src/m1_control_fixtures.rs",
+    "src/m1_transition_kernel.rs",
+    "src/main.rs"
+  ],
+  "implementation_sha256": "fcef827b4a904294a9e8afd421fc7302bf8f1dabcdee6d90db705a5cbacd654f",
+  "outcome": "pass",
+  "profile": "component",
+  "schema_version": "m1-control-packet/v1",
+  "scope": "M1 live PostgreSQL wire/catalog observations and pure control kernel; M2 SQLite/runtime adapters are not claimed",
+  "seed": "m1-control-v1",
+  "source_fingerprint": "7ddda6d3ebe677ceb7c342e915966043411e3bfe55a35bad8e995cb6cad09e87",
+  "table_fingerprint_assertion": "exact canonical set including both control relations"
+}

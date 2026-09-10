@@ -1,0 +1,27 @@
+
+running 12 tests
+test m1_ordering::tests::canonical_hashes_are_unambiguous_for_component_boundaries_and_types ... ok
+test m1_ordering::tests::invalid_keys_fail_closed ... ok
+test m1_ordering::tests::epoch_and_decoder_ordinal_mismatches_fail_closed ... ok
+test m1_ordering::tests::ordering_case_inventory_is_complete ... ok
+test m1_ordering::tests::positional_event_id_excludes_payload_and_volatile_fields ... ok
+test m1_ordering::tests::relation_fingerprint_changes_payload_hash ... ok
+test m1_ordering::tests::four_column_states_have_distinct_payload_hashes ... ok
+test m1_ordering::tests::key_change_expands_delete_before_upsert ... ok
+test m1_ordering::tests::repeated_same_key_has_total_source_order ... ok
+test m1_ordering::tests::wal_and_snapshot_identities_are_namespaced_and_stable ... ok
+test m1_ordering::tests::snapshot_payload_requires_matching_table_and_key ... ok
+test m1_ordering::tests::same_id_same_hash_is_duplicate_and_different_hash_is_conflict ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 122 filtered out; finished in 0.02s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
