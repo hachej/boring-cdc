@@ -1,0 +1,3 @@
+docker run <pinned-postgres-image>
+docker exec <container> psql <advisory-lock-probe>
+python3 SO_PEERCRED probe

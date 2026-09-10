@@ -1,0 +1,1 @@
+{"mode":"e2e","postgres":{"advisory_contention_rejected":true,"backend_death_injected":true,"fault_hook":"postgres-owner-release","reconciliation":"required-before-dispatch","successor_acquired_after_backend_death":true},"unix_peer":{"authorized":true,"peer_gid":1000,"peer_pid_is_client":true,"peer_uid":1000,"process_uid":1000,"socket_uid":1000}}

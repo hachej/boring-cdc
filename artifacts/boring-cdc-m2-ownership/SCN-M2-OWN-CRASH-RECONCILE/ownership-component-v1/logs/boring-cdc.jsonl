@@ -1,0 +1,3 @@
+{"bead_id":"boring-cdc-m2-ownership","case_event_seq":1,"component":"postgres-advisory-lock","outcome":"rejected","phase":"contention","scenario_id":"SCN-M2-OWN-CRASH-RECONCILE","schema_version":"ownership-event/v1"}
+{"bead_id":"boring-cdc-m2-ownership","case_event_seq":2,"component":"postgres-advisory-lock","outcome":"fenced","phase":"backend-death","scenario_id":"SCN-M2-OWN-CRASH-RECONCILE","schema_version":"ownership-event/v1"}
+{"bead_id":"boring-cdc-m2-ownership","case_event_seq":3,"component":"unix-command-socket","outcome":"authorized","phase":"peer-credentials","scenario_id":"SCN-M2-OWN-CRASH-RECONCILE","schema_version":"ownership-event/v1"}
