@@ -49,6 +49,8 @@
     ],
     "tool_digests": {
       "buildkit": "sha256:6eceb8971ce4fceb3daca562832642706238b7eea72941fcf9896c93c3c4a53e",
+      "docker_cli": "sha256:0135662b510037ea581d99c2e5929c5e01185139c0b86986a418bd4da0b98a44",
+      "docker_dind": "sha256:a56b3bdde89315ed2cc0e4906e582b5033d93bf20d9cb9510c2cdd4e7f7690b1",
       "dockerfile_frontend": "sha256:db1ff77fb637a5955317c7a3a62540196396d565f3dd5742e76dddbb6d75c4c5"
     },
     "tool_versions": {

@@ -2,16 +2,16 @@
 set -eu
 ROOT=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 cd "$ROOT"
-python3 - <<'PY'
-import json
-p=json.load(open('fixtures/m0/scaffold/scenarios.json'))
-rows={x['id']:x for x in p['scenarios']}
-assert rows['SCN-M0-SCAFFOLD-DIGEST-MISMATCH']['expected_exit']==78
-assert rows['SCN-M0-SCAFFOLD-DEPENDENCY-DELAY']['expected_exit']==75
-assert rows['SCN-M0-SCAFFOLD-ZOMBIE-BOUND']['expected_status']=='pass'
-assert rows['SCN-M0-SCAFFOLD-AGENT-READONLY']['external_effect']=='none'
-compose=open('compose.yaml').read()
-assert 'tcp_keepalives_idle=30' in compose and 'tcp_keepalives_interval=10' in compose and 'tcp_keepalives_count=3' in compose
-assert 'restart: unless-stopped' in compose and 'condition: service_healthy' in compose
-print('{"status":"pass","scenarios":4,"runtime_timing_owner":"boring-cdc-m6-failure-matrix"}')
-PY
+tmp=$(mktemp "${TMPDIR:-/var/tmp}/m0-scaffold-compose.XXXXXX")
+trap 'rm -f "$tmp"' EXIT HUP INT TERM
+sed 's/sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929/sha256:0000000000000000000000000000000000000000000000000000000000000000/' compose.yaml > "$tmp"
+set +e
+python3 scripts/lib/m0_scaffold.py probe SCN-M0-SCAFFOLD-DIGEST-MISMATCH --path "$tmp" >/dev/null
+mismatch=$?
+python3 scripts/lib/m0_scaffold.py probe SCN-M0-SCAFFOLD-DEPENDENCY-DELAY >/dev/null
+delay=$?
+set -e
+[ "$mismatch" -eq 78 ] && [ "$delay" -eq 75 ]
+python3 scripts/lib/m0_scaffold.py probe SCN-M0-SCAFFOLD-ZOMBIE-BOUND >/dev/null
+python3 scripts/lib/m0_scaffold.py probe SCN-M0-SCAFFOLD-AGENT-READONLY >/dev/null
+printf '%s\n' '{"status":"pass","executed_scenarios":4,"runtime_timing_owner":"boring-cdc-m6-failure-matrix"}'

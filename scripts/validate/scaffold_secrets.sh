@@ -12,7 +12,8 @@ for name in paths:
  except UnicodeDecodeError:continue
  for n,line in enumerate(text.splitlines(),1):
   if not pat.search(line):continue
-  if 'example.invalid' in line or 'SECRET = re.compile' in line or 'pat=re.compile' in line or 'POSTGRES_PASSWORD_FILE' in line or 'E_SECRET' in line or 'user:pw@host/db' in line:continue
+  synthetic = ((name == 'tests/test_context.py' and 'postgres://user:supersecret@example.invalid/db' in line) or (name == 'tests/validate_knowledge.py' and 'postgresql://user:pw@host/db' in line) or (name in ('scripts/lib/core_validator.py','scripts/lib/knowledge_validator.py','scripts/validate/scaffold_secrets.sh') and ('SECRET = re.compile' in line or 'pat=re.compile' in line)))
+  if synthetic or (name in ('compose.yaml','.env.example') and 'POSTGRES_PASSWORD_FILE' in line):continue
   hits.append(f'{name}:{n}')
 assert not hits,hits
 print('{"status":"pass","scope":"all tracked non-evidence files","secrets_found":0}')
