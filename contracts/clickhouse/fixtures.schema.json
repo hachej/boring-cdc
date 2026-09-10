@@ -28,6 +28,33 @@
               "fault": {
                 "additionalProperties": false,
                 "properties": {
+                  "mutation": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "field": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "replacement": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "row_index": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "field",
+                      "kind",
+                      "replacement",
+                      "row_index"
+                    ],
+                    "type": "object"
+                  },
                   "operation": {
                     "type": "string"
                   },
@@ -40,6 +67,7 @@
                   }
                 },
                 "required": [
+                  "mutation",
                   "operation",
                   "preserve",
                   "target"
@@ -94,40 +122,278 @@
               "setup": {
                 "additionalProperties": false,
                 "properties": {
-                  "batch_marker": {
+                  "audit": {
                     "additionalProperties": false,
                     "properties": {
-                      "batch_id": {
-                        "type": "string"
+                      "budgets": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "bytes": {
+                            "type": "integer"
+                          },
+                          "events": {
+                            "type": "integer"
+                          },
+                          "milliseconds": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "bytes",
+                          "events",
+                          "milliseconds"
+                        ],
+                        "type": "object"
                       },
-                      "event_count": {
+                      "cursor": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "column_offset": {
+                            "type": "integer"
+                          },
+                          "connector_event_id": {
+                            "type": "string"
+                          },
+                          "journal_seq": {
+                            "type": "integer"
+                          },
+                          "logical_table_id": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "column_offset",
+                          "connector_event_id",
+                          "journal_seq",
+                          "logical_table_id"
+                        ],
+                        "type": "object"
+                      },
+                      "fresh_until_unix_ms": {
                         "type": "integer"
                       },
-                      "first_journal_seq": {
+                      "observed_unix_ms": {
                         "type": "integer"
                       },
-                      "last_journal_seq": {
+                      "target_checkpoint": {
                         "type": "integer"
-                      },
-                      "object_fingerprint": {
-                        "type": "string"
-                      },
-                      "ordered_event_digest": {
-                        "type": "string"
                       }
                     },
                     "required": [
-                      "batch_id",
-                      "event_count",
-                      "first_journal_seq",
-                      "last_journal_seq",
-                      "object_fingerprint",
-                      "ordered_event_digest"
+                      "budgets",
+                      "cursor",
+                      "fresh_until_unix_ms",
+                      "observed_unix_ms",
+                      "target_checkpoint"
                     ],
                     "type": "object"
                   },
-                  "event_rows": {
-                    "type": "string"
+                  "batch_markers": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "batch_id": {
+                          "type": "string"
+                        },
+                        "event_count": {
+                          "type": "integer"
+                        },
+                        "first_journal_seq": {
+                          "type": "integer"
+                        },
+                        "last_journal_seq": {
+                          "type": "integer"
+                        },
+                        "object_fingerprint": {
+                          "type": "string"
+                        },
+                        "ordered_event_digest": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "batch_id",
+                        "event_count",
+                        "first_journal_seq",
+                        "last_journal_seq",
+                        "object_fingerprint",
+                        "ordered_event_digest"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "candidate_table_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "history_events": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "before_key": {
+                          "type": "string"
+                        },
+                        "cells": {
+                          "items": {
+                            "items": {
+                              "type": [
+                                "integer",
+                                "string"
+                              ]
+                            },
+                            "maxItems": 5,
+                            "minItems": 5,
+                            "type": "array"
+                          },
+                          "type": "array"
+                        },
+                        "hash": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "key_hash": {
+                          "type": "string"
+                        },
+                        "mutation_kind": {
+                          "type": "string"
+                        },
+                        "op": {
+                          "type": "string"
+                        },
+                        "relation_schema_fingerprint": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "items": {
+                            "type": [
+                              "integer",
+                              "string"
+                            ]
+                          },
+                          "maxItems": 5,
+                          "minItems": 5,
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "before_key",
+                        "cells",
+                        "hash",
+                        "id",
+                        "key",
+                        "key_hash",
+                        "mutation_kind",
+                        "op",
+                        "relation_schema_fingerprint",
+                        "version"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "quota": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "free_bytes": {
+                        "type": "integer"
+                      },
+                      "history_bytes": {
+                        "type": "integer"
+                      },
+                      "temporary_part_bytes": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "free_bytes",
+                      "history_bytes",
+                      "temporary_part_bytes"
+                    ],
+                    "type": "object"
+                  },
+                  "retirement": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "elapsed_seconds": {
+                        "type": "integer"
+                      },
+                      "live_generation": {
+                        "type": "integer"
+                      },
+                      "pins": {
+                        "items": {},
+                        "type": "array"
+                      },
+                      "target_generation": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "elapsed_seconds",
+                      "live_generation",
+                      "pins",
+                      "target_generation"
+                    ],
+                    "type": "object"
+                  },
+                  "retry": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "attempt": {
+                        "type": "integer"
+                      },
+                      "due_unix_ms": {
+                        "type": "integer"
+                      },
+                      "failed_boundary": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "capture_epoch": {
+                            "type": "string"
+                          },
+                          "first_journal_seq": {
+                            "type": "integer"
+                          },
+                          "generation": {
+                            "type": "integer"
+                          },
+                          "last_journal_seq": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "capture_epoch",
+                          "first_journal_seq",
+                          "generation",
+                          "last_journal_seq"
+                        ],
+                        "type": "object"
+                      },
+                      "now_unix_ms": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "attempt",
+                      "due_unix_ms",
+                      "failed_boundary",
+                      "now_unix_ms"
+                    ],
+                    "type": "object"
+                  },
+                  "selected_table_ids": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
                   },
                   "selector_rows": {
                     "items": {
@@ -163,12 +429,35 @@
                       "type": "object"
                     },
                     "type": "array"
+                  },
+                  "sqlite": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "checkpoint_journal_seq": {
+                        "type": "integer"
+                      },
+                      "highest_external_fence": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "checkpoint_journal_seq",
+                      "highest_external_fence"
+                    ],
+                    "type": "object"
                   }
                 },
                 "required": [
-                  "batch_marker",
-                  "event_rows",
-                  "selector_rows"
+                  "audit",
+                  "batch_markers",
+                  "candidate_table_ids",
+                  "history_events",
+                  "quota",
+                  "retirement",
+                  "retry",
+                  "selected_table_ids",
+                  "selector_rows",
+                  "sqlite"
                 ],
                 "type": "object"
               }
@@ -337,6 +626,8 @@
                     "string"
                   ]
                 },
+                "maxItems": 5,
+                "minItems": 5,
                 "type": "array"
               }
             },

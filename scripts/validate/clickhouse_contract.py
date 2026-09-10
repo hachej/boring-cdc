@@ -25,7 +25,7 @@ def simulate(events):
  rows=[]
  for key,es in bykey.items():
   es.sort(key=lambda e:tuple(e['version'])+(e['id'],)); latest=es[-1]
-  if latest['op']=='delete': continue
+  if latest['op']=='delete' or latest['mutation_kind']=='delete': continue
   cells={}
   for e in es:
    for cid,state,type_oid,typmod,value in e['cells']:
@@ -66,7 +66,7 @@ def validate():
  order=['persist immutable batch intent','insert event_history','Rust insert','read back exact event count','insert batch_markers','read back one identical marker','commit destination checkpoint']
  pos=[next((i for i,x in enumerate(c['insert_acceptance']['ordered_steps']) if t in x),-1) for t in order]
  if -1 in pos or pos!=sorted(pos):add(out,'E_ACCEPT_ORDER','insert_acceptance/ordered_steps','acceptance ordering incomplete')
- for term in ('argMax','payload_variants',"operation!='delete'",'ARRAY JOIN','promotion_fence'):
+ for term in ('argMax','payload_variants',"latest_mutation.2!='delete'",'ARRAY JOIN','promotion_fence'):
   if term not in query:add(out,'E_QUERY','files/canonical_query','missing '+term)
  if 'FINAL' in query and 'FINAL is intentionally absent' not in query:add(out,'E_FINAL','files/canonical_query','FINAL must not provide correctness')
  if 'DROP PARTITION' not in retire or re.search(r'ALTER TABLE\s+boring_cdc\.generation_selectors_v1',retire,re.I):add(out,'E_RETIRE','files/retirement','retirement scope unsafe')
@@ -81,6 +81,9 @@ def validate():
  if (quota['warning_history_bytes'],quota['hard_history_bytes'],quota['emergency_free_bytes'])!=(68719476736,85899345920,10737418240):add(out,'E_QUOTA','history_retention/quota','confirmed quota changed')
  if c['history_retention']['retirement_grace_seconds']!=86400 or c['history_retention']['ttl']!='forbidden':add(out,'E_RETENTION','history_retention','retention safety changed')
  ids=[x['fixture_id'] for x in f['cases']]
+ for j,e in enumerate(f['golden_vectors']['events']):
+  v=e.get('version',[])
+  if len(v)!=5 or not isinstance(v[0],int) or v[1] not in (0,1) or not isinstance(v[2],int) or not isinstance(v[3],int) or v[4]!=e['id']:add(out,'E_GOLDEN_VERSION',f'golden_vectors/events/{j}/version','version must be exact event ABI tuple')
  if ids!=c['fixture_ids'] or len(ids)!=len(set(ids)):add(out,'E_FIXTURE_INVENTORY','fixtures/cases','fixture inventory mismatch')
  if {x['executor_id'] for x in f['cases']}!=set(c['executors']):add(out,'E_EXECUTORS','fixtures/cases','executor inventory mismatch')
  required={'DUPLICATE-CONFLICT','SOURCE-ORDER-SNAPSHOT-LATE','TOAST-PREDECESSOR','TOMBSTONE','BATCH-CRASH-AFTER-INSERT','PAYLOAD-ONLY-CORRUPTION','AUDIT-UNIT-RESUME','SAME-FENCE-CONFLICT','EXTERNAL-FENCE-AHEAD','INCOMPLETE-ANCHOR','QUOTA-HARD-BLOCK','RETIRE-ELIGIBLE','DETERMINISTIC-POISON','RESUME-CHANGED-BOUNDARY'}
@@ -90,6 +93,14 @@ def validate():
   execution=x.get('execution',{}); oracle=execution.get('oracle',{}); fault=execution.get('fault',{})
   if not execution.get('setup') or fault.get('operation')!=x['action']['fault_hook'] or oracle.get('destination_state')!=x['expected']['destination_state'] or oracle.get('checkpoint')!=x['expected']['checkpoint']:add(out,'E_EXECUTABLE_FIXTURE',f'cases/{i}','fixture lacks exact setup/fault/oracle binding')
   if x['action']['fault_hook']=='mutate_payload_keep_ids_hash_marker' and fault.get('preserve')!=['connector_event_id','payload_hash','batch_marker']:add(out,'E_PAYLOAD_CORRUPTION_FIXTURE',f'cases/{i}','payload-only corruption does not preserve required identity')
+  setup=execution.get('setup',{}); hook=x['action']['fault_hook']
+  required_setup={'history_events','selector_rows','batch_markers','selected_table_ids','candidate_table_ids','audit','quota','retirement','retry','sqlite'}
+  if set(setup)!=required_setup:add(out,'E_FIXTURE_SETUP',f'cases/{i}','scenario setup is not complete and exact')
+  if hook=='higher_fence' and not any(r['promotion_fence']==10 and r['generation']==8 for r in setup.get('selector_rows',[])):add(out,'E_PROMOTION_FIXTURE',f'cases/{i}','higher selector missing')
+  if hook=='same_fence_different_candidate' and len({(r['generation'],r['candidate_digest']) for r in setup.get('selector_rows',[]) if r['promotion_fence']==9})<2:add(out,'E_PROMOTION_FIXTURE',f'cases/{i}','same-fence conflict missing')
+  if hook=='candidate_missing_table' and set(setup.get('candidate_table_ids',[]))>=set(setup.get('selected_table_ids',[])):add(out,'E_ANCHOR_FIXTURE',f'cases/{i}','incomplete candidate not modeled')
+  if hook=='history_bytes_at_hard' and setup.get('quota',{}).get('history_bytes')!=85899345920:add(out,'E_QUOTA_FIXTURE',f'cases/{i}','hard quota literal missing')
+  if hook=='retire_nonlive_after_grace_no_pins' and not (setup.get('retirement',{}).get('target_generation')==6 and setup['retirement']['elapsed_seconds']>86400 and setup['retirement']['pins']==[]):add(out,'E_RETIRE_FIXTURE',f'cases/{i}','eligible retirement proof missing')
   if not x['action']['fault_once'] or x['expected']['capture_and_archive']!='continue' or not x['expected']['redacted']:add(out,'E_FIXTURE_EXPECTED',f'cases/{i}','determinism/independence/redaction invalid')
   if x['expected']['destination_state'].startswith('blocked') and x['expected']['checkpoint']!='unchanged':add(out,'E_CHECKPOINT_SKIP',f'cases/{i}','blocked case advances checkpoint')
  try:

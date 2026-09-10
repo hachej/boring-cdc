@@ -88,7 +88,7 @@
       "id": "ART-M0-CLICKHOUSE-CANONICAL-QUERY",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/canonical-query.sql",
-      "sha256": "09b9d2a2967e92094303f1ac3665e31fd502fe8b85ddc0587346912a6adb8ff8",
+      "sha256": "95c8b6e8f49f94cdd1cb47360a5e5b777d8d8b9f2b8639dd46fdaf322f72f375",
       "status": "complete"
     },
     {
@@ -102,28 +102,28 @@
       "id": "ART-M0-CLICKHOUSE-DOC",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "docs/CLICKHOUSE_MODEL.md",
-      "sha256": "4d93050e269e91606b6044ee5c348c87ad3f455f37c32be97eec107b527f73c3",
+      "sha256": "6ad74b91f87b228c0ce233266402ea33749b10838203b883ccce800d2d299b37",
       "status": "complete"
     },
     {
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "8c53d9a2a08cc7ac84a4fa82087c0113324f0d266eadb73528ce2cc6e669ffe0",
+      "sha256": "9055616292b01bb77ea0ffdbd45dce26e2fe800ee3624372838cd9e2f80a530a",
       "status": "complete"
     },
     {
       "id": "ART-M0-CLICKHOUSE-FIXTURE-SCHEMA",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/fixtures.schema.json",
-      "sha256": "6d1711bacc86a3679098f05ab229105bdc0dd00c327feb280d5d705793ff3ceb",
+      "sha256": "6d5e9fb2ff2cc9c1459a20450fce3ffb2f3d4a7a2652ced48a7c75bf9c1c4147",
       "status": "complete"
     },
     {
       "id": "ART-M0-CLICKHOUSE-FIXTURES",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "fixtures/m0/clickhouse/scenarios.json",
-      "sha256": "b9fefe410cadb64d8f4adcfe80e8f7639e81ebd6485e98df361f9e085c0d7936",
+      "sha256": "f7807310a8cc081092ab849edea98d454606f8541221a4ec351548c6eb9433b4",
       "status": "complete"
     },
     {
@@ -158,7 +158,7 @@
       "id": "ART-M0-CLICKHOUSE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "scripts/validate/clickhouse_contract.py",
-      "sha256": "8de50244ebb64ec5ca28801cc5ad7c22b04d7b57e9378bd0d13d23b0078e5ec7",
+      "sha256": "2b94c0da3f49b8273a060fd5bd8904945fa2e97cd00cd34c772bfb6fa8809825",
       "status": "complete"
     },
     {

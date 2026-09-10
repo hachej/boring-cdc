@@ -9,7 +9,7 @@ exploded AS
 (SELECT *,countIf(state IN ('explicit_null','explicit_value')) OVER (PARTITION BY canonical_key,column_id ORDER BY source_version ROWS BETWEEN UNBOUNDED PRECEDING AND 1 PRECEDING) predecessor_count FROM exploded0),
 invalid_toast AS (SELECT count() invalid_count FROM exploded WHERE state='unchanged_toast' AND predecessor_count=0),
 guard AS (SELECT throwIf((SELECT count() FROM boring_cdc.selector_conflicts_v1 WHERE capture_epoch={capture_epoch:FixedString(64)})>0 OR (SELECT count() FROM boring_cdc.event_identity_conflicts_v1 WHERE capture_epoch={capture_epoch:FixedString(64)} AND generation=(SELECT generation FROM selected))>0 OR (SELECT invalid_count FROM invalid_toast)>0,'BCDC_CH_INTEGRITY_CONFLICT') ok),
-latest_operation AS (SELECT canonical_key,argMax(operation,tuple(lsn_u64,origin_rank,transaction_ordinal,mutation_ordinal,connector_event_id)) operation FROM valid GROUP BY canonical_key),
+latest_operation AS (SELECT canonical_key,argMax(tuple(operation,mutation_kind),tuple(lsn_u64,origin_rank,transaction_ordinal,mutation_ordinal,connector_event_id)) latest_mutation FROM valid GROUP BY canonical_key),
 cells AS (SELECT canonical_key,column_id,argMaxIf(tuple(state,type_oid,typmod,value_base64),source_version,state IN ('explicit_null','explicit_value')) value FROM exploded GROUP BY canonical_key,column_id),
-rows AS (SELECT o.canonical_key,o.operation,arraySort(x->x.1,groupArray((c.column_id,c.value.1,c.value.2,c.value.3,c.value.4))) explicit_cells FROM latest_operation o LEFT JOIN cells c USING canonical_key CROSS JOIN guard GROUP BY o.canonical_key,o.operation)
-SELECT canonical_key,explicit_cells FROM rows WHERE operation!='delete' ORDER BY canonical_key;
+rows AS (SELECT o.canonical_key,o.latest_mutation,arraySort(x->x.1,groupArray((c.column_id,c.value.1,c.value.2,c.value.3,c.value.4))) explicit_cells FROM latest_operation o LEFT JOIN cells c USING canonical_key CROSS JOIN guard GROUP BY o.canonical_key,o.latest_mutation)
+SELECT canonical_key,explicit_cells FROM rows WHERE latest_mutation.1!='delete' AND latest_mutation.2!='delete' ORDER BY canonical_key;

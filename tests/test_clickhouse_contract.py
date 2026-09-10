@@ -9,7 +9,7 @@ class ClickHouseContractTests(unittest.TestCase):
   es=copy.deepcopy(m.load(m.F)['golden_vectors']['events']); es.append({**es[0],'hash':'f'*64})
   with self.assertRaisesRegex(ValueError,'event conflict'): m.simulate(es)
  def test_missing_toast_predecessor_blocks(self):
-  es=[{'id':'1'*64,'hash':'a'*64,'key':'k','op':'update','version':[1,1,0,0,0,0,0],'cells':[[1,'unchanged_toast',25,-1,'']]}]
+  es=[{'id':'1'*64,'hash':'a'*64,'key':'k','op':'update','mutation_kind':'upsert','version':[1,1,0,0,0,0,0],'cells':[[1,'unchanged_toast',25,-1,'']]}]
   with self.assertRaisesRegex(ValueError,'missing predecessor'): m.simulate(es)
  def test_fixture_scope(self):
   c=m.load(m.C); f=m.load(m.F); self.assertEqual(41,len(f['cases'])); self.assertEqual(c['fixture_ids'],[x['fixture_id'] for x in f['cases']])
