@@ -10,7 +10,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-1.stdout",
-      "stdout_sha256": "b4f2a498bd631bad48463638ac337079894a4d6be64f863ce8ed27b031810be4",
+      "stdout_sha256": "1a5942058dc3b006de077c45dabea9ac4b28a3cc11a3cafda30c7144776479c8",
       "version": "preflight-v1"
     },
     {
@@ -19,7 +19,7 @@
       "stderr_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/e2e-2.stdout",
-      "stdout_sha256": "b4f2a498bd631bad48463638ac337079894a4d6be64f863ce8ed27b031810be4",
+      "stdout_sha256": "1a5942058dc3b006de077c45dabea9ac4b28a3cc11a3cafda30c7144776479c8",
       "version": "preflight-v1"
     },
     {
@@ -43,7 +43,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "36c6e131556d5e9aad784bc176a77aa027ad07d4",
+  "git_commit": "c367fd1ea46c84c7ddac42e400f636fdf70631b2",
   "owner_bead": "boring-cdc-m1-preflight",
   "redaction": {
     "checked": true,
@@ -67,7 +67,7 @@
       "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/state/after.json",
       "artifacts/boring-cdc-m1-preflight/SCN-M1-PREFLIGHT-COMPONENT/preflight-v1/state/before.json"
     ],
-    "digest": "74198392a3e08b9e9a40ff02c6e0b2836571ee7bc4a262a7732d4671ac759df5",
+    "digest": "70f2a09e65e543977865b642bd0a904086461fe1951fa9aa2b7568317953477b",
     "product_faults": "all_41_contract_cases",
     "runtime_observed": true,
     "status": "pass"
@@ -92,6 +92,6 @@
     "full_failure_matrix": true,
     "integration": true,
     "targeted_checks": true,
-    "workspace_tests": true
+    "workspace_tests": false
   }
 }
