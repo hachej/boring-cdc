@@ -1,0 +1,75 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-1.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo test --locked m1_source_identity::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-2.stderr",
+      "stderr_sha256": "de44755b5747bcb47e2bf05b7f25903d86931d8b750ca2653f6db9a997f24505",
+      "stdout_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-2.log",
+      "stdout_sha256": "28c593174c429881036c6da3b3e7e95fe131e11f2081f7d3ebe05d5af5461d36",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "scripts/validate/m1_source_identity.py",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-3.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/command-3.log",
+      "stdout_sha256": "7656b3da4ad1615f5e9cf65d404bfd5564f5d74040c5c2ab1a1e227a6d72279d",
+      "version": "python 3"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "leaf",
+  "git_commit": "26d04e02ba3028cb7d4bfc7839005cb814722c35",
+  "owner_bead": "boring-cdc-m1-source-identity",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/proof-summary.json",
+      "artifacts/boring-cdc-m1-source-identity/SCN-M1-SOURCE-IDENTITY-LEAF/source-identity-v1/versions.json"
+    ],
+    "digest": "b9b2256ecb943aeb6247332d4c0ef534cd488b7a83205f5d999c31fc55ba692a",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-SOURCE-IDENTITY-LEAF",
+  "schema_version": "evidence/v1",
+  "seed": "fixed pure startup vectors v1",
+  "source_preservation": {
+    "after_sha256": "492239063cb28ffa697a34a3a6e6a82ef77df5532aa7c7d0f45e08f66c83adde",
+    "before_sha256": "492239063cb28ffa697a34a3a6e6a82ef77df5532aa7c7d0f45e08f66c83adde",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": false,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": false,
+    "full_failure_matrix": true,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

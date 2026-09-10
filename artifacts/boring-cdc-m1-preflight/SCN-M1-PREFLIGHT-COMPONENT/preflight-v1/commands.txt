@@ -1,0 +1,9 @@
+cargo fmt --check
+cargo clippy --locked --all-targets -- -D warnings
+cargo test --locked --workspace --all-targets
+cargo test --locked m1_preflight::tests
+scripts/e2e/m1_preflight.sh (twice)
+scripts/faults/m1_preflight.sh (twice)
+scripts/validate/m1_preflight.sh
+scripts/validate/plan_coverage.sh
+scripts/validate/evidence.sh artifacts/boring-cdc-m1-preflight

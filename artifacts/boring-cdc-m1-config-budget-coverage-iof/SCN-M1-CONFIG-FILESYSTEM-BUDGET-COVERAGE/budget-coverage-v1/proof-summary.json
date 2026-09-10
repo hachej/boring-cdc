@@ -1,0 +1,22 @@
+{
+  "schema_version": "boring-cdc/m1-config-filesystem-budget-coverage-proof/v1",
+  "owner_bead": "boring-cdc-m1-config-budget-coverage-iof",
+  "scenario_id": "SCN-M1-CONFIG-FILESYSTEM-BUDGET-COVERAGE",
+  "git_commit": "bff4a2d8d8a7d993e228fb1e44df34bffeb98197",
+  "outcome": "pass",
+  "assertions": [
+    "at least one nonempty uniquely named and uniquely rooted filesystem budget is required",
+    "most-specific safe roots explicitly associate SQLite state including sibling sidecars, SQLite temp, transaction spool, and archive paths",
+    "relative dot roots cannot cover absolute configured paths and unrelated budgets are rejected",
+    "each associated role has a nonzero emergency, SQLite/WAL/temp, spool, backfill, or archive reservation as applicable",
+    "one shared filesystem validates the combined reservation while four nested/separate filesystem budgets validate independently",
+    "shared filesystem declarations must agree and empty, zero, uncovered, unassociated, mismatched, overflow, and overcommit inputs return stable exact codes",
+    "archive and backfill compatibility fingerprints include only their associated budget while runtime fingerprints the complete configuration",
+    "validation remains side-effect-free and does not perform or re-own runtime capacity/filesystem probes"
+  ],
+  "artifact_digests": {
+    "src/m1_config.rs": "a82284b5e88d34b4de4057e8107cefdeddaef06d71ec350b4a195eb5a2f3b1d2",
+    "contracts/m1/config-cases.json": "3869055826ba28a94e3c43e9e68eb0fbab9381bf68e483765c3ad39b71032113",
+    "tests/fixtures/m1_config/representative.toml": "d7645989c660d47802c7893120e437f7bca80d3534283528c0ecab5acb29dca6"
+  }
+}

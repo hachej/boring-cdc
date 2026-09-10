@@ -1,16 +1,29 @@
 [package]
 name = "boring-cdc"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 rust-version = "1.89"
 license = "Apache-2.0"
 repository = "https://github.com/hachej/boring-cdc"
 description = "A bounded Postgres CDC experiment"
 publish = false
 
+[lib]
+name = "boring_cdc"
+path = "src/lib.rs"
+
 [[bin]]
 name = "boring-cdc"
 path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.143"
+sha2 = "0.10.8"
+toml = "0.9.5"
+
+[dev-dependencies]
+trybuild = "1.0.110"
 
 [profile.release]
 strip = true

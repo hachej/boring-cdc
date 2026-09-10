@@ -169,7 +169,7 @@ def execute(out:Path)->None:
      buildkit_container=subprocess.check_output(["docker","ps","--filter",f"name=buildx_buildkit_{builder}","--format","{{.Names}}"],env=env,text=True).strip()
      observed_buildkit=subprocess.check_output(["docker","exec",buildkit_container,"buildkitd","--version"],env=env,text=True).strip()
      if "v0.24.0" not in observed_buildkit:raise RuntimeError(f"BuildKit mismatch: {observed_buildkit}")
-     common.append(run_record(["docker","compose","-f","compose.yaml","pull","postgres","clickhouse"],proof,env));common.append(run_record(["docker","compose","-f","compose.yaml","up","-d","--no-build","--wait","--wait-timeout","120"],proof,env));common.append(run_record(["docker","compose","-f","compose.yaml","exec","-T","connector","boring-cdc","check"],proof,env))
+     common.append(run_record(["docker","compose","-f","compose.yaml","pull","postgres","clickhouse"],proof,env));common.append(run_record(["docker","compose","-f","compose.yaml","up","-d","--no-build","--wait","--wait-timeout","120"],proof,env));common.append(run_record(["docker","compose","-f","compose.yaml","exec","-T","connector","boring-cdc","scaffold-check"],proof,env))
      mutated=proof/"compose-mismatch.yaml";mutated.write_text(read("compose.yaml").decode().replace(PINS["postgres_index"],"sha256:"+"0"*64))
      scenarios["SCN-M0-SCAFFOLD-STATIC"]=[run_record(["python3","scripts/lib/m0_scaffold.py","probe","SCN-M0-SCAFFOLD-STATIC"],proof,env)]
      scenarios["SCN-M0-SCAFFOLD-DIGEST-MISMATCH"]=[run_record(["python3","scripts/lib/m0_scaffold.py","probe","SCN-M0-SCAFFOLD-DIGEST-MISMATCH","--path",str(mutated)],proof,env,78,"python3 scripts/lib/m0_scaffold.py probe SCN-M0-SCAFFOLD-DIGEST-MISMATCH --path <isolated-mutated-compose>")]

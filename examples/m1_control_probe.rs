@@ -1,0 +1,162 @@
+//! Executable adapter used only by the M1 PostgreSQL component fixture.
+use boring_cdc::m1_control_fixtures::{
+    ControlKind, ControlWriterState, FenceIdentity, PublicationSpec, decode_control_update,
+    decode_truncate,
+};
+use boring_cdc::m1_ddl_fixtures::{GuardPhase, GuardState, LogicalRelationId};
+
+fn decode_hex_messages(value: &str) -> Vec<Vec<u8>> {
+    value
+        .split(',')
+        .filter(|item| !item.is_empty())
+        .map(|item| {
+            assert_eq!(item.len() % 2, 0, "odd hex message");
+            item.as_bytes()
+                .chunks_exact(2)
+                .map(|pair| {
+                    u8::from_str_radix(std::str::from_utf8(pair).unwrap(), 16).expect("hex byte")
+                })
+                .collect()
+        })
+        .collect()
+}
+
+fn intended_fence() -> FenceIdentity {
+    FenceIdentity {
+        capture_epoch: 1,
+        generation: 1,
+        table_set_fingerprint: "a".repeat(64),
+    }
+}
+
+fn fence_authorization(
+    identity: &FenceIdentity,
+    nonce: u64,
+) -> boring_cdc::m1_ddl_fixtures::GuardFenceAuthorization {
+    let relation = LogicalRelationId {
+        database_oid: 1,
+        relation_oid: 1,
+        logical_table_id: "fixture-table".into(),
+    };
+    let mut guard = GuardState::acquire_before_export(
+        identity.capture_epoch,
+        identity.generation,
+        identity.table_set_fingerprint.clone(),
+        nonce,
+        vec![relation],
+    )
+    .unwrap();
+    guard
+        .verify_catalog_fingerprint(&identity.table_set_fingerprint)
+        .unwrap();
+    guard.advance(GuardPhase::Exported).unwrap();
+    guard.advance(GuardPhase::Copying).unwrap();
+    guard
+        .authorize_fence_intent(
+            identity.capture_epoch,
+            identity.generation,
+            &identity.table_set_fingerprint,
+            nonce,
+        )
+        .unwrap()
+}
+
+fn expected_publication() -> PublicationSpec {
+    PublicationSpec::new(
+        "boring_cdc_publication",
+        "boring_cdc_admin",
+        ["public.accounts".into()],
+    )
+}
+
+fn main() {
+    let mode = std::env::args().nth(1).expect("mode");
+    match mode.as_str() {
+        "update" | "fence" | "fence-mismatch" => {
+            let messages = decode_hex_messages(&std::env::args().nth(2).expect("wire hex"));
+            let nonce = std::env::args()
+                .nth(3)
+                .expect("nonce")
+                .parse::<u64>()
+                .expect("numeric nonce");
+            let kind = if mode == "update" {
+                ControlKind::Heartbeat
+            } else {
+                ControlKind::CaptureFence
+            };
+            let update = decode_control_update(&messages, kind, nonce).unwrap();
+            let mut writer = ControlWriterState::default();
+            if kind == ControlKind::CaptureFence {
+                writer
+                    .intend_fence(
+                        "fixture-intent",
+                        fence_authorization(&intended_fence(), nonce),
+                    )
+                    .unwrap();
+            }
+            if mode == "fence-mismatch" {
+                let failure = writer.observe(&update, None).unwrap_err();
+                assert_eq!(failure.fingerprint, "FENCE_IDENTITY_MISMATCH");
+                println!("PASS live_fence_identity_mismatch=block_before_feedback");
+            } else {
+                let event = writer.observe(&update, None).unwrap();
+                assert!(!event.writes_user_row() && !event.writes_benchmark_mutation());
+                assert!(!event.feedback_eligible());
+                println!("PASS pgoutput_update=decoded_typed_noop feedback=awaits_durable_commit");
+            }
+        }
+        "cardinality" => {
+            let messages = decode_hex_messages(&std::env::args().nth(2).expect("wire hex"));
+            let nonce = std::env::args()
+                .nth(3)
+                .map(|value| value.parse::<u64>().expect("numeric nonce"))
+                .unwrap_or(1);
+            let failure =
+                decode_control_update(&messages, ControlKind::Heartbeat, nonce).unwrap_err();
+            assert_eq!(failure.fingerprint, "CONTROL_CARDINALITY_INVALID");
+            println!("PASS live_cardinality=block_before_feedback");
+        }
+        "nonce" | "shape" | "tuple-shape" => {
+            let messages = decode_hex_messages(&std::env::args().nth(2).expect("wire hex"));
+            let expected_nonce = if mode == "nonce" {
+                999
+            } else if mode == "shape" {
+                4
+            } else {
+                5
+            };
+            let failure = decode_control_update(&messages, ControlKind::Heartbeat, expected_nonce)
+                .unwrap_err();
+            let expected = match mode.as_str() {
+                "nonce" => "CONTROL_NONCE_MISMATCH",
+                "shape" => "CONTROL_RELATION_SHAPE_INVALID",
+                _ => "CONTROL_TUPLE_SHAPE_INVALID",
+            };
+            assert_eq!(failure.fingerprint, expected);
+            println!("PASS live_{mode}_mismatch=block_before_feedback");
+        }
+        "truncate" => {
+            let messages = decode_hex_messages(&std::env::args().nth(2).expect("wire hex"));
+            let failure = decode_truncate(&messages).unwrap_err();
+            assert_eq!(failure.fingerprint, "TRUNCATE_REQUIRES_RESEED");
+            println!("PASS pgoutput_truncate=decoded_block_before_feedback");
+        }
+        "catalog" | "catalog-drift" => {
+            let observed: PublicationSpec =
+                serde_json::from_str(&std::env::args().nth(2).expect("catalog json")).unwrap();
+            let result = expected_publication().verify(&observed);
+            if mode == "catalog" {
+                result.unwrap();
+                println!(
+                    "PASS live_catalog=exact fingerprint={}",
+                    observed.fingerprint()
+                );
+            } else {
+                let failure = result.unwrap_err();
+                assert_eq!(failure.fingerprint, "PUBLICATION_DRIFT");
+                println!("PASS live_catalog_drift=publication_drift_requires_reseed");
+            }
+        }
+        _ => panic!("unknown mode"),
+    }
+}

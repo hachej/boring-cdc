@@ -1,0 +1,213 @@
+{
+  "execution_ownership": {
+    "component_contract": "M1 owns protocol/catalog/capability fixture assertions and immutable component evidence, not the downstream semantic transition execution",
+    "component_evidence_owner": "boring-cdc-m1-control-fixtures",
+    "consumer_contract": "the canonical plan owner executes its integrated/runtime scenario once and consumes the immutable M1 component evidence digest without re-owning the fixture assertion",
+    "non_editable_plan_view": "contracts/coverage/plan-to-beads.json",
+    "non_editable_plan_view_owner": "boring-cdc-m0.2",
+    "reconciliation": "retain generated plan scenario owners and narrow the M1 contract to specification plus component evidence",
+    "rule": "each canonical plan scenario has exactly one executing owner from the generated plan view"
+  },
+  "owned_plan_ids": [
+    "CMD-RECOVER-RESEED-ADD-TABLE-SCHEMA-TABLE-RECREATE",
+    "CMD-RECOVER-RESEED-RECREATE-PUBLICATION-RECREATE-SLOT-CONFIRM",
+    "INV-ONE-PUBLICATION-AND-ONE-LOGICAL-REPLICATION-SLOT",
+    "RISK-PUBLICATION-DRIFT-REMOVES-DATA-FROM-THE-STREAM",
+    "SCN-CRASH-DURING-TABLE-ADD-RE-SEED",
+    "SCN-EXTERNAL-LIVE-PUBLICATION-MUTATION",
+    "SCN-TIMELINE-SOURCE-PUBLICATION-SLOT-MISMATCH",
+    "TRANS-PUBLICATION-DRIFT-REQUIRES-RESEED"
+  ],
+  "owner_bead": "boring-cdc-m1-control-fixtures",
+  "publication": {
+    "control_relations": [
+      "boring_cdc_control.capture_fences",
+      "boring_cdc_control.heartbeat"
+    ],
+    "membership_change": "confirmed_full_reseed_only",
+    "name": "boring_cdc_publication",
+    "operations": [
+      "insert",
+      "update",
+      "delete",
+      "truncate_detection_only"
+    ],
+    "owner": "administration"
+  },
+  "scenarios": [
+    {
+      "component_fixture": {
+        "assertion_boundary": "source privilege/cardinality fixture; no runtime feedback or health claim",
+        "evidence_owner": "boring-cdc-m1-control-fixtures",
+        "id": "SCN-M1-CONTROL-FIXED-ROW-ABUSE"
+      },
+      "expected": "source_privilege_and_cardinality_observations_classified",
+      "id": "SCN-M1-CONTROL-FIXED-ROW-ABUSE",
+      "plan_scenario_execution": {
+        "consumes_component_evidence": {
+          "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
+          "owner_bead": "boring-cdc-m1-control-fixtures",
+          "scenario_id": "SCN-M1-CONTROL-COMPONENT"
+        },
+        "executing_owner": "boring-cdc-m6-failure-matrix",
+        "id": "SCN-FIXED-CONTROL-ROW-CARDINALITY-AND-PRIVILEGE-ABUSE"
+      },
+      "test": "m1_control_fixtures::tests::zero_or_multiple_control_rows_block",
+      "traceability_plan_scenario": "SCN-FIXED-CONTROL-ROW-CARDINALITY-AND-PRIVILEGE-ABUSE"
+    },
+    {
+      "component_fixture": {
+        "assertion_boundary": "protocol failure classification; no runtime health, WAL-headroom, or feedback claim",
+        "evidence_owner": "boring-cdc-m1-control-fixtures",
+        "id": "SCN-M1-CONTROL-HEARTBEAT-OUTAGE"
+      },
+      "expected": "heartbeat_write_failure_classified_without_component_feedback",
+      "id": "SCN-M1-CONTROL-HEARTBEAT-OUTAGE",
+      "plan_scenario_execution": {
+        "consumes_component_evidence": {
+          "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
+          "owner_bead": "boring-cdc-m1-control-fixtures",
+          "scenario_id": "SCN-M1-CONTROL-COMPONENT"
+        },
+        "executing_owner": "boring-cdc-m6-failure-matrix",
+        "id": "SCN-HEARTBEAT-PERMISSION-OUTAGE"
+      },
+      "test": "m1_control_fixtures::tests::heartbeat_cannot_feedback_before_durable_commit",
+      "traceability_plan_scenario": "SCN-HEARTBEAT-PERMISSION-OUTAGE"
+    },
+    {
+      "component_fixture": {
+        "assertion_boundary": "wire/control-envelope fixture; no durable journal or feedback advancement claim",
+        "evidence_owner": "boring-cdc-m1-control-fixtures",
+        "id": "SCN-M1-CONTROL-IDLE-HEARTBEAT"
+      },
+      "expected": "published_heartbeat_decoded_as_control_envelope",
+      "id": "SCN-M1-CONTROL-IDLE-HEARTBEAT",
+      "plan_scenario_execution": {
+        "consumes_component_evidence": {
+          "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
+          "owner_bead": "boring-cdc-m1-control-fixtures",
+          "scenario_id": "SCN-M1-CONTROL-COMPONENT"
+        },
+        "executing_owner": "boring-cdc-m2-journal",
+        "id": "SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL"
+      },
+      "test": "m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop",
+      "traceability_plan_scenario": "SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL"
+    },
+    {
+      "component_fixture": {
+        "assertion_boundary": "pure routing fixture; no runtime ordering, checkpoint, or benchmark claim",
+        "evidence_owner": "boring-cdc-m1-control-fixtures",
+        "id": "SCN-M1-CONTROL-INTERNAL-NOOP"
+      },
+      "expected": "control_envelope_classified_without_user_or_benchmark_row",
+      "id": "SCN-M1-CONTROL-INTERNAL-NOOP",
+      "plan_scenario_execution": {
+        "consumes_component_evidence": {
+          "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
+          "owner_bead": "boring-cdc-m1-control-fixtures",
+          "scenario_id": "SCN-M1-CONTROL-COMPONENT"
+        },
+        "executing_owner": "boring-cdc-m6-endurance",
+        "id": "SCN-INTERNAL-CONTROL-EVENT-ROUTING"
+      },
+      "test": "m1_control_fixtures::tests::heartbeat_is_monotonic_durable_noop",
+      "traceability_plan_scenario": "SCN-INTERNAL-CONTROL-EVENT-ROUTING"
+    },
+    {
+      "component_fixture": {
+        "assertion_boundary": "protocol classifier fixture; no integrated runtime checkpoint or feedback claim",
+        "evidence_owner": "boring-cdc-m1-control-fixtures",
+        "id": "SCN-M1-CONTROL-TRUNCATE-DETECTION"
+      },
+      "expected": "pgoutput_truncate_classified_as_reseed_required",
+      "id": "SCN-M1-CONTROL-TRUNCATE-DETECTION",
+      "plan_scenario_execution": {
+        "consumes_component_evidence": {
+          "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
+          "owner_bead": "boring-cdc-m1-control-fixtures",
+          "scenario_id": "SCN-M1-CONTROL-COMPONENT"
+        },
+        "executing_owner": "boring-cdc-m6-failure-matrix",
+        "id": "SCN-REAL-SQL-TRUNCATE-ON-A-PUBLISHED-TABLE"
+      },
+      "test": "m1_control_fixtures::tests::truncate_is_detection_only",
+      "traceability_plan_scenario": "SCN-REAL-SQL-TRUNCATE-ON-A-PUBLISHED-TABLE"
+    },
+    {
+      "expected": "ownership_denied_or_drift_requires_reseed",
+      "id": "SCN-EXTERNAL-LIVE-PUBLICATION-MUTATION",
+      "test": "m1_control_fixtures::tests::publication_fingerprint_is_exact_and_order_independent"
+    },
+    {
+      "expected": "block_before_streaming",
+      "id": "SCN-TIMELINE-SOURCE-PUBLICATION-SLOT-MISMATCH",
+      "test": "m1_control_fixtures::tests::source_timeline_publication_slot_mismatch_blocks_startup"
+    },
+    {
+      "expected": "one_immutable_proof",
+      "id": "SCN-CONTROL-FENCE-REPEATED-NONCE",
+      "test": "m1_control_fixtures::tests::repeated_fence_keeps_one_proof"
+    },
+    {
+      "expected": "block_before_feedback",
+      "id": "SCN-CONTROL-FENCE-UNBOUND-NONCE",
+      "test": "m1_control_fixtures::tests::unbound_fence_fails_closed"
+    },
+    {
+      "expected": "configured_intent_bound_export_snapshot_only",
+      "id": "SCN-CONTROL-SLOT-GUARD",
+      "test": "m1_control_fixtures::tests::slot_guard_accepts_only_bound_configured_export"
+    },
+    {
+      "component_fixture": {
+        "assertion_boundary": "typed capability fixture; no normal-run or maintenance credential-loading claim",
+        "evidence_owner": "boring-cdc-m1-control-fixtures",
+        "id": "SCN-M1-CONTROL-ADMIN-LIFETIME"
+      },
+      "expected": "exporter_capability_rejects_administration_secret",
+      "id": "SCN-M1-CONTROL-ADMIN-LIFETIME",
+      "plan_scenario_execution": {
+        "consumes_component_evidence": {
+          "artifact_path": "artifacts/boring-cdc-m1-control-fixtures/SCN-M1-CONTROL-COMPONENT/m1-control-v1/manifest.json",
+          "evidence_digest": "61c63c507b9a0f7c872fb88e5b3e2373ef141d9c181aec2669243216f153d754",
+          "owner_bead": "boring-cdc-m1-control-fixtures",
+          "scenario_id": "SCN-M1-CONTROL-COMPONENT"
+        },
+        "executing_owner": "boring-cdc-m6-failure-matrix",
+        "id": "SCN-RE-SEED-ADMINISTRATION-CREDENTIAL-LIFETIME"
+      },
+      "test": "m1_control_fixtures::tests::administration_credential_is_gone_before_exporter",
+      "traceability_plan_scenario": "SCN-RE-SEED-ADMINISTRATION-CREDENTIAL-LIFETIME"
+    },
+    {
+      "expected": "full_reseed_required_no_live_alter",
+      "id": "SCN-CRASH-DURING-TABLE-ADD-RE-SEED",
+      "test": "m1_control_fixtures::tests::table_membership_change_has_no_live_path"
+    }
+  ],
+  "schema_version": "m1-control-fixtures/v2",
+  "supported_postgresql_majors": [
+    {
+      "image": "postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b",
+      "major": 15,
+      "provenance": "// M0-RECONCILED: boring-cdc-d-pg-protocol"
+    },
+    {
+      "image": "postgres@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777",
+      "major": 16,
+      "provenance": "// M0-RECONCILED: boring-cdc-d-pg-protocol"
+    },
+    {
+      "image": "postgres@sha256:c7526c0f6c3f30260a563d7bcf8ad778effac59a44f8ffa86678c35418338609",
+      "major": 17,
+      "provenance": "// M0-RECONCILED: boring-cdc-d-pg-protocol"
+    }
+  ]
+}

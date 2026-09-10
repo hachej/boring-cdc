@@ -1,0 +1,251 @@
+{
+  "events": [
+    {
+      "case_event_seq": 1,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_OBSERVATION_SCHEMA_UNSUPPORTED",
+      "scenario_id": "SCN-M1-PREFLIGHT-SCHEMA"
+    },
+    {
+      "case_event_seq": 2,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_OBSERVATION_PROVENANCE_MISMATCH",
+      "scenario_id": "SCN-M1-PREFLIGHT-PROVENANCE"
+    },
+    {
+      "case_event_seq": 3,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_POSTGRES_VERSION_UNSUPPORTED",
+      "scenario_id": "SCN-M1-PREFLIGHT-PG-VERSION"
+    },
+    {
+      "case_event_seq": 4,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_WAL_LEVEL_NOT_LOGICAL",
+      "scenario_id": "SCN-M1-PREFLIGHT-WAL"
+    },
+    {
+      "case_event_seq": 5,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_COPYBOTH_UNAVAILABLE",
+      "scenario_id": "SCN-M1-PREFLIGHT-COPYBOTH"
+    },
+    {
+      "case_event_seq": 6,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_PUBLICATION_FINGERPRINT_MISMATCH",
+      "scenario_id": "SCN-M1-PREFLIGHT-PUBLICATION"
+    },
+    {
+      "case_event_seq": 7,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_PUBLICATION_PRIVILEGE_UNSAFE",
+      "scenario_id": "SCN-M1-PREFLIGHT-PUBLICATION-OWNERSHIP"
+    },
+    {
+      "case_event_seq": 8,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_REPLICATION_PRIVILEGE_MISSING",
+      "scenario_id": "SCN-M1-PREFLIGHT-REPLICATION-ROLE"
+    },
+    {
+      "case_event_seq": 9,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_SLOT_BINDING_MISMATCH",
+      "scenario_id": "SCN-M1-PREFLIGHT-SLOT"
+    },
+    {
+      "case_event_seq": 10,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_SLOT_INTENT_NOT_BOUND",
+      "scenario_id": "SCN-M1-PREFLIGHT-SLOT-INTENT"
+    },
+    {
+      "case_event_seq": 11,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_SLOT_STATE_UNSAFE",
+      "scenario_id": "SCN-M1-PREFLIGHT-SLOT-STATE"
+    },
+    {
+      "case_event_seq": 12,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_PUBLICATION_SHAPE_UNSUPPORTED",
+      "scenario_id": "SCN-M1-PREFLIGHT-PUBLICATION-SHAPE"
+    },
+    {
+      "case_event_seq": 13,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_SOURCE_POLICY_MISMATCH",
+      "scenario_id": "SCN-M1-PREFLIGHT-SOURCE-POLICY"
+    },
+    {
+      "case_event_seq": 14,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_TABLE_CONTRACT_MISMATCH",
+      "scenario_id": "SCN-M1-PREFLIGHT-TABLES"
+    },
+    {
+      "case_event_seq": 15,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_DDL_POLICY_UNSUPPORTED",
+      "scenario_id": "SCN-M1-PREFLIGHT-DDL"
+    },
+    {
+      "case_event_seq": 16,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_KEY_UNSUPPORTED",
+      "scenario_id": "SCN-M1-PREFLIGHT-KEYS"
+    },
+    {
+      "case_event_seq": 17,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_TYPE_UNSUPPORTED",
+      "scenario_id": "SCN-M1-PREFLIGHT-TYPES"
+    },
+    {
+      "case_event_seq": 18,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_PARTITION_UNSUPPORTED",
+      "scenario_id": "SCN-M1-PREFLIGHT-PARTITIONS"
+    },
+    {
+      "case_event_seq": 19,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_REPLICA_IDENTITY_INCOMPLETE",
+      "scenario_id": "SCN-M1-PREFLIGHT-REPLICA-IDENTITY"
+    },
+    {
+      "case_event_seq": 20,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_CONTROL_ROW_CARDINALITY",
+      "scenario_id": "SCN-M1-PREFLIGHT-CONTROL-CARDINALITY"
+    },
+    {
+      "case_event_seq": 21,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_CONTROL_PRIVILEGE_EXCESS",
+      "scenario_id": "SCN-M1-PREFLIGHT-CONTROL-PRIVILEGES"
+    },
+    {
+      "case_event_seq": 22,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_REQUIRED_GRANT_MISSING",
+      "scenario_id": "SCN-M1-PREFLIGHT-GRANTS"
+    },
+    {
+      "case_event_seq": 23,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_PROTOCOL_FINGERPRINT_MISMATCH",
+      "scenario_id": "SCN-M1-PREFLIGHT-PROTOCOL-FINGERPRINT"
+    },
+    {
+      "case_event_seq": 24,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_MEMORY_BUDGET_INSUFFICIENT",
+      "scenario_id": "SCN-M1-PREFLIGHT-MEMORY"
+    },
+    {
+      "case_event_seq": 25,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_SPILL_COUNTERS_UNAVAILABLE",
+      "scenario_id": "SCN-M1-PREFLIGHT-SPILL-COUNTERS"
+    },
+    {
+      "case_event_seq": 26,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_TIMEOUT_KEEPALIVE_INCOMPATIBLE",
+      "scenario_id": "SCN-M1-PREFLIGHT-TIMEOUTS"
+    },
+    {
+      "case_event_seq": 27,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_OWNERSHIP_RECOVERY_UNSAFE",
+      "scenario_id": "SCN-M1-PREFLIGHT-OWNERSHIP"
+    },
+    {
+      "case_event_seq": 28,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_STATE_MUTATED",
+      "scenario_id": "SCN-M1-PREFLIGHT-NO-MUTATION"
+    },
+    {
+      "case_event_seq": 29,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_SQLITE_PRAGMA_MISMATCH",
+      "scenario_id": "SCN-M1-PREFLIGHT-SQLITE-PRAGMAS"
+    },
+    {
+      "case_event_seq": 30,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_WRITER_SYNCHRONOUS_UNVERIFIED",
+      "scenario_id": "SCN-M1-PREFLIGHT-WRITER-ATTESTATION"
+    },
+    {
+      "case_event_seq": 31,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_FILESYSTEM_UNSUPPORTED",
+      "scenario_id": "SCN-M1-PREFLIGHT-FILESYSTEM"
+    },
+    {
+      "case_event_seq": 32,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_UNIT_BUDGET_INVALID",
+      "scenario_id": "SCN-M1-PREFLIGHT-BUDGETS"
+    },
+    {
+      "case_event_seq": 33,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_CLICKHOUSE_MAPPING_UNSUPPORTED",
+      "scenario_id": "SCN-M1-PREFLIGHT-CLICKHOUSE-MAPPING"
+    },
+    {
+      "case_event_seq": 34,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_ARCHIVE_MAPPING_UNSUPPORTED",
+      "scenario_id": "SCN-M1-PREFLIGHT-ARCHIVE-MAPPING"
+    },
+    {
+      "case_event_seq": 35,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_DESTINATION_TLS_UNVERIFIED",
+      "scenario_id": "SCN-M1-PREFLIGHT-DESTINATION-TLS"
+    },
+    {
+      "case_event_seq": 36,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_OPERATOR_SOCKET_UNSAFE",
+      "scenario_id": "SCN-M1-PREFLIGHT-SOCKET"
+    },
+    {
+      "case_event_seq": 37,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_MUTATING_OBSERVABILITY_ROUTE",
+      "scenario_id": "SCN-M1-PREFLIGHT-READONLY-ROUTES"
+    },
+    {
+      "case_event_seq": 38,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_LISTENER_POLICY_MISMATCH",
+      "scenario_id": "SCN-M1-PREFLIGHT-LISTENERS"
+    },
+    {
+      "case_event_seq": 39,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_REDACTION_POLICY_FAILED",
+      "scenario_id": "SCN-M1-PREFLIGHT-REDACTION"
+    },
+    {
+      "case_event_seq": 40,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_SOURCE_FREE_DISK_UNKNOWN",
+      "scenario_id": "SCN-M1-PREFLIGHT-SOURCE-FREE-DISK"
+    },
+    {
+      "case_event_seq": 41,
+      "outcome": "exercised",
+      "reason": "PREFLIGHT_LIVE_COLLECTION_UNVERIFIED",
+      "scenario_id": "SCN-M1-PREFLIGHT-LIVE-COLLECTOR"
+    }
+  ],
+  "schema_version": "fault-timeline/v1"
+}

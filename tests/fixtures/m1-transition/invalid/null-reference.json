@@ -1,0 +1,9 @@
+{
+  "schema_version": "boring-cdc/transition-fixture/v1",
+  "scenario_id": "SCN-M1-INVALID",
+  "synthetic": true,
+  "seed": {"schema_version": "boring-cdc/schedule-seed/v1", "algorithm": "splitmix64-v1", "seed": 1, "fair_scheduler_assumed": false, "restored_resources_assumed": false},
+  "budget": {"max_steps": 1, "max_trace_entries": 1, "max_minimizer_runs": 1, "max_redacted_bytes": 1, "max_state_bytes": 1, "max_scheduled_payload_bytes": 1},
+  "steps": [{"kind": "event", "fixture_ref": null}],
+  "expected_violation": null
+}

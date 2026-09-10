@@ -1,0 +1,53 @@
+{
+  "assertions": {
+    "cross_epoch_ordering": "rejected",
+    "duplicate_conflict_property_samples": 64,
+    "equal_key_change": "blocked",
+    "fixed_goldens": 5,
+    "immutable_position_conflict": "blocked",
+    "key_change_incomplete_tuple": "blocked",
+    "max_key_arity": 32,
+    "relation_fingerprint_sensitivity": "proven",
+    "semantic_tests": 12,
+    "snapshot_invalid_epoch_xid_ordinal": "blocked",
+    "snapshot_payload_identity_mismatch": "blocked",
+    "stable_cases": 10
+  },
+  "exact_sha_sandbox": {
+    "br_lint": "pass",
+    "evidence_validator": "pass",
+    "factory_sha": "19f1f12c34ebe51e37ec9927a6d41cf5c07c9a2e",
+    "git_diff_check": "pass",
+    "head": "19f1f12c34ebe51e37ec9927a6d41cf5c07c9a2e",
+    "lease": "edb0c43c-632e-4a1a-a503-69d3fe50f1bd",
+    "ordering_tests": "12 passed",
+    "ordering_validator": "pass",
+    "plan_coverage": "pass",
+    "source_identity_tests": "17 passed"
+  },
+  "git_commit": "19f1f12c34ebe51e37ec9927a6d41cf5c07c9a2e",
+  "inputs": {
+    "contracts/m1/ordering-cases.json": "ac4cf238a2d24bf13589259500daa3a4ed8a21273ba2725b850b5720579c03b8",
+    "scripts/validate/m1_ordering.py": "eea898f9b01dacb0f1042f517973a7cf7a00bb6aa8524f33bc0e50b371255b08",
+    "src/m1_ordering.rs": "23e22b6e0c43321fa93e520040a4a78ec90623d64659226a1efacf9c204e3c64",
+    "src/m1_source_identity.rs": "3677c2c7341d170106b908f55eb6471b04ebd46952973f0e5960966564aff9e3"
+  },
+  "owner_bead": "boring-cdc-m1-ordering",
+  "provisional_constants": [
+    "WAL_EVENT_DOMAIN=boring-cdc/wal-event/v1",
+    "SNAPSHOT_EVENT_DOMAIN=boring-cdc/snapshot-event/v1",
+    "SOURCE_SLOT_DOMAIN=boring-cdc/source-slot/v1",
+    "LOGICAL_TABLE_DOMAIN=boring-cdc/logical-table/v1 (consumed shared type)",
+    "RELATION_SCHEMA_DOMAIN=boring-cdc/relation-schema/v1 (consumed shared type)",
+    "PHYSICAL_KEY_DOMAIN=boring-cdc/physical-key/v1 (consumed shared type)",
+    "VALUE_HASH_DOMAIN=boring-cdc/canonical-value/v1",
+    "PAYLOAD_HASH_DOMAIN=boring-cdc/mutation-payload/v1",
+    "SNAPSHOT_ORIGIN_RANK=0",
+    "WAL_ORIGIN_RANK=1",
+    "HASH_LENGTH_FRAMING=u64-be",
+    "COLUMN_STATE_TAGS=Absent:0,Null:1,UnchangedToast:2,Value:3",
+    "MUTATION_KIND_TAGS=Delete:0,Upsert:1",
+    "MAX_CANONICAL_KEY_COMPONENTS=8"
+  ],
+  "schema_version": "m1-ordering-proof/v1"
+}

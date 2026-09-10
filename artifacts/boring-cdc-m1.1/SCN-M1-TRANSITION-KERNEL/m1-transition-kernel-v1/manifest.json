@@ -1,0 +1,102 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo fmt --check",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-1.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo test --locked --quiet m1_transition_kernel::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-2.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-2.log",
+      "stdout_sha256": "0f9a8bafd95873391a60a8fa3f8f786178406f0974c0ca90522ceb09cbf14272",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo test --locked --quiet --test compile_fail",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-3.stderr",
+      "stderr_sha256": "d40c2ee884fc95957af65c0b1902b36b9b6344828fe9d83b71e23a6b37ad5aa2",
+      "stdout_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-3.log",
+      "stdout_sha256": "517b1ae5c7104d54421bde6447a82dd1f321da3aad379237c0d9d00b20cee3de",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo clippy --locked --quiet --all-targets -- -D warnings",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-4.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-4.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "scripts/validate/m1_transition_contracts.py",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-5.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-5.log",
+      "stdout_sha256": "28fdf22fd1d51c3f1f38725065ceb260b3f0306acc6060c949b4ba3a62d79748",
+      "version": "python 3 / jsonschema Draft 2020-12"
+    },
+    {
+      "argv": "br lint",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-6.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/command-6.log",
+      "stdout_sha256": "81a6f776c83bf1ad7c9e049ad5c018048899a220efd39a665ce7d0cabdf23598",
+      "version": "br 0.2.16"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "leaf",
+  "git_commit": "4c75d371a8de480e540eb0bc03c37ee15f3372ec",
+  "owner_bead": "boring-cdc-m1.1",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/proof-summary.json",
+      "artifacts/boring-cdc-m1.1/SCN-M1-TRANSITION-KERNEL/m1-transition-kernel-v1/versions.json"
+    ],
+    "digest": "fd78b74280fe21f386789232e69dde64d1fc2981155e8531b727bbbe660fd638",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-TRANSITION-KERNEL",
+  "schema_version": "evidence/v1",
+  "seed": "fixed seeds 0x5eed and 17",
+  "source_preservation": {
+    "after_sha256": "78924af64e5c518b97b0af68cd9c640eb450dfbb52dcc8226251316963c27fe1",
+    "before_sha256": "78924af64e5c518b97b0af68cd9c640eb450dfbb52dcc8226251316963c27fe1",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": false,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": false,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

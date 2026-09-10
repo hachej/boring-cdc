@@ -1,0 +1,68 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/e2e/m1_cli_contract.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/e2e.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/e2e.stdout",
+      "stdout_sha256": "24f2cd4172a47d92b749684d5c4798c54122a78158f87f287880ec96a193a254",
+      "version": "cli-contract-v1"
+    },
+    {
+      "argv": "scripts/faults/m1_cli_contract.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/fault.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/fault.stdout",
+      "stdout_sha256": "271e181df05a5204ecb0e213ca9fbf59f57f0358169d80885013aad5e062f69a",
+      "version": "cli-contract-v1"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "leaf",
+  "git_commit": "25e2a9d43c16d658a18d053b989b7be2bb60bf77",
+  "owner_bead": "boring-cdc-m1-cli-contract",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/e2e.stdout",
+      "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/fault.stdout",
+      "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/registry-v1.json",
+      "artifacts/boring-cdc-m1-cli-contract/SCN-M1-CLI-CONTRACT/cli-contract-v1/envelopes-v1.json"
+    ],
+    "digest": "f36e187b31f3e06a758cd717279bbfc2dea3b287a206ae42986c908ccb263a32",
+    "product_faults": "invalid,ambiguous,redaction,path,broken_pipe",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-CLI-CONTRACT",
+  "schema_version": "evidence/v1",
+  "seed": "cli-contract-v1",
+  "source_preservation": {
+    "after_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": false,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

@@ -41,7 +41,7 @@ services:
       postgres: {condition: service_healthy}
       clickhouse: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "boring-cdc", "check"]
+      test: ["CMD", "boring-cdc", "scaffold-check"]
       interval: 5s
       timeout: 3s
       retries: 12

@@ -1,0 +1,114 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/m1/transition-fixture.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "budget": {
+      "additionalProperties": false,
+      "properties": {
+        "max_minimizer_runs": {
+          "maximum": 4096,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_redacted_bytes": {
+          "maximum": 16384,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_scheduled_payload_bytes": {
+          "maximum": 16777216,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_state_bytes": {
+          "maximum": 16777216,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_steps": {
+          "maximum": 4096,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "max_trace_entries": {
+          "maximum": 4096,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_steps",
+        "max_trace_entries",
+        "max_minimizer_runs",
+        "max_redacted_bytes",
+        "max_state_bytes",
+        "max_scheduled_payload_bytes"
+      ],
+      "type": "object"
+    },
+    "expected_violation": {
+      "maxLength": 16384,
+      "pattern": "^(?![\\s\\S]*[^\\u0020-\\u007e])[\\s\\S]+$",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scenario_id": {
+      "maxLength": 128,
+      "pattern": "^SCN-[A-Z0-9-]+$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "boring-cdc/transition-fixture/v1"
+    },
+    "seed": {
+      "$ref": "schedule-seed.schema.json"
+    },
+    "steps": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "fixture_ref": {
+            "maxLength": 256,
+            "minLength": 1,
+            "pattern": "^(?![\\s\\S]*[^\\u0020-\\u007e])[\\s\\S]+$",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "event",
+              "completion",
+              "advance_clock",
+              "expiry",
+              "cancel",
+              "crash_restart"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "fixture_ref"
+        ],
+        "type": "object"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    },
+    "synthetic": {
+      "const": true
+    }
+  },
+  "required": [
+    "schema_version",
+    "scenario_id",
+    "synthetic",
+    "seed",
+    "budget",
+    "steps",
+    "expected_violation"
+  ],
+  "title": "Boring CDC synthetic transition fixture",
+  "type": "object"
+}

@@ -1,0 +1,118 @@
+{
+  "clean": {
+    "business": "pass",
+    "business_count": 10,
+    "business_sorted_digest": "e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab",
+    "fence": "pass",
+    "final_state": "pass",
+    "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
+    "ledger": "pass",
+    "ledger_count": 11,
+    "ledger_sorted_digest": "5fa4f2cc7510beecd5769943e1d05eb8eef29f1a8ab9020d43ec21e144aff39e",
+    "sequence_gaps": "pass",
+    "state_count": 4
+  },
+  "contract_digests": {
+    "keys": "30c14e8b953c11dfb9ab4ac10ccde0cbad9c7ae4d25097d62258e7d71d7a510d",
+    "oracle": "8b745babbe152ac65cc537c0e01f3e1814b785443d4a63aaddc08f56fba85774",
+    "values": "b03d04460a78c4cd0b02817952e6bcc21d89c9b712b027b1b866cf5e62c7acc8"
+  },
+  "correlation_fields": [
+    "transaction_group_id",
+    "transaction_ordinal",
+    "entity_table",
+    "canonical_key",
+    "operation",
+    "after_hash"
+  ],
+  "faults": {
+    "business-omission": {
+      "business": "fail",
+      "business_count": 9,
+      "business_sorted_digest": "f0fe2b747c73ed4a8d2284d8c3eeee69085aa780080b5e0a6b9aa78032045420",
+      "fence": "pass",
+      "final_state": "pass",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
+      "ledger": "pass",
+      "ledger_count": 11,
+      "ledger_sorted_digest": "5fa4f2cc7510beecd5769943e1d05eb8eef29f1a8ab9020d43ec21e144aff39e",
+      "scenario": "business-omission",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    },
+    "fence-omission": {
+      "business": "pass",
+      "business_count": 10,
+      "business_sorted_digest": "e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab",
+      "fence": "fail",
+      "final_state": "pass",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
+      "ledger": "pass",
+      "ledger_count": 11,
+      "ledger_sorted_digest": "5fa4f2cc7510beecd5769943e1d05eb8eef29f1a8ab9020d43ec21e144aff39e",
+      "scenario": "fence-omission",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    },
+    "ledger-omission": {
+      "business": "pass",
+      "business_count": 10,
+      "business_sorted_digest": "e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab",
+      "fence": "pass",
+      "final_state": "pass",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
+      "ledger": "fail",
+      "ledger_count": 10,
+      "ledger_sorted_digest": "09a5a0f23815f3624d67d72cfc4486dd25a306a9293353a850c57e9f03225e3c",
+      "scenario": "ledger-omission",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    },
+    "retry-conflict": {
+      "business": "fail",
+      "business_count": 10,
+      "business_sorted_digest": "f7dc1b0c600ca3b039481375448c54611950b5ec6e803785b66cbfba5d80187f",
+      "fence": "pass",
+      "final_state": "pass",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
+      "ledger": "pass",
+      "ledger_count": 11,
+      "ledger_sorted_digest": "5fa4f2cc7510beecd5769943e1d05eb8eef29f1a8ab9020d43ec21e144aff39e",
+      "scenario": "retry-conflict",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    },
+    "retry-duplicate": {
+      "business": "pass",
+      "business_count": 10,
+      "business_sorted_digest": "e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab",
+      "fence": "pass",
+      "final_state": "pass",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
+      "ledger": "pass",
+      "ledger_count": 11,
+      "ledger_sorted_digest": "5fa4f2cc7510beecd5769943e1d05eb8eef29f1a8ab9020d43ec21e144aff39e",
+      "scenario": "retry-duplicate",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    },
+    "unavailable": {
+      "business": "unavailable",
+      "business_count": 0,
+      "business_sorted_digest": null,
+      "fence": "pass",
+      "final_state": "pass",
+      "final_typed_checksum": "3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af",
+      "ledger": "pass",
+      "ledger_count": 11,
+      "ledger_sorted_digest": "5fa4f2cc7510beecd5769943e1d05eb8eef29f1a8ab9020d43ec21e144aff39e",
+      "scenario": "unavailable",
+      "sequence_gaps": "pass",
+      "state_count": 4
+    }
+  },
+  "observation_boundary": "ClickHouse delivered tables populated independently from PostgreSQL trigger stream, ledger, fence, and typed final state",
+  "reader": "pre_transaction=1:tier1,events0\npost_transaction=7:tier3,events2\nintermediate_tier2_events1=absent\nsample_count=12\n",
+  "schema_version": "m1-workload-packet/v2",
+  "unavailable_boundary_error": "RuntimeError:clickhouse_observation_boundary_unavailable"
+}

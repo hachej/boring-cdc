@@ -1,0 +1,9 @@
+{
+  "clickhouse_image": "docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f",
+  "compose_observed": "2.37.1+ds1-0ubuntu2~25.04.1",
+  "compose_policy": "2.39.2",
+  "docker_engine_observed": "28.2.2",
+  "docker_engine_policy": "28.3.3",
+  "policy_source": "owner-card:765bd3b2-4b68-4102-a9ec-43ca93357390",
+  "postgres_image": "docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929"
+}
