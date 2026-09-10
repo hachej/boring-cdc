@@ -16,4 +16,4 @@ python3 scripts/lib/m2_journal_component.py e2e
 cp -a artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-COMPONENT/. "$scratch"/
 python3 scripts/lib/m2_journal_component.py e2e
 diff -ru "$scratch" artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-COMPONENT
-python3 scripts/validate/m2_journal.py
+python3 scripts/validate/m2_journal.py e2e

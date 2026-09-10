@@ -27,7 +27,11 @@ for symbol in ('journal_inspect_event','journal_verify','journal_gc_dry_run','co
  if symbol not in src: errors.append('missing journal boundary '+symbol)
 if 'WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5)' not in (root/'src/m2_schema.rs').read_text(): errors.append('confirmed sqlite writer timeout changed')
 head=subprocess.run(['git','rev-parse','HEAD'],cwd=root,text=True,capture_output=True).stdout.strip(); impl=implementation_digest()
-for scenario in ('SCN-M2-JOURNAL-COMPONENT','SCN-M2-JOURNAL-CRASH-BOUNDARY'):
+scenario_filter=sys.argv[1] if len(sys.argv)>1 else 'all'
+scenarios={'e2e':('SCN-M2-JOURNAL-COMPONENT',),'fault':('SCN-M2-JOURNAL-CRASH-BOUNDARY',),'all':('SCN-M2-JOURNAL-COMPONENT','SCN-M2-JOURNAL-CRASH-BOUNDARY')}
+if scenario_filter not in scenarios: errors.append('unknown scenario filter '+scenario_filter); selected=()
+else: selected=scenarios[scenario_filter]
+for scenario in selected:
  packet=root/'artifacts/boring-cdc-m2-journal'/scenario/'journal-component-v1'
  if packet.exists():
   manifest=json.loads((packet/'manifest.json').read_text()); versions=json.loads((packet/'versions.json').read_text())
