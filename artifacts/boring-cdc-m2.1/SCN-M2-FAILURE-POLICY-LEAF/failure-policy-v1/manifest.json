@@ -1,0 +1,120 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-1.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    {
+      "argv": "cargo test --locked failure_policy::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-2.stderr",
+      "stderr_sha256": "5cf1b2c71180b2184147442e5ff4be2b6afeb4fcd2b05c09d1dc21e39bb31845",
+      "stdout_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-2.log",
+      "stdout_sha256": "910294943cbde9197da6643871214ef3f513e069c892f24f112e052e22a3f829",
+      "version": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)"
+    },
+    {
+      "argv": "python3 scripts/validate/failure_policy.py",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-3.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-3.log",
+      "stdout_sha256": "adc28b923fb5162f66abab6a484cf83c4dc41e58314a16cc8b01168ce07f89c8",
+      "version": "Python 3.13.3"
+    },
+    {
+      "argv": "scripts/e2e/failure_policy.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-4.stderr",
+      "stderr_sha256": "853a16c10f8f8d69f78526f0646288ba3e211c36fd604d50d5626406956ac764",
+      "stdout_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-4.log",
+      "stdout_sha256": "413b8d8a165e33fabd81a56ff1c5786b6d1516c672530cf2ce80ecbb7278c862",
+      "version": "Python 3.13.3"
+    },
+    {
+      "argv": "scripts/faults/failure_policy.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-5.stderr",
+      "stderr_sha256": "880a697aa97cd56a6572d7f31915e6fae827604dd99f3a2551ab2d717a697cea",
+      "stdout_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-5.log",
+      "stdout_sha256": "50d232f09182328d2d771617cd729cb1ccb0a2347f835280849000aa14cceaff",
+      "version": "Python 3.13.3"
+    },
+    {
+      "argv": "scripts/validate/plan_coverage.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-6.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-6.log",
+      "stdout_sha256": "018e1fe4f8d8859bebc624223d73f084a067be0a9acd48b787ba2f3f83828220",
+      "version": "Python 3.13.3"
+    },
+    {
+      "argv": "br lint",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-7.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-7.log",
+      "stdout_sha256": "6a7aa9ae2660ed53e9c0f5d2565820b85ad40fc52fed054e630442ceb228cdb3",
+      "version": "Python 3.13.3"
+    },
+    {
+      "argv": "python3 duplicate-id-scan",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-8.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/command-8.log",
+      "stdout_sha256": "89d3ab8aac2070eb40621f3a11faf96ad32e701df11956687b1de33a99b3bce7",
+      "version": "Python 3.13.3"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "leaf",
+  "git_commit": "74097a98bcf8b256161e2186d76e8b2b5a535e17",
+  "owner_bead": "boring-cdc-m2.1",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/proof-summary.json",
+      "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/versions.json"
+    ],
+    "digest": "b12b8b23cdaaed3045c45a03c2127ab46eaa8206c6d5f7abe0adb830d84824c2",
+    "product_faults": "clock-rollback,stale-completion,stale-persistence-operation",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M2-FAILURE-POLICY-LEAF",
+  "schema_version": "evidence/v1",
+  "seed": "failure-policy-v1",
+  "source_preservation": {
+    "after_sha256": "ea17e82e1e1ec0abafb995f0573eb651fb7d380ae7c91e78e6d8ec9048089d4d",
+    "before_sha256": "ea17e82e1e1ec0abafb995f0573eb651fb7d380ae7c91e78e6d8ec9048089d4d",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": false,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

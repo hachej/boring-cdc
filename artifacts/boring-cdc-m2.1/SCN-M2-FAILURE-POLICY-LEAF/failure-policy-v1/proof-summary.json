@@ -1,0 +1,14 @@
+{
+  "assertions": [
+    "closed seven-class provisional taxonomy",
+    "fixed-seed injected-clock/randomness capped schedule",
+    "same-fingerprint suppression and cleared recurrence re-arm",
+    "class-specific re-arm proofs",
+    "epoch/generation/attempt/fingerprint stale completion fencing",
+    "length-framed redacted SHA-256 fingerprints",
+    "typed capture/ClickHouse/archive synthetic hooks",
+    "reopened SQLite persistence and stale transactional operation fencing",
+    "destination current_failure_id atomic linkage and clear"
+  ],
+  "outcome": "pass"
+}
