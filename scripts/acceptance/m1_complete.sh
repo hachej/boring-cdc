@@ -168,9 +168,10 @@ else:
   evidence=load(evidence_path)
   commands=evidence.get('commands',[])
   if len(commands)!=2: fail('gate must contain exactly two command executions')
-  observed=[]
+  observed=[]; stdout_paths=set(); stderr_paths=set()
   for entry in commands:
    path=root/entry.get('stdout_path',''); stderr=root/entry.get('stderr_path','')
+   stdout_paths.add(str(path)); stderr_paths.add(str(stderr))
    if entry.get('argv')!='scripts/acceptance/m1_complete.sh --probe' or entry.get('exit_code')!=0: fail('gate command was not a successful completion probe')
    if not path.is_file() or sha(path)!=entry.get('stdout_sha256'): fail('gate command stdout digest mismatch')
    if not stderr.is_file() or sha(stderr)!=entry.get('stderr_sha256'): fail('gate command stderr digest mismatch')
@@ -179,11 +180,14 @@ else:
     try:
      if json.loads(path.read_text()).get('status')!='pass': fail('gate command output is not pass')
     except Exception: fail('gate command output is not valid completion JSON')
-  if len(observed)==2 and observed[0]!=observed[1]: fail('gate command executions are not byte-identical')
+  if len(stdout_paths)!=2 or len(stderr_paths)!=2: fail('gate commands must reference distinct stdout/stderr captures')
+  expected_output=encoded.encode()
+  if len(observed)==2 and (observed[0]!=observed[1] or observed[0]!=(expected_output,b'')):
+   fail('gate command executions are not byte-identical fresh semantic summaries')
   commit=evidence.get('git_commit','')
   exists=subprocess.run(['git','cat-file','-e',str(commit)+'^{commit}'],capture_output=True).returncode==0
   ancestor=exists and subprocess.run(['git','merge-base','--is-ancestor',str(commit),'HEAD'],capture_output=True).returncode==0
-  clean_inputs=ancestor and subprocess.run(['git','diff','--quiet',str(commit)+'..HEAD','--','contracts','scripts','tests']).returncode==0
+  clean_inputs=ancestor and subprocess.run(['git','diff','--quiet',str(commit)+'..HEAD','--','.beads/issues.jsonl','src','fixtures','contracts','scripts','tests','artifacts',':(exclude)artifacts/boring-cdc-m1-complete']).returncode==0
   if not (exists and ancestor and clean_inputs): fail('gate git_commit is missing, non-ancestor, or stale')
   if evidence.get('result',{}).get('status')!='pass': fail('gate result is not pass')
   paths=[root/p for p in evidence.get('result',{}).get('artifacts',[])]
