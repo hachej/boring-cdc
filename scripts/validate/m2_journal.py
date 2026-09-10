@@ -4,7 +4,8 @@ from pathlib import Path
 root=Path(__file__).resolve().parents[2]; src=(root/'src/m2_journal.rs').read_text(); contract=json.loads((root/'contracts/m2/journal-cases.json').read_text()); errors=[]
 def sha(data): return hashlib.sha256(data).hexdigest()
 def implementation_digest():
- paths=['src/m2_journal.rs','src/m2_schema.rs','src/lib.rs','examples/m2_journal_component.rs','contracts/m2/journal-cases.json','scripts/lib/m2_journal_component.py','scripts/validate/m2_journal.py','scripts/lib/core_validator.py','scripts/e2e/m2_journal.sh','scripts/faults/m2_journal.sh']
+ paths=[p.relative_to(root).as_posix() for base in ('src','examples') for p in sorted((root/base).rglob('*')) if p.is_file()]
+ paths += ['contracts/m2/journal-cases.json','scripts/lib/m2_journal_component.py','scripts/validate/m2_journal.py','scripts/lib/core_validator.py','scripts/e2e/m2_journal.sh','scripts/faults/m2_journal.sh']
  h=hashlib.sha256()
  for name in paths:
   raw=(root/name).read_bytes(); h.update(len(name).to_bytes(8,'big'));h.update(name.encode());h.update(len(raw).to_bytes(8,'big'));h.update(raw)
@@ -12,9 +13,14 @@ def implementation_digest():
 ids=[c['id'] for c in contract['cases']]
 if len(ids)!=len(set(ids)): errors.append('duplicate scenario IDs')
 for case in contract['cases']:
- if not re.search(r'fn\s+'+re.escape(case['test'])+r'\s*\(',src): errors.append('missing test '+case['test'])
+ status=case.get('status')
  assertion=case.get('assertion','')
- if len(assertion)<40 or 'journal-owned projection executes or fail-closes' in assertion: errors.append('non-specific assertion '+case['id'])
+ if status=='executed':
+  if not isinstance(case.get('test'),str) or not re.search(r'fn\s+'+re.escape(case['test'])+r'\s*\(',src): errors.append('missing executed test '+case['id'])
+  if len(assertion)<40 or assertion.startswith('provisional:'): errors.append('non-specific executed assertion '+case['id'])
+ elif status=='provisional_unexecuted':
+  if case.get('test') is not None or not assertion.startswith('provisional:'): errors.append('dishonest provisional assignment '+case['id'])
+ else: errors.append('unknown coverage status '+case['id'])
 coverage=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text())
 required={a['id'] for a in coverage['assignments'] if a.get('owner_bead')=='boring-cdc-m2-journal'}
 missing=required-set(ids)
@@ -37,13 +43,14 @@ for scenario in selected:
   manifest=json.loads((packet/'manifest.json').read_text()); versions=json.loads((packet/'versions.json').read_text())
   evidence_commit=manifest['git_commit']
   ancestor=subprocess.run(['git','merge-base','--is-ancestor',evidence_commit,head],cwd=root).returncode==0
-  bound=['src/m2_journal.rs','src/m2_schema.rs','src/lib.rs','examples/m2_journal_component.rs','contracts/m2/journal-cases.json','scripts/lib/m2_journal_component.py','scripts/validate/m2_journal.py','scripts/lib/core_validator.py','scripts/e2e/m2_journal.sh','scripts/faults/m2_journal.sh']
+  bound=['src','examples','contracts/m2/journal-cases.json','scripts/lib/m2_journal_component.py','scripts/validate/m2_journal.py','scripts/lib/core_validator.py','scripts/e2e/m2_journal.sh','scripts/faults/m2_journal.sh']
   source_unchanged=ancestor and subprocess.run(['git','diff','--quiet',evidence_commit+'..'+head,'--',*bound],cwd=root).returncode==0
   if not source_unchanged: errors.append(f'{scenario} not bound to reviewed implementation')
   if manifest['source_preservation']['before_sha256']!=impl or manifest['source_preservation']['after_sha256']!=impl: errors.append(f'{scenario} implementation digest mismatch')
   if versions.get('git_commit')!=evidence_commit or versions.get('implementation_sha256')!=impl: errors.append(f'{scenario} binary provenance source mismatch')
   binary=root/'target/debug/examples/m2_journal_component'
-  if binary.exists() and versions.get('binary_sha256')!=sha(binary.read_bytes()): errors.append(f'{scenario} binary hash mismatch')
+  if not binary.is_file(): errors.append(f'{scenario} binary provenance unavailable')
+  elif versions.get('binary_sha256')!=sha(binary.read_bytes()): errors.append(f'{scenario} binary hash mismatch')
   events=[json.loads(x) for x in (packet/'logs/boring-cdc.jsonl').read_text().splitlines()]
   for i,event in enumerate(events,1):
    for field in ('schema_version','case_event_seq','bead_id','scenario_id','correlation_id','run_id','capture_epoch','component','phase','outcome','config_fingerprint'):

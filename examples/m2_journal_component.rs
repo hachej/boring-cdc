@@ -185,7 +185,7 @@ fn main() {
         let inspection = journal_inspect_event(Path::new(&path), "event-1", Duration::from_secs(2))
             .unwrap()
             .unwrap();
-        let verification = journal_verify(Path::new(&path), Duration::from_secs(2)).unwrap();
+        let verification = journal_verify(Path::new(&path), 16, Duration::from_secs(2)).unwrap();
         let gc = journal_gc_dry_run(Path::new(&path), 3, 16, Duration::from_secs(2)).unwrap();
         println!(
             "{{\"command_boundaries\":[\"CMD-JOURNAL-INSPECT-EVENT-ID-ID-EXPLAIN-JSON\",\"CMD-JOURNAL-VERIFY\",\"CMD-JOURNAL-GC-DRY-RUN\"],\"event_id\":\"{}\",\"verified_events\":{},\"gc_dry_run_events\":{}}}",

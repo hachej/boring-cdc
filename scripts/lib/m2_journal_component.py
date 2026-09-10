@@ -10,7 +10,8 @@ def run(a): return subprocess.run(a,cwd=ROOT,text=True,capture_output=True,timeo
 def command(argv,out,err,version,code=0): return {"argv":argv,"version":version,"exit_code":code,"stdout_path":out.relative_to(ROOT).as_posix(),"stdout_sha256":sha(out.read_bytes()),"stderr_path":err.relative_to(ROOT).as_posix(),"stderr_sha256":sha(err.read_bytes())}
 def invoke(binary,mode,db): return run([str(binary),mode,str(db)])
 def implementation_digest():
- paths=['src/m2_journal.rs','src/m2_schema.rs','src/lib.rs','examples/m2_journal_component.rs','contracts/m2/journal-cases.json','scripts/lib/m2_journal_component.py','scripts/validate/m2_journal.py','scripts/lib/core_validator.py','scripts/e2e/m2_journal.sh','scripts/faults/m2_journal.sh']
+ paths=[p.relative_to(ROOT).as_posix() for base in ('src','examples') for p in sorted((ROOT/base).rglob('*')) if p.is_file()]
+ paths += ['contracts/m2/journal-cases.json','scripts/lib/m2_journal_component.py','scripts/validate/m2_journal.py','scripts/lib/core_validator.py','scripts/e2e/m2_journal.sh','scripts/faults/m2_journal.sh']
  h=hashlib.sha256()
  for name in paths:
   raw=(ROOT/name).read_bytes(); h.update(len(name).to_bytes(8,'big'));h.update(name.encode());h.update(len(raw).to_bytes(8,'big'));h.update(raw)

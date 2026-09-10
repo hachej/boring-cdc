@@ -184,7 +184,7 @@ def validate_evidence(obj, findings, args):
         else:
             bound_paths = ["contracts", "scripts", "tests"]
             if obj.get("owner_bead") == "boring-cdc-m2-journal":
-                bound_paths += ["src/m2_journal.rs", "src/m2_schema.rs", "src/lib.rs", "examples/m2_journal_component.rs"]
+                bound_paths += ["src", "examples"]
             if subprocess.run(["git","diff","--quiet",commit+"..HEAD","--",*bound_paths],cwd=ROOT).returncode != 0:
                 add(findings,"E_EVIDENCE_STALE","/git_commit","owned implementation, contract, fixture, src, or example paths changed after the evidence commit")
     cmds=obj.get("commands")

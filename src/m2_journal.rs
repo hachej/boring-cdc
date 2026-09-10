@@ -515,8 +515,19 @@ pub fn read_complete_range(
             ));
         }
     }
-    let mut events = Vec::new();
-    let mut copied = 0usize;
+    let result_slots = max_events
+        .checked_mul(std::mem::size_of::<CopiedEvent>())
+        .ok_or(JournalError::Limit("copied bytes overflow"))?;
+    if result_slots > max_bytes {
+        return Err(JournalError::Limit(
+            "result vector capacity exceeds byte bound",
+        ));
+    }
+    let mut events = Vec::with_capacity(max_events);
+    let mut copied = events
+        .capacity()
+        .checked_mul(std::mem::size_of::<CopiedEvent>())
+        .ok_or(JournalError::Limit("copied bytes overflow"))?;
     let mut expected_first = after_seq as i64 + 1;
     loop {
         let boundary: Option<(String, i64, i64)> = reader.query_one_bounded(
@@ -559,16 +570,12 @@ pub fn read_complete_range(
         let boundary_bytes = std::mem::size_of::<(String, i64, i64)>()
             .checked_add(txid.len())
             .ok_or(JournalError::Limit("copied bytes overflow"))?;
-        let result_bytes = (field_bytes as usize)
-            .checked_add(
-                expected
-                    .checked_mul(std::mem::size_of::<CopiedEvent>())
-                    .ok_or(JournalError::Limit("copied bytes overflow"))?,
-            )
-            .ok_or(JournalError::Limit("copied bytes overflow"))?;
+        let result_bytes = field_bytes as usize;
+        let sqlite_row_bytes = std::mem::size_of::<rusqlite::Row<'static>>();
         let peak = copied
             .checked_add(result_bytes)
             .and_then(|v| v.checked_add(boundary_bytes))
+            .and_then(|v| v.checked_add(sqlite_row_bytes))
             .ok_or(JournalError::Limit("copied bytes overflow"))?;
         if peak > max_bytes {
             if events.is_empty() {
@@ -652,23 +659,54 @@ pub struct JournalVerification {
 /// Bounded read-only implementation boundary for CMD-JOURNAL-VERIFY.
 pub fn journal_verify(
     path: &std::path::Path,
+    max_events: usize,
     max_age: Duration,
 ) -> Result<JournalVerification, JournalError> {
-    let reader = open_reader_with_limits(path, max_age, 1)?;
+    if max_events == 0 {
+        return Err(JournalError::Invalid("zero verification event bound"));
+    }
+    let reader = open_reader_with_limits(path, max_age, max_events)?;
     let quick: Option<String> = reader.query_one_bounded("PRAGMA quick_check", |r| r.get(0))?;
     if quick.as_deref() != Some("ok") {
         return Err(JournalError::Conflict("SQLite quick_check failed"));
     }
-    let summary: Option<(i64,i64,i64,i64,i64)> = reader.query_one_bounded(
-        "SELECT count(*),coalesce(sum(event_count),0),coalesce(min(first_seq),1),coalesce(max(last_seq),0),coalesce((SELECT durable_journal_seq FROM source_state WHERE singleton=1),0) FROM source_transactions WHERE state='committed'",
-        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
+    let summary: Option<(i64,i64,i64)> = reader.query_one_bounded(
+        "SELECT count(*),coalesce(sum(event_count),0),coalesce((SELECT durable_journal_seq FROM source_state WHERE singleton=1),0) FROM source_transactions WHERE state='committed'",
+        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
     )?;
-    let (transactions, expected_events, first, last, durable) =
+    let (transactions, expected_events, durable) =
         summary.ok_or(JournalError::Conflict("missing verification summary"))?;
-    let actual: Option<i64> =
-        reader.query_one_bounded("SELECT count(*) FROM journal_events", |r| r.get(0))?;
-    if actual != Some(expected_events)
-        || (transactions > 0 && (first != 1 || last != expected_events || durable != last))
+    if expected_events as usize > max_events {
+        return Err(JournalError::Limit("verification event bound"));
+    }
+    let mut global_seq = 1i64;
+    let mut seen_events = 0i64;
+    let mut seen_transactions = 0i64;
+    let mut active: Option<(String, i64, i64, i64, String, Sha256)> = None;
+    reader.for_each_bounded(
+        "SELECT t.transaction_id,t.first_seq,t.last_seq,t.event_count,t.payload_checksum,e.journal_seq,e.transaction_ordinal,e.payload,e.payload_hash FROM source_transactions t JOIN journal_events e ON e.transaction_id=t.transaction_id WHERE t.state='committed' ORDER BY e.journal_seq",
+        |r| {
+            let txid:String=r.get(0)?; let first:i64=r.get(1)?; let last:i64=r.get(2)?; let count:i64=r.get(3)?; let checksum:String=r.get(4)?;
+            let seq:i64=r.get(5)?; let ordinal:i64=r.get(6)?; let payload:Vec<u8>=r.get(7)?; let payload_hash:String=r.get(8)?;
+            if seq!=global_seq || seq<first || seq>last || ordinal!=seq-first || sha256(&payload)!=payload_hash { return Err(rusqlite::Error::InvalidQuery); }
+            if active.as_ref().is_none_or(|a|a.0!=txid) {
+                if let Some((_,old_first,old_last,old_count,old_checksum,hasher))=active.take() {
+                    if old_last-old_first+1!=old_count || format!("{:x}",hasher.finalize())!=old_checksum { return Err(rusqlite::Error::InvalidQuery); }
+                }
+                if first!=seq || last-first+1!=count { return Err(rusqlite::Error::InvalidQuery); }
+                active=Some((txid.clone(),first,last,count,checksum,Sha256::new())); seen_transactions+=1;
+            }
+            let hasher=&mut active.as_mut().unwrap().5;
+            hasher.update((payload_hash.len() as u64).to_be_bytes()); hasher.update(payload_hash.as_bytes());
+            global_seq+=1; seen_events+=1; Ok(())
+        },
+    ).map_err(|_| JournalError::Conflict("journal event sequence, boundary, payload hash, or transaction checksum mismatch"))?;
+    if let Some((_, first, last, count, checksum, hasher)) = active.take() {
+        if last - first + 1 != count || format!("{:x}", hasher.finalize()) != checksum {
+            return Err(JournalError::Conflict("transaction checksum mismatch"));
+        }
+    }
+    if seen_events != expected_events || seen_transactions != transactions || durable != seen_events
     {
         return Err(JournalError::Conflict(
             "journal continuity or durable boundary mismatch",
@@ -1472,7 +1510,7 @@ pub mod tests {
             (inspect.event_id.as_str(), inspect.transaction_boundary),
             ("event-1", (1, 1))
         );
-        let verify = journal_verify(&p, Duration::from_secs(1)).unwrap();
+        let verify = journal_verify(&p, 8, Duration::from_secs(1)).unwrap();
         assert_eq!(
             (
                 verify.transaction_count,
@@ -1492,6 +1530,13 @@ pub mod tests {
             (Some(1), Some(1), 1, 1)
         );
         assert_eq!(fs::metadata(&p).unwrap().len(), before);
+        let corrupt = rusqlite::Connection::open(&p).unwrap();
+        corrupt.execute_batch("DROP TRIGGER journal_events_immutable; UPDATE journal_events SET journal_seq=3 WHERE event_id='event-2'").unwrap();
+        drop(corrupt);
+        assert!(matches!(
+            journal_verify(&p, 8, Duration::from_secs(1)),
+            Err(JournalError::Conflict(_))
+        ));
         assert!(journal_inspect_event(&p, "", Duration::from_secs(1)).is_err());
         assert!(journal_gc_dry_run(&p, 2, 0, Duration::from_secs(1)).is_err());
     }
@@ -1504,18 +1549,22 @@ pub mod tests {
                 &commit(
                     "tx1",
                     "0000000000000010",
-                    vec![event("event-1", 0, b"payload")],
+                    vec![
+                        event("event-1", 0, b"payload"),
+                        event("event-2", 1, b"payload-two"),
+                        event("event-3", 2, b"payload-three"),
+                    ],
                 ),
                 CommitFault::None,
             )
             .unwrap();
         drop(store);
-        let full = read_complete_range(&p, 0, 1, 4096, Duration::from_secs(1))
+        let full = read_complete_range(&p, 0, 3, 4096, Duration::from_secs(1))
             .unwrap()
             .unwrap();
         assert!(full.copied_bytes > b"payload".len() + std::mem::size_of::<CopiedEvent>());
         assert!(matches!(
-            read_complete_range(&p, 0, 1, full.copied_bytes, Duration::from_secs(1)),
+            read_complete_range(&p, 0, 3, full.copied_bytes, Duration::from_secs(1)),
             Err(JournalError::Limit(
                 "next complete transaction exceeds byte bound"
             ))
@@ -1540,8 +1589,18 @@ pub mod tests {
         assert!(required.is_subset(&actual));
         for case in cases {
             let assertion = case["assertion"].as_str().unwrap();
-            assert!(!assertion.contains("journal-owned projection executes or fail-closes"));
             assert!(assertion.len() >= 40);
+            match case["status"].as_str().unwrap() {
+                "executed" => {
+                    assert!(case["test"].is_string());
+                    assert!(!assertion.starts_with("provisional:"));
+                }
+                "provisional_unexecuted" => {
+                    assert!(case["test"].is_null());
+                    assert!(assertion.starts_with("provisional:"));
+                }
+                other => panic!("unknown coverage status {other}"),
+            }
         }
         let by_id = |id: &str| {
             cases.iter().find(|c| c["id"] == id).unwrap()["test"]
