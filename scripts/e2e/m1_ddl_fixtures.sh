@@ -53,6 +53,9 @@ for major in 15 16 17; do
  # One guarded lifecycle: before export -> exported snapshot -> imported copy -> durable fence.
  psql "$dsn" -qc 'CREATE TABLE public.capture_fence(generation bigint PRIMARY KEY, nonce bigint NOT NULL)'
  start_guard
+ # The adapter reads and verifies the live catalog only after ACCESS SHARE is granted.
+ guarded_fingerprint=$(fingerprint)
+ [ "$guarded_fingerprint" = "$before" ] || { echo "E_GUARDED_CATALOG_FINGERPRINT major=$major" >&2; exit 1; }
  conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' guard-before-export
  mkfifo "$tmp/export-$major.in" "$tmp/export-$major.out"
  PGAPPNAME=boring_cdc_snapshot_exporter psql "$dsn" -qAt -v ON_ERROR_STOP=1 <"$tmp/export-$major.in" >"$tmp/export-$major.out" 2>"$tmp/export-$major.err" & exporter_pid=$!
@@ -66,6 +69,7 @@ for major in 15 16 17; do
  wait "$importer_pid"; grep -qx 0 "$tmp/copy-$major.out"
  printf 'COMMIT;\n\\q\n' >&3; exec 3>&-; exec 4<&-; wait "$exporter_pid"
  psql "$dsn" -v ON_ERROR_STOP=1 -qc 'INSERT INTO public.capture_fence VALUES (7,99)'; [ "$(psql "$dsn" -Atqc 'SELECT nonce FROM public.capture_fence WHERE generation=7')" = 99 ]
+ [ "$(fingerprint)" = "$guarded_fingerprint" ] || { echo "E_GUARDED_FINGERPRINT_DRIFT major=$major" >&2; exit 1; }
  conflict 'ALTER TABLE public.guarded RENAME COLUMN payload TO payload_changed' durable-fence
  stop_guard
  # Execute the complete admitted operation matrix under one guarded generation.
@@ -79,7 +83,7 @@ for major in 15 16 17; do
  stop_guard; wait "$waiter_pid"; psql "$dsn" -qc 'ALTER TABLE public.guarded DROP COLUMN waiter_release_probe'
  psql "$dsn" -v ON_ERROR_STOP=1 -qc 'ALTER TABLE public.guarded ADD COLUMN optional text'
  after=$(fingerprint); [ "$before" != "$after" ] || { echo "E_IDLE_DDL_FINGERPRINT major=$major" >&2; exit 1; }
- printf 'PASS pg=%s matrix=6 boundaries=4 waiter=observed-released lock=AccessExclusiveLock idle-poll=full-fingerprint-changed\n' "$major"
+ printf 'PASS pg=%s matrix=6 boundaries=4 waiter=observed-released lock=AccessExclusiveLock guarded-fingerprint=verified-through-durable-fence idle-poll=full-fingerprint-changed\n' "$major"
  docker rm -f "$name" >/dev/null; name=''
 done
 cargo test --locked m1_ddl_fixtures::tests >/dev/null 2>&1

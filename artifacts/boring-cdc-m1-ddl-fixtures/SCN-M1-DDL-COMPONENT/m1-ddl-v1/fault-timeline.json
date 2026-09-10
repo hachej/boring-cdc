@@ -7,19 +7,19 @@
       "sequence": 1
     },
     {
-      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "failure_fingerprint": "ACTIVE_GENERATION_SCHEMA_DRIFT",
       "hook": "active_generation_change",
       "outcome": "pass_fail_closed",
       "sequence": 2
     },
     {
-      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "failure_fingerprint": "DDL_GUARD_CATALOG_FINGERPRINT_MISMATCH",
       "hook": "guard_lifecycle",
       "outcome": "pass_fail_closed",
       "sequence": 3
     },
     {
-      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "failure_fingerprint": "DDL_GUARD_SESSION_LOST",
       "hook": "guard_session_lost",
       "outcome": "pass_fail_closed",
       "sequence": 4
@@ -37,7 +37,7 @@
       "sequence": 6
     },
     {
-      "failure_fingerprint": "RELATION_CONTRACT_CHANGED",
+      "failure_fingerprint": "RELATION_CONTRACT_NON_CANONICAL",
       "hook": "noncanonical_contract",
       "outcome": "pass_fail_closed",
       "sequence": 7
@@ -61,7 +61,7 @@
       "sequence": 10
     },
     {
-      "failure_fingerprint": "DML_BEFORE_RELATION_VALIDATION",
+      "failure_fingerprint": "RELATION_CONTRACT_NON_CANONICAL",
       "hook": "decoded_relation_admission",
       "outcome": "pass_fail_closed",
       "sequence": 11

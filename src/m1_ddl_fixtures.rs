@@ -267,6 +267,7 @@ pub struct GuardState {
     phase: GuardPhase,
     locked: Vec<LogicalRelationId>,
     feedback_gate_open: bool,
+    catalog_fingerprint_verified: bool,
 }
 
 impl GuardState {
@@ -297,6 +298,7 @@ impl GuardState {
             phase: GuardPhase::BeforeExport,
             locked: relations,
             feedback_gate_open: false,
+            catalog_fingerprint_verified: false,
         })
     }
     pub fn locked_relations(&self) -> &[LogicalRelationId] {
@@ -308,11 +310,28 @@ impl GuardState {
     pub fn feedback_gate_open(&self) -> bool {
         self.feedback_gate_open
     }
+    /// Records a live catalog fingerprint read after this guard acquired its lock set.
+    /// Export cannot begin until the read matches the fingerprint bound to the generation.
+    pub fn verify_catalog_fingerprint(
+        &mut self,
+        observed_table_set_fingerprint: &str,
+    ) -> Result<(), DdlFailure> {
+        if self.phase != GuardPhase::BeforeExport
+            || observed_table_set_fingerprint != self.table_set_fingerprint
+        {
+            return Err(DdlFailure::guard("DDL_GUARD_CATALOG_FINGERPRINT_MISMATCH"));
+        }
+        self.catalog_fingerprint_verified = true;
+        Ok(())
+    }
     pub fn advance(&mut self, next: GuardPhase) -> Result<(), DdlFailure> {
         let valid = matches!(
             (self.phase, next),
             (GuardPhase::BeforeExport, GuardPhase::Exported)
-                | (GuardPhase::Exported, GuardPhase::Copying)
+                if self.catalog_fingerprint_verified
+        ) || matches!(
+            (self.phase, next),
+            (GuardPhase::Exported, GuardPhase::Copying)
                 | (GuardPhase::Copying, GuardPhase::AwaitingDurableFence)
         );
         if !valid {
@@ -489,6 +508,13 @@ pub struct GuardedDecoder {
     catalog: RelationValidationGate,
     blocked: bool,
 }
+
+fn wire_replica_identity_matches_catalog(wire: u8, catalog: &str) -> bool {
+    matches!(
+        (wire, catalog),
+        (b'd', "default") | (b'i', "index") | (b'f', "full") | (b'n', "nothing")
+    )
+}
 impl GuardedDecoder {
     pub fn new(limits: WireLimits) -> Self {
         Self {
@@ -535,6 +561,25 @@ impl GuardedDecoder {
             )));
         }
         let id = wire.relation.id;
+        if wire
+            .key_columns
+            .iter()
+            .any(|&index| index >= wire.relation.columns.len())
+        {
+            self.blocked = true;
+            return Err(GuardedDecodeFailure::Catalog(DdlFailure::contract(
+                "WIRE_KEY_COLUMN_INDEX_OUT_OF_RANGE",
+            )));
+        }
+        if !wire_replica_identity_matches_catalog(
+            wire.relation.replica_identity,
+            &catalog.key.replica_identity_mode,
+        ) {
+            self.blocked = true;
+            return Err(GuardedDecodeFailure::Catalog(DdlFailure::contract(
+                "WIRE_CATALOG_REPLICA_IDENTITY_MISMATCH",
+            )));
+        }
         let wire_matches_catalog = catalog.identity.relation_oid == id
             && catalog.namespace == wire.relation.namespace
             && catalog.relation_name == wire.relation.name
@@ -700,6 +745,17 @@ pub(crate) mod tests {
         )
         .unwrap();
         assert_eq!(g.locked[0].relation_oid, 1);
+        assert_eq!(
+            g.verify_catalog_fingerprint("tables-v2")
+                .unwrap_err()
+                .fingerprint,
+            "DDL_GUARD_CATALOG_FINGERPRINT_MISMATCH"
+        );
+        assert_eq!(
+            g.advance(GuardPhase::Exported).unwrap_err().fingerprint,
+            "DDL_GUARD_PHASE_ORDER"
+        );
+        g.verify_catalog_fingerprint("tables-v1").unwrap();
         g.advance(GuardPhase::Exported).unwrap();
         g.advance(GuardPhase::Copying).unwrap();
         g.advance(GuardPhase::AwaitingDurableFence).unwrap();
@@ -880,6 +936,7 @@ pub(crate) mod tests {
             vec![relation(1).identity],
         )
         .unwrap();
+        g.verify_catalog_fingerprint("tables-v1").unwrap();
         g.advance(GuardPhase::Exported).unwrap();
         g.advance(GuardPhase::Copying).unwrap();
         g.advance(GuardPhase::AwaitingDurableFence).unwrap();
@@ -1064,6 +1121,90 @@ pub(crate) mod tests {
                 .standby_status(boundary, 946_684_800_000_000, false)
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn malformed_wire_key_index_blocks_without_panicking() {
+        let mut guarded = GuardedDecoder::new(WireLimits::default());
+        guarded.catalog.relation_message(1, true);
+        let failure = guarded
+            .admit_relation(
+                WireRelationContract {
+                    relation: crate::m1_decoder::Relation {
+                        id: 1,
+                        namespace: "public".into(),
+                        name: "t1".into(),
+                        replica_identity: b'd',
+                        columns: vec![crate::m1_decoder::Column {
+                            key: true,
+                            name: "id".into(),
+                            type_oid: 20,
+                            type_modifier: -1,
+                        }],
+                    },
+                    key_columns: vec![usize::MAX],
+                    control: None,
+                },
+                &relation(1),
+                None,
+                false,
+                &admission_policy(),
+            )
+            .unwrap_err();
+        assert_eq!(
+            failure,
+            GuardedDecodeFailure::Catalog(DdlFailure::contract(
+                "WIRE_KEY_COLUMN_INDEX_OUT_OF_RANGE"
+            ))
+        );
+        assert!(guarded.blocked);
+    }
+
+    #[test]
+    fn wire_catalog_replica_identity_mismatch_blocks_admission() {
+        let mut guarded = GuardedDecoder::new(WireLimits::default());
+        guarded.catalog.relation_message(1, true);
+        let failure = guarded
+            .admit_relation(
+                WireRelationContract {
+                    relation: crate::m1_decoder::Relation {
+                        id: 1,
+                        namespace: "public".into(),
+                        name: "t1".into(),
+                        replica_identity: b'i',
+                        columns: vec![crate::m1_decoder::Column {
+                            key: true,
+                            name: "id".into(),
+                            type_oid: 20,
+                            type_modifier: -1,
+                        }],
+                    },
+                    key_columns: vec![0],
+                    control: None,
+                },
+                &relation(1),
+                None,
+                false,
+                &admission_policy(),
+            )
+            .unwrap_err();
+        assert_eq!(
+            failure,
+            GuardedDecodeFailure::Catalog(DdlFailure::contract(
+                "WIRE_CATALOG_REPLICA_IDENTITY_MISMATCH"
+            ))
+        );
+        assert!(guarded.blocked);
+    }
+
+    fn admission_policy() -> AdmissionPolicy {
+        AdmissionPolicy {
+            configured_publication_attnums: BTreeSet::from([1]),
+            configured_key_attnums: vec![1],
+            capture_type_oids: BTreeSet::from([20]),
+            destination_columns: BTreeMap::from([(1, 20)]),
+            destination_supports_delete: true,
+        }
     }
 
     #[test]

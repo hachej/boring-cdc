@@ -22,6 +22,11 @@ if [x.get('id') for x in ca]!=owned or any(not x.get('executed_by') or not set(x
 for marker in ['// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED catalog poll interval).','// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED DDL waiter source-impact bound).','// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED supported PostgreSQL majors).']:
  if marker not in src: errors.append('provisional_marker')
 if re.search(r'\b(TBD|TODO|FIXME)\b',src+json.dumps(c)):errors.append('unresolved')
+fault_script=(root/'scripts/faults/m1_ddl_fixtures.sh').read_text()
+exercised=[{'hook': hook, 'failure_fingerprint': fingerprint} for _,hook,fingerprint in re.findall(r'^([^|\n]+)\|([^|\n]+)\|([^|\n]+)$',fault_script,re.M)]
+timeline=json.loads((root/'artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/fault-timeline.json').read_text())
+recorded=[{'hook': row.get('hook'), 'failure_fingerprint': row.get('failure_fingerprint')} for row in timeline.get('faults',[])]
+if len(recorded)!=11 or recorded!=exercised: errors.append('fault_timeline_exactness')
 artifact_root=root/'artifacts/boring-cdc-m1-ddl-fixtures'
 if artifact_root.exists():
  corpus='\n'.join(x.read_text(errors='replace') for x in artifact_root.rglob('*') if x.is_file())
