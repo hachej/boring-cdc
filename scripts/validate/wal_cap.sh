@@ -15,7 +15,7 @@ def fail():
  print('{"code":"WAL_CAP_FIXTURE_INVALID","outcome":"fail","phase":"validate_spec"}'); raise SystemExit(1)
 def expected_eval(i):
  buckets=i['buckets']
- if i['cap']!=68719476736 or i['retained'] is None or i['free'] is None or buckets is None or len(buckets)!=15 or any(not isinstance(x,int) or isinstance(x,bool) or x<0 for x in buckets) or i['age']>180: return ('unknown',None,None,None)
+ if i['cap']!=68719476736 or i['retained'] is None or i['free'] is None or i['retained']<0 or i['free']<0 or buckets is None or len(buckets)!=15 or any(not isinstance(x,int) or isinstance(x,bool) or x<0 for x in buckets) or i['age']>180: return ('unknown',None,None,None)
  # Nearest-rank p95 over 15 complete one-minute buckets: ceil(.95*15)=15.
  rate=sorted(buckets)[14]
  raw_headroom=max(0,min(i['cap']-i['retained'],i['free']-17179869184))
@@ -38,6 +38,7 @@ def expected_operation(i):
   audit=i.get('audit',{})
   audit_ok=set(audit)=={'actor','activated_at','configuration_sha256'} and bool(audit.get('actor')) and bool(audit.get('activated_at')) and bool(re.fullmatch(r'[0-9a-f]{64}',audit.get('configuration_sha256','')))
   if i.get('origin')=='remote': return ('blocked_remote_override',2,'none',['WAL_HEADROOM_UNKNOWN'])
+  if i.get('origin')!='local_process': return ('blocked_nonlocal_override',2,'none',['WAL_HEADROOM_UNKNOWN'])
   if i.get('flag')!='--unsafe-unbounded-slot-wal' or i.get('confirmation')!='UNBOUNDED_WAL_LOCAL_ONLY' or not audit_ok: return ('blocked_confirmation',2,'none',['WAL_HEADROOM_UNKNOWN'])
   if i.get('age_seconds',86400)>=86400: return ('blocked_override_expired',2,'none',['WAL_HEADROOM_UNKNOWN'])
   return ('unsafe_override_active',0,'none',['WAL_CAP_DISABLED_UNSAFE'])
@@ -59,7 +60,7 @@ try:
  if b.get('wal_rate')!={'bucket_count':15,'bucket_seconds':60,'window_seconds':900,'statistic':'nearest_rank_p95','rank_formula':'ceil(0.95 * 15) = 15 after ascending sort','unit':'byte_per_second','fresh_through_age_seconds':180,'stale_after_age_seconds':180,'zero_rate_horizon':'infinite_when_fresh_and_raw_headroom_positive','zero_headroom_horizon_seconds':0}: fail()
  if b.get('monitor_interval_seconds')!=30 or b.get('reaction_reserve_seconds')!=120 or b.get('horizon')!={'raw_formula':'floor(raw_headroom_bytes / wal_rate_bytes_per_second)','safety_formula':'max(0, raw_horizon_seconds - monitor_interval_seconds - reaction_reserve_seconds)','threshold_input':'safety_horizon_seconds','rounding':'floor','unit':'second'}: fail()
  if b.get('thresholds')!=[{'horizon_seconds_lte':600,'state':'critical'},{'horizon_seconds_lte':1800,'state':'action_required'},{'horizon_seconds_lte':3600,'state':'warning'},{'horizon_seconds_gt':3600,'state':'normal'}] or b.get('threshold_precedence')!=['unknown','critical','action_required','warning','normal']: fail()
- if b.get('unknown_predicates')!=['source_free_bytes_missing','configured_cap_missing_or_not_68719476736','retained_slot_bytes_missing','wal_rate_buckets_missing_or_count_not_15','wal_rate_bucket_negative','wal_rate_age_seconds_greater_than_180']: fail()
+ if b.get('unknown_predicates')!=['source_free_bytes_missing_or_negative','configured_cap_missing_or_not_68719476736','retained_slot_bytes_missing_or_negative','wal_rate_buckets_missing_or_count_not_15','wal_rate_bucket_negative','wal_rate_age_seconds_greater_than_180']: fail()
  if b.get('unknown_behavior')!={'automatic_cap_increase':False,'automatic_detach_destination':False,'automatic_drop_slot':False,'fabricate_feedback':False,'healthy_capture':'continues','new_backfill':'blocked','new_bootstrap':'blocked'}: fail()
  override={'allowed_origin':'local_process','audit_fields':['actor','activated_at','configuration_sha256'],'configuration_digest':'SHA-256','confirmation':'UNBOUNDED_WAL_LOCAL_ONLY','expires_when_age_seconds_gte':86400,'flag':'--unsafe-unbounded-slot-wal','forbidden_origin':'remote','scope':'local_experiment_bootstrap_and_backfill_admission_only','status_code':'WAL_CAP_DISABLED_UNSAFE','valid_for_seconds':86400}
  if b.get('unsafe_override')!=override: fail()
@@ -67,8 +68,8 @@ try:
  if b.get('metric_names')!={'headroom_bytes':'wal_headroom_bytes','horizon_seconds':'wal_headroom_horizon_seconds','rate_bytes_per_second':'wal_rate_bytes_per_second','state':'wal_headroom_state'}: fail()
  if b.get('invalidation')!={'automatic_reseed':False,'forecast_is_conditional':True,'forecast_may_override_source_safety':False,'slot_invalidated_outcome':'require_reseed'}: fail()
  vectors=spec['vectors']; matrix=spec['supported_matrix']; cases={x['case_id']:x for x in matrix}
- numeric={'normal_above_warning','warning_equality_60m','warning_above_action','action_equality_30m','action_above_critical','critical_equality_10m','critical_floor_fraction','cap_headroom_clamped_zero','free_space_is_minimum','free_headroom_clamped_zero','fresh_zero_rate_infinite','zero_headroom_zero_rate','missing_free_unknown','missing_retained_unknown','missing_rate_unknown','stale_rate_unknown','unsupported_unbounded_cap_unknown','different_finite_cap_unknown'}
- operational={'unknown_blocks_new_work','unknown_blocks_new_backfill','unknown_healthy_capture_continues','local_override_valid_before_expiry','local_override_expired_at_24h','remote_override_forbidden','override_confirmation_mismatch','slot_invalidation_requires_reseed','conditional_forecast_cannot_override_action'}
+ numeric={'normal_above_warning','warning_equality_60m','warning_above_action','action_equality_30m','action_above_critical','critical_equality_10m','critical_floor_fraction','cap_headroom_clamped_zero','free_space_is_minimum','free_headroom_clamped_zero','fresh_zero_rate_infinite','zero_headroom_zero_rate','missing_free_unknown','missing_retained_unknown','missing_rate_unknown','stale_rate_unknown','unsupported_unbounded_cap_unknown','different_finite_cap_unknown','negative_retained_unknown','negative_free_unknown'}
+ operational={'unknown_blocks_new_work','unknown_blocks_new_backfill','unknown_healthy_capture_continues','local_override_valid_before_expiry','local_override_expired_at_24h','remote_override_forbidden','override_confirmation_mismatch','unsupported_origin_override_forbidden','slot_invalidation_requires_reseed','conditional_forecast_cannot_override_action'}
  if set(vectors)!=numeric|operational or set(cases)!=set(vectors) or len(matrix)!=len(vectors): fail()
  for cid,v in vectors.items():
   if v.get('case_id')!=cid or cases[cid].get('expected_outcome')!=v.get('expected_outcome') or v.get('executor_bead') not in executors or not v.get('preconditions') or not v.get('fault_hook') or not v.get('expected'): fail()
@@ -91,7 +92,7 @@ try:
  if stable['owner_bead']!=owner or covered!={'evidence_status':'pending','id':decision_id,'owner_bead':owner,'source':'docs/PLAN.md','source_digest':stable['source_digest']}: fail()
  if subprocess.run([str(root/'scripts/validate/plan_coverage.sh')],cwd=root,capture_output=True).returncode: fail()
  probe_rel='artifacts/m0/decisions/boring-cdc-d-wal-cap/fixture-run.jsonl'; probe=[json.loads(x) for x in (root/probe_rel).read_text().splitlines()]
- expected_probe=[{'code':'WAL_CAP_FIXTURE_VALID','outcome':'pass','phase':'validate_spec','vector_count':27}]
+ expected_probe=[{'code':'WAL_CAP_FIXTURE_VALID','outcome':'pass','phase':'validate_spec','vector_count':30}]
  if probe!=expected_probe or spec['execution_probe']!={'expected_lines':expected_probe,'path':probe_rel,'sha256':sha(root/probe_rel)}: fail()
  decision=next(x for x in decisions['decisions'] if x['id']==decision_id)
  decision_approval={'approved_at':'2026-09-10T14:03:30.949Z','approved_by':'Julien Hurault (repository owner), intention 765bd3b2-4b68-4102-a9ec-43ca93357390','value_digest':hashlib.sha256(proposed.encode()).hexdigest()}

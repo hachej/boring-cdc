@@ -1,1 +1,1 @@
-{"findings":[],"git_commit":"8345e10dd62f5c6ce106c55eb10f182e6db3101a","input_sha256":"c3ddcfad0c403a59467deac6d0efca4e49df57a249d8c0483e220468cba26fc9","owner_bead":"boring-cdc-m0.1","schema_version":"validation-result/v1","status":"pass","validator_version":"core-validators/1.0.0"}
+{"findings":[],"git_commit":"507a2c8452520e373f31446163da1e0fcfc64791","input_sha256":"c873393c8093bb6fa900d2e18d66e24cf435fb92fdf0b56413c3a051d356c9f5","owner_bead":"boring-cdc-m0.1","schema_version":"validation-result/v1","status":"pass","validator_version":"core-validators/1.0.0"}
