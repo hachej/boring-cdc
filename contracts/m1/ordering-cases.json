@@ -1,0 +1,21 @@
+{
+  "schema_version": "m1-ordering-cases/v1",
+  "owner_bead": "boring-cdc-m1-ordering",
+  "evidence_tier": "leaf",
+  "consumes": [
+    "boring-cdc-m1.1:SourceVersion,CaptureEpoch,DestinationGeneration",
+    "boring-cdc-m1-decoder:row_ordinal,transaction_end_lsn",
+    "boring-cdc-m1-ddl-fixtures:relation_fingerprint"
+  ],
+  "cases": [
+    {"scenario_id":"SCN-M1-ORDERING-WAL-ID","unit_test":"wal_and_snapshot_identities_are_namespaced_and_stable","expected":"stable positional WAL SHA-256 ID"},
+    {"scenario_id":"SCN-M1-ORDERING-SNAPSHOT-ID","unit_test":"wal_and_snapshot_identities_are_namespaced_and_stable","expected":"stable positional snapshot SHA-256 ID in a separate domain"},
+    {"scenario_id":"SCN-M1-ORDERING-VOLATILE-EXCLUSION","unit_test":"positional_event_id_excludes_payload_and_volatile_fields","expected":"payload and volatile fields cannot affect positional ID"},
+    {"scenario_id":"SCN-M1-ORDERING-TAGGED-STATES","unit_test":"four_column_states_have_distinct_payload_hashes","expected":"absent, null, unchanged-TOAST and value hash distinctly"},
+    {"scenario_id":"SCN-M1-ORDERING-CANONICAL-HASH","unit_test":"canonical_hashes_are_unambiguous_for_component_boundaries_and_types","expected":"key/value/type/boundary-sensitive SHA-256 hashes"},
+    {"scenario_id":"SCN-M1-ORDERING-KEY-CHANGE","unit_test":"key_change_expands_delete_before_upsert","expected":"old-key delete mutation 0 precedes new-key upsert mutation 1"},
+    {"scenario_id":"SCN-M1-ORDERING-SAME-KEY-TOTAL","unit_test":"repeated_same_key_has_total_source_order","expected":"same-key mutations total-order only within one capture epoch"},
+    {"scenario_id":"SCN-M1-ORDERING-DUPLICATE-CONFLICT","unit_test":"same_id_same_hash_is_duplicate_and_different_hash_is_conflict","expected":"same ID/same hash duplicates; same ID/different hash blocks before checkpoint and feedback"},
+    {"scenario_id":"SCN-M1-ORDERING-RELATION-FINGERPRINT","unit_test":"invalid_key_and_relation_fingerprint_fail_closed","expected":"payload accepts only admitted lowercase SHA-256 relation fingerprint"}
+  ]
+}
