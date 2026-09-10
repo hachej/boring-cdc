@@ -1,1 +1,1 @@
-{"copied_bytes":385,"duplicate_reconciled":true,"event_count":2,"fault_hook":"slow-commit","first_seq":1,"last_seq":2,"durable_end_lsn":"0000000000000042"}
+{"copied_bytes":1841,"duplicate_reconciled":true,"event_count":2,"fault_hook":"slow-commit","first_seq":1,"last_seq":2,"durable_end_lsn":"0000000000000042"}
