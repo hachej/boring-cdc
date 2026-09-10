@@ -1,1 +1,1 @@
-m1 cli e2e pass seed=cli-contract-v1 help=28 json=versioned source_mutation=none store_mutation=none cleanup=complete
+m1 cli e2e pass seed=cli-contract-v1 help=28 parse_paths=28 text=golden json=versioned source_mutation=none store_mutation=none cleanup=complete
