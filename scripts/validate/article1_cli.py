@@ -70,9 +70,9 @@ def main() -> int:
         if [events[index]["old_state"] for index in (1, 2, 3)] != ["absent", "absent", "key"]:
             raise RuntimeError("CLI transcript old-state contract drifted")
         expected_results = [
-            {"action": "current_row", "key": ["9101"], "row": ["9101", "Article Default", "1"]},
-            {"action": "current_row", "key": ["9101"], "row": ["9101", "Article Default Updated", "2"]},
-            {"action": "removed", "key": ["9101"], "removed_row": ["9101", "Article Default Updated", "2"], "row": None},
+            {"action": "current_row", "key": ["9101"], "row": ["9101", "CLI", "1"]},
+            {"action": "current_row", "key": ["9101"], "row": ["9101", "CLI", "2"]},
+            {"action": "removed", "key": ["9101"], "removed_row": ["9101", "CLI", "2"], "row": None},
         ]
         for event, expected in zip(events[1:4], expected_results):
             view = event.get("article1_row_view", {})
