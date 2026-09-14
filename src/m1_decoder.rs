@@ -618,14 +618,24 @@ fn validate_full_key(contract: &RelationContract, values: &[TupleValue]) -> Resu
     }
 }
 fn validate_compact_key(contract: &RelationContract, values: &[TupleValue]) -> Result<()> {
-    if values.len() != contract.key_columns.len()
-        || values
+    // PostgreSQL emits key tuples at relation width, using NULL placeholders for
+    // non-key columns. Keep accepting the compact golden-corpus form as well.
+    let compact = values.len() == contract.key_columns.len()
+        && values
             .iter()
-            .any(|value| !matches!(value, TupleValue::Text(_)))
-    {
-        Err(fail(FailureClass::Contract, "CANONICAL_KEY_INCOMPLETE"))
-    } else {
+            .all(|value| matches!(value, TupleValue::Text(_)));
+    let relation_width = values.len() == contract.relation.columns.len()
+        && values.iter().enumerate().all(|(index, value)| {
+            if contract.key_columns.contains(&index) {
+                matches!(value, TupleValue::Text(_))
+            } else {
+                matches!(value, TupleValue::Null)
+            }
+        });
+    if compact || relation_width {
         Ok(())
+    } else {
+        Err(fail(FailureClass::Contract, "CANONICAL_KEY_INCOMPLETE"))
     }
 }
 fn full_key(contract: &RelationContract, values: &[TupleValue]) -> Vec<Vec<u8>> {
@@ -1199,6 +1209,15 @@ pub mod tests {
         assert!(
             d.decode_copy_data(&xlog(row(b'D', 9, b"K", &[vec![text("a"), text("g")]])))
                 .is_ok()
+        );
+        assert!(
+            d.decode_copy_data(&xlog(row(
+                b'D',
+                9,
+                b"K",
+                &[vec![text("a"), TupleValue::Null, text("g")]],
+            )))
+            .is_ok()
         );
 
         let mut d = admitted(false);
