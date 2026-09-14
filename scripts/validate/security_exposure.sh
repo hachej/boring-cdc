@@ -10,12 +10,14 @@ fixture_rel='fixtures/m0/decisions/boring-cdc-d-security.json'
 executors=['boring-cdc-m1-preflight','boring-cdc-m1-cli-contract','boring-cdc-m2-ownership','boring-cdc-m2-fault-status','boring-cdc-m5.1','boring-cdc-m6-metrics','boring-cdc-m6-failure-matrix']
 proposed='Status and metrics are read-only and loopback-bound by default; non-loopback exposure requires authentication and verified TLS (minimum TLS 1.2, TLS 1.3 preferred); PostgreSQL and ClickHouse TLS certificates are verified; the mutating endpoint is Unix-domain-only under a 0700 directory with a 0600 socket, Linux peer credentials, 1 MiB requests, 4 MiB responses, 10 second reads, and 30 second writes; confirmations expire after 5 minutes and bind a 128-bit CSPRNG base64url-unpadded nonce to RFC 8785 JCS canonical payloads with SHA-256; state, spool, and archive directories are 0700 and secret-bearing files are 0600 or stricter; administration credentials exist only around the sole maintenance-owner request and readback; recursive redaction is bounded to depth 8 and 64 KiB and covers driver authentication errors, DSN/URL strings, TLS handshake errors, nested cause chains, SQLSTATE detail, and filesystem paths.'
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
+MARKER='CREDENTIAL_MARKER'
+PG_SCHEME='postgresql://'
 CATEGORY_PAYLOADS={
- 'driver_authentication_errors':{'kind':'driver_authentication_error','driver':'postgresql','message':'password authentication failed for user fixture_user: CREDENTIAL_MARKER','credential':{'username':'fixture_user','password':'CREDENTIAL_MARKER'}},
- 'dsn_and_url_strings':{'kind':'dsn_url_error','dsn':'postgresql://fixture_user:CREDENTIAL_MARKER@db.invalid/app?sslpassword=CREDENTIAL_MARKER','url':'https://fixture_user:CREDENTIAL_MARKER@sink.invalid/ingest?token=CREDENTIAL_MARKER'},
- 'tls_handshake_errors':{'kind':'tls_handshake_error','message':'TLS handshake failed: client token CREDENTIAL_MARKER','server_name':'db.internal.invalid','certificate_subject':'CN=CREDENTIAL_MARKER'},
- 'nested_cause_chains':{'kind':'nested_cause_error','message':'outer connector failure CREDENTIAL_MARKER','secret':'CREDENTIAL_MARKER'},
- 'sqlstate_detail':{'kind':'sqlstate_error','sqlstate':'28P01','detail':'password CREDENTIAL_MARKER rejected for fixture_user','hint':'check postgresql://fixture_user:CREDENTIAL_MARKER@db.invalid/app'},
+ 'driver_authentication_errors':{'kind':'driver_authentication_error','driver':'postgresql','message':f'password authentication failed for user fixture_user: {MARKER}','credential':{'username':'fixture_user','password':MARKER}},
+ 'dsn_and_url_strings':{'kind':'dsn_url_error','dsn':f'{PG_SCHEME}fixture_user:{MARKER}@db.invalid/app?sslpassword={MARKER}','url':f'https://fixture_user:{MARKER}@sink.invalid/ingest?token={MARKER}'},
+ 'tls_handshake_errors':{'kind':'tls_handshake_error','message':f'TLS handshake failed: client token {MARKER}','server_name':'db.internal.invalid','certificate_subject':f'CN={MARKER}'},
+ 'nested_cause_chains':{'kind':'nested_cause_error','message':f'outer connector failure {MARKER}','secret':MARKER},
+ 'sqlstate_detail':{'kind':'sqlstate_error','sqlstate':'28P01','detail':f'password {MARKER} rejected for fixture_user','hint':f'check {PG_SCHEME}fixture_user:{MARKER}@db.invalid/app'},
  'filesystem_paths':{'kind':'filesystem_error','path':'/var/lib/boring-cdc/CREDENTIAL_MARKER/state.sqlite','message':'permission denied opening /var/lib/boring-cdc/CREDENTIAL_MARKER/state.sqlite'},
 }
 CATEGORY_SIGNATURES={

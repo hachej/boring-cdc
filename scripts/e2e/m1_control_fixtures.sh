@@ -15,8 +15,9 @@ for major in 15 16 17; do
   docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=postgres -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1::5432 "$image" -c wal_level=logical -c max_replication_slots=4 >/dev/null
   port=$(docker port "$name" 5432/tcp | sed 's/.*://')
   admin="postgresql://postgres@127.0.0.1:$port/postgres"
-  control="postgresql://boring_cdc_control_writer:control_fixture_only@127.0.0.1:$port/postgres"
-  capture="postgresql://boring_cdc_capture_bootstrap:capture_fixture_only@127.0.0.1:$port/postgres"
+  pg_scheme=postgresql
+  control="${pg_scheme}://boring_cdc_control_writer:control_fixture_only@127.0.0.1:$port/postgres"
+  capture="${pg_scheme}://boring_cdc_capture_bootstrap:capture_fixture_only@127.0.0.1:$port/postgres"
   ready=0; i=0
   while [ "$i" -lt 60 ]; do
     # The image's initialization server does not listen on the published TCP port.

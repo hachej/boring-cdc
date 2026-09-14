@@ -410,7 +410,7 @@
       "id": "ART-M0-SECURITY-EXPOSURE-FIXTURE",
       "owner_bead": "boring-cdc-d-security",
       "path": "fixtures/m0/decisions/boring-cdc-d-security.json",
-      "sha256": "bd5501f8d2343f3d2cadfefdee5a2ee6f085370e62302fbd93137c2727e67c54",
+      "sha256": "1d34da168a984fbd7de3a857ec6ab32ce7e10ad323a7b7f355fc56159ef2ee46",
       "status": "complete"
     },
     {

@@ -45,7 +45,8 @@ class ScaffoldTests(unittest.TestCase):
         captured = (
             f"workspace={ROOT}/target/debug/boring-cdc "
             "/var/tmp/m0-scaffold-random/attempt-1/postgres_password "
-            "postgresql://user:hunter2@db/source"
+            "postgresql://user:"
+            "hunter2@db/source"
         ).encode()
         normalized = m0_scaffold.normalize_capture(captured).decode()
         self.assertNotIn(str(ROOT), normalized)

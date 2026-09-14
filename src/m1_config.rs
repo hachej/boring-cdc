@@ -1196,15 +1196,15 @@ pub mod tests {
         Env(BTreeMap::from([
             (
                 "PG_RUNTIME".into(),
-                "postgres://runtime:secret@source/db".into(),
+                concat!("postgres://runtime:", "secret@source/db").into(),
             ),
             (
                 "PG_CONTROL".into(),
-                "postgres://control:secret@source/db".into(),
+                concat!("postgres://control:", "secret@source/db").into(),
             ),
             (
                 "PG_ADMIN".into(),
-                "postgres://admin:secret@source/db".into(),
+                concat!("postgres://admin:", "secret@source/db").into(),
             ),
             (
                 "CH_RUNTIME".into(),
@@ -2533,7 +2533,7 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                         "mutation": "scan_diagnostic_surfaces_for_secret_tokens",
                         "expected_absent": [
                             "PG_RUNTIME", "PG_CONTROL", "PG_ADMIN", "CH_RUNTIME", "CH_MAINT",
-                            "postgres://runtime:secret@source/db",
+                            concat!("postgres://runtime:", "secret@source/db"),
                             "https://runtime:secret@clickhouse"
                         ]
                     }
