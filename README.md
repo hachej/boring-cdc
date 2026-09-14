@@ -31,13 +31,17 @@ The intended guarantee is **at-least-once capture with idempotent destination co
 
 Start with [`AGENTS.md`](AGENTS.md), then inspect the current Git/Beads state and claim one ready Bead. Routine work should begin from the complete claimed Bead and a bounded set of owned contracts—not by loading the entire plan or tracker snapshot. Generated context, impact, evidence, and handoff views are projections with source digests; they never become independent authority.
 
-Until the planned `scripts/agent/` interface exists, the first commands are:
+The repository-local helper interface is available and remains transparent and non-mutating:
 
 ```bash
-git status --short --branch
-br sync --status && br doctor
-br ready
+scripts/agent/doctor
+scripts/agent/next
+scripts/agent/context <bead-id>
+scripts/agent/impact <bead-id>
+scripts/agent/verify <bead-id>
 ```
+
+Each helper emits source provenance and its underlying commands. `handoff`, `recover`, and `finish` emit bounded projections or explicit operation plans; they never claim, mutate product state, commit, push, or close work.
 
 ## Status
 

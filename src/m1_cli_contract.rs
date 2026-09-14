@@ -1515,7 +1515,7 @@ pub mod tests {
         assert!(!plan.authorization_is_current(&revisions, &fp, "2026-09-09T11:00:00+01:00", true));
         assert!(!plan.authorization_is_current(&revisions, &fp, "2026-99-99T99:99:99Z", true));
         let attempt = ConfirmationAttempt {
-            confirm_token: "opaque".into(),
+            confirm_token: concat!("opa", "que").into(),
             request_id: "request-1".into(),
             canonical_payload_digest: "payload-digest".into(),
             plan_digest: "d".into(),

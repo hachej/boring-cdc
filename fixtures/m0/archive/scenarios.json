@@ -1,0 +1,2121 @@
+{
+  "schema_version": "archive-fixtures/v1",
+  "owner_bead": "boring-cdc-m0-archive-model",
+  "contract": "contracts/archive/archive-model.json",
+  "fixed_seed": "0x424344435f415243484956455f563031",
+  "cases": [
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-EMPTY-RANGE",
+      "executor_id": "boring-cdc-m2-jsonl",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "select",
+        "fault_hook": "none",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "complete_no_segment",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_EMPTY_RANGE",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-JSONL-BYTE-RETRY",
+      "executor_id": "boring-cdc-m2-jsonl",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "write_jsonl",
+        "fault_hook": "after_jsonl_sync",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "byte_identical",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_JSONL_BYTE_RETRY",
+        "redacted": true,
+        "persisted_phase": "checkpointed",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-PARQUET-BYTE-RETRY",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "write_parquet",
+        "fault_hook": "after_parquet_sync",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "byte_identical",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_PARQUET_BYTE_RETRY",
+        "redacted": true,
+        "persisted_phase": "checkpointed",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-INTENT",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "intent",
+        "fault_hook": "after_intent_commit",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "remove_empty_staging_and_retry",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_INTENT",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-DURING-FILE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "stage",
+        "fault_hook": "during_file_write",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "remove_partial_staging_and_retry",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_DURING_FILE",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-FILE-SYNC",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "stage",
+        "fault_hook": "after_all_files_sync",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "validate_files_then_continue",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_FILE_SYNC",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-MANIFEST-SYNC",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "manifest",
+        "fault_hook": "after_manifest_sync",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "validate_manifest_then_continue",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_MANIFEST_SYNC",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-DIRECTORY-RENAME",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "finalize",
+        "fault_hook": "after_directory_rename",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "sync_parent_then_continue",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_DIRECTORY_RENAME",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-BEFORE-READY",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "ready",
+        "fault_hook": "before_ready_create",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "validate_final_then_create_ready",
+        "archive_state": "pending",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_pending",
+        "log_code": "BCDC_ARCHIVE_CRASH_BEFORE_READY",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-READY-SYNC",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "ready",
+        "fault_hook": "after_ready_sync",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "adopt_ready_segment",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_READY_SYNC",
+        "redacted": true,
+        "persisted_phase": "checkpointed",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-FINAL-WITHOUT-READY-VALID",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "reconcile",
+        "fault_hook": "final_without_ready",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "resync_and_create_ready",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_FINAL_WITHOUT_READY_VALID",
+        "redacted": true,
+        "persisted_phase": "checkpointed",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-FINAL-WITHOUT-READY-CORRUPT",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "reconcile",
+        "fault_hook": "final_manifest_mismatch",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "quarantine_and_block",
+        "archive_state": "blocked_integrity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_integrity",
+        "log_code": "BCDC_ARCHIVE_FINAL_WITHOUT_READY_CORRUPT",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-MANIFEST-HASH-MISMATCH",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "manifest_hash_mismatch",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "block_archive_only",
+        "archive_state": "blocked_integrity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_integrity",
+        "log_code": "BCDC_ARCHIVE_MANIFEST_HASH_MISMATCH",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-FILE-HASH-MISMATCH",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "file_hash_mismatch",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "block_archive_only",
+        "archive_state": "blocked_integrity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_integrity",
+        "log_code": "BCDC_ARCHIVE_FILE_HASH_MISMATCH",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-MISSING-READY",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "ready_removed_after_checkpoint",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "block_archive_only",
+        "archive_state": "blocked_integrity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_integrity",
+        "log_code": "BCDC_ARCHIVE_MISSING_READY",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-SYMLINK-RACE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "path_open",
+        "fault_hook": "swap_intermediate_to_symlink",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "reject_and_block",
+        "archive_state": "blocked_security",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 78,
+        "status_code": "archive_blocked_security",
+        "log_code": "BCDC_ARCHIVE_SYMLINK_RACE",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-HARDLINK-RACE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "path_open",
+        "fault_hook": "unexpected_link_count",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "reject_and_block",
+        "archive_state": "blocked_security",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 78,
+        "status_code": "archive_blocked_security",
+        "log_code": "BCDC_ARCHIVE_HARDLINK_RACE",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-HOSTILE-IDENTIFIER",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "path_encode",
+        "fault_hook": "raw_identifier_attempt",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "reject_raw_path_component",
+        "archive_state": "blocked_contract",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 78,
+        "status_code": "archive_blocked_contract",
+        "log_code": "BCDC_ARCHIVE_HOSTILE_IDENTIFIER",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-LOWER-FENCE-NOOP",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "selector",
+        "fault_hook": "publish_lower_fence",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "no_external_change",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_LOWER_FENCE_NOOP",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-SAME-FENCE-CONFLICT",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "selector",
+        "fault_hook": "publish_conflicting_same_fence",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "block_corruption",
+        "archive_state": "blocked_integrity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_integrity",
+        "log_code": "BCDC_ARCHIVE_SAME_FENCE_CONFLICT",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-HIGHER-FENCE-WINS",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "selector",
+        "fault_hook": "publish_higher_fence",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "select_new_generation",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_HIGHER_FENCE_WINS",
+        "redacted": true,
+        "persisted_phase": "checkpointed",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-EXTERNAL-FENCE-AHEAD",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "startup",
+        "fault_hook": "external_fence_above_sqlite",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "maintenance_adopt_or_reject",
+        "archive_state": "blocked_continuity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 66,
+        "status_code": "archive_blocked_continuity",
+        "log_code": "BCDC_ARCHIVE_EXTERNAL_FENCE_AHEAD",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-TRANSIENT-RESTART",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "retry",
+        "fault_hook": "restart_before_due",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "preserve_attempt_and_due",
+        "archive_state": "retry_wait",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_retry_wait",
+        "log_code": "BCDC_ARCHIVE_TRANSIENT_RESTART",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-DETERMINISTIC-POISON",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "materialize",
+        "fault_hook": "canonical_encode_failure",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "persist_block_no_hot_loop",
+        "archive_state": "blocked_poison",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_poison",
+        "log_code": "BCDC_ARCHIVE_DETERMINISTIC_POISON",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-EXHAUSTED-RETRY",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "retry",
+        "fault_hook": "attempt_ten_failed",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "persist_exhausted_block",
+        "archive_state": "blocked_exhausted",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 65,
+        "status_code": "archive_blocked_exhausted",
+        "log_code": "BCDC_ARCHIVE_EXHAUSTED_RETRY",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-RESUME-CHANGED-BOUNDARY",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "resume",
+        "fault_hook": "boundary_changed",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "reject_resume",
+        "archive_state": "blocked_poison",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 78,
+        "status_code": "archive_blocked_poison",
+        "log_code": "BCDC_ARCHIVE_RESUME_CHANGED_BOUNDARY",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-BOOTSTRAP-OUTSIDE-RETENTION",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "bootstrap",
+        "fault_hook": "requested_start_gced",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "require_reseed_or_detach",
+        "archive_state": "blocked_continuity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 66,
+        "status_code": "archive_blocked_continuity",
+        "log_code": "BCDC_ARCHIVE_BOOTSTRAP_OUTSIDE_RETENTION",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-AUDIT-FINITE-PASS",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "budget_exhausted",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "persist_cursor_partial_unknown",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_AUDIT_FINITE_PASS",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-AUDIT-OVERSIZED-PART-RESUME",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "part_exceeds_pass_bytes",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "persist_part_offset_and_resume",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_AUDIT_OVERSIZED_PART_RESUME",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-AUDIT-IDENTITY-CHANGE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "selector_changed_mid_round",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "discard_round_restart",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_AUDIT_IDENTITY_CHANGE",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-AUDIT-FRESHNESS-EXPIRES",
+      "executor_id": "boring-cdc-m5-loops",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "audit",
+        "fault_hook": "fresh_until_elapsed",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "report_unknown_not_verified",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_AUDIT_FRESHNESS_EXPIRES",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-GC-PINNED-LIVE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "gc",
+        "fault_hook": "segment_referenced_by_live_selector",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "retain",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_GC_PINNED_LIVE",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-GC-RETIREMENT-GRACE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "gc",
+        "fault_hook": "retired_before_grace",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "retain",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_GC_RETIREMENT_GRACE",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-GC-ELIGIBLE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "gc",
+        "fault_hook": "retired_after_grace_no_pins",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "descriptor_relative_delete_and_sync",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_GC_ELIGIBLE",
+        "redacted": true,
+        "persisted_phase": "pending_or_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-UNSUPPORTED-FILESYSTEM",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "preflight",
+        "fault_hook": "filesystem_tmpfs",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "reject_configuration",
+        "archive_state": "blocked_configuration",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 78,
+        "status_code": "archive_blocked_configuration",
+        "log_code": "BCDC_ARCHIVE_UNSUPPORTED_FILESYSTEM",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-ENOSPC-BEFORE-RESERVE",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "admission",
+        "fault_hook": "reserve_exceeds_headroom",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "do_not_create_intent",
+        "archive_state": "blocked_resource",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_blocked_resource",
+        "log_code": "BCDC_ARCHIVE_ENOSPC_BEFORE_RESERVE",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-GENERATION-MANIFEST",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "generation_manifest",
+        "fault_hook": "after_generation_manifest_sync",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "validate_complete_generation_then_continue",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_GENERATION_MANIFEST",
+        "redacted": true,
+        "persisted_phase": "generation_manifest_synced",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "absent",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-GENERATION-READY",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "generation_ready",
+        "fault_hook": "after_generation_ready_sync",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "adopt_ready_generation_before_selector",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 75,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_GENERATION_READY",
+        "redacted": true,
+        "persisted_phase": "generation_ready",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "valid",
+          "expected_generation_ready_bytes_base64": "Z2VuZXJhdGlvbi1tYW5pZmVzdC1zaGEyNTY6YmVhZjBjODRlZmUzNWM3Mzk5ZWQ3MTYyM2NjZGQ5MjVlOGM0MTE2ODczNDViYTQyM2JkYzAzZTRhYzRjZGQ1OAo=",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-CRASH-AFTER-SELECTOR-SYNC",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": true
+      },
+      "action": {
+        "phase": "selector",
+        "fault_hook": "after_selector_sync",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "adopt_external_high_fence_then_commit",
+        "archive_state": "ready",
+        "checkpoint": "advance_to_end",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_CRASH_AFTER_SELECTOR_SYNC",
+        "redacted": true,
+        "persisted_phase": "selector_synced",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "matches_golden_selector",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "valid",
+          "expected_generation_ready_bytes_base64": "Z2VuZXJhdGlvbi1tYW5pZmVzdC1zaGEyNTY6YmVhZjBjODRlZmUzNWM3Mzk5ZWQ3MTYyM2NjZGQ5MjVlOGM0MTE2ODczNDViYTQyM2JkYzAzZTRhYzRjZGQ1OAo=",
+          "expected_selector_jcs_base64": "eyJjYXB0dXJlX2Vwb2NoIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsImdlbmVyYXRpb24iOjcsImdlbmVyYXRpb25fbWFuaWZlc3Rfc2hhMjU2IjoiYmVhZjBjODRlZmUzNWM3Mzk5ZWQ3MTYyM2NjZGQ5MjVlOGM0MTE2ODczNDViYTQyM2JkYzAzZTRhYzRjZGQ1OCIsImdlbmVyYXRpb25fcmVsYXRpdmVfcGF0aCI6InYxL2UtYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYS9nLTAwMDAwMDAwMDAwMDAwMDAwMDA3IiwicHJvbW90aW9uX2ZlbmNlIjo5LCJzY2hlbWFfdmVyc2lvbiI6ImFyY2hpdmUtc2VsZWN0b3IvdjEifQ=="
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-FORMAT-CHANGE-NEW-GENERATION",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "generation_plan",
+        "fault_hook": "enabled_formats_changed",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "require_compatible_complete_new_generation",
+        "archive_state": "ready",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 0,
+        "status_code": "archive_ready",
+        "log_code": "BCDC_ARCHIVE_FORMAT_CHANGE_NEW_GENERATION",
+        "redacted": true,
+        "persisted_phase": "generation_phase_specific",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    },
+    {
+      "fixture_id": "SCN-M0-ARCHIVE-EXPLICIT-DISCONTINUITY",
+      "executor_id": "boring-cdc-m5-segment-set",
+      "seed": "0x424344435f415243484956455f563031",
+      "pre_state": {
+        "archive_state": "ready",
+        "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "generation": 7,
+        "promotion_fence": 9,
+        "checkpoint_journal_seq": 99,
+        "requested_range": {
+          "start": 100,
+          "end": 120
+        },
+        "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "intent_phase": "pending",
+        "archive_checkpoint": 99,
+        "generation_verified": false
+      },
+      "action": {
+        "phase": "generation_plan",
+        "fault_hook": "compatible_anchor_unavailable",
+        "fault_once": true,
+        "input_vector": "golden_vectors"
+      },
+      "expected": {
+        "recovery": "publish_explicit_discontinuity_new_root",
+        "archive_state": "blocked_continuity",
+        "checkpoint": "unchanged",
+        "feedback": "unaffected",
+        "capture_and_other_destinations": "continue",
+        "external_effect": "none_or_only_valid_immutable_artifacts",
+        "exit_code": 66,
+        "status_code": "archive_blocked_continuity",
+        "log_code": "BCDC_ARCHIVE_EXPLICIT_DISCONTINUITY",
+        "redacted": true,
+        "persisted_phase": "blocked",
+        "artifacts": {
+          "staging": "absent_or_intent_bound",
+          "segment_ready": "valid_only_after_manifest_and_files_sync",
+          "generation_selector": "unchanged_unless_generation_verified",
+          "byte_hashes": "match_golden_on_retry_cases",
+          "generation_ready": "unchanged",
+          "expected_generation_ready_bytes_base64": "",
+          "expected_selector_jcs_base64": ""
+        }
+      }
+    }
+  ],
+  "golden_vectors": {
+    "input_events": [
+      {
+        "event_id": "evt-a",
+        "journal_seq": 100
+      },
+      {
+        "event_id": "evt-b",
+        "journal_seq": 101
+      }
+    ],
+    "jsonl": {
+      "canonical_utf8_base64": "eyJldmVudF9pZCI6ImV2dC1hIiwiam91cm5hbF9zZXEiOjEwMH0KeyJldmVudF9pZCI6ImV2dC1iIiwiam91cm5hbF9zZXEiOjEwMX0K",
+      "canonical_utf8_sha256": "19fa24aec66c3073493c58165c058f27fbb1d1920ea96432788779dc37897974",
+      "zstd_bytes_base64": "KLUv/SROrQEAtAJ7ImV2ZW50X2lkIjoiZXZ0LWEiLCJqb3VybmFsX3NlcSI6MTAwfQpiMX0KAgDAE1ezegLBbuNb",
+      "zstd_sha256": "203a180a85e1d76dc8817bf5dbf71b254137b9950c6a46fdf5b3ee2c3901d554",
+      "writer": "zstd-rs 0.13.3/libzstd 1.5.7 level=3 checksum=true workers=0",
+      "content_size_bytes": 78,
+      "checksum_present": true
+    },
+    "parquet": {
+      "bytes_base64": "UEFSMRUGFRYVFlwVBBUAFQQVChUAFQASAACAAgQCyAECAAAAABUGFTQVNFwVBBUAFQQVDhUAFQASAACAAQQCAAgAAAAAgAEEAgoHAAAAAGV2dC1hYhkSAhkYCGQAAAAAAAAAGRgIZQAAAAAAAAAVAhkWAAAZEgIZGAVldnQtYRkYBWV2dC1iFQIZFgAAGRwWCBVCFgAAABkcFkoVYBYAABkWFAAVBBk8SAxhcnJvd19zY2hlbWEVBAAVBCUAGAtqb3VybmFsX3NlcSUcTKwTQBIAAAAVDCUAGAhldmVudF9pZCUATBwAAAAWBBkcGSwmABwVBBklBgoZGAtqb3VybmFsX3NlcRUMFgQWQhZCJgg8NgAoCGUAAAAAAAAAGAhkAAAAAAAAABERABkcFQYVChUCAAAWmgIVFBaqARU+ACYAHBUMGSUGDhkYCGV2ZW50X2lkFQwWBBZgFmAmSjw2ACgFZXZ0LWIYBWV2dC1hEREAGRwVBhUOFQIAPBYUAAAWrgIVGhboARUyABaiARYEJggWogEUAAAZHBgMQVJST1c6c2NoZW1hGIwCLy8vLy84QUFBQUFRQUFBQUFBQUtBQXdBQ2dBSkFBUUFDZ0FBQUJBQUFBQUFBUVFBQ0FBSUFBQUFCQUFJQUFBQUJBQUFBQUlBQUFCWUFBQUFGQUFBQUJBQUZBQVFBQUFBRHdBRUFBQUFDQUFRQUFBQUdBQUFBQXdBQUFBQUFBQUZFQUFBQUFBQUFBQUVBQVFBQkFBQUFBZ0FBQUJsZG1WdWRGOXBaQUFBQUFBUUFCWUFFQUFBQUE4QUJBQUFBQWdBRUFBQUFCZ0FBQUFjQUFBQUFBQUFBaGdBQUFBQUFBWUFDQUFFQUFZQUFBQkFBQUFBQUFBQUFBc0FBQUJxYjNWeWJtRnNYM05sY1FBPQAYHGJvcmluZy1jZGMvYXJjaGl2ZS13cml0ZXIvdjEZLBwAABwAAAA6AgAAUEFSMQ==",
+      "sha256": "cf17581ecf75d86cc9c5bad6a594c9ee8183bee086d1fdd524a8b7db1456caee",
+      "writer": "arrow-rs/parquet 57.0.0",
+      "expected_rows": 2,
+      "expected_row_groups": 1,
+      "expected_columns": [
+        "journal_seq:uint64:not-null",
+        "event_id:utf8:not-null"
+      ],
+      "created_by": "boring-cdc/archive-writer/v1"
+    },
+    "segment_manifest": {
+      "schema_version": "archive-segment-manifest/v1",
+      "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "generation": 7,
+      "promotion_fence": 9,
+      "range": {
+        "start_journal_seq": 100,
+        "end_journal_seq": 120,
+        "end_commit_lsn_u64": 4096
+      },
+      "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "event_contract_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "writer_profile": "archive-writer/v1",
+      "files": [
+        {
+          "path": "events.jsonl.zst",
+          "size_bytes": 66,
+          "sha256": "203a180a85e1d76dc8817bf5dbf71b254137b9950c6a46fdf5b3ee2c3901d554",
+          "format": "jsonl-zstd",
+          "logical_table_id": "0000000000000000000000000000000000000000000000000000000000000000",
+          "relation_schema_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+          "part_ordinal": 0,
+          "row_count": 2
+        },
+        {
+          "path": "t-1111111111111111111111111111111111111111111111111111111111111111/s-2222222222222222222222222222222222222222222222222222222222222222/part-000000.parquet",
+          "size_bytes": 742,
+          "sha256": "cf17581ecf75d86cc9c5bad6a594c9ee8183bee086d1fdd524a8b7db1456caee",
+          "format": "parquet-zstd",
+          "logical_table_id": "1111111111111111111111111111111111111111111111111111111111111111",
+          "relation_schema_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+          "part_ordinal": 0,
+          "row_count": 2
+        }
+      ],
+      "intent_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "enabled_formats": [
+        "jsonl-zstd",
+        "parquet-zstd"
+      ],
+      "writer_config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "event_count": 2,
+      "schema_fingerprints": [
+        "2222222222222222222222222222222222222222222222222222222222222222"
+      ],
+      "display_mappings": {
+        "1111111111111111111111111111111111111111111111111111111111111111": {
+          "schema_display": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+          "table_display": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+        }
+      },
+      "format_versions": {
+        "jsonl": "event-canonical-json/v1+zstd-1.5.7",
+        "parquet": "parquet-2.6+arrow-rs-57.0.0+zstd-1.5.7"
+      },
+      "compatible_anchor": {
+        "anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "lower_journal_seq": 99,
+        "post_copy_journal_seq": 100
+      }
+    },
+    "segment_manifest_jcs_sha256": "5dff5751fb2a7c38e6dae45df73df82380192d83eb87a43057ff47a14610ada6",
+    "ready_bytes_base64": "aW50ZW50OmRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGQKbWFuaWZlc3Qtc2hhMjU2OjVkZmY1NzUxZmIyYTdjMzhlNmRhZTQ1ZGY3M2RmODIzODAxOTJkODNlYjg3YTQzMDU3ZmY0N2ExNDYxMGFkYTYK",
+    "generation_manifest": {
+      "schema_version": "archive-generation-manifest/v1",
+      "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "generation": 7,
+      "promotion_fence": 9,
+      "compatible_anchor": {
+        "anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "lower_journal_seq": 99,
+        "post_copy_journal_seq": 100
+      },
+      "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+      "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "writer_config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "enabled_formats": [
+        "jsonl-zstd",
+        "parquet-zstd"
+      ],
+      "segment_manifests": [
+        {
+          "relative_path": "segments/r-00000000000000000100-00000000000000000120/i-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "manifest_sha256": "5dff5751fb2a7c38e6dae45df73df82380192d83eb87a43057ff47a14610ada6",
+          "start_journal_seq": 100,
+          "end_journal_seq": 120,
+          "event_count": 2
+        }
+      ],
+      "complete_checkpoint": {
+        "journal_seq": 120,
+        "commit_lsn_u64": 4096
+      },
+      "verification": {
+        "anchor": true,
+        "watermark": true,
+        "formats_semantically_equal": true,
+        "no_gaps_or_overlaps": true
+      }
+    },
+    "generation_manifest_jcs_sha256": "beaf0c84efe35c7399ed71623ccdd925e8c411687345ba423bdc03e4ac4cdd58",
+    "generation_ready_bytes_base64": "Z2VuZXJhdGlvbi1tYW5pZmVzdC1zaGEyNTY6YmVhZjBjODRlZmUzNWM3Mzk5ZWQ3MTYyM2NjZGQ5MjVlOGM0MTE2ODczNDViYTQyM2JkYzAzZTRhYzRjZGQ1OAo=",
+    "selector": {
+      "schema_version": "archive-selector/v1",
+      "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "generation": 7,
+      "promotion_fence": 9,
+      "generation_manifest_sha256": "beaf0c84efe35c7399ed71623ccdd925e8c411687345ba423bdc03e4ac4cdd58",
+      "generation_relative_path": "v1/e-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/g-00000000000000000007"
+    },
+    "selector_jcs_base64": "eyJjYXB0dXJlX2Vwb2NoIjoiYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYSIsImdlbmVyYXRpb24iOjcsImdlbmVyYXRpb25fbWFuaWZlc3Rfc2hhMjU2IjoiYmVhZjBjODRlZmUzNWM3Mzk5ZWQ3MTYyM2NjZGQ5MjVlOGM0MTE2ODczNDViYTQyM2JkYzAzZTRhYzRjZGQ1OCIsImdlbmVyYXRpb25fcmVsYXRpdmVfcGF0aCI6InYxL2UtYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYS9nLTAwMDAwMDAwMDAwMDAwMDAwMDA3IiwicHJvbW90aW9uX2ZlbmNlIjo5LCJzY2hlbWFfdmVyc2lvbiI6ImFyY2hpdmUtc2VsZWN0b3IvdjEifQ==",
+    "selector_jcs_sha256": "54fec9a24f3aaf725de96758082302fd2279568b544cd82a017ace079fb25b88"
+  }
+}

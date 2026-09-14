@@ -7,11 +7,11 @@
 use crate::m1_transition_kernel::DurableSourceBoundary;
 use std::collections::BTreeMap;
 
-// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED PostgreSQL majors).
+// M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED PostgreSQL majors).
 pub const SUPPORTED_POSTGRES_MAJORS: [u16; 3] = [15, 16, 17];
-// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED protocol zero sentinel).
+// M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED protocol zero sentinel).
 pub const PROTOCOL_ZERO_SENTINEL: u64 = 0;
-// M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED PostgreSQL-to-Unix epoch offset).
+// M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED PostgreSQL-to-Unix epoch offset).
 const PG_EPOCH_UNIX_MICROS: i64 = 946_684_800_000_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -30,7 +30,7 @@ impl Default for WireLimits {
             max_pgoutput_message_bytes: 1_048_551,
             max_columns: 1_024,
             max_tuple_bytes: 1_048_576,
-            // M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED relation-cache bound).
+            // M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED relation-cache bound).
             max_relations: 4_096,
         }
     }

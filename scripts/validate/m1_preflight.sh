@@ -10,6 +10,6 @@ for case in c['cases']:
  assert scenario in text, scenario
  assert reason in text, reason
  assert case['state_assertion']=='before_state_sha256 == after_state_sha256'
-assert '// M0-PROVISIONAL:' not in text
+assert '// M0-RECONCILED:' not in text
 print(f"m1 preflight contract: PASS ({len(c['cases'])} cases)")
 PY

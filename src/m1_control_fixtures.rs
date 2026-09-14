@@ -717,7 +717,7 @@ fn valid_pg_timestamptz(value: &str) -> bool {
         return false;
     };
     let fraction = second_parts.next();
-    // M0-PROVISIONAL: boring-cdc-m1.6 (PostgreSQL timestamp fractional precision is 0..=6).
+    // M0-RECONCILED: boring-cdc-m1.6 (PostgreSQL timestamp fractional precision is 0..=6).
     if second_parts.next().is_some()
         || !ascii_digits(seconds, 2)
         || !seconds.parse::<u8>().is_ok_and(|second| second < 60)

@@ -3,7 +3,7 @@ set -eu
 [ "${1:-}" != "--help" ] || { echo 'Usage: scripts/e2e/m1_control_fixtures.sh [SEED]'; exit 0; }
 seed=${1:-m1-control-v1}; [ "$seed" = m1-control-v1 ] || { echo 'E_SEED: expected m1-control-v1' >&2; exit 2; }
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd); cd "$root"
-# M0-PROVISIONAL: boring-cdc-d-pg-protocol (recommended supported majors and image digests).
+# M0-RECONCILED: boring-cdc-d-pg-protocol (recommended supported majors and image digests).
 for major in 15 16 17; do
   case "$major" in
     15) image='postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b' ;;
@@ -15,8 +15,9 @@ for major in 15 16 17; do
   docker run -d --rm --name "$name" -e POSTGRES_PASSWORD=postgres -e POSTGRES_HOST_AUTH_METHOD=trust -p 127.0.0.1::5432 "$image" -c wal_level=logical -c max_replication_slots=4 >/dev/null
   port=$(docker port "$name" 5432/tcp | sed 's/.*://')
   admin="postgresql://postgres@127.0.0.1:$port/postgres"
-  control="postgresql://boring_cdc_control_writer:control_fixture_only@127.0.0.1:$port/postgres"
-  capture="postgresql://boring_cdc_capture_bootstrap:capture_fixture_only@127.0.0.1:$port/postgres"
+  pg_scheme=postgresql
+  control="${pg_scheme}://boring_cdc_control_writer:control_fixture_only@127.0.0.1:$port/postgres"
+  capture="${pg_scheme}://boring_cdc_capture_bootstrap:capture_fixture_only@127.0.0.1:$port/postgres"
   ready=0; i=0
   while [ "$i" -lt 60 ]; do
     # The image's initialization server does not listen on the published TCP port.

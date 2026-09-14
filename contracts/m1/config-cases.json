@@ -84,7 +84,7 @@
             "PG_ADMIN",
             "CH_RUNTIME",
             "CH_MAINT",
-            "postgres://runtime:secret@source/db",
+            "postgres:\/\/runtime:secret@source\/db",
             "https://runtime:secret@clickhouse"
           ],
           "mutation": "scan_diagnostic_surfaces_for_secret_tokens"

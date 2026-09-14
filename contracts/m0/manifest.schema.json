@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "executor_ids": {
+            "items": {
+              "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "fixture_ids": {
+            "items": {
+              "pattern": "^SCN-[A-Z0-9-]+$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^ART-[A-Z0-9-]+$",
+            "type": "string"
+          },
+          "owner_bead": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "complete"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "owner_bead",
+          "path",
+          "sha256",
+          "fixture_ids",
+          "executor_ids",
+          "status"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "m0-manifest/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "artifacts"
+  ],
+  "type": "object"
+}

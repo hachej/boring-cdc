@@ -6,8 +6,8 @@ error[E0308]: mismatched types
   |             |
   |             arguments to this function are incorrect
   |
-  = note: expected struct `ValidatedCommit<boring_cdc::m1_transition_kernel::evidence_kind::Production>`
-             found struct `ValidatedCommit<boring_cdc::m1_transition_kernel::evidence_kind::Synthetic>`
+  = note: expected struct `ValidatedCommit<Production>`
+             found struct `ValidatedCommit<Synthetic>`
 note: associated function defined here
  --> src/m1_transition_kernel.rs
   |

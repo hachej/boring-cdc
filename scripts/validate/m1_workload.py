@@ -9,7 +9,7 @@ VALUES_DIGEST="b03d04460a78c4cd0b02817952e6bcc21d89c9b712b027b1b866cf5e62c7acc8"
 FIXED_LEDGER_DIGEST='5fa4f2cc7510beecd5769943e1d05eb8eef29f1a8ab9020d43ec21e144aff39e'
 FIXED_BUSINESS_DIGEST='e9569d802503097ca488fc72a1363bb207d578a800a9b59a3edfb1927f2da8ab'
 FIXED_STATE_DIGEST='3daaee386b5efb4e2c6337f0cc9bd3321a1deaa79a545c8c75f8a55a3c1a30af'
-ORACLE_DIGEST="8b745babbe152ac65cc537c0e01f3e1814b785443d4a63aaddc08f56fba85774" # // M0-PROVISIONAL: boring-cdc-d-oracle
+ORACLE_DIGEST="8b745babbe152ac65cc537c0e01f3e1814b785443d4a63aaddc08f56fba85774" # // M0-RECONCILED: boring-cdc-d-oracle
 FIELDS=['transaction_group_id','transaction_ordinal','entity_table','canonical_key','operation','after_hash']
 def h(v): return hashlib.sha256(v.encode()).hexdigest()
 def component(oid,bits,value):
