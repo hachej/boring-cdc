@@ -8,9 +8,9 @@ use boring_cdc::m1_preflight::{
 };
 use pg_walstream::CancellationToken;
 use serde::Deserialize;
-use std::io::{self, Write};
-use std::sync::Arc;
+use std::io::{self, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
@@ -57,7 +57,13 @@ impl ReaderFailure {
 }
 
 fn load_article1_config() -> Result<CaptureConfig, ReaderFailure> {
-    let metadata = std::fs::metadata(ARTICLE1_CONFIG_PATH).map_err(|_| {
+    let file = std::fs::File::open(ARTICLE1_CONFIG_PATH).map_err(|_| {
+        ReaderFailure::unavailable(
+            "ARTICLE1_CONFIG_UNAVAILABLE",
+            "reader configuration is unavailable",
+        )
+    })?;
+    let metadata = file.metadata().map_err(|_| {
         ReaderFailure::unavailable(
             "ARTICLE1_CONFIG_UNAVAILABLE",
             "reader configuration is unavailable",
@@ -69,11 +75,23 @@ fn load_article1_config() -> Result<CaptureConfig, ReaderFailure> {
             "reader configuration is invalid",
         ));
     }
-    let text = std::fs::read_to_string(ARTICLE1_CONFIG_PATH).map_err(|_| {
-        ReaderFailure::unavailable(
-            "ARTICLE1_CONFIG_UNAVAILABLE",
-            "reader configuration is unavailable",
-        )
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(ARTICLE1_CONFIG_LIMIT_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| {
+            ReaderFailure::unavailable(
+                "ARTICLE1_CONFIG_UNAVAILABLE",
+                "reader configuration is unavailable",
+            )
+        })?;
+    if bytes.len() as u64 > ARTICLE1_CONFIG_LIMIT_BYTES {
+        return Err(ReaderFailure::unavailable(
+            "ARTICLE1_CONFIG_INVALID",
+            "reader configuration is invalid",
+        ));
+    }
+    let text = String::from_utf8(bytes).map_err(|_| {
+        ReaderFailure::unavailable("ARTICLE1_CONFIG_INVALID", "reader configuration is invalid")
     })?;
     let reader: Article1ReaderConfig = toml::from_str(&text).map_err(|_| {
         ReaderFailure::unavailable("ARTICLE1_CONFIG_INVALID", "reader configuration is invalid")
@@ -113,9 +131,7 @@ extern "C" fn article1_signal_handler(_: i32) {
     ARTICLE1_SIGNAL_RECEIVED.store(true, Ordering::Relaxed);
 }
 
-fn cancellation_for_signals() -> (CancellationToken, Arc<AtomicBool>) {
-    let cancellation = CancellationToken::new();
-    let done = Arc::new(AtomicBool::new(false));
+fn cancellation_for_signals() -> CancellationToken {
     #[cfg(unix)]
     {
         ARTICLE1_SIGNAL_RECEIVED.store(false, Ordering::Relaxed);
@@ -124,23 +140,24 @@ fn cancellation_for_signals() -> (CancellationToken, Arc<AtomicBool>) {
             signal(2, article1_signal_handler);
             signal(15, article1_signal_handler);
         }
-        let token = cancellation.clone();
-        let thread_done = Arc::clone(&done);
-        thread::spawn(move || {
-            while !thread_done.load(Ordering::Relaxed) {
-                if ARTICLE1_SIGNAL_RECEIVED.load(Ordering::Relaxed) {
-                    token.cancel();
-                    return;
-                }
-                thread::sleep(Duration::from_millis(25));
-            }
-        });
     }
-    (cancellation, done)
+    CancellationToken::new()
 }
 
-fn run_article1() -> Result<(), ReaderFailure> {
-    let config = load_article1_config()?;
+#[cfg(unix)]
+fn signal_received() -> bool {
+    ARTICLE1_SIGNAL_RECEIVED.load(Ordering::Relaxed)
+}
+
+#[cfg(not(unix))]
+fn signal_received() -> bool {
+    false
+}
+
+fn capture_article1(
+    config: CaptureConfig,
+    cancellation: CancellationToken,
+) -> Result<(), ReaderFailure> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -150,7 +167,6 @@ fn run_article1() -> Result<(), ReaderFailure> {
                 "reader runtime is unavailable",
             )
         })?;
-    let (cancellation, done) = cancellation_for_signals();
     let mut stdout = io::stdout().lock();
     let mut broken_pipe = false;
     let result = runtime.block_on(capture_jsonl(&config, &cancellation, |line| {
@@ -163,7 +179,6 @@ fn run_article1() -> Result<(), ReaderFailure> {
         }
         Ok(())
     }));
-    done.store(true, Ordering::Relaxed);
     match result {
         Ok(_) => Ok(()),
         Err(_) if broken_pipe || cancellation.is_cancelled() => Ok(()),
@@ -176,6 +191,34 @@ fn run_article1() -> Result<(), ReaderFailure> {
                 ExitCode::Unavailable
             },
         }),
+    }
+}
+
+fn run_article1() -> Result<(), ReaderFailure> {
+    let config = load_article1_config()?;
+    let cancellation = cancellation_for_signals();
+    let worker_cancellation = cancellation.clone();
+    let (sender, receiver) = mpsc::sync_channel(1);
+    thread::spawn(move || {
+        let _ = sender.send(capture_article1(config, worker_cancellation));
+    });
+    loop {
+        if signal_received() {
+            cancellation.cancel();
+            // Do not join potentially blocked synchronous connection setup. Process exit
+            // terminates this stdout-only provisional reader without publishing feedback.
+            return Ok(());
+        }
+        match receiver.recv_timeout(Duration::from_millis(25)) {
+            Ok(result) => return result,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                return Err(ReaderFailure::unavailable(
+                    "ARTICLE1_RUNTIME_UNAVAILABLE",
+                    "reader runtime is unavailable",
+                ));
+            }
+        }
     }
 }
 

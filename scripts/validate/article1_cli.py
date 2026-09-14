@@ -84,22 +84,58 @@ def main() -> int:
             raise RuntimeError("unrelated command handler changed")
 
         recreate(compose, env)
+        startup_cancelled = subprocess.Popen(
+            [str(BINARY), "run"], cwd=ROOT, env=env, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        time.sleep(0.01)
+        startup_cancelled.send_signal(signal.SIGINT)
+        startup_stdout, startup_stderr = startup_cancelled.communicate(timeout=2)
+        if startup_cancelled.returncode != 0 or startup_stdout or startup_stderr:
+            raise RuntimeError(
+                f"startup SIGINT was not clean: rc={startup_cancelled.returncode} "
+                f"stdout={startup_stdout!r} stderr={startup_stderr!r}"
+            )
+
+        recreate(compose, env)
         cancelled = subprocess.Popen(
             [str(BINARY), "run"], cwd=ROOT, env=env, text=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         time.sleep(1)
         cancelled.send_signal(signal.SIGTERM)
-        cancel_stdout, cancel_stderr = cancelled.communicate(timeout=10)
+        cancel_stdout, cancel_stderr = cancelled.communicate(timeout=2)
         if cancelled.returncode != 0 or cancel_stdout or cancel_stderr:
             raise RuntimeError(
                 f"SIGTERM was not clean: rc={cancelled.returncode} stdout={cancel_stdout!r} stderr={cancel_stderr!r}"
             )
 
+        recreate(compose, env)
+        broken_pipe = subprocess.Popen(
+            [str(BINARY), "run"], cwd=ROOT, env=env, text=True,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        assert broken_pipe.stdout is not None
+        broken_pipe.stdout.close()
+        time.sleep(0.75)
+        run(
+            compose
+            + [
+                "exec", "-T", "postgres", "psql", "-v", "ON_ERROR_STOP=1",
+                "-U", "postgres", "-d", "article1", "-c",
+                "BEGIN; INSERT INTO customers VALUES (9102, 'PIPE', 1); COMMIT;",
+            ],
+            env,
+        )
+        broken_stderr = broken_pipe.stderr.read() if broken_pipe.stderr is not None else ""
+        broken_code = broken_pipe.wait(timeout=10)
+        if broken_code != 0 or broken_stderr:
+            raise RuntimeError(f"broken pipe was not clean: rc={broken_code} stderr={broken_stderr!r}")
+
         print(
             "ARTICLE1_CLI_OK command='BORING_CDC_ARTICLE1_DSN=<redacted> target/debug/boring-cdc run' "
             "postgres=17.6 events=BEGIN,INSERT,UPDATE,DELETE,COMMIT old_states=absent,key "
-            "auth=redacted cancellation=clean unrelated=unchanged"
+            "auth=redacted sigint_sigterm=clean broken_pipe=clean unrelated=unchanged"
         )
         return 0
     finally:
