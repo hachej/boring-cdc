@@ -225,6 +225,7 @@ def main() -> int:
             fail("manifest consumer row shape drifted")
         if manifest.get("article1_row_view") != {
             "label": "TEACHING VIEW",
+            "disclaimer": DISCLAIMER,
             "same_in_process_decoded_events_as_raw_output": True,
             "not_clickhouse": True,
             "not_durable": True,

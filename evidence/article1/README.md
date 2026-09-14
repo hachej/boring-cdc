@@ -68,7 +68,7 @@ Raw real stdout is preserved because PostgreSQL commit timestamps vary by run. T
 
 1. replace each numeric `transaction.commit_time` with numeric `0`, after proving the BEGIN and COMMIT values match within that transaction;
 2. serialize each JSON object with lexicographically sorted keys and compact separators;
-3. concatenate default then FULL events, retaining every xid, relation ID, ordinal, row value, WAL LSN, final LSN, commit LSN, and end LSN unchanged.
+3. concatenate default then FULL events, retaining every xid, relation ID, ordinal, raw tuple value, `article1_row_view` result, WAL LSN, final LSN, commit LSN, and end LSN unchanged.
 
 The retained LSN contract requires BEGIN and its first row to share the start LSN, later row/event LSNs to increase, BEGIN `final_lsn` to equal COMMIT `commit_lsn`, and COMMIT `wal_start`/`wal_end` to equal `end_lsn`. `scripts/acceptance/article1.sh` performs default and FULL capture across two independent clean volume resets per round, normalizes both rounds, and requires byte equality with each other and with the committed normalized transcript.
 

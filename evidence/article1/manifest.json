@@ -31,6 +31,7 @@
   },
   "article1_row_view": {
     "label": "TEACHING VIEW",
+    "disclaimer": "NOT ClickHouse; NOT durable; NOT exactly-once; NOT checkpointed; NOT a materializer; NOT production state; NOT M4; ClickHouse and destination guarantees are deferred to Article 4/M4",
     "same_in_process_decoded_events_as_raw_output": true,
     "not_clickhouse": true,
     "not_durable": true,
