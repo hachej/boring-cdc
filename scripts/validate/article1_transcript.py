@@ -12,6 +12,14 @@ from typing import Any
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 EVIDENCE = ROOT / "evidence/article1"
 LSN = re.compile(r"^[0-9A-F]+/[0-9A-F]+$")
+EXPECTED_SHA256 = {
+    "config/article1-reader.toml": "50945fe039ad1594d124783ec4f02558649875ed7ddf6633235d797b81b1869c",
+    "fixtures/article1/schema-and-seed.sql": "7f58d39e39d26006849c0bd6f4f6e6f63cf7ae81c71ba511fc64a976e4744cf1",
+    "fixtures/article1/fixture.json": "6c9f5705efead78c287fe3791aaad096f7bf6446287d6f44f789f623ff023ad1",
+    "evidence/article1/reader-default.raw.jsonl": "74a7275851d82121468de916742a8067cf2906062a92cc6da0a066399275d818",
+    "evidence/article1/reader-full.raw.jsonl": "de7fac472c6114a004cfc10939fe251ecf8d19a2b9d2f38ffd511137868cfa3e",
+    "evidence/article1/reader.normalized.jsonl": "1842c3162593775d9cfbd0be3368769f060c617df9a3871d2101d893787f0915",
+}
 
 
 def fail(message: str) -> None:
@@ -44,6 +52,30 @@ def validate_scenario(rows: list[dict[str, Any]], scenario: str) -> None:
         fail(f"{scenario}: expected event sequence {expected_events}")
 
     begin, insert, update, delete, commit = rows
+    expected_keys = [
+        {"event", "final_lsn", "transaction", "wal_end", "wal_start"},
+        {"event", "new", "old", "old_state", "relation_id", "transaction", "wal_end", "wal_start"},
+        {"event", "new", "old", "old_state", "relation_id", "transaction", "wal_end", "wal_start"},
+        {"event", "new", "old", "old_state", "relation_id", "transaction", "wal_end", "wal_start"},
+        {"commit_lsn", "end_lsn", "event", "row_count", "transaction", "wal_end", "wal_start"},
+    ]
+    if [set(row) for row in rows] != expected_keys:
+        fail(f"{scenario}: event field shape drifted")
+    if set(begin.get("transaction", {})) != {"commit_time", "xid"} or set(commit.get("transaction", {})) != {"commit_time"}:
+        fail(f"{scenario}: transaction boundary shape drifted")
+    if any(set(row.get("transaction", {})) != {"ordinal", "xid"} for row in (insert, update, delete)):
+        fail(f"{scenario}: row transaction shape drifted")
+    if any(row.get("relation_id") != 16385 for row in (insert, update, delete)):
+        fail(f"{scenario}: relation identity drifted")
+
+    expected_new = (
+        [["9101", "Article Default", "1"], ["9101", "Article Default Updated", "2"], None]
+        if scenario == "default"
+        else [["9201", "Article Full", "3"], ["9201", "Article Full Updated", "4"], None]
+    )
+    if [insert.get("new"), update.get("new"), delete.get("new")] != expected_new:
+        fail(f"{scenario}: row payload drifted")
+
     xid = begin.get("transaction", {}).get("xid")
     if not isinstance(xid, int):
         fail(f"{scenario}: BEGIN xid is absent")
@@ -111,6 +143,7 @@ def main() -> int:
     parser.add_argument("--default", type=pathlib.Path, default=EVIDENCE / "reader-default.raw.jsonl")
     parser.add_argument("--full", type=pathlib.Path, default=EVIDENCE / "reader-full.raw.jsonl")
     parser.add_argument("--output", type=pathlib.Path)
+    parser.add_argument("--manifest", type=pathlib.Path, default=EVIDENCE / "manifest.json")
     parser.add_argument("--skip-manifest", action="store_true")
     args = parser.parse_args()
 
@@ -124,10 +157,55 @@ def main() -> int:
             fail("committed normalized transcript does not derive from the raw stdout transcripts")
 
     if not args.skip_manifest:
-        manifest = json.loads((EVIDENCE / "manifest.json").read_text())
-        for name, expected in manifest["sha256"].items():
-            path = ROOT / name
-            actual = digest(path)
+        manifest = json.loads(args.manifest.read_text())
+        if set(manifest) != {
+            "schema_version", "owner_bead", "capture_code_sha", "reader_command", "capture_binary_sha256",
+            "capture_binary_note", "server", "fixture", "normalization", "consumer_row_shape",
+            "m4_canonical_destination_row_produced_or_tested", "sha256",
+        }:
+            fail("manifest field inventory drifted")
+        expected_identity = {
+            "schema_version": "article1-reader-evidence/v1",
+            "owner_bead": "boring-cdc-pci.4",
+            "capture_code_sha": "30e9fe4ed6f0796b2aca8497b31d30f517f141c5",
+            "reader_command": "BORING_CDC_ARTICLE1_DSN='postgresql://postgres:article1_fixture_only@127.0.0.1:55696/article1?sslmode=disable' target/debug/boring-cdc run",
+            "capture_binary_sha256": "3fc5d0fe0652fcbc6b033075c555e651d46efc2f7e0aa7f105a834a6155b84b8",
+            "capture_binary_note": "Digest of the exact target/debug/boring-cdc executable used for the committed raw capture; debug binaries built in another absolute checkout can differ.",
+        }
+        for name, expected in expected_identity.items():
+            if manifest.get(name) != expected:
+                fail(f"manifest identity drift for {name}")
+        if manifest.get("server") != {
+            "version": "PostgreSQL 17.6 (Debian 17.6-2.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+            "server_version_num": 170006,
+            "image": "docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+            "image_id": "sha256:50903ccdcab597707a1f61c7ae016a06b0b548da53a6f7ad716d56b072bedba0",
+            "platform": "linux/amd64",
+        }:
+            fail("manifest server/image identity drifted")
+        if manifest.get("fixture") != {
+            "publication": "article1_publication", "slot": "article1_slot", "seed": "workload-v1",
+            "seed_rows_sha256": "238b582c56ffa001bcd4e566cfb307d26fbe3804f55a4b0be014ace3ae143e57",
+        }:
+            fail("manifest fixture identity drifted")
+        if manifest.get("normalization") != {
+            "normalized_fields": ["transaction.commit_time"], "replacement": 0,
+            "serialization": "JSON objects with sorted keys and compact separators; default events then FULL events",
+            "retained_unchanged": ["xid", "relation_id", "ordinal", "tuple values", "wal_start", "wal_end", "final_lsn", "commit_lsn", "end_lsn"],
+        }:
+            fail("manifest normalization contract drifted")
+        if manifest.get("consumer_row_shape") != {
+            "begin": ["event", "final_lsn", "transaction{xid,commit_time}", "wal_start", "wal_end"],
+            "row": ["event", "new", "old", "old_state", "relation_id", "transaction{xid,ordinal}", "wal_start", "wal_end"],
+            "commit": ["event", "commit_lsn", "end_lsn", "row_count", "transaction{commit_time}", "wal_start", "wal_end"],
+        }:
+            fail("manifest consumer row shape drifted")
+        if manifest.get("m4_canonical_destination_row_produced_or_tested") is not False:
+            fail("manifest M4 boundary drifted")
+        if manifest.get("sha256") != EXPECTED_SHA256:
+            fail("manifest digest inventory drifted")
+        for name, expected in EXPECTED_SHA256.items():
+            actual = digest(ROOT / name)
             if actual != expected:
                 fail(f"digest drift for {name}: expected {expected}, got {actual}")
     print("ARTICLE1_TRANSCRIPT_OK real_stdout=true events=BEGIN,INSERT,UPDATE,DELETE,COMMIT old_states=absent,key,full lsn_relationships=valid")
