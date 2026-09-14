@@ -30,7 +30,24 @@ pub const TWO_PHASE: &str = "false";
 // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const BINARY: &str = "false";
 // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-pub const TABLES_CSV: &str = "customers,order_items,orders,products";
+pub const TABLES_CSV: &str = "public.customers,public.order_items,public.orders,public.products";
+
+#[derive(Clone, Copy)]
+struct Expectations<'a> {
+    version: i32,
+    publication: &'a str,
+    slot: &'a str,
+    tables_csv: &'a str,
+    continuity_available: bool,
+}
+
+const PROVISIONAL_EXPECTATIONS: Expectations<'static> = Expectations {
+    version: POSTGRES_VERSION_NUM,
+    publication: PUBLICATION,
+    slot: SLOT,
+    tables_csv: TABLES_CSV,
+    continuity_available: true,
+};
 
 const START_OPTIONS: [(&str, &str); 6] = [
     ("proto_version", PROTO_VERSION), // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
@@ -95,7 +112,7 @@ impl CaptureConfig {
 ///
 /// This function deliberately has no retry loop and never calls a feedback API.
 pub async fn capture_jsonl(config: &CaptureConfig) -> Result<Vec<String>, CaptureFailure> {
-    let contracts = preflight(config)?;
+    let contracts = preflight(config, &PROVISIONAL_EXPECTATIONS)?;
     let replication_dsn = if config.dsn.contains('?') {
         format!("{}&replication=database", config.dsn)
     } else {
@@ -168,17 +185,21 @@ pub async fn capture_jsonl(config: &CaptureConfig) -> Result<Vec<String>, Captur
     Ok(lines)
 }
 
-fn preflight(config: &CaptureConfig) -> Result<BTreeMap<u32, RelationContract>, CaptureFailure> {
+fn preflight(
+    config: &CaptureConfig,
+    expected: &Expectations<'_>,
+) -> Result<BTreeMap<u32, RelationContract>, CaptureFailure> {
     let mut connection = PgReplicationConnection::connect(&config.dsn)
         .map_err(|error| classify_connection(&error.to_string()))?;
-    if connection.server_version() != POSTGRES_VERSION_NUM {
+    if connection.server_version() != expected.version {
         return Err(CaptureFailure::at(
             "server_version",
             "ARTICLE1_VERSION_MISMATCH",
         ));
     }
     let publication_query = format!(
-        "SELECT pubinsert::int || ',' || pubupdate::int || ',' || pubdelete::int || ',' || pubtruncate::int FROM pg_publication WHERE pubname = '{PUBLICATION}'"
+        "SELECT pubinsert::int || ',' || pubupdate::int || ',' || pubdelete::int || ',' || pubtruncate::int FROM pg_publication WHERE pubname = '{}'",
+        expected.publication
     );
     let publication = connection
         .exec(&publication_query)
@@ -190,28 +211,29 @@ fn preflight(config: &CaptureConfig) -> Result<BTreeMap<u32, RelationContract>, 
         ));
     }
     let membership = connection
-        .exec(&format!("SELECT string_agg(tablename, ',' ORDER BY tablename) FROM pg_publication_tables WHERE pubname = '{PUBLICATION}'"))
+        .exec(&format!("SELECT string_agg(schemaname || '.' || tablename, ',' ORDER BY schemaname,tablename) FROM pg_publication_tables WHERE pubname = '{}'", expected.publication))
         .map_err(|_| CaptureFailure::at("publication", "ARTICLE1_PUBLICATION_QUERY_FAILED"))?;
-    if membership.get_value(0, 0).as_deref() != Some(TABLES_CSV) {
+    if membership.get_value(0, 0).as_deref() != Some(expected.tables_csv) {
         return Err(CaptureFailure::at(
             "publication",
             "ARTICLE1_PUBLICATION_TABLES_MISMATCH",
         ));
     }
     let slot_query = format!(
-        "SELECT plugin || ',' || slot_type || ',' || database || ',' || active::int, (restart_lsn IS NOT NULL)::int FROM pg_replication_slots WHERE slot_name = '{SLOT}'"
+        "SELECT plugin || ',' || slot_type || ',' || database || ',' || active::int, (restart_lsn IS NOT NULL)::int FROM pg_replication_slots WHERE slot_name = '{}'",
+        expected.slot
     );
     let slot = connection
         .exec(&slot_query)
         .map_err(|_| CaptureFailure::at("slot", "ARTICLE1_SLOT_QUERY_FAILED"))?;
-    let expected = connection
+    let expected_slot_identity = connection
         .exec("SELECT 'pgoutput,logical,' || current_database() || ',0'")
         .map_err(|_| CaptureFailure::at("slot", "ARTICLE1_SLOT_QUERY_FAILED"))?
         .get_value(0, 0);
-    if slot.ntuples() != 1 || slot.get_value(0, 0) != expected {
+    if slot.ntuples() != 1 || slot.get_value(0, 0) != expected_slot_identity {
         return Err(CaptureFailure::at("slot", "ARTICLE1_SLOT_MISMATCH"));
     }
-    if slot.get_value(0, 1).as_deref() != Some("1") {
+    if (slot.get_value(0, 1).as_deref() == Some("1")) != expected.continuity_available {
         return Err(CaptureFailure::at(
             "wal_continuity",
             "ARTICLE1_CONTINUITY_UNAVAILABLE",
@@ -219,7 +241,7 @@ fn preflight(config: &CaptureConfig) -> Result<BTreeMap<u32, RelationContract>, 
     }
 
     let catalog = connection
-        .exec(&format!("SELECT c.oid::text,n.nspname,c.relname,c.relreplident,a.attname,a.atttypid::text,a.atttypmod::text,(EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid=c.oid AND (i.indisreplident OR (c.relreplident='d' AND i.indisprimary)) AND a.attnum=ANY(i.indkey)))::int::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_publication_tables p ON p.schemaname=n.nspname AND p.tablename=c.relname JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped WHERE p.pubname='{PUBLICATION}' ORDER BY c.oid,a.attnum"))
+        .exec(&format!("SELECT c.oid::text,n.nspname,c.relname,c.relreplident,a.attname,a.atttypid::text,a.atttypmod::text,(EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid=c.oid AND (i.indisreplident OR (c.relreplident='d' AND i.indisprimary)) AND a.attnum=ANY(i.indkey)))::int::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_publication_tables p ON p.schemaname=n.nspname AND p.tablename=c.relname JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped WHERE p.pubname='{}' ORDER BY c.oid,a.attnum", expected.publication))
         .map_err(|_| CaptureFailure::at("publication", "ARTICLE1_CATALOG_QUERY_FAILED"))?;
     let mut relations: BTreeMap<u32, Relation> = BTreeMap::new();
     for row in 0..catalog.ntuples() {
@@ -388,6 +410,61 @@ mod tests {
             classify_connection("tcp refused").code,
             "ARTICLE1_CONNECTION_FAILED"
         );
+    }
+
+    #[test]
+    #[ignore = "requires the pinned PostgreSQL 17.6 Article 1 fixture"]
+    fn live_pg17_preflight_negatives_use_capture_boundaries() {
+        let config = CaptureConfig::article1(
+            std::env::var("ARTICLE1_DSN").expect("ARTICLE1_DSN is required"),
+            1,
+        )
+        .unwrap();
+        for (expected, boundary, code) in [
+            (
+                Expectations {
+                    version: 170_005,
+                    ..PROVISIONAL_EXPECTATIONS
+                },
+                "server_version",
+                "ARTICLE1_VERSION_MISMATCH",
+            ),
+            (
+                Expectations {
+                    publication: "wrong_publication",
+                    ..PROVISIONAL_EXPECTATIONS
+                },
+                "publication",
+                "ARTICLE1_PUBLICATION_MISMATCH",
+            ),
+            (
+                Expectations {
+                    slot: "wrong_slot",
+                    ..PROVISIONAL_EXPECTATIONS
+                },
+                "slot",
+                "ARTICLE1_SLOT_MISMATCH",
+            ),
+            (
+                Expectations {
+                    tables_csv: "other.customers",
+                    ..PROVISIONAL_EXPECTATIONS
+                },
+                "publication",
+                "ARTICLE1_PUBLICATION_TABLES_MISMATCH",
+            ),
+            (
+                Expectations {
+                    continuity_available: false,
+                    ..PROVISIONAL_EXPECTATIONS
+                },
+                "wal_continuity",
+                "ARTICLE1_CONTINUITY_UNAVAILABLE",
+            ),
+        ] {
+            let error = preflight(&config, &expected).unwrap_err();
+            assert_eq!((error.boundary, error.code), (boundary, code));
+        }
     }
 
     #[test]
