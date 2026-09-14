@@ -1,0 +1,5 @@
+# Article 1's finite, stdout-only reader configuration.
+# The PostgreSQL DSN remains in the environment and is never written here.
+schema_version = 1
+dsn_env = "BORING_CDC_ARTICLE1_DSN"
+stop_after_commits = 1

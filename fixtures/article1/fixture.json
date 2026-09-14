@@ -1,0 +1,22 @@
+{
+  "schema_version": "article1-pgoutput-fixture/v1",
+  "owner_bead": "boring-cdc-pci.2",
+  "seed": "workload-v1",
+  "source_workload": {
+    "path": "fixtures/m1/workload-v1.json",
+    "sha256": "48b270382bce0c35688db8a78973f215715f4d301fbe054fcaf4cbeb02a7a4b7"
+  },
+  "postgres_image": "docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+  "platform": "linux/amd64",
+  "database": "article1",
+  "publication": "article1_publication",
+  "slot": "article1_slot",
+  "plugin": "pgoutput",
+  "tables": ["customers", "products", "orders", "order_items"],
+  "seed_rows_sha256": "238b582c56ffa001bcd4e566cfb307d26fbe3804f55a4b0be014ace3ae143e57",
+  "replica_identity": "default",
+  "expected_old_tuple_behavior": {
+    "update_non_key": "absent",
+    "delete": "key_only"
+  }
+}

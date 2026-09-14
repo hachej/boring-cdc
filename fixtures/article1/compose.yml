@@ -1,0 +1,31 @@
+name: boring-cdc-article1
+x-compose-policy-source: "owner-card:765bd3b2-4b68-4102-a9ec-43ca93357390"
+services:
+  postgres:
+    image: docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
+    platform: linux/amd64
+    environment:
+      POSTGRES_DB: article1
+      POSTGRES_PASSWORD: article1_fixture_only
+      POSTGRES_USER: postgres
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=1
+      - -c
+      - max_wal_senders=1
+    ports:
+      - "127.0.0.1:${ARTICLE1_PG_PORT:-55432}:5432"
+    volumes:
+      - article1-pgdata:/var/lib/postgresql/data
+      - ./schema-and-seed.sql:/docker-entrypoint-initdb.d/10-schema-and-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d article1 && psql -U postgres -d article1 -Atqc \"SELECT (current_setting('server_version_num') = '170006' AND (SELECT count(*) FROM pg_publication) = 1 AND (SELECT count(*) FROM pg_replication_slots) = 1)::int\" | grep -qx 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+volumes:
+  article1-pgdata:

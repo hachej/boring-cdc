@@ -1,3 +1,4 @@
+use boring_cdc::article1_capture::{CaptureConfig, CaptureFailure, capture_jsonl};
 use boring_cdc::m1_cli_contract::{
     ExitCode, command_help, error_envelope, parse, root_help, unavailable,
 };
@@ -5,7 +6,11 @@ use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
 use boring_cdc::m1_preflight::{
     CheckStatus, PreflightObservation, envelope, evaluate_untrusted, input_failure,
 };
-use std::io::{self, Write};
+use pg_walstream::CancellationToken;
+use serde::Deserialize;
+use std::io::{self, Read, Write};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
@@ -23,6 +28,207 @@ const SLOT_WAL_CAP_BYTES: u64 = 68_719_476_736;
 const WAL_REACTION_RESERVE_SECONDS: u64 = 120;
 const READINESS_TIMEOUT_SECONDS: u64 = 120;
 const OWNERSHIP_TAKEOVER_SECONDS: u64 = 90;
+const ARTICLE1_CONFIG_PATH: &str = "config/article1-reader.toml";
+const ARTICLE1_CONFIG_LIMIT_BYTES: u64 = 16_384;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Article1ReaderConfig {
+    schema_version: u32,
+    dsn_env: String,
+    stop_after_commits: usize,
+}
+
+#[derive(Clone, Copy)]
+struct ReaderFailure {
+    code: &'static str,
+    message: &'static str,
+    exit: ExitCode,
+}
+
+impl ReaderFailure {
+    fn unavailable(code: &'static str, message: &'static str) -> Self {
+        Self {
+            code,
+            message,
+            exit: ExitCode::Unavailable,
+        }
+    }
+}
+
+fn load_article1_config() -> Result<CaptureConfig, ReaderFailure> {
+    let file = std::fs::File::open(ARTICLE1_CONFIG_PATH).map_err(|_| {
+        ReaderFailure::unavailable(
+            "ARTICLE1_CONFIG_UNAVAILABLE",
+            "reader configuration is unavailable",
+        )
+    })?;
+    let metadata = file.metadata().map_err(|_| {
+        ReaderFailure::unavailable(
+            "ARTICLE1_CONFIG_UNAVAILABLE",
+            "reader configuration is unavailable",
+        )
+    })?;
+    if !metadata.is_file() || metadata.len() > ARTICLE1_CONFIG_LIMIT_BYTES {
+        return Err(ReaderFailure::unavailable(
+            "ARTICLE1_CONFIG_INVALID",
+            "reader configuration is invalid",
+        ));
+    }
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    file.take(ARTICLE1_CONFIG_LIMIT_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|_| {
+            ReaderFailure::unavailable(
+                "ARTICLE1_CONFIG_UNAVAILABLE",
+                "reader configuration is unavailable",
+            )
+        })?;
+    if bytes.len() as u64 > ARTICLE1_CONFIG_LIMIT_BYTES {
+        return Err(ReaderFailure::unavailable(
+            "ARTICLE1_CONFIG_INVALID",
+            "reader configuration is invalid",
+        ));
+    }
+    let text = String::from_utf8(bytes).map_err(|_| {
+        ReaderFailure::unavailable("ARTICLE1_CONFIG_INVALID", "reader configuration is invalid")
+    })?;
+    let reader: Article1ReaderConfig = toml::from_str(&text).map_err(|_| {
+        ReaderFailure::unavailable("ARTICLE1_CONFIG_INVALID", "reader configuration is invalid")
+    })?;
+    if reader.schema_version != 1
+        || reader.dsn_env != "BORING_CDC_ARTICLE1_DSN"
+        || reader.stop_after_commits != 1
+    {
+        return Err(ReaderFailure::unavailable(
+            "ARTICLE1_CONFIG_INVALID",
+            "reader configuration is invalid",
+        ));
+    }
+    let dsn = std::env::var(&reader.dsn_env).map_err(|_| {
+        ReaderFailure::unavailable(
+            "ARTICLE1_DSN_UNAVAILABLE",
+            "reader source credential is unavailable",
+        )
+    })?;
+    CaptureConfig::article1(dsn, reader.stop_after_commits)
+        .map_err(|error| ReaderFailure::unavailable(error.code, "reader configuration is invalid"))
+}
+
+#[cfg(unix)]
+static ARTICLE1_SIGNAL_RECEIVED: AtomicBool = AtomicBool::new(false);
+
+#[cfg(unix)]
+type SignalHandler = extern "C" fn(i32);
+
+#[cfg(unix)]
+unsafe extern "C" {
+    fn signal(number: i32, handler: SignalHandler) -> SignalHandler;
+}
+
+#[cfg(unix)]
+extern "C" fn article1_signal_handler(_: i32) {
+    ARTICLE1_SIGNAL_RECEIVED.store(true, Ordering::Relaxed);
+}
+
+fn cancellation_for_signals() -> CancellationToken {
+    #[cfg(unix)]
+    {
+        ARTICLE1_SIGNAL_RECEIVED.store(false, Ordering::Relaxed);
+        // `signal` installs a handler that performs only an async-signal-safe atomic store.
+        unsafe {
+            signal(2, article1_signal_handler);
+            signal(15, article1_signal_handler);
+        }
+    }
+    CancellationToken::new()
+}
+
+#[cfg(unix)]
+fn signal_received() -> bool {
+    ARTICLE1_SIGNAL_RECEIVED.load(Ordering::Relaxed)
+}
+
+#[cfg(not(unix))]
+fn signal_received() -> bool {
+    false
+}
+
+fn capture_article1(
+    config: CaptureConfig,
+    cancellation: CancellationToken,
+) -> Result<(), ReaderFailure> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|_| {
+            ReaderFailure::unavailable(
+                "ARTICLE1_RUNTIME_UNAVAILABLE",
+                "reader runtime is unavailable",
+            )
+        })?;
+    let mut stdout = io::stdout().lock();
+    let mut broken_pipe = false;
+    let result = runtime.block_on(capture_jsonl(&config, &cancellation, |line| {
+        if let Err(error) = writeln!(stdout, "{line}").and_then(|_| stdout.flush()) {
+            broken_pipe = error.kind() == io::ErrorKind::BrokenPipe;
+            return Err(CaptureFailure {
+                boundary: "output",
+                code: "ARTICLE1_STDOUT_FAILED",
+            });
+        }
+        Ok(())
+    }));
+    match result {
+        Ok(_) => Ok(()),
+        Err(_) if broken_pipe || cancellation.is_cancelled() => Ok(()),
+        Err(error) => Err(ReaderFailure {
+            code: error.code,
+            message: "reader capture failed",
+            exit: if error.boundary == "protocol" {
+                ExitCode::Integrity
+            } else {
+                ExitCode::Unavailable
+            },
+        }),
+    }
+}
+
+fn run_article1() -> Result<(), ReaderFailure> {
+    let config = load_article1_config()?;
+    let cancellation = cancellation_for_signals();
+    let worker_cancellation = cancellation.clone();
+    let (sender, receiver) = mpsc::sync_channel(1);
+    thread::Builder::new()
+        .name("article1-capture".into())
+        .spawn(move || {
+            let _ = sender.send(capture_article1(config, worker_cancellation));
+        })
+        .map_err(|_| {
+            ReaderFailure::unavailable(
+                "ARTICLE1_RUNTIME_UNAVAILABLE",
+                "reader runtime is unavailable",
+            )
+        })?;
+    loop {
+        if signal_received() {
+            cancellation.cancel();
+            // Do not join potentially blocked synchronous connection setup. Process exit
+            // terminates this stdout-only provisional reader without publishing feedback.
+            return Ok(());
+        }
+        match receiver.recv_timeout(Duration::from_millis(25)) {
+            Ok(result) => return result,
+            Err(mpsc::RecvTimeoutError::Timeout) => {}
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                return Err(ReaderFailure::unavailable(
+                    "ARTICLE1_RUNTIME_UNAVAILABLE",
+                    "reader runtime is unavailable",
+                ));
+            }
+        }
+    }
+}
 
 fn scaffold_check() -> io::Result<()> {
     let mut out = io::stdout().lock();
@@ -65,6 +271,15 @@ fn main() {
             let _ = write_stdout(command_help(parsed.spec).as_bytes());
         }
         Ok(parsed) => {
+            if parsed.spec.id == "CMD-RUN" {
+                match run_article1() {
+                    Ok(()) => return,
+                    Err(error) => {
+                        eprintln!("{}: {}", error.code, error.message);
+                        std::process::exit(error.exit as i32);
+                    }
+                }
+            }
             let check_result = if parsed.spec.id == "CMD-CHECK" {
                 Some(match std::fs::read_to_string("boring-cdc.toml") {
                     Err(_) => input_failure(
@@ -164,6 +379,17 @@ fn main() {
 mod m0_scaffold {
     mod tests {
         use super::super::*;
+
+        #[test]
+        fn article1_config_is_secret_indirect_and_bounded() {
+            let text = include_str!("../config/article1-reader.toml");
+            let config: Article1ReaderConfig = toml::from_str(text).unwrap();
+            assert_eq!(config.schema_version, 1);
+            assert_eq!(config.dsn_env, "BORING_CDC_ARTICLE1_DSN");
+            assert_eq!(config.stop_after_commits, 1);
+            assert!(!text.contains("postgresql://"));
+            assert!((text.len() as u64) < ARTICLE1_CONFIG_LIMIT_BYTES);
+        }
 
         #[test]
         fn constants_are_bounded_and_takeover_exceeds_reap_bound() {
