@@ -6,6 +6,7 @@
 Cargo.toml / Cargo.lock              # pinned PostgreSQL CopyBoth client
 src/
 ├── article1_capture.rs              # reusable live transport + JSONL rendering
+├── article1_row_view.rs             # process-local TEACHING VIEW from same decoded objects
 ├── m1_decoder.rs                    # existing decoder; consumed unchanged
 ├── m1_cli_contract.rs               # existing `run` command contract
 └── main.rs                          # dispatches `run` to live capture
@@ -32,8 +33,9 @@ sequenceDiagram
     PG-->>CLI: CopyBoth / CopyData
     CLI->>Decoder: decode_copy_data(frame)
     Decoder-->>CLI: BEGIN / row / COMMIT + LSNs
-    CLI-->>Reader: stable readable JSONL
-    Note over CLI,Reader: no feedback, journal, checkpoint, or destination
+    CLI->>CLI: same RowChange updates article1_row_view
+    CLI-->>Reader: raw event + teaching current row/removal JSONL
+    Note over CLI,Reader: TEACHING VIEW only; no ClickHouse, durability, exactly-once, checkpoint, materializer, production state, or M4
 ```
 
 ## Change shape
@@ -47,10 +49,13 @@ sequenceDiagram
 +  feed frames to the existing m1_decoder
 +  print BEGIN / INSERT / UPDATE / DELETE / COMMIT JSONL
 +  expose absent or key-only old tuple state honestly
++  apply the same live RowChange to article1_row_view
++  show insert current row / update overwrite / delete removal
 
  article evidence
 -  unavailable from this repository
 +  real clean-run transcript + deterministic provenance
 +  consumer-row shape
-+  explicit limitation: no tested M4 canonical destination row
++  hard label: TEACHING VIEW; NOT ClickHouse/durable/exactly-once/checkpointed/materializer/production/M4
++  ClickHouse and destination guarantees deferred to Article 4/M4
 ```

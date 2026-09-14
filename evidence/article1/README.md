@@ -1,11 +1,11 @@
 # Article 1 real PostgreSQL reader evidence
 
-> **M4 boundary: no M4 canonical destination row was produced or tested.** This is real PostgreSQL `pgoutput` reader stdout and a documented consumer-facing event shape only. It does not prove feedback, retry, spool/journal, checkpoint, destination, or backfill behavior.
+> **`article1_row_view` is a TEACHING VIEW: NOT ClickHouse, NOT durable, NOT exactly-once, NOT checkpointed, NOT a materializer, NOT production state, and NOT M4.** ClickHouse and destination guarantees are deferred to Article 4/M4. This real PostgreSQL `pgoutput` reader stdout proves only a process-local explanation of current rows; it does not prove feedback, retry, spool/journal, checkpoint, destination, or backfill behavior.
 
 ## What these files are
 
-- `reader-default.raw.jsonl` is unmodified stdout from the exact reader command against a clean default-replica-identity fixture. Its UPDATE has no old tuple (`old_state: "absent"`); its DELETE has only the key (`["9101", null, null]`, `old_state: "key"`).
-- `reader-full.raw.jsonl` is unmodified stdout from a second clean fixture after `ALTER TABLE customers REPLICA IDENTITY FULL`. UPDATE and DELETE contain complete old tuples (`old_state: "full"`).
+- `reader-default.raw.jsonl` is unmodified stdout from the exact reader command against a clean default-replica-identity fixture. Each decoded event carries raw fields and the `article1_row_view` result produced from that same live in-process `PgoutputEvent`/`RowChange`; no SQL, transcript, or rendered JSONL is re-parsed. INSERT creates a current row, UPDATE with `old_state: "absent"` overwrites that known row, and key-only DELETE removes it.
+- `reader-full.raw.jsonl` is unmodified stdout from a second clean fixture after `ALTER TABLE customers REPLICA IDENTITY FULL`. UPDATE and DELETE retain `old_state: "full"` while producing the same overwrite/removal teaching result.
 - `reader.normalized.jsonl` is mechanically derived from those raw files by `scripts/validate/article1_transcript.py`.
 - `manifest.json` records the capture identity and SHA-256 digests.
 
@@ -13,7 +13,7 @@ The default and FULL captures are separate clean database resets. FULL is an exp
 
 ## Exact capture environment
 
-Capture source SHA: `30e9fe4ed6f0796b2aca8497b31d30f517f141c5` (includes preserved closure commit `30e9fe4`, merged M0 base `55078fec9`, and the provisional transport/CLI implementation). The exact `target/debug/boring-cdc` executable used for both committed raw captures had SHA-256 `3fc5d0fe0652fcbc6b033075c555e651d46efc2f7e0aa7f105a834a6155b84b8`. This is capture identity, not a cross-checkout reproducible-build claim; Rust debug artifacts can encode their absolute build path.
+Capture source SHA: `PENDING` (includes preserved closure commits `e852813` and `30e9fe4`, merged M0 base `55078fec9`, the provisional transport/CLI markers, and the same-stream teaching-view implementation). The exact `target/debug/boring-cdc` executable used for both committed raw captures had SHA-256 `PENDING`. This is capture identity, not a cross-checkout reproducible-build claim; Rust debug artifacts can encode their absolute build path.
 
 Server banner:
 
@@ -80,6 +80,14 @@ TMPDIR=/var/tmp ARTICLE1_PG_PORT=55696 ARTICLE1_PROJECT=article1-owner-evidence 
 python3 scripts/validate/article1_transcript.py
 ```
 
-## Consumer-row shape
+## Raw event plus teaching row/removal
 
-Each line is one source event object. BEGIN exposes `event`, `final_lsn`, `wal_start`, `wal_end`, and transaction `{xid, commit_time}`. Row events expose `event`, `relation_id`, `new`, `old`, `old_state`, `wal_start`, `wal_end`, and transaction `{xid, ordinal}`. COMMIT exposes `event`, `commit_lsn`, `end_lsn`, `wal_start`, `wal_end`, `row_count`, and transaction `{commit_time}`. Tuple arrays follow the published `customers(id, name, tier)` relation order; JSON `null` placeholders in a key-only old tuple are not full old values.
+Each line is one raw source event object with an `article1_row_view` field. BEGIN and COMMIT retain their transaction envelope and LSNs and mark a transaction boundary. Row events retain `event`, `relation_id`, `new`, `old`, `old_state`, transaction identity/ordinal, and LSNs beside the result derived directly from the same decoded object:
+
+- INSERT: `action: "current_row"` with the inserted row;
+- UPDATE: `action: "current_row"` with the overwritten row;
+- DELETE: `action: "removed"`, the removed prior row, and `row: null`.
+
+Tuple arrays follow the published `customers(id, name, tier)` relation order; JSON `null` placeholders in a key-only old tuple are not full old values. Missing current state, keys, new UPDATE values, or DELETE identity fail with a visible `ARTICLE1_ROW_VIEW_*` error rather than guessing.
+
+Again, **`article1_row_view` is a TEACHING VIEW: NOT ClickHouse, NOT durable, NOT exactly-once, NOT checkpointed, NOT a materializer, NOT production state, and NOT M4.** ClickHouse and destination guarantees are deferred to Article 4/M4.

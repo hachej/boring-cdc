@@ -2,9 +2,9 @@
 
 ## Outcome
 
-Make Article 1’s hands-on beat runnable from a clean checkout: PostgreSQL 17.6 emits live `pgoutput`, `boring-cdc run` receives CopyBoth frames, the existing `m1_decoder` decodes them, and stable JSONL shows `BEGIN`, `INSERT`, `UPDATE`, `DELETE`, and `COMMIT` beside the consumer-row shape.
+Make Article 1’s hands-on beat runnable from a clean checkout: PostgreSQL 17.6 emits live `pgoutput`, `boring-cdc run` receives CopyBoth frames, the existing `m1_decoder` decodes them, and stable JSONL shows `BEGIN`, `INSERT`, `UPDATE`, `DELETE`, and `COMMIT` beside a current row/removal derived from the same live decoded objects.
 
-This is deliberately **not** M4 evidence. It proves a raw source event and the row shape a consumer can derive. It does not connect that event to a tested canonical destination row, and the article must narrow its claim accordingly.
+**PR-ready boundary:** `article1_row_view` is a TEACHING VIEW: NOT ClickHouse, NOT durable, NOT exactly-once, NOT checkpointed, NOT a materializer, NOT production state, and NOT M4. ClickHouse and destination guarantees are deferred to Article 4/M4.
 
 ## Authority and open risk
 
@@ -21,13 +21,14 @@ This is deliberately **not** M4 evidence. It proves a raw source event and the r
 | `boring-cdc-pci.2` | Pinned PostgreSQL 17.6 commerce fixture and deterministic mutations | — | Compose clean start/reset, publication/slot/version assertions |
 | `boring-cdc-pci.3` | Wire existing `boring-cdc run` contract to capture | `.1` | CLI contract, exit/redaction, live invocation |
 | `boring-cdc-pci.4` | Capture and validate a real insert/update/delete transcript | `.1`, `.2`, `.3` | two clean runs byte-identical under documented normalization; evidence digests |
-| `boring-cdc-pci.5` | Final integration, scope audit, and local green-head receipt | `.4` | full locked local suite, affected validators, duplicate-ID check, clean head |
+| `boring-cdc-pci.6` | Same-stream process-local `article1_row_view` teaching view | `.4` | real PG17 raw event + insert/update/delete row result; fail-visible insufficient-state tests |
+| `boring-cdc-pci.5` | Final integration, scope audit, and local green-head receipt | `.6` | full locked local suite, affected validators, duplicate-ID check, clean head |
 
 The epic Bead is `boring-cdc-pci`. Initial parallelism is limited to `.1` and `.2`; later work is dependency-serial.
 
 ## Scope boundaries
 
-No spool, SQLite journal, atomic commit, PostgreSQL feedback/acknowledgement, checkpoint, destination, backfill, or claim that M2/M3/M4 behavior exists. The live transport is a reusable library boundary that `boring-cdc-m2-capture-runtime` can consume later.
+No spool, SQLite journal, atomic commit, PostgreSQL feedback/acknowledgement, checkpoint, destination, backfill, or claim that M2/M3/M4 behavior exists. `article1_row_view` is ephemeral explanatory memory only, never a destination guarantee. The live transport is a reusable library boundary that `boring-cdc-m2-capture-runtime` can consume later.
 
 Wrong PostgreSQL version, publication, slot, or continuity is named and exits non-zero. Replica-identity output distinguishes absent, key-only, and full old tuples without treating an expected absence as corruption.
 

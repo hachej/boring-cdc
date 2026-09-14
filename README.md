@@ -43,6 +43,10 @@ scripts/agent/verify <bead-id>
 
 Each helper emits source provenance and its underlying commands. `handoff`, `recover`, and `finish` emit bounded projections or explicit operation plans; they never claim, mutate product state, commit, push, or close work.
 
+## Article 1 reader
+
+The Article 1 live reader prints raw `pgoutput` events beside `article1_row_view` results derived from the same in-process decoded objects. **`article1_row_view` is a TEACHING VIEW: NOT ClickHouse, NOT durable, NOT exactly-once, NOT checkpointed, NOT a materializer, NOT production state, and NOT M4.** ClickHouse and destination guarantees are deferred to Article 4/M4. See [`evidence/article1/README.md`](evidence/article1/README.md).
+
 ## Status
 
 Planning and M0 contract work. No production-ready connector exists yet. `br ready` is the authoritative current-work view; this summary must not be used as a readiness gate.

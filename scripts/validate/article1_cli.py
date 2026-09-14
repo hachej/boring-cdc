@@ -69,6 +69,19 @@ def main() -> int:
             raise RuntimeError(f"unexpected CLI events: {names}")
         if [events[index]["old_state"] for index in (1, 2, 3)] != ["absent", "absent", "key"]:
             raise RuntimeError("CLI transcript old-state contract drifted")
+        expected_results = [
+            {"action": "current_row", "key": ["9101"], "row": ["9101", "Article Default", "1"]},
+            {"action": "current_row", "key": ["9101"], "row": ["9101", "Article Default Updated", "2"]},
+            {"action": "removed", "key": ["9101"], "removed_row": ["9101", "Article Default Updated", "2"], "row": None},
+        ]
+        for event, expected in zip(events[1:4], expected_results):
+            view = event.get("article1_row_view", {})
+            if view.get("label") != "TEACHING VIEW" or view.get("result") != expected:
+                raise RuntimeError("same-stream article1_row_view contract drifted")
+            disclaimer = view.get("disclaimer", "")
+            for phrase in ("NOT ClickHouse", "NOT durable", "NOT exactly-once", "NOT checkpointed", "NOT a materializer", "NOT production state", "NOT M4"):
+                if phrase not in disclaimer:
+                    raise RuntimeError(f"article1_row_view disclaimer missing {phrase}")
 
         wrong = env.copy()
         wrong["BORING_CDC_ARTICLE1_DSN"] = wrong["BORING_CDC_ARTICLE1_DSN"].replace(PASSWORD, "super-secret-wrong")
@@ -158,6 +171,7 @@ def main() -> int:
         print(
             "ARTICLE1_CLI_OK command='BORING_CDC_ARTICLE1_DSN=<redacted> target/debug/boring-cdc run' "
             "postgres=17.6 events=BEGIN,INSERT,UPDATE,DELETE,COMMIT old_states=absent,key "
+            "same_stream_row_view=insert-current,update-overwritten,delete-removed teaching_view=true "
             "auth=redacted sigint_sigterm=clean broken_pipe=clean unrelated=unchanged"
         )
         return 0

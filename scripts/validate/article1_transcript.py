@@ -16,10 +16,15 @@ EXPECTED_SHA256 = {
     "config/article1-reader.toml": "50945fe039ad1594d124783ec4f02558649875ed7ddf6633235d797b81b1869c",
     "fixtures/article1/schema-and-seed.sql": "7f58d39e39d26006849c0bd6f4f6e6f63cf7ae81c71ba511fc64a976e4744cf1",
     "fixtures/article1/fixture.json": "6c9f5705efead78c287fe3791aaad096f7bf6446287d6f44f789f623ff023ad1",
-    "evidence/article1/reader-default.raw.jsonl": "74a7275851d82121468de916742a8067cf2906062a92cc6da0a066399275d818",
-    "evidence/article1/reader-full.raw.jsonl": "de7fac472c6114a004cfc10939fe251ecf8d19a2b9d2f38ffd511137868cfa3e",
-    "evidence/article1/reader.normalized.jsonl": "1842c3162593775d9cfbd0be3368769f060c617df9a3871d2101d893787f0915",
+    "evidence/article1/reader-default.raw.jsonl": "PENDING",
+    "evidence/article1/reader-full.raw.jsonl": "PENDING",
+    "evidence/article1/reader.normalized.jsonl": "PENDING",
 }
+
+DISCLAIMER = (
+    "NOT ClickHouse; NOT durable; NOT exactly-once; NOT checkpointed; NOT a materializer; "
+    "NOT production state; NOT M4; ClickHouse and destination guarantees are deferred to Article 4/M4"
+)
 
 
 def fail(message: str) -> None:
@@ -53,11 +58,11 @@ def validate_scenario(rows: list[dict[str, Any]], scenario: str) -> None:
 
     begin, insert, update, delete, commit = rows
     expected_keys = [
-        {"event", "final_lsn", "transaction", "wal_end", "wal_start"},
-        {"event", "new", "old", "old_state", "relation_id", "transaction", "wal_end", "wal_start"},
-        {"event", "new", "old", "old_state", "relation_id", "transaction", "wal_end", "wal_start"},
-        {"event", "new", "old", "old_state", "relation_id", "transaction", "wal_end", "wal_start"},
-        {"commit_lsn", "end_lsn", "event", "row_count", "transaction", "wal_end", "wal_start"},
+        {"article1_row_view", "event", "final_lsn", "transaction", "wal_end", "wal_start"},
+        {"article1_row_view", "event", "new", "old", "old_state", "relation_id", "transaction", "wal_end", "wal_start"},
+        {"article1_row_view", "event", "new", "old", "old_state", "relation_id", "transaction", "wal_end", "wal_start"},
+        {"article1_row_view", "event", "new", "old", "old_state", "relation_id", "transaction", "wal_end", "wal_start"},
+        {"article1_row_view", "commit_lsn", "end_lsn", "event", "row_count", "transaction", "wal_end", "wal_start"},
     ]
     if [set(row) for row in rows] != expected_keys:
         fail(f"{scenario}: event field shape drifted")
@@ -111,6 +116,20 @@ def validate_scenario(rows: list[dict[str, Any]], scenario: str) -> None:
         fail(f"{scenario}: replica-identity old-state contract drifted")
     if insert.get("old") is not None:
         fail(f"{scenario}: INSERT unexpectedly has an old tuple")
+
+    row_id, initial_name, initial_tier = expected_new[0]
+    _, updated_name, updated_tier = expected_new[1]
+    expected_view_results = [
+        {"action": "transaction_boundary"},
+        {"action": "current_row", "key": [row_id], "row": [row_id, initial_name, initial_tier]},
+        {"action": "current_row", "key": [row_id], "row": [row_id, updated_name, updated_tier]},
+        {"action": "removed", "key": [row_id], "removed_row": [row_id, updated_name, updated_tier], "row": None},
+        {"action": "transaction_boundary"},
+    ]
+    for index, (row, expected_result) in enumerate(zip(rows, expected_view_results)):
+        view = row.get("article1_row_view")
+        if view != {"label": "TEACHING VIEW", "disclaimer": DISCLAIMER, "result": expected_result}:
+            fail(f"{scenario}: article1_row_view result drifted at event {index}")
     if scenario == "default":
         if update.get("old") is not None or delete.get("old") != ["9101", None, None]:
             fail("default: expected absent UPDATE old tuple and key-only DELETE old tuple")
@@ -161,15 +180,15 @@ def main() -> int:
         if set(manifest) != {
             "schema_version", "owner_bead", "capture_code_sha", "reader_command", "capture_binary_sha256",
             "capture_binary_note", "server", "fixture", "normalization", "consumer_row_shape",
-            "m4_canonical_destination_row_produced_or_tested", "sha256",
+            "article1_row_view", "sha256",
         }:
             fail("manifest field inventory drifted")
         expected_identity = {
-            "schema_version": "article1-reader-evidence/v1",
-            "owner_bead": "boring-cdc-pci.4",
-            "capture_code_sha": "30e9fe4ed6f0796b2aca8497b31d30f517f141c5",
+            "schema_version": "article1-reader-evidence/v2",
+            "owner_bead": "boring-cdc-pci.6",
+            "capture_code_sha": "PENDING",
             "reader_command": "BORING_CDC_ARTICLE1_DSN='postgresql://postgres:article1_fixture_only@127.0.0.1:55696/article1?sslmode=disable' target/debug/boring-cdc run",
-            "capture_binary_sha256": "3fc5d0fe0652fcbc6b033075c555e651d46efc2f7e0aa7f105a834a6155b84b8",
+            "capture_binary_sha256": "PENDING",
             "capture_binary_note": "Digest of the exact target/debug/boring-cdc executable used for the committed raw capture; debug binaries built in another absolute checkout can differ.",
         }
         for name, expected in expected_identity.items():
@@ -191,24 +210,35 @@ def main() -> int:
         if manifest.get("normalization") != {
             "normalized_fields": ["transaction.commit_time"], "replacement": 0,
             "serialization": "JSON objects with sorted keys and compact separators; default events then FULL events",
-            "retained_unchanged": ["xid", "relation_id", "ordinal", "tuple values", "wal_start", "wal_end", "final_lsn", "commit_lsn", "end_lsn"],
+            "retained_unchanged": ["xid", "relation_id", "ordinal", "tuple values", "article1_row_view results", "wal_start", "wal_end", "final_lsn", "commit_lsn", "end_lsn"],
         }:
             fail("manifest normalization contract drifted")
         if manifest.get("consumer_row_shape") != {
-            "begin": ["event", "final_lsn", "transaction{xid,commit_time}", "wal_start", "wal_end"],
-            "row": ["event", "new", "old", "old_state", "relation_id", "transaction{xid,ordinal}", "wal_start", "wal_end"],
-            "commit": ["event", "commit_lsn", "end_lsn", "row_count", "transaction{commit_time}", "wal_start", "wal_end"],
+            "begin": ["article1_row_view", "event", "final_lsn", "transaction{xid,commit_time}", "wal_start", "wal_end"],
+            "row": ["article1_row_view", "event", "new", "old", "old_state", "relation_id", "transaction{xid,ordinal}", "wal_start", "wal_end"],
+            "commit": ["article1_row_view", "event", "commit_lsn", "end_lsn", "row_count", "transaction{commit_time}", "wal_start", "wal_end"],
         }:
             fail("manifest consumer row shape drifted")
-        if manifest.get("m4_canonical_destination_row_produced_or_tested") is not False:
-            fail("manifest M4 boundary drifted")
+        if manifest.get("article1_row_view") != {
+            "label": "TEACHING VIEW",
+            "same_in_process_decoded_events_as_raw_output": True,
+            "not_clickhouse": True,
+            "not_durable": True,
+            "not_exactly_once": True,
+            "not_checkpointed": True,
+            "not_a_materializer": True,
+            "not_production_state": True,
+            "not_m4": True,
+            "destination_guarantees_deferred_to": "Article 4/M4",
+        }:
+            fail("manifest article1_row_view boundary drifted")
         if manifest.get("sha256") != EXPECTED_SHA256:
             fail("manifest digest inventory drifted")
         for name, expected in EXPECTED_SHA256.items():
             actual = digest(ROOT / name)
             if actual != expected:
                 fail(f"digest drift for {name}: expected {expected}, got {actual}")
-    print("ARTICLE1_TRANSCRIPT_OK real_stdout=true events=BEGIN,INSERT,UPDATE,DELETE,COMMIT old_states=absent,key,full lsn_relationships=valid")
+    print("ARTICLE1_TRANSCRIPT_OK real_stdout=true same_stream_row_view=true teaching_view=true events=BEGIN,INSERT,UPDATE,DELETE,COMMIT old_states=absent,key,full insert=current update=overwritten delete=removed lsn_relationships=valid")
     return 0
 
 

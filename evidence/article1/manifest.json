@@ -1,9 +1,9 @@
 {
-  "schema_version": "article1-reader-evidence/v1",
-  "owner_bead": "boring-cdc-pci.4",
-  "capture_code_sha": "30e9fe4ed6f0796b2aca8497b31d30f517f141c5",
+  "schema_version": "article1-reader-evidence/v2",
+  "owner_bead": "boring-cdc-pci.6",
+  "capture_code_sha": "PENDING",
   "reader_command": "BORING_CDC_ARTICLE1_DSN='postgresql://postgres:article1_fixture_only@127.0.0.1:55696/article1?sslmode=disable' target/debug/boring-cdc run",
-  "capture_binary_sha256": "3fc5d0fe0652fcbc6b033075c555e651d46efc2f7e0aa7f105a834a6155b84b8",
+  "capture_binary_sha256": "PENDING",
   "capture_binary_note": "Digest of the exact target/debug/boring-cdc executable used for the committed raw capture; debug binaries built in another absolute checkout can differ.",
   "server": {
     "version": "PostgreSQL 17.6 (Debian 17.6-2.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
@@ -22,20 +22,31 @@
     "normalized_fields": ["transaction.commit_time"],
     "replacement": 0,
     "serialization": "JSON objects with sorted keys and compact separators; default events then FULL events",
-    "retained_unchanged": ["xid", "relation_id", "ordinal", "tuple values", "wal_start", "wal_end", "final_lsn", "commit_lsn", "end_lsn"]
+    "retained_unchanged": ["xid", "relation_id", "ordinal", "tuple values", "article1_row_view results", "wal_start", "wal_end", "final_lsn", "commit_lsn", "end_lsn"]
   },
   "consumer_row_shape": {
-    "begin": ["event", "final_lsn", "transaction{xid,commit_time}", "wal_start", "wal_end"],
-    "row": ["event", "new", "old", "old_state", "relation_id", "transaction{xid,ordinal}", "wal_start", "wal_end"],
-    "commit": ["event", "commit_lsn", "end_lsn", "row_count", "transaction{commit_time}", "wal_start", "wal_end"]
+    "begin": ["article1_row_view", "event", "final_lsn", "transaction{xid,commit_time}", "wal_start", "wal_end"],
+    "row": ["article1_row_view", "event", "new", "old", "old_state", "relation_id", "transaction{xid,ordinal}", "wal_start", "wal_end"],
+    "commit": ["article1_row_view", "event", "commit_lsn", "end_lsn", "row_count", "transaction{commit_time}", "wal_start", "wal_end"]
   },
-  "m4_canonical_destination_row_produced_or_tested": false,
+  "article1_row_view": {
+    "label": "TEACHING VIEW",
+    "same_in_process_decoded_events_as_raw_output": true,
+    "not_clickhouse": true,
+    "not_durable": true,
+    "not_exactly_once": true,
+    "not_checkpointed": true,
+    "not_a_materializer": true,
+    "not_production_state": true,
+    "not_m4": true,
+    "destination_guarantees_deferred_to": "Article 4/M4"
+  },
   "sha256": {
     "config/article1-reader.toml": "50945fe039ad1594d124783ec4f02558649875ed7ddf6633235d797b81b1869c",
     "fixtures/article1/schema-and-seed.sql": "7f58d39e39d26006849c0bd6f4f6e6f63cf7ae81c71ba511fc64a976e4744cf1",
     "fixtures/article1/fixture.json": "6c9f5705efead78c287fe3791aaad096f7bf6446287d6f44f789f623ff023ad1",
-    "evidence/article1/reader-default.raw.jsonl": "74a7275851d82121468de916742a8067cf2906062a92cc6da0a066399275d818",
-    "evidence/article1/reader-full.raw.jsonl": "de7fac472c6114a004cfc10939fe251ecf8d19a2b9d2f38ffd511137868cfa3e",
-    "evidence/article1/reader.normalized.jsonl": "1842c3162593775d9cfbd0be3368769f060c617df9a3871d2101d893787f0915"
+    "evidence/article1/reader-default.raw.jsonl": "PENDING",
+    "evidence/article1/reader-full.raw.jsonl": "PENDING",
+    "evidence/article1/reader.normalized.jsonl": "PENDING"
   }
 }

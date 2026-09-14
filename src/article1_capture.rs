@@ -4,6 +4,7 @@
 //! receiving CopyBoth payloads. Every payload is decoded by [`crate::m1_decoder::Decoder`].
 //! This module sends no standby-status packet, performs no retry, and persists nothing.
 
+use crate::article1_row_view::{Article1RowView, RowViewChange};
 use crate::m1_decoder::{
     Column, CopyBothEvent, Decoder, OldTupleKind, PgoutputEvent, Relation, RelationContract,
     RowKind, TupleValue, WireLimits,
@@ -126,6 +127,7 @@ where
             .await
             .map_err(|_| CaptureFailure::at("connection", "ARTICLE1_SETUP_TASK_FAILED"))??;
     let mut decoder = Decoder::new(WireLimits::default());
+    let mut row_view = Article1RowView::new(&contracts);
     let mut commits = 0usize;
 
     while commits < config.stop_after_commits {
@@ -164,7 +166,15 @@ where
                 PgoutputEvent::RelationMetadata(_) | PgoutputEvent::Origin { .. } => {}
                 event => {
                     let commit = matches!(event, PgoutputEvent::Commit { .. });
-                    emit(render(wal_start, wal_end, event)?)?;
+                    let view_change = match &event {
+                        PgoutputEvent::Row(row) => {
+                            Some(row_view.apply(row).map_err(|failure| {
+                                CaptureFailure::at("article1_row_view", failure.code)
+                            })?)
+                        }
+                        _ => None,
+                    };
+                    emit(render(wal_start, wal_end, &event, view_change.as_ref())?)?;
                     if commit {
                         commits += 1;
                     }
@@ -343,14 +353,19 @@ fn classify_connection(message: &str) -> CaptureFailure {
     }
 }
 
-fn render(wal_start: u64, wal_end: u64, event: PgoutputEvent) -> Result<String, CaptureFailure> {
-    let body = match event {
+fn render(
+    wal_start: u64,
+    wal_end: u64,
+    event: &PgoutputEvent,
+    view_change: Option<&RowViewChange>,
+) -> Result<String, CaptureFailure> {
+    let mut body = match event {
         PgoutputEvent::Begin {
             final_lsn,
             commit_time,
             xid,
         } => {
-            json!({"event":"BEGIN","final_lsn":lsn(final_lsn),"transaction":{"commit_time":commit_time,"xid":xid},"wal_end":lsn(wal_end),"wal_start":lsn(wal_start)})
+            json!({"event":"BEGIN","final_lsn":lsn(*final_lsn),"transaction":{"commit_time":commit_time,"xid":xid},"wal_end":lsn(wal_end),"wal_start":lsn(wal_start)})
         }
         PgoutputEvent::Row(row) => json!({
             "event": match row.kind { RowKind::Insert => "INSERT", RowKind::Update => "UPDATE", RowKind::Delete => "DELETE" },
@@ -368,12 +383,37 @@ fn render(wal_start: u64, wal_end: u64, event: PgoutputEvent) -> Result<String, 
             row_count,
             ..
         } => {
-            json!({"commit_lsn":lsn(commit_lsn),"end_lsn":lsn(end_lsn),"event":"COMMIT","row_count":row_count,"transaction":{"commit_time":commit_time},"wal_end":lsn(wal_end),"wal_start":lsn(wal_start)})
+            json!({"commit_lsn":lsn(*commit_lsn),"end_lsn":lsn(*end_lsn),"event":"COMMIT","row_count":row_count,"transaction":{"commit_time":commit_time},"wal_end":lsn(wal_end),"wal_start":lsn(wal_start)})
         }
         _ => return Err(CaptureFailure::at("protocol", "ARTICLE1_EVENT_UNEXPECTED")),
     };
+    body.as_object_mut()
+        .ok_or_else(|| CaptureFailure::at("protocol", "ARTICLE1_JSON_ENCODING_FAILED"))?
+        .insert("article1_row_view".into(), render_row_view(view_change)?);
     serde_json::to_string(&body)
         .map_err(|_| CaptureFailure::at("protocol", "ARTICLE1_JSON_ENCODING_FAILED"))
+}
+
+fn render_row_view(change: Option<&RowViewChange>) -> Result<Value, CaptureFailure> {
+    let result = match change {
+        None => json!({"action":"transaction_boundary"}),
+        Some(RowViewChange::Current { key, row }) => json!({
+            "action":"current_row",
+            "key":tuple(Some(key))?,
+            "row":tuple(Some(row))?,
+        }),
+        Some(RowViewChange::Removed { key, row }) => json!({
+            "action":"removed",
+            "key":tuple(Some(key))?,
+            "removed_row":tuple(Some(row))?,
+            "row":Value::Null,
+        }),
+    };
+    Ok(json!({
+        "label":"TEACHING VIEW",
+        "disclaimer":"NOT ClickHouse; NOT durable; NOT exactly-once; NOT checkpointed; NOT a materializer; NOT production state; NOT M4; ClickHouse and destination guarantees are deferred to Article 4/M4",
+        "result":result,
+    }))
 }
 
 fn tuple(values: Option<&[TupleValue]>) -> Result<Value, CaptureFailure> {
