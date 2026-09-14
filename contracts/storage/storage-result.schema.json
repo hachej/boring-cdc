@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assertions": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "bead_id": {
+      "const": "boring-cdc-m0-storage-model"
+    },
+    "contract_sha256": {
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "executor_id": {
+      "enum": [
+        "boring-cdc-m1-preflight",
+        "boring-cdc-m2-capture-runtime",
+        "boring-cdc-m2-journal",
+        "boring-cdc-m2-ownership",
+        "boring-cdc-m2-pressure",
+        "boring-cdc-m2-reconcile",
+        "boring-cdc-m2-spool"
+      ]
+    },
+    "fixture_id": {
+      "enum": [
+        "SCN-M0-STORAGE-FRESH-INIT",
+        "SCN-M0-STORAGE-WRITER-OFF-OBSERVER-FULL",
+        "SCN-M0-STORAGE-REOPENED-WRITER",
+        "SCN-M0-STORAGE-STALE-ATTESTATION",
+        "SCN-M0-STORAGE-READONLY-CHECK",
+        "SCN-M0-STORAGE-UNSUPPORTED-FS",
+        "SCN-M0-STORAGE-EXT4-ABRUPT-HOST",
+        "SCN-M0-STORAGE-XFS-ABRUPT-HOST",
+        "SCN-M0-STORAGE-CRASH-BEFORE-COMMIT",
+        "SCN-M0-STORAGE-CRASH-AFTER-COMMIT",
+        "SCN-M0-STORAGE-CHECKPOINT-BUSY",
+        "SCN-M0-STORAGE-READER-OVERAGE",
+        "SCN-M0-STORAGE-PIN-LIFETIME",
+        "SCN-M0-STORAGE-WAL-RECYCLING",
+        "SCN-M0-STORAGE-INCREMENTAL-VACUUM",
+        "SCN-M0-STORAGE-NO-FULL-VACUUM",
+        "SCN-M0-STORAGE-SPOOL-ORPHAN-SAFE",
+        "SCN-M0-STORAGE-SPOOL-ORPHAN-AMBIGUOUS",
+        "SCN-M0-STORAGE-STATE-NEAR-LIMIT",
+        "SCN-M0-STORAGE-STATE-OVER-LIMIT",
+        "SCN-M0-STORAGE-SEPARATE-ARCHIVE-FULL",
+        "SCN-M0-STORAGE-SHARED-FS-COMBINED",
+        "SCN-M0-STORAGE-ENOSPC-PERSIST-FAIL",
+        "SCN-M0-STORAGE-MEMORY-AT-LIMIT",
+        "SCN-M0-STORAGE-MEMORY-OVER-LIMIT",
+        "SCN-M0-STORAGE-OVERSIZED-WIRE",
+        "SCN-M0-STORAGE-OVERSIZED-TRANSACTION",
+        "SCN-M0-STORAGE-WRITER-FAIRNESS",
+        "SCN-M0-STORAGE-WRITER-QUEUE-FULL",
+        "SCN-M0-STORAGE-COMMAND-LOST-RESPONSE",
+        "SCN-M0-STORAGE-COMMAND-RESTART-ABORT",
+        "SCN-M0-STORAGE-DIRECT-SECOND-WRITER",
+        "SCN-M0-STORAGE-ADVISORY-UNCERTAIN",
+        "SCN-M0-STORAGE-QUICK-CHECK-CORRUPT",
+        "SCN-M0-STORAGE-CHECKSUM-MISMATCH",
+        "SCN-M0-STORAGE-PERMISSION-WEAK"
+      ]
+    },
+    "git_sha": {
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "logs_redacted": {
+      "const": true
+    },
+    "outcome": {
+      "enum": [
+        "pass",
+        "fail",
+        "unavailable"
+      ]
+    },
+    "schema_version": {
+      "const": "storage-result/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "bead_id",
+    "fixture_id",
+    "executor_id",
+    "git_sha",
+    "contract_sha256",
+    "outcome",
+    "assertions",
+    "logs_redacted"
+  ],
+  "type": "object"
+}

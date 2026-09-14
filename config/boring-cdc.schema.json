@@ -1,0 +1,162 @@
+{
+  "$id": "https://boring-cdc.dev/config/boring-cdc.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "failure_policy": {
+      "additionalProperties": false,
+      "properties": {
+        "base_ms": {
+          "const": 250
+        },
+        "cap_ms": {
+          "const": 30000
+        },
+        "max_attempts": {
+          "const": 10
+        },
+        "version": {
+          "const": 1
+        }
+      },
+      "required": [
+        "version",
+        "base_ms",
+        "cap_ms",
+        "max_attempts"
+      ],
+      "type": "object"
+    },
+    "journal": {
+      "additionalProperties": false,
+      "properties": {
+        "busy_timeout_ms": {
+          "const": 5000
+        },
+        "max_readers": {
+          "const": 16
+        },
+        "path": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "sqlite_version": {
+          "const": "3.45.3"
+        }
+      },
+      "required": [
+        "path",
+        "sqlite_version",
+        "busy_timeout_ms",
+        "max_readers"
+      ],
+      "type": "object"
+    },
+    "limits": {
+      "additionalProperties": false,
+      "properties": {
+        "event_bytes": {
+          "const": 8388608
+        },
+        "key_bytes": {
+          "const": 1024
+        },
+        "row_bytes": {
+          "const": 4194304
+        },
+        "scalar_bytes": {
+          "const": 1048576
+        }
+      },
+      "required": [
+        "scalar_bytes",
+        "row_bytes",
+        "event_bytes",
+        "key_bytes"
+      ],
+      "type": "object"
+    },
+    "security": {
+      "additionalProperties": false,
+      "properties": {
+        "canonicalization": {
+          "const": "RFC8785-JCS-SHA256"
+        },
+        "confirmation_expiry_seconds": {
+          "const": 300
+        },
+        "nonce_bits": {
+          "const": 128
+        },
+        "nonce_encoding": {
+          "const": "base64url-unpadded"
+        },
+        "read_timeout_seconds": {
+          "const": 10
+        },
+        "redaction_max_bytes": {
+          "const": 65536
+        },
+        "redaction_max_depth": {
+          "const": 8
+        },
+        "request_bytes": {
+          "const": 1048576
+        },
+        "response_bytes": {
+          "const": 4194304
+        },
+        "tls_minimum": {
+          "const": "1.2"
+        },
+        "tls_preferred": {
+          "const": "1.3"
+        },
+        "write_timeout_seconds": {
+          "const": 30
+        }
+      },
+      "required": [
+        "request_bytes",
+        "response_bytes",
+        "read_timeout_seconds",
+        "write_timeout_seconds",
+        "confirmation_expiry_seconds",
+        "nonce_bits",
+        "nonce_encoding",
+        "canonicalization",
+        "tls_minimum",
+        "tls_preferred",
+        "redaction_max_depth",
+        "redaction_max_bytes"
+      ],
+      "type": "object"
+    },
+    "source": {
+      "additionalProperties": false,
+      "properties": {
+        "dsn_env": {
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "type": "string"
+        },
+        "max_slot_wal_keep_size_bytes": {
+          "const": 68719476736
+        }
+      },
+      "required": [
+        "dsn_env",
+        "max_slot_wal_keep_size_bytes"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "source",
+    "journal",
+    "limits",
+    "failure_policy",
+    "security"
+  ],
+  "title": "Boring CDC configuration scaffold",
+  "type": "object"
+}

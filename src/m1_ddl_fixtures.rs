@@ -12,11 +12,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
-// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED catalog poll interval).
+// M0-RECONCILED: boring-cdc-d-ddl (RECOMMENDED catalog poll interval).
 pub const CATALOG_POLL_INTERVAL_MS: u64 = 5_000;
-// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED DDL waiter source-impact bound).
+// M0-RECONCILED: boring-cdc-d-ddl (RECOMMENDED DDL waiter source-impact bound).
 pub const DDL_WAITER_BOUND_MS: u64 = 5_000;
-// M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED supported PostgreSQL majors).
+// M0-RECONCILED: boring-cdc-d-ddl (RECOMMENDED supported PostgreSQL majors).
 pub const SUPPORTED_POSTGRES_MAJORS: [u16; 3] = [15, 16, 17];
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -608,11 +608,10 @@ impl GuardedDecoder {
         if let CopyBothEvent::XLogData {
             event: pgoutput, ..
         } = &event
+            && let Err(failure) = self.catalog.observe_decoder_event(pgoutput)
         {
-            if let Err(failure) = self.catalog.observe_decoder_event(pgoutput) {
-                self.blocked = true;
-                return Err(GuardedDecodeFailure::Catalog(failure));
-            }
+            self.blocked = true;
+            return Err(GuardedDecodeFailure::Catalog(failure));
         }
         Ok(event)
     }

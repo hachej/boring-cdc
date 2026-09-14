@@ -1,0 +1,223 @@
+{
+  "array_type_oids": {
+    "bool": 1000,
+    "bpchar": 1014,
+    "bytea": 1001,
+    "date": 1182,
+    "float4": 1021,
+    "float8": 1022,
+    "int2": 1005,
+    "int4": 1007,
+    "int8": 1016,
+    "name": 1003,
+    "numeric": 1231,
+    "oid": 1028,
+    "text": 1009,
+    "timestamp": 1115,
+    "timestamptz": 1185,
+    "uuid": 2951,
+    "varchar": 1015
+  },
+  "domains": {
+    "canonical_value": "boring-cdc/canonical-value/v1",
+    "control_payload": "boring-cdc/control-payload/v1",
+    "logical_table": "boring-cdc/logical-table/v1",
+    "mutation_payload": "boring-cdc/mutation-payload/v1",
+    "physical_key": "boring-cdc/physical-key/v1",
+    "relation_component": "boring-cdc/relation-component/v1",
+    "relation_schema": "boring-cdc/relation-schema/v1",
+    "snapshot_event": "boring-cdc/snapshot-event/v1",
+    "source_slot": "boring-cdc/source-slot/v1",
+    "wal_event": "boring-cdc/wal-event/v1"
+  },
+  "event_schema": "contracts/event/event.schema.json",
+  "executors": [
+    "boring-cdc-m1-ordering",
+    "boring-cdc-m1-decoder",
+    "boring-cdc-m2-journal"
+  ],
+  "fixture_ids": [
+    "SCN-M0-EVENT-WAL-IDENTITY",
+    "SCN-M0-EVENT-SNAPSHOT-IDENTITY",
+    "SCN-M0-EVENT-SAME-KEY-ORDER",
+    "SCN-M0-EVENT-KEY-CHANGE-ORDER",
+    "SCN-M0-EVENT-TYPE-CANONICAL",
+    "SCN-M0-EVENT-TYPE-UNSUPPORTED",
+    "SCN-M0-EVENT-LIMIT-BOUNDARIES",
+    "SCN-M0-EVENT-TOAST-STATES",
+    "SCN-M0-EVENT-TOAST-KEY-CHANGE-BLOCK",
+    "SCN-M0-EVENT-ADDITIVE-OUTSIDE-BACKFILL",
+    "SCN-M0-EVENT-ADDITIVE-DURING-BACKFILL",
+    "SCN-M0-EVENT-RETRY-STABILITY",
+    "SCN-M0-EVENT-CONTROL-HEARTBEAT",
+    "SCN-M0-EVENT-CONTROL-FENCE"
+  ],
+  "golden_vectors": "fixtures/m0/event-format/golden-vectors.json",
+  "hash_inputs": {
+    "control_payload": [
+      "32-byte connector_event_id",
+      "UTF-8 control kind",
+      "u64-be transaction end_lsn",
+      "empty or u64-be generation"
+    ],
+    "mutation_payload": [
+      "u64-be capture_epoch",
+      "source_version lsn_u64/origin_rank/transaction_ordinal/mutation_ordinal",
+      "32-byte connector_event_id",
+      "32-byte relation_fingerprint",
+      "canonical_key encoding",
+      "32-byte key_hash",
+      "u8 operation tag snapshot=0 insert=1 update=2 delete=3",
+      "empty or canonical before_key encoding",
+      "u8 mutation tag delete=0 upsert=1",
+      "column state encoding"
+    ],
+    "snapshot_event": [
+      "u64-be capture_epoch",
+      "u64-be generation",
+      "32-byte logical_table_id",
+      "u64-be chunk_id",
+      "canonical_key encoding"
+    ],
+    "wal_event": [
+      "u64-be capture_epoch",
+      "32-byte source_slot_identity",
+      "u64-be transaction end_lsn",
+      "u64-be row-change transaction_ordinal",
+      "u8 mutation_ordinal"
+    ]
+  },
+  "hashing": {
+    "algorithm": "SHA-256",
+    "field_framing": "u64-be byte length followed by bytes",
+    "hex_rendering": "lowercase"
+  },
+  "identity_encodings": {
+    "canonical_key": "u32-be component count; each component is one-byte representation tag (bool=1,int64=2,uint64=3,bytes=4,text=5), u32-be PostgreSQL type OID (bool 16; int64 21/23/20; uint64 OID 26; bytes 17/2950; text 25/1043/1042/19), i32-be typmod, then bool as one byte, integers as eight-byte big-endian, or bytes/text as u64-be byte length plus raw unpadded-base64url-decoded/UTF-8 bytes",
+    "logical_table_id": "u64-be system_identifier, UTF-8 database_identity, UTF-8 schema name, UTF-8 table name; each field receives outer u64 length framing",
+    "relation_component_hash": "SHA-256 over outer-length-framed domain boring-cdc/relation-component/v1, UTF-8 component kind, and canonical UTF-8 definition. Definitions are PostgreSQL catalog-deparsed expressions/index/partition/publication forms with identifiers UTF-8, keywords lower-case, one ASCII space between tokens, no comments, no trailing semicolon, and numeric literals in minimal decimal form.",
+    "source_slot_identity": "u64-be system_identifier, u32-be timeline, UTF-8 database_identity, UTF-8 slot name, UTF-8 plugin; each field receives outer u64 length framing"
+  },
+  "key_types": [
+    "bool",
+    "int2",
+    "int4",
+    "int8",
+    "oid",
+    "uuid",
+    "text",
+    "varchar",
+    "bpchar",
+    "name",
+    "bytea"
+  ],
+  "limits": {
+    "canonical_key_components": 32,
+    "event_bytes": 8388608,
+    "key_component_bytes": 1024,
+    "row_bytes": 4194304,
+    "scalar_bytes": 1048576,
+    "units": "bytes (octets); limits are inclusive over canonical decoded bytes"
+  },
+  "owner_bead": "boring-cdc-m0-event-format",
+  "relation_contract_encoding": "u64-length-framed logical_table_id; u32-be relation_id; u32-be physical-column count; each physical attnum ascending: i16-be attnum, u32-be logical ordinal (ffffffff if dropped), framed UTF-8 name (empty only if dropped), one-byte dropped, u32-be type OID, i32-be typmod, u32-be collation OID, one-byte nullable, framed SHA-256 default-expression hash or empty, framed SHA-256 generated-expression hash or empty, framed SHA-256 identity-expression hash or empty; one-byte replica mode d=0 n=1 f=2 i=3; framed replica-index definition hash or empty; framed primary/unique effective-key definition hash; framed partition-root logical_table_id or empty; framed partition-routing definition hash or empty; framed partition-key hash or empty; framed partition-bounds hash or empty; one-byte publication action bits INSERT=1 UPDATE=2 DELETE=4 TRUNCATE=8; one-byte publication membership; framed publication row-filter hash or empty; framed publication column-projection hash or empty",
+  "schema_version": "boring-cdc/event-format-contract/v1",
+  "tags": {
+    "column_state": {
+      "absent_for_schema": 0,
+      "explicit_null": 1,
+      "explicit_value": 3,
+      "unchanged_toast": 2
+    },
+    "mutation_kind": {
+      "delete": 0,
+      "upsert": 1
+    },
+    "origin_rank": {
+      "snapshot": 0,
+      "wal": 1
+    }
+  },
+  "value_types": [
+    {
+      "canonical": "one byte: 00 false, 01 true",
+      "oid": 16,
+      "pg": "bool"
+    },
+    {
+      "canonical": "two-byte signed big-endian two's complement",
+      "oid": 21,
+      "pg": "int2"
+    },
+    {
+      "canonical": "four-byte signed big-endian two's complement",
+      "oid": 23,
+      "pg": "int4"
+    },
+    {
+      "canonical": "eight-byte signed big-endian two's complement",
+      "oid": 20,
+      "pg": "int8"
+    },
+    {
+      "canonical": "four-byte unsigned big-endian",
+      "oid": 26,
+      "pg": "oid"
+    },
+    {
+      "canonical": "IEEE-754 binary32 big-endian; preserve signed zero; all NaNs become 7fc00000",
+      "oid": 700,
+      "pg": "float4"
+    },
+    {
+      "canonical": "IEEE-754 binary64 big-endian; preserve signed zero; all NaNs become 7ff8000000000000",
+      "oid": 701,
+      "pg": "float8"
+    },
+    {
+      "canonical": "UTF-8 minimal decimal: no plus, exponent, leading/trailing zero, or negative zero; NaN and infinity unsupported",
+      "oid": 1700,
+      "pg": "numeric"
+    },
+    {
+      "canonical": "signed int32 big-endian days since 2000-01-01; infinities int32 min/max",
+      "oid": 1082,
+      "pg": "date"
+    },
+    {
+      "canonical": "signed int64 big-endian microseconds since 2000-01-01; infinities int64 min/max; no timezone conversion",
+      "oid": 1114,
+      "pg": "timestamp"
+    },
+    {
+      "canonical": "signed int64 big-endian UTC microseconds since 2000-01-01; infinities int64 min/max",
+      "oid": 1184,
+      "pg": "timestamptz"
+    },
+    {
+      "canonical": "16 RFC 4122 network-order bytes",
+      "oid": 2950,
+      "pg": "uuid"
+    },
+    {
+      "canonical": "exact UTF-8 bytes after PostgreSQL type semantics; no connector Unicode normalization",
+      "oid": [
+        25,
+        1043,
+        1042,
+        19
+      ],
+      "pg": "text/varchar/bpchar/name"
+    },
+    {
+      "canonical": "raw octets",
+      "oid": 17,
+      "pg": "bytea"
+    },
+    {
+      "canonical": "u32-be count, then each element as state tag plus u32-be OID, i32-be typmod, u64-be length and canonical bytes; lower bound must be 1",
+      "oid": "element-specific",
+      "pg": "one-dimensional arrays of admitted non-array scalars"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "findings": [],
+  "fixture_count": 14,
+  "inputs": {
+    "contracts/event/event-format.json": "ec09bf8ab2df2fd9fc035ee6021297a0b5c31551cc183c2d26e4d91f0a918547",
+    "contracts/event/event.schema.json": "55c977f3f17d4854c3d9bc23f9aecdc24c20945eee4308ac6522a2fbcc60ef96",
+    "docs/EVENT_FORMAT.md": "c2c5fe3c6eeb34827a817136e9f7f0ad9b6974fb0bb49334f2b14773665b1cbc",
+    "fixtures/m0/event-format/golden-vectors.json": "98ed0c59f6e4735463484648e981b258a0077e4fc2facd458bce46b1cfaeed93"
+  },
+  "owner_bead": "boring-cdc-m0-event-format",
+  "product_faults": "fault_not_applicable",
+  "runtime_observed": false,
+  "schema_version": "m0-event-format-evidence/v1",
+  "status": "pass",
+  "validator": "scripts/validate/event_format.py"
+}

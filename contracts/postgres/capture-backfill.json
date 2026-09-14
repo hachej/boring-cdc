@@ -1,0 +1,624 @@
+{
+  "anchors": {
+    "existing_lower_proof": "last locally durable complete transaction (lower_stitch_lsn,lower_stitch_seq) before export",
+    "initial_lower_proof": "(consistent_point,start_seq); consistent_point remains creation floor, not durable transaction",
+    "prohibited": [
+      "pg_current_wal_lsn()",
+      "keepalive wal_end",
+      "post-export sampled LSN",
+      "timer"
+    ],
+    "required_fields": [
+      "capture_epoch",
+      "generation",
+      "lower_stitch_lsn",
+      "lower_stitch_seq",
+      "start_seq",
+      "snapshot_boundary_lsn",
+      "snapshot_complete_seq",
+      "post_copy_fence_nonce",
+      "post_copy_fence_lsn",
+      "post_copy_fence_seq",
+      "table_set_fingerprint",
+      "snapshot_schema_fingerprints",
+      "state"
+    ],
+    "upper_proof": "first durable pgoutput observation of pre-persisted unique fixed-row fence nonce paired atomically with transaction end LSN and complete journal seq"
+  },
+  "bootstrap": {
+    "backend_cleanup": "persist exporter/importer/guard backend PID; verify gone or terminate exact stale owned PID before replacement",
+    "existing_slot": [
+      "persist last complete durable (lower_stitch_lsn, lower_stitch_seq)",
+      "acquire DDL guard before snapshot export",
+      "export snapshot on dedicated read-only SQL connection",
+      "import first statement and bind schema",
+      "copy half-open key ranges",
+      "publish durable capture fence",
+      "complete anchor"
+    ],
+    "initial": [
+      "persist prepared intent",
+      "acquire canonical ACCESS SHARE DDL guard and verify contracts",
+      "create configured permanent slot with EXPORT_SNAPSHOT on dedicated exporter",
+      "persist consistent point as snapshot boundary and creation floor plus token and start_seq",
+      "start replication on separate CopyBoth connection",
+      "each importer SET TRANSACTION SNAPSHOT as first statement",
+      "persist all importer acknowledgements",
+      "legitimately release exporter",
+      "copy bounded chunks",
+      "publish and durably observe unique capture fence",
+      "complete anchor and release guard"
+    ],
+    "invalid_generation": "all snapshot rows permanently non-promotable; release importer feedback gate atomically",
+    "invalidates": [
+      "exporter loss before all import acknowledgements",
+      "importer death before assigned reads complete",
+      "guard loss before durable fence",
+      "generation cancel",
+      "source-impact limit"
+    ],
+    "normal_exporter_release": "after all import acknowledgements is valid and does not invalidate",
+    "states": [
+      "prepared",
+      "snapshot_exported",
+      "imports_pending",
+      "imports_complete",
+      "exporter_release_permitted",
+      "exporter_released",
+      "snapshot_unusable",
+      "bootstrap_ambiguous_requires_restart",
+      "existing_slot_generation_required",
+      "anchor_complete",
+      "requires_reseed"
+    ]
+  },
+  "control_relations": {
+    "capture_fences": {
+      "immutable_key": {
+        "id": 1
+      },
+      "nonce_bytes": 16,
+      "nonce_encoding": "base64url unpadded",
+      "table": "capture_fences",
+      "value_columns": [
+        "capture_epoch",
+        "generation",
+        "table_set_fingerprint",
+        "unique_nonce"
+      ]
+    },
+    "cardinality": "exactly one administration-seeded row each; UPDATE must affect exactly one row",
+    "heartbeat": {
+      "cadence_seconds": 30,
+      "immutable_key": {
+        "id": 1
+      },
+      "maximum_payload_bytes": 256,
+      "table": "heartbeat",
+      "value_columns": [
+        "nonce",
+        "updated_at"
+      ]
+    },
+    "routing": "journal control event; complete-transaction destination checkpoint no-op; never user-table state",
+    "schema": "boring_cdc_control"
+  },
+  "ddl_guard": {
+    "acquire": "before slot creation/export or existing-slot snapshot export",
+    "canonical_order": "ascending logical_table_id bytes, then relation OID unsigned",
+    "catalog_poll_seconds": 30,
+    "conflicting_waiter_max_seconds": 15,
+    "guard_keepalive_seconds": 20,
+    "idle_in_transaction_session_timeout_seconds": 120,
+    "lock": "ACCESS SHARE",
+    "lock_timeout_seconds": 10,
+    "relation_message": "pause synchronously, reread and validate before following DML decode/feedback",
+    "release": "only after matching capture fence is durable, or checked invalidation cleanup",
+    "statement_timeout_seconds": 30,
+    "waiter_outcome": "backfill_ddl_waiter; atomically invalidate, release feedback gate, cancel sessions, verify locks released"
+  },
+  "ddl_matrix": [
+    {
+      "guard_conflicts": true,
+      "minimum_lock": "ACCESS EXCLUSIVE",
+      "operation": "ALTER TABLE ADD COLUMN",
+      "outcome": "ACCESS SHARE blocks; after generation only nullable/no-default/non-generated may continue"
+    },
+    {
+      "guard_conflicts": true,
+      "minimum_lock": "ACCESS EXCLUSIVE",
+      "operation": "ALTER TABLE DROP COLUMN",
+      "outcome": "requires re-seed"
+    },
+    {
+      "guard_conflicts": true,
+      "minimum_lock": "ACCESS EXCLUSIVE",
+      "operation": "ALTER TABLE ALTER COLUMN TYPE",
+      "outcome": "requires re-seed"
+    },
+    {
+      "guard_conflicts": true,
+      "minimum_lock": "ACCESS EXCLUSIVE",
+      "operation": "ALTER TABLE ALTER COLUMN SET/DROP NOT NULL",
+      "outcome": "requires re-seed"
+    },
+    {
+      "guard_conflicts": true,
+      "minimum_lock": "ACCESS EXCLUSIVE",
+      "operation": "ALTER TABLE ALTER COLUMN SET/DROP DEFAULT",
+      "outcome": "requires re-seed"
+    },
+    {
+      "guard_conflicts": true,
+      "minimum_lock": "ACCESS EXCLUSIVE",
+      "operation": "ALTER TABLE ALTER COLUMN ADD/DROP GENERATED or IDENTITY",
+      "outcome": "requires re-seed"
+    },
+    {
+      "guard_conflicts": true,
+      "minimum_lock": "ACCESS EXCLUSIVE",
+      "operation": "ALTER TABLE RENAME COLUMN/TABLE",
+      "outcome": "requires re-seed"
+    },
+    {
+      "guard_conflicts": true,
+      "minimum_lock": "ACCESS EXCLUSIVE",
+      "operation": "ALTER TABLE REPLICA IDENTITY",
+      "outcome": "requires re-seed"
+    },
+    {
+      "guard_conflicts": true,
+      "minimum_lock": "ACCESS EXCLUSIVE",
+      "operation": "ALTER TABLE SET SCHEMA",
+      "outcome": "requires re-seed"
+    },
+    {
+      "guard_conflicts": true,
+      "minimum_lock": "ACCESS EXCLUSIVE",
+      "operation": "DROP/TRUNCATE TABLE",
+      "outcome": "TRUNCATE WAL message blocks; DDL guard conflicts"
+    }
+  ],
+  "evidence_tier": "leaf",
+  "executors": [
+    "boring-cdc-m1-decoder",
+    "boring-cdc-m1-control-fixtures",
+    "boring-cdc-m1-ddl-fixtures",
+    "boring-cdc-m1-preflight",
+    "boring-cdc-m2-capture-runtime",
+    "boring-cdc-m2-ownership",
+    "boring-cdc-m2-spool",
+    "boring-cdc-m2-pressure",
+    "boring-cdc-m3-bootstrap",
+    "boring-cdc-m3-restart",
+    "boring-cdc-m3-faults",
+    "boring-cdc-m3-schema-guard"
+  ],
+  "feedback": {
+    "effective_server_restart": "max(requested_lsn, server_confirmed_flush_lsn)",
+    "forbidden_inputs": [
+      "primary keepalive wal_end",
+      "last_received_lsn",
+      "slot creation floor as durable transaction",
+      "destination checkpoint",
+      "clock-derived LSN"
+    ],
+    "importer_gate": "while eligible snapshot imports are pending, later durable WAL is not feedback eligible; reply 0/0 or verified floor only",
+    "invalidation": "atomic snapshot invalidation releases importer gate; complete durable WAL may drain",
+    "keepalive_reply": "immediate complete status packet at last eligible durable safe boundary",
+    "service": {
+      "during_spool_or_commit": "send only prior durable boundary; never block behind decoder/writer work",
+      "ownership_probe_interval_ms": 5000,
+      "queue_capacity": 64,
+      "requested_reply_deadline_ms": 1000,
+      "task": "independent bounded feedback/probe task"
+    }
+  },
+  "fixture_ids": [
+    "SCN-M0-PG-COPYBOTH-FRAMES",
+    "SCN-M0-PG-ORIGIN-ORDINAL",
+    "SCN-M0-PG-KEEPALIVE-REPLY",
+    "SCN-M0-PG-RESTART-MAX",
+    "SCN-M0-PG-CREATION-FLOOR-NULL",
+    "SCN-M0-PG-CREATION-FLOOR-EQUAL",
+    "SCN-M0-PG-CREATION-FLOOR-INVALID-SLOT",
+    "SCN-M0-PG-CREATION-FLOOR-WAL-UNAVAILABLE",
+    "SCN-M0-PG-AMBIGUOUS-SLOT",
+    "SCN-M0-PG-SAFE-STOP-CLOSE",
+    "SCN-M0-PG-UNEXPECTED-COPYBOTH-LOSS",
+    "SCN-M0-PG-SLOW-COMMIT-REQUESTED-REPLY",
+    "SCN-M0-PG-PUBLICATION-DRIFT",
+    "SCN-M0-PG-CONTROL-CARDINALITY",
+    "SCN-M0-PG-CONTROL-PRIVILEGES",
+    "SCN-M0-PG-DDL-CONFLICT-MATRIX",
+    "SCN-M0-PG-DDL-IDLE-POLL",
+    "SCN-M0-PG-DDL-IMMEDIATE-DML",
+    "SCN-M0-PG-DDL-WAITER-INVALIDATE",
+    "SCN-M0-PG-BOOTSTRAP-IMPORTS",
+    "SCN-M0-PG-BOOTSTRAP-EXPORTER-LOSS",
+    "SCN-M0-PG-EXISTING-SLOT-STITCH",
+    "SCN-M0-PG-CAPTURE-FENCE",
+    "SCN-M0-PG-RETAINED-SLOT-RECOVERY",
+    "SCN-M0-PG-WAL-HEADROOM",
+    "SCN-M0-PG-BEFORE-SLOT-CREATE",
+    "SCN-M0-PG-TOKEN-PERSIST",
+    "SCN-M0-PG-EXPORTER-RELEASE-BEFORE",
+    "SCN-M0-PG-EXPORTER-RELEASE-AFTER",
+    "SCN-M0-PG-START-REPLICATION",
+    "SCN-M0-PG-FIRST-FEEDBACK",
+    "SCN-M0-PG-COMMIT-FEEDBACK-CRASH",
+    "SCN-M0-PG-SAFE-STOP-PERSIST-BEFORE",
+    "SCN-M0-PG-EXPECTED-CLOSE-TOKEN",
+    "SCN-M0-PG-ADVISORY-PROBE-LATE",
+    "SCN-M0-PG-SNAPSHOT-EXPORT-AFTER-GUARD",
+    "SCN-M0-PG-CHUNK-COMMIT",
+    "SCN-M0-PG-FENCE-UPDATE-BEFORE",
+    "SCN-M0-PG-FENCE-UPDATE-AFTER",
+    "SCN-M0-PG-GUARD-LOSS"
+  ],
+  "hooks": [
+    "copyboth_frame",
+    "origin_message",
+    "keepalive_reply_requested",
+    "restart_request",
+    "startup_reconcile",
+    "after_slot_server_response",
+    "after_safe_stop_persist_before_close",
+    "unexpected_copyboth_eof",
+    "during_spool_before_commit",
+    "catalog_poll",
+    "control_update_row_count",
+    "roles_sql_probe",
+    "before_snapshot_export",
+    "relation_then_dml",
+    "ddl_waiter_limit",
+    "after_import_ack",
+    "before_all_import_ack",
+    "after_lower_stitch_persist",
+    "after_fence_journal_before_anchor",
+    "wal_metric_sample",
+    "before_slot_create",
+    "after_snapshot_token_persist",
+    "before_exporter_release",
+    "after_exporter_release",
+    "before_start_replication",
+    "before_first_feedback",
+    "after_journal_commit_before_feedback",
+    "before_safe_stop_persist",
+    "after_expected_close_token",
+    "advisory_probe_late",
+    "after_chunk_commit",
+    "before_fence_update",
+    "after_fence_update_before_observe",
+    "guard_connection_loss"
+  ],
+  "owner_bead": "boring-cdc-m0-pg-contract",
+  "ownership": {
+    "advisory_key": "first signed i64 of SHA-256 over u64-be-length-framed UTF-8 fields: boring-cdc/source-lock/v1, system_identifier decimal, database_identity, publication, slot",
+    "loss": "fence all dispatch, persist ownership_lost when possible, exit nonzero; no in-process reacquire or CopyBoth reopen",
+    "ownership_deadline_seconds": 15,
+    "probe_interval_seconds": 5,
+    "session": "dedicated non-pooled SQL connection; persist backend PID plus random 128-bit nonce",
+    "source_mutation_max_seconds": 10,
+    "takeover_wait_seconds": 90
+  },
+  "protocol": {
+    "binary": false,
+    "logical_decoding_work_mem_bytes": 67108864,
+    "option_order": [
+      "proto_version",
+      "publication_names",
+      "binary",
+      "messages",
+      "streaming",
+      "two_phase",
+      "origin"
+    ],
+    "origin": "any",
+    "slot_plugin": "pgoutput",
+    "spill_counters": [
+      "spill_txns",
+      "spill_count",
+      "spill_bytes"
+    ],
+    "start_replication_template": "START_REPLICATION SLOT {quoted_slot_identifier} LOGICAL {canonical_lsn} (proto_version '1', publication_names '{quoted_publication_literal}', binary 'false', messages 'true', streaming 'false', two_phase 'false', origin 'any')",
+    "status_packet": {
+      "apply_lsn": "durable_safe_boundary",
+      "flush_lsn": "durable_safe_boundary",
+      "reply_requested": 0,
+      "tag": "r",
+      "timestamp_epoch": "PostgreSQL 2000-01-01 UTC microseconds signed i64 big-endian",
+      "write_lsn": "durable_safe_boundary"
+    },
+    "stream_counters": [
+      "stream_txns",
+      "stream_count",
+      "stream_bytes"
+    ],
+    "streaming": false,
+    "transport": {
+      "adapter": "boring-cdc-pgwire-v1",
+      "crate": "pgwire-replication",
+      "feature": "tls-rustls,scram",
+      "implementation_boundary": "use pinned crate CopyBoth framing/auth/TLS and public status encoder; owned adapter encodes exact START_REPLICATION query and always passes false for outgoing reply_requested",
+      "required_capability": "incremental bidirectional logical-replication CopyBoth with standby-status writes; no complete-stream collection",
+      "stock_high_level_worker": "forbidden: cannot encode frozen streaming/two_phase/origin options and replies to requested keepalive with outgoing reply_requested=true",
+      "version": "0.4.0"
+    },
+    "tuple_mode": "text",
+    "two_phase": false,
+    "wire_frame_max_bytes": 8388608,
+    "zero_lsn_sentinel": "0/0"
+  },
+  "publication": {
+    "catalog_poll_seconds": 30,
+    "column_lists": false,
+    "drift_outcome": "publication_drift_requires_reseed before feedback of newly decoded transaction",
+    "exactly_one": true,
+    "fingerprint_fields": [
+      "owner",
+      "publish operations",
+      "sorted relation OIDs",
+      "row-filter absence",
+      "column-list absence",
+      "publish_via_partition_root"
+    ],
+    "name": "boring_cdc",
+    "owner_role": "boring_cdc_admin",
+    "publish": [
+      "insert",
+      "update",
+      "delete",
+      "truncate"
+    ],
+    "publish_via_partition_root": false,
+    "row_filters": false,
+    "truncate": "detection_only_requires_reseed"
+  },
+  "result_contract": {
+    "artifact_root": "artifacts/boring-cdc-m0-pg-contract/spec",
+    "contract_schema": "contracts/postgres/capture-backfill.schema.json",
+    "evidence_schema": "contracts/postgres/postgres-contract-evidence.schema.json",
+    "fixture_schema": "contracts/postgres/capture-backfill-fixtures.schema.json",
+    "fixture_spec": "fixtures/m0/postgres/capture-backfill.json",
+    "redaction": [
+      "no DSN/password/private key",
+      "no absolute workspace or temporary path",
+      "role names and fixture literals only"
+    ],
+    "validator": "scripts/validate/postgres_contract.py"
+  },
+  "roles_sql": "contracts/postgres/roles-grants.sql",
+  "runtime_observed": false,
+  "safe_stop_close": {
+    "advisory_loss_always": "ownership loss and nonzero exit",
+    "matching_close": "process remains alive; source lock remains probed; safe destination draining continues",
+    "nonmatching_or_late_generation": "ownership loss and nonzero exit",
+    "reopen": "forbidden in process",
+    "sequence": [
+      "stop capture dispatch",
+      "persist capture_safe_stopped and unchanged checkpoint/feedback",
+      "persist expected-close token",
+      "close transport intentionally"
+    ],
+    "token_fields": [
+      "run_id",
+      "capture_connection_generation",
+      "failure_fingerprint",
+      "failed_transaction_boundary",
+      "issued_monotonic_deadline"
+    ]
+  },
+  "schema_version": "m0-postgres-capture-backfill/v1",
+  "source_privilege_matrix": {
+    "administration": {
+      "allowed": [
+        "publication/control schema lifecycle",
+        "seed and verify fixed control rows",
+        "confirmed configured old-slot drop during maintenance"
+      ],
+      "forbidden": [
+        "ordinary run credential retention",
+        "permanent slot exported-snapshot creation"
+      ],
+      "role": "boring_cdc_admin"
+    },
+    "application": {
+      "allowed": [
+        "normal application DML granted by application owner"
+      ],
+      "forbidden": [
+        "publication administration",
+        "slot administration",
+        "control schema access"
+      ],
+      "role": "boring_cdc_application"
+    },
+    "capture_bootstrap": {
+      "allowed": [
+        "LOGIN REPLICATION",
+        "CONNECT configured database",
+        "USAGE selected schemas",
+        "SELECT selected tables and fixed control rows",
+        "catalog reads",
+        "advisory lock",
+        "intent-bound configured permanent slot CREATE_REPLICATION_SLOT EXPORT_SNAPSHOT"
+      ],
+      "forbidden": [
+        "application DML",
+        "publication alter/drop",
+        "unbound or wrong-name slot creation",
+        "all slot drop paths"
+      ],
+      "role": "boring_cdc_capture"
+    },
+    "control_writer": {
+      "allowed": [
+        "USAGE control schema",
+        "SELECT immutable id column only",
+        "UPDATE declared non-key value columns only"
+      ],
+      "forbidden": [
+        "INSERT",
+        "DELETE",
+        "key UPDATE",
+        "other SELECT/UPDATE",
+        "selected-table DML",
+        "slot/publication administration"
+      ],
+      "role": "boring_cdc_control_writer"
+    }
+  },
+  "source_state_fields": [
+    {
+      "constructor": "reseed transition only",
+      "name": "capture_epoch",
+      "nullable": false,
+      "type": "u64"
+    },
+    {
+      "constructor": "IDENTIFY_SYSTEM",
+      "name": "system_identifier",
+      "nullable": false,
+      "type": "u64"
+    },
+    {
+      "constructor": "IDENTIFY_SYSTEM",
+      "name": "timeline",
+      "nullable": false,
+      "type": "u32"
+    },
+    {
+      "constructor": "catalog identity",
+      "name": "database_identity",
+      "nullable": false,
+      "type": "utf8"
+    },
+    {
+      "constructor": "validated configuration",
+      "name": "slot_name",
+      "nullable": false,
+      "type": "identifier"
+    },
+    {
+      "constructor": "slot catalog readback",
+      "name": "plugin",
+      "nullable": false,
+      "type": "enum(pgoutput)"
+    },
+    {
+      "constructor": "canonical verified catalog",
+      "name": "publication_fingerprint",
+      "nullable": false,
+      "type": "sha256"
+    },
+    {
+      "constructor": "canonical supported protocol",
+      "name": "protocol_fingerprint",
+      "nullable": false,
+      "type": "sha256"
+    },
+    {
+      "constructor": "CopyData parser",
+      "name": "last_received_lsn",
+      "nullable": true,
+      "type": "Lsn"
+    },
+    {
+      "constructor": "atomic journal commit only",
+      "name": "durable_transaction_end_lsn",
+      "nullable": true,
+      "type": "DurableTransactionEndLsn"
+    },
+    {
+      "constructor": "CREATE_REPLICATION_SLOT consistent_point bound to nonterminal intent",
+      "name": "slot_creation_floor_lsn",
+      "nullable": true,
+      "type": "SlotCreationFloorLsn"
+    },
+    {
+      "constructor": "successful standby-status write from eligible safe boundary",
+      "name": "last_feedback_lsn",
+      "nullable": true,
+      "type": "FeedbackLsn"
+    },
+    {
+      "constructor": "status sender",
+      "name": "last_feedback_was_creation_floor_repeat",
+      "nullable": false,
+      "type": "bool"
+    },
+    {
+      "constructor": "slot catalog readback",
+      "name": "server_restart_lsn",
+      "nullable": true,
+      "type": "Lsn"
+    },
+    {
+      "constructor": "slot catalog readback",
+      "name": "server_confirmed_flush_lsn",
+      "nullable": true,
+      "type": "Lsn"
+    },
+    {
+      "constructor": "slot catalog readback",
+      "name": "wal_status",
+      "nullable": true,
+      "type": "enum"
+    },
+    {
+      "constructor": "slot catalog readback",
+      "name": "safe_wal_size_bytes",
+      "nullable": true,
+      "type": "u64"
+    }
+  ],
+  "supported_postgresql": [
+    {
+      "exact_version": "17.6",
+      "image_manifest": "sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+      "major": 17,
+      "platform": "linux/amd64"
+    }
+  ],
+  "unadmitted_concurrent_ddl": [
+    {
+      "operation": "CREATE INDEX [CONCURRENTLY]",
+      "reason": "index creation alone is not in relation contract unless adopted as replica identity; adoption uses conflicting ALTER TABLE REPLICA IDENTITY"
+    },
+    {
+      "operation": "ALTER PUBLICATION membership/options",
+      "reason": "administration-only lifecycle; may not run concurrently; fingerprint drift requires re-seed and is not claimed blocked by ACCESS SHARE"
+    },
+    {
+      "operation": "ALTER TABLE ATTACH PARTITION or DETACH PARTITION [CONCURRENTLY]",
+      "reason": "PostgreSQL 17 may use SHARE UPDATE EXCLUSIVE on the parent, which does not conflict with ACCESS SHARE; unsupported during an active guarded generation until a stronger guard exists"
+    }
+  ],
+  "wal_headroom": {
+    "automatic_forbidden": [
+      "increase cap",
+      "drop slot",
+      "detach destination",
+      "fabricate feedback"
+    ],
+    "cap_headroom_bytes": "max(0, cap_bytes-retained_wal_bytes)",
+    "disk_headroom_bytes": "max(0, source_free_bytes-source_reserved_free_bytes)",
+    "effective_headroom_bytes": "min(cap_headroom_bytes,disk_headroom_bytes)",
+    "equality": "state enters threshold when safe_seconds <= threshold; choose most severe",
+    "horizons_seconds": {
+      "action": 900,
+      "critical": 300,
+      "hard": 0,
+      "warning": 1800
+    },
+    "max_slot_wal_keep_size_bytes": 68719476736,
+    "metric_freshness_seconds": 30,
+    "missing_metric": "unknown; block new bootstrap/backfill unless explicit unsafe_local_experiment; do not stop healthy capture solely for unknown",
+    "monitoring_delay_seconds": 30,
+    "rate_statistic": "maximum of five nonnegative 60-second retained-WAL deltas, bytes/second, integer ceiling",
+    "rate_window_seconds": 300,
+    "reaction_reserve_seconds": 120,
+    "safe_seconds": "floor(effective_headroom_bytes/max(rate_bytes_per_second,1)) - monitoring_delay_seconds - reaction_reserve_seconds"
+  }
+}
