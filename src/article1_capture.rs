@@ -108,45 +108,35 @@ impl CaptureConfig {
     }
 }
 
-/// Capture complete transactions as stable JSONL, stopping after `stop_after_commits`.
+/// Stream stable JSONL through a caller-owned sink, stopping after `stop_after_commits`.
 ///
-/// This function deliberately has no retry loop and never calls a feedback API.
-pub async fn capture_jsonl(config: &CaptureConfig) -> Result<Vec<String>, CaptureFailure> {
-    let contracts = preflight(config, &PROVISIONAL_EXPECTATIONS)?;
-    let replication_dsn = if config.dsn.contains('?') {
-        format!("{}&replication=database", config.dsn)
-    } else {
-        format!("{}?replication=database", config.dsn)
-    };
-    let mut connection = PgReplicationConnection::connect(&replication_dsn)
-        .map_err(|error| classify_connection(&error.to_string()))?;
-    if connection.server_version() != POSTGRES_VERSION_NUM {
-        return Err(CaptureFailure::at(
-            "server_version",
-            "ARTICLE1_VERSION_MISMATCH",
-        ));
-    }
-    connection
-        .start_replication(SLOT, 0, &START_OPTIONS)
-        .map_err(|_| {
-            CaptureFailure::at("start_replication", "ARTICLE1_START_REPLICATION_FAILED")
-        })?;
-
-    let cancellation = CancellationToken::new();
+/// Setup runs on Tokio's blocking pool, the caller owns cancellation, and rows are emitted
+/// incrementally. This function has no retry loop and never calls a feedback API.
+pub async fn capture_jsonl<F>(
+    config: &CaptureConfig,
+    cancellation: &CancellationToken,
+    mut emit: F,
+) -> Result<usize, CaptureFailure>
+where
+    F: FnMut(String) -> Result<(), CaptureFailure>,
+{
+    let owned = config.clone();
+    let (mut connection, contracts) =
+        tokio::task::spawn_blocking(move || setup(&owned))
+            .await
+            .map_err(|_| CaptureFailure::at("connection", "ARTICLE1_SETUP_TASK_FAILED"))??;
     let mut decoder = Decoder::new(WireLimits::default());
-    let mut lines = Vec::new();
     let mut commits = 0usize;
 
     while commits < config.stop_after_commits {
+        if cancellation.is_cancelled() {
+            return Err(CaptureFailure::at("connection", "ARTICLE1_CANCELLED"));
+        }
         let frame = connection
             .get_copy_data_async(&cancellation)
             .await
             .map_err(|_| CaptureFailure::at("connection", "ARTICLE1_COPYBOTH_DISCONNECTED"))?;
-        let decoded = decoder.decode_copy_data(&frame).map_err(|_error| {
-            #[cfg(test)]
-            eprintln!("decoder fingerprint={}", _error.fingerprint);
-            CaptureFailure::at("protocol", "ARTICLE1_PROTOCOL_REJECTED")
-        })?;
+        let decoded = decode_frame(&mut decoder, &frame)?;
         match decoded {
             CopyBothEvent::Keepalive { .. } => {
                 // Strict Article 1 rule: observe and send no feedback, even when requested.
@@ -174,7 +164,7 @@ pub async fn capture_jsonl(config: &CaptureConfig) -> Result<Vec<String>, Captur
                 PgoutputEvent::RelationMetadata(_) | PgoutputEvent::Origin { .. } => {}
                 event => {
                     let commit = matches!(event, PgoutputEvent::Commit { .. });
-                    lines.push(render(wal_start, wal_end, event)?);
+                    emit(render(wal_start, wal_end, event)?)?;
                     if commit {
                         commits += 1;
                     }
@@ -182,7 +172,32 @@ pub async fn capture_jsonl(config: &CaptureConfig) -> Result<Vec<String>, Captur
             },
         }
     }
-    Ok(lines)
+    Ok(commits)
+}
+
+fn setup(
+    config: &CaptureConfig,
+) -> Result<(PgReplicationConnection, BTreeMap<u32, RelationContract>), CaptureFailure> {
+    let contracts = preflight(config, &PROVISIONAL_EXPECTATIONS)?;
+    let replication_dsn = if config.dsn.contains('?') {
+        format!("{}&replication=database", config.dsn)
+    } else {
+        format!("{}?replication=database", config.dsn)
+    };
+    let mut connection = PgReplicationConnection::connect(&replication_dsn)
+        .map_err(|error| classify_connection(&error.to_string()))?;
+    if connection.server_version() != POSTGRES_VERSION_NUM {
+        return Err(CaptureFailure::at(
+            "server_version",
+            "ARTICLE1_VERSION_MISMATCH",
+        ));
+    }
+    connection
+        .start_replication(SLOT, 0, &START_OPTIONS)
+        .map_err(|_| {
+            CaptureFailure::at("start_replication", "ARTICLE1_START_REPLICATION_FAILED")
+        })?;
+    Ok((connection, contracts))
 }
 
 fn preflight(
@@ -220,7 +235,7 @@ fn preflight(
         ));
     }
     let slot_query = format!(
-        "SELECT plugin || ',' || slot_type || ',' || database || ',' || active::int, (restart_lsn IS NOT NULL)::int FROM pg_replication_slots WHERE slot_name = '{}'",
+        "SELECT plugin || ',' || slot_type || ',' || database || ',' || active::int, (restart_lsn IS NOT NULL AND invalidation_reason IS NULL AND wal_status IN ('reserved','extended'))::int FROM pg_replication_slots WHERE slot_name = '{}'",
         expected.slot
     );
     let slot = connection
@@ -301,6 +316,12 @@ fn preflight(
             ))
         })
         .collect()
+}
+
+fn decode_frame(decoder: &mut Decoder, frame: &[u8]) -> Result<CopyBothEvent, CaptureFailure> {
+    decoder
+        .decode_copy_data(frame)
+        .map_err(|_| CaptureFailure::at("protocol", "ARTICLE1_PROTOCOL_REJECTED"))
 }
 
 fn classify_connection(message: &str) -> CaptureFailure {
@@ -398,6 +419,12 @@ mod tests {
                 .code,
             "ARTICLE1_CONFIG_INVALID"
         );
+        assert_eq!(
+            decode_frame(&mut Decoder::new(WireLimits::default()), b"?")
+                .unwrap_err()
+                .code,
+            "ARTICLE1_PROTOCOL_REJECTED"
+        );
     }
 
     #[test]
@@ -469,6 +496,28 @@ mod tests {
 
     #[test]
     #[ignore = "requires the pinned PostgreSQL 17.6 Article 1 fixture"]
+    fn live_pg17_connection_fails_closed() {
+        let dsn = std::env::var("ARTICLE1_DSN").expect("ARTICLE1_DSN is required");
+        let port = std::env::var("ARTICLE1_PG_PORT").expect("ARTICLE1_PG_PORT is required");
+        let wrong = dsn.replace(&format!(":{port}/"), ":1/");
+        assert_ne!(wrong, dsn, "fixture port marker missing");
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let error = runtime
+            .block_on(capture_jsonl(
+                &CaptureConfig::article1(wrong, 1).unwrap(),
+                &CancellationToken::new(),
+                |_| Ok(()),
+            ))
+            .unwrap_err();
+        assert_eq!(error.boundary, "connection");
+        assert_eq!(error.code, "ARTICLE1_CONNECTION_FAILED");
+    }
+
+    #[test]
+    #[ignore = "requires the pinned PostgreSQL 17.6 Article 1 fixture"]
     fn live_pg17_wrong_auth_fails_closed() {
         let dsn = std::env::var("ARTICLE1_DSN").expect("ARTICLE1_DSN is required");
         let wrong = dsn.replace("article1_fixture_only", "definitely_wrong");
@@ -478,7 +527,11 @@ mod tests {
             .build()
             .unwrap();
         let error = runtime
-            .block_on(capture_jsonl(&CaptureConfig::article1(wrong, 1).unwrap()))
+            .block_on(capture_jsonl(
+                &CaptureConfig::article1(wrong, 1).unwrap(),
+                &CancellationToken::new(),
+                |_| Ok(()),
+            ))
             .unwrap_err();
         assert_eq!(error.boundary, "authentication");
         assert_eq!(error.code, "ARTICLE1_AUTH_FAILED");
@@ -501,9 +554,18 @@ mod tests {
             .enable_all()
             .build()
             .unwrap();
-        let lines = runtime
-            .block_on(capture_jsonl(&CaptureConfig::article1(dsn, 1).unwrap()))
+        let mut lines = Vec::new();
+        let commits = runtime
+            .block_on(capture_jsonl(
+                &CaptureConfig::article1(dsn, 1).unwrap(),
+                &CancellationToken::new(),
+                |line| {
+                    lines.push(line);
+                    Ok(())
+                },
+            ))
             .unwrap();
+        assert_eq!(commits, 1);
         mutation.join().unwrap();
         let events = lines
             .iter()

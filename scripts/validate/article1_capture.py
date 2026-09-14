@@ -44,6 +44,10 @@ def main() -> int:
             ["cargo", "test", "--locked", "live_pg17_preflight_negatives_use_capture_boundaries", "--", "--ignored"],
             env,
         )
+        connection = run(
+            ["cargo", "test", "--locked", "live_pg17_connection_fails_closed", "--", "--ignored"],
+            env,
+        )
         auth = run(
             ["cargo", "test", "--locked", "live_pg17_wrong_auth_fails_closed", "--", "--ignored"],
             env,
@@ -69,9 +73,9 @@ def main() -> int:
             if boundary not in output:
                 raise RuntimeError(f"negative did not name {boundary}")
         print("ARTICLE1_CAPTURE_OK postgres=17.6 copyboth=true events=BEGIN,INSERT,UPDATE,DELETE,COMMIT")
-        print("ARTICLE1_LIVE_FAILURES_OK auth/version/publication/slot/continuity=fail-closed")
-        print("ARTICLE1_FOCUSED_FAILURES_OK connection/config/protocol=fail-closed")
-        assert focused and preflight and auth
+        print("ARTICLE1_LIVE_FAILURES_OK connection/auth/version/publication/slot/continuity=fail-closed")
+        print("ARTICLE1_FOCUSED_FAILURES_OK config/protocol=fail-closed")
+        assert focused and preflight and connection and auth
         return 0
     finally:
         subprocess.run(compose + ["down", "-v", "--remove-orphans"], cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
