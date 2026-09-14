@@ -16,9 +16,9 @@ EXPECTED_SHA256 = {
     "config/article1-reader.toml": "50945fe039ad1594d124783ec4f02558649875ed7ddf6633235d797b81b1869c",
     "fixtures/article1/schema-and-seed.sql": "7f58d39e39d26006849c0bd6f4f6e6f63cf7ae81c71ba511fc64a976e4744cf1",
     "fixtures/article1/fixture.json": "6c9f5705efead78c287fe3791aaad096f7bf6446287d6f44f789f623ff023ad1",
-    "evidence/article1/reader-default.raw.jsonl": "PENDING",
-    "evidence/article1/reader-full.raw.jsonl": "PENDING",
-    "evidence/article1/reader.normalized.jsonl": "PENDING",
+    "evidence/article1/reader-default.raw.jsonl": "e65fe9a3ce34d74715026d6354668aa832034fe46964f65d44144df621137f13",
+    "evidence/article1/reader-full.raw.jsonl": "0c7d5b6d06997c6328e9aea084e3906c234fb991fa30670eef3c09f9cb9feeee",
+    "evidence/article1/reader.normalized.jsonl": "38254d4e414c12c7a5b3d8e59921a65c83111e64bb2bf208d1fe74f1b09592ff",
 }
 
 DISCLAIMER = (
@@ -119,11 +119,15 @@ def validate_scenario(rows: list[dict[str, Any]], scenario: str) -> None:
 
     row_id, initial_name, initial_tier = expected_new[0]
     _, updated_name, updated_tier = expected_new[1]
+    initial_row = [row_id, initial_name, initial_tier]
+    updated_row = [row_id, updated_name, updated_tier]
+    initial_key = [row_id] if scenario == "default" else initial_row
+    updated_key = [row_id] if scenario == "default" else updated_row
     expected_view_results = [
         {"action": "transaction_boundary"},
-        {"action": "current_row", "key": [row_id], "row": [row_id, initial_name, initial_tier]},
-        {"action": "current_row", "key": [row_id], "row": [row_id, updated_name, updated_tier]},
-        {"action": "removed", "key": [row_id], "removed_row": [row_id, updated_name, updated_tier], "row": None},
+        {"action": "current_row", "key": initial_key, "row": initial_row},
+        {"action": "current_row", "key": updated_key, "row": updated_row},
+        {"action": "removed", "key": updated_key, "removed_row": updated_row, "row": None},
         {"action": "transaction_boundary"},
     ]
     for index, (row, expected_result) in enumerate(zip(rows, expected_view_results)):
@@ -186,9 +190,9 @@ def main() -> int:
         expected_identity = {
             "schema_version": "article1-reader-evidence/v2",
             "owner_bead": "boring-cdc-pci.6",
-            "capture_code_sha": "PENDING",
+            "capture_code_sha": "fbd139e0d9f09d1e4141f3d84b4ce7eb55992149",
             "reader_command": "BORING_CDC_ARTICLE1_DSN='postgresql://postgres:article1_fixture_only@127.0.0.1:55696/article1?sslmode=disable' target/debug/boring-cdc run",
-            "capture_binary_sha256": "PENDING",
+            "capture_binary_sha256": "2a37d6efebe34d7efb1866bc62b74c58663ba3f3da5701e4e932c7391170f800",
             "capture_binary_note": "Digest of the exact target/debug/boring-cdc executable used for the committed raw capture; debug binaries built in another absolute checkout can differ.",
         }
         for name, expected in expected_identity.items():

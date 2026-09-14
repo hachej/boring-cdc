@@ -13,7 +13,7 @@ The default and FULL captures are separate clean database resets. FULL is an exp
 
 ## Exact capture environment
 
-Capture source SHA: `PENDING` (includes preserved closure commits `e852813` and `30e9fe4`, merged M0 base `55078fec9`, the provisional transport/CLI markers, and the same-stream teaching-view implementation). The exact `target/debug/boring-cdc` executable used for both committed raw captures had SHA-256 `PENDING`. This is capture identity, not a cross-checkout reproducible-build claim; Rust debug artifacts can encode their absolute build path.
+Capture source SHA: `fbd139e0d9f09d1e4141f3d84b4ce7eb55992149` (includes preserved closure commits `e852813` and `30e9fe4`, merged M0 base `55078fec9`, the provisional transport/CLI markers, and the same-stream teaching-view implementation). The exact `target/debug/boring-cdc` executable used for both committed raw captures had SHA-256 `2a37d6efebe34d7efb1866bc62b74c58663ba3f3da5701e4e932c7391170f800`. This is capture identity, not a cross-checkout reproducible-build claim; Rust debug artifacts can encode their absolute build path.
 
 Server banner:
 
