@@ -135,7 +135,7 @@ where
             return Err(CaptureFailure::at("connection", "ARTICLE1_CANCELLED"));
         }
         let frame = connection
-            .get_copy_data_async(&cancellation)
+            .get_copy_data_async(cancellation)
             .await
             .map_err(|_| CaptureFailure::at("connection", "ARTICLE1_COPYBOTH_DISCONNECTED"))?;
         let decoded = decode_frame(&mut decoder, &frame)?;
