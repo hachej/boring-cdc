@@ -9,7 +9,18 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 COMPOSE = ROOT / "fixtures/article1/compose.yml"
-DSN_PASSWORD = "article1_fixture_only"
+
+
+def load_password(env: dict[str, str]) -> str:
+    if env.get("PGPASSWORD"):
+        return env["PGPASSWORD"]
+    password_file = pathlib.Path(
+        env.get("BORING_CDC_POSTGRES_PASSWORD_FILE", ROOT / ".secrets/postgres_password")
+    )
+    password = password_file.read_text().rstrip("\r\n")
+    if not password:
+        raise RuntimeError(f"PostgreSQL password file is empty: {password_file}")
+    return password
 
 
 def run(command: list[str], env: dict[str, str], *, expect_failure: bool = False) -> str:
@@ -32,12 +43,13 @@ def main() -> int:
     env = os.environ.copy()
     env["TMPDIR"] = "/var/tmp"
     env["ARTICLE1_PG_PORT"] = str(args.port)
+    env["PGPASSWORD"] = load_password(env)
     compose = ["docker", "compose", "-p", args.project, "-f", str(COMPOSE)]
     try:
         run(compose + ["down", "-v", "--remove-orphans"], env, expect_failure=False)
         run(compose + ["up", "-d", "--wait"], env)
         env["ARTICLE1_DSN"] = (
-            f"postgresql://postgres:{DSN_PASSWORD}@127.0.0.1:{args.port}/article1?sslmode=disable"
+            f"postgresql://postgres@127.0.0.1:{args.port}/article1?sslmode=disable"
         )
         focused = run(["cargo", "test", "--locked", "article1_capture::tests"], env)
         preflight = run(

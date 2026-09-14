@@ -40,7 +40,9 @@ docker compose -p "$project" -f fixtures/article1/compose.yml exec -T postgres \
 The exact reader command was:
 
 ```sh
-BORING_CDC_ARTICLE1_DSN='postgresql://postgres:article1_fixture_only@127.0.0.1:55696/article1?sslmode=disable' target/debug/boring-cdc run
+export PGPASSWORD
+PGPASSWORD=$(cat "${BORING_CDC_POSTGRES_PASSWORD_FILE:-.secrets/postgres_password}")
+BORING_CDC_ARTICLE1_DSN='postgresql://postgres@127.0.0.1:55696/article1?sslmode=disable' target/debug/boring-cdc run
 ```
 
 While that process was reading, the default-identity transaction was executed with:

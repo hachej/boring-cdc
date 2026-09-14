@@ -7,7 +7,13 @@ export TMPDIR="${TMPDIR:-/var/tmp}"
 PORT="${ARTICLE1_PG_PORT:-55696}"
 PROJECT="${ARTICLE1_PROJECT:-boring-cdc-article1-evidence}"
 COMPOSE=(docker compose -p "$PROJECT" -f fixtures/article1/compose.yml)
-DSN="postgresql://postgres:article1_fixture_only@127.0.0.1:${PORT}/article1?sslmode=disable"
+PASSWORD_FILE="${BORING_CDC_POSTGRES_PASSWORD_FILE:-.secrets/postgres_password}"
+if [[ -z "${PGPASSWORD:-}" ]]; then
+  [[ -r "$PASSWORD_FILE" ]] || { echo "ARTICLE1_ACCEPTANCE_FAILED: unreadable PostgreSQL password file: $PASSWORD_FILE" >&2; exit 1; }
+  PGPASSWORD=$(cat "$PASSWORD_FILE")
+fi
+export PGPASSWORD
+DSN="postgresql://postgres@127.0.0.1:${PORT}/article1?sslmode=disable"
 WORK="$(mktemp -d "$TMPDIR/article1-evidence.XXXXXX")"
 
 cleanup() {

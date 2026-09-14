@@ -191,7 +191,7 @@ def main() -> int:
             "schema_version": "article1-reader-evidence/v2",
             "owner_bead": "boring-cdc-pci.6",
             "capture_code_sha": "fbd139e0d9f09d1e4141f3d84b4ce7eb55992149",
-            "reader_command": "BORING_CDC_ARTICLE1_DSN='postgresql://postgres:article1_fixture_only@127.0.0.1:55696/article1?sslmode=disable' target/debug/boring-cdc run",
+            "reader_command": "export PGPASSWORD; PGPASSWORD=$(cat \"${BORING_CDC_POSTGRES_PASSWORD_FILE:-.secrets/postgres_password}\"); BORING_CDC_ARTICLE1_DSN='postgresql://postgres@127.0.0.1:55696/article1?sslmode=disable' target/debug/boring-cdc run",
             "capture_binary_sha256": "2a37d6efebe34d7efb1866bc62b74c58663ba3f3da5701e4e932c7391170f800",
             "capture_binary_note": "Digest of the exact target/debug/boring-cdc executable used for the committed raw capture; debug binaries built in another absolute checkout can differ.",
         }

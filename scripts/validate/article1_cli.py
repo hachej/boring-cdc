@@ -15,7 +15,18 @@ import time
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 COMPOSE = ROOT / "fixtures/article1/compose.yml"
 BINARY = ROOT / "target/debug/boring-cdc"
-PASSWORD = "article1_fixture_only"
+
+
+def load_password(env: dict[str, str]) -> str:
+    if env.get("PGPASSWORD"):
+        return env["PGPASSWORD"]
+    password_file = pathlib.Path(
+        env.get("BORING_CDC_POSTGRES_PASSWORD_FILE", ROOT / ".secrets/postgres_password")
+    )
+    password = password_file.read_text().rstrip("\r\n")
+    if not password:
+        raise RuntimeError(f"PostgreSQL password file is empty: {password_file}")
+    return password
 
 
 def run(command: list[str], env: dict[str, str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -39,8 +50,9 @@ def main() -> int:
     env = os.environ.copy()
     env["TMPDIR"] = "/var/tmp"
     env["ARTICLE1_PG_PORT"] = str(args.port)
+    env["PGPASSWORD"] = load_password(env)
     env["BORING_CDC_ARTICLE1_DSN"] = (
-        f"postgresql://postgres:{PASSWORD}@127.0.0.1:{args.port}/article1?sslmode=disable"
+        f"postgresql://postgres@127.0.0.1:{args.port}/article1?sslmode=disable"
     )
     compose = ["docker", "compose", "-p", args.project, "-f", str(COMPOSE)]
     try:
@@ -84,11 +96,12 @@ def main() -> int:
                     raise RuntimeError(f"article1_row_view disclaimer missing {phrase}")
 
         wrong = env.copy()
-        wrong["BORING_CDC_ARTICLE1_DSN"] = wrong["BORING_CDC_ARTICLE1_DSN"].replace(PASSWORD, "super-secret-wrong")
+        wrong_password = f"wrong-{env['PGPASSWORD']}"
+        wrong["PGPASSWORD"] = wrong_password
         failure = run([str(BINARY), "run"], wrong, check=False)
         if failure.returncode != 4 or "ARTICLE1_AUTH_FAILED: reader capture failed" not in failure.stderr:
             raise RuntimeError("authentication failure contract drifted")
-        if "super-secret-wrong" in failure.stdout + failure.stderr or "postgresql://" in failure.stdout + failure.stderr:
+        if wrong_password in failure.stdout + failure.stderr or "postgresql://" in failure.stdout + failure.stderr:
             raise RuntimeError("reader failure leaked its DSN")
 
         unsupported = run([str(BINARY), "run", "--json"], env, check=False)
@@ -116,7 +129,7 @@ def main() -> int:
             holder.start()
             stalled_env = env.copy()
             stalled_env["BORING_CDC_ARTICLE1_DSN"] = (
-                f"postgresql://postgres:{PASSWORD}@127.0.0.1:{stalled_port}/article1?sslmode=disable"
+                f"postgresql://postgres@127.0.0.1:{stalled_port}/article1?sslmode=disable"
             )
             startup_cancelled = subprocess.Popen(
                 [str(BINARY), "run"], cwd=ROOT, env=stalled_env, text=True,

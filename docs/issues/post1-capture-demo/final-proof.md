@@ -14,7 +14,9 @@
 Run from the repository root with `TMPDIR=/var/tmp` after starting the pinned PostgreSQL fixture on port 55696:
 
 ```sh
-BORING_CDC_ARTICLE1_DSN='postgresql://postgres:article1_fixture_only@127.0.0.1:55696/article1?sslmode=disable' target/debug/boring-cdc run
+export PGPASSWORD
+PGPASSWORD=$(cat "${BORING_CDC_POSTGRES_PASSWORD_FILE:-.secrets/postgres_password}")
+BORING_CDC_ARTICLE1_DSN='postgresql://postgres@127.0.0.1:55696/article1?sslmode=disable' target/debug/boring-cdc run
 ```
 
 Committed REAL PostgreSQL 17.6 evidence:
