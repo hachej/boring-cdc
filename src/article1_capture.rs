@@ -5,11 +5,12 @@
 //! This module sends no standby-status packet, performs no retry, and persists nothing.
 
 use crate::m1_decoder::{
-    CopyBothEvent, Decoder, OldTupleKind, PgoutputEvent, RelationContract, RowKind, TupleValue,
-    WireLimits,
+    Column, CopyBothEvent, Decoder, OldTupleKind, PgoutputEvent, Relation, RelationContract,
+    RowKind, TupleValue, WireLimits,
 };
 use pg_walstream::{CancellationToken, PgReplicationConnection};
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use std::fmt;
 
 // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
@@ -28,6 +29,8 @@ pub const STREAMING: &str = "false";
 pub const TWO_PHASE: &str = "false";
 // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const BINARY: &str = "false";
+// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
+pub const TABLES_CSV: &str = "customers,order_items,orders,products";
 
 const START_OPTIONS: [(&str, &str); 6] = [
     ("proto_version", PROTO_VERSION), // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
@@ -91,8 +94,8 @@ impl CaptureConfig {
 /// Capture complete transactions as stable JSONL, stopping after `stop_after_commits`.
 ///
 /// This function deliberately has no retry loop and never calls a feedback API.
-pub fn capture_jsonl(config: &CaptureConfig) -> Result<Vec<String>, CaptureFailure> {
-    preflight(config)?;
+pub async fn capture_jsonl(config: &CaptureConfig) -> Result<Vec<String>, CaptureFailure> {
+    let contracts = preflight(config)?;
     let replication_dsn = if config.dsn.contains('?') {
         format!("{}&replication=database", config.dsn)
     } else {
@@ -112,18 +115,15 @@ pub fn capture_jsonl(config: &CaptureConfig) -> Result<Vec<String>, CaptureFailu
             CaptureFailure::at("start_replication", "ARTICLE1_START_REPLICATION_FAILED")
         })?;
 
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(|_| CaptureFailure::at("connection", "ARTICLE1_RUNTIME_FAILED"))?;
     let cancellation = CancellationToken::new();
     let mut decoder = Decoder::new(WireLimits::default());
     let mut lines = Vec::new();
     let mut commits = 0usize;
 
     while commits < config.stop_after_commits {
-        let frame = runtime
-            .block_on(connection.get_copy_data_async(&cancellation))
+        let frame = connection
+            .get_copy_data_async(&cancellation)
+            .await
             .map_err(|_| CaptureFailure::at("connection", "ARTICLE1_COPYBOTH_DISCONNECTED"))?;
         let decoded = decoder.decode_copy_data(&frame).map_err(|_error| {
             #[cfg(test)]
@@ -140,18 +140,20 @@ pub fn capture_jsonl(config: &CaptureConfig) -> Result<Vec<String>, CaptureFailu
                 event,
                 ..
             } => match event {
-                PgoutputEvent::RelationNeedsValidation(relation) => decoder
-                    .admit_relation(RelationContract {
-                        key_columns: relation
-                            .columns
-                            .iter()
-                            .enumerate()
-                            .filter_map(|(index, column)| column.key.then_some(index))
-                            .collect(),
-                        relation,
-                        control: None,
-                    })
-                    .map_err(|_| CaptureFailure::at("protocol", "ARTICLE1_RELATION_REJECTED"))?,
+                PgoutputEvent::RelationNeedsValidation(relation) => {
+                    let contract = contracts.get(&relation.id).ok_or_else(|| {
+                        CaptureFailure::at("publication", "ARTICLE1_RELATION_NOT_PUBLISHED")
+                    })?;
+                    if contract.relation != relation {
+                        return Err(CaptureFailure::at(
+                            "protocol",
+                            "ARTICLE1_RELATION_SCHEMA_MISMATCH",
+                        ));
+                    }
+                    decoder
+                        .admit_relation(contract.clone())
+                        .map_err(|_| CaptureFailure::at("protocol", "ARTICLE1_RELATION_REJECTED"))?
+                }
                 PgoutputEvent::RelationMetadata(_) | PgoutputEvent::Origin { .. } => {}
                 event => {
                     let commit = matches!(event, PgoutputEvent::Commit { .. });
@@ -166,7 +168,7 @@ pub fn capture_jsonl(config: &CaptureConfig) -> Result<Vec<String>, CaptureFailu
     Ok(lines)
 }
 
-fn preflight(config: &CaptureConfig) -> Result<(), CaptureFailure> {
+fn preflight(config: &CaptureConfig) -> Result<BTreeMap<u32, RelationContract>, CaptureFailure> {
     let mut connection = PgReplicationConnection::connect(&config.dsn)
         .map_err(|error| classify_connection(&error.to_string()))?;
     if connection.server_version() != POSTGRES_VERSION_NUM {
@@ -185,6 +187,15 @@ fn preflight(config: &CaptureConfig) -> Result<(), CaptureFailure> {
         return Err(CaptureFailure::at(
             "publication",
             "ARTICLE1_PUBLICATION_MISMATCH",
+        ));
+    }
+    let membership = connection
+        .exec(&format!("SELECT string_agg(tablename, ',' ORDER BY tablename) FROM pg_publication_tables WHERE pubname = '{PUBLICATION}'"))
+        .map_err(|_| CaptureFailure::at("publication", "ARTICLE1_PUBLICATION_QUERY_FAILED"))?;
+    if membership.get_value(0, 0).as_deref() != Some(TABLES_CSV) {
+        return Err(CaptureFailure::at(
+            "publication",
+            "ARTICLE1_PUBLICATION_TABLES_MISMATCH",
         ));
     }
     let slot_query = format!(
@@ -206,7 +217,68 @@ fn preflight(config: &CaptureConfig) -> Result<(), CaptureFailure> {
             "ARTICLE1_CONTINUITY_UNAVAILABLE",
         ));
     }
-    Ok(())
+
+    let catalog = connection
+        .exec(&format!("SELECT c.oid::text,n.nspname,c.relname,c.relreplident,a.attname,a.atttypid::text,a.atttypmod::text,(EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid=c.oid AND (i.indisreplident OR (c.relreplident='d' AND i.indisprimary)) AND a.attnum=ANY(i.indkey)))::int::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_publication_tables p ON p.schemaname=n.nspname AND p.tablename=c.relname JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped WHERE p.pubname='{PUBLICATION}' ORDER BY c.oid,a.attnum"))
+        .map_err(|_| CaptureFailure::at("publication", "ARTICLE1_CATALOG_QUERY_FAILED"))?;
+    let mut relations: BTreeMap<u32, Relation> = BTreeMap::new();
+    for row in 0..catalog.ntuples() {
+        let value = |column| {
+            catalog
+                .get_value(row, column)
+                .ok_or_else(|| CaptureFailure::at("protocol", "ARTICLE1_CATALOG_VALUE_INVALID"))
+        };
+        let id = value(0)?
+            .parse()
+            .map_err(|_| CaptureFailure::at("protocol", "ARTICLE1_CATALOG_VALUE_INVALID"))?;
+        let relation = relations.entry(id).or_insert_with(|| Relation {
+            id,
+            namespace: value(1).unwrap_or_default(),
+            name: value(2).unwrap_or_default(),
+            replica_identity: value(3)
+                .unwrap_or_default()
+                .as_bytes()
+                .first()
+                .copied()
+                .unwrap_or(0),
+            columns: Vec::new(),
+        });
+        relation.columns.push(Column {
+            name: value(4)?,
+            type_oid: value(5)?
+                .parse()
+                .map_err(|_| CaptureFailure::at("protocol", "ARTICLE1_CATALOG_VALUE_INVALID"))?,
+            type_modifier: value(6)?
+                .parse()
+                .map_err(|_| CaptureFailure::at("protocol", "ARTICLE1_CATALOG_VALUE_INVALID"))?,
+            key: value(7)?.as_str() == "1",
+        });
+    }
+    relations
+        .into_iter()
+        .map(|(id, relation)| {
+            let key_columns = relation
+                .columns
+                .iter()
+                .enumerate()
+                .filter_map(|(index, column)| column.key.then_some(index))
+                .collect::<Vec<_>>();
+            if key_columns.is_empty() {
+                return Err(CaptureFailure::at(
+                    "protocol",
+                    "ARTICLE1_RELATION_KEY_MISSING",
+                ));
+            }
+            Ok((
+                id,
+                RelationContract {
+                    relation,
+                    key_columns,
+                    control: None,
+                },
+            ))
+        })
+        .collect()
 }
 
 fn classify_connection(message: &str) -> CaptureFailure {
@@ -318,6 +390,23 @@ mod tests {
         );
     }
 
+    #[test]
+    #[ignore = "requires the pinned PostgreSQL 17.6 Article 1 fixture"]
+    fn live_pg17_wrong_auth_fails_closed() {
+        let dsn = std::env::var("ARTICLE1_DSN").expect("ARTICLE1_DSN is required");
+        let wrong = dsn.replace("article1_fixture_only", "definitely_wrong");
+        assert_ne!(wrong, dsn, "fixture password marker missing");
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let error = runtime
+            .block_on(capture_jsonl(&CaptureConfig::article1(wrong, 1).unwrap()))
+            .unwrap_err();
+        assert_eq!(error.boundary, "authentication");
+        assert_eq!(error.code, "ARTICLE1_AUTH_FAILED");
+    }
+
     /// Real-fixture proof only; run explicitly with `ARTICLE1_DSN`.
     #[test]
     #[ignore = "requires the pinned PostgreSQL 17.6 Article 1 fixture"]
@@ -331,7 +420,13 @@ mod tests {
             let mut connection = PgReplicationConnection::connect(&mutation_dsn).unwrap();
             connection.exec("BEGIN; INSERT INTO customers VALUES (9001, 'Live', 1); UPDATE customers SET tier = 2 WHERE id = 9001; DELETE FROM customers WHERE id = 9001; COMMIT;").unwrap();
         });
-        let lines = capture_jsonl(&CaptureConfig::article1(dsn, 1).unwrap()).unwrap();
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let lines = runtime
+            .block_on(capture_jsonl(&CaptureConfig::article1(dsn, 1).unwrap()))
+            .unwrap();
         mutation.join().unwrap();
         let events = lines
             .iter()
