@@ -256,7 +256,7 @@ fn preflight(
     }
 
     let catalog = connection
-        .exec(&format!("SELECT c.oid::text,n.nspname,c.relname,c.relreplident,a.attname,a.atttypid::text,a.atttypmod::text,(EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid=c.oid AND (i.indisreplident OR (c.relreplident='d' AND i.indisprimary)) AND a.attnum=ANY(i.indkey)))::int::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_publication_tables p ON p.schemaname=n.nspname AND p.tablename=c.relname JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped WHERE p.pubname='{}' ORDER BY c.oid,a.attnum", expected.publication))
+        .exec(&format!("SELECT c.oid::text,n.nspname,c.relname,c.relreplident,a.attname,a.atttypid::text,a.atttypmod::text,(c.relreplident='f' OR EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid=c.oid AND (i.indisreplident OR (c.relreplident='d' AND i.indisprimary)) AND a.attnum=ANY(i.indkey)))::int::text FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_publication_tables p ON p.schemaname=n.nspname AND p.tablename=c.relname JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped WHERE p.pubname='{}' ORDER BY c.oid,a.attnum", expected.publication))
         .map_err(|_| CaptureFailure::at("publication", "ARTICLE1_CATALOG_QUERY_FAILED"))?;
     let mut relations: BTreeMap<u32, Relation> = BTreeMap::new();
     for row in 0..catalog.ntuples() {
@@ -293,29 +293,40 @@ fn preflight(
     }
     relations
         .into_iter()
-        .map(|(id, relation)| {
-            let key_columns = relation
-                .columns
-                .iter()
-                .enumerate()
-                .filter_map(|(index, column)| column.key.then_some(index))
-                .collect::<Vec<_>>();
-            if key_columns.is_empty() {
-                return Err(CaptureFailure::at(
-                    "protocol",
-                    "ARTICLE1_RELATION_KEY_MISSING",
-                ));
-            }
-            Ok((
-                id,
-                RelationContract {
-                    relation,
-                    key_columns,
-                    control: None,
-                },
-            ))
-        })
+        .map(|(id, relation)| relation_contract(id, relation))
         .collect()
+}
+
+fn relation_contract(
+    id: u32,
+    relation: Relation,
+) -> Result<(u32, RelationContract), CaptureFailure> {
+    let key_columns = relation
+        .columns
+        .iter()
+        .enumerate()
+        .filter_map(|(index, column)| column.key.then_some(index))
+        .collect::<Vec<_>>();
+    if relation.replica_identity == b'f' && key_columns.len() != relation.columns.len() {
+        return Err(CaptureFailure::at(
+            "protocol",
+            "ARTICLE1_CATALOG_VALUE_INVALID",
+        ));
+    }
+    if key_columns.is_empty() {
+        return Err(CaptureFailure::at(
+            "protocol",
+            "ARTICLE1_RELATION_KEY_MISSING",
+        ));
+    }
+    Ok((
+        id,
+        RelationContract {
+            relation,
+            key_columns,
+            control: None,
+        },
+    ))
 }
 
 fn decode_frame(decoder: &mut Decoder, frame: &[u8]) -> Result<CopyBothEvent, CaptureFailure> {
@@ -424,6 +435,39 @@ mod tests {
                 .unwrap_err()
                 .code,
             "ARTICLE1_PROTOCOL_REJECTED"
+        );
+    }
+
+    #[test]
+    fn full_identity_contract_requires_and_admits_every_column() {
+        let relation = Relation {
+            id: 42,
+            namespace: "public".into(),
+            name: "customers".into(),
+            replica_identity: b'f',
+            columns: vec![
+                Column {
+                    name: "id".into(),
+                    type_oid: 20,
+                    type_modifier: -1,
+                    key: true,
+                },
+                Column {
+                    name: "name".into(),
+                    type_oid: 25,
+                    type_modifier: -1,
+                    key: true,
+                },
+            ],
+        };
+        let (_, contract) = relation_contract(42, relation.clone()).unwrap();
+        assert_eq!(contract.key_columns, vec![0, 1]);
+
+        let mut incomplete = relation;
+        incomplete.columns[1].key = false;
+        assert_eq!(
+            relation_contract(42, incomplete).unwrap_err().code,
+            "ARTICLE1_CATALOG_VALUE_INVALID"
         );
     }
 
@@ -583,6 +627,52 @@ mod tests {
         assert_eq!(events[3]["old_state"], "key");
         assert_eq!(events[4]["row_count"], 3);
         assert!(events.iter().all(|event| event["wal_start"].is_string()));
+        for line in lines {
+            println!("{line}");
+        }
+    }
+
+    /// Real-fixture proof that catalog-derived FULL identity reaches the existing decoder.
+    #[test]
+    #[ignore = "requires the pinned PostgreSQL 17.6 Article 1 fixture"]
+    fn live_pg17_full_identity_renders_full_old_tuples() {
+        let dsn = std::env::var("ARTICLE1_DSN").expect("ARTICLE1_DSN is required");
+        let mut setup = PgReplicationConnection::connect(&dsn).unwrap();
+        setup
+            .exec("ALTER TABLE public.customers REPLICA IDENTITY FULL")
+            .unwrap();
+        let mutation_dsn = dsn.clone();
+        let mutation = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(750));
+            let mut connection = PgReplicationConnection::connect(&mutation_dsn).unwrap();
+            connection.exec("BEGIN; INSERT INTO customers VALUES (9002, 'Full', 1); UPDATE customers SET tier = 2 WHERE id = 9002; DELETE FROM customers WHERE id = 9002; COMMIT;").unwrap();
+        });
+        let runtime = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let mut lines = Vec::new();
+        let commits = runtime
+            .block_on(capture_jsonl(
+                &CaptureConfig::article1(dsn, 1).unwrap(),
+                &CancellationToken::new(),
+                |line| {
+                    lines.push(line);
+                    Ok(())
+                },
+            ))
+            .unwrap();
+        assert_eq!(commits, 1);
+        mutation.join().unwrap();
+        let events = lines
+            .iter()
+            .map(|line| serde_json::from_str::<Value>(line).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(events[1]["old_state"], "absent");
+        assert_eq!(events[2]["old_state"], "full");
+        assert_eq!(events[3]["old_state"], "full");
+        assert_eq!(events[2]["old"], json!(["9002", "Full", "1"]));
+        assert_eq!(events[3]["old"], json!(["9002", "Full", "2"]));
         for line in lines {
             println!("{line}");
         }

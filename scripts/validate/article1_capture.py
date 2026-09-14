@@ -59,6 +59,17 @@ def main() -> int:
         for event in ("BEGIN", "INSERT", "UPDATE", "DELETE", "COMMIT"):
             if f'"event":"{event}"' not in transcript:
                 raise RuntimeError(f"live transcript missing {event}")
+        # No-feedback is an explicit Article 1 boundary, so the slot cannot advance
+        # past the default-identity transcript. Recreate the pinned fixture before
+        # proving FULL to avoid replaying stale Relation metadata under a new identity.
+        run(compose + ["down", "-v", "--remove-orphans"], env)
+        run(compose + ["up", "-d", "--wait"], env)
+        full_transcript = run(
+            ["cargo", "test", "--locked", "live_pg17_full_identity_renders_full_old_tuples", "--", "--ignored", "--nocapture"],
+            env,
+        )
+        if full_transcript.count('"old_state":"full"') != 2:
+            raise RuntimeError("FULL identity transcript missing update/delete full old tuples")
         negatives = [
             (["--expected-version", "17.5"], "version"),
             (["--expected-publication", "wrong_publication"], "publication"),
@@ -72,7 +83,7 @@ def main() -> int:
             )
             if boundary not in output:
                 raise RuntimeError(f"negative did not name {boundary}")
-        print("ARTICLE1_CAPTURE_OK postgres=17.6 copyboth=true events=BEGIN,INSERT,UPDATE,DELETE,COMMIT")
+        print("ARTICLE1_CAPTURE_OK postgres=17.6 copyboth=true events=BEGIN,INSERT,UPDATE,DELETE,COMMIT old_states=absent,key,full")
         print("ARTICLE1_LIVE_FAILURES_OK connection/auth/version/publication/slot/continuity=fail-closed")
         print("ARTICLE1_FOCUSED_FAILURES_OK config/protocol=fail-closed")
         assert focused and preflight and connection and auth
