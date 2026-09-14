@@ -607,10 +607,15 @@ fn validate_width(contract: &RelationContract, values: &[TupleValue]) -> Result<
     }
 }
 fn validate_full_key(contract: &RelationContract, values: &[TupleValue]) -> Result<()> {
+    let valid = |value: Option<&TupleValue>| match value {
+        Some(TupleValue::Text(_)) => true,
+        Some(TupleValue::Null) => contract.relation.replica_identity == b'f',
+        _ => false,
+    };
     if contract
         .key_columns
         .iter()
-        .any(|&i| !matches!(values.get(i), Some(TupleValue::Text(_))))
+        .any(|&index| !valid(values.get(index)))
     {
         Err(fail(FailureClass::Contract, "CANONICAL_KEY_INCOMPLETE"))
     } else {
@@ -643,7 +648,14 @@ fn full_key(contract: &RelationContract, values: &[TupleValue]) -> Vec<Vec<u8>> 
         .key_columns
         .iter()
         .filter_map(|&i| match values.get(i) {
-            Some(TupleValue::Text(v)) => Some(v.clone()),
+            Some(TupleValue::Text(value)) if contract.relation.replica_identity == b'f' => {
+                let mut encoded = Vec::with_capacity(value.len() + 1);
+                encoded.push(1);
+                encoded.extend(value);
+                Some(encoded)
+            }
+            Some(TupleValue::Text(value)) => Some(value.clone()),
+            Some(TupleValue::Null) if contract.relation.replica_identity == b'f' => Some(vec![0]),
             _ => None,
         })
         .collect()
@@ -1235,6 +1247,30 @@ pub mod tests {
             .unwrap_err();
         assert_eq!(e.fingerprint, "KEY_CHANGE_UNCHANGED_TOAST");
     }
+    #[test]
+    fn full_identity_keys_preserve_nullable_components() {
+        let mut full = relation(10, false);
+        full.replica_identity = b'f';
+        for column in &mut full.columns {
+            column.key = true;
+        }
+        let contract = RelationContract {
+            relation: full,
+            key_columns: vec![0, 1, 2],
+            control: None,
+        };
+        let nullable = vec![text("a"), TupleValue::Null, text("b")];
+        validate_full_key(&contract, &nullable).unwrap();
+        assert_eq!(
+            full_key(&contract, &nullable),
+            vec![vec![1, b'a'], vec![0], vec![1, b'b']]
+        );
+        assert_ne!(
+            full_key(&contract, &nullable),
+            full_key(&contract, &[text("a"), text(""), text("b")])
+        );
+    }
+
     // SCENARIO: SCN-M1-DECODER-CONTROL
     #[test]
     fn control_relation_allows_only_fixed_key_update_and_mutable_columns() {

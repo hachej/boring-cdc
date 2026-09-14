@@ -639,13 +639,13 @@ mod tests {
         let dsn = std::env::var("ARTICLE1_DSN").expect("ARTICLE1_DSN is required");
         let mut setup = PgReplicationConnection::connect(&dsn).unwrap();
         setup
-            .exec("ALTER TABLE public.customers REPLICA IDENTITY FULL")
+            .exec("ALTER TABLE public.customers ALTER COLUMN name DROP NOT NULL; ALTER TABLE public.customers REPLICA IDENTITY FULL")
             .unwrap();
         let mutation_dsn = dsn.clone();
         let mutation = std::thread::spawn(move || {
             std::thread::sleep(std::time::Duration::from_millis(750));
             let mut connection = PgReplicationConnection::connect(&mutation_dsn).unwrap();
-            connection.exec("BEGIN; INSERT INTO customers VALUES (9002, 'Full', 1); UPDATE customers SET tier = 2 WHERE id = 9002; DELETE FROM customers WHERE id = 9002; COMMIT;").unwrap();
+            connection.exec("BEGIN; INSERT INTO customers VALUES (9002, NULL, 1); UPDATE customers SET tier = 2 WHERE id = 9002; DELETE FROM customers WHERE id = 9002; COMMIT;").unwrap();
         });
         let runtime = tokio::runtime::Builder::new_multi_thread()
             .enable_all()
@@ -671,8 +671,8 @@ mod tests {
         assert_eq!(events[1]["old_state"], "absent");
         assert_eq!(events[2]["old_state"], "full");
         assert_eq!(events[3]["old_state"], "full");
-        assert_eq!(events[2]["old"], json!(["9002", "Full", "1"]));
-        assert_eq!(events[3]["old"], json!(["9002", "Full", "2"]));
+        assert_eq!(events[2]["old"], json!(["9002", null, "1"]));
+        assert_eq!(events[3]["old"], json!(["9002", null, "2"]));
         for line in lines {
             println!("{line}");
         }
