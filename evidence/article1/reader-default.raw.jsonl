@@ -1,0 +1,5 @@
+{"event":"BEGIN","final_lsn":"0/1928758","transaction":{"commit_time":842727420368350,"xid":749},"wal_end":"0/1928538","wal_start":"0/1928538"}
+{"event":"INSERT","new":["9101","Article Default","1"],"old":null,"old_state":"absent","relation_id":16385,"transaction":{"ordinal":0,"xid":749},"wal_end":"0/1928538","wal_start":"0/1928538"}
+{"event":"UPDATE","new":["9101","Article Default Updated","2"],"old":null,"old_state":"absent","relation_id":16385,"transaction":{"ordinal":1,"xid":749},"wal_end":"0/19286A8","wal_start":"0/19286A8"}
+{"event":"DELETE","new":null,"old":["9101",null,null],"old_state":"key","relation_id":16385,"transaction":{"ordinal":2,"xid":749},"wal_end":"0/1928710","wal_start":"0/1928710"}
+{"commit_lsn":"0/1928758","end_lsn":"0/1928788","event":"COMMIT","row_count":3,"transaction":{"commit_time":842727420368350},"wal_end":"0/1928788","wal_start":"0/1928788"}
