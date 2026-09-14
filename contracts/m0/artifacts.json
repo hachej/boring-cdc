@@ -424,7 +424,7 @@
       "id": "ART-M0-SECURITY-EXPOSURE-VALIDATION",
       "owner_bead": "boring-cdc-d-security",
       "path": "artifacts/m0/decisions/boring-cdc-d-security/evidence.json",
-      "sha256": "5653dde2b7dacfe752c8456833d42b491637d654efa361cf805f65eacd2b14f3",
+      "sha256": "e5681f9dae2cc66752aed78c9e44591bd32a812f9325e4822708e4bb50e2f495",
       "status": "complete"
     },
     {
