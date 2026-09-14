@@ -6,8 +6,10 @@ import json
 import os
 import pathlib
 import signal
+import socket
 import subprocess
 import sys
+import threading
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -83,19 +85,40 @@ def main() -> int:
         if unrelated.returncode != 4 or "CLI_HANDLER_UNAVAILABLE" not in unrelated.stderr:
             raise RuntimeError("unrelated command handler changed")
 
-        recreate(compose, env)
-        startup_cancelled = subprocess.Popen(
-            [str(BINARY), "run"], cwd=ROOT, env=env, text=True,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        )
-        time.sleep(0.01)
-        startup_cancelled.send_signal(signal.SIGINT)
-        startup_stdout, startup_stderr = startup_cancelled.communicate(timeout=2)
-        if startup_cancelled.returncode != 0 or startup_stdout or startup_stderr:
-            raise RuntimeError(
-                f"startup SIGINT was not clean: rc={startup_cancelled.returncode} "
-                f"stdout={startup_stdout!r} stderr={startup_stderr!r}"
+        # A local listener accepts the PostgreSQL connection but never answers its
+        # startup packet, deterministically pinning synchronous setup until SIGINT.
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as stalled_server:
+            stalled_server.bind(("127.0.0.1", 0))
+            stalled_server.listen(1)
+            stalled_port = stalled_server.getsockname()[1]
+            accepted = threading.Event()
+
+            def hold_startup() -> None:
+                connection, _ = stalled_server.accept()
+                with connection:
+                    accepted.set()
+                    time.sleep(3)
+
+            holder = threading.Thread(target=hold_startup, daemon=True)
+            holder.start()
+            stalled_env = env.copy()
+            stalled_env["BORING_CDC_ARTICLE1_DSN"] = (
+                f"postgresql://postgres:{PASSWORD}@127.0.0.1:{stalled_port}/article1?sslmode=disable"
             )
+            startup_cancelled = subprocess.Popen(
+                [str(BINARY), "run"], cwd=ROOT, env=stalled_env, text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            if not accepted.wait(timeout=2):
+                startup_cancelled.kill()
+                raise RuntimeError("reader did not enter stalled synchronous setup")
+            startup_cancelled.send_signal(signal.SIGINT)
+            startup_stdout, startup_stderr = startup_cancelled.communicate(timeout=2)
+            if startup_cancelled.returncode != 0 or startup_stdout or startup_stderr:
+                raise RuntimeError(
+                    f"stalled-setup SIGINT was not clean: rc={startup_cancelled.returncode} "
+                    f"stdout={startup_stdout!r} stderr={startup_stderr!r}"
+                )
 
         recreate(compose, env)
         cancelled = subprocess.Popen(

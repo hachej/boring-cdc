@@ -199,9 +199,17 @@ fn run_article1() -> Result<(), ReaderFailure> {
     let cancellation = cancellation_for_signals();
     let worker_cancellation = cancellation.clone();
     let (sender, receiver) = mpsc::sync_channel(1);
-    thread::spawn(move || {
-        let _ = sender.send(capture_article1(config, worker_cancellation));
-    });
+    thread::Builder::new()
+        .name("article1-capture".into())
+        .spawn(move || {
+            let _ = sender.send(capture_article1(config, worker_cancellation));
+        })
+        .map_err(|_| {
+            ReaderFailure::unavailable(
+                "ARTICLE1_RUNTIME_UNAVAILABLE",
+                "reader runtime is unavailable",
+            )
+        })?;
     loop {
         if signal_received() {
             cancellation.cancel();
