@@ -1,2 +1,2 @@
 cargo test --locked --workspace --all-targets
-cargo test --locked m2_jsonl::tests::deterministic_commit_and_exact_range_retry_are_byte_identical
+cargo test --quiet --locked m2_jsonl::tests::direct_runtime_evidence_observes_process_filesystem_sqlite_and_races -- --nocapture

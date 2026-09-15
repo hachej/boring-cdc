@@ -1,1 +1,1 @@
-["after-intent","after-write","after-file-sync","after-directory-sync","after-rename","after-parent-sync","before-marker","after-marker-write","after-marker-sync","before-checkpoint","exact-range-adopted"]
+["after-intent","after-write","after-file-sync","after-directory-sync","after-rename","after-parent-sync","before-marker","after-marker-write","after-marker-sync","before-checkpoint","inode-bound-temp-race","exact-byte-rerun"]
