@@ -19,6 +19,8 @@ EVIDENCE = ROOT / "artifacts/boring-cdc-m0-complete/gate/evidence.json"
 SUMMARY = EVIDENCE.with_name("completion-summary.json")
 
 # primary manifest ID -> (artifact registry ID, canonical owner)
+EXPECTED_ARTIFACTS_SHA256 = "3f61bcd6a4913b7c50bd6633fcf25f9543daad776d22b1dd9a63889b7134b051"
+
 PRIMARY_ARTIFACTS = {
     "ART-M0-ARCHIVE-MODEL": ("ART-M0-ARCHIVE-MODEL", "boring-cdc-m0-archive-model"),
     "ART-M0-CLICKHOUSE-MODEL": ("ART-M0-CLICKHOUSE-MODEL", "boring-cdc-m0-ch-model"),
@@ -38,6 +40,36 @@ DECISION_OWNERS = {
     "boring-cdc-d-values",
     "boring-cdc-d-wal-cap",
 }
+SPEC_INPUTS = {
+    "boring-cdc-m0-pg-contract": {
+        "contracts/postgres/capture-backfill-fixtures.schema.json", "contracts/postgres/capture-backfill.json",
+        "contracts/postgres/capture-backfill.schema.json", "contracts/postgres/postgres-contract-evidence.schema.json",
+        "contracts/postgres/roles-grants.sql", "fixtures/m0/postgres/capture-backfill.json",
+    },
+    "boring-cdc-m0-storage-model": {
+        "contracts/storage/sqlite-schema.sql", "contracts/storage/storage-fixtures.schema.json",
+        "contracts/storage/storage-model.json", "contracts/storage/storage-model.schema.json",
+        "contracts/storage/storage-result.schema.json", "fixtures/m0/storage/scenarios.json",
+    },
+    "boring-cdc-m0-event-format": {
+        "contracts/event/event-format.json", "contracts/event/event.schema.json", "docs/EVENT_FORMAT.md",
+        "fixtures/m0/event-format/golden-vectors.json",
+    },
+    "boring-cdc-m0-archive-model": {
+        "contracts/archive/archive-fixtures.schema.json", "contracts/archive/archive-model.json",
+        "contracts/archive/archive-model.schema.json", "contracts/archive/archive-result.schema.json",
+        "contracts/archive/generation-manifest.schema.json", "contracts/archive/segment-manifest.schema.json",
+        "fixtures/m0/archive/scenarios.json",
+    },
+    "boring-cdc-m0-ch-model": {
+        "contracts/clickhouse/canonical-query.sql", "contracts/clickhouse/ddl.sql",
+        "contracts/clickhouse/fixtures.schema.json", "contracts/clickhouse/model.json",
+        "contracts/clickhouse/model.schema.json", "contracts/clickhouse/result.schema.json",
+        "contracts/clickhouse/retire-generation.sql", "docs/CLICKHOUSE_MODEL.md",
+        "fixtures/m0/clickhouse/scenarios.json",
+    },
+}
+
 PROVISIONAL = {
     "boring-cdc-d-archive-durability",
     "boring-cdc-d-compose",
@@ -147,6 +179,8 @@ def aggregate_findings(root: Path = ROOT) -> list[str]:
         findings.append("primary manifest contains duplicate or malformed rows")
     if set(by_primary) != set(PRIMARY_ARTIFACTS):
         findings.append("primary manifest artifact ID set mismatch")
+    if sha(root / "contracts/m0/expected-artifacts.json") != EXPECTED_ARTIFACTS_SHA256:
+        findings.append("expected artifact inventory digest mismatch")
     registry_rows = artifacts.get("artifacts", [])
     by_artifact = {row.get("id"): row for row in registry_rows if isinstance(row, dict)}
     if len(by_artifact) != len(registry_rows):
@@ -213,7 +247,7 @@ def aggregate_findings(root: Path = ROOT) -> list[str]:
             if not validator.is_file() or sha(validator) != value.get("validator_sha256"):
                 findings.append(f"{owner}: evidence validator provenance mismatch")
             inputs = value.get("inputs")
-            if not isinstance(inputs, dict) or any(not (root / path).is_file() or sha(root / path) != digest for path, digest in inputs.items()):
+            if not isinstance(inputs, dict) or set(inputs) != SPEC_INPUTS[owner] or any(not (root / path).is_file() or sha(root / path) != digest for path, digest in inputs.items()):
                 findings.append(f"{owner}: evidence input provenance mismatch")
         except Exception as exc:
             findings.append(f"{owner}: evidence missing or invalid: {exc}")

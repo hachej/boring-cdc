@@ -59,7 +59,19 @@ class M0CompletenessTests(unittest.TestCase):
         value = json.loads(registry.read_text())
         value["artifacts"] = [row for row in value["artifacts"] if row["id"] != "ART-M0-PG-VALIDATOR"]
         registry.write_text(json.dumps(value, sort_keys=True) + "\n")
-        self.assertIn("artifact registry expected ID set mismatch", m0.aggregate_findings(target))
+        expected = target / "contracts/m0/expected-artifacts.json"
+        expected.write_text(json.dumps([item for item in json.loads(expected.read_text()) if item != "ART-M0-PG-VALIDATOR"]) + "\n")
+        findings = m0.aggregate_findings(target)
+        self.assertIn("expected artifact inventory digest mismatch", findings)
+
+    def test_evidence_cannot_omit_its_input_inventory(self):
+        temporary, target = self.fixture_root()
+        self.addCleanup(temporary.cleanup)
+        evidence = target / "artifacts/boring-cdc-m0-event-format/spec/evidence.json"
+        value = json.loads(evidence.read_text())
+        value["inputs"] = {}
+        evidence.write_text(json.dumps(value, sort_keys=True) + "\n")
+        self.assertIn("boring-cdc-m0-event-format: evidence input provenance mismatch", m0.aggregate_findings(target))
 
     def test_provisional_manifest_rows_cannot_claim_approval(self):
         temporary, target = self.fixture_root()
