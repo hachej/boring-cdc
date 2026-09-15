@@ -294,7 +294,9 @@ pub fn snapshot(
             observed_transaction_events: None,
             limit_bytes: None,
             limit_events: None,
-            wal_headroom_consequence: if x.10 == "transient" {
+            wal_headroom_consequence: if x.7 == 0 {
+                "resolved historical failure; no current action".into()
+            } else if x.10 == "transient" {
                 "retry may consume retained WAL headroom".into()
             } else {
                 "checkpoint remains fixed; operator action required".into()
@@ -302,7 +304,36 @@ pub fn snapshot(
         })
     }
     let mut raw = Vec::new();
+    if freshness != "fresh" {
+        add(
+            &mut raw,
+            "heartbeat_degraded",
+            "degraded",
+            if freshness == "stale" {
+                "STATUS_PROVENANCE_STALE"
+            } else {
+                "STATUS_PROVENANCE_UNKNOWN"
+            },
+            None,
+        );
+    }
+    if s.7
+        .as_ref()
+        .zip(s.5.as_ref())
+        .is_some_and(|(feedback, durable)| feedback > durable)
+    {
+        add(
+            &mut raw,
+            "unsafe_durability",
+            "critical",
+            "FEEDBACK_OUTRUNS_DURABILITY",
+            None,
+        );
+    }
     if let Some((o, r, _, _)) = &latest {
+        if r.starts_with("SCHEMA_") {
+            add(&mut raw, "schema_blocked", "blocked", r, None);
+        }
         match (o.as_str(), r.as_str()) {
             (_, "JOURNAL_INTEGRITY_FAILED") => add(
                 &mut raw,
@@ -526,7 +557,12 @@ pub mod tests {
         assert!(
             !t.contains("secret-system") && !t.contains("secret-db") && !t.contains("secret-slot")
         );
-        assert_eq!(a.conditions[0].condition, "healthy")
+        assert!(
+            a.conditions
+                .iter()
+                .any(|c| c.condition == "heartbeat_degraded")
+        );
+        assert!(!a.conditions.iter().any(|c| c.condition == "healthy"));
     }
     #[test]
     fn failure_and_reseed_are_concurrent() {

@@ -759,6 +759,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         RuntimeError::UnexpectedCopyBothLoss
     }
     pub fn ownership_lost(&mut self) -> RuntimeError {
+        crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::OwnershipLost);
         self.state = RuntimeState::OwnershipLost;
         RuntimeError::OwnershipLost
     }
@@ -1176,9 +1177,6 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         }
         for packet in runtime.take_feedback() {
             if !ownership_probe() {
-                crate::m2_fault_status::fault_hook(
-                    crate::m2_fault_status::FaultHook::OwnershipLost,
-                );
                 runtime.ownership_lost();
                 runtime
                     .persist_if_enabled(
@@ -2186,6 +2184,11 @@ pub mod tests {
                 .code,
             "M2_RECEIVE_FRAME_LIMIT"
         );
+    }
+    #[test]
+    fn ownership_lost_hook_crosses_runtime_boundary() {
+        let (_path, mut runtime) = runtime(FeedbackPermit::Hold);
+        assert_eq!(runtime.ownership_lost(), RuntimeError::OwnershipLost);
     }
     #[test]
     fn persisted_retry_schedule_gates_successor_startup() {

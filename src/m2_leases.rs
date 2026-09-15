@@ -702,6 +702,23 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn promotion_after_selector_hook_crosses_live_dispatch_boundary() {
+        let (mut writer, path) = writer();
+        let token = acquire(&mut writer, identity(1), 10, 100).unwrap();
+        let mut fake = Fake { namespaces: vec![] };
+        let mut times = [11_u64, 12].into_iter();
+        assert!(matches!(
+            dispatch(
+                &mut writer,
+                &token,
+                &mut || times.next().unwrap(),
+                &mut fake
+            ),
+            Ok(SideEffectOutcome::Live(_))
+        ));
+        cleanup(path);
+    }
+    #[test]
     fn two_runtime_race_keeps_stale_artifact_out_of_live_state() {
         let (mut writer, path) = writer();
         let token = acquire(&mut writer, identity(1), 10, 100).unwrap();
