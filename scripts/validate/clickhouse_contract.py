@@ -40,6 +40,30 @@ def simulate(events):
     elif state=='unchanged_toast' and cid not in cells: raise ValueError('missing predecessor')
   rows.append({'canonical_key':key,'columns':[{'column_id':k,'state':v[0],'type_oid':v[1],'typmod':v[2],'value_base64':v[3]} for k,v in sorted(cells.items())]})
  return sorted(rows,key=lambda x:x['canonical_key'])
+def validate_marker_oracles(case,index,out):
+ setup=case.get('execution',{}).get('setup',{}); rows=setup.get('history_events',[]); markers=setup.get('batch_markers',[])
+ batches={}
+ for row in rows:
+  key=(row.get('capture_epoch'),row.get('generation'),row.get('batch_id'))
+  batches.setdefault(key,[]).append(row)
+ valid=[]
+ for j,marker in enumerate(markers):
+  path=f'cases/{index}/execution/setup/batch_markers/{j}'
+  key=(marker.get('capture_epoch'),marker.get('generation'),marker.get('batch_id')); represented=batches.get(key,[])
+  identity_hashes={}
+  for row in represented: identity_hashes.setdefault(row.get('id'),set()).add(row.get('hash'))
+  if not represented or any(len(hashes)!=1 for hashes in identity_hashes.values()) or marker.get('first_journal_seq')!=min(row.get('journal_seq') for row in represented) or marker.get('last_journal_seq')!=max(row.get('journal_seq') for row in represented) or marker.get('event_count')!=len(identity_hashes):
+   add(out,'E_BATCH_MARKER_BOUNDARY',path,'marker range/count must equal its represented history batch and logical event identities')
+  else: valid.append(marker)
+ checkpoint=case.get('execution',{}).get('oracle',{}).get('checkpoint','')
+ match=re.fullmatch(r'advance_to_(\d+)',checkpoint)
+ if match:
+  previous=case.get('pre_state',{}).get('checkpoint_journal_seq'); endpoint=previous
+  for marker in sorted(valid,key=lambda item:item['first_journal_seq']):
+   if marker['first_journal_seq']==endpoint+1: endpoint=marker['last_journal_seq']
+  target=case.get('pre_state',{}).get('target_journal_seq')
+  if previous is None or endpoint==previous or endpoint!=target or int(match.group(1))!=endpoint:
+   add(out,'E_CHECKPOINT_ORACLE',f'cases/{index}/execution/oracle/checkpoint','advanced checkpoint must equal the target at the end of the contiguous valid finalized marker range')
 def validate():
  out=[]
  try: c,s,f,fs,rs=map(load,(C,S,F,FS,RS))
@@ -122,6 +146,7 @@ def validate():
   for j,marker in enumerate(setup.get('batch_markers',[])):
    if set(marker)!=required_marker:add(out,'E_BATCH_MARKER',f'cases/{i}/execution/setup/batch_markers/{j}','batch marker is not directly insertable into DDL')
    if marker.get('capture_epoch')!=x['pre_state']['capture_epoch'] or marker.get('generation')!=x['pre_state']['generation'] or marker.get('batch_id') not in history_batches:add(out,'E_BATCH_MARKER',f'cases/{i}/execution/setup/batch_markers/{j}','marker does not identify the scenario history batch')
+  validate_marker_oracles(x,i,out)
   if set(setup)!=required_setup:add(out,'E_FIXTURE_SETUP',f'cases/{i}','scenario setup is not complete and exact')
   if hook=='higher_fence' and not any(r['promotion_fence']==10 and r['generation']==8 for r in setup.get('selector_rows',[])):add(out,'E_PROMOTION_FIXTURE',f'cases/{i}','higher selector missing')
   if hook=='same_fence_different_candidate' and len({(r['generation'],r['candidate_digest']) for r in setup.get('selector_rows',[]) if r['promotion_fence']==9})<2:add(out,'E_PROMOTION_FIXTURE',f'cases/{i}','same-fence conflict missing')

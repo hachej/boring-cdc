@@ -15,7 +15,7 @@
           "target": "audit_or_resource_state"
         },
         "oracle": {
-          "checkpoint": "advance_to_102",
+          "checkpoint": "advance_to_104",
           "conflict_count": 0,
           "current_rows": "golden_vectors.expected_current_rows",
           "destination_state": "ready",
@@ -275,7 +275,7 @@
       "executor_id": "boring-cdc-m4-durability",
       "expected": {
         "capture_and_archive": "continue",
-        "checkpoint": "advance_to_102",
+        "checkpoint": "advance_to_104",
         "destination_state": "ready",
         "exit_code": 0,
         "log_code": "BCDC_CH_DUPLICATE_IDENTICAL",
@@ -1818,11 +1818,11 @@
             {
               "batch_id": "7777777777777777777777777777777777777777777777777777777777777777",
               "capture_epoch": 1,
-              "event_count": 4,
+              "event_count": 1,
               "finalized_at_unix_ms": 1000,
               "first_journal_seq": 100,
               "generation": 7,
-              "last_journal_seq": 104,
+              "last_journal_seq": 100,
               "object_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "ordered_event_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
             }

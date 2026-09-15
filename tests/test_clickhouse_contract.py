@@ -23,6 +23,17 @@ class ClickHouseContractTests(unittest.TestCase):
    self.assertTrue(all(set(marker)==marker_required for marker in markers))
    self.assertTrue(all(marker['batch_id'] in {row['batch_id'] for row in rows} for marker in markers))
    m.resolve_pointer(case,case['execution']['fault']['arguments']['setup_pointer'])
+ def test_marker_boundaries_and_counts_reject_mismatches(self):
+  original=m.load(m.F)['cases'][0]
+  for field,value in (('first_journal_seq',101),('last_journal_seq',103),('event_count',5)):
+   with self.subTest(field=field):
+    case=copy.deepcopy(original); case['execution']['setup']['batch_markers'][0][field]=value; findings=[]
+    m.validate_marker_oracles(case,0,findings)
+    self.assertIn('E_BATCH_MARKER_BOUNDARY',{finding['code'] for finding in findings})
+ def test_checkpoint_oracle_rejects_nonfinalized_endpoint(self):
+  case=copy.deepcopy(m.load(m.F)['cases'][0]); case['execution']['oracle']['checkpoint']='advance_to_102'; case['expected']['checkpoint']='advance_to_102'; findings=[]
+  m.validate_marker_oracles(case,0,findings)
+  self.assertIn('E_CHECKPOINT_ORACLE',{finding['code'] for finding in findings})
  def test_fixture_scope(self):
   c=m.load(m.C); f=m.load(m.F); self.assertEqual(41,len(f['cases'])); self.assertEqual(c['fixture_ids'],[x['fixture_id'] for x in f['cases']])
  def test_exact_provisional_inventory(self):
