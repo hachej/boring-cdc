@@ -2,9 +2,9 @@
 {"schema_version": "validation-result/v1", "status": "pass", "owner_bead": "boring-cdc-m2-fault-status", "validator_version": "m2-fault-status/v1", "findings": []}
 M2_FAULT_STATUS_E2E_OK postgres=17.6 crash=exact-pid status=stable redaction=pass
 
-running 3 tests
-...
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 0.17s
+running 4 tests
+....
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 0.18s
 
 
 running 0 tests

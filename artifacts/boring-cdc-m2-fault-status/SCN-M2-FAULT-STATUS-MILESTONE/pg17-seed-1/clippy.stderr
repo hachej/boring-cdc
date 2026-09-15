@@ -1,4 +1,3 @@
-    Checking boring-cdc v0.1.0 (/home/ubuntu/projects/boring-cdc/.worktrees/epic-boring-cdc-m2)
 warning: file opened with `create`, but `truncate` behavior not defined
   --> src/m2_init_recovery.rs:70:10
    |
@@ -87,15 +86,15 @@ warning: method `next` can be confused for the standard trait method `std::iter:
     = note: `#[warn(clippy::should_implement_trait)]` on by default
 
 warning: this function has too many arguments (9/7)
-   --> src/m2_jsonl.rs:737:5
+   --> src/m2_jsonl.rs:744:5
     |
-737 | /     pub fn prepare_failure(
-738 | |         current: Option<&crate::failure_policy::FailureRecord>,
-739 | |         outcome: DestinationOutcome,
-740 | |         destination_id: &str,
+744 | /     pub fn prepare_failure(
+745 | |         current: Option<&crate::failure_policy::FailureRecord>,
+746 | |         outcome: DestinationOutcome,
+747 | |         destination_id: &str,
 ...   |
-746 | |         context: &mut crate::m1_transition_kernel::TransitionContext<'_>,
-747 | |     ) -> crate::failure_policy::PolicyAction {
+753 | |         context: &mut crate::m1_transition_kernel::TransitionContext<'_>,
+754 | |     ) -> crate::failure_policy::PolicyAction {
     | |____________________________________________^
     |
     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
@@ -132,64 +131,64 @@ warning: this function has too many arguments (9/7)
     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
 
 warning: this function has too many arguments (9/7)
-   --> src/m2_spool.rs:771:5
+   --> src/m2_spool.rs:773:5
     |
-771 | /     pub fn rearm_failure_policy(
-772 | |         &self,
-773 | |         error: &SpoolError,
-774 | |         end_lsn: Option<&str>,
+773 | /     pub fn rearm_failure_policy(
+774 | |         &self,
+775 | |         error: &SpoolError,
+776 | |         end_lsn: Option<&str>,
 ...   |
-784 | |         Option<PreparedFailureOperation>,
-785 | |     ) {
+786 | |         Option<PreparedFailureOperation>,
+787 | |     ) {
     | |_____^
     |
     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
 
 warning: this function has too many arguments (11/7)
-    --> src/m2_spool.rs:1081:1
+    --> src/m2_spool.rs:1083:1
      |
-1081 | / pub fn classify_startup_spools(
-1082 | |     lock: &crate::m2_ownership::StateLock,
-1083 | |     store: &Path,
-1084 | |     directory: &Path,
+1083 | / pub fn classify_startup_spools(
+1084 | |     lock: &crate::m2_ownership::StateLock,
+1085 | |     store: &Path,
+1086 | |     directory: &Path,
 ...    |
-1092 | |     existing: impl FnMut(&str, &str) -> ExistingTransaction,
-1093 | | ) -> Result<Vec<StartupAction>, SpoolError> {
+1094 | |     existing: impl FnMut(&str, &str) -> ExistingTransaction,
+1095 | | ) -> Result<Vec<StartupAction>, SpoolError> {
      | |___________________________________________^
      |
      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
 
 warning: this function has too many arguments (12/7)
-    --> src/m2_spool.rs:1110:1
+    --> src/m2_spool.rs:1112:1
      |
-1110 | / fn classify_startup_spools_with(
-1111 | |     filesystem: &impl StartupFilesystem,
-1112 | |     lock: &crate::m2_ownership::StateLock,
-1113 | |     store: &Path,
+1112 | / fn classify_startup_spools_with(
+1113 | |     filesystem: &impl StartupFilesystem,
+1114 | |     lock: &crate::m2_ownership::StateLock,
+1115 | |     store: &Path,
 ...    |
-1122 | |     mut existing: impl FnMut(&str, &str) -> ExistingTransaction,
-1123 | | ) -> Result<Vec<StartupAction>, SpoolError> {
+1124 | |     mut existing: impl FnMut(&str, &str) -> ExistingTransaction,
+1125 | | ) -> Result<Vec<StartupAction>, SpoolError> {
      | |___________________________________________^
      |
      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
 
-warning: `boring-cdc` (lib) generated 13 warnings (run `cargo clippy --fix --lib -p boring-cdc` to apply 4 suggestions)
 warning: useless use of `vec!`
-    --> src/m2_spool.rs:1407:22
+    --> src/m2_spool.rs:1409:22
      |
-1407 |         push(&mut b, &vec![1; 100]).unwrap();
+1409 |         push(&mut b, &vec![1; 100]).unwrap();
      |                      ^^^^^^^^^^^^^ help: you can use a slice directly: `&[1; 100]`
      |
      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_vec
      = note: `#[warn(clippy::useless_vec)]` on by default
 
 warning: useless use of `vec!`
-    --> src/m2_spool.rs:1511:30
+    --> src/m2_spool.rs:1513:30
      |
-1511 |         let e = push(&mut b, &vec![1; 32]).unwrap_err();
+1513 |         let e = push(&mut b, &vec![1; 32]).unwrap_err();
      |                              ^^^^^^^^^^^^ help: you can use a slice directly: `&[1; 32]`
      |
      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_vec
 
+warning: `boring-cdc` (lib) generated 13 warnings (run `cargo clippy --fix --lib -p boring-cdc` to apply 4 suggestions)
 warning: `boring-cdc` (lib test) generated 15 warnings (13 duplicates) (run `cargo clippy --fix --lib -p boring-cdc --tests` to apply 2 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.48s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.28s

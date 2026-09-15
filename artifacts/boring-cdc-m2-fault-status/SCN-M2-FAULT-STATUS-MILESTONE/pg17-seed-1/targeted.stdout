@@ -1,10 +1,11 @@
 
-running 3 tests
+running 4 tests
 test m2_fault_status::tests::inventories_are_exact ... ok
+test m2_fault_status::tests::freshness_expires_and_causal_records_exclude_payloads ... ok
 test m2_fault_status::tests::failure_and_reseed_are_concurrent ... ok
 test m2_fault_status::tests::stable_restart_projection_redacts ... ok
 
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 0.14s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 0.19s
 
 
 running 0 tests
