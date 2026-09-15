@@ -33,8 +33,8 @@ sequenceDiagram
     EV->>TV: same-stream current-state projection
     Note over TV: non-durable; teaching only
     EV->>ST: canonical event contract
-    ST->>AR: independent archive materialization
-    ST->>CH: independent ClickHouse materialization
+    ST->>AR: independent archive replay + checkpoint
+    ST->>CH: independent ClickHouse replay + checkpoint
     Note over CH: runtime evidence remains Article 4
     G->>G: verify 6 artifacts + 9 decisions + inventories
     G-->>G: preserve 7 provisional owner decisions
