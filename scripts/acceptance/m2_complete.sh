@@ -53,12 +53,13 @@ def validate_inventory(owner, manifest):
 
 # Evidence must be attributable to committed inputs. Generated gate outputs are
 # the sole exception because their evidence necessarily names the input commit.
-status=subprocess.check_output(['git','status','--porcelain=v1','--untracked-files=all','--','.beads/issues.jsonl','src','fixtures','contracts','scripts','tests','artifacts'],text=True)
+status=subprocess.check_output(['git','status','--porcelain=v1','--untracked-files=all'],text=True)
 dirty=[]
 for line in status.splitlines():
  path=line[3:].split(' -> ')[-1]
- if not path.startswith('artifacts/boring-cdc-m2-complete/gate/'):
-  dirty.append(line)
+ if path=='.factory-sha' or path.startswith('.doctor/') or path.startswith('target/') or path.startswith('artifacts/boring-cdc-m2-complete/gate/'):
+  continue
+ dirty.append(line)
 if dirty: fail('dirty certification inputs: '+', '.join(dirty))
 
 coverage=load(coverage_path)
@@ -92,10 +93,20 @@ for leaf in leaves:
   for event in events:
    if event not in owned_text: fail(f'{owner}: structured log event code is not backed by owned implementation: {event}')
  if not leaf.get('evidence'): fail(f'{owner}: missing immutable evidence manifests')
+ expected_features={feature for feature,assigned_owner in canonical.items() if assigned_owner==owner}
+ declared_features=set(leaf.get('feature_ids',[]))
+ if declared_features!=expected_features: fail(f'{owner}: canonical feature set mismatch: missing={sorted(expected_features-declared_features)} extra={sorted(declared_features-expected_features)}')
  for feature in leaf.get('feature_ids',[]):
   if feature in features: fail(f'duplicate feature owner: {feature}')
   features[feature]=owner
   if canonical.get(feature)!=owner: fail(f'{owner}: canonical feature owner mismatch: {feature}')
+ expected_contracts=set()
+ for candidate in (root/'contracts').rglob('*.json'):
+  try: candidate_value=json.loads(candidate.read_text())
+  except (OSError,json.JSONDecodeError): continue
+  if candidate_value.get('owner_bead')==owner and candidate_value.get('schema_version'): expected_contracts.add(candidate_value['schema_version'])
+ declared_contracts=set(leaf.get('contract_ids',[]))
+ if declared_contracts!=expected_contracts: fail(f'{owner}: owned contract set mismatch: missing={sorted(expected_contracts-declared_contracts)} extra={sorted(declared_contracts-expected_contracts)}')
  for contract in leaf.get('contract_ids',[]):
   if contract in contracts: fail(f'duplicate contract owner: {contract}')
   contracts[contract]=owner
@@ -123,11 +134,25 @@ for leaf in leaves:
   if len(attempts)<2 or len(set(attempts))!=len(attempts): fail(f'{owner}: two distinct rerun attempts missing')
   schema=subprocess.run(['python3','scripts/lib/core_validator.py','schema',str(path.relative_to(root)),'--schema','contracts/evidence.schema.json'],text=True,capture_output=True)
   if schema.returncode: fail(f'{owner}: evidence schema validation failed: {path.relative_to(root)}')
+  semantic=subprocess.run(['scripts/validate/evidence.sh',str(path.relative_to(root))],text=True,capture_output=True)
+  if semantic.returncode: fail(f'{owner}: evidence semantic/freshness validation failed: {path.relative_to(root)}')
+  if manifest.get('result',{}).get('status')!='pass': fail(f'{owner}: evidence result is not pass: {path.relative_to(root)}')
+  commands=manifest.get('commands',[])
+  if not commands or any(command.get('exit_code')!=0 for command in commands): fail(f'{owner}: evidence commands are missing or unsuccessful: {path.relative_to(root)}')
+  command_text='\n'.join(str(command.get('argv','')) for command in commands)
+  for declared in [leaf.get('unit_target','')]+scripts:
+   if declared not in command_text: fail(f'{owner}: declared command not executed by evidence {path.relative_to(root)}: {declared}')
+  commit=manifest.get('git_commit','')
+  exists=subprocess.run(['git','cat-file','-e',str(commit)+'^{commit}'],capture_output=True).returncode==0
+  if not exists or subprocess.run(['git','merge-base','--is-ancestor',str(commit),'HEAD'],capture_output=True).returncode: fail(f'{owner}: evidence commit is missing or non-ancestral: {path.relative_to(root)}')
   validate_inventory(owner,path)
   log=path.parent/'logs/boring-cdc.jsonl'
-  if not log.is_file(): fail(f'{owner}: missing structured log {log.relative_to(root)}')
+  if not log.is_file() or not log.read_text().strip(): fail(f'{owner}: missing or empty structured log {log.relative_to(root)}')
   else:
-   for number,line in enumerate(log.read_text().splitlines(),1):
+   log_text=log.read_text()
+   for event in leaf.get('structured_log_event_codes',[]):
+    if event not in log_text: fail(f'{owner}: declared event code absent from evidence log {log.relative_to(root)}: {event}')
+   for number,line in enumerate(log_text.splitlines(),1):
     if not line.strip(): continue
     try: value=json.loads(line)
     except json.JSONDecodeError: fail(f'{owner}: invalid structured log JSON {log.relative_to(root)}:{number}'); continue
