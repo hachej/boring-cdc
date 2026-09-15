@@ -1,0 +1,1 @@
+{"checkpoint_complete_only":true,"control_writes_user_rows":false,"durable_before_feedback":true,"failure_fingerprint":"HEARTBEAT_WRITE_UNAVAILABLE","feedback_callbacks_before_commit":0,"feedback_from_unrelated_wal":false,"heartbeat_degraded":true,"retry_capped":true,"targeted_tests":true}

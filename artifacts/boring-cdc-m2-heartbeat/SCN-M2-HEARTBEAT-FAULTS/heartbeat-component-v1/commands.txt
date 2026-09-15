@@ -1,0 +1,1 @@
+scripts/faults/m2_heartbeat.sh
