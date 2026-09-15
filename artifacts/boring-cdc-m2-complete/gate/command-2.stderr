@@ -204,4 +204,4 @@ warning: useless use of `vec!`
 
 warning: `boring-cdc` (lib) generated 14 warnings (run `cargo clippy --fix --lib -p boring-cdc` to apply 4 suggestions)
 warning: `boring-cdc` (lib test) generated 16 warnings (14 duplicates) (run `cargo clippy --fix --lib -p boring-cdc --tests` to apply 2 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.83s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.27s

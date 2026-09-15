@@ -17,7 +17,7 @@
       "argv": "cargo clippy --locked --workspace --all-targets --all-features",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-2.stderr",
-      "stderr_sha256": "e418d74436c30307421bc8d424bd623ae2f3ea757ac39e6d507b6f8f290dad75",
+      "stderr_sha256": "9d5f398b2ee1a66a55c0759d61b81e0003102a424bd9a92413f47bdd5f07603d",
       "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-2.stdout",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "version": "m2-complete/v2"
@@ -26,9 +26,9 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-3.stderr",
-      "stderr_sha256": "72cced5a2a67dbd0839da1243ec72843dfda4f0c7b69829e68ee33a336489eb7",
+      "stderr_sha256": "a72b967f4a42de5012f3e68fe82822944bb96a16a6e44f81b67997612843ac05",
       "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-3.stdout",
-      "stdout_sha256": "e2097ddff38f1a5ba9667a92a47f9a192fa31541bd638a8969d4b7a2aa5d5e44",
+      "stdout_sha256": "6c6b63c6670c6a5720cd268562e5a326a99d23001329628242182c68bbbb8b97",
       "version": "m2-complete/v2"
     },
     {
@@ -37,7 +37,7 @@
       "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-4.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-4.stdout",
-      "stdout_sha256": "9d356f84480b989ab966dfda367bf58eba6773908de50a44a2362031830fb293",
+      "stdout_sha256": "02216cec8e83900d55b9ebad02605cc7a58388970a74ed51aa372e6f645d9fbe",
       "version": "m2-complete/v2"
     },
     {
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "milestone",
-  "git_commit": "a118f35e30d0ddef908895eeb4597f8c2849c41f",
+  "git_commit": "920696ff8cbca3a9ddc8656667f3cd2f9089a5d0",
   "owner_bead": "boring-cdc-m2-complete",
   "redaction": {
     "checked": true,
@@ -70,14 +70,13 @@
   "result": {
     "artifacts": [
       "contracts/coverage/m2.json",
-      ".beads/issues.jsonl",
       "artifacts/boring-cdc-m2-complete/gate/completion-summary.json"
     ],
     "attempts": [
       "attempt-5:f807dc608559dadfa998f24446a4a3203f312e182ab5f32ce1b4cacaa155ce03",
       "attempt-6:52beb557105e641a43fe971c41e5fcf8f7b7833897e1b6455d1e4d3e0b7cca84"
     ],
-    "digest": "89cc8245555ab9f1fd88cd27df7031b837a0910324a316824f5f2bacb9d10078",
+    "digest": "252e474aad783442b9357e2428208c6e9e85b841fceed3d66e71d7315082fc53",
     "product_faults": "factory completion consumes pinned PostgreSQL 17.6 Compose crash/fault proof; three review-cap residual handoffs remain explicit for owner disposition; downstream terminal proof remains excluded",
     "runtime_observed": true,
     "status": "pass"
