@@ -67,8 +67,16 @@ while not pathlib.Path(sys.argv[3]).exists(): time.sleep(.02)
 c.rollback()
 PY
 deadline=$((SECONDS+10)); until [[ -e "$work/sqlite-locked" ]]; do (( SECONDS < deadline )); sleep .02; done
-run_connector >"$work/crash.out" 2>"$work/crash.err" & crash_pid=$!
-sleep .25; kill -KILL "$crash_pid"; wait "$crash_pid" 2>/dev/null || true
+(
+  cd "$work/run"
+  exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/crash.out" 2>"$work/crash.err"
+) & crash_pid=$!
+deadline=$((SECONDS+10)); until [[ "$(readlink "/proc/$crash_pid/exe" 2>/dev/null || true)" == */boring-cdc ]]; do
+  (( SECONDS < deadline )) || { echo E_CRASH_PROCESS_NOT_EXEC >&2; exit 1; }
+  sleep .02
+done
+kill -KILL "$crash_pid"; wait "$crash_pid" 2>/dev/null || true
+[[ ! -e "/proc/$crash_pid" ]]
 touch "$work/release-lock"; wait "$lock_pid"
 [[ "$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from source_state").fetchone()[0])' "$work/run/state/boring.db")" == 0 ]]
 if run_connector >"$work/retry.out" 2>"$work/retry.err"; then echo E_UNPROVEN_RETRY_ADMITTED >&2; exit 1; fi
