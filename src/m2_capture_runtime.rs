@@ -1576,6 +1576,18 @@ pub async fn run_loaded_config(
             .query_row("SELECT count(*) FROM source_state", [], |row| row.get(0))
             .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_READ_FAILED"))?;
         if source_rows == 0 {
+            #[cfg(debug_assertions)]
+            if let (Some(marker), Some(release)) = (
+                std::env::var_os("M2_RECONCILE_FAULT_BEFORE_SOURCE_RECEIPT_MARKER"),
+                std::env::var_os("M2_RECONCILE_FAULT_BEFORE_SOURCE_RECEIPT_RELEASE"),
+            ) {
+                std::fs::write(&marker, b"before-source-state-receipt").map_err(|_| {
+                    CaptureFailure::at("journal", "M2_SOURCE_STATE_FAULT_MARKER_FAILED")
+                })?;
+                while !std::path::Path::new(&release).exists() {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+            }
             let tx = initial
                 .connection_mut()
                 .transaction()

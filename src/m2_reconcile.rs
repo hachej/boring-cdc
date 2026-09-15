@@ -404,16 +404,23 @@ pub struct JournalReport {
 }
 
 pub fn startup_integrity(path: &Path) -> Result<JournalVerification, ReconcileError> {
-    // The approved runtime boundary permits quick_check at startup; integrity_check and a full
-    // payload/checksum walk are maintenance/CLI work. Startup validates physical/FK integrity and
-    // constant-cardinality durable summaries without retaining an unbounded Rust-side result.
+    // The approved runtime boundary permits quick_check at startup; integrity_check remains
+    // maintenance-only. Derive an exact finite row bound from durable transaction metadata, then
+    // stream every retained event through journal_verify's continuity/hash/count checks under the
+    // reader wall-time bound.
     let reader = open_reader_with_limits(path, READER_MAX_AGE, 1)?;
-    let quick: Option<String> = reader.query_one_bounded("PRAGMA quick_check", |r| r.get(0))?;
-    if quick.as_deref() != Some("ok") {
-        return Err(ReconcileError::Journal(JournalError::Conflict(
-            "SQLite quick_check failed",
-        )));
-    }
+    let expected_events: i64 = reader
+        .query_one_bounded(
+            "SELECT coalesce(sum(event_count),0) FROM source_transactions WHERE state='committed'",
+            |r| r.get(0),
+        )?
+        .ok_or(ReconcileError::Journal(JournalError::Conflict(
+            "missing startup integrity summary",
+        )))?;
+    let max_events = usize::try_from(expected_events)
+        .ok()
+        .filter(|value| *value > 0)
+        .unwrap_or(1);
     let foreign: Option<i64> = reader
         .query_one_bounded("SELECT 1 FROM pragma_foreign_key_check LIMIT 1", |r| {
             r.get(0)
@@ -423,20 +430,8 @@ pub fn startup_integrity(path: &Path) -> Result<JournalVerification, ReconcileEr
             "foreign-key integrity mismatch",
         )));
     }
-    let summary = reader.query_one_bounded(
-        "SELECT count(*),coalesce(sum(event_count),0),coalesce((SELECT durable_journal_seq FROM source_state WHERE singleton=1),0),coalesce(max(last_seq),0) FROM source_transactions WHERE state='committed'",
-        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, i64>(2)?, r.get::<_, i64>(3)?)),
-    )?.ok_or(ReconcileError::Journal(JournalError::Conflict("missing startup integrity summary")))?;
-    if summary.2 < summary.3 {
-        return Err(ReconcileError::Journal(JournalError::Conflict(
-            "durable boundary trails committed journal",
-        )));
-    }
-    Ok(JournalVerification {
-        transaction_count: summary.0 as u64,
-        event_count: summary.1 as u64,
-        durable_seq: summary.2 as u64,
-    })
+    drop(reader);
+    Ok(journal_verify(path, max_events, READER_MAX_AGE)?)
 }
 
 pub fn journal_report(path: &Path) -> Result<JournalReport, ReconcileError> {
@@ -753,6 +748,29 @@ pub mod tests {
         .unwrap();
         assert_eq!(r.reason_code, "EXTERNAL_SELECTOR_AHEAD");
     }
+    #[test]
+    fn startup_blocks_structurally_valid_payload_checksum_corruption() {
+        let p = db("checksum-corruption");
+        seed_durable(&p);
+        let connection = rusqlite::Connection::open(&p).unwrap();
+        connection.execute_batch("DROP TRIGGER journal_events_immutable; UPDATE journal_events SET payload=x'00' WHERE event_id='event';").unwrap();
+        drop(connection);
+        assert!(
+            reconcile_startup(
+                &p,
+                "corrupt-run",
+                &live(),
+                &[],
+                &mut Archive(ArchiveReconciliation::Compatible)
+            )
+            .is_err()
+        );
+        assert_eq!(
+            recover_report(&p).unwrap().latest_reason_code.as_deref(),
+            Some("JOURNAL_INTEGRITY_FAILED")
+        );
+    }
+
     #[test]
     fn reports_are_bounded_and_read_only() {
         let p = db("reports");

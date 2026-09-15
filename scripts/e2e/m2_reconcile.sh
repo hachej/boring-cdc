@@ -58,26 +58,23 @@ python3 - "$work/run/state/boring.db" <<'PY'
 import sqlite3,sys
 c=sqlite3.connect(sys.argv[1]); c.execute('drop trigger fail_source_receipt'); c.commit()
 PY
-# Abruptly terminate a real connector process while a migrated empty database cannot yet accept
-# its source-state receipt, then release the lock and prove restart writes exactly one receipt.
-python3 - "$work/run/state/boring.db" "$work/sqlite-locked" "$work/release-lock" <<'PY' & lock_pid=$!
-import pathlib,sqlite3,sys,time
-c=sqlite3.connect(sys.argv[1]); c.execute('begin immediate'); pathlib.Path(sys.argv[2]).touch()
-while not pathlib.Path(sys.argv[3]).exists(): time.sleep(.02)
-c.rollback()
-PY
-deadline=$((SECONDS+10)); until [[ -e "$work/sqlite-locked" ]]; do (( SECONDS < deadline )); sleep .02; done
+# Abruptly terminate a real connector at the instrumented post-migration, immediately-before-
+# source-state-receipt boundary; the debug-only hook publishes the reached-boundary marker.
 (
   cd "$work/run"
-  exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/crash.out" 2>"$work/crash.err"
+  exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE \
+    M2_RECONCILE_FAULT_BEFORE_SOURCE_RECEIPT_MARKER="$work/before-source-receipt" \
+    M2_RECONCILE_FAULT_BEFORE_SOURCE_RECEIPT_RELEASE="$work/release-source-receipt" \
+    "$OLDPWD/target/debug/boring-cdc" run >"$work/crash.out" 2>"$work/crash.err"
 ) & crash_pid=$!
-deadline=$((SECONDS+10)); until [[ "$(readlink "/proc/$crash_pid/exe" 2>/dev/null || true)" == */boring-cdc ]]; do
-  (( SECONDS < deadline )) || { echo E_CRASH_PROCESS_NOT_EXEC >&2; exit 1; }
+deadline=$((SECONDS+10)); until [[ -e "$work/before-source-receipt" ]]; do
+  (( SECONDS < deadline )) || { echo E_CRASH_BOUNDARY_NOT_REACHED >&2; exit 1; }
   sleep .02
 done
+[[ "$(cat "$work/before-source-receipt")" == before-source-state-receipt ]]
+[[ "$(readlink "/proc/$crash_pid/exe")" == */boring-cdc ]]
 kill -KILL "$crash_pid"; wait "$crash_pid" 2>/dev/null || true
 [[ ! -e "/proc/$crash_pid" ]]
-touch "$work/release-lock"; wait "$lock_pid"
 [[ "$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from source_state").fetchone()[0])' "$work/run/state/boring.db")" == 0 ]]
 if run_connector >"$work/retry.out" 2>"$work/retry.err"; then echo E_UNPROVEN_RETRY_ADMITTED >&2; exit 1; fi
 [[ "$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from source_state").fetchone()[0])' "$work/run/state/boring.db")" == 1 ]]
