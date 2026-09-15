@@ -1315,6 +1315,16 @@ mod tests {
         .unwrap();
         let reader_elapsed_us = started.elapsed().as_micros();
         let copied_bytes = copied.copied_bytes;
+        let memory_limit_rejected = crate::m2_journal::read_exact_complete_range(
+            &base.join("state.sqlite"),
+            1,
+            2,
+            10,
+            copied_bytes.saturating_sub(1),
+            Duration::from_secs(2),
+        )
+        .is_err();
+        assert!(memory_limit_rejected);
         let output =
             commit_jsonl_segment(&mut writer, &root, &intent, &range, ArchiveFault::None).unwrap();
         let bytes_one = fs::read(root.join(&output.segment_dir).join("events.jsonl")).unwrap();
@@ -1365,6 +1375,75 @@ mod tests {
         });
         fs::remove_dir_all(base).unwrap();
 
+        let (pin_base, pin_root, mut pin_writer, pin_intent, pin_range) = setup("evidence-pin");
+        assert!(
+            commit_jsonl_segment(
+                &mut pin_writer,
+                &pin_root,
+                &pin_intent,
+                &pin_range,
+                ArchiveFault::AfterIntent
+            )
+            .is_err()
+        );
+        let pin_state_while_stalled: String = pin_writer
+            .connection()
+            .query_row(
+                "SELECT state FROM archive_segment_intents WHERE intent_id='intent-a'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(10));
+        let gc_while_pinned = crate::m2_journal::journal_gc_dry_run(
+            &pin_base.join("state.sqlite"),
+            1,
+            8,
+            Duration::from_secs(2),
+        )
+        .unwrap();
+        let resumed_pin = load_segment_intent(&pin_writer, "intent-a")
+            .unwrap()
+            .unwrap();
+        commit_jsonl_segment(
+            &mut pin_writer,
+            &pin_root,
+            &resumed_pin,
+            &pin_range,
+            ArchiveFault::None,
+        )
+        .unwrap();
+        let pin_state_after_publish: String = pin_writer
+            .connection()
+            .query_row(
+                "SELECT state FROM archive_segment_intents WHERE intent_id='intent-a'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let gc_after_pin_release = crate::m2_journal::journal_gc_dry_run(
+            &pin_base.join("state.sqlite"),
+            3,
+            8,
+            Duration::from_secs(2),
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                pin_state_while_stalled.as_str(),
+                gc_while_pinned.transaction_count
+            ),
+            ("selected", 0)
+        );
+        assert_eq!(
+            (
+                pin_state_after_publish.as_str(),
+                gc_after_pin_release.transaction_count
+            ),
+            ("published", 1)
+        );
+        fs::remove_dir_all(pin_base).unwrap();
+
         let (race_base, race_root, mut race_writer, race_intent, race_range) =
             setup("evidence-race");
         assert!(
@@ -1414,6 +1493,7 @@ mod tests {
             "reader_elapsed_us": reader_elapsed_us,
             "copied_bytes": copied_bytes,
             "copy_limit_bytes": 4096,
+            "memory_limit_rejected": memory_limit_rejected,
             "reader_released_wal_checkpoint": wal_checkpoint,
             "gc_dry_run": {"first_seq": gc.first_seq, "last_seq": gc.last_seq, "transactions": gc.transaction_count, "events": gc.event_count},
             "writer_checkpoint": output.checkpoint,
@@ -1423,6 +1503,8 @@ mod tests {
             "rss_growth_kib": rss_growth_kib,
             "rss_growth_limit_kib": 65_536,
             "logical_range_pin_state": intent_state,
+            "stalled_pin": {"before": pin_state_while_stalled, "gc_transactions": gc_while_pinned.transaction_count},
+            "released_pin": {"after": pin_state_after_publish, "gc_transactions": gc_after_pin_release.transaction_count},
             "writer_attestation": writer_attestation,
             "temp_inode_race_blocked": race_blocked,
             "replacement_preserved": replacement_preserved,
@@ -1461,8 +1543,18 @@ mod tests {
             serde_json::from_str(include_str!("../contracts/m2/failure-policy-cases.json"))
                 .unwrap();
         assert_eq!(corpus["owner_bead"], "boring-cdc-m2.1");
-        let golden_cases = corpus["cases"].as_array().unwrap();
-        assert_eq!(golden_cases.len(), 14);
+        let all_golden_cases = corpus["cases"].as_array().unwrap();
+        assert_eq!(all_golden_cases.len(), 14);
+        let selected_case = std::env::var("BORING_CDC_FAILURE_GOLDEN_CASE").ok();
+        let golden_cases: Vec<&serde_json::Value> = all_golden_cases
+            .iter()
+            .filter(|case| {
+                selected_case
+                    .as_deref()
+                    .is_none_or(|wanted| case["id"].as_str() == Some(wanted))
+            })
+            .collect();
+        assert!(!golden_cases.is_empty());
         // Every unchanged vector starts through the real adapter, then traverses the shared
         // restart, stale/exact completion, schedule, redaction, and deterministic-poison paths.
         for case in golden_cases {
