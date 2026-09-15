@@ -18,6 +18,7 @@ pub mod m1_cli_contract;
 
 pub mod m2_capture_runtime;
 pub mod m2_journal;
+pub mod m2_jsonl;
 pub mod m2_ownership;
 pub mod m2_schema;
 pub mod m2_spool;
