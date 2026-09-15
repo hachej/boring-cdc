@@ -76,7 +76,9 @@ def provisional_marker_errors(source_paths:list[Path])->list[str]:
   while (position:=text.find(token,offset))!=-1:
    offset=position+len(token)
    match=pattern.match(text,position)
-   if match:
+   if position < 3 or text[position-3:position] != "// ":
+    errors.append(f"provisional-marker-malformed:{relative}")
+   elif match:
     decision=match.group(1)
     end=match.end()
     if allowed is None or decision not in allowed:

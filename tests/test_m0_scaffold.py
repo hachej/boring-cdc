@@ -88,6 +88,8 @@ class ScaffoldTests(unittest.TestCase):
         try:
             for value in (
                 "// M0-" + "PROVISIONAL\n",
+                "M0-" + "PROVISIONAL: boring-cdc-d-values\n",
+                "# M0-" + "PROVISIONAL: boring-cdc-d-values\n",
                 "// M0-" + "PROVISIONAL: boring-cdc-d-values/forged\n",
             ):
                 marker.write_text(value)
