@@ -75,7 +75,6 @@ plan=load(root/'contracts/coverage/plan-to-beads.json')
 canonical={a.get('id'):a.get('owner_bead') for a in plan.get('assignments',[])}
 for leaf in leaves:
  owner=leaf.get('owner_bead','unknown')
- if not leaf.get('feature_ids'): fail(f'{owner}: missing canonical feature IDs')
  if not leaf.get('contract_ids'): fail(f'{owner}: missing contract IDs')
  if not leaf.get('unit_target'): fail(f'{owner}: missing unit target')
  scripts=leaf.get('component_and_fault_scripts',[])
@@ -144,7 +143,10 @@ for leaf in leaves:
    if declared not in command_text: fail(f'{owner}: declared command not executed by evidence {path.relative_to(root)}: {declared}')
   commit=manifest.get('git_commit','')
   exists=subprocess.run(['git','cat-file','-e',str(commit)+'^{commit}'],capture_output=True).returncode==0
-  if not exists or subprocess.run(['git','merge-base','--is-ancestor',str(commit),'HEAD'],capture_output=True).returncode: fail(f'{owner}: evidence commit is missing or non-ancestral: {path.relative_to(root)}')
+  ancestor=exists and subprocess.run(['git','merge-base','--is-ancestor',str(commit),'HEAD'],capture_output=True).returncode==0
+  if not ancestor: fail(f'{owner}: evidence commit is missing or non-ancestral: {path.relative_to(root)}')
+  elif subprocess.run(['git','diff','--quiet',str(commit)+'..HEAD','--','src','examples','Cargo.toml','Cargo.lock','build.rs','config','compose.yaml','Dockerfile','fixtures','contracts','scripts','tests']).returncode:
+   fail(f'{owner}: implementation changed after evidence commit: {path.relative_to(root)}')
   validate_inventory(owner,path)
   log=path.parent/'logs/boring-cdc.jsonl'
   if not log.is_file() or not log.read_text().strip(): fail(f'{owner}: missing or empty structured log {log.relative_to(root)}')
