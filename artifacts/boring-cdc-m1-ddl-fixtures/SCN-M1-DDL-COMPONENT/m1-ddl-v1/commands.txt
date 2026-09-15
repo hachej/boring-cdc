@@ -1,0 +1,5 @@
+cargo test --locked --workspace --all-targets
+cargo test --locked m1_ddl_fixtures::tests
+scripts/e2e/m1_ddl_fixtures.sh (twice)
+scripts/faults/m1_ddl_fixtures.sh (twice)
+scripts/validate/evidence.sh artifacts/boring-cdc-m1-ddl-fixtures

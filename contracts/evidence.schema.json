@@ -1,0 +1,266 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/evidence.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cleanup": {
+      "additionalProperties": false,
+      "properties": {
+        "complete": {
+          "const": true
+        },
+        "remaining_paths": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 0,
+          "type": "array"
+        }
+      },
+      "required": [
+        "complete",
+        "remaining_paths"
+      ],
+      "type": "object"
+    },
+    "commands": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "argv": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "exit_code": {
+            "type": "integer"
+          },
+          "stderr_path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "stderr_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "stdout_path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "stdout_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "version": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "argv",
+          "version",
+          "exit_code",
+          "stdout_path",
+          "stdout_sha256",
+          "stderr_path",
+          "stderr_sha256"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "evidence_profile": {
+      "enum": [
+        "runtime",
+        "external_managed",
+        "documentation"
+      ]
+    },
+    "evidence_tier": {
+      "enum": [
+        "leaf",
+        "component",
+        "milestone",
+        "release"
+      ]
+    },
+    "git_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "owner_bead": {
+      "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+      "type": "string"
+    },
+    "redaction": {
+      "additionalProperties": false,
+      "properties": {
+        "checked": {
+          "const": true
+        },
+        "secrets_found": {
+          "const": 0
+        }
+      },
+      "required": [
+        "checked",
+        "secrets_found"
+      ],
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "attempts": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "product_faults": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "runtime_observed": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "unavailable",
+            "unsupported"
+          ]
+        }
+      },
+      "required": [
+        "status",
+        "digest",
+        "artifacts",
+        "product_faults",
+        "runtime_observed"
+      ],
+      "type": "object"
+    },
+    "scenario_id": {
+      "pattern": "^SCN-[A-Z0-9-]+$",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "evidence/v1"
+    },
+    "seed": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "source_preservation": {
+      "additionalProperties": false,
+      "properties": {
+        "after_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "before_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "preserved": {
+          "const": true
+        }
+      },
+      "required": [
+        "before_sha256",
+        "after_sha256",
+        "preserved"
+      ],
+      "type": "object"
+    },
+    "tier_proof": {
+      "additionalProperties": false,
+      "properties": {
+        "boundary_e2e": {
+          "type": "boolean"
+        },
+        "clean_clone": {
+          "type": "boolean"
+        },
+        "clean_environment": {
+          "type": "boolean"
+        },
+        "consumed_contract_vectors": {
+          "type": "boolean"
+        },
+        "deterministic_rerun": {
+          "type": "boolean"
+        },
+        "endurance": {
+          "type": "boolean"
+        },
+        "exit_assertions": {
+          "type": "boolean"
+        },
+        "fault_suite": {
+          "type": "boolean"
+        },
+        "full_failure_matrix": {
+          "type": "boolean"
+        },
+        "integration": {
+          "type": "boolean"
+        },
+        "targeted_checks": {
+          "type": "boolean"
+        },
+        "workspace_tests": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "targeted_checks",
+        "boundary_e2e",
+        "fault_suite",
+        "deterministic_rerun",
+        "consumed_contract_vectors",
+        "workspace_tests",
+        "integration",
+        "clean_environment",
+        "exit_assertions",
+        "endurance",
+        "full_failure_matrix",
+        "clean_clone"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "owner_bead",
+    "scenario_id",
+    "evidence_profile",
+    "evidence_tier",
+    "seed",
+    "git_commit",
+    "commands",
+    "source_preservation",
+    "cleanup",
+    "redaction",
+    "tier_proof",
+    "result"
+  ],
+  "title": "Evidence manifest",
+  "type": "object"
+}

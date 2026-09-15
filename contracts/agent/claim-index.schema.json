@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "claim_id": {
+            "pattern": "^CLAIM-[A-Z0-9-]+$",
+            "type": "string"
+          },
+          "claim_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "owner_bead": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "claim_id",
+          "owner_bead",
+          "claim_sha256"
+        ],
+        "type": "object"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema_version": {
+      "const": "claim-index/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "entries"
+  ],
+  "type": "object"
+}

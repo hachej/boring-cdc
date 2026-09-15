@@ -1,0 +1,157 @@
+{
+  "article1_boundary": "raw pgoutput plus same-stream process-local non-durable teaching view; ClickHouse deferred to Article 4",
+  "checks": [
+    {
+      "argv": "scripts/validate/m0_artifact.sh boring-cdc-m0-pg-contract",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/m0_artifact.sh boring-cdc-m0-storage-model",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/m0_artifact.sh boring-cdc-m0-event-format",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/m0_artifact.sh boring-cdc-m0-archive-model",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/m0_artifact.sh boring-cdc-m0-ch-model",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/archive_scope.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/compose_spec.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/failure_policy.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/license.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/fixtures/validate_m0_repository_identity.py",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/security_exposure.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/sqlite_durability.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/supported_values.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/wal_cap.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/m0_artifact.sh contracts/m0/artifacts.json --complete --expected-artifacts contracts/m0/expected-artifacts.json",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/m0_decisions.sh contracts/m0/decisions.json",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/m0_scaffold.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/plan_coverage.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "python3 scripts/validate/article1_transcript.py",
+      "exit_code": 0
+    },
+    {
+      "argv": "python3 -m unittest tests.planning.test_kickoff_contracts.KickoffContracts.test_article_one_uses_shipped_teaching_view_without_article_four_evidence -v",
+      "exit_code": 0
+    }
+  ],
+  "decision_manifest_owners": [
+    "boring-cdc-d-archive-scope",
+    "boring-cdc-d-compose",
+    "boring-cdc-d-failure-policy",
+    "boring-cdc-d-license",
+    "boring-cdc-d-owner",
+    "boring-cdc-d-security",
+    "boring-cdc-d-sqlite",
+    "boring-cdc-d-values",
+    "boring-cdc-d-wal-cap"
+  ],
+  "duplicate_bead_ids": 0,
+  "findings": [],
+  "primary_artifact_owners": [
+    "boring-cdc-m0-archive-model",
+    "boring-cdc-m0-ch-model",
+    "boring-cdc-m0-event-format",
+    "boring-cdc-m0-pg-contract",
+    "boring-cdc-m0-scaffold",
+    "boring-cdc-m0-storage-model"
+  ],
+  "provisional_decisions": [
+    "boring-cdc-d-archive-durability",
+    "boring-cdc-d-compose",
+    "boring-cdc-d-keys",
+    "boring-cdc-d-sqlite",
+    "boring-cdc-d-values",
+    "boring-cdc-d-values.1",
+    "boring-cdc-d-wal-cap"
+  ],
+  "required_m0_owners": [
+    "boring-cdc-d-additive",
+    "boring-cdc-d-admission",
+    "boring-cdc-d-anchor",
+    "boring-cdc-d-archive-durability",
+    "boring-cdc-d-archive-scope",
+    "boring-cdc-d-backfill",
+    "boring-cdc-d-ch-accept",
+    "boring-cdc-d-ch-history",
+    "boring-cdc-d-compose",
+    "boring-cdc-d-ddl",
+    "boring-cdc-d-event-id",
+    "boring-cdc-d-failure-policy",
+    "boring-cdc-d-keys",
+    "boring-cdc-d-license",
+    "boring-cdc-d-oracle",
+    "boring-cdc-d-owner",
+    "boring-cdc-d-pg-protocol",
+    "boring-cdc-d-promotion",
+    "boring-cdc-d-publication",
+    "boring-cdc-d-scale",
+    "boring-cdc-d-security",
+    "boring-cdc-d-sqlite",
+    "boring-cdc-d-toast",
+    "boring-cdc-d-values",
+    "boring-cdc-d-values.1",
+    "boring-cdc-d-wal-cap",
+    "boring-cdc-m0-archive-model",
+    "boring-cdc-m0-ch-model",
+    "boring-cdc-m0-decisions",
+    "boring-cdc-m0-event-format",
+    "boring-cdc-m0-pg-contract",
+    "boring-cdc-m0-scaffold",
+    "boring-cdc-m0-storage-model",
+    "boring-cdc-m0-validation-tooling",
+    "boring-cdc-m0.1",
+    "boring-cdc-m0.2",
+    "boring-cdc-m0.3"
+  ],
+  "schema_version": "m0-completion-summary/v1",
+  "status": "pass",
+  "supervisor_override": "open recommendations require exact M0-PROVISIONAL markers; no approval inferred"
+}

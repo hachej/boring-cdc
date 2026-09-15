@@ -1,0 +1,6 @@
+{
+  "br": "br 0.2.16",
+  "cargo": "cargo 1.95.0 (f2d3ce0bd 2026-03-21)",
+  "git_commit": "7bf763bbd99a4601cdc193ba4a6485b8672c596d",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)"
+}

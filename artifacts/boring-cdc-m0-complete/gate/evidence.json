@@ -1,0 +1,68 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/acceptance/m0_complete.sh --probe",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m0-complete/gate/run-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0-complete/gate/run-1.log",
+      "stdout_sha256": "66262b31cea18e2162f61a094363bd5c572fab38f22d6cd086349ea4ceb8a100",
+      "version": "m0-complete/v1"
+    },
+    {
+      "argv": "scripts/acceptance/m0_complete.sh --probe",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m0-complete/gate/run-2.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0-complete/gate/run-2.log",
+      "stdout_sha256": "66262b31cea18e2162f61a094363bd5c572fab38f22d6cd086349ea4ceb8a100",
+      "version": "m0-complete/v1"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "milestone",
+  "git_commit": "fd16e10d0275cb4f0c15513c8b8ebd85c26b949a",
+  "owner_bead": "boring-cdc-m0-complete",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "contracts/m0/manifest.json",
+      "contracts/m0/artifacts.json",
+      "contracts/m0/decisions.json",
+      "artifacts/boring-cdc-m0-complete/gate/completion-summary.json"
+    ],
+    "digest": "bb0305fb9ea206f5644946be42a84d5452e013f5e0bc00e508ddcca17430ce6e",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M0-COMPLETION-BARRIER",
+  "schema_version": "evidence/v1",
+  "seed": "m0-complete-v1",
+  "source_preservation": {
+    "after_sha256": "f4046d8b1ed30f61f708ec6cd2de415fe0dc16c1fb55314769aa1bd9054337bf",
+    "before_sha256": "f4046d8b1ed30f61f708ec6cd2de415fe0dc16c1fb55314769aa1bd9054337bf",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": true,
+    "targeted_checks": true,
+    "workspace_tests": true
+  }
+}

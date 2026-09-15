@@ -1,0 +1,29 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/postgres/postgres-contract-evidence.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "findings": {"type": "array"},
+    "fixture_count": {"minimum": 1, "type": "integer"},
+    "input_tree_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+    "inputs": {
+      "additionalProperties": {"pattern": "^[0-9a-f]{64}$", "type": "string"},
+      "minProperties": 5,
+      "type": "object"
+    },
+    "owner_bead": {"const": "boring-cdc-m0-pg-contract"},
+    "product_faults": {"const": "fault_not_applicable"},
+    "runtime_observed": {"const": false},
+    "schema_version": {"const": "m0-postgres-contract-evidence/v1"},
+    "source_parent_git_commit": {"pattern": "^[0-9a-f]{40}$", "type": "string"},
+    "status": {"enum": ["pass", "fail"]},
+    "validator": {"const": "scripts/validate/postgres_contract.py"},
+    "validator_sha256": {"pattern": "^[0-9a-f]{64}$", "type": "string"}
+  },
+  "required": [
+    "schema_version", "owner_bead", "status", "validator", "validator_sha256",
+    "source_parent_git_commit", "input_tree_sha256", "inputs", "fixture_count",
+    "findings", "runtime_observed", "product_faults"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "cases": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "executor_id": {
+            "type": "string"
+          },
+          "expected": {
+            "additionalProperties": false,
+            "properties": {
+              "checkpoint": {
+                "type": "string"
+              },
+              "exit_code": {
+                "type": "integer"
+              },
+              "external_effect": {
+                "type": "string"
+              },
+              "feedback": {
+                "type": "string"
+              },
+              "log_code": {
+                "type": "string"
+              },
+              "redacted": {
+                "type": "boolean"
+              },
+              "state": {
+                "type": "string"
+              },
+              "status_code": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "checkpoint",
+              "exit_code",
+              "external_effect",
+              "feedback",
+              "log_code",
+              "redacted",
+              "state",
+              "status_code"
+            ],
+            "type": "object"
+          },
+          "fixture_id": {
+            "pattern": "^SCN-M0-STORAGE-[A-Z0-9-]+$",
+            "type": "string"
+          },
+          "hook": {
+            "type": "string"
+          },
+          "inputs": {
+            "additionalProperties": false,
+            "properties": {
+              "allocation_request_bytes": {
+                "type": "integer"
+              },
+              "available_above_reserve_bytes": {
+                "type": "integer"
+              },
+              "capture_epoch": {
+                "type": "string"
+              },
+              "case_seq": {
+                "type": "integer"
+              },
+              "configured_memory_limit_bytes": {
+                "type": "integer"
+              },
+              "connection_generation": {
+                "type": "integer"
+              },
+              "fault_once": {
+                "type": "boolean"
+              },
+              "filesystem_observed": {
+                "type": "string"
+              },
+              "free_bytes": {
+                "type": "integer"
+              },
+              "precondition": {
+                "type": "string"
+              },
+              "required_free_bytes": {
+                "type": "integer"
+              },
+              "run_id": {
+                "type": "string"
+              },
+              "transaction_bytes": {
+                "type": "integer"
+              },
+              "wire_frame_bytes": {
+                "type": "integer"
+              },
+              "writer_queue_depth": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "allocation_request_bytes",
+              "available_above_reserve_bytes",
+              "capture_epoch",
+              "case_seq",
+              "configured_memory_limit_bytes",
+              "connection_generation",
+              "fault_once",
+              "filesystem_observed",
+              "free_bytes",
+              "precondition",
+              "required_free_bytes",
+              "run_id",
+              "wire_frame_bytes",
+              "transaction_bytes",
+              "writer_queue_depth"
+            ],
+            "type": "object"
+          },
+          "matrix": {
+            "additionalProperties": false,
+            "properties": {
+              "filesystem": {
+                "type": "string"
+              },
+              "page_size_bytes": {
+                "type": "integer"
+              },
+              "sqlite_version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "filesystem",
+              "page_size_bytes",
+              "sqlite_version"
+            ],
+            "type": "object"
+          },
+          "seed": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "executor_id",
+          "expected",
+          "fixture_id",
+          "hook",
+          "inputs",
+          "matrix",
+          "seed"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "contract": {
+      "type": "string"
+    },
+    "fixed_seed": {
+      "type": "string"
+    },
+    "owner_bead": {
+      "const": "boring-cdc-m0-storage-model"
+    },
+    "schema_version": {
+      "const": "storage-fixtures/v1"
+    }
+  },
+  "required": [
+    "cases",
+    "contract",
+    "fixed_seed",
+    "owner_bead",
+    "schema_version"
+  ],
+  "title": "Boring CDC closed storage fixtures",
+  "type": "object"
+}

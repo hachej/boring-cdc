@@ -1,0 +1,3438 @@
+{
+    "cases": [
+        {
+            "accepted_examples": [
+                "valid source.runtime_dsn_env in representative/default fixture"
+            ],
+            "constraint": "valid environment reference; loaded only for authorized purpose",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "runtime_dsn_env",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-RUNTIME-DSN-ENV",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.runtime_dsn_env"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.control_writer_dsn_env in representative/default fixture"
+            ],
+            "constraint": "valid environment reference; loaded only for authorized purpose",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "control_writer_dsn_env",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-CONTROL-WRITER-DSN-ENV",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.control_writer_dsn_env"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.administration_dsn_env in representative/default fixture"
+            ],
+            "constraint": "valid environment reference; loaded only for PostgreSQL administration purpose",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "administration_dsn_env",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-ADMINISTRATION-DSN-ENV",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.administration_dsn_env"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.publication in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "publication",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-PUBLICATION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.publication"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.slot in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "slot",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-SLOT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.slot"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.copy_both_transport in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "copy_both_transport",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-COPY-BOTH-TRANSPORT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.copy_both_transport"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.start_replication_options in representative/default fixture"
+            ],
+            "constraint": "exact sorted set proto_version=1, streaming=false, two_phase=false, binary=false",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "array",
+            "field": "start_replication_options",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-START-REPLICATION-OPTIONS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.start_replication_options"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.origin_policy in representative/default fixture"
+            ],
+            "constraint": "exact provisional value any",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "origin_policy",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-ORIGIN-POLICY",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.origin_policy"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.advisory_lock_derivation in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "advisory_lock_derivation",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-ADVISORY-LOCK-DERIVATION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.advisory_lock_derivation"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.lock_probe_interval_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "lock_probe_interval_ms",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-LOCK-PROBE-INTERVAL-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.lock_probe_interval_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.ownership_deadline_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "ownership_deadline_ms",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-OWNERSHIP-DEADLINE-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.ownership_deadline_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.maximum_operation_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "maximum_operation_ms",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-MAXIMUM-OPERATION-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.maximum_operation_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.stale_owner_takeover_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "stale_owner_takeover_ms",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-STALE-OWNER-TAKEOVER-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.stale_owner_takeover_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.heartbeat_cadence_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "heartbeat_cadence_ms",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-HEARTBEAT-CADENCE-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.heartbeat_cadence_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid source.verify_tls in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_REPLICATION_OPTIONS",
+                "CONFIG_INVALID_OWNERSHIP_BOUNDS",
+                "CONFIG_MISSING_SECRET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "boolean",
+            "field": "verify_tls",
+            "fingerprint_impact": [
+                "source",
+                "runtime"
+            ],
+            "group": "source",
+            "id": "SCN-M1-CONFIG-SOURCE-VERIFY-TLS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "secret names and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating source.verify_tls"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid tables.logical_id in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_EMPTY_TABLE_SET",
+                "CONFIG_DUPLICATE_ID",
+                "CONFIG_INVALID_TABLE_IDENTITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "logical_id",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "runtime"
+            ],
+            "group": "tables",
+            "id": "SCN-M1-CONFIG-TABLES-LOGICAL-ID",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "payload and key values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating tables.logical_id"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid tables.source_relation in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_EMPTY_TABLE_SET",
+                "CONFIG_DUPLICATE_ID",
+                "CONFIG_INVALID_TABLE_IDENTITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "source_relation",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "runtime"
+            ],
+            "group": "tables",
+            "id": "SCN-M1-CONFIG-TABLES-SOURCE-RELATION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "payload and key values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating tables.source_relation"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid tables.replica_key in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_EMPTY_TABLE_SET",
+                "CONFIG_DUPLICATE_ID",
+                "CONFIG_INVALID_TABLE_IDENTITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "array",
+            "field": "replica_key",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "runtime"
+            ],
+            "group": "tables",
+            "id": "SCN-M1-CONFIG-TABLES-REPLICA-KEY",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "payload and key values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating tables.replica_key"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid tables.key_type_policy in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_EMPTY_TABLE_SET",
+                "CONFIG_DUPLICATE_ID",
+                "CONFIG_INVALID_TABLE_IDENTITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "key_type_policy",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "runtime"
+            ],
+            "group": "tables",
+            "id": "SCN-M1-CONFIG-TABLES-KEY-TYPE-POLICY",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "payload and key values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating tables.key_type_policy"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid tables.relation_contract in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_EMPTY_TABLE_SET",
+                "CONFIG_DUPLICATE_ID",
+                "CONFIG_INVALID_TABLE_IDENTITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "map",
+            "field": "relation_contract",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "runtime"
+            ],
+            "group": "tables",
+            "id": "SCN-M1-CONFIG-TABLES-RELATION-CONTRACT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "payload and key values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating tables.relation_contract"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid storage.sqlite_path in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_UNSAFE_SQLITE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "sqlite_path",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "storage",
+            "id": "SCN-M1-CONFIG-STORAGE-SQLITE-PATH",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "unapproved absolute paths absent from errors",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating storage.sqlite_path"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid storage.sqlite_temp_path in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_UNSAFE_SQLITE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "sqlite_temp_path",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "storage",
+            "id": "SCN-M1-CONFIG-STORAGE-SQLITE-TEMP-PATH",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "unapproved absolute paths absent from errors",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating storage.sqlite_temp_path"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid storage.spool_path in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_UNSAFE_SQLITE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "spool_path",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "storage",
+            "id": "SCN-M1-CONFIG-STORAGE-SPOOL-PATH",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "unapproved absolute paths absent from errors",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating storage.spool_path"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid storage.filesystem in representative/default fixture"
+            ],
+            "constraint": "provisional enum ext4 or xfs",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_UNSAFE_SQLITE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "filesystem",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "storage",
+            "id": "SCN-M1-CONFIG-STORAGE-FILESYSTEM",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "unapproved absolute paths absent from errors",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating storage.filesystem"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid storage.journal_mode in representative/default fixture"
+            ],
+            "constraint": "exact value WAL",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_UNSAFE_SQLITE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "journal_mode",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "storage",
+            "id": "SCN-M1-CONFIG-STORAGE-JOURNAL-MODE",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "unapproved absolute paths absent from errors",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating storage.journal_mode"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid storage.synchronous in representative/default fixture"
+            ],
+            "constraint": "exact value FULL",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_UNSAFE_SQLITE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "synchronous",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "storage",
+            "id": "SCN-M1-CONFIG-STORAGE-SYNCHRONOUS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "unapproved absolute paths absent from errors",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating storage.synchronous"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid storage.auto_vacuum in representative/default fixture"
+            ],
+            "constraint": "exact value INCREMENTAL",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_UNSAFE_SQLITE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "auto_vacuum",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "storage",
+            "id": "SCN-M1-CONFIG-STORAGE-AUTO-VACUUM",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "unapproved absolute paths absent from errors",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating storage.auto_vacuum"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid storage.checkpoint_pages in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_UNSAFE_SQLITE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "checkpoint_pages",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "storage",
+            "id": "SCN-M1-CONFIG-STORAGE-CHECKPOINT-PAGES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "unapproved absolute paths absent from errors",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating storage.checkpoint_pages"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid storage.vacuum_pages in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_UNSAFE_SQLITE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "vacuum_pages",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "storage",
+            "id": "SCN-M1-CONFIG-STORAGE-VACUUM-PAGES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "unapproved absolute paths absent from errors",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating storage.vacuum_pages"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid storage.unsafe_local_experiment in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_UNSAFE_SQLITE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "boolean",
+            "field": "unsafe_local_experiment",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "storage",
+            "id": "SCN-M1-CONFIG-STORAGE-UNSAFE-LOCAL-EXPERIMENT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "unapproved absolute paths absent from errors",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating storage.unsafe_local_experiment"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid limits.max_wire_frame_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INCOMPATIBLE_LIMITS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "max_wire_frame_bytes",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "limits",
+            "id": "SCN-M1-CONFIG-LIMITS-MAX-WIRE-FRAME-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "no payload samples",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating limits.max_wire_frame_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid limits.max_event_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INCOMPATIBLE_LIMITS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "max_event_bytes",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "limits",
+            "id": "SCN-M1-CONFIG-LIMITS-MAX-EVENT-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "no payload samples",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating limits.max_event_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid limits.max_row_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INCOMPATIBLE_LIMITS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "max_row_bytes",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "limits",
+            "id": "SCN-M1-CONFIG-LIMITS-MAX-ROW-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "no payload samples",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating limits.max_row_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid limits.max_transaction_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INCOMPATIBLE_LIMITS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "max_transaction_bytes",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "limits",
+            "id": "SCN-M1-CONFIG-LIMITS-MAX-TRANSACTION-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "no payload samples",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating limits.max_transaction_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid limits.max_transaction_events in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INCOMPATIBLE_LIMITS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "max_transaction_events",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "limits",
+            "id": "SCN-M1-CONFIG-LIMITS-MAX-TRANSACTION-EVENTS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "no payload samples",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating limits.max_transaction_events"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid limits.process_memory_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INCOMPATIBLE_LIMITS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "process_memory_bytes",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "limits",
+            "id": "SCN-M1-CONFIG-LIMITS-PROCESS-MEMORY-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "no payload samples",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating limits.process_memory_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.name"
+            ],
+            "constraint": "nonempty unique filesystem-budget identifier; every budget must associate with at least one configured durability path",
+            "error_codes": [
+                "CONFIG_INVALID_FILESYSTEM_BUDGET",
+                "CONFIG_DUPLICATE_ID",
+                "CONFIG_UNASSOCIATED_FILESYSTEM_BUDGET"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "name",
+            "fingerprint_impact": [
+                "archive",
+                "backfill",
+                "runtime"
+            ],
+            "group": "budgets",
+            "id": "SCN-M1-CONFIG-BUDGETS-NAME",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "paths represented only in public config projection",
+            "rejected_examples": [
+                "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.name as applicable"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.root"
+            ],
+            "constraint": "safe unique root explicitly associating the most-specific configured state, SQLite-temp, spool, or archive path with one physical-filesystem budget",
+            "error_codes": [
+                "CONFIG_UNSAFE_PATH",
+                "CONFIG_DUPLICATE_ID",
+                "CONFIG_UNCOVERED_FILESYSTEM_PATH",
+                "CONFIG_UNASSOCIATED_FILESYSTEM_BUDGET",
+                "CONFIG_FILESYSTEM_ASSOCIATION_MISMATCH"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "root",
+            "fingerprint_impact": [
+                "archive",
+                "backfill",
+                "runtime"
+            ],
+            "group": "budgets",
+            "id": "SCN-M1-CONFIG-BUDGETS-ROOT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "paths represented only in public config projection",
+            "rejected_examples": [
+                "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.root as applicable"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.total_bytes"
+            ],
+            "constraint": "nonzero physical-filesystem capacity greater than or equal to the checked sum of reserve terms",
+            "error_codes": [
+                "CONFIG_INVALID_FILESYSTEM_BUDGET",
+                "CONFIG_NUMERIC_OVERFLOW",
+                "CONFIG_BUDGET_EXCEEDED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "total_bytes",
+            "fingerprint_impact": [
+                "archive",
+                "backfill",
+                "runtime"
+            ],
+            "group": "budgets",
+            "id": "SCN-M1-CONFIG-BUDGETS-TOTAL-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "paths represented only in public config projection",
+            "rejected_examples": [
+                "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.total_bytes as applicable"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.reserved_free_bytes"
+            ],
+            "constraint": "nonzero emergency reserve on every configured physical-filesystem budget",
+            "error_codes": [
+                "CONFIG_INVALID_FILESYSTEM_BUDGET",
+                "CONFIG_NUMERIC_OVERFLOW",
+                "CONFIG_BUDGET_EXCEEDED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "reserved_free_bytes",
+            "fingerprint_impact": [
+                "archive",
+                "backfill",
+                "runtime"
+            ],
+            "group": "budgets",
+            "id": "SCN-M1-CONFIG-BUDGETS-RESERVED-FREE-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "paths represented only in public config projection",
+            "rejected_examples": [
+                "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.reserved_free_bytes as applicable"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.sqlite_wal_temp_bytes"
+            ],
+            "constraint": "nonzero on every budget associated with the SQLite state or SQLite temporary path; zero is allowed only on unrelated separate filesystems",
+            "error_codes": [
+                "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+                "CONFIG_NUMERIC_OVERFLOW",
+                "CONFIG_BUDGET_EXCEEDED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "sqlite_wal_temp_bytes",
+            "fingerprint_impact": [
+                "archive",
+                "backfill",
+                "runtime"
+            ],
+            "group": "budgets",
+            "id": "SCN-M1-CONFIG-BUDGETS-SQLITE-WAL-TEMP-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "paths represented only in public config projection",
+            "rejected_examples": [
+                "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.sqlite_wal_temp_bytes as applicable"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.capture_spool_bytes"
+            ],
+            "constraint": "nonzero on the budget associated with the configured capture spool path; zero is allowed only on unrelated separate filesystems",
+            "error_codes": [
+                "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+                "CONFIG_NUMERIC_OVERFLOW",
+                "CONFIG_BUDGET_EXCEEDED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "capture_spool_bytes",
+            "fingerprint_impact": [
+                "archive",
+                "backfill",
+                "runtime"
+            ],
+            "group": "budgets",
+            "id": "SCN-M1-CONFIG-BUDGETS-CAPTURE-SPOOL-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "paths represented only in public config projection",
+            "rejected_examples": [
+                "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.capture_spool_bytes as applicable"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.concurrent_backfill_bytes"
+            ],
+            "constraint": "nonzero on the budget associated with SQLite state; zero is allowed only on unrelated separate filesystems",
+            "error_codes": [
+                "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+                "CONFIG_NUMERIC_OVERFLOW",
+                "CONFIG_BUDGET_EXCEEDED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "concurrent_backfill_bytes",
+            "fingerprint_impact": [
+                "archive",
+                "backfill",
+                "runtime"
+            ],
+            "group": "budgets",
+            "id": "SCN-M1-CONFIG-BUDGETS-CONCURRENT-BACKFILL-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "paths represented only in public config projection",
+            "rejected_examples": [
+                "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.concurrent_backfill_bytes as applicable"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "representative shared-filesystem budget and separate state/temp/spool/archive budget fixture for budgets.archive_segment_bytes"
+            ],
+            "constraint": "nonzero on the budget associated with the configured archive root; zero is allowed only on unrelated separate filesystems",
+            "error_codes": [
+                "CONFIG_ZERO_FILESYSTEM_RESERVATION",
+                "CONFIG_NUMERIC_OVERFLOW",
+                "CONFIG_BUDGET_EXCEEDED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "archive_segment_bytes",
+            "fingerprint_impact": [
+                "archive",
+                "backfill",
+                "runtime"
+            ],
+            "group": "budgets",
+            "id": "SCN-M1-CONFIG-BUDGETS-ARCHIVE-SEGMENT-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "paths represented only in public config projection",
+            "rejected_examples": [
+                "empty, zero, duplicate, uncovered, unassociated, or filesystem-mismatched budgets.archive_segment_bytes as applicable"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid retention.replay_window_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "replay_window_ms",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "retention",
+            "id": "SCN-M1-CONFIG-RETENTION-REPLAY-WINDOW-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "no journal content",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating retention.replay_window_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid retention.usable_anchor_count in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "usable_anchor_count",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "retention",
+            "id": "SCN-M1-CONFIG-RETENTION-USABLE-ANCHOR-COUNT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "no journal content",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating retention.usable_anchor_count"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid retention.invalid_generation_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "invalid_generation_ms",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "retention",
+            "id": "SCN-M1-CONFIG-RETENTION-INVALID-GENERATION-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "no journal content",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating retention.invalid_generation_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid retention.metadata_gc_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "metadata_gc_ms",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "retention",
+            "id": "SCN-M1-CONFIG-RETENTION-METADATA-GC-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "no journal content",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating retention.metadata_gc_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid wal.max_slot_wal_keep_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "max_slot_wal_keep_bytes",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "wal",
+            "id": "SCN-M1-CONFIG-WAL-MAX-SLOT-WAL-KEEP-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating wal.max_slot_wal_keep_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid wal.source_free_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "source_free_bytes",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "wal",
+            "id": "SCN-M1-CONFIG-WAL-SOURCE-FREE-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating wal.source_free_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid wal.production_bytes_per_second in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "production_bytes_per_second",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "wal",
+            "id": "SCN-M1-CONFIG-WAL-PRODUCTION-BYTES-PER-SECOND",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating wal.production_bytes_per_second"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid wal.monitor_delay_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "monitor_delay_ms",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "wal",
+            "id": "SCN-M1-CONFIG-WAL-MONITOR-DELAY-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating wal.monitor_delay_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid wal.reaction_reserve_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "reaction_reserve_bytes",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "wal",
+            "id": "SCN-M1-CONFIG-WAL-REACTION-RESERVE-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating wal.reaction_reserve_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid wal.missing_metric_policy in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "missing_metric_policy",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "wal",
+            "id": "SCN-M1-CONFIG-WAL-MISSING-METRIC-POLICY",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating wal.missing_metric_policy"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.chunk_rows in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "chunk_rows",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-CHUNK-ROWS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.chunk_rows"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.chunk_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "chunk_bytes",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-CHUNK-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.chunk_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.chunk_duration_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "chunk_duration_ms",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-CHUNK-DURATION-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.chunk_duration_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.concurrency in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "concurrency",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-CONCURRENCY",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.concurrency"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.exporter_lifetime_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "exporter_lifetime_ms",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-EXPORTER-LIFETIME-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.exporter_lifetime_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.importer_lifetime_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "importer_lifetime_ms",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-IMPORTER-LIFETIME-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.importer_lifetime_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.guard_lifetime_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "guard_lifetime_ms",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-GUARD-LIFETIME-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.guard_lifetime_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.guard_keepalive_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "guard_keepalive_ms",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-GUARD-KEEPALIVE-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.guard_keepalive_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.session_timeout_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "session_timeout_ms",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-SESSION-TIMEOUT-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.session_timeout_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.ddl_waiter_bound_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "ddl_waiter_bound_ms",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-DDL-WAITER-BOUND-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.ddl_waiter_bound_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid backfill.source_impact_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_BACKFILL_BOUNDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "source_impact_bytes",
+            "fingerprint_impact": [
+                "backfill",
+                "runtime"
+            ],
+            "group": "backfill",
+            "id": "SCN-M1-CONFIG-BACKFILL-SOURCE-IMPACT-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "snapshot token absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating backfill.source_impact_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.endpoint in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "endpoint",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-ENDPOINT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.endpoint"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.server_version in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "server_version",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-SERVER-VERSION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.server_version"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.client_version in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "client_version",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-CLIENT-VERSION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.client_version"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.runtime_dsn_env in representative/default fixture"
+            ],
+            "constraint": "valid environment reference; loaded only for authorized purpose",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "runtime_dsn_env",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-RUNTIME-DSN-ENV",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.runtime_dsn_env"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.maintenance_dsn_env in representative/default fixture"
+            ],
+            "constraint": "valid environment reference; loaded only for ClickHouse maintenance purpose",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "maintenance_dsn_env",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-MAINTENANCE-DSN-ENV",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.maintenance_dsn_env"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.contract_id in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "contract_id",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-CONTRACT-ID",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.contract_id"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.history_object in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "history_object",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-HISTORY-OBJECT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.history_object"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.selector_object in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "selector_object",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-SELECTOR-OBJECT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.selector_object"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.history_quota_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "history_quota_bytes",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-HISTORY-QUOTA-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.history_quota_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.synchronous_insert in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "boolean",
+            "field": "synchronous_insert",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-SYNCHRONOUS-INSERT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.synchronous_insert"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.fsync_after_insert in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "boolean",
+            "field": "fsync_after_insert",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-FSYNC-AFTER-INSERT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.fsync_after_insert"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.rust_insert_finalization in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "rust_insert_finalization",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-RUST-INSERT-FINALIZATION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.rust_insert_finalization"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.destination_generation in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "destination_generation",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-DESTINATION-GENERATION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.destination_generation"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.selector_policy in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "selector_policy",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-SELECTOR-POLICY",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.selector_policy"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.adopted_external_fence in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "adopted_external_fence",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-ADOPTED-EXTERNAL-FENCE",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.adopted_external_fence"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.retirement_grace_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "retirement_grace_ms",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-RETIREMENT-GRACE-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.retirement_grace_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.audit_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "audit_bytes",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-AUDIT-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.audit_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.audit_events in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "audit_events",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-AUDIT-EVENTS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.audit_events"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.audit_time_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "audit_time_ms",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-AUDIT-TIME-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.audit_time_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.audit_cadence_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "audit_cadence_ms",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-AUDIT-CADENCE-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.audit_cadence_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.audit_freshness_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "audit_freshness_ms",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-AUDIT-FRESHNESS-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.audit_freshness_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid clickhouse.verify_tls in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_MISSING_SECRET",
+                "CONFIG_TLS_REQUIRED",
+                "CONFIG_UNSAFE_CLICKHOUSE_DURABILITY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "boolean",
+            "field": "verify_tls",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "clickhouse",
+            "id": "SCN-M1-CONFIG-CLICKHOUSE-VERIFY-TLS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "DSNs and driver strings absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating clickhouse.verify_tls"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.root in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "root",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-ROOT",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.root"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.filesystem in representative/default fixture"
+            ],
+            "constraint": "provisional enum ext4 or xfs",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "filesystem",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-FILESYSTEM",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.filesystem"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.budget_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "budget_bytes",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-BUDGET-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.budget_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.schedule_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "schedule_ms",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-SCHEDULE-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.schedule_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.formats in representative/default fixture"
+            ],
+            "constraint": "exact set jsonl and parquet",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "array",
+            "field": "formats",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-FORMATS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.formats"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.writer_crate in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "writer_crate",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-WRITER-CRATE",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.writer_crate"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.writer_version in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "writer_version",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-WRITER-VERSION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.writer_version"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.compression in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "compression",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-COMPRESSION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.compression"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.segment_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "segment_bytes",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-SEGMENT-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.segment_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.path_encoding in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "path_encoding",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-PATH-ENCODING",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.path_encoding"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.filesystem_policy in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "filesystem_policy",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-FILESYSTEM-POLICY",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.filesystem_policy"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.ready_marker in representative/default fixture"
+            ],
+            "constraint": "exact SEGMENT_READY",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "ready_marker",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-READY-MARKER",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.ready_marker"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.selector_policy in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "selector_policy",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-SELECTOR-POLICY",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.selector_policy"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.continuity_break_policy in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "continuity_break_policy",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-CONTINUITY-BREAK-POLICY",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.continuity_break_policy"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.audit_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "audit_bytes",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-AUDIT-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.audit_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.audit_events in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "audit_events",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-AUDIT-EVENTS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.audit_events"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.audit_time_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "audit_time_ms",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-AUDIT-TIME-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.audit_time_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.audit_cadence_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "audit_cadence_ms",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-AUDIT-CADENCE-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.audit_cadence_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid archive.audit_freshness_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSUPPORTED_ARCHIVE_POLICY"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "audit_freshness_ms",
+            "fingerprint_impact": [
+                "destination",
+                "runtime"
+            ],
+            "group": "archive",
+            "id": "SCN-M1-CONFIG-ARCHIVE-AUDIT-FRESHNESS-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "production payload absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating archive.audit_freshness_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid conditions.warning in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_THRESHOLDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "warning",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "conditions",
+            "id": "SCN-M1-CONFIG-CONDITIONS-WARNING",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating conditions.warning"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid conditions.action in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_THRESHOLDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "action",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "conditions",
+            "id": "SCN-M1-CONFIG-CONDITIONS-ACTION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating conditions.action"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid conditions.critical in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_THRESHOLDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "critical",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "conditions",
+            "id": "SCN-M1-CONFIG-CONDITIONS-CRITICAL",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating conditions.critical"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid conditions.hard in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_THRESHOLDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "hard",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "conditions",
+            "id": "SCN-M1-CONFIG-CONDITIONS-HARD",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating conditions.hard"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid conditions.freshness_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_THRESHOLDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "freshness_ms",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "conditions",
+            "id": "SCN-M1-CONFIG-CONDITIONS-FRESHNESS-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating conditions.freshness_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid conditions.hysteresis_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_THRESHOLDS"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "hysteresis_ms",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "conditions",
+            "id": "SCN-M1-CONFIG-CONDITIONS-HYSTERESIS-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "metrics contain units only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating conditions.hysteresis_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid observability.log_level in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS",
+                "CONFIG_EMPTY_OVERRIDE",
+                "CONFIG_INVALID_LISTENER"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "log_level",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "observability",
+            "id": "SCN-M1-CONFIG-OBSERVABILITY-LOG-LEVEL",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "fixed secret role labels only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating observability.log_level"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid observability.status_listen_addr in representative/default fixture"
+            ],
+            "constraint": "valid SocketAddr; non-loopback requires authentication and TLS",
+            "error_codes": [
+                "CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS",
+                "CONFIG_EMPTY_OVERRIDE",
+                "CONFIG_INVALID_LISTENER"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "status_listen_addr",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "observability",
+            "id": "SCN-M1-CONFIG-OBSERVABILITY-STATUS-LISTEN-ADDR",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "fixed secret role labels only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating observability.status_listen_addr"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid observability.prometheus_listen_addr in representative/default fixture"
+            ],
+            "constraint": "valid SocketAddr; non-loopback requires authentication and TLS",
+            "error_codes": [
+                "CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS",
+                "CONFIG_EMPTY_OVERRIDE",
+                "CONFIG_INVALID_LISTENER"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "prometheus_listen_addr",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "observability",
+            "id": "SCN-M1-CONFIG-OBSERVABILITY-PROMETHEUS-LISTEN-ADDR",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "fixed secret role labels only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating observability.prometheus_listen_addr"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid observability.authentication in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS",
+                "CONFIG_EMPTY_OVERRIDE",
+                "CONFIG_INVALID_LISTENER"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "boolean",
+            "field": "authentication",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "observability",
+            "id": "SCN-M1-CONFIG-OBSERVABILITY-AUTHENTICATION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "fixed secret role labels only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating observability.authentication"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid observability.tls in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_EXPOSED_LISTENER_REQUIRES_AUTH_TLS",
+                "CONFIG_EMPTY_OVERRIDE",
+                "CONFIG_INVALID_LISTENER"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "boolean",
+            "field": "tls",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "observability",
+            "id": "SCN-M1-CONFIG-OBSERVABILITY-TLS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "fixed secret role labels only",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating observability.tls"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid operator.socket_path in representative/default fixture"
+            ],
+            "constraint": "relative path nested beneath connector-owned directory with .sock suffix",
+            "error_codes": [
+                "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+                "CONFIG_UNSAFE_PATH"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "socket_path",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "operator",
+            "id": "SCN-M1-CONFIG-OPERATOR-SOCKET-PATH",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "confirmation nonce absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating operator.socket_path"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid operator.directory_mode in representative/default fixture"
+            ],
+            "constraint": "exact mode 0700",
+            "error_codes": [
+                "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+                "CONFIG_UNSAFE_PATH"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "directory_mode",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "operator",
+            "id": "SCN-M1-CONFIG-OPERATOR-DIRECTORY-MODE",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "confirmation nonce absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating operator.directory_mode"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid operator.socket_mode in representative/default fixture"
+            ],
+            "constraint": "exact mode 0600",
+            "error_codes": [
+                "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+                "CONFIG_UNSAFE_PATH"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "socket_mode",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "operator",
+            "id": "SCN-M1-CONFIG-OPERATOR-SOCKET-MODE",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "confirmation nonce absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating operator.socket_mode"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid operator.peer_credentials in representative/default fixture"
+            ],
+            "constraint": "must be true",
+            "error_codes": [
+                "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+                "CONFIG_UNSAFE_PATH"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "boolean",
+            "field": "peer_credentials",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "operator",
+            "id": "SCN-M1-CONFIG-OPERATOR-PEER-CREDENTIALS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "confirmation nonce absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating operator.peer_credentials"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid operator.max_request_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+                "CONFIG_UNSAFE_PATH"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "max_request_bytes",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "operator",
+            "id": "SCN-M1-CONFIG-OPERATOR-MAX-REQUEST-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "confirmation nonce absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating operator.max_request_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid operator.max_response_bytes in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+                "CONFIG_UNSAFE_PATH"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "max_response_bytes",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "operator",
+            "id": "SCN-M1-CONFIG-OPERATOR-MAX-RESPONSE-BYTES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "confirmation nonce absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating operator.max_response_bytes"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid operator.timeout_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+                "CONFIG_UNSAFE_PATH"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "timeout_ms",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "operator",
+            "id": "SCN-M1-CONFIG-OPERATOR-TIMEOUT-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "confirmation nonce absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating operator.timeout_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid operator.result_retention_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+                "CONFIG_UNSAFE_PATH"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "result_retention_ms",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "operator",
+            "id": "SCN-M1-CONFIG-OPERATOR-RESULT-RETENTION-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "confirmation nonce absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating operator.result_retention_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid operator.confirmation_expiry_ms in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_UNSAFE_OPERATOR_ENDPOINT",
+                "CONFIG_UNSAFE_PATH"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "integer_with_explicit_units",
+            "field": "confirmation_expiry_ms",
+            "fingerprint_impact": [
+                "runtime"
+            ],
+            "group": "operator",
+            "id": "SCN-M1-CONFIG-OPERATOR-CONFIRMATION-EXPIRY-MS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "confirmation nonce absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating operator.confirmation_expiry_ms"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid boundary.schema_version in representative/default fixture"
+            ],
+            "constraint": "exact value 1",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+                "CONFIG_UNAPPROVED_ENV_OVERRIDE",
+                "CONFIG_CANONICALIZATION_FAILED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "schema_version",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "destination",
+                "backfill",
+                "runtime"
+            ],
+            "group": "boundary",
+            "id": "SCN-M1-CONFIG-BOUNDARY-SCHEMA-VERSION",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "all secret references and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating boundary.schema_version"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid boundary.precedence in representative/default fixture"
+            ],
+            "constraint": "defaults then TOML then approved environment override",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+                "CONFIG_UNAPPROVED_ENV_OVERRIDE",
+                "CONFIG_CANONICALIZATION_FAILED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "precedence",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "destination",
+                "backfill",
+                "runtime"
+            ],
+            "group": "boundary",
+            "id": "SCN-M1-CONFIG-BOUNDARY-PRECEDENCE",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "all secret references and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating boundary.precedence"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid boundary.approved_environment_overrides in representative/default fixture"
+            ],
+            "constraint": "nonzero when a bound; nonempty when an identifier; included only in applicable canonical fingerprints",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+                "CONFIG_UNAPPROVED_ENV_OVERRIDE",
+                "CONFIG_CANONICALIZATION_FAILED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "approved_environment_overrides",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "destination",
+                "backfill",
+                "runtime"
+            ],
+            "group": "boundary",
+            "id": "SCN-M1-CONFIG-BOUNDARY-APPROVED-ENVIRONMENT-OVERRIDES",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "all secret references and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating boundary.approved_environment_overrides"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid boundary.purpose_scoped_secrets in representative/default fixture"
+            ],
+            "constraint": "mutually exclusive least-privilege secret capability sets",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+                "CONFIG_UNAPPROVED_ENV_OVERRIDE",
+                "CONFIG_CANONICALIZATION_FAILED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "purpose_scoped_secrets",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "destination",
+                "backfill",
+                "runtime"
+            ],
+            "group": "boundary",
+            "id": "SCN-M1-CONFIG-BOUNDARY-PURPOSE-SCOPED-SECRETS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "all secret references and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating boundary.purpose_scoped_secrets"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid boundary.canonical_fingerprints in representative/default fixture"
+            ],
+            "constraint": "source/table_set/destination/archive/promotion/backfill/runtime domains",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+                "CONFIG_UNAPPROVED_ENV_OVERRIDE",
+                "CONFIG_CANONICALIZATION_FAILED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "canonical_fingerprints",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "destination",
+                "backfill",
+                "runtime"
+            ],
+            "group": "boundary",
+            "id": "SCN-M1-CONFIG-BOUNDARY-CANONICAL-FINGERPRINTS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "all secret references and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating boundary.canonical_fingerprints"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        },
+        {
+            "accepted_examples": [
+                "valid boundary.redacted_diagnostics in representative/default fixture"
+            ],
+            "constraint": "no secret names/values, raw source identifiers, or configured paths",
+            "error_codes": [
+                "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+                "CONFIG_UNAPPROVED_ENV_OVERRIDE",
+                "CONFIG_CANONICALIZATION_FAILED"
+            ],
+            "executable_scenario": "cargo test --locked m1_config::tests",
+            "expected_type": "nonempty_string",
+            "field": "redacted_diagnostics",
+            "fingerprint_impact": [
+                "source",
+                "table_set",
+                "destination",
+                "backfill",
+                "runtime"
+            ],
+            "group": "boundary",
+            "id": "SCN-M1-CONFIG-BOUNDARY-REDACTED-DIAGNOSTICS",
+            "log_code": "CONFIG_REDACTED_VALIDATION",
+            "redaction": "all secret references and values absent",
+            "rejected_examples": [
+                "wrong TOML type or contract-violating boundary.redacted_diagnostics"
+            ],
+            "status_code": "configuration_rejected",
+            "unit_target": "m1_config::tests"
+        }
+    ],
+    "owner_bead": "boring-cdc-m1-config",
+    "schema_version": "m1-config-cases/v1"
+}

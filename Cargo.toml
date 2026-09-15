@@ -1,0 +1,44 @@
+[package]
+name = "boring-cdc"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+license = "Apache-2.0"
+repository = "https://github.com/hachej/boring-cdc"
+description = "A bounded Postgres CDC experiment"
+publish = false
+include = [
+    "/src/**",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/rust-toolchain.toml",
+    "/README.md",
+    "/LICENSE",
+]
+
+[lib]
+name = "boring_cdc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "boring-cdc"
+path = "src/main.rs"
+
+[dependencies]
+# ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
+pg_walstream = { version = "=0.8.1", default-features = false, features = ["rustls-tls"] }
+# ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
+tokio = { version = "=1.53.1", features = ["rt-multi-thread"] }
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.143"
+sha2 = "0.10.8"
+toml = "0.9.5"
+
+[dev-dependencies]
+trybuild = "1.0.110"
+
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1
+panic = "abort"

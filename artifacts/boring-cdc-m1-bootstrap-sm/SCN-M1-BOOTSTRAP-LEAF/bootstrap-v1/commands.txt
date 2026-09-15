@@ -1,0 +1,3 @@
+cargo fmt --all -- --check
+cargo test --locked m1_bootstrap_sm::tests
+scripts/validate/m1_bootstrap_sm.py

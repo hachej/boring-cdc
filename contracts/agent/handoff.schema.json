@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_sha": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "bead_id": {
+      "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+      "type": "string"
+    },
+    "changed_paths": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "checks": {
+      "additionalProperties": false,
+      "properties": {
+        "completed": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "result": {
+                "enum": [
+                  "pass",
+                  "fail",
+                  "stale"
+                ]
+              }
+            },
+            "required": [
+              "command",
+              "result",
+              "digest"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "failed": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "result": {
+                "enum": [
+                  "pass",
+                  "fail",
+                  "stale"
+                ]
+              }
+            },
+            "required": [
+              "command",
+              "result",
+              "digest"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "stale": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "command": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "result": {
+                "enum": [
+                  "pass",
+                  "fail",
+                  "stale"
+                ]
+              }
+            },
+            "required": [
+              "command",
+              "result",
+              "digest"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "completed",
+        "failed",
+        "stale"
+      ],
+      "type": "object"
+    },
+    "dirty": {
+      "additionalProperties": false,
+      "properties": {
+        "is_dirty": {
+          "type": "boolean"
+        },
+        "paths": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "is_dirty",
+        "paths"
+      ],
+      "type": "object"
+    },
+    "facts": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "head_sha": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "hypotheses": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "intents": {
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "ambiguous": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "active",
+        "ambiguous"
+      ],
+      "type": "object"
+    },
+    "log_references": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "next_safe_command": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "observations": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "redaction": {
+      "additionalProperties": false,
+      "properties": {
+        "checked": {
+          "const": true
+        },
+        "secrets_found": {
+          "const": 0
+        }
+      },
+      "required": [
+        "checked",
+        "secrets_found"
+      ],
+      "type": "object"
+    },
+    "risks": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "handoff/v1"
+    },
+    "touched_ids": {
+      "items": {
+        "pattern": "^[A-Z]+-[A-Z0-9-]+$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "unsafe_repeats": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "world_state_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema_version",
+    "bead_id",
+    "world_state_digest",
+    "base_sha",
+    "head_sha",
+    "dirty",
+    "changed_paths",
+    "touched_ids",
+    "checks",
+    "facts",
+    "observations",
+    "hypotheses",
+    "intents",
+    "risks",
+    "unsafe_repeats",
+    "next_safe_command",
+    "log_references",
+    "redaction"
+  ],
+  "type": "object"
+}

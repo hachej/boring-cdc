@@ -1,0 +1,76 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/command-1.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo test --locked m1_decoder::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/command-2.stderr",
+      "stderr_sha256": "d2006dab1b88bf7e03b4d9236f4e6896ecae6bda362a889062343577cf90415c",
+      "stdout_path": "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/command-2.log",
+      "stdout_sha256": "d33023d9065da575c7541352d338c27b7f778fdd17a04c3f529f8ec9c3702df6",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "scripts/validate/m1_decoder.py",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/command-3.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/command-3.log",
+      "stdout_sha256": "71a1bef93a731a82025e0f27804dab34d773aaf953c8f566b00d1bb8e9e3a419",
+      "version": "python 3"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "leaf",
+  "git_commit": "df9bf31739e898158dc31d1dfb0013461e4873db",
+  "owner_bead": "boring-cdc-m1-decoder",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/proof-summary.json",
+      "artifacts/boring-cdc-m1-decoder/SCN-M1-DECODER-LEAF/decoder-v1/versions.json",
+      "tests/fixtures/m1_decoder/pgoutput-v1.json"
+    ],
+    "digest": "d222a34e9684da81d9abb2634f99464cc5a4e7d40a985de6a31c37872e2f7fe8",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-DECODER-LEAF",
+  "schema_version": "evidence/v1",
+  "seed": "pgoutput-v1 fixed wire corpus",
+  "source_preservation": {
+    "after_sha256": "6d625f3cf25ce22d722ce37fa71ba1ac2630412ff7045f7c4ed487504cce1bd0",
+    "before_sha256": "6d625f3cf25ce22d722ce37fa71ba1ac2630412ff7045f7c4ed487504cce1bd0",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": false,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": false,
+    "full_failure_matrix": true,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

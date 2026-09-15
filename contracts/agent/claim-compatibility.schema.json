@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "predicates": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_values": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "minProperties": 1,
+            "type": "object"
+          },
+          "owner_bead": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "predicate_id": {
+            "pattern": "^PRED-[A-Z0-9-]+$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "predicate_id",
+          "owner_bead",
+          "allowed_values"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "claim-compatibility/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "predicates"
+  ],
+  "type": "object"
+}

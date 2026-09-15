@@ -1,0 +1,111 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo fmt --check",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-1.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo test --locked m1_config::tests::every_pair_of_secret_roles_requires_a_distinct_reference",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-2.stderr",
+      "stderr_sha256": "856fad4a1cefe91cf3e1350e9b74df0d9ac3aafd40eb21c6594c8666b0a958f4",
+      "stdout_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-2.log",
+      "stdout_sha256": "0526ba4cc73101cbb7c0df6bf480659229a4f323437ede0639329917273d1ce0",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo test --locked m1_config::tests::secret_references_cannot_alias_public_override_names",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-3.stderr",
+      "stderr_sha256": "625b726366f8ad0b616ac3632105ec8c5967d312c104d374df9b52838e408101",
+      "stdout_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-3.log",
+      "stdout_sha256": "079ff3962db229fca0d18a844a06e3f8d5a81a574815e13fbe71f56cd801a0c4",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo test --locked m1_config::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-4.stderr",
+      "stderr_sha256": "e7bfec21eb9f42703c83e48073144102ff00c456ea8ba9f9ea04799e3ce2ef8f",
+      "stdout_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-4.log",
+      "stdout_sha256": "378a1f028d8aaf17594e7d545bf0bfe5143547fc5839cfdefd20ace0e09cff18",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo clippy --locked --all-targets -- -D warnings",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-5.stderr",
+      "stderr_sha256": "4f27ac380b22e1d975eee20ce727fa8cbc09061177f6253af0777fd4de7b7506",
+      "stdout_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-5.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo/clippy 1.95.0"
+    },
+    {
+      "argv": "scripts/validate/plan_coverage.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-6.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-6.log",
+      "stdout_sha256": "be60bc83433a00f516247c163142f4e069f11f3a3d8a2d9e108bffe8676f0b03",
+      "version": "plan-coverage/v1"
+    },
+    {
+      "argv": "br lint",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-7.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/command-7.log",
+      "stdout_sha256": "4d3ec237e65218bb47f99e7923f2c90e7327b6f30efa227cf0a3e9bbc3d3b9a2",
+      "version": "br 0.2.16"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "leaf",
+  "git_commit": "23f1dbb4961c7dd3fbe589900d261bd3a5649aa4",
+  "owner_bead": "boring-cdc-m1-config-secret-role-distinctness-6o9",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/proof-summary.json",
+      "artifacts/boring-cdc-m1-config-secret-role-distinctness-6o9/SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS/pairwise-v1/versions.json"
+    ],
+    "digest": "fb5ef944a72968de06b10e383dd43bb33e85d02b149e35fe020aa8498d31a3e2",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-CONFIG-SECRET-ROLE-DISTINCTNESS",
+  "schema_version": "evidence/v1",
+  "seed": "five roles / ten unordered alias pairs / three reserved public overrides",
+  "source_preservation": {
+    "after_sha256": "31ba3519b025458bb20b78840b113dbb40642ddd759ae087d947c7b110bbda7f",
+    "before_sha256": "31ba3519b025458bb20b78840b113dbb40642ddd759ae087d947c7b110bbda7f",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": false,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": false,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

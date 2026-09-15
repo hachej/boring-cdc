@@ -1,0 +1,10 @@
+{
+  "feedback_boundary": "durable_only",
+  "fence_history_count": 1,
+  "heartbeat_nonce": 1,
+  "publication": "verified",
+  "source_control_cardinality": {
+    "capture_fences": 1,
+    "heartbeat": 1
+  }
+}

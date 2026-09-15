@@ -1,0 +1,1 @@
+m1 cli fault pass seed=cli-contract-v1 invalid_exit=2 unavailable_exit=4 json_error=pass redaction=pass broken_pipe=pass cleanup=complete

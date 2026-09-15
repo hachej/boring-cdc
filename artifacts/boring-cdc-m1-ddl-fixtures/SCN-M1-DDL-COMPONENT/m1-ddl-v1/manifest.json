@@ -1,0 +1,105 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo test --locked --workspace --all-targets",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/workspace.txt",
+      "stderr_sha256": "dda1da876430480d4e260ad8799f9ae725eb951cc9f322d47a648625c9244b97",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/workspace.txt",
+      "stdout_sha256": "c95794a74f9ba1927f90e678241b45e80f452d9ee3d11139ba110cdbaea1f66c",
+      "version": "cargo"
+    },
+    {
+      "argv": "cargo test --locked m1_ddl_fixtures::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/targeted.txt",
+      "stderr_sha256": "0a994fcf11c3686b94df429e41a6dd241069ebc0dc1ee47f77fbd06ecf674f1c",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/targeted.txt",
+      "stdout_sha256": "3f05a8bd31ddf70937ba642b586383b338367a927c43a564803c9c88e99177fa",
+      "version": "cargo"
+    },
+    {
+      "argv": "scripts/e2e/m1_ddl_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/e2e-1.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/e2e-1.txt",
+      "stdout_sha256": "ba0f154b13a380969d898642d921a79c67651f0b67a9916a91755439e9f7747a",
+      "version": "fixture/v1"
+    },
+    {
+      "argv": "scripts/e2e/m1_ddl_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/e2e-2.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/e2e-2.txt",
+      "stdout_sha256": "ba0f154b13a380969d898642d921a79c67651f0b67a9916a91755439e9f7747a",
+      "version": "fixture/v1"
+    },
+    {
+      "argv": "scripts/faults/m1_ddl_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/faults-1.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/faults-1.txt",
+      "stdout_sha256": "77eedc2f7abcfc24354ad39e0205e395f78a8b99fdf6bb9f214cd1bc7e54d324",
+      "version": "fixture/v1"
+    },
+    {
+      "argv": "scripts/faults/m1_ddl_fixtures.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stderr/faults-2.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/stdout/faults-2.txt",
+      "stdout_sha256": "77eedc2f7abcfc24354ad39e0205e395f78a8b99fdf6bb9f214cd1bc7e54d324",
+      "version": "fixture/v1"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "component",
+  "git_commit": "460323296444d95b3233f372deea6906f7ea8f1f",
+  "owner_bead": "boring-cdc-m1-ddl-fixtures",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/config.json",
+      "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/logs/boring-cdc.jsonl",
+      "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/state/before.json",
+      "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/state/after.json",
+      "artifacts/boring-cdc-m1-ddl-fixtures/SCN-M1-DDL-COMPONENT/m1-ddl-v1/fault-timeline.json"
+    ],
+    "digest": "ef565362d4ab253863607c97b41e72560138ee2a772e896c27e39b4d7e87c5ae",
+    "product_faults": "Live PG15/16/17 guarded catalog verification through durable fence; exact 11-hook fault fingerprints; malformed key-index and replica-identity admission blocks",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-DDL-COMPONENT",
+  "schema_version": "evidence/v1",
+  "seed": "m1-ddl-v1",
+  "source_preservation": {
+    "after_sha256": "5ad1ebe46fd486da9524c4f13fa9aa19d167649754cf3fcf83811488dedcb365",
+    "before_sha256": "5ad1ebe46fd486da9524c4f13fa9aa19d167649754cf3fcf83811488dedcb365",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": true
+  }
+}

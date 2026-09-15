@@ -1,0 +1,83 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/m1/execution-trace.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "event",
+              "completion",
+              "advance_clock",
+              "expiry",
+              "cancel",
+              "crash_restart"
+            ]
+          },
+          "emitted_effects": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "fixture_ref": {
+            "maxLength": 256,
+            "type": "string"
+          },
+          "redacted_state": {
+            "maxLength": 16384,
+            "type": "string"
+          },
+          "step": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "violation": {
+            "maxLength": 16384,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "step",
+          "action",
+          "fixture_ref",
+          "redacted_state",
+          "emitted_effects",
+          "violation"
+        ],
+        "type": "object"
+      },
+      "maxItems": 4096,
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "boring-cdc/execution-trace/v1"
+    },
+    "seed": {
+      "$ref": "schedule-seed.schema.json"
+    },
+    "synthetic": {
+      "const": true
+    },
+    "violation": {
+      "maxLength": 16384,
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "synthetic",
+    "seed",
+    "entries",
+    "violation"
+  ],
+  "title": "Boring CDC bounded synthetic transition trace",
+  "type": "object"
+}

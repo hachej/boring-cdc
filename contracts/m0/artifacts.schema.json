@@ -1,0 +1,54 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/m0/artifacts.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "pattern": "^ART-[A-Z0-9-]+$",
+            "type": "string"
+          },
+          "owner_bead": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "declared",
+              "complete"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "owner_bead",
+          "path",
+          "sha256",
+          "status"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "m0-artifacts/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "artifacts"
+  ],
+  "title": "M0 artifacts",
+  "type": "object"
+}

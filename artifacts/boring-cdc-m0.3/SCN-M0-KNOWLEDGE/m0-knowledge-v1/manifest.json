@@ -1,0 +1,106 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/validate/test_knowledge.sh m0-knowledge-v1 > artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-1.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-1.log",
+      "stdout_sha256": "0cc7bc89305bdb1909c72702fc34049849f475e3f8b155d1f61605753f6eae5b",
+      "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
+    },
+    {
+      "argv": "scripts/e2e/m0_knowledge.sh m0-knowledge-v1 > artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-2.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-2.log",
+      "stdout_sha256": "687f2469d070aac798321076cfb4fc22360700dc5cb518061728036a133c0cb0",
+      "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
+    },
+    {
+      "argv": "scripts/faults/m0_knowledge.sh m0-knowledge-v1 > artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-3.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-3.log",
+      "stdout_sha256": "ae8528e2cee89fd2705449101fd1fae8bda45ab661d42b43f47cbf33ee316796",
+      "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
+    },
+    {
+      "argv": "scripts/validate/test_knowledge.sh m0-knowledge-v1 > artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-4.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-4.log",
+      "stdout_sha256": "0cc7bc89305bdb1909c72702fc34049849f475e3f8b155d1f61605753f6eae5b",
+      "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
+    },
+    {
+      "argv": "scripts/e2e/m0_knowledge.sh m0-knowledge-v1 > artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-5.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-5.log",
+      "stdout_sha256": "687f2469d070aac798321076cfb4fc22360700dc5cb518061728036a133c0cb0",
+      "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
+    },
+    {
+      "argv": "scripts/faults/m0_knowledge.sh m0-knowledge-v1 > artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-6.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-core/valid/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-6.log",
+      "stdout_sha256": "ae8528e2cee89fd2705449101fd1fae8bda45ab661d42b43f47cbf33ee316796",
+      "version": "python=Python 3.13.3; br=br 0.2.16; knowledge-validators/1.0.0"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "component",
+  "git_commit": "fc50a08ec257251b0b6e5e439556732ac2539ca2",
+  "owner_bead": "boring-cdc-m0.3",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-1.log",
+      "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-2.log",
+      "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-3.log",
+      "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-4.log",
+      "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-5.log",
+      "artifacts/boring-cdc-m0.3/SCN-M0-KNOWLEDGE/m0-knowledge-v1/command-6.log"
+    ],
+    "digest": "a420948c1151a159e42a6425b9e9d24d7e9bd1feb6b1d72cbb2e5e012c971b87",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M0-KNOWLEDGE",
+  "schema_version": "evidence/v1",
+  "seed": "m0-knowledge-v1",
+  "source_preservation": {
+    "after_sha256": "d627decddb5b25aae40b29bdc2d7cae970dfc9f3db9a8e753eab6628d5a15d9e",
+    "before_sha256": "d627decddb5b25aae40b29bdc2d7cae970dfc9f3db9a8e753eab6628d5a15d9e",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

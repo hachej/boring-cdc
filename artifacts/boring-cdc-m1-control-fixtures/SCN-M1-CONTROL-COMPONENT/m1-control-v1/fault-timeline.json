@@ -1,0 +1,16 @@
+{
+  "checkpoint": "unchanged_on_failure",
+  "hooks": [
+    "publication_drift",
+    "pre_durable_heartbeat",
+    "zero_rows",
+    "multiple_rows",
+    "forbidden_dml",
+    "unbound_fence",
+    "truncate",
+    "table_set_change",
+    "slot_guard",
+    "admin_credential_lifetime"
+  ],
+  "outcome": "pass"
+}

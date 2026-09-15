@@ -1,0 +1,52 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/common/structured-log.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "pattern": "^[A-Z][A-Z0-9_]+$",
+      "type": "string"
+    },
+    "correlation_id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "fields": {
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "integer",
+          "boolean",
+          "null"
+        ]
+      },
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "type": "object"
+    },
+    "level": {
+      "enum": [
+        "info",
+        "warning",
+        "error"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "structured-log/v1"
+    }
+  },
+  "required": [
+    "schema_version",
+    "level",
+    "code",
+    "correlation_id",
+    "message"
+  ],
+  "title": "Redacted structured log",
+  "type": "object"
+}

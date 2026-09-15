@@ -1,0 +1,2 @@
+scripts/e2e/m1_raw_demo.sh raw-demo-v1
+scripts/e2e/m1_raw_demo.sh raw-demo-v1
