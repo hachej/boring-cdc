@@ -1,0 +1,1 @@
+{"feedback_permitted":false,"high_water":{"aggregate_bytes":37376,"decoder_bytes":32768,"receive_bytes":4,"staging_bytes":512},"iterator_events":2,"observed_bytes":8,"observed_events":2,"outcome":"commit_ready","spill_delta":8,"stream_delta":0}

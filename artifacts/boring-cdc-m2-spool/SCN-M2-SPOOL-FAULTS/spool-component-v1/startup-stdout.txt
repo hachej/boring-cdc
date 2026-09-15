@@ -1,0 +1,1 @@
+{"feedback_permitted":false,"outcome":"startup_blocked_for_quarantine","quarantined":2,"remaining_spools":0,"removed":1}
