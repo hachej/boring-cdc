@@ -2334,6 +2334,10 @@
                   "generation": 11,
                   "guard_backend_pid": 4102,
                   "importer_acknowledged": 2,
+                  "importer_backend_pids": [
+                    4103,
+                    4104
+                  ],
                   "importer_expected": 2,
                   "journal_checkpoint_seq": 101,
                   "last_feedback_lsn": "0/16B6C50",

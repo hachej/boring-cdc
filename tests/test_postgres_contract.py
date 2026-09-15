@@ -98,6 +98,12 @@ class PostgresContractTests(unittest.TestCase):
         self.assertTrue(all(row["minimum_lock"] == "ACCESS EXCLUSIVE" for row in rows))
         self.assertTrue(all(row["guard_conflicts"] for row in rows))
 
+    def test_importers_remain_live_after_exporter_release(self):
+        case = next(case for case in self.fixtures["cases"] if case["fixture_id"] == "SCN-M0-PG-EXPORTER-RELEASE-AFTER")
+        self.assertNotIn("exporter_backend_pid", case["inputs"])
+        self.assertEqual([4103, 4104], case["inputs"]["importer_backend_pids"])
+        self.assertEqual(2, case["inputs"]["importer_acknowledged"])
+
     def test_forged_evidence_source_parent_is_rejected(self):
         inputs = postgres_contract.validate()[1]
         validator_sha = postgres_contract.hashlib.sha256(postgres_contract.VALIDATOR.read_bytes()).hexdigest()
