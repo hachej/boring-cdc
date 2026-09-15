@@ -335,7 +335,9 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         self.journal
             .persist_failure(operation)
             .map_err(|error| RuntimeError::JournalTransient(error.to_string()))?;
-        self.state = RuntimeState::Capturing;
+        // Re-arm authorizes only a supervised successor. Frames were deliberately discarded while
+        // fenced, so resuming this CopyBoth generation would be unsafe.
+        self.state = RuntimeState::ExpectedClose;
         Ok(())
     }
 }
@@ -592,7 +594,10 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         let durable = self.journal.commit(&commit).map_err(|error| {
             self.state = RuntimeState::CaptureSafeStopped;
             match error {
-                JournalError::Sqlite(_) | JournalError::BusyBoundExceeded => {
+                JournalError::Sqlite(_)
+                | JournalError::BusyBoundExceeded
+                | JournalError::BusyBoundExceededAfterCommit
+                | JournalError::AmbiguousAfterCommit => {
                     RuntimeError::JournalTransient(error.to_string())
                 }
                 _ => RuntimeError::JournalIntegrity(error.to_string()),
@@ -1003,20 +1008,27 @@ pub fn acquire_production_ownership(
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
         ).optional().map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
         if let Some((class, next)) = gate {
-            if class != "transient" {
+            if class != "transient" && class != "rearmed" {
                 return Err(CaptureFailure::at(
                     "failure_policy",
                     "M2_EXPLICIT_REARM_REQUIRED",
                 ));
             }
-            let deadline = next
-                .and_then(|value| value.strip_prefix("unix-ms:")?.parse::<u64>().ok())
-                .ok_or_else(|| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
+            let deadline = if class == "transient" {
+                Some(
+                    next.and_then(|value| value.strip_prefix("unix-ms:")?.parse::<u64>().ok())
+                        .ok_or_else(|| {
+                            CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED")
+                        })?,
+                )
+            } else {
+                None
+            };
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?
                 .as_millis() as u64;
-            if deadline > now {
+            if deadline.is_some_and(|deadline| deadline > now) {
                 return Err(CaptureFailure::at("failure_policy", "M2_RETRY_NOT_DUE"));
             }
         }
@@ -1293,7 +1305,7 @@ pub async fn run_loaded_config(
     {
         let now_ms =
             u64::try_from(now).map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?;
-        if retry_class != "transient" {
+        if retry_class != "transient" && retry_class != "rearmed" {
             return Err(CaptureFailure::at(
                 "failure_policy",
                 "M2_EXPLICIT_REARM_REQUIRED",

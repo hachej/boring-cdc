@@ -971,7 +971,7 @@ impl JournalWriterService {
     }
     pub fn capture_startup_gate(&self) -> Result<Option<(String, Option<u64>)>, JournalError> {
         let mut statement = self.store.writer.connection().prepare(
-            "SELECT retry_class,next_retry_at FROM processing_failures WHERE component='capture' AND armed=1",
+            "SELECT CASE WHEN instr(last_failed_at,';rearm-token=')>0 THEN 'rearmed' ELSE retry_class END,next_retry_at FROM processing_failures WHERE component='capture' AND armed=1",
         )?;
         let values = statement
             .query_map([], |row| {

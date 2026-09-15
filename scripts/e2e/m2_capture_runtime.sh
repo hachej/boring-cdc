@@ -50,8 +50,18 @@ try: print(sqlite3.connect(sys.argv[1]).execute('select count(*) from source_tra
 except Exception: print(0)
 PY2
 )" == 1 ]]; do (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }; sleep .1; done
-feedback=$(psqlc -Atqc "SELECT coalesce(write_lsn::text,'')||','||coalesce(flush_lsn::text,'')||','||coalesce(replay_lsn::text,'') FROM pg_stat_replication WHERE application_name='' OR application_name IS NOT NULL ORDER BY pid LIMIT 1")
-[[ "$feedback" =~ ^[^,]+,[^,]+,[^,]+$ ]]
+feedback=$(psqlc -Atqc "SELECT coalesce(write_lsn::text,'')||','||coalesce(flush_lsn::text,'')||','||coalesce(replay_lsn::text,'') FROM pg_stat_replication ORDER BY pid LIMIT 1")
+durable_hex=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+print(sqlite3.connect(sys.argv[1]).execute('select durable_transaction_end_lsn from source_state where singleton=1').fetchone()[0])
+PY2
+)
+durable_lsn=$(python3 - "$durable_hex" <<'PY2'
+import sys
+v=int(sys.argv[1],16); print(f'{v>>32:X}/{v&0xffffffff:X}')
+PY2
+)
+[[ "$feedback" == "$durable_lsn,$durable_lsn,$durable_lsn" ]]
 kill -TERM "$pid"; wait "$pid"; [[ ! -s "$work/runtime.err" ]]
 python3 - "$work/run/state/journal.sqlite" "$feedback" <<'PY2'
 import sqlite3,sys
@@ -60,7 +70,7 @@ assert tx[0]==1 and ev==2 and tx[1] is not None
 print('{"journal_transactions":1,"journal_events":2,"feedback_bounded":true,"server_feedback_positions":"%s"}'%sys.argv[2])
 PY2
 version=$(psqlc -Atqc 'show server_version'); [[ "$version" == 17.6* ]]
-printf '{"command":"CMD-RUN","exit":0,"postgres":"%s","journal_transactions":1,"journal_events":2,"durable_before_feedback":true,"blocked_sqlite_transactions":0,"blocked_server_feedback_positions":"0/0,0/0,0/0","server_feedback_positions":"%s"}\n' "$version" "$feedback" >"$work/observation.json"
+printf '{"command":"CMD-RUN","exit":0,"postgres":"%s","journal_transactions":1,"journal_events":2,"durable_before_feedback":true,"blocked_sqlite_transactions":0,"blocked_server_feedback_positions":"0/0,0/0,0/0","durable_sqlite_lsn":"%s","server_feedback_positions":"%s"}\n' "$version" "$durable_lsn" "$feedback" >"$work/observation.json"
 export M2_RUNTIME_OUTPUT="$work/runtime.out" M2_RUNTIME_OBSERVATION="$work/observation.json" M2_POSTGRES_VERSION="$version"
 python3 scripts/lib/m2_capture_runtime_evidence.py e2e
 scripts/validate/evidence.sh artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-E2E/capture-runtime-production-v1/evidence.json
