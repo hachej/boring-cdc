@@ -1,0 +1,2 @@
+cargo test --locked --workspace --all-targets
+cargo test --locked m2_jsonl::tests::every_crash_boundary_is_absent_adopted_or_blocks_without_checkpoint_skip
