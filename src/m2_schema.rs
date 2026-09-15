@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 10;
+pub const SCHEMA_VERSION: i64 = 11;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -410,6 +410,23 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_10_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v11: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=11)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v11 {
+            connection.execute_batch(MIGRATION_11)?;
+            connection.execute("INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(11,'reconcile-audit-pin-owners',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[MIGRATION_11_CHECKSUM])?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=11",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_11_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -770,10 +787,20 @@ FROM source_transactions WHERE state='committed';
 "#;
 
 const MIGRATION_10_CHECKSUM: &str =
-    "sha256:8ef084b989eeb4089ca795b7b84feed4cc041fccc1a2be2c5be084b24e6c9372";
+    "sha256:3f2922071f599fa575fbc9a7aa5b9cfb7a4ea0039edb66ab0cf409d4bc84d195";
 const MIGRATION_10: &str = r#"
 CREATE INDEX logical_range_pins_owner_state
+ON logical_range_pins(owner_kind,owner_id,state,pin_id);
+"#;
+
+const MIGRATION_11_CHECKSUM: &str =
+    "sha256:9a445ca9cf4f7641f52487670ac66bd78c9c5866874b596eaa0b2ff18a4ea5cd";
+const MIGRATION_11: &str = r#"
+DROP INDEX logical_range_pins_owner_state;
+CREATE INDEX logical_range_pins_owner_state
 ON logical_range_pins(owner_kind,owner_id,pin_id) WHERE state!='released';
+CREATE INDEX terminal_metadata_retention_age
+ON terminal_metadata_retention(category,terminal_at_unix_ms,object_id);
 UPDATE logical_range_pins SET state='release_pending',revision=revision+1
 WHERE owner_kind='audit' AND state='active'
 AND NOT EXISTS(SELECT 1 FROM destination_audits a WHERE a.audit_id=logical_range_pins.owner_id);
@@ -1131,12 +1158,15 @@ pub mod tests {
     }
 
     #[test]
-    fn v9_upgrade_releases_orphaned_audit_pins_and_metadata() {
+    fn v10_upgrade_releases_orphaned_audit_pins_and_metadata() {
         let (p, w) = writer("v9-orphan-audit-pin");
         w.connection()
             .execute_batch(
-                "DROP INDEX logical_range_pins_owner_state;
-                 DELETE FROM schema_migrations WHERE version=10;
+                "DROP INDEX terminal_metadata_retention_age;
+                 DROP INDEX logical_range_pins_owner_state;
+                 DELETE FROM schema_migrations WHERE version=11;
+                 CREATE INDEX logical_range_pins_owner_state
+                 ON logical_range_pins(owner_kind,owner_id,state,pin_id);
                  INSERT INTO logical_range_pins(pin_id,owner_kind,owner_id,capture_epoch,start_seq,state)
                  VALUES('active-pin','audit','deleted-audit','epoch',1,'active'),
                        ('pending-pin','audit','deleted-audit','epoch',1,'release_pending');

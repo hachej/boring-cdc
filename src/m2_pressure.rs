@@ -9,6 +9,12 @@ use std::time::{Duration, Instant};
 pub const GC_MAX_TRANSACTIONS: usize = 1_000;
 pub const GC_MAX_HOLD: Duration = Duration::from_millis(50);
 pub const INCREMENTAL_VACUUM_MAX_PAGES: u32 = 1_000;
+pub const METADATA_ALERT_ROWS: u64 = 10_000;
+pub const METADATA_AUDIT_ROWS: u64 = 100_000;
+const METADATA_COMPLETED_COMMAND_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
+const METADATA_INVALID_GENERATION_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
+const METADATA_RETIRED_GENERATION_RETENTION_MS: i64 = 90 * 24 * 60 * 60 * 1_000;
+const METADATA_ORPHAN_RETENTION_MS: i64 = 30 * 24 * 60 * 60 * 1_000;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum PressureState {
@@ -324,6 +330,7 @@ pub struct PressureObservation<'a> {
 pub struct PressureServiceResult {
     pub decision: PressureDecision,
     pub gc: Option<GcResult>,
+    pub metadata_gc: Option<MetadataGcResult>,
     pub checkpoint: Option<CheckpointProgress>,
 }
 /// The run-owned maintenance tick: evaluate actions and execute automatic GC/checkpoint work.
@@ -351,6 +358,30 @@ pub fn service_pressure_tick(
     } else {
         None
     };
+    let metadata_gc = if decision.actions.automatic_gc {
+        Some(bounded_metadata_gc(
+            writer,
+            MetadataRetention {
+                alerts_rows: METADATA_ALERT_ROWS,
+                audit_rows: METADATA_AUDIT_ROWS,
+                completed_command_cutoff_ms: observation
+                    .now_unix_ms
+                    .saturating_sub(METADATA_COMPLETED_COMMAND_RETENTION_MS),
+                invalid_generation_cutoff_ms: observation
+                    .now_unix_ms
+                    .saturating_sub(METADATA_INVALID_GENERATION_RETENTION_MS),
+                retired_generation_cutoff_ms: observation
+                    .now_unix_ms
+                    .saturating_sub(METADATA_RETIRED_GENERATION_RETENTION_MS),
+                orphan_cutoff_ms: observation
+                    .now_unix_ms
+                    .saturating_sub(METADATA_ORPHAN_RETENTION_MS),
+                batch_max: GC_MAX_TRANSACTIONS,
+            },
+        )?)
+    } else {
+        None
+    };
     let checkpoint = if decision.state >= PressureState::Action {
         Some(checkpoint_restart(writer)?)
     } else {
@@ -362,6 +393,7 @@ pub fn service_pressure_tick(
     Ok(PressureServiceResult {
         decision,
         gc,
+        metadata_gc,
         checkpoint,
     })
 }
@@ -551,10 +583,10 @@ pub fn automatic_gc(
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MetadataRetention<'a> {
+pub struct MetadataRetention {
     pub alerts_rows: u64,
     pub audit_rows: u64,
-    pub completed_command_cutoff: &'a str,
+    pub completed_command_cutoff_ms: i64,
     pub invalid_generation_cutoff_ms: i64,
     pub retired_generation_cutoff_ms: i64,
     pub orphan_cutoff_ms: i64,
@@ -571,13 +603,14 @@ pub struct MetadataGcResult {
 }
 pub fn bounded_metadata_gc(
     writer: &mut WriterConnection,
-    limits: MetadataRetention<'_>,
+    limits: MetadataRetention,
 ) -> Result<MetadataGcResult, PressureError> {
     if limits.batch_max == 0
         || limits.batch_max > GC_MAX_TRANSACTIONS
         || limits.alerts_rows == 0
+        || limits.alerts_rows > METADATA_ALERT_ROWS
         || limits.audit_rows == 0
-        || limits.completed_command_cutoff.is_empty()
+        || limits.audit_rows > METADATA_AUDIT_ROWS
     {
         return Err(PressureError::Invalid("invalid metadata retention"));
     }
@@ -586,20 +619,24 @@ pub fn bounded_metadata_gc(
         .transaction_with_behavior(TransactionBehavior::Immediate)?;
     let n = limits.batch_max as i64;
     let alerts=tx.execute("DELETE FROM alerts WHERE rowid IN (SELECT rowid FROM alerts WHERE state='cleared' ORDER BY rowid LIMIT ?1) AND (SELECT count(*) FROM alerts)>?2",params![n,limits.alerts_rows as i64])? as u64;
-    let audit_count = tx.query_row("SELECT count(*) FROM destination_audits", [], |row| {
-        row.get::<_, u64>(0)
-    })?;
+    let audit_probe_limit = limits
+        .audit_rows
+        .checked_add(limits.batch_max as u64)
+        .ok_or(PressureError::Invalid("audit retention bound overflow"))?;
+    let audit_count = tx.query_row(
+        "SELECT count(*) FROM (SELECT 1 FROM destination_audits LIMIT ?1)",
+        [audit_probe_limit as i64],
+        |row| row.get::<_, u64>(0),
+    )?;
     let audit_limit = audit_count
         .saturating_sub(limits.audit_rows)
         .min(limits.batch_max as u64) as i64;
     let audit_ids = {
         let mut statement = tx.prepare(
-            "SELECT a.audit_id FROM destination_audits a
-             JOIN terminal_metadata_retention m
-               ON m.category='destination_audit' AND m.object_id=a.audit_id
-             WHERE a.journal_cursor_seq>=a.round_target_seq
-               AND a.self_cursor_seq>=a.round_target_seq
-             ORDER BY m.terminal_at_unix_ms,a.audit_id LIMIT ?1",
+            "SELECT a.audit_id FROM terminal_metadata_retention m
+             JOIN destination_audits a ON a.audit_id=m.object_id
+             WHERE m.category='destination_audit'
+             ORDER BY m.terminal_at_unix_ms,m.object_id LIMIT ?1",
         )?;
         statement
             .query_map([audit_limit], |row| row.get::<_, String>(0))?
@@ -608,6 +645,15 @@ pub fn bounded_metadata_gc(
     let mut audits = 0;
     let mut remaining_pin_rows = limits.batch_max;
     for audit_id in audit_ids {
+        let terminal = tx.query_row(
+            "SELECT journal_cursor_seq>=round_target_seq AND self_cursor_seq>=round_target_seq
+             FROM destination_audits WHERE audit_id=?1",
+            [&audit_id],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if !terminal {
+            continue;
+        }
         // The owner index and shared row budget keep reconciliation bounded even when corrupt or
         // legacy state contains many pins for one audit. The audit remains until a later tick has
         // released every pin, and each tick is one IMMEDIATE transaction.
@@ -661,7 +707,7 @@ pub fn bounded_metadata_gc(
             audits += 1;
         }
     }
-    let commands=tx.execute("DELETE FROM operator_command_requests WHERE request_id IN (SELECT request_id FROM operator_command_requests WHERE state IN ('completed','failed','aborted_by_restart') AND expires_at<?1 ORDER BY expires_at LIMIT ?2)",params![limits.completed_command_cutoff,n])? as u64;
+    let commands=tx.execute("DELETE FROM operator_command_requests WHERE request_id IN (SELECT request_id FROM operator_command_requests WHERE state IN ('completed','failed','aborted_by_restart') AND CAST(unixepoch(expires_at)*1000 AS INTEGER)<?1 ORDER BY expires_at LIMIT ?2)",params![limits.completed_command_cutoff_ms,n])? as u64;
     let invalid_generations=tx.execute("DELETE FROM backfill_generations WHERE generation_id IN (SELECT g.generation_id FROM backfill_generations g JOIN terminal_metadata_retention m ON m.category='invalid_generation' AND m.object_id=g.generation_id WHERE g.state='invalidated' AND m.terminal_at_unix_ms<?1 ORDER BY m.terminal_at_unix_ms LIMIT ?2)",params![limits.invalid_generation_cutoff_ms,n])? as u64;
     let retired_generations=tx.execute("DELETE FROM archive_generations WHERE generation_id IN (SELECT g.generation_id FROM archive_generations g JOIN terminal_metadata_retention m ON m.category='retired_generation' AND m.object_id=g.generation_id WHERE g.state IN ('retired','invalidated') AND m.terminal_at_unix_ms<?1 ORDER BY m.terminal_at_unix_ms LIMIT ?2)",params![limits.retired_generation_cutoff_ms,n])? as u64;
     let orphan_diagnostics=tx.execute("DELETE FROM orphan_diagnostics WHERE diagnostic_id IN (SELECT diagnostic_id FROM orphan_diagnostics WHERE state='resolved' AND resolved_at_unix_ms<?1 ORDER BY resolved_at_unix_ms LIMIT ?2)",params![limits.orphan_cutoff_ms,n])? as u64;
@@ -976,7 +1022,7 @@ pub(crate) mod tests {
         let limits = MetadataRetention {
             alerts_rows: 2,
             audit_rows: 2,
-            completed_command_cutoff: "2025",
+            completed_command_cutoff_ms: 1,
             invalid_generation_cutoff_ms: 1,
             retired_generation_cutoff_ms: 1,
             orphan_cutoff_ms: 1,
@@ -1033,7 +1079,7 @@ pub(crate) mod tests {
         let limits = MetadataRetention {
             alerts_rows: 1,
             audit_rows: 1,
-            completed_command_cutoff: "2025",
+            completed_command_cutoff_ms: 1,
             invalid_generation_cutoff_ms: 1,
             retired_generation_cutoff_ms: 1,
             orphan_cutoff_ms: 1,
@@ -1130,10 +1176,23 @@ pub(crate) mod tests {
             .unwrap();
         assert!(query_plan.contains("logical_range_pins_owner_state"));
         assert!(!query_plan.contains("TEMP B-TREE"));
+        let metadata_query_plan = w
+            .connection()
+            .query_row(
+                "EXPLAIN QUERY PLAN SELECT a.audit_id FROM terminal_metadata_retention m
+                 JOIN destination_audits a ON a.audit_id=m.object_id
+                 WHERE m.category='destination_audit'
+                 ORDER BY m.terminal_at_unix_ms,m.object_id LIMIT ?1",
+                [1_i64],
+                |row| row.get::<_, String>(3),
+            )
+            .unwrap();
+        assert!(metadata_query_plan.contains("terminal_metadata_retention_age"));
+        assert!(!metadata_query_plan.contains("TEMP B-TREE"));
         let limits = MetadataRetention {
             alerts_rows: 1,
             audit_rows: 1,
-            completed_command_cutoff: "2025",
+            completed_command_cutoff_ms: 1,
             invalid_generation_cutoff_ms: 1,
             retired_generation_cutoff_ms: 1,
             orphan_cutoff_ms: 1,
@@ -1199,7 +1258,7 @@ pub(crate) mod tests {
             MetadataRetention {
                 alerts_rows: 1,
                 audit_rows: 1,
-                completed_command_cutoff: "2025",
+                completed_command_cutoff_ms: 1,
                 invalid_generation_cutoff_ms: 1,
                 retired_generation_cutoff_ms: 1,
                 orphan_cutoff_ms: 1,
@@ -1256,6 +1315,7 @@ pub(crate) mod tests {
         .unwrap();
         assert_eq!(result.decision.state, PressureState::Action);
         assert_eq!(result.gc.unwrap().transactions, 5);
+        assert_eq!(result.metadata_gc.unwrap(), MetadataGcResult::default());
         assert!(result.checkpoint.is_some());
         drop(w);
         let _ = std::fs::remove_file(p);
