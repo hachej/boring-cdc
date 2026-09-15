@@ -44,6 +44,11 @@
       "assertion": "empty identities, zero generations or TTLs, and integer/expiry overflow fail closed",
       "id": "SCN-M2-LEASE-INVALID-INPUT",
       "test": "invalid_identities_ttls_and_overflows_are_rejected"
+    },
+    {
+      "assertion": "terminal lease rows are atomically replaced by a unique successor lease for the same generation; old tokens and namespaces remain stale",
+      "id": "SCN-M2-LEASE-SUCCESSOR-REACQUIRE",
+      "test": "released_generation_can_be_reacquired_by_successor_runtime"
     }
   ],
   "evidence_tier": "leaf",

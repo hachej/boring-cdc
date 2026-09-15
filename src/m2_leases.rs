@@ -203,6 +203,26 @@ pub fn acquire(
          WHERE destination_id=?1 AND state='held' AND generation<>?2",
         params![identity.destination_id, generation],
     )?;
+    // The schema intentionally keeps one current lease row per generation. Once a terminal row has
+    // no live authority, replace it atomically with a new immutable lease identity; old tokens can
+    // no longer validate and their unique candidate namespaces remain non-live reconciliation data.
+    transaction.execute(
+        "UPDATE destination_generation_leases SET state='expired',revision=revision+1
+         WHERE destination_id=?1 AND capture_epoch=?2 AND generation=?3
+           AND state='held' AND expires_mono_ms<=?4",
+        params![
+            identity.destination_id,
+            identity.capture_epoch,
+            generation,
+            now
+        ],
+    )?;
+    transaction.execute(
+        "DELETE FROM destination_generation_leases
+         WHERE destination_id=?1 AND capture_epoch=?2 AND generation=?3
+           AND state IN ('fenced','expired','released')",
+        params![identity.destination_id, identity.capture_epoch, generation],
+    )?;
     let inserted = transaction.execute(
         "INSERT OR IGNORE INTO destination_generation_leases
          (lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state,revision)
@@ -266,6 +286,29 @@ pub fn expire_due(writer: &mut WriterConnection, now_mono_ms: u64) -> Result<usi
          WHERE state='held' AND expires_mono_ms<=?1",
         [as_i64(now_mono_ms)?],
     )?)
+}
+
+pub fn release(
+    writer: &mut WriterConnection,
+    token: &LeaseToken,
+    now_mono_ms: u64,
+) -> Result<(), LeaseError> {
+    let transaction = writer
+        .connection_mut()
+        .transaction_with_behavior(TransactionBehavior::Immediate)?;
+    if !valid_in(&transaction, token, now_mono_ms)? {
+        return Err(LeaseError::Stale);
+    }
+    let changed = transaction.execute(
+        "UPDATE destination_generation_leases SET state='released',revision=revision+1
+         WHERE lease_id=?1 AND revision=?2 AND state='held'",
+        params![token.identity.lease_id, as_i64(token.revision)?],
+    )?;
+    if changed != 1 {
+        return Err(LeaseError::Stale);
+    }
+    transaction.commit()?;
+    Ok(())
 }
 
 /// Validate immediately before dispatch, then validate again after dispatch. A stale completion is
@@ -446,13 +489,28 @@ pub(crate) mod tests {
         assert_eq!(expire_due(&mut writer, 49).unwrap(), 0);
         assert_eq!(expire_due(&mut writer, 50).unwrap(), 1);
         assert_eq!(renew(&mut writer, &renewed, 50, 30), Err(LeaseError::Stale));
-        writer.connection().execute("UPDATE destinations SET generation=2,revision=revision+1 WHERE destination_id='dest-a'", []).unwrap();
-        let replacement = acquire(&mut writer, identity(2), 50, 30).unwrap();
+        let mut replacement_identity = identity(1);
+        replacement_identity.lease_id = "lease-replacement".into();
+        let replacement = acquire(&mut writer, replacement_identity, 50, 30).unwrap();
         assert_ne!(
             replacement.external_namespace(),
             renewed.external_namespace()
         );
         assert_eq!(renew(&mut writer, &renewed, 51, 30), Err(LeaseError::Stale));
+        cleanup(path);
+    }
+
+    #[test]
+    fn released_generation_can_be_reacquired_by_successor_runtime() {
+        let (mut writer, path) = writer();
+        let old = acquire(&mut writer, identity(1), 10, 100).unwrap();
+        release(&mut writer, &old, 11).unwrap();
+        let mut successor = identity(1);
+        successor.lease_id = "lease-successor".into();
+        let current = acquire(&mut writer, successor, 12, 100).unwrap();
+        assert_ne!(old.external_namespace(), current.external_namespace());
+        assert_eq!(renew(&mut writer, &old, 13, 100), Err(LeaseError::Stale));
+        assert!(renew(&mut writer, &current, 13, 100).is_ok());
         cleanup(path);
     }
 
