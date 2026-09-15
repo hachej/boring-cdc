@@ -238,6 +238,42 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             .persist_failure(operation)
             .map_err(|e| RuntimeError::Journal(e.to_string()))
     }
+    pub fn rearm_capture_failure(
+        &mut self,
+        current: &crate::failure_policy::FailureRecord,
+        request: crate::failure_policy::RearmRequest,
+        now_ms: u64,
+    ) -> Result<(), RuntimeError> {
+        use crate::failure_policy::{PolicyAction, PolicyEvent, PreparedFailureOperation};
+        use crate::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
+        struct Zero;
+        impl Randomness for Zero {
+            fn next_u64(&mut self) -> u64 {
+                0
+            }
+        }
+        let clock = VirtualClock::new(now_ms);
+        let mut randomness = Zero;
+        let mut context = TransitionContext {
+            clock: &clock,
+            randomness: &mut randomness,
+        };
+        let action = crate::failure_policy::transition(
+            Some(current),
+            PolicyEvent::Rearm(request),
+            &mut context,
+        );
+        if !matches!(action, PolicyAction::Rearmed { .. }) {
+            return Err(RuntimeError::Protocol("capture_rearm_rejected"));
+        }
+        let operation = PreparedFailureOperation::from_policy_action(action, None)
+            .ok_or(RuntimeError::Protocol("capture_rearm_missing_operation"))?;
+        self.journal
+            .persist_failure(operation)
+            .map_err(|error| RuntimeError::Journal(error.to_string()))?;
+        self.state = RuntimeState::Capturing;
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -645,8 +681,34 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
     capture_copyboth_until_with_probe(config, cancellation, runtime, stop_after_commits, || true)
         .await
 }
+fn classify_runtime_failure(
+    error: &RuntimeError,
+) -> (
+    crate::failure_policy::FailureClass,
+    crate::failure_policy::StableErrorCode,
+    bool,
+) {
+    use crate::failure_policy::{FailureClass as Class, StableErrorCode as Code};
+    match error {
+        RuntimeError::Journal(_) => (Class::TransientIo, Code::TransportUnavailable, true),
+        RuntimeError::Spool(message) if message.contains("Io(") || message.contains("Enospc") => {
+            (Class::TransientIo, Code::TransportUnavailable, true)
+        }
+        RuntimeError::OwnershipLost | RuntimeError::UnexpectedCopyBothLoss => {
+            (Class::OwnershipLost, Code::TransportUnavailable, false)
+        }
+        RuntimeError::Spool(_) => (Class::Integrity, Code::ResourceLimit, false),
+        RuntimeError::Decode(_)
+        | RuntimeError::Protocol(_)
+        | RuntimeError::ReconciliationRequired => (Class::Integrity, Code::InvalidRecord, false),
+        RuntimeError::Feedback => (Class::TransientSource, Code::TransportUnavailable, true),
+        RuntimeError::RetryNotDue { .. } => (Class::TransientSource, Code::DeadlineExceeded, true),
+    }
+}
+
 struct TransportReceiveLane {
     admitted_bytes: usize,
+    _reservation: Vec<u8>,
 }
 impl TransportReceiveLane {
     fn admit(max_frame_bytes: usize) -> Result<Self, CaptureFailure> {
@@ -656,8 +718,13 @@ impl TransportReceiveLane {
                 "M2_RECEIVE_ADMISSION_INVALID",
             ));
         }
+        let mut reservation = Vec::new();
+        reservation
+            .try_reserve_exact(max_frame_bytes)
+            .map_err(|_| CaptureFailure::at("admission", "M2_RECEIVE_ADMISSION_DENIED"))?;
         Ok(Self {
             admitted_bytes: max_frame_bytes,
+            _reservation: reservation,
         })
     }
     fn validate(self, observed: usize) -> Result<(), CaptureFailure> {
@@ -744,14 +811,18 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
             }
         };
         admission.validate(frame.len())?;
-        if runtime.receive(&frame).is_err() {
+        if let Err(error) = runtime.receive(&frame) {
+            let (class, code, supervisor_retry) = classify_runtime_failure(&error);
             runtime
-                .persist_if_enabled(
-                    crate::failure_policy::FailureClass::Integrity,
-                    crate::failure_policy::StableErrorCode::InvalidRecord,
-                )
+                .persist_if_enabled(class, code)
                 .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
-            return Err(CaptureFailure::at("runtime", "M2_CAPTURE_FAILED"));
+            if supervisor_retry {
+                return Err(CaptureFailure::at("runtime", "M2_CAPTURE_FAILED"));
+            }
+            // Deterministic failures stay connected but fenced: subsequent frames are drained,
+            // requested keepalives reply only at the durable boundary, and an explicit re-arm API
+            // may restore decoding after external recovery proof.
+            continue;
         }
         for packet in runtime.take_feedback() {
             if !ownership_probe() {

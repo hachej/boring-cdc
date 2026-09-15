@@ -9,7 +9,7 @@ files=['src/main.rs','src/m2_capture_runtime.rs','src/article1_capture.rs','src/
 for n in files: b=(R/n).read_bytes();h.update(len(n).to_bytes(8,'big'));h.update(n.encode());h.update(len(b).to_bytes(8,'big'));h.update(b)
 impl=h.hexdigest(); git=os.popen(f'git -C {R} log -1 --format=%H -- ' + ' '.join(files)).read().strip(); cfg={'profile':'postgres-17.6-production-cmd-run','seed':seed,'credentials':'secret-file-indirect','destination':None}; fp=sha(canon(cfg))
 if mode=='e2e':
- src=pathlib.Path(os.environ['M2_RUNTIME_OUTPUT']); raw=src.read_bytes(); wr(out/'stdout.txt',raw);wr(out/'stderr.txt',b''); after={'postgres_version':os.environ['M2_POSTGRES_VERSION'],'durable_before_feedback':True,'journal_transactions':1,'journal_events':2,'requested_reply_safe':True}; product='real_postgresql_copyboth'
+ src=pathlib.Path(os.environ['M2_RUNTIME_OUTPUT']); raw=src.read_bytes(); wr(out/'stdout.txt',raw);wr(out/'stderr.txt',b''); observed=json.loads(pathlib.Path(os.environ['M2_RUNTIME_OBSERVATION']).read_text()); assert observed['command']=='CMD-RUN' and observed['exit']==0 and observed['durable_before_feedback'] and observed['journal_transactions']==1 and observed['journal_events']==2; after=observed; product='real_postgresql_copyboth_cmd_run'
 else:
  wr(out/'stdout.txt',b'M2_CAPTURE_RUNTIME_FAULTS_OK\n');wr(out/'stderr.txt',b'');after={'pre_commit_feedback':0,'post_commit_reconciled':True,'unexpected_loss_fenced':True,'in_process_reopens':0};product='sqlite_commit_faults_and_ownership_loss'
 wr(out/'config.json',canon(cfg));wr(out/'state/before.json',canon({'durable_transactions':0,'feedback_packets':0}));wr(out/'state/after.json',canon(after));wr(out/'fault-timeline.json',canon(['start',product,'cleanup']))

@@ -50,5 +50,5 @@ printf '{"command":"CMD-RUN","exit":0,"postgres":"%s","server_feedback_positions
 ' "$version" "$feedback" >"$work/runtime.out"
 export M2_RUNTIME_OUTPUT="$work/runtime.out" M2_POSTGRES_VERSION="$version"
 python3 scripts/lib/m2_capture_runtime_evidence.py e2e
-scripts/validate/evidence.sh artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-E2E/capture-runtime-component-v1/evidence.json
+scripts/validate/evidence.sh artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-E2E/capture-runtime-production-v1/evidence.json
 echo "M2_CAPTURE_RUNTIME_E2E_OK postgres=$version durable_before_feedback=true"
