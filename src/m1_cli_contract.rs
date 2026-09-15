@@ -247,7 +247,7 @@ pub static COMMANDS: &[CommandSpec] = &[
         "CMD-INIT",
         &["init"],
         "base",
-        "boring-cdc-m2-schema",
+        "boring-cdc-m2-init-recovery",
         Mutation,
         Maintenance,
         DryRunThenConfirm,

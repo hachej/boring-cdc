@@ -1,17 +1,19 @@
 use boring_cdc::article1_capture::{CaptureConfig, CaptureFailure, capture_jsonl};
 use boring_cdc::m1_cli_contract::{
-    CLI_SCHEMA_VERSION, CliEnvelope, ExitCode, command_help, error_envelope, parse, root_help,
-    unavailable,
+    CLI_SCHEMA_VERSION, CliEnvelope, ExitCode, NextCommand, command_help, error_envelope, parse,
+    root_help, unavailable,
 };
 use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
 use boring_cdc::m1_preflight::{
     CheckStatus, PreflightObservation, envelope, evaluate_untrusted, input_failure,
 };
 use boring_cdc::m2_capture_runtime::{acquire_production_ownership, run_loaded_config};
+use boring_cdc::m2_init_recovery::execute_confirmed;
 use boring_cdc::m2_journal::journal_inspect_event;
 use boring_cdc::m2_reconcile::{journal_report, recover_report};
 use pg_walstream::CancellationToken;
 use serde::Deserialize;
+use sha2::{Digest, Sha256};
 use std::io::{self, Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -363,6 +365,105 @@ fn read_only_journal_command(
         mutation_trace: None,
     })
 }
+fn init_command(
+    parsed: &boring_cdc::m1_cli_contract::ParsedCommand,
+) -> Result<CliEnvelope, ReaderFailure> {
+    let text = std::fs::read_to_string("boring-cdc.toml").map_err(|_| {
+        ReaderFailure::unavailable(
+            "M2_INIT_CONFIG_UNAVAILABLE",
+            "init configuration is unavailable",
+        )
+    })?;
+    let confirmed = parsed.argv.iter().any(|v| v == "--confirm");
+    let purpose = if confirmed {
+        LoadPurpose::PostgresAdmin
+    } else {
+        LoadPurpose::Status
+    };
+    let config = load_str_for(&text, &ProcessEnvironment, purpose)
+        .map_err(|e| ReaderFailure::unavailable(e.code, "init configuration is invalid"))?;
+    let plan_digest = format!(
+        "{:x}",
+        Sha256::digest(format!("m2-init/v1:{}", config.fingerprints().runtime).as_bytes())
+    );
+    let token = &plan_digest[..32];
+    if !confirmed {
+        return Ok(CliEnvelope {
+            schema_version: CLI_SCHEMA_VERSION,
+            command: parsed.spec.id.into(),
+            outcome: "dry_run".into(),
+            code: "M2_INIT_CONFIRMATION_REQUIRED".into(),
+            message: "init plan is ready for confirmation".into(),
+            request_id: Some(plan_digest.clone()),
+            run_id: None,
+            capture_epoch: None,
+            condition: None,
+            runbook_id: None,
+            data: serde_json::json!({"effects":["initialize_sqlite","prepare_source_publication_and_control_relations","persist_source_identity"],"creates_logical_slot":false,"confirm_token":token}),
+            warnings: vec![],
+            next_commands: vec![NextCommand {
+                command_id: "CMD-INIT".into(),
+                argv: vec![
+                    "init".into(),
+                    "--confirm".into(),
+                    "--confirm-token".into(),
+                    token.into(),
+                    "--json".into(),
+                ],
+            }],
+            plan_digest: Some(plan_digest),
+            postcondition_evidence_digest: None,
+            mutation_trace: None,
+        });
+    }
+    let supplied = parsed
+        .argv
+        .windows(2)
+        .find(|w| w[0] == "--confirm-token")
+        .map(|w| w[1].as_str());
+    if supplied != Some(token) {
+        return Err(ReaderFailure {
+            code: "M2_INIT_CONFIRMATION_INVALID",
+            message: "init confirmation is invalid or stale",
+            exit: ExitCode::SafetyBlocked,
+        });
+    }
+    let admin = config.administration_dsn().ok_or_else(|| {
+        ReaderFailure::unavailable(
+            "M2_INIT_ADMIN_UNAVAILABLE",
+            "administration credential is unavailable",
+        )
+    })?;
+    let run_id = format!("init-{}", &plan_digest[..16]);
+    let receipt = execute_confirmed(&config, admin, &run_id).map_err(|e| ReaderFailure {
+        code: e.code,
+        message: "init failed closed at a verified boundary",
+        exit: if e.boundary == "ownership" {
+            ExitCode::SafetyBlocked
+        } else {
+            ExitCode::Integrity
+        },
+    })?;
+    Ok(CliEnvelope {
+        schema_version: CLI_SCHEMA_VERSION,
+        command: parsed.spec.id.into(),
+        outcome: "success".into(),
+        code: "OK".into(),
+        message: "source and local state initialized".into(),
+        request_id: Some(plan_digest.clone()),
+        run_id: Some(run_id),
+        capture_epoch: None,
+        condition: None,
+        runbook_id: None,
+        data: serde_json::to_value(receipt).expect("init receipt"),
+        warnings: vec![],
+        next_commands: vec![],
+        plan_digest: Some(plan_digest),
+        postcondition_evidence_digest: None,
+        mutation_trace: None,
+    })
+}
+
 fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     match argv.as_slice() {
@@ -384,6 +485,34 @@ fn main() {
             let _ = write_stdout(command_help(parsed.spec).as_bytes());
         }
         Ok(parsed) => {
+            if parsed.spec.id == "CMD-INIT" {
+                match init_command(&parsed) {
+                    Ok(result) => {
+                        if parsed.json {
+                            let mut bytes = serde_json::to_vec(&result).expect("envelope");
+                            bytes.push(b'\n');
+                            if write_stdout(&bytes).is_err() {
+                                std::process::exit(0);
+                            }
+                        } else {
+                            let text = format!(
+                                "{}: {}\n{}\n",
+                                result.code,
+                                result.message,
+                                serde_json::to_string_pretty(&result.data).expect("init data")
+                            );
+                            if write_stdout(text.as_bytes()).is_err() {
+                                std::process::exit(0);
+                            }
+                        }
+                        return;
+                    }
+                    Err(error) => {
+                        eprintln!("{}: {}", error.code, error.message);
+                        std::process::exit(error.exit as i32);
+                    }
+                }
+            }
             if matches!(
                 parsed.spec.id,
                 "CMD-JOURNAL-INSPECT" | "CMD-JOURNAL-VERIFY" | "CMD-RECOVER-INSPECT"

@@ -1,0 +1,17 @@
+{
+  "schema_version": "m2-init-recovery-cases/v1",
+  "owner_bead": "boring-cdc-m2-init-recovery",
+  "evidence_tier": "component",
+  "postgres": "17.6",
+  "cases": [
+    {"id":"SCN-M2-INIT-CLEAN","test":"scripts/e2e/m2_init_recovery.sh","expected":"publication, two fixed control rows, SQLite identity readback, and no slot"},
+    {"id":"SCN-M2-INIT-IDEMPOTENT","test":"scripts/e2e/m2_init_recovery.sh","expected":"second confirmed pass preserves exactly-one rows and source identity"},
+    {"id":"SCN-M2-INIT-CARDINALITY","test":"M2_INIT_CONTROL_CARDINALITY_INVALID","expected":"zero, multiple, or wrong immutable key blocks"},
+    {"id":"SCN-M2-INIT-PRIVILEGE","test":"M2_INIT_CONTROL_PRIVILEGE_EXCESS","expected":"insert, delete, or immutable-key update grant blocks"},
+    {"id":"SCN-M2-INIT-PUBLICATION-DRIFT","test":"M2_INIT_PUBLICATION_DRIFT","expected":"owner, operation, or membership drift blocks"},
+    {"id":"SCN-M2-INIT-OWNERSHIP","test":"M2_INIT_OWNERSHIP_CONFLICT","expected":"ordinary run or competing maintenance ownership blocks"},
+    {"id":"SCN-M2-INIT-CONFIRMATION","test":"CMD-INIT dry-run and confirm","expected":"mutation requires matching plan-bound token; dry-run loads no administration secret"},
+    {"id":"SCN-M2-INIT-AMBIGUOUS","test":"M2_INIT_RECONCILIATION_REQUIRED","expected":"nonterminal or ambiguous maintenance state blocks before remote mutation"},
+    {"id":"SCN-M2-INIT-NO-SLOT","test":"scripts/faults/m2_init_recovery.sh","expected":"init contains no logical-slot create, export, or drop operation"}
+  ]
+}
