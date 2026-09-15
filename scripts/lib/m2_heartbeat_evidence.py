@@ -10,7 +10,7 @@ required=['targeted_tests','durable_before_feedback','control_writes_user_rows',
 assert all(k in obs for k in required) and obs['targeted_tests'] and obs['deterministic_attempts']==2 and obs['durable_before_feedback'] and not obs['control_writes_user_rows'] and obs['checkpoint_complete_only'] and not obs['feedback_from_unrelated_wal']
 if mode=='e2e': assert obs['affected_rows']==1 and obs['selected_keys']==1 and obs['runtime_rust_writer'] and obs['excess_privileges_denied'] and obs['published']
 else: assert obs['heartbeat_degraded'] and obs['retry_capped'] and obs['feedback_callbacks_before_commit']==0
-files=['src/m2_heartbeat.rs','src/m2_journal.rs','src/lib.rs','contracts/m2/heartbeat-cases.json','scripts/e2e/m2_heartbeat.sh','scripts/faults/m2_heartbeat.sh','scripts/lib/m2_heartbeat_evidence.py','scripts/validate/m2_heartbeat.py'];h=hashlib.sha256()
+files=['src/m2_heartbeat.rs','src/m2_capture_runtime.rs','src/m2_journal.rs','src/lib.rs','examples/m2_heartbeat_component.rs','contracts/m2/heartbeat-cases.json','scripts/e2e/m2_heartbeat.sh','scripts/faults/m2_heartbeat.sh','scripts/lib/m2_heartbeat_evidence.py','scripts/validate/m2_heartbeat.py'];h=hashlib.sha256()
 for n in files:
  b=subprocess.check_output(['git','show',f'HEAD:{n}'],cwd=R);h.update(len(n).to_bytes(8,'big'));h.update(n.encode());h.update(len(b).to_bytes(8,'big'));h.update(b)
 impl=h.hexdigest();git=subprocess.check_output(['git','rev-parse','HEAD'],cwd=R,text=True).strip();cfg={'profile':'postgres-17.6-component' if mode=='e2e' else 'deterministic-fault-fixture','seed':seed,'cadence_ms':1000,'initial_retry_ms':100,'max_retry_ms':400};fp=sha(canon(cfg))
