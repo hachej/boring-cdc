@@ -1,0 +1,1 @@
+TMPDIR=/var/tmp cargo test --locked m2_leases::tests

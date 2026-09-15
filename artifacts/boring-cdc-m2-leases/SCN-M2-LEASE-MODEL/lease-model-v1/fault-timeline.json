@@ -1,0 +1,1 @@
+{"hooks":["pause_or_detach_before_dispatch","reseed_before_dispatch","fence_during_candidate_write","expiry_during_candidate_write","expiry_during_local_completion","ownership_loss"],"outcome":"all_stale_work_fenced"}
