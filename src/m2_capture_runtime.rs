@@ -103,6 +103,9 @@ pub trait DurableJournal {
     ) -> Result<(), JournalError> {
         Ok(())
     }
+    fn active_capture_failure_id(&self) -> Result<Option<String>, JournalError> {
+        Ok(None)
+    }
 }
 impl DurableJournal for JournalStore {
     fn commit(&mut self, commit: &SourceCommit) -> Result<DurableCommit, JournalError> {
@@ -136,6 +139,9 @@ impl DurableJournal for JournalWriterService {
     ) -> Result<(), JournalError> {
         JournalWriterService::persist_failure(self, operation)
     }
+    fn active_capture_failure_id(&self) -> Result<Option<String>, JournalError> {
+        JournalWriterService::active_capture_failure_id(self)
+    }
 }
 
 impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G> {
@@ -143,6 +149,16 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
     /// generation is returned to the supervisor. The persisted deadline is therefore authoritative
     /// after process restart.
     pub fn enable_failure_policy(&mut self, capture_epoch: String, config_fingerprint: String) {
+        let boundary = crate::failure_policy::FailedBoundary::Capture {
+            capture_epoch: capture_epoch.clone(),
+            end_lsn: format!("{:016X}", self.durable_end_lsn.unwrap_or(0)),
+        };
+        self.active_failure = self
+            .journal
+            .active_capture_failure_id()
+            .ok()
+            .flatten()
+            .and_then(|id| self.journal.load_failure(&id, boundary).ok().flatten());
         self.failure_policy_identity = Some((capture_epoch, config_fingerprint));
     }
     fn persist_if_enabled(
@@ -162,18 +178,20 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         code: crate::failure_policy::StableErrorCode,
     ) -> Result<(), RuntimeError> {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let (capture_epoch, config_fingerprint) = self
-            .failure_policy_identity
-            .clone()
-            .ok_or_else(|| RuntimeError::Journal("failure policy identity unavailable".into()))?;
+        let (capture_epoch, config_fingerprint) =
+            self.failure_policy_identity.clone().ok_or_else(|| {
+                RuntimeError::JournalTransient("failure policy identity unavailable".into())
+            })?;
         let now_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map_err(|_| RuntimeError::Journal("failure policy clock invalid".into()))?
+            .map_err(|_| RuntimeError::JournalTransient("failure policy clock invalid".into()))?
             .as_millis() as u64;
         let mut random_bytes = [0_u8; 8];
         std::fs::File::open("/dev/urandom")
             .and_then(|mut source| std::io::Read::read_exact(&mut source, &mut random_bytes))
-            .map_err(|_| RuntimeError::Journal("failure policy randomness unavailable".into()))?;
+            .map_err(|_| {
+                RuntimeError::JournalTransient("failure policy randomness unavailable".into())
+            })?;
         let random_sample = u64::from_be_bytes(random_bytes);
         use crate::failure_policy::{
             Component, FailedBoundary, FailureObservation, FingerprintInput, PolicyAction,
@@ -216,14 +234,14 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             &mut context,
         );
         let PolicyAction::Persist(candidate_record) = candidate else {
-            return Err(RuntimeError::Journal(
+            return Err(RuntimeError::JournalTransient(
                 "failure policy did not persist".into(),
             ));
         };
         let current = self
             .journal
             .load_failure(&candidate_record.failure_id, boundary)
-            .map_err(|e| RuntimeError::Journal(e.to_string()))?;
+            .map_err(|e| RuntimeError::JournalTransient(e.to_string()))?;
         let action = crate::failure_policy::transition(
             current.as_ref(),
             PolicyEvent::Observe(observation),
@@ -233,10 +251,56 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             action,
             current.as_ref().map(|record| record.failure_id.clone()),
         )
-        .ok_or_else(|| RuntimeError::Journal("failure policy suppressed persistence".into()))?;
+        .ok_or_else(|| {
+            RuntimeError::JournalTransient("failure policy suppressed persistence".into())
+        })?;
+        let persisted = match &operation {
+            PreparedFailureOperation::StoreAndArm { record, .. }
+            | PreparedFailureOperation::Rearm { record, .. } => Some(record.clone()),
+            PreparedFailureOperation::Clear { .. } => None,
+        };
         self.journal
             .persist_failure(operation)
-            .map_err(|e| RuntimeError::Journal(e.to_string()))
+            .map_err(|e| RuntimeError::JournalTransient(e.to_string()))?;
+        self.active_failure = persisted;
+        Ok(())
+    }
+    fn clear_completed_failure(&mut self) -> Result<(), RuntimeError> {
+        use crate::failure_policy::{CompletionToken, PolicyEvent, PreparedFailureOperation};
+        use crate::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
+        let Some(record) = self.active_failure.clone() else {
+            return Ok(());
+        };
+        struct Zero;
+        impl Randomness for Zero {
+            fn next_u64(&mut self) -> u64 {
+                0
+            }
+        }
+        let clock = VirtualClock::new(record.last_failed_at_ms.saturating_add(1));
+        let mut random = Zero;
+        let mut context = TransitionContext {
+            clock: &clock,
+            randomness: &mut random,
+        };
+        let action = crate::failure_policy::transition(
+            Some(&record),
+            PolicyEvent::Completed(CompletionToken {
+                failure_id: record.failure_id.clone(),
+                fingerprint: record.fingerprint.clone(),
+                capture_epoch: record.boundary.capture_epoch().to_owned(),
+                generation: record.boundary.generation(),
+                attempt: record.attempt,
+            }),
+            &mut context,
+        );
+        let operation = PreparedFailureOperation::from_policy_action(action, None)
+            .ok_or(RuntimeError::Protocol("capture_failure_clear_rejected"))?;
+        self.journal
+            .persist_failure(operation)
+            .map_err(|e| RuntimeError::JournalTransient(e.to_string()))?;
+        self.active_failure = None;
+        Ok(())
     }
     pub fn rearm_capture_failure(
         &mut self,
@@ -270,7 +334,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             .ok_or(RuntimeError::Protocol("capture_rearm_missing_operation"))?;
         self.journal
             .persist_failure(operation)
-            .map_err(|error| RuntimeError::Journal(error.to_string()))?;
+            .map_err(|error| RuntimeError::JournalTransient(error.to_string()))?;
         self.state = RuntimeState::Capturing;
         Ok(())
     }
@@ -289,7 +353,8 @@ pub enum RuntimeState {
 pub enum RuntimeError {
     Decode(&'static str),
     Spool(String),
-    Journal(String),
+    JournalTransient(String),
+    JournalIntegrity(String),
     Protocol(&'static str),
     Feedback,
     UnexpectedCopyBothLoss,
@@ -322,6 +387,7 @@ pub struct CaptureRuntime<J, S, G> {
     feedback: Vec<FeedbackPacket>,
     committed_transactions: u64,
     failure_policy_identity: Option<(String, String)>,
+    active_failure: Option<crate::failure_policy::FailureRecord>,
 }
 
 impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G> {
@@ -344,6 +410,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             feedback: Vec::new(),
             committed_transactions: 0,
             failure_policy_identity: None,
+            active_failure: None,
         }
     }
     pub fn state(&self) -> RuntimeState {
@@ -524,7 +591,12 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         };
         let durable = self.journal.commit(&commit).map_err(|error| {
             self.state = RuntimeState::CaptureSafeStopped;
-            RuntimeError::Journal(error.to_string())
+            match error {
+                JournalError::Sqlite(_) | JournalError::BusyBoundExceeded => {
+                    RuntimeError::JournalTransient(error.to_string())
+                }
+                _ => RuntimeError::JournalIntegrity(error.to_string()),
+            }
         })?;
         let durable_lsn = parse_lsn(durable.feedback_eligible_end_lsn())?;
         if durable_lsn != end_lsn || commit_lsn > end_lsn {
@@ -539,6 +611,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             self.durable_end_lsn
                 .map_or(durable_lsn, |old| old.max(durable_lsn)),
         );
+        self.clear_completed_failure()?;
         self.queue_feedback(false);
         Ok(())
     }
@@ -678,8 +751,15 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
     runtime: &mut CaptureRuntime<J, S, G>,
     stop_after_commits: u64,
 ) -> Result<(), CaptureFailure> {
-    capture_copyboth_until_with_probe(config, cancellation, runtime, stop_after_commits, || true)
-        .await
+    capture_copyboth_until_with_probe(
+        config,
+        cancellation,
+        runtime,
+        stop_after_commits,
+        std::time::Duration::from_millis(250),
+        || true,
+    )
+    .await
 }
 fn classify_runtime_failure(
     error: &RuntimeError,
@@ -690,7 +770,8 @@ fn classify_runtime_failure(
 ) {
     use crate::failure_policy::{FailureClass as Class, StableErrorCode as Code};
     match error {
-        RuntimeError::Journal(_) => (Class::TransientIo, Code::TransportUnavailable, true),
+        RuntimeError::JournalTransient(_) => (Class::TransientIo, Code::TransportUnavailable, true),
+        RuntimeError::JournalIntegrity(_) => (Class::Integrity, Code::InvalidRecord, false),
         RuntimeError::Spool(message) if message.contains("Io(") || message.contains("Enospc") => {
             (Class::TransientIo, Code::TransportUnavailable, true)
         }
@@ -740,6 +821,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     cancellation: &CancellationToken,
     runtime: &mut CaptureRuntime<J, S, G>,
     stop_after_commits: u64,
+    control_cadence: std::time::Duration,
     mut ownership_probe: impl FnMut() -> bool,
 ) -> Result<(), CaptureFailure> {
     let (mut connection, contracts) = setup_runtime(config)?;
@@ -766,8 +848,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         let admission = TransportReceiveLane::admit(WireLimits::default().max_copy_data_bytes)?;
         let read_cancellation = cancellation.child_token();
         let mut read = Box::pin(connection.get_copy_data_async(&read_cancellation));
-        // M0-PROVISIONAL: boring-cdc-m2-capture-runtime.1 (control-lane probe cadence).
-        let control_tick = tokio::time::sleep(std::time::Duration::from_millis(250));
+        let control_tick = tokio::time::sleep(control_cadence);
         tokio::pin!(control_tick);
         let received = tokio::select! {
             result = &mut read => Some(result),
@@ -984,6 +1065,65 @@ pub fn acquire_production_ownership(
     Ok(guard)
 }
 
+struct ProductionControlLane {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ownership_lost: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    worker: Option<std::thread::JoinHandle<()>>,
+}
+impl ProductionControlLane {
+    fn start(
+        dsn: String,
+        backend_pid: i32,
+        cadence: std::time::Duration,
+    ) -> Result<Self, CaptureFailure> {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        if cadence.is_zero() {
+            return Err(CaptureFailure::at(
+                "control_lane",
+                "M2_CONTROL_CADENCE_INVALID",
+            ));
+        }
+        let stop = Arc::new(AtomicBool::new(false));
+        let ownership_lost = Arc::new(AtomicBool::new(false));
+        let worker_stop = stop.clone();
+        let worker_lost = ownership_lost.clone();
+        let worker = std::thread::Builder::new().name("capture-control-lane".into()).spawn(move || {
+            let mut connection = match PgReplicationConnection::connect(&dsn) {
+                Ok(connection) => connection,
+                Err(_) => { worker_lost.store(true, Ordering::Release); return; }
+            };
+            while !worker_stop.load(Ordering::Acquire) {
+                let healthy = connection.exec(&format!(
+                    "SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND pid={backend_pid} AND granted)::int"
+                )).ok().and_then(|r| r.get_value(0, 0)).is_some_and(|v| v == "1");
+                if !healthy { worker_lost.store(true, Ordering::Release); return; }
+                std::thread::sleep(cadence);
+            }
+        }).map_err(|_| CaptureFailure::at("control_lane", "M2_CONTROL_LANE_START_FAILED"))?;
+        Ok(Self {
+            stop,
+            ownership_lost,
+            worker: Some(worker),
+        })
+    }
+    fn ownership_live(&self) -> bool {
+        !self
+            .ownership_lost
+            .load(std::sync::atomic::Ordering::Acquire)
+    }
+}
+impl Drop for ProductionControlLane {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::Release);
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
+    }
+}
+
 /// Builds the bounded durable runtime from the canonical loaded configuration. The caller owns
 /// process supervision and the source advisory-lock guard for the full future lifetime.
 pub async fn run_loaded_config(
@@ -1174,17 +1314,24 @@ pub async fn run_loaded_config(
         config.fingerprints().runtime.clone(),
         config.fingerprints().runtime.clone(),
     );
+    let control_lane = ProductionControlLane::start(
+        dsn.clone(),
+        ownership.backend_pid(),
+        Duration::from_millis(public.source.lock_probe_interval_ms.0),
+    )?;
     let result = capture_copyboth_until_with_probe(
         &CaptureConfig::article1(dsn, 1)?,
         cancellation,
         &mut runtime,
         u64::MAX,
+        Duration::from_millis(public.source.lock_probe_interval_ms.0),
         || {
-            ownership
-                .probe(std::time::Duration::from_millis(
-                    public.source.ownership_deadline_ms.0,
-                ))
-                .is_ok()
+            control_lane.ownership_live()
+                && ownership
+                    .probe(std::time::Duration::from_millis(
+                        public.source.ownership_deadline_ms.0,
+                    ))
+                    .is_ok()
         },
     )
     .await;
@@ -1484,6 +1631,16 @@ pub mod tests {
                 .unwrap()
                 .is_some()
         );
+        runtime.clear_completed_failure().unwrap();
+        let armed: i64 = rusqlite::Connection::open(&p)
+            .unwrap()
+            .query_row(
+                "SELECT armed FROM processing_failures WHERE component='capture'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(armed, 0);
         drop(runtime);
         let _ = std::fs::remove_file(p);
     }

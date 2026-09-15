@@ -1018,6 +1018,18 @@ impl JournalWriterService {
             })
             .transpose()
     }
+    pub fn active_capture_failure_id(&self) -> Result<Option<String>, JournalError> {
+        let mut statement = self.store.writer.connection().prepare(
+            "SELECT failure_id FROM processing_failures WHERE component='capture' AND armed=1",
+        )?;
+        let ids = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        if ids.len() > 1 {
+            return Err(JournalError::Conflict("multiple armed capture failures"));
+        }
+        Ok(ids.into_iter().next())
+    }
     pub fn load_failure(
         &self,
         failure_id: &str,

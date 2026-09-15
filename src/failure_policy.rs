@@ -258,7 +258,7 @@ impl FailedBoundary {
         }
     }
 
-    fn capture_epoch(&self) -> &str {
+    pub(crate) fn capture_epoch(&self) -> &str {
         match self {
             Self::Capture { capture_epoch, .. }
             | Self::Destination { capture_epoch, .. }
@@ -266,7 +266,7 @@ impl FailedBoundary {
         }
     }
 
-    fn generation(&self) -> Option<u64> {
+    pub(crate) fn generation(&self) -> Option<u64> {
         match self {
             Self::Destination { generation, .. } | Self::Control { generation, .. } => {
                 Some(*generation)
