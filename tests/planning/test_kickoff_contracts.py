@@ -221,17 +221,18 @@ class KickoffContracts(unittest.TestCase):
         rows = [line for line in self.series.splitlines()
                 if line.startswith("| 1. How Postgres CDC Works |")]
         self.assertEqual(len(rows), 1)
-        article_one = rows[0]
-        for evidence in ["PR #3", "../evidence/article1/README.md", "raw `pgoutput` events",
-                         "same-stream", "non-durable", "`article1_row_view`", "TEACHING VIEW"]:
-            self.assertIn(evidence, article_one)
-        self.assertIn(
-            "ClickHouse, durability, checkpoints and exactly-once are deferred to Article 4/M4",
-            article_one,
+        self.assertEqual(
+            rows[0],
+            "| 1. How Postgres CDC Works | `boring-cdc-m1-raw-demo`: protocol, "
+            "workload, decode and fail-closed fixtures | Shipped PR #3 evidence: "
+            "[real raw `pgoutput` events](../evidence/article1/README.md) plus the "
+            "same-stream, process-local, non-durable `article1_row_view` **TEACHING VIEW** "
+            "showing insert/current row, update/overwrite and delete/removal; explain the tested "
+            "topology, keys, source-risk, replica-identity and oracle limits. This is not "
+            "destination evidence: ClickHouse, durability, checkpoints and exactly-once are "
+            "deferred to Article 4/M4 | Relevant M7 external decode/observation evidence where "
+            "available; otherwise clearly label unavailable visibility. Debezium explanation only |",
         )
-        self.assertNotIn("boring-cdc-m4-bench", article_one)
-        self.assertNotIn("boring-cdc-m4-toast", article_one)
-        self.assertNotIn("canonical destination row", article_one)
 
     def test_document_bead_links_resolve(self):
         for name in ["docs/PLAN.md", "docs/AGENT_SYSTEM.md", "docs/SERIES_EXECUTION.md"]:
