@@ -1049,7 +1049,7 @@ fn safe_path(value: &str, field: &'static str) -> Result<(), ConfigError> {
     Ok(())
 }
 
-fn filesystem_budget_for_path(
+pub(crate) fn filesystem_budget_for_path(
     budgets: &[FilesystemBudget],
     path: &Path,
 ) -> Result<usize, ConfigError> {

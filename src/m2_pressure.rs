@@ -32,12 +32,15 @@ pub struct FilesystemBudget {
     pub filesystem_id: u64,
     pub total_bytes: u64,
     pub reserved_free_bytes: u64,
+    /// True when this budget contains the journal, SQLite temp, or capture spool.
+    pub capture_critical: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PhysicalFilesystemThresholds {
     pub filesystem_id: u64,
     pub thresholds: PressureThresholds,
+    pub capture_critical: bool,
 }
 
 /// Convert configured used-capacity percentages into free-byte thresholds after grouping every
@@ -55,7 +58,7 @@ pub fn derive_physical_filesystem_thresholds(
             "invalid filesystem budgets or pressure percentages",
         ));
     }
-    let mut grouped = BTreeMap::<u64, (u64, u64)>::new();
+    let mut grouped = BTreeMap::<u64, (u64, u64, bool)>::new();
     for budget in budgets {
         if budget.total_bytes == 0
             || budget.reserved_free_bytes == 0
@@ -72,10 +75,11 @@ pub fn derive_physical_filesystem_thresholds(
             .1
             .checked_add(budget.reserved_free_bytes)
             .ok_or(PressureError::Invalid("filesystem reserve overflow"))?;
+        entry.2 |= budget.capture_critical;
     }
     grouped
         .into_iter()
-        .map(|(filesystem_id, (total, reserve))| {
+        .map(|(filesystem_id, (total, reserve, capture_critical))| {
             let usable = total
                 .checked_sub(reserve)
                 .ok_or(PressureError::Invalid("filesystem reserve exceeds budget"))?;
@@ -101,6 +105,7 @@ pub fn derive_physical_filesystem_thresholds(
             Ok(PhysicalFilesystemThresholds {
                 filesystem_id,
                 thresholds,
+                capture_critical,
             })
         })
         .collect()
@@ -717,16 +722,19 @@ pub(crate) mod tests {
                 filesystem_id: 7,
                 total_bytes: 1_000,
                 reserved_free_bytes: 100,
+                capture_critical: true,
             },
             FilesystemBudget {
                 filesystem_id: 7,
                 total_bytes: 2_000,
                 reserved_free_bytes: 200,
+                capture_critical: false,
             },
             FilesystemBudget {
                 filesystem_id: 9,
                 total_bytes: 2_000,
                 reserved_free_bytes: 200,
+                capture_critical: false,
             },
         ];
         let grouped = derive_physical_filesystem_thresholds(&budgets, [60, 75, 90, 100]).unwrap();
@@ -742,10 +750,12 @@ pub(crate) mod tests {
                     hard: 300,
                     reserve: 300,
                 },
+                capture_critical: true,
             }
         );
         let separate = grouped[1].thresholds;
         assert_eq!((separate.warning, separate.hard), (920, 200));
+        assert!(!grouped[1].capture_critical);
         let (index, worst) = decide_pressure_filesystems(&[
             (grouped[0].thresholds.warning + 1, grouped[0].thresholds),
             (separate.hard, separate),

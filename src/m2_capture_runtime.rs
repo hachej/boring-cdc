@@ -397,6 +397,7 @@ struct ActiveTransaction {
 struct RuntimePressureFilesystem {
     observation_path: std::path::PathBuf,
     thresholds: crate::m2_pressure::PressureThresholds,
+    capture_critical: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -467,25 +468,23 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         replay_window_ms: u64,
     ) {
         self.enable_pressure_filesystems(
-            vec![(journal_path, thresholds)],
+            vec![RuntimePressureFilesystem {
+                observation_path: journal_path,
+                thresholds,
+                capture_critical: true,
+            }],
             capture_epoch,
             replay_window_ms,
         );
     }
     fn enable_pressure_filesystems(
         &mut self,
-        filesystems: Vec<(std::path::PathBuf, crate::m2_pressure::PressureThresholds)>,
+        filesystems: Vec<RuntimePressureFilesystem>,
         capture_epoch: String,
         replay_window_ms: u64,
     ) {
         self.pressure = Some(RuntimePressureConfig {
-            filesystems: filesystems
-                .into_iter()
-                .map(|(observation_path, thresholds)| RuntimePressureFilesystem {
-                    observation_path,
-                    thresholds,
-                })
-                .collect(),
+            filesystems,
             capture_epoch,
             replay_window_ms,
         });
@@ -532,7 +531,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             .map_err(|e| RuntimeError::JournalTransient(e.to_string()))?;
         let result = result
             .ok_or_else(|| RuntimeError::JournalTransient("pressure service unavailable".into()))?;
-        if result.decision.actions.safe_stop_capture {
+        if pressure_stops_capture(&result.decision, &config.filesystems[worst_index]) {
             self.state = RuntimeState::CaptureSafeStopped;
         }
         Ok(())
@@ -902,13 +901,39 @@ fn classify_runtime_failure(
     }
 }
 
+fn pressure_stops_capture(
+    decision: &crate::m2_pressure::PressureDecision,
+    filesystem: &RuntimePressureFilesystem,
+) -> bool {
+    decision.actions.safe_stop_capture && filesystem.capture_critical
+}
+
 fn configured_pressure_filesystems(
     config: &crate::m1_config::PublicConfig,
-) -> Result<Vec<(std::path::PathBuf, crate::m2_pressure::PressureThresholds)>, CaptureFailure> {
+) -> Result<Vec<RuntimePressureFilesystem>, CaptureFailure> {
     use std::os::unix::fs::MetadataExt;
+    let sqlite_path = std::path::Path::new(&config.storage.sqlite_path);
+    let sqlite_root = sqlite_path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| std::path::Path::new("."));
+    let capture_budget_indexes = [
+        crate::m1_config::filesystem_budget_for_path(&config.budgets, sqlite_root),
+        crate::m1_config::filesystem_budget_for_path(
+            &config.budgets,
+            std::path::Path::new(&config.storage.sqlite_temp_path),
+        ),
+        crate::m1_config::filesystem_budget_for_path(
+            &config.budgets,
+            std::path::Path::new(&config.storage.spool_path),
+        ),
+    ]
+    .into_iter()
+    .collect::<Result<std::collections::BTreeSet<_>, _>>()
+    .map_err(|_| CaptureFailure::at("configuration", "M2_PRESSURE_BUDGET_PATH_UNCOVERED"))?;
     let mut paths = BTreeMap::new();
     let mut budgets = Vec::with_capacity(config.budgets.len());
-    for budget in &config.budgets {
+    for (index, budget) in config.budgets.iter().enumerate() {
         let path = std::path::PathBuf::from(&budget.root);
         let device = std::fs::metadata(&path)
             .map_err(|_| CaptureFailure::at("storage", "M2_PRESSURE_BUDGET_PATH_UNAVAILABLE"))?
@@ -918,6 +943,7 @@ fn configured_pressure_filesystems(
             filesystem_id: device,
             total_bytes: budget.total_bytes.0,
             reserved_free_bytes: budget.reserved_free_bytes.0,
+            capture_critical: capture_budget_indexes.contains(&index),
         });
     }
     let derived = crate::m2_pressure::derive_physical_filesystem_thresholds(
@@ -933,10 +959,14 @@ fn configured_pressure_filesystems(
     derived
         .into_iter()
         .map(|profile| {
-            let path = paths
+            let observation_path = paths
                 .remove(&profile.filesystem_id)
                 .ok_or_else(|| CaptureFailure::at("configuration", "M2_PRESSURE_DEVICE_MISSING"))?;
-            Ok((path, profile.thresholds))
+            Ok(RuntimePressureFilesystem {
+                observation_path,
+                thresholds: profile.thresholds,
+                capture_critical: profile.capture_critical,
+            })
         })
         .collect()
 }
@@ -1933,6 +1963,31 @@ pub mod tests {
         drop(runtime);
         let _ = std::fs::remove_file(p);
     }
+    #[test]
+    fn archive_only_hard_pressure_does_not_safe_stop_capture() {
+        let thresholds = crate::m2_pressure::PressureThresholds {
+            warning: 100,
+            action: 80,
+            critical: 60,
+            hard: 40,
+            reserve: 40,
+        };
+        let hard = crate::m2_pressure::decide_pressure(40, thresholds).unwrap();
+        let archive = RuntimePressureFilesystem {
+            observation_path: PathBuf::from("archive"),
+            thresholds,
+            capture_critical: false,
+        };
+        let shared_state_archive = RuntimePressureFilesystem {
+            observation_path: PathBuf::from("state"),
+            thresholds,
+            capture_critical: true,
+        };
+        assert!(!pressure_stops_capture(&hard, &archive));
+        assert!(hard.actions.stop_new_archive_backfill);
+        assert!(pressure_stops_capture(&hard, &shared_state_archive));
+    }
+
     #[test]
     fn receive_lane_is_admitted_before_frame_validation() {
         assert!(TransportReceiveLane::admit(0).is_err());
