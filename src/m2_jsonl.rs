@@ -189,7 +189,7 @@ impl RootDir {
         }
         Ok(())
     }
-    fn cleanup_temp(&self, name: &str) -> Result<(), ArchiveError> {
+    fn cleanup_temp(&self, name: &str, expected_inode: u64) -> Result<(), ArchiveError> {
         let n = std::ffi::CString::new(name).unwrap();
         let fd = unsafe {
             libc::openat(
@@ -204,6 +204,7 @@ impl RootDir {
         let dir = unsafe { File::from_raw_fd(fd) };
         let m = dir.metadata()?;
         if !m.is_dir()
+            || m.ino() != expected_inode
             || m.uid() != unsafe { libc::geteuid() }
             || m.permissions().mode() & 0o777 != DIR_MODE
         {
@@ -302,6 +303,13 @@ fn staged_bytes(
     {
         return Err(ArchiveError::Invalid("range differs from immutable intent"));
     }
+    if rows
+        .windows(2)
+        .any(|w| w[1].journal_seq != w[0].journal_seq + 1)
+        || rows.len() as u64 != intent.end_seq - intent.start_seq + 1
+    {
+        return Err(ArchiveError::Blocked("non-contiguous intent range"));
+    }
     let mut part = Vec::new();
     let mut schema_fingerprints = std::collections::BTreeSet::new();
     let mut source_identifier_mappings = std::collections::BTreeMap::new();
@@ -371,13 +379,14 @@ pub fn commit_jsonl_segment(
         let tx = writer
             .connection_mut()
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let generation_row:Option<(String,String,i64,String)>=tx.query_row("SELECT destination_id,capture_epoch,generation,state FROM archive_generations WHERE generation_id=?1",[&intent.generation_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional()?;
+        let generation_row:Option<(String,String,i64,String,Option<String>)>=tx.query_row("SELECT destination_id,capture_epoch,generation,state,anchor_id FROM archive_generations WHERE generation_id=?1",[&intent.generation_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).optional()?;
         if generation_row
             != Some((
                 intent.destination_id.clone(),
                 intent.capture_epoch.clone(),
                 intent.generation as i64,
                 "candidate".into(),
+                intent.anchor_id.clone(),
             ))
         {
             return Err(ArchiveError::Blocked("candidate generation mismatch"));
@@ -399,8 +408,9 @@ pub fn commit_jsonl_segment(
     fail(ArchiveFault::AfterIntent, fault)?;
     let (temp_name, final_name) = names(intent);
     let mut adopted = false;
-    if root_dir.child(&temp_name)?.is_some() {
-        root_dir.cleanup_temp(&temp_name)?;
+    if let Some(existing_temp) = root_dir.child(&temp_name)? {
+        let inode = existing_temp.file.metadata()?.ino();
+        root_dir.cleanup_temp(&temp_name, inode)?;
     }
     let final_handle = if let Some(dir) = root_dir.child(&final_name)? {
         validate_final(&dir, intent, &manifest_hash, &part, &manifest)?;
@@ -538,6 +548,62 @@ fn validate_final(
     }
     dir.sync()?;
     Ok(())
+}
+
+/// Production-facing commit wrapper: every archive error is projected through the sole shared
+/// FailurePolicy and persisted by the supplied capture-priority writer before return.
+pub fn commit_jsonl_segment_with_policy(
+    writer: &mut WriterConnection,
+    root: &Path,
+    intent: &SegmentIntent,
+    range: &CopiedRange,
+    fault: ArchiveFault,
+    context: &mut crate::m1_transition_kernel::TransitionContext<'_>,
+) -> Result<PublishedSegment, ArchiveError> {
+    match commit_jsonl_segment(writer, root, intent, range, fault) {
+        Ok(v) => Ok(v),
+        Err(error) => {
+            use crate::failure_policy::{FailedBoundary, PreparedFailureOperation, load_failure};
+            let current_id: Option<String> = writer.connection().query_row(
+                "SELECT current_failure_id FROM destinations WHERE destination_id=?1",
+                [&intent.destination_id],
+                |r| r.get(0),
+            )?;
+            let boundary = FailedBoundary::Destination {
+                capture_epoch: intent.capture_epoch.clone(),
+                generation: intent.generation,
+                first_seq: intent.start_seq,
+                last_seq: intent.end_seq,
+            };
+            let current = match &current_id {
+                Some(id) => load_failure(writer.connection(), id, boundary)?,
+                None => None,
+            };
+            let outcome = match error {
+                ArchiveError::Io(_) | ArchiveError::Sqlite(_) | ArchiveError::Fault(_) => {
+                    DestinationOutcome::RetryEligible
+                }
+                _ => DestinationOutcome::IntegrityRecoveryRequired,
+            };
+            let action = ArchiveFailureAdapter::prepare_failure(
+                current.as_ref(),
+                outcome,
+                &intent.destination_id,
+                &intent.capture_epoch,
+                intent.generation,
+                intent.start_seq,
+                intent.end_seq,
+                &intent.writer_configuration_hash,
+                context,
+            );
+            if let Some(op) = PreparedFailureOperation::from_policy_action(action, current_id) {
+                let tx = writer.connection_mut().transaction()?;
+                op.execute(&tx)?;
+                tx.commit()?;
+            }
+            Err(error)
+        }
+    }
 }
 
 /// Reconstructs the immutable logical range pin after restart. Physical journal readers are
@@ -789,6 +855,21 @@ mod tests {
         }
     }
     #[test]
+    fn incomplete_caller_range_never_publishes_or_checkpoints() {
+        let (b, r, mut w, i, mut x) = setup("gap");
+        x.events.remove(0);
+        x.first_seq = 1;
+        assert!(commit_jsonl_segment(&mut w, &r, &i, &x, ArchiveFault::None).is_err());
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT count(*) FROM destination_checkpoints", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        fs::remove_dir_all(b).unwrap()
+    }
+    #[test]
     fn candidate_is_not_live_and_mismatch_blocks() {
         let (b, r, mut w, i, x) = setup("candidate");
         let out = commit_jsonl_segment(&mut w, &r, &i, &x, ArchiveFault::BeforeMarker);
@@ -879,7 +960,56 @@ mod tests {
                 .unwrap();
         assert_eq!(corpus["owner_bead"], "boring-cdc-m2.1");
         assert!(corpus["cases"].as_array().unwrap().len() >= 14);
-        let (b, _r, mut w, _i, _x) = setup("policy-persist");
+        let (b, r, mut w, i, x) = setup("policy-persist");
+        let clock = VirtualClock::new(1000);
+        let mut rng = SplitMix64::new(7);
+        let mut cx = TransitionContext {
+            clock: &clock,
+            randomness: &mut rng,
+        };
+        assert!(
+            commit_jsonl_segment_with_policy(
+                &mut w,
+                &r,
+                &i,
+                &x,
+                ArchiveFault::BeforeCheckpoint,
+                &mut cx
+            )
+            .is_err()
+        );
+        assert_eq!(w.connection().query_row("SELECT journal_seq FROM destination_checkpoints WHERE destination_id='archive'",[],|r|r.get::<_,i64>(0)).optional().unwrap(),None);
+        let persisted_id: String = w
+            .connection()
+            .query_row("SELECT current_failure_id FROM destinations", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        let persisted_attempt: i64 = w
+            .connection()
+            .query_row(
+                "SELECT attempt FROM processing_failures WHERE failure_id=?1",
+                [persisted_id],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(persisted_attempt, 1);
+        // Separate unaffected destination state remains independent.
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('other','archive',?1,'epoch',1)",["a".repeat(64)]).unwrap();
+        assert!(
+            w.connection()
+                .query_row(
+                    "SELECT current_failure_id FROM destinations WHERE destination_id='other'",
+                    [],
+                    |r| r.get::<_, Option<String>>(0)
+                )
+                .unwrap()
+                .is_none()
+        );
+        fs::remove_dir_all(&r).unwrap();
+        fs::create_dir(&r).unwrap();
+        fs::set_permissions(&r, fs::Permissions::from_mode(0o700)).unwrap();
+        let (b2, _r, mut w, _i, _x) = setup("policy-core");
         let clock = VirtualClock::new(1000);
         let mut rng = SplitMix64::new(7);
         let mut cx = TransitionContext {
@@ -929,7 +1059,7 @@ mod tests {
         assert_eq!(suppressed, PolicyAction::Suppressed);
         assert!(w.connection().query_row("SELECT journal_seq FROM destination_checkpoints WHERE destination_id='archive'",[],|r|r.get::<_,i64>(0)).optional().unwrap().is_none());
         drop(w);
-        let reopened = open_writer(&b.join("state.sqlite"), "run-reopen", 3, 3).unwrap();
+        let reopened = open_writer(&b2.join("state.sqlite"), "run-reopen", 3, 3).unwrap();
         assert_eq!(
             reopened
                 .connection()
@@ -939,5 +1069,6 @@ mod tests {
             1
         );
         fs::remove_dir_all(b).unwrap();
+        fs::remove_dir_all(b2).unwrap();
     }
 }
