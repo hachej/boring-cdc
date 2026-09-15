@@ -770,10 +770,18 @@ FROM source_transactions WHERE state='committed';
 "#;
 
 const MIGRATION_10_CHECKSUM: &str =
-    "sha256:3f2922071f599fa575fbc9a7aa5b9cfb7a4ea0039edb66ab0cf409d4bc84d195";
+    "sha256:8ef084b989eeb4089ca795b7b84feed4cc041fccc1a2be2c5be084b24e6c9372";
 const MIGRATION_10: &str = r#"
 CREATE INDEX logical_range_pins_owner_state
-ON logical_range_pins(owner_kind,owner_id,state,pin_id);
+ON logical_range_pins(owner_kind,owner_id,pin_id) WHERE state!='released';
+UPDATE logical_range_pins SET state='release_pending',revision=revision+1
+WHERE owner_kind='audit' AND state='active'
+AND NOT EXISTS(SELECT 1 FROM destination_audits a WHERE a.audit_id=logical_range_pins.owner_id);
+UPDATE logical_range_pins SET state='released',revision=revision+1
+WHERE owner_kind='audit' AND state='release_pending'
+AND NOT EXISTS(SELECT 1 FROM destination_audits a WHERE a.audit_id=logical_range_pins.owner_id);
+DELETE FROM terminal_metadata_retention WHERE category='destination_audit'
+AND NOT EXISTS(SELECT 1 FROM destination_audits a WHERE a.audit_id=terminal_metadata_retention.object_id);
 "#;
 
 #[cfg(test)]
@@ -1120,6 +1128,47 @@ pub mod tests {
         );
         drop(c);
         let _ = fs::remove_file(upgrade);
+    }
+
+    #[test]
+    fn v9_upgrade_releases_orphaned_audit_pins_and_metadata() {
+        let (p, w) = writer("v9-orphan-audit-pin");
+        w.connection()
+            .execute_batch(
+                "DROP INDEX logical_range_pins_owner_state;
+                 DELETE FROM schema_migrations WHERE version=10;
+                 INSERT INTO logical_range_pins(pin_id,owner_kind,owner_id,capture_epoch,start_seq,state)
+                 VALUES('active-pin','audit','deleted-audit','epoch',1,'active'),
+                       ('pending-pin','audit','deleted-audit','epoch',1,'release_pending');
+                 INSERT INTO terminal_metadata_retention(category,object_id,terminal_at_unix_ms)
+                 VALUES('destination_audit','deleted-audit',1);",
+            )
+            .unwrap();
+        apply_migrations(w.connection()).unwrap();
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT count(*) FROM logical_range_pins WHERE owner_kind='audit' AND state='released'",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT count(*) FROM terminal_metadata_retention WHERE category='destination_audit'", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT count(*) FROM sqlite_schema WHERE type='index' AND name='logical_range_pins_owner_state'", [], |row| row.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        drop(w);
+        let _ = fs::remove_file(p);
     }
 
     #[test]

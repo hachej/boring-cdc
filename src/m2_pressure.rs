@@ -1118,6 +1118,18 @@ pub(crate) mod tests {
             )
             .unwrap();
         }
+        let query_plan = w
+            .connection()
+            .query_row(
+                "EXPLAIN QUERY PLAN SELECT pin_id FROM logical_range_pins
+                 WHERE owner_kind='audit' AND owner_id=?1 AND state!='released'
+                 ORDER BY pin_id LIMIT ?2",
+                params!["many", 1_i64],
+                |row| row.get::<_, String>(3),
+            )
+            .unwrap();
+        assert!(query_plan.contains("logical_range_pins_owner_state"));
+        assert!(!query_plan.contains("TEMP B-TREE"));
         let limits = MetadataRetention {
             alerts_rows: 1,
             audit_rows: 1,
