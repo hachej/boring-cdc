@@ -1,26 +1,10 @@
-scripts/faults/m2_fault_status.sh: line 6: 393245 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 393453 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 393526 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 393606 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 393650 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 393721 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 393840 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 394009 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 394162 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 394209 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 394302 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 394363 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 394427 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 394532 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 394572 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
-scripts/faults/m2_fault_status.sh: line 6: 394663 Aborted                 (core dumped) BORING_CDC_M2_FAULT_HOOK="$hook" cargo run --quiet --locked --example m2_fault_hook_probe -- "$hook" > "$work/$hook.out" 2> "$work/$hook.err"
- Network m2-reconcile-1029-394848_default  Creating
- Network m2-reconcile-1029-394848_default  Created
- Volume "m2-reconcile-1029-394848_pgdata"  Creating
- Volume "m2-reconcile-1029-394848_pgdata"  Created
- Container m2-reconcile-1029-394848-postgres-1  Creating
- Container m2-reconcile-1029-394848-postgres-1  Created
- Container m2-reconcile-1029-394848-postgres-1  Starting
- Container m2-reconcile-1029-394848-postgres-1  Started
- Container m2-reconcile-1029-394848-postgres-1  Waiting
- Container m2-reconcile-1029-394848-postgres-1  Healthy
+ Network m2-reconcile-12620-491540_default  Creating
+ Network m2-reconcile-12620-491540_default  Created
+ Volume "m2-reconcile-12620-491540_pgdata"  Creating
+ Volume "m2-reconcile-12620-491540_pgdata"  Created
+ Container m2-reconcile-12620-491540-postgres-1  Creating
+ Container m2-reconcile-12620-491540-postgres-1  Created
+ Container m2-reconcile-12620-491540-postgres-1  Starting
+ Container m2-reconcile-12620-491540-postgres-1  Started
+ Container m2-reconcile-12620-491540-postgres-1  Waiting
+ Container m2-reconcile-12620-491540-postgres-1  Healthy
