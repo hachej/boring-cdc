@@ -22,6 +22,7 @@ pub mod m2_journal;
 pub mod m2_jsonl;
 pub mod m2_leases;
 pub mod m2_ownership;
+pub mod m2_pressure;
 pub mod m2_reconcile;
 pub mod m2_schema;
 pub mod m2_spool;

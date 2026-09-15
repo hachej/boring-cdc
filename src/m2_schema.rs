@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 5;
+pub const SCHEMA_VERSION: i64 = 6;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -322,6 +322,26 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_5_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v6: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=6)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v6 {
+            connection.execute_batch(MIGRATION_6)?;
+            connection.execute(
+                "INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(6,'retention-pressure-controls',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+                [MIGRATION_6_CHECKSUM],
+            )?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=6",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_6_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -623,6 +643,27 @@ CREATE TABLE startup_reconciliations(
  durable_transaction_end_lsn TEXT, creation_floor_lsn TEXT, created_at TEXT NOT NULL,
  CHECK(requested_lsn IS NULL OR (length(requested_lsn)=16 AND requested_lsn NOT GLOB '*[^0-9A-F]*')),
  CHECK(effective_restart_lsn IS NULL OR (length(effective_restart_lsn)=16 AND effective_restart_lsn NOT GLOB '*[^0-9A-F]*')));
+"#;
+
+const MIGRATION_6_CHECKSUM: &str =
+    "sha256:1031a19e8221b10c63bae5c80bb8288acf3f94ef28f3a508ef550f2db5331d97";
+const MIGRATION_6: &str = r#"
+CREATE TABLE logical_range_pins(
+ pin_id TEXT PRIMARY KEY, owner_kind TEXT NOT NULL, owner_id TEXT NOT NULL,
+ capture_epoch TEXT NOT NULL, start_seq INTEGER NOT NULL CHECK(start_seq>0),
+ end_seq INTEGER CHECK(end_seq IS NULL OR end_seq>=start_seq),
+ expires_at_unix_ms INTEGER, state TEXT NOT NULL CHECK(state IN ('active','release_pending','released')),
+ revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0));
+CREATE INDEX logical_range_pins_active_start ON logical_range_pins(state,capture_epoch,start_seq);
+CREATE TABLE journal_gc_audits(
+ audit_id INTEGER PRIMARY KEY AUTOINCREMENT, capture_epoch TEXT NOT NULL,
+ first_seq INTEGER NOT NULL, last_seq INTEGER NOT NULL CHECK(last_seq>=first_seq),
+ transaction_count INTEGER NOT NULL CHECK(transaction_count>0), reason TEXT NOT NULL, created_at_unix_ms INTEGER NOT NULL);
+CREATE TRIGGER logical_pin_transition BEFORE UPDATE OF state ON logical_range_pins
+ WHEN NOT ((OLD.state='active' AND NEW.state='release_pending') OR (OLD.state='release_pending' AND NEW.state='released') OR NEW.state=OLD.state)
+ BEGIN SELECT RAISE(ABORT,'invalid logical pin transition'); END;
+CREATE TRIGGER logical_pin_revision BEFORE UPDATE ON logical_range_pins
+ WHEN NEW.revision!=OLD.revision+1 BEGIN SELECT RAISE(ABORT,'stale logical pin revision'); END;
 "#;
 
 #[cfg(test)]

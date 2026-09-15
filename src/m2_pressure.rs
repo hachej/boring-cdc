@@ -1,0 +1,571 @@
+//! Pin-safe retention, per-filesystem admission and bounded SQLite maintenance.
+
+use crate::m2_schema::WriterConnection;
+use rusqlite::{TransactionBehavior, params};
+use std::fmt;
+use std::time::{Duration, Instant};
+
+pub const GC_MAX_TRANSACTIONS: usize = 1_000;
+pub const GC_MAX_HOLD: Duration = Duration::from_millis(50);
+pub const INCREMENTAL_VACUUM_MAX_PAGES: u32 = 1_000;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum PressureState {
+    Normal,
+    Warning,
+    Action,
+    Critical,
+    Hard,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PressureThresholds {
+    pub warning: u64,
+    pub action: u64,
+    pub critical: u64,
+    pub hard: u64,
+    pub reserve: u64,
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PressureActions {
+    pub throttle_backfill: bool,
+    pub finish_snapshot_generations: bool,
+    pub automatic_gc: bool,
+    pub stop_new_archive_backfill: bool,
+    pub drain_materializers: bool,
+    pub safe_stop_capture: bool,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PressureDecision {
+    pub state: PressureState,
+    pub actions: PressureActions,
+    pub free_bytes: u64,
+    pub required_free_bytes: u64,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum PressureError {
+    Invalid(&'static str),
+    ReserveExceeded,
+    StalePin,
+    Busy,
+    Sqlite(String),
+}
+impl fmt::Display for PressureError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+impl std::error::Error for PressureError {}
+impl From<rusqlite::Error> for PressureError {
+    fn from(v: rusqlite::Error) -> Self {
+        Self::Sqlite(v.to_string())
+    }
+}
+
+pub fn decide_pressure(
+    free_bytes: u64,
+    t: PressureThresholds,
+) -> Result<PressureDecision, PressureError> {
+    if !(t.warning > t.action
+        && t.action > t.critical
+        && t.critical > t.hard
+        && t.hard >= t.reserve
+        && t.reserve > 0)
+    {
+        return Err(PressureError::Invalid(
+            "pressure thresholds must strictly descend to reserve",
+        ));
+    }
+    let state = if free_bytes <= t.hard {
+        PressureState::Hard
+    } else if free_bytes <= t.critical {
+        PressureState::Critical
+    } else if free_bytes <= t.action {
+        PressureState::Action
+    } else if free_bytes <= t.warning {
+        PressureState::Warning
+    } else {
+        PressureState::Normal
+    };
+    Ok(PressureDecision {
+        state,
+        free_bytes,
+        required_free_bytes: t.reserve,
+        actions: PressureActions {
+            throttle_backfill: state >= PressureState::Warning,
+            finish_snapshot_generations: state >= PressureState::Action,
+            automatic_gc: state >= PressureState::Action,
+            stop_new_archive_backfill: state >= PressureState::Critical,
+            drain_materializers: state >= PressureState::Critical,
+            safe_stop_capture: state >= PressureState::Hard,
+        },
+    })
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct FilesystemReservations {
+    pub spool: u64,
+    pub sqlite_growth: u64,
+    pub sqlite_temp: u64,
+    pub backfill: u64,
+    pub archive_segment: u64,
+    pub publish_directory: u64,
+    pub metadata: u64,
+}
+pub fn admit_filesystem(
+    free: u64,
+    reserve: u64,
+    r: FilesystemReservations,
+) -> Result<u64, PressureError> {
+    if reserve == 0 {
+        return Err(PressureError::Invalid("zero emergency reserve"));
+    }
+    let required = [
+        r.spool,
+        r.sqlite_growth,
+        r.sqlite_temp,
+        r.backfill,
+        r.archive_segment,
+        r.publish_directory,
+        r.metadata,
+    ]
+    .into_iter()
+    .try_fold(reserve, u64::checked_add)
+    .ok_or(PressureError::Invalid("reservation overflow"))?;
+    if free < required {
+        Err(PressureError::ReserveExceeded)
+    } else {
+        Ok(required)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PinSpec<'a> {
+    pub pin_id: &'a str,
+    pub owner_kind: &'a str,
+    pub owner_id: &'a str,
+    pub capture_epoch: &'a str,
+    pub start_seq: u64,
+    pub end_seq: Option<u64>,
+    pub expires_at_unix_ms: Option<i64>,
+}
+pub fn create_pin(writer: &mut WriterConnection, pin: PinSpec<'_>) -> Result<(), PressureError> {
+    if [pin.pin_id, pin.owner_kind, pin.owner_id, pin.capture_epoch]
+        .iter()
+        .any(|v| v.is_empty())
+        || pin.start_seq == 0
+        || pin.end_seq.is_some_and(|v| v < pin.start_seq)
+    {
+        return Err(PressureError::Invalid("invalid logical pin"));
+    }
+    writer.connection().execute("INSERT INTO logical_range_pins(pin_id,owner_kind,owner_id,capture_epoch,start_seq,end_seq,expires_at_unix_ms,state) VALUES(?1,?2,?3,?4,?5,?6,?7,'active')",params![pin.pin_id,pin.owner_kind,pin.owner_id,pin.capture_epoch,pin.start_seq as i64,pin.end_seq.map(|v|v as i64),pin.expires_at_unix_ms])?;
+    Ok(())
+}
+pub fn request_pin_release(
+    writer: &mut WriterConnection,
+    pin_id: &str,
+    revision: u64,
+) -> Result<(), PressureError> {
+    let n=writer.connection().execute("UPDATE logical_range_pins SET state='release_pending',revision=revision+1 WHERE pin_id=?1 AND state='active' AND revision=?2",params![pin_id,revision as i64])?;
+    if n == 1 {
+        Ok(())
+    } else {
+        Err(PressureError::StalePin)
+    }
+}
+pub fn confirm_pin_release(
+    writer: &mut WriterConnection,
+    pin_id: &str,
+    revision: u64,
+) -> Result<(), PressureError> {
+    let n=writer.connection().execute("UPDATE logical_range_pins SET state='released',revision=revision+1 WHERE pin_id=?1 AND state='release_pending' AND revision=?2",params![pin_id,revision as i64])?;
+    if n == 1 {
+        Ok(())
+    } else {
+        Err(PressureError::StalePin)
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GcResult {
+    pub transactions: u64,
+    pub events: u64,
+    pub first_seq: Option<u64>,
+    pub last_seq: Option<u64>,
+    pub retain_from_seq: u64,
+    pub blockers: Vec<String>,
+}
+/// Automatic runtime GC. Eligibility is recomputed inside the same IMMEDIATE transaction as deletion.
+pub fn automatic_gc(
+    writer: &mut WriterConnection,
+    epoch: &str,
+    replay_from_seq: u64,
+    now_ms: i64,
+    max_transactions: usize,
+    max_hold: Duration,
+) -> Result<GcResult, PressureError> {
+    if epoch.is_empty()
+        || replay_from_seq == 0
+        || max_transactions == 0
+        || max_transactions > GC_MAX_TRANSACTIONS
+        || max_hold.is_zero()
+        || max_hold > GC_MAX_HOLD
+    {
+        return Err(PressureError::Invalid("invalid GC bound"));
+    }
+    let started = Instant::now();
+    let tx = writer
+        .connection_mut()
+        .transaction_with_behavior(TransactionBehavior::Immediate)?;
+    // Expiry is intentionally not release: owner reconciliation must complete the two-step lifecycle.
+    let mut floors = vec![replay_from_seq];
+    let mut blockers = Vec::new();
+    {
+        let mut s=tx.prepare("SELECT d.destination_id,c.journal_seq FROM destinations d JOIN destination_checkpoints c USING(destination_id) WHERE d.capture_epoch=?1")?;
+        for row in s.query_map([epoch], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+        })? {
+            let (id, seq) = row?;
+            floors.push((seq as u64).saturating_add(1));
+            blockers.push(format!("destination:{id}"));
+        }
+    }
+    {
+        let mut s=tx.prepare("SELECT pin_id,start_seq,expires_at_unix_ms FROM logical_range_pins WHERE capture_epoch=?1 AND state!='released'")?;
+        for row in s.query_map([epoch], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, Option<i64>>(2)?,
+            ))
+        })? {
+            let (id, seq, expires) = row?;
+            floors.push(seq as u64);
+            blockers.push(if expires.is_some_and(|v| v <= now_ms) {
+                format!("expired_pin_requires_reconciliation:{id}")
+            } else {
+                format!("pin:{id}")
+            });
+        }
+    }
+    {
+        let mut s=tx.prepare("SELECT anchor_id,start_seq,state FROM bootstrap_anchors WHERE capture_epoch=?1 AND state IN ('building','complete')")?;
+        for row in s.query_map([epoch], |r| {
+            Ok((
+                r.get::<_, String>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, String>(2)?,
+            ))
+        })? {
+            let (id, seq, state) = row?;
+            floors.push((seq as u64).max(1));
+            blockers.push(format!("anchor:{state}:{id}"));
+        }
+    }
+    // Nonterminal intents are implicit pins even if a worker died before creating its logical pin.
+    {
+        let mut s=tx.prepare("SELECT intent_id,first_seq FROM clickhouse_batch_intents WHERE capture_epoch=?1 AND state IN ('prepared','dispatched')")?;
+        for row in s.query_map([epoch], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+        })? {
+            let (id, seq) = row?;
+            floors.push(seq as u64);
+            blockers.push(format!("clickhouse_intent:{id}"));
+        }
+    }
+    {
+        let mut s=tx.prepare("SELECT i.intent_id,i.first_seq FROM archive_segment_intents i JOIN archive_generations g ON g.generation_id=i.generation_id WHERE g.capture_epoch=?1 AND i.state IN ('selected','writing')")?;
+        for row in s.query_map([epoch], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+        })? {
+            let (id, seq) = row?;
+            floors.push(seq as u64);
+            blockers.push(format!("archive_intent:{id}"));
+        }
+    }
+    {
+        let mut s=tx.prepare("SELECT audit_id,coalesce(retained_history_start_seq,journal_cursor_seq) FROM destination_audits WHERE capture_epoch=?1 AND journal_cursor_seq<round_target_seq")?;
+        for row in s.query_map([epoch], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+        })? {
+            let (id, seq) = row?;
+            floors.push((seq as u64).max(1));
+            blockers.push(format!("audit:{id}"));
+        }
+    }
+    let retain = *floors.iter().min().unwrap();
+    let mut selected = Vec::new();
+    {
+        let mut s=tx.prepare("SELECT transaction_id,first_seq,last_seq,event_count FROM source_transactions WHERE capture_epoch=?1 AND state='committed' AND last_seq<?2 ORDER BY first_seq LIMIT ?3")?;
+        let rows = s.query_map(
+            params![epoch, retain as i64, max_transactions as i64],
+            |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, i64>(1)?,
+                    r.get::<_, i64>(2)?,
+                    r.get::<_, i64>(3)?,
+                ))
+            },
+        )?;
+        for row in rows {
+            selected.push(row?);
+            if started.elapsed() > max_hold {
+                return Err(PressureError::Busy);
+            }
+        }
+    }
+    if selected.is_empty() {
+        tx.commit()?;
+        return Ok(GcResult {
+            transactions: 0,
+            events: 0,
+            first_seq: None,
+            last_seq: None,
+            retain_from_seq: retain,
+            blockers,
+        });
+    }
+    let first = selected[0].1;
+    let last = selected.last().unwrap().2;
+    let events: i64 = selected.iter().map(|v| v.3).sum();
+    // Range is contiguous by construction; transaction metadata remains as bounded proof while payload rows go.
+    for (id, _, _, _) in &selected {
+        tx.execute("DELETE FROM journal_events WHERE transaction_id=?1", [id])?;
+        tx.execute(
+            "UPDATE source_transactions SET state='gc_removed' WHERE transaction_id=?1",
+            [id],
+        )?;
+    }
+    tx.execute("INSERT INTO journal_gc_audits(capture_epoch,first_seq,last_seq,transaction_count,reason,created_at_unix_ms) VALUES(?1,?2,?3,?4,'automatic_pin_safe',?5)",params![epoch,first,last,selected.len() as i64,now_ms])?;
+    if started.elapsed() > max_hold {
+        return Err(PressureError::Busy);
+    }
+    tx.commit()?;
+    Ok(GcResult {
+        transactions: selected.len() as u64,
+        events: events as u64,
+        first_seq: Some(first as u64),
+        last_seq: Some(last as u64),
+        retain_from_seq: retain,
+        blockers,
+    })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CheckpointProgress {
+    pub busy: u32,
+    pub wal_pages: u32,
+    pub checkpointed_pages: u32,
+}
+pub fn checkpoint_restart(
+    writer: &mut WriterConnection,
+) -> Result<CheckpointProgress, PressureError> {
+    // M0-PROVISIONAL: boring-cdc-m2-pressure -- frozen storage contract literal.
+    writer
+        .connection()
+        .busy_timeout(Duration::from_millis(50))?;
+    let result = writer
+        .connection()
+        .query_row("PRAGMA wal_checkpoint(RESTART)", [], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, i64>(1)?,
+                r.get::<_, i64>(2)?,
+            ))
+        });
+    writer.connection().busy_timeout(Duration::from_secs(5))?;
+    let (busy, wal, done) = result?;
+    Ok(CheckpointProgress {
+        busy: busy as u32,
+        wal_pages: wal.max(0) as u32,
+        checkpointed_pages: done.max(0) as u32,
+    })
+}
+pub fn incremental_vacuum(writer: &mut WriterConnection, pages: u32) -> Result<(), PressureError> {
+    if pages == 0 || pages > INCREMENTAL_VACUUM_MAX_PAGES {
+        return Err(PressureError::Invalid("invalid incremental vacuum bound"));
+    }
+    writer
+        .connection()
+        .execute_batch(&format!("PRAGMA incremental_vacuum({pages})"))?;
+    Ok(())
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WalRisk {
+    pub seconds_to_cap: Option<u64>,
+    pub requires_reseed: bool,
+    pub metrics_available: bool,
+}
+pub fn forecast_wal_risk(
+    retained: u64,
+    cap: u64,
+    rate_per_sec: Option<u64>,
+    monitor_delay_sec: u64,
+    reaction_reserve_sec: u64,
+) -> WalRisk {
+    let Some(rate) = rate_per_sec.filter(|v| *v > 0) else {
+        return WalRisk {
+            seconds_to_cap: None,
+            requires_reseed: retained >= cap,
+            metrics_available: false,
+        };
+    };
+    let remaining = cap.saturating_sub(retained);
+    let secs = remaining / rate;
+    WalRisk {
+        seconds_to_cap: Some(secs),
+        requires_reseed: retained >= cap
+            || secs <= monitor_delay_sec.saturating_add(reaction_reserve_sec),
+        metrics_available: true,
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::m2_schema::open_writer;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static N: AtomicU64 = AtomicU64::new(1);
+    fn writer() -> (WriterConnection, std::path::PathBuf) {
+        let p = std::env::temp_dir().join(format!(
+            "m2-pressure-{}-{}.db",
+            std::process::id(),
+            N.fetch_add(1, Ordering::Relaxed)
+        ));
+        (open_writer(&p, "run", 1, 0).unwrap(), p)
+    }
+    fn seed(w: &WriterConnection) {
+        for i in 1..=5 {
+            w.connection().execute("INSERT INTO source_transactions VALUES(?1,'epoch','sys','db','slot',?2,?3,?4,?4,1,?5,'committed')",params![format!("tx{i}"),format!("x{i}"),format!("{i:016X}"),i,format!("sum{i}")]).unwrap();
+            w.connection().execute("INSERT INTO journal_events(journal_seq,event_id,transaction_id,transaction_ordinal,capture_epoch,control_kind,payload,payload_hash) VALUES(?1,?2,?3,0,'epoch','heartbeat',x'01','hash')",params![i,format!("e{i}"),format!("tx{i}")]).unwrap();
+        }
+    }
+    #[test]
+    fn transition_order_and_actions_are_exact() {
+        let t = PressureThresholds {
+            warning: 100,
+            action: 80,
+            critical: 60,
+            hard: 40,
+            reserve: 40,
+        };
+        let states = [101, 100, 80, 60, 40].map(|f| decide_pressure(f, t).unwrap().state);
+        assert_eq!(
+            states,
+            [
+                PressureState::Normal,
+                PressureState::Warning,
+                PressureState::Action,
+                PressureState::Critical,
+                PressureState::Hard
+            ]
+        );
+        assert!(decide_pressure(40, t).unwrap().actions.safe_stop_capture);
+        assert!(decide_pressure(60, t).unwrap().actions.drain_materializers);
+    }
+    #[test]
+    fn per_filesystem_reserve_equal_admits_and_one_over_rejects() {
+        let r = FilesystemReservations {
+            spool: 2,
+            sqlite_growth: 3,
+            ..Default::default()
+        };
+        assert_eq!(admit_filesystem(15, 10, r), Ok(15));
+        assert_eq!(
+            admit_filesystem(14, 10, r),
+            Err(PressureError::ReserveExceeded)
+        );
+    }
+    #[test]
+    fn pin_lifecycle_and_gc_preserve_whole_transactions() {
+        let (mut w, p) = writer();
+        seed(&w);
+        create_pin(
+            &mut w,
+            PinSpec {
+                pin_id: "p",
+                owner_kind: "backfill",
+                owner_id: "g",
+                capture_epoch: "epoch",
+                start_seq: 4,
+                end_seq: None,
+                expires_at_unix_ms: Some(1),
+            },
+        )
+        .unwrap();
+        let g = automatic_gc(&mut w, "epoch", 6, 2, 10, GC_MAX_HOLD).unwrap();
+        assert_eq!(
+            (g.transactions, g.last_seq, g.retain_from_seq),
+            (3, Some(3), 4)
+        );
+        assert!(
+            g.blockers
+                .contains(&"expired_pin_requires_reconciliation:p".into())
+        );
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT count(*) FROM journal_events", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+        request_pin_release(&mut w, "p", 0).unwrap();
+        confirm_pin_release(&mut w, "p", 1).unwrap();
+        let g = automatic_gc(&mut w, "epoch", 6, 2, 10, GC_MAX_HOLD).unwrap();
+        assert_eq!(g.transactions, 2);
+        drop(w);
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn paused_destination_is_a_visible_retention_pin() {
+        let (mut w, p) = writer();
+        seed(&w);
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('paused','archive','cfg','epoch',1)",[]).unwrap();
+        w.connection().execute("INSERT INTO destination_checkpoints(destination_id,capture_epoch,configuration_fingerprint,generation,complete_transaction_id,journal_seq) VALUES('paused','epoch','cfg',1,'tx2',2)",[]).unwrap();
+        let g = automatic_gc(&mut w, "epoch", 6, 0, 10, GC_MAX_HOLD).unwrap();
+        assert_eq!(g.last_seq, Some(2));
+        assert!(g.blockers.contains(&"destination:paused".into()));
+        drop(w);
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn maintenance_is_bounded_and_never_full_vacuum() {
+        let (mut w, p) = writer();
+        let reader = rusqlite::Connection::open(&p).unwrap();
+        reader
+            .execute_batch("BEGIN; SELECT count(*) FROM schema_migrations;")
+            .unwrap();
+        w.connection()
+            .execute("CREATE TABLE checkpoint_probe(value INTEGER)", [])
+            .unwrap();
+        let blocked = checkpoint_restart(&mut w).unwrap();
+        assert_eq!(blocked.busy, 1);
+        assert!(blocked.wal_pages >= blocked.checkpointed_pages);
+        reader.execute_batch("ROLLBACK").unwrap();
+        drop(reader);
+        assert_eq!(checkpoint_restart(&mut w).unwrap().busy, 0);
+        incremental_vacuum(&mut w, INCREMENTAL_VACUUM_MAX_PAGES).unwrap();
+        assert!(matches!(
+            incremental_vacuum(&mut w, 1001),
+            Err(PressureError::Invalid(_))
+        ));
+        let sql: String = w
+            .connection()
+            .query_row(
+                "SELECT group_concat(sql,' ') FROM sqlite_schema WHERE sql IS NOT NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(!sql.contains("VACUUM"));
+        drop(w);
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn wal_forecast_is_honest() {
+        assert!(forecast_wal_risk(900, 1000, Some(1), 10, 120).requires_reseed);
+        assert!(!forecast_wal_risk(1, 1000, None, 10, 120).metrics_available);
+    }
+}
