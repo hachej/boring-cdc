@@ -200,7 +200,7 @@ if mode=='--write':
  for index,argv in enumerate(required_proof_commands,1):
   run=subprocess.run(argv,text=True,capture_output=True)
   stdout=gate/f'command-{index}.stdout'; stderr=gate/f'command-{index}.stderr'
-  stdout.write_text(run.stdout); stderr.write_text(run.stderr)
+  stdout.write_text(run.stdout.rstrip()+('\n' if run.stdout else '')); stderr.write_text(run.stderr.rstrip()+('\n' if run.stderr else ''))
   if run.returncode: raise SystemExit(f'certification command failed: {shlex.join(argv)}')
   if argv==['scripts/acceptance/m2_complete.sh','--probe']: observed.append((run.stdout,run.stderr))
   commands.append({'argv':shlex.join(argv),'version':'m2-complete/v2','exit_code':run.returncode,'stdout_path':str(stdout.relative_to(root)),'stdout_sha256':sha(stdout),'stderr_path':str(stderr.relative_to(root)),'stderr_sha256':sha(stderr)})
