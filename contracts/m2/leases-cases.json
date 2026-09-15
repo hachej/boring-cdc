@@ -16,6 +16,11 @@
       "test": "reseed_generation_and_configuration_fence_old_workers"
     },
     {
+      "assertion": "same-generation epoch/configuration A-to-B-to-A cycling permanently fences the old lease before dispatch, checkpoint, or promotion",
+      "id": "SCN-M2-LEASE-IDENTITY-CYCLE",
+      "test": "same_generation_identity_cycle_permanently_fences_old_worker"
+    },
+    {
       "assertion": "a worker fenced during its fake external call returns a stale namespaced artifact and cannot complete local live state",
       "id": "SCN-M2-LEASE-TWO-RUNTIME-RACE",
       "test": "two_runtime_race_keeps_stale_artifact_out_of_live_state"

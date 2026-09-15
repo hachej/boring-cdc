@@ -204,8 +204,14 @@ pub fn acquire(
     }
     transaction.execute(
         "UPDATE destination_generation_leases SET state='fenced',revision=revision+1
-         WHERE destination_id=?1 AND state='held' AND generation<>?2",
-        params![identity.destination_id, generation],
+         WHERE destination_id=?1 AND state='held'
+           AND (capture_epoch<>?2 OR generation<>?3 OR configuration_fingerprint<>?4)",
+        params![
+            identity.destination_id,
+            identity.capture_epoch,
+            generation,
+            identity.configuration_fingerprint
+        ],
     )?;
     // The schema intentionally keeps one current lease row per generation. Once a terminal row has
     // no live authority, replace it atomically with a new immutable lease identity; old tokens can
@@ -579,6 +585,75 @@ pub(crate) mod tests {
             Ok(tx.execute("UPDATE destinations SET revision=revision+1", [])?)
         });
         assert_eq!(changed, Err(LeaseError::Stale));
+        cleanup(path);
+    }
+
+    #[test]
+    fn same_generation_identity_cycle_permanently_fences_old_worker() {
+        let (mut writer, path) = writer();
+        // Promotion needs an anchored lease. The predecessor-owned anchor triggers are disabled only
+        // to build the deterministic fixture, as in the dedicated promotion test below.
+        writer.connection().execute_batch("DROP TRIGGER complete_anchor_requires_fence; DROP TRIGGER complete_anchor_update_requires_fence; DROP TRIGGER anchor_v2_update; INSERT INTO bootstrap_anchors(anchor_id,capture_epoch,generation,start_seq,snapshot_boundary_lsn,snapshot_complete_seq,post_copy_fence_nonce,post_copy_fence_lsn,post_copy_fence_seq,table_set_fingerprint,snapshot_schema_fingerprints,state,expires_at) VALUES('anchor-a','epoch-a',1,0,'0000000000000001',0,'nonce','0000000000000001',0,'tables','[\"schema\"]','building','never'); UPDATE bootstrap_anchors SET state='complete' WHERE anchor_id='anchor-a';").unwrap();
+        let mut old_identity = identity(1);
+        old_identity.anchor_id = Some("anchor-a".into());
+        let old = acquire(&mut writer, old_identity, 10, 100).unwrap();
+
+        writer.connection().execute("UPDATE destinations SET capture_epoch='epoch-b',configuration_fingerprint='config-b',revision=revision+1 WHERE destination_id='dest-a'", []).unwrap();
+        let mut replacement_identity = identity(1);
+        replacement_identity.capture_epoch = "epoch-b".into();
+        replacement_identity.configuration_fingerprint = "config-b".into();
+        replacement_identity.lease_id = "lease-b".into();
+        let replacement = acquire(&mut writer, replacement_identity, 11, 100).unwrap();
+        assert_ne!(old.external_namespace(), replacement.external_namespace());
+
+        // Cycling the destination row back to A must not revive the still-unexpired A token.
+        writer.connection().execute("UPDATE destinations SET capture_epoch='epoch-a',configuration_fingerprint='config-a',revision=revision+1 WHERE destination_id='dest-a'", []).unwrap();
+        let mut fake = Fake { namespaces: vec![] };
+        assert_eq!(
+            dispatch(&mut writer, &old, &mut || 12, &mut fake),
+            Err(LeaseError::Stale)
+        );
+        assert!(fake.namespaces.is_empty());
+        let revision_before: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT revision FROM destinations WHERE destination_id='dest-a'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            complete_local(&mut writer, &old, &mut || 12, |tx| {
+                tx.execute(
+                    "UPDATE destinations SET revision=revision+1 WHERE destination_id='dest-a'",
+                    [],
+                )?;
+                Ok(())
+            }),
+            Err(LeaseError::Stale)
+        );
+        let revision_after: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT revision FROM destinations WHERE destination_id='dest-a'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(revision_before, revision_after);
+        assert_eq!(
+            prepare_promotion(&mut writer, &old, 12, "cycled-intent", 2, "selector-a"),
+            Err(LeaseError::Stale)
+        );
+        let intents: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT COUNT(*) FROM destination_promotion_intents",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(intents, 0);
         cleanup(path);
     }
 
