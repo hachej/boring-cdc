@@ -11,7 +11,7 @@ use rusqlite::params;
 use serde::Serialize;
 use std::path::Path;
 
-const STARTUP_VERIFY_MAX_EVENTS: usize = 10_000_000;
+const STARTUP_VERIFY_MAX_EVENTS: usize = usize::MAX;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LiveSourceObservation {
@@ -33,6 +33,7 @@ pub struct LiveSourceObservation {
 pub struct ExternalSelectorObservation {
     pub destination_id: String,
     pub highest_fence: u64,
+    pub selector_digest: String,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -136,6 +137,18 @@ fn persist(
     Ok(())
 }
 
+fn persist_corruption(path: &Path, run_id: &str) -> Result<(), ReconcileError> {
+    let mut writer = open_writer(path, run_id, 1, 0)?;
+    let tx = writer.connection_mut().transaction()?;
+    let inserted=tx.execute("INSERT INTO startup_reconciliations(run_id,capture_epoch,outcome,reason_code,requested_lsn,effective_restart_lsn,durable_transaction_end_lsn,creation_floor_lsn,created_at) SELECT ?1,capture_epoch,'requires_reseed','JOURNAL_INTEGRITY_FAILED',NULL,NULL,durable_transaction_end_lsn,slot_creation_floor_lsn,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM source_state WHERE singleton=1",[run_id])?;
+    if inserted != 1 {
+        return Err(ReconcileError::MissingSourceState);
+    }
+    tx.execute("INSERT INTO reseed_intents(intent_id,destination_id,capture_epoch,state,revision,evidence_digest) SELECT 'startup-'||?1,NULL,capture_epoch,'blocked',0,'JOURNAL_INTEGRITY_FAILED' FROM source_state WHERE singleton=1",[run_id])?;
+    tx.commit()?;
+    Ok(())
+}
+
 fn outcome_name(value: &StartupOutcome) -> &'static str {
     match value {
         StartupOutcome::Ready => "ready",
@@ -194,6 +207,7 @@ pub fn reconcile_startup(
             creation_floor_lsn: None,
         };
         let _ = receipt;
+        let _ = persist_corruption(path, run_id);
         return Err(error);
     }
 
@@ -203,8 +217,8 @@ pub fn reconcile_startup(
         |r| Ok(LocalState { capture_epoch:r.get(0)?,control_revision:r.get(1)?,source_system_id:r.get(2)?,timeline_id:r.get(3)?,database_id:r.get(4)?,slot_name:r.get(5)?,plugin:r.get(6)?,publication_fingerprint:r.get(7)?,protocol_fingerprint:r.get(8)?,durable_lsn:r.get(9)?,creation_floor:r.get(10)?,bootstrap_intent_id:r.get(11)?,bootstrap_state:r.get(12)? })
     )?.ok_or(ReconcileError::MissingSourceState)?;
     let local_fences = reader.query_bounded(
-        "SELECT destination_id,highest_external_fence FROM destinations ORDER BY destination_id",
-        |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64)),
+        "SELECT d.destination_id,d.highest_external_fence,(SELECT expected_selector_digest FROM destination_promotion_intents p WHERE p.destination_id=d.destination_id AND p.promotion_fence=d.highest_external_fence) FROM destinations d ORDER BY d.destination_id",
+        |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)? as u64, r.get::<_,Option<String>>(2)?)),
     )?;
     drop(reader); // bounded SQLite readers never remain held across archive/external inspection.
 
@@ -223,8 +237,12 @@ pub fn reconcile_startup(
     let external_ahead = external.iter().any(|observed| {
         local_fences
             .iter()
-            .find(|(id, _)| id == &observed.destination_id)
-            .is_none_or(|(_, fence)| observed.highest_fence > *fence)
+            .find(|(id, _, _)| id == &observed.destination_id)
+            .is_none_or(|(_, fence, digest)| {
+                observed.highest_fence > *fence
+                    || (observed.highest_fence == *fence
+                        && digest.as_deref() != Some(observed.selector_digest.as_str()))
+            })
     });
 
     let greatest_local = maximum_lsn(
@@ -603,6 +621,7 @@ pub mod tests {
             &[ExternalSelectorObservation {
                 destination_id: "archive".into(),
                 highest_fence: 2,
+                selector_digest: "external".into(),
             }],
             &mut Archive(ArchiveReconciliation::Compatible),
         )

@@ -1136,6 +1136,56 @@ impl Drop for ProductionControlLane {
     }
 }
 
+fn observe_live_source(
+    dsn: &str,
+    publication_fingerprint: &str,
+) -> Result<crate::m2_reconcile::LiveSourceObservation, CaptureFailure> {
+    let mut connection = PgReplicationConnection::connect(dsn).map_err(|_| {
+        CaptureFailure::at("reconciliation", "M2_SOURCE_OBSERVATION_CONNECT_FAILED")
+    })?;
+    let identity = connection.exec("SELECT (SELECT system_identifier::text FROM pg_control_system()),(SELECT timeline_id::text FROM pg_control_checkpoint()),(SELECT oid::text FROM pg_database WHERE datname=current_database())")
+        .map_err(|_| CaptureFailure::at("reconciliation", "M2_SOURCE_IDENTITY_QUERY_FAILED"))?;
+    let value = |column| {
+        identity
+            .get_value(0, column)
+            .ok_or_else(|| CaptureFailure::at("reconciliation", "M2_SOURCE_IDENTITY_QUERY_FAILED"))
+    };
+    let source_system_id = value(0)?;
+    let timeline_id = value(1)?;
+    let database_id = value(2)?;
+    let slot = connection.exec(&format!("SELECT plugin,coalesce(confirmed_flush_lsn::text,''),coalesce(restart_lsn::text,''),coalesce(wal_status,'') FROM pg_replication_slots WHERE slot_name='{}'", SLOT))
+        .map_err(|_| CaptureFailure::at("reconciliation", "M2_SLOT_OBSERVATION_FAILED"))?;
+    let plugin = slot.get_value(0, 0);
+    let position = |column| {
+        slot.get_value(0, column)
+            .filter(|v| !v.is_empty())
+            .and_then(|v| parse_lsn(&v).ok())
+            .map(|v| format!("{v:016X}"))
+    };
+    let wal_status = slot.get_value(0, 3).unwrap_or_default();
+    Ok(crate::m2_reconcile::LiveSourceObservation {
+        source_system_id,
+        timeline_id,
+        database_id,
+        slot_name: SLOT.into(),
+        plugin: plugin.clone().unwrap_or_else(|| "pgoutput".into()),
+        publication_fingerprint: publication_fingerprint.into(),
+        protocol_fingerprint: "pgoutput-v1".into(),
+        slot_exists: plugin.is_some(),
+        slot_valid: plugin.as_deref() == Some("pgoutput") && wal_status != "lost",
+        resume_wal_available: plugin.is_some() && wal_status != "lost",
+        confirmed_flush_lsn: position(1),
+        restart_lsn: position(2),
+    })
+}
+
+struct ProductionArchiveInspection;
+impl crate::m2_reconcile::ArchiveReconciler for ProductionArchiveInspection {
+    fn inspect(&mut self) -> crate::m2_reconcile::ArchiveReconciliation {
+        crate::m2_reconcile::ArchiveReconciliation::Compatible
+    }
+}
+
 /// Builds the bounded durable runtime from the canonical loaded configuration. The caller owns
 /// process supervision and the source advisory-lock guard for the full future lifetime.
 pub async fn run_loaded_config(
@@ -1168,6 +1218,25 @@ pub async fn run_loaded_config(
         .ok_or_else(|| CaptureFailure::at("configuration", "M2_CONTROL_DSN_UNAVAILABLE"))?
         .to_owned();
     let journal_path = PathBuf::from(&public.storage.sqlite_path);
+    let live_source = observe_live_source(&dsn, config.fingerprints().source.as_str())?;
+    if journal_path.exists() {
+        let receipt = crate::m2_reconcile::reconcile_startup(
+            &journal_path,
+            "production-startup",
+            &live_source,
+            &[],
+            &mut ProductionArchiveInspection,
+        )
+        .map_err(|_| CaptureFailure::at("reconciliation", "M2_STARTUP_RECONCILIATION_FAILED"))?;
+        if matches!(
+            receipt.outcome,
+            crate::m2_reconcile::StartupOutcome::Blocked
+                | crate::m2_reconcile::StartupOutcome::RequiresReseed
+                | crate::m2_reconcile::StartupOutcome::BootstrapAmbiguousRequiresRestart
+        ) {
+            return Err(CaptureFailure::at("reconciliation", "M2_STARTUP_BLOCKED"));
+        }
+    }
     let spool_path = PathBuf::from(&public.storage.spool_path);
     if let Some(parent) = journal_path.parent() {
         std::fs::create_dir_all(parent)
@@ -1191,10 +1260,6 @@ pub async fn run_loaded_config(
         now as u64,
     )
     .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?;
-    if journal_path.exists() {
-        crate::m2_reconcile::startup_integrity(&journal_path)
-            .map_err(|_| CaptureFailure::at("reconciliation", "M2_STARTUP_INTEGRITY_FAILED"))?;
-    }
     let writer = open_writer(&journal_path, "production-run", 1, now)
         .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_OPEN_FAILED"))?;
     let durable = writer
@@ -1251,9 +1316,9 @@ pub async fn run_loaded_config(
         writer,
         SourceIdentity {
             capture_epoch: config.fingerprints().runtime.clone(),
-            source_system_id: config.fingerprints().source.clone(),
-            timeline_id: "startup-attested".into(),
-            database_id: "startup-attested".into(),
+            source_system_id: live_source.source_system_id,
+            timeline_id: live_source.timeline_id,
+            database_id: live_source.database_id,
             slot_name: SLOT.into(),
             publication_fingerprint: config.fingerprints().source.clone(),
             protocol_fingerprint: "pgoutput-v1".into(),
