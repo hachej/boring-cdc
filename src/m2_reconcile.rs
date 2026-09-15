@@ -11,8 +11,6 @@ use rusqlite::params;
 use serde::Serialize;
 use std::path::Path;
 
-const STARTUP_VERIFY_MAX_EVENTS: usize = usize::MAX;
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LiveSourceObservation {
     pub source_system_id: String,
@@ -406,12 +404,14 @@ pub struct JournalReport {
 }
 
 pub fn startup_integrity(path: &Path) -> Result<JournalVerification, ReconcileError> {
-    let verified = journal_verify(path, STARTUP_VERIFY_MAX_EVENTS, READER_MAX_AGE)?;
+    // The approved runtime boundary permits quick_check at startup; integrity_check and a full
+    // payload/checksum walk are maintenance/CLI work. Startup validates physical/FK integrity and
+    // constant-cardinality durable summaries without retaining an unbounded Rust-side result.
     let reader = open_reader_with_limits(path, READER_MAX_AGE, 1)?;
-    let full: Option<String> = reader.query_one_bounded("PRAGMA integrity_check", |r| r.get(0))?;
-    if full.as_deref() != Some("ok") {
+    let quick: Option<String> = reader.query_one_bounded("PRAGMA quick_check", |r| r.get(0))?;
+    if quick.as_deref() != Some("ok") {
         return Err(ReconcileError::Journal(JournalError::Conflict(
-            "SQLite integrity_check failed",
+            "SQLite quick_check failed",
         )));
     }
     let foreign: Option<i64> = reader
@@ -423,7 +423,20 @@ pub fn startup_integrity(path: &Path) -> Result<JournalVerification, ReconcileEr
             "foreign-key integrity mismatch",
         )));
     }
-    Ok(verified)
+    let summary = reader.query_one_bounded(
+        "SELECT count(*),coalesce(sum(event_count),0),coalesce((SELECT durable_journal_seq FROM source_state WHERE singleton=1),0),coalesce(max(last_seq),0) FROM source_transactions WHERE state='committed'",
+        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?, r.get::<_, i64>(2)?, r.get::<_, i64>(3)?)),
+    )?.ok_or(ReconcileError::Journal(JournalError::Conflict("missing startup integrity summary")))?;
+    if summary.2 < summary.3 {
+        return Err(ReconcileError::Journal(JournalError::Conflict(
+            "durable boundary trails committed journal",
+        )));
+    }
+    Ok(JournalVerification {
+        transaction_count: summary.0 as u64,
+        event_count: summary.1 as u64,
+        durable_seq: summary.2 as u64,
+    })
 }
 
 pub fn journal_report(path: &Path) -> Result<JournalReport, ReconcileError> {
@@ -431,7 +444,7 @@ pub fn journal_report(path: &Path) -> Result<JournalReport, ReconcileError> {
         transaction_count,
         event_count,
         durable_seq,
-    } = startup_integrity(path)?;
+    } = journal_verify(path, READER_MAX_ROWS, READER_MAX_AGE)?;
     let reader = open_reader_with_limits(path, READER_MAX_AGE, READER_MAX_ROWS)?;
     let foreign_violation: Option<i64> = reader
         .query_one_bounded("SELECT 1 FROM pragma_foreign_key_check LIMIT 1", |r| {
