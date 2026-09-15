@@ -1191,6 +1191,10 @@ pub async fn run_loaded_config(
         now as u64,
     )
     .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?;
+    if journal_path.exists() {
+        crate::m2_reconcile::startup_integrity(&journal_path)
+            .map_err(|_| CaptureFailure::at("reconciliation", "M2_STARTUP_INTEGRITY_FAILED"))?;
+    }
     let writer = open_writer(&journal_path, "production-run", 1, now)
         .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_OPEN_FAILED"))?;
     let durable = writer

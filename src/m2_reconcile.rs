@@ -11,6 +11,8 @@ use rusqlite::params;
 use serde::Serialize;
 use std::path::Path;
 
+const STARTUP_VERIFY_MAX_EVENTS: usize = 10_000_000;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LiveSourceObservation {
     pub source_system_id: String,
@@ -69,6 +71,8 @@ pub struct StartupReceipt {
 
 #[derive(Clone, Debug)]
 struct LocalState {
+    capture_epoch: String,
+    control_revision: i64,
     source_system_id: String,
     timeline_id: String,
     database_id: String,
@@ -101,23 +105,32 @@ fn persist(
     path: &Path,
     run_id: &str,
     live: &LiveSourceObservation,
+    local: &LocalState,
     receipt: &StartupReceipt,
+    persist_live_positions: bool,
 ) -> Result<(), ReconcileError> {
     let mut writer = open_writer(path, run_id, 1, 0)?;
     let tx = writer.connection_mut().transaction()?;
     tx.execute(
-        "INSERT INTO startup_reconciliations(run_id,capture_epoch,outcome,reason_code,requested_lsn,effective_restart_lsn,durable_transaction_end_lsn,creation_floor_lsn,created_at) SELECT ?1,capture_epoch,?2,?3,?4,?5,durable_transaction_end_lsn,slot_creation_floor_lsn,strftime('%Y-%m-%dT%H:%M:%fZ','now') FROM source_state WHERE singleton=1",
-        params![run_id, outcome_name(&receipt.outcome), receipt.reason_code, receipt.requested_lsn, receipt.effective_restart_lsn],
+        "INSERT INTO startup_reconciliations(run_id,capture_epoch,outcome,reason_code,requested_lsn,effective_restart_lsn,durable_transaction_end_lsn,creation_floor_lsn,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+        params![run_id, local.capture_epoch, outcome_name(&receipt.outcome), receipt.reason_code, receipt.requested_lsn, receipt.effective_restart_lsn, receipt.durable_transaction_end_lsn, receipt.creation_floor_lsn],
     )?;
-    tx.execute(
-        "UPDATE source_state SET observed_confirmed_flush_lsn=?1,observed_restart_lsn=?2,control_revision=control_revision+1 WHERE singleton=1",
-        params![live.confirmed_flush_lsn, live.restart_lsn],
-    )?;
+    let changed = if persist_live_positions {
+        tx.execute("UPDATE source_state SET observed_confirmed_flush_lsn=?1,observed_restart_lsn=?2,control_revision=control_revision+1 WHERE singleton=1 AND control_revision=?3", params![live.confirmed_flush_lsn, live.restart_lsn, local.control_revision])?
+    } else {
+        tx.execute("UPDATE source_state SET control_revision=control_revision+1 WHERE singleton=1 AND control_revision=?1", [local.control_revision])?
+    };
+    if changed != 1 {
+        return Err(ReconcileError::StaleSnapshot);
+    }
     if receipt.outcome == StartupOutcome::BootstrapAmbiguousRequiresRestart {
         tx.execute(
             "UPDATE bootstrap_intents SET state='remote_slot_unknown',revision=revision+1 WHERE state='prepared' AND EXISTS(SELECT 1 FROM source_state s WHERE s.singleton=1 AND bootstrap_intents.capture_epoch=s.capture_epoch AND bootstrap_intents.source_system_id=s.source_system_id AND bootstrap_intents.database_id=s.database_id AND bootstrap_intents.slot_name=s.slot_name)",
             [],
         )?;
+    }
+    if receipt.outcome == StartupOutcome::RequiresReseed {
+        tx.execute("INSERT INTO reseed_intents(intent_id,destination_id,capture_epoch,state,revision,evidence_digest) VALUES('startup-'||?1,NULL,?2,'blocked',0,?3)", params![run_id,local.capture_epoch,receipt.reason_code])?;
     }
     tx.commit()?;
     Ok(())
@@ -140,6 +153,7 @@ pub enum ReconcileError {
     Journal(JournalError),
     MissingSourceState,
     InvalidObservation,
+    StaleSnapshot,
 }
 impl From<rusqlite::Error> for ReconcileError {
     fn from(value: rusqlite::Error) -> Self {
@@ -170,7 +184,7 @@ pub fn reconcile_startup(
         return Err(ReconcileError::InvalidObservation);
     }
 
-    if let Err(error) = journal_verify(path, READER_MAX_ROWS, READER_MAX_AGE) {
+    if let Err(error) = startup_integrity(path) {
         let receipt = StartupReceipt {
             outcome: StartupOutcome::RequiresReseed,
             reason_code: "JOURNAL_INTEGRITY_FAILED".into(),
@@ -179,14 +193,14 @@ pub fn reconcile_startup(
             durable_transaction_end_lsn: None,
             creation_floor_lsn: None,
         };
-        let _ = persist(path, run_id, live, &receipt);
-        return Err(ReconcileError::Journal(error));
+        let _ = receipt;
+        return Err(error);
     }
 
     let reader = open_reader_with_limits(path, READER_MAX_AGE, READER_MAX_ROWS)?;
     let local = reader.query_one_bounded(
-        "SELECT s.capture_epoch,s.source_system_id,s.timeline_id,s.database_id,s.slot_name,s.plugin,s.publication_fingerprint,s.protocol_fingerprint,s.durable_transaction_end_lsn,s.slot_creation_floor_lsn,coalesce(s.slot_creation_intent_id,(SELECT intent_id FROM bootstrap_intents bi WHERE bi.capture_epoch=s.capture_epoch AND bi.source_system_id=s.source_system_id AND bi.database_id=s.database_id AND bi.slot_name=s.slot_name AND bi.state NOT IN ('complete','invalidated','aborted') ORDER BY bi.created_at,bi.intent_id LIMIT 1)),coalesce(b.state,(SELECT state FROM bootstrap_intents bi WHERE bi.capture_epoch=s.capture_epoch AND bi.source_system_id=s.source_system_id AND bi.database_id=s.database_id AND bi.slot_name=s.slot_name AND bi.state NOT IN ('complete','invalidated','aborted') ORDER BY bi.created_at,bi.intent_id LIMIT 1)) FROM source_state s LEFT JOIN bootstrap_intents b ON b.intent_id=s.slot_creation_intent_id WHERE s.singleton=1",
-        |r| Ok(LocalState { source_system_id:r.get(1)?,timeline_id:r.get(2)?,database_id:r.get(3)?,slot_name:r.get(4)?,plugin:r.get(5)?,publication_fingerprint:r.get(6)?,protocol_fingerprint:r.get(7)?,durable_lsn:r.get(8)?,creation_floor:r.get(9)?,bootstrap_intent_id:r.get(10)?,bootstrap_state:r.get(11)? })
+        "SELECT s.capture_epoch,s.control_revision,s.source_system_id,s.timeline_id,s.database_id,s.slot_name,s.plugin,s.publication_fingerprint,s.protocol_fingerprint,s.durable_transaction_end_lsn,s.slot_creation_floor_lsn,coalesce(s.slot_creation_intent_id,(SELECT intent_id FROM bootstrap_intents bi WHERE bi.capture_epoch=s.capture_epoch AND bi.source_system_id=s.source_system_id AND bi.database_id=s.database_id AND bi.slot_name=s.slot_name AND bi.state NOT IN ('complete','invalidated','aborted') ORDER BY bi.created_at,bi.intent_id LIMIT 1)),coalesce(b.state,(SELECT state FROM bootstrap_intents bi WHERE bi.capture_epoch=s.capture_epoch AND bi.source_system_id=s.source_system_id AND bi.database_id=s.database_id AND bi.slot_name=s.slot_name AND bi.state NOT IN ('complete','invalidated','aborted') ORDER BY bi.created_at,bi.intent_id LIMIT 1)) FROM source_state s LEFT JOIN bootstrap_intents b ON b.intent_id=s.slot_creation_intent_id WHERE s.singleton=1",
+        |r| Ok(LocalState { capture_epoch:r.get(0)?,control_revision:r.get(1)?,source_system_id:r.get(2)?,timeline_id:r.get(3)?,database_id:r.get(4)?,slot_name:r.get(5)?,plugin:r.get(6)?,publication_fingerprint:r.get(7)?,protocol_fingerprint:r.get(8)?,durable_lsn:r.get(9)?,creation_floor:r.get(10)?,bootstrap_intent_id:r.get(11)?,bootstrap_state:r.get(12)? })
     )?.ok_or(ReconcileError::MissingSourceState)?;
     let local_fences = reader.query_bounded(
         "SELECT destination_id,highest_external_fence FROM destinations ORDER BY destination_id",
@@ -194,7 +208,6 @@ pub fn reconcile_startup(
     )?;
     drop(reader); // bounded SQLite readers never remain held across archive/external inspection.
 
-    let archive_state = archive.inspect();
     let identity_mismatch = local.source_system_id != live.source_system_id
         || local.timeline_id != live.timeline_id
         || local.database_id != live.database_id
@@ -202,6 +215,11 @@ pub fn reconcile_startup(
         || local.plugin != live.plugin
         || local.publication_fingerprint != live.publication_fingerprint
         || local.protocol_fingerprint != live.protocol_fingerprint;
+    let archive_state = if identity_mismatch {
+        ArchiveReconciliation::Compatible
+    } else {
+        archive.inspect()
+    };
     let external_ahead = external.iter().any(|observed| {
         local_fences
             .iter()
@@ -319,10 +337,10 @@ pub fn reconcile_startup(
         reason_code: reason.into(),
         requested_lsn: requested,
         effective_restart_lsn: effective,
-        durable_transaction_end_lsn: local.durable_lsn,
-        creation_floor_lsn: local.creation_floor,
+        durable_transaction_end_lsn: local.durable_lsn.clone(),
+        creation_floor_lsn: local.creation_floor.clone(),
     };
-    persist(path, run_id, live, &receipt)?;
+    persist(path, run_id, live, &local, &receipt, !identity_mismatch)?;
     Ok(receipt)
 }
 
@@ -336,12 +354,33 @@ pub struct JournalReport {
     pub replay_ceiling_seq: u64,
 }
 
+pub fn startup_integrity(path: &Path) -> Result<JournalVerification, ReconcileError> {
+    let verified = journal_verify(path, STARTUP_VERIFY_MAX_EVENTS, READER_MAX_AGE)?;
+    let reader = open_reader_with_limits(path, READER_MAX_AGE, 1)?;
+    let full: Option<String> = reader.query_one_bounded("PRAGMA integrity_check", |r| r.get(0))?;
+    if full.as_deref() != Some("ok") {
+        return Err(ReconcileError::Journal(JournalError::Conflict(
+            "SQLite integrity_check failed",
+        )));
+    }
+    let foreign: Option<i64> = reader
+        .query_one_bounded("SELECT 1 FROM pragma_foreign_key_check LIMIT 1", |r| {
+            r.get(0)
+        })?;
+    if foreign.is_some() {
+        return Err(ReconcileError::Journal(JournalError::Conflict(
+            "foreign-key integrity mismatch",
+        )));
+    }
+    Ok(verified)
+}
+
 pub fn journal_report(path: &Path) -> Result<JournalReport, ReconcileError> {
     let JournalVerification {
         transaction_count,
         event_count,
         durable_seq,
-    } = journal_verify(path, READER_MAX_ROWS, READER_MAX_AGE)?;
+    } = startup_integrity(path)?;
     let reader = open_reader_with_limits(path, READER_MAX_AGE, READER_MAX_ROWS)?;
     let foreign_violation: Option<i64> = reader
         .query_one_bounded("SELECT 1 FROM pragma_foreign_key_check LIMIT 1", |r| {

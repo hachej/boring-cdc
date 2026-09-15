@@ -736,16 +736,16 @@ pub fn journal_verify(
     if quick.as_deref() != Some("ok") {
         return Err(JournalError::Conflict("SQLite quick_check failed"));
     }
-    let summary: Option<(i64,i64,i64)> = reader.query_one_bounded(
-        "SELECT count(*),coalesce(sum(event_count),0),coalesce((SELECT durable_journal_seq FROM source_state WHERE singleton=1),0) FROM source_transactions WHERE state='committed'",
-        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
+    let summary: Option<(i64,i64,i64,i64,i64)> = reader.query_one_bounded(
+        "SELECT count(*),coalesce(sum(event_count),0),coalesce((SELECT durable_journal_seq FROM source_state WHERE singleton=1),0),coalesce(min(first_seq),1),coalesce(max(last_seq),0) FROM source_transactions WHERE state='committed'",
+        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)),
     )?;
-    let (transactions, expected_events, durable) =
+    let (transactions, expected_events, durable, first_retained, last_retained) =
         summary.ok_or(JournalError::Conflict("missing verification summary"))?;
     if expected_events as usize > max_events {
         return Err(JournalError::Limit("verification event bound"));
     }
-    let mut global_seq = 1i64;
+    let mut global_seq = first_retained;
     let mut seen_events = 0i64;
     let mut seen_transactions = 0i64;
     let mut active: Option<(String, i64, i64, i64, String, Sha256)> = None;
@@ -772,7 +772,9 @@ pub fn journal_verify(
             return Err(JournalError::Conflict("transaction checksum mismatch"));
         }
     }
-    if seen_events != expected_events || seen_transactions != transactions || durable != seen_events
+    if seen_events != expected_events
+        || seen_transactions != transactions
+        || durable < last_retained
     {
         return Err(JournalError::Conflict(
             "journal continuity or durable boundary mismatch",
