@@ -25,7 +25,7 @@ def main():
   adapter_argv=['cargo','test','--quiet','--locked',adapter,'--','--exact']
   adapter_env={**os.environ,'TMPDIR':'/var/tmp','BORING_CDC_FAILURE_GOLDEN_CASE':case['id']}
   adapted=subprocess.run(adapter_argv,cwd=R,text=True,capture_output=True,timeout=300,env=adapter_env);assert adapted.returncode==0,adapted.stderr
-  adapter_out=out/'golden'/f"{case['id']}-adapter.stdout";adapter_err=out/'golden'/f"{case['id']}-adapter.stderr";w(adapter_out,adapted.stdout);w(adapter_err,adapted.stderr);extra_commands.append(('BORING_CDC_FAILURE_GOLDEN_CASE='+case['id']+' '+' '.join(adapter_argv),adapter_out,adapter_err,adapted.returncode))
+  adapter_out=out/'golden'/f"{case['id']}-adapter.stdout";adapter_err=out/'golden'/f"{case['id']}-adapter.stderr";w(adapter_out,adapted.stdout);w(adapter_err,adapted.stderr);extra_commands.append(('env BORING_CDC_FAILURE_GOLDEN_CASE='+case['id']+' '+' '.join(adapter_argv),adapter_out,adapter_err,adapted.returncode))
  process_observations=[]
  probe='m2_jsonl::tests::process_crash_and_recovery_probe'
  for hook in ['after-intent','after-write','after-file-sync','after-directory-sync','after-rename','after-parent-sync','before-marker','after-marker-write','after-marker-sync','before-checkpoint']:
@@ -33,10 +33,10 @@ def main():
   crash_env={**os.environ,'TMPDIR':'/var/tmp','BORING_CDC_JSONL_PROCESS_BASE':str(base),'BORING_CDC_JSONL_PROCESS_PHASE':'crash','BORING_CDC_JSONL_PROCESS_FAULT':hook}
   proc=subprocess.Popen(['cargo','test','--quiet','--locked',probe,'--','--exact','--nocapture'],cwd=R,text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=crash_env)
   crash_pid=proc.pid; crash_stdout,crash_stderr=proc.communicate(timeout=300);assert proc.returncode!=0
-  crash_out=out/'process'/f'{hook}-crash.stdout';crash_err=out/'process'/f'{hook}-crash.stderr';w(crash_out,crash_stdout);w(crash_err,crash_stderr);extra_commands.append((f'BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT={hook} cargo test --quiet --locked {probe} -- --exact --nocapture',crash_out,crash_err,proc.returncode))
+  crash_out=out/'process'/f'{hook}-crash.stdout';crash_err=out/'process'/f'{hook}-crash.stderr';w(crash_out,crash_stdout);w(crash_err,crash_stderr);extra_commands.append((f'env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT={hook} cargo test --quiet --locked {probe} -- --exact --nocapture',crash_out,crash_err,proc.returncode))
   recover_env={**os.environ,'TMPDIR':'/var/tmp','BORING_CDC_JSONL_PROCESS_BASE':str(base),'BORING_CDC_JSONL_PROCESS_PHASE':'recover','BORING_CDC_JSONL_PROCESS_OBSERVATION':str(observed)}
   recovered=subprocess.run(['cargo','test','--quiet','--locked',probe,'--','--exact','--nocapture'],cwd=R,text=True,capture_output=True,timeout=300,env=recover_env);assert recovered.returncode==0,recovered.stderr
-  recover_out=out/'process'/f'{hook}-recover.stdout';recover_err=out/'process'/f'{hook}-recover.stderr';w(recover_out,recovered.stdout);w(recover_err,recovered.stderr);extra_commands.append((f'BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked {probe} -- --exact --nocapture',recover_out,recover_err,recovered.returncode))
+  recover_out=out/'process'/f'{hook}-recover.stdout';recover_err=out/'process'/f'{hook}-recover.stderr';w(recover_out,recovered.stdout);w(recover_err,recovered.stderr);extra_commands.append((f'env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked {probe} -- --exact --nocapture',recover_out,recover_err,recovered.returncode))
   value=json.loads(observed.read_text());assert value['recovery_pid']!=value['crash_pid'] and value['checkpoint']==2 and value['segment_count']==1 and value['marker_file']
   process_observations.append({'hook':hook,'crash_exit_code':proc.returncode,**value})
  process_raw=scratch/'process-observations.json';w(process_raw,c({'schema_version':'m2-jsonl-process-crash-observations/v1','runs':process_observations}))
