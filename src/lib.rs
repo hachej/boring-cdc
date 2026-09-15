@@ -17,6 +17,7 @@ pub mod m1_workload;
 pub mod m1_cli_contract;
 
 pub mod m2_capture_runtime;
+pub mod m2_fault_status;
 pub mod m2_heartbeat;
 pub mod m2_init_recovery;
 pub mod m2_journal;

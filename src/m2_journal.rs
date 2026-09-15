@@ -333,7 +333,11 @@ impl JournalStore {
         if fault == CommitFault::SlowSqliteCommit {
             std::thread::sleep(Duration::from_millis(50));
         }
+        crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::BeforeSourceCommit);
         transaction.commit()?;
+        crate::m2_fault_status::fault_hook(
+            crate::m2_fault_status::FaultHook::AfterSourceCommitBeforeFeedback,
+        );
         if fault == CommitFault::AfterSqliteCommit {
             return Err(JournalError::AmbiguousAfterCommit);
         }

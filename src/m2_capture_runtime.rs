@@ -1176,6 +1176,9 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         }
         for packet in runtime.take_feedback() {
             if !ownership_probe() {
+                crate::m2_fault_status::fault_hook(
+                    crate::m2_fault_status::FaultHook::OwnershipLost,
+                );
                 runtime.ownership_lost();
                 runtime
                     .persist_if_enabled(
@@ -1187,6 +1190,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                     })?;
                 return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
             }
+            crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::BeforeFeedback);
             if connection
                 .send_standby_status_update(
                     packet.write_lsn,
@@ -1208,6 +1212,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                     })?;
                 return Err(CaptureFailure::at("runtime", "M2_FEEDBACK_TRANSPORT_LOSS"));
             }
+            crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::AfterFeedback);
         }
         if runtime.committed_transactions() >= stop_after_commits {
             runtime.graceful_shutdown().map_err(|_| {

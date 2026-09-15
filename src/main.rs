@@ -8,6 +8,7 @@ use boring_cdc::m1_preflight::{
     CheckStatus, PreflightObservation, envelope, evaluate_untrusted, input_failure,
 };
 use boring_cdc::m2_capture_runtime::{acquire_production_ownership, run_loaded_config};
+use boring_cdc::m2_fault_status::snapshot as status_snapshot;
 use boring_cdc::m2_init_recovery::{complete_plan, consume_plan, execute_confirmed, issue_plan};
 use boring_cdc::m2_journal::journal_inspect_event;
 use boring_cdc::m2_reconcile::{journal_report, recover_report};
@@ -365,6 +366,45 @@ fn read_only_journal_command(
         mutation_trace: None,
     })
 }
+fn status_command() -> Result<CliEnvelope, ReaderFailure> {
+    let text = std::fs::read_to_string("boring-cdc.toml").map_err(|_| {
+        ReaderFailure::unavailable(
+            "M2_STATUS_CONFIG_UNAVAILABLE",
+            "status configuration is unavailable",
+        )
+    })?;
+    let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Status)
+        .map_err(|e| ReaderFailure::unavailable(e.code, "status configuration is invalid"))?;
+    let report = status_snapshot(
+        std::path::Path::new(&config.public().storage.sqlite_path),
+        &config.fingerprints().runtime,
+        std::time::SystemTime::now(),
+    )
+    .map_err(|_| ReaderFailure {
+        code: "M2_STATUS_UNAVAILABLE",
+        message: "fresh status evidence is unavailable",
+        exit: ExitCode::Unavailable,
+    })?;
+    Ok(CliEnvelope {
+        schema_version: CLI_SCHEMA_VERSION,
+        command: "CMD-STATUS".into(),
+        outcome: "success".into(),
+        code: "OK".into(),
+        message: "fresh read-only system snapshot".into(),
+        request_id: None,
+        run_id: report.run_id.clone(),
+        capture_epoch: report.capture_epoch.clone(),
+        condition: Some(report.overall_health.clone()),
+        runbook_id: None,
+        data: serde_json::to_value(report).expect("status snapshot"),
+        warnings: vec![],
+        next_commands: vec![],
+        plan_digest: None,
+        postcondition_evidence_digest: None,
+        mutation_trace: None,
+    })
+}
+
 fn init_command(
     parsed: &boring_cdc::m1_cli_contract::ParsedCommand,
 ) -> Result<CliEnvelope, ReaderFailure> {
@@ -515,6 +555,49 @@ fn main() {
             let _ = write_stdout(command_help(parsed.spec).as_bytes());
         }
         Ok(parsed) => {
+            if parsed.spec.id == "CMD-STATUS" {
+                match status_command() {
+                    Ok(result) => {
+                        if parsed.json {
+                            let mut bytes = serde_json::to_vec(&result).expect("envelope");
+                            bytes.push(b'\n');
+                            if write_stdout(&bytes).is_err() {
+                                std::process::exit(0);
+                            }
+                        } else {
+                            let report = &result.data;
+                            let mut text = format!(
+                                "overall_health: {}\nsnapshot_id: {}\nstate_revision: {}\n",
+                                report["overall_health"].as_str().unwrap_or("unknown"),
+                                report["snapshot_id"].as_str().unwrap_or("unknown"),
+                                report["state_revision"]
+                            );
+                            for condition in report["conditions"].as_array().into_iter().flatten() {
+                                text.push_str(&format!(
+                                    "condition: {} severity={} reason={} runbook={} procedure={}\n",
+                                    condition["condition"].as_str().unwrap_or("unknown"),
+                                    condition["severity"].as_str().unwrap_or("unknown"),
+                                    condition["reason"].as_str().unwrap_or("unknown"),
+                                    condition["runbook_id"].as_str().unwrap_or("unknown"),
+                                    condition["procedure_status"].as_str().unwrap_or("unknown")
+                                ));
+                            }
+                            text.push_str(&format!(
+                                "facts_json: {}\n",
+                                serde_json::to_string(report).expect("status facts")
+                            ));
+                            if write_stdout(text.as_bytes()).is_err() {
+                                std::process::exit(0);
+                            }
+                        }
+                        return;
+                    }
+                    Err(error) => {
+                        eprintln!("{}: {}", error.code, error.message);
+                        std::process::exit(error.exit as i32);
+                    }
+                }
+            }
             if parsed.spec.id == "CMD-INIT" {
                 match init_command(&parsed) {
                     Ok(result) => {
