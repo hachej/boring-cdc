@@ -296,6 +296,12 @@ impl SecretString {
         &self.0
     }
 }
+impl Drop for SecretString {
+    fn drop(&mut self) {
+        // String owns this allocation exclusively; erase its initialized bytes before release.
+        unsafe { self.0.as_mut_vec().fill(0) };
+    }
+}
 
 struct Secrets {
     runtime: Option<SecretString>,

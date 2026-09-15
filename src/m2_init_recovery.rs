@@ -10,7 +10,10 @@ use crate::m2_ownership::{OwnerKind, OwnershipError, OwnershipGuard, SourceLockS
 use crate::m2_schema::open_writer;
 use pg_walstream::PgReplicationConnection;
 use sha2::{Digest, Sha256};
-use std::path::Path;
+use std::fs::OpenOptions;
+use std::io::{Read, Write};
+use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub const OWNER_BEAD: &str = "boring-cdc-m2-init-recovery";
@@ -28,6 +31,139 @@ impl InitFailure {
     fn at(boundary: &'static str, code: &'static str) -> Self {
         Self { code, boundary }
     }
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+struct PersistedPlan {
+    plan_digest: String,
+    token: String,
+    config_fingerprint: String,
+    expires_unix_ms: u64,
+    state: String,
+}
+
+fn plan_path(store: &Path) -> PathBuf {
+    store.with_extension("init-plan.json")
+}
+
+/// Issue a CSPRNG-backed, expiring confirmation plan under the local ownership sidecar.
+pub fn issue_plan(
+    store: &Path,
+    config_fingerprint: &str,
+    now_ms: u64,
+) -> Result<(String, String), InitFailure> {
+    if let Some(parent) = store.parent() {
+        std::fs::create_dir_all(parent).map_err(|_| InitFailure::at("plan", "M2_INIT_PLAN_IO"))?;
+    }
+    let lock_path = store.with_extension("ownership.lock");
+    let lock = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .mode(0o600)
+        .open(&lock_path)
+        .map_err(|_| InitFailure::at("ownership", "M2_INIT_OWNERSHIP_CONFLICT"))?;
+    lock.try_lock()
+        .map_err(|_| InitFailure::at("ownership", "M2_INIT_OWNERSHIP_CONFLICT"))?;
+    let existing_path = plan_path(store);
+    if existing_path.exists() {
+        let state = std::fs::read(&existing_path)
+            .ok()
+            .and_then(|b| serde_json::from_slice::<PersistedPlan>(&b).ok())
+            .map(|p| p.state);
+        return Err(InitFailure::at(
+            "reconciliation",
+            if state.as_deref() == Some("executing") {
+                "M2_INIT_RECONCILIATION_REQUIRED"
+            } else {
+                "M2_INIT_PLAN_ALREADY_ISSUED"
+            },
+        ));
+    }
+    let mut nonce = [0u8; 16];
+    OpenOptions::new()
+        .read(true)
+        .open("/dev/urandom")
+        .and_then(|mut f| f.read_exact(&mut nonce))
+        .map_err(|_| InitFailure::at("plan", "M2_INIT_RANDOM_UNAVAILABLE"))?;
+    let token = nonce.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    let plan_digest = format!(
+        "{:x}",
+        Sha256::digest(format!("m2-init/v1:{config_fingerprint}:{token}").as_bytes())
+    );
+    let plan = PersistedPlan {
+        plan_digest: plan_digest.clone(),
+        token: token.clone(),
+        config_fingerprint: config_fingerprint.into(),
+        expires_unix_ms: now_ms.saturating_add(300_000),
+        state: "issued".into(),
+    };
+    let path = plan_path(store);
+    let mut f = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&path)
+        .map_err(|_| InitFailure::at("plan", "M2_INIT_PLAN_IO"))?;
+    f.write_all(
+        &serde_json::to_vec(&plan).map_err(|_| InitFailure::at("plan", "M2_INIT_PLAN_IO"))?,
+    )
+    .and_then(|_| f.sync_all())
+    .map_err(|_| InitFailure::at("plan", "M2_INIT_PLAN_IO"))?;
+    Ok((plan_digest, token))
+}
+
+/// Atomically marks the exact issued plan executing. Executing remnants are ambiguous and block.
+pub fn consume_plan(
+    store: &Path,
+    config_fingerprint: &str,
+    token: &str,
+    now_ms: u64,
+) -> Result<String, InitFailure> {
+    let path = plan_path(store);
+    let meta = path
+        .metadata()
+        .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
+    if meta.permissions().mode() & 0o077 != 0 || !meta.is_file() {
+        return Err(InitFailure::at(
+            "confirmation",
+            "M2_INIT_CONFIRMATION_INVALID",
+        ));
+    }
+    let mut plan: PersistedPlan = serde_json::from_slice(
+        &std::fs::read(&path)
+            .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?,
+    )
+    .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
+    if plan.state != "issued"
+        || plan.token != token
+        || plan.config_fingerprint != config_fingerprint
+        || now_ms > plan.expires_unix_ms
+    {
+        return Err(InitFailure::at(
+            "confirmation",
+            if plan.state == "executing" {
+                "M2_INIT_RECONCILIATION_REQUIRED"
+            } else {
+                "M2_INIT_CONFIRMATION_INVALID"
+            },
+        ));
+    }
+    plan.state = "executing".into();
+    let mut f = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(&path)
+        .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
+    f.write_all(&serde_json::to_vec(&plan).unwrap())
+        .and_then(|_| f.sync_all())
+        .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
+    Ok(plan.plan_digest)
+}
+pub fn complete_plan(store: &Path) -> Result<(), InitFailure> {
+    std::fs::remove_file(plan_path(store))
+        .map_err(|_| InitFailure::at("confirmation", "M2_INIT_PLAN_COMPLETION_FAILED"))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
@@ -194,9 +330,9 @@ pub fn execute_confirmed(
                 .max(1),
         ))
         .map_err(|_| InitFailure::at("ownership", "M2_INIT_OWNERSHIP_LOST"))?;
-    // A dedicated connection performs the bounded request while the lock connection remains live.
-    let mut c = PgReplicationConnection::connect(admin_dsn)
-        .map_err(|_| InitFailure::at("source", "M2_INIT_ADMIN_CONNECT_FAILED"))?;
+    // The advisory-lock connection itself performs every source read and mutation. If it dies,
+    // PostgreSQL aborts its transaction while releasing the lock; no detached session can commit.
+    let c = &mut ownership.source_session_mut().connection;
     let identity = c
         .exec("SELECT system_identifier::text,(pg_control_checkpoint()).timeline_id::text FROM pg_control_system()")
         .map_err(|_| InitFailure::at("source_identity", "M2_INIT_SOURCE_IDENTITY_FAILED"))?;
@@ -207,7 +343,7 @@ pub fn execute_confirmed(
         .get_value(0, 1)
         .ok_or_else(|| InitFailure::at("source_identity", "M2_INIT_SOURCE_IDENTITY_FAILED"))?;
     let database = scalar(
-        &mut c,
+        c,
         "SELECT oid::text FROM pg_database WHERE datname=current_database()",
         "source_identity",
     )?;
@@ -216,7 +352,7 @@ pub fn execute_confirmed(
         Sha256::digest(format!("{system}:{timeline}:{database}").as_bytes())
     );
     let slot_count = scalar(
-        &mut c,
+        c,
         &format!(
             "SELECT count(*)::text FROM pg_replication_slots WHERE slot_name='{}'",
             config.public().source.slot
@@ -227,7 +363,7 @@ pub fn execute_confirmed(
         return Err(InitFailure::at("slot", "M2_INIT_PERMANENT_SLOT_EXISTS"));
     }
     let publication_exists = scalar(
-        &mut c,
+        c,
         &format!(
             "SELECT count(*)::text FROM pg_publication WHERE pubname='{}'",
             config.public().source.publication
@@ -266,8 +402,8 @@ GRANT SELECT(id),UPDATE(capture_epoch,generation,table_set_fingerprint,unique_no
             )
         }
     );
-    exec(&mut c, &setup, "source_setup")?;
-    verify(&mut c, config, &expected)?;
+    exec(c, &setup, "source_setup")?;
+    verify(c, config, &expected)?;
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| InitFailure::at("clock", "M2_INIT_CLOCK_INVALID"))?
@@ -353,6 +489,19 @@ fn verify(
                 "M2_INIT_CONTROL_SHAPE_DRIFT",
             ));
         }
+        let constraints = scalar(
+            c,
+            &format!(
+                "SELECT count(*)::text FROM pg_constraint WHERE conrelid='{table}'::regclass AND (contype='p' OR (contype='c' AND pg_get_constraintdef(oid) LIKE '%singleton%'))"
+            ),
+            "control_shape",
+        )?;
+        if constraints != "2" {
+            return Err(InitFailure::at(
+                "control_shape",
+                "M2_INIT_CONTROL_KEY_NOT_IMMUTABLE",
+            ));
+        }
     }
     let role_safety = scalar(
         c,
@@ -363,6 +512,19 @@ fn verify(
     )?;
     if role_safety != "0" {
         return Err(InitFailure::at("privilege", "M2_INIT_CONTROL_ROLE_EXCESS"));
+    }
+    let memberships = scalar(
+        c,
+        &format!(
+            "SELECT count(*)::text FROM pg_auth_members WHERE roleid=(SELECT oid FROM pg_roles WHERE rolname='{CONTROL_ROLE}') OR member=(SELECT oid FROM pg_roles WHERE rolname='{CONTROL_ROLE}')"
+        ),
+        "privilege",
+    )?;
+    if memberships != "0" {
+        return Err(InitFailure::at(
+            "privilege",
+            "M2_INIT_CONTROL_ROLE_MEMBERSHIP_EXCESS",
+        ));
     }
     let members = scalar(
         c,
@@ -392,7 +554,7 @@ fn verify(
     let privilege = scalar(
         c,
         &format!(
-            "SELECT (has_table_privilege('{CONTROL_ROLE}','{HEARTBEAT}','INSERT') OR has_table_privilege('{CONTROL_ROLE}','{HEARTBEAT}','DELETE') OR has_column_privilege('{CONTROL_ROLE}','{HEARTBEAT}','id','UPDATE') OR has_table_privilege('{CONTROL_ROLE}','{FENCE}','INSERT') OR has_table_privilege('{CONTROL_ROLE}','{FENCE}','DELETE') OR has_column_privilege('{CONTROL_ROLE}','{FENCE}','id','UPDATE'))::int::text"
+            "SELECT (has_table_privilege('{CONTROL_ROLE}','{HEARTBEAT}','SELECT') OR has_table_privilege('{CONTROL_ROLE}','{HEARTBEAT}','INSERT') OR has_table_privilege('{CONTROL_ROLE}','{HEARTBEAT}','DELETE') OR has_column_privilege('{CONTROL_ROLE}','{HEARTBEAT}','id','UPDATE') OR has_table_privilege('{CONTROL_ROLE}','{FENCE}','SELECT') OR has_table_privilege('{CONTROL_ROLE}','{FENCE}','INSERT') OR has_table_privilege('{CONTROL_ROLE}','{FENCE}','DELETE') OR has_column_privilege('{CONTROL_ROLE}','{FENCE}','id','UPDATE'))::int::text"
         ),
         "privilege",
     )?;
@@ -430,6 +592,34 @@ pub mod tests {
             Some("\"public\".\"accounts\"")
         );
         assert!(relation("public.accounts.extra").is_none());
+    }
+    #[test]
+    fn confirmation_plan_is_random_expiring_and_one_shot() {
+        let root = std::env::temp_dir().join(format!("m2-init-plan-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let store = root.join("state.sqlite");
+        let (digest, token) = issue_plan(&store, "config", 100).unwrap();
+        assert_eq!(token.len(), 32);
+        assert_eq!(consume_plan(&store, "config", &token, 200).unwrap(), digest);
+        assert_eq!(
+            consume_plan(&store, "config", &token, 201)
+                .unwrap_err()
+                .code,
+            "M2_INIT_RECONCILIATION_REQUIRED"
+        );
+        complete_plan(&store).unwrap();
+        let (_, next) = issue_plan(&store, "config", 300).unwrap();
+        assert_ne!(token, next);
+        complete_plan(&store).unwrap();
+        let (_, expired) = issue_plan(&store, "config", 0).unwrap();
+        assert_eq!(
+            consume_plan(&store, "config", &expired, 300_001)
+                .unwrap_err()
+                .code,
+            "M2_INIT_CONFIRMATION_INVALID"
+        );
+        let _ = std::fs::remove_dir_all(root);
     }
     #[test]
     fn fresh_schema_accepts_init_identity_without_slot_intent() {

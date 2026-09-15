@@ -307,6 +307,9 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
     pub fn state_lock(&self) -> &StateLock {
         &self.state
     }
+    pub(crate) fn source_session_mut(&mut self) -> &mut S {
+        &mut self.source
+    }
     pub fn backend_pid(&self) -> i32 {
         self.backend_pid
     }

@@ -1,14 +1,14 @@
 use boring_cdc::article1_capture::{CaptureConfig, CaptureFailure, capture_jsonl};
 use boring_cdc::m1_cli_contract::{
-    CLI_SCHEMA_VERSION, CliEnvelope, ExitCode, NextCommand, command_help, error_envelope, parse,
-    root_help, unavailable,
+    CLI_SCHEMA_VERSION, CliEnvelope, ExitCode, MutationTerminal, MutationTrace, NextCommand,
+    command_help, error_envelope, parse, root_help, unavailable,
 };
 use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
 use boring_cdc::m1_preflight::{
     CheckStatus, PreflightObservation, envelope, evaluate_untrusted, input_failure,
 };
 use boring_cdc::m2_capture_runtime::{acquire_production_ownership, run_loaded_config};
-use boring_cdc::m2_init_recovery::execute_confirmed;
+use boring_cdc::m2_init_recovery::{complete_plan, consume_plan, execute_confirmed, issue_plan};
 use boring_cdc::m2_journal::journal_inspect_event;
 use boring_cdc::m2_reconcile::{journal_report, recover_report};
 use pg_walstream::CancellationToken;
@@ -382,12 +382,18 @@ fn init_command(
     };
     let config = load_str_for(&text, &ProcessEnvironment, purpose)
         .map_err(|e| ReaderFailure::unavailable(e.code, "init configuration is invalid"))?;
-    let plan_digest = format!(
-        "{:x}",
-        Sha256::digest(format!("m2-init/v1:{}", config.fingerprints().runtime).as_bytes())
-    );
-    let token = &plan_digest[..32];
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| ReaderFailure::unavailable("M2_INIT_CLOCK_INVALID", "init clock is invalid"))?
+        .as_millis() as u64;
+    let store = std::path::Path::new(&config.public().storage.sqlite_path);
     if !confirmed {
+        let (plan_digest, token) = issue_plan(store, &config.fingerprints().runtime, now_ms)
+            .map_err(|e| ReaderFailure {
+                code: e.code,
+                message: "init dry-run could not be issued",
+                exit: ExitCode::SafetyBlocked,
+            })?;
         return Ok(CliEnvelope {
             schema_version: CLI_SCHEMA_VERSION,
             command: parsed.spec.id.into(),
@@ -407,7 +413,7 @@ fn init_command(
                     "init".into(),
                     "--confirm".into(),
                     "--confirm-token".into(),
-                    token.into(),
+                    token.clone(),
                     "--json".into(),
                 ],
             }],
@@ -421,13 +427,17 @@ fn init_command(
         .windows(2)
         .find(|w| w[0] == "--confirm-token")
         .map(|w| w[1].as_str());
-    if supplied != Some(token) {
-        return Err(ReaderFailure {
-            code: "M2_INIT_CONFIRMATION_INVALID",
-            message: "init confirmation is invalid or stale",
+    let supplied = supplied.ok_or(ReaderFailure {
+        code: "M2_INIT_CONFIRMATION_INVALID",
+        message: "init confirmation is invalid or stale",
+        exit: ExitCode::SafetyBlocked,
+    })?;
+    let plan_digest = consume_plan(store, &config.fingerprints().runtime, supplied, now_ms)
+        .map_err(|e| ReaderFailure {
+            code: e.code,
+            message: "init confirmation is invalid, stale, or ambiguous",
             exit: ExitCode::SafetyBlocked,
-        });
-    }
+        })?;
     let admin = config.administration_dsn().ok_or_else(|| {
         ReaderFailure::unavailable(
             "M2_INIT_ADMIN_UNAVAILABLE",
@@ -444,6 +454,15 @@ fn init_command(
             ExitCode::Integrity
         },
     })?;
+    complete_plan(store).map_err(|e| ReaderFailure {
+        code: e.code,
+        message: "init completion could not be made durable",
+        exit: ExitCode::Integrity,
+    })?;
+    let evidence_digest = format!(
+        "{:x}",
+        Sha256::digest(serde_json::to_vec(&receipt).expect("init receipt"))
+    );
     Ok(CliEnvelope {
         schema_version: CLI_SCHEMA_VERSION,
         command: parsed.spec.id.into(),
@@ -458,9 +477,17 @@ fn init_command(
         data: serde_json::to_value(receipt).expect("init receipt"),
         warnings: vec![],
         next_commands: vec![],
-        plan_digest: Some(plan_digest),
-        postcondition_evidence_digest: None,
-        mutation_trace: None,
+        plan_digest: Some(plan_digest.clone()),
+        postcondition_evidence_digest: Some(evidence_digest.clone()),
+        mutation_trace: Some(MutationTrace {
+            before_snapshot_id: format!("init-before:{}", &plan_digest[..16]),
+            plan_digest: plan_digest.clone(),
+            immutable_intent_id: plan_digest.clone(),
+            external_effect_evidence_digest: Some(evidence_digest),
+            terminal: MutationTerminal::AfterSnapshot {
+                after_snapshot_id: format!("init-after:{}", &plan_digest[..16]),
+            },
+        }),
     })
 }
 

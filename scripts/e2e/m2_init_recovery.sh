@@ -19,7 +19,11 @@ password=$(cat "$work/postgres_password"); dsn="postgresql://boring_cdc:${passwo
 (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --dry-run --json) >"$work/dry.json"
 token=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["confirm_token"])' "$work/dry.json")
 (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token" --json) >"$work/first.json"
-(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token" --json) >"$work/second.json"
+if (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token" --json) >/dev/null 2>&1; then echo E_INIT_TOKEN_REPLAY >&2; exit 1; fi
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --dry-run --json) >"$work/dry2.json"
+token2=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["confirm_token"])' "$work/dry2.json")
+[[ "$token" != "$token2" ]]
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token2" --json) >"$work/second.json"
 [[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot'")" == 0 ]]
 [[ "$(psqlc -Atqc 'select count(*) from boring_cdc_control.heartbeat')" == 1 ]]
 [[ "$(psqlc -Atqc 'select count(*) from boring_cdc_control.capture_fences')" == 1 ]]
@@ -28,7 +32,14 @@ token=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"][
 python3 - "$work/first.json" "$work/second.json" <<'PY'
 import json,sys
 for p in sys.argv[1:]:
- x=json.load(open(p)); assert x['outcome']=='success' and x['data']['logical_slot_exists'] is False and x['data']['control_rows']==2
+ x=json.load(open(p)); assert x['outcome']=='success' and x['data']['logical_slot_exists'] is False and x['data']['control_rows']==2 and x['mutation_trace'] and x['postcondition_evidence_digest']
  s=open(p).read(); assert 'postgresql://' not in s and 'm2-init-password' not in s
 PY
-echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 idempotent=true no_slot=true'
+# Existing excess privilege is detected, never silently repaired.
+psqlc -qc 'GRANT SELECT ON boring_cdc_control.heartbeat TO boring_cdc_control_writer'
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --dry-run --json) >"$work/dry3.json"
+token3=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["confirm_token"])' "$work/dry3.json")
+if (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token3" --json) >"$work/drift.out" 2>"$work/drift.err"; then echo E_PRIVILEGE_DRIFT_ACCEPTED >&2; exit 1; fi
+grep -q M2_INIT_CONTROL_PRIVILEGE_EXCESS "$work/drift.err"; ! grep -q 'postgresql://' "$work/drift.err"
+[[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot'")" == 0 ]]
+echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 idempotent=true replay=blocked privilege_drift=blocked no_slot=true'
