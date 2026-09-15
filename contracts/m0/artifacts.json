@@ -109,7 +109,7 @@
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "14bda17fd5bd64f8ac47e82ccbec91092bf6b0d84d5578fcbec82fb0a1b0c199",
+      "sha256": "b9ed2e9b23ce1cc2154b4a1b8b3f06981eac187f8ca9e569d75b80fcf68dbc0f",
       "status": "complete"
     },
     {
@@ -158,7 +158,7 @@
       "id": "ART-M0-CLICKHOUSE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "scripts/validate/clickhouse_contract.py",
-      "sha256": "19dbf6c6b7f0d38ce27fa40d33904102d82bb789fe38b322dc4be526e8f11151",
+      "sha256": "165f50b3acdbf4329c8e12901755baf55c84fa7ca56929977e5a64421df85568",
       "status": "complete"
     },
     {

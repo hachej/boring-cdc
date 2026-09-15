@@ -57,6 +57,9 @@ def validate_marker_oracles(case,index,out):
   else: valid.append(marker)
  checkpoint=case.get('execution',{}).get('oracle',{}).get('checkpoint','')
  match=re.fullmatch(r'advance_to_(\d+)',checkpoint)
+ adoption=case.get('action',{}).get('fault_hook') in {'replay_identical','after_marker_before_checkpoint'}
+ if adoption and not match:
+  add(out,'E_CHECKPOINT_ORACLE',f'cases/{index}/execution/oracle/checkpoint','valid-marker adoption must advance to its finalized range')
  if match:
   previous=case.get('pre_state',{}).get('checkpoint_journal_seq'); endpoint=previous
   for marker in sorted(valid,key=lambda item:item['first_journal_seq']):

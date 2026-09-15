@@ -17,8 +17,8 @@
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-clickhouse-contract-evidence/v1",
-  "source_parent_git_commit": "aa8450302d382fea2a14a3676620f221ab9c4616",
+  "source_parent_git_commit": "7ed3044f8f1846038ad3beb53221ee6d5fba748b",
   "status": "pass",
   "validator": "scripts/validate/clickhouse_contract.py",
-  "validator_sha256": "19dbf6c6b7f0d38ce27fa40d33904102d82bb789fe38b322dc4be526e8f11151"
+  "validator_sha256": "165f50b3acdbf4329c8e12901755baf55c84fa7ca56929977e5a64421df85568"
 }

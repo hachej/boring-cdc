@@ -31,9 +31,12 @@ class ClickHouseContractTests(unittest.TestCase):
     m.validate_marker_oracles(case,0,findings)
     self.assertIn('E_BATCH_MARKER_BOUNDARY',{finding['code'] for finding in findings})
  def test_checkpoint_oracle_rejects_nonfinalized_endpoint(self):
-  case=copy.deepcopy(m.load(m.F)['cases'][0]); case['execution']['oracle']['checkpoint']='advance_to_102'; case['expected']['checkpoint']='advance_to_102'; findings=[]
-  m.validate_marker_oracles(case,0,findings)
-  self.assertIn('E_CHECKPOINT_ORACLE',{finding['code'] for finding in findings})
+  original=m.load(m.F)['cases'][0]
+  for checkpoint in ('advance_to_102','unchanged','invalid'):
+   with self.subTest(checkpoint=checkpoint):
+    case=copy.deepcopy(original); case['execution']['oracle']['checkpoint']=checkpoint; case['expected']['checkpoint']=checkpoint; findings=[]
+    m.validate_marker_oracles(case,0,findings)
+    self.assertIn('E_CHECKPOINT_ORACLE',{finding['code'] for finding in findings})
  def test_fixture_scope(self):
   c=m.load(m.C); f=m.load(m.F); self.assertEqual(41,len(f['cases'])); self.assertEqual(c['fixture_ids'],[x['fixture_id'] for x in f['cases']])
  def test_exact_provisional_inventory(self):
