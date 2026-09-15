@@ -650,7 +650,33 @@ impl TxnBuffer {
     pub fn stream_events(&self) -> u64 {
         0
     }
-    /// Admits the journal API's owned transaction representation before collecting a spill iterator.
+    /// Admits and collects the journal API's owned transaction representation.
+    ///
+    /// In-memory events transfer ownership instead of being copied. Spilled events reserve the
+    /// complete returned representation once; the iterator does not overlap that reservation with
+    /// a second max-event staging reservation.
+    pub fn collect_for_commit(&mut self) -> Result<Vec<Vec<u8>>, SpoolError> {
+        if self.commit_collection_reserved != 0 {
+            return Err(SpoolError::Invalid("commit collection already admitted"));
+        }
+        if self.failed || self.events == 0 {
+            return Err(SpoolError::Invalid("failed or empty transaction"));
+        }
+        if self.spool.is_none() {
+            self.commit_collection_reserved = self.memory_payload;
+            self.memory_payload = 0;
+            return Ok(std::mem::take(&mut self.memory_events));
+        }
+        let bytes = usize::try_from(self.bytes)
+            .map_err(|_| SpoolError::MemoryLimit(MemoryClass::Staging))?;
+        self.memory.reserve(MemoryClass::Staging, bytes)?;
+        self.commit_collection_reserved = bytes;
+        self.commit_iter()?
+            .map(|entry| entry.map(|bytes| bytes.as_ref().to_vec()))
+            .collect()
+    }
+
+    /// Compatibility admission for callers that consume [`TxnBuffer::commit_iter`] directly.
     pub fn admit_commit_collection(&mut self) -> Result<(), SpoolError> {
         if self.commit_collection_reserved != 0 {
             return Err(SpoolError::Invalid("commit collection already admitted"));
@@ -666,10 +692,16 @@ impl TxnBuffer {
             return Err(SpoolError::Invalid("failed or empty transaction"));
         }
         if self.spool.is_some() {
-            let reservation = self.limits.max_event_bytes;
+            let reservation = if self.commit_collection_reserved == 0 {
+                self.limits.max_event_bytes
+            } else {
+                0
+            };
             self.memory
                 .reserve(MemoryClass::Decoder, READER_WORK_BYTES)?;
-            if let Err(error) = self.memory.reserve(MemoryClass::Staging, reservation) {
+            if reservation != 0
+                && let Err(error) = self.memory.reserve(MemoryClass::Staging, reservation)
+            {
                 self.memory.release(MemoryClass::Decoder, READER_WORK_BYTES);
                 return Err(error);
             }
@@ -1396,6 +1428,24 @@ pub mod tests {
         assert_eq!(values, vec![b"one".to_vec(), b"two".to_vec()]);
         drop(values);
         b.finish().unwrap();
+    }
+    #[test]
+    fn near_limit_commit_collection_does_not_overlap_reservations() {
+        let mut memory = setup("near-limit-memory", 1024, 4096);
+        push(&mut memory, &vec![1; 512]).unwrap();
+        push(&mut memory, &vec![2; 512]).unwrap();
+        let collected = memory.collect_for_commit().unwrap();
+        assert_eq!(collected.iter().map(Vec::len).sum::<usize>(), 1024);
+        drop(collected);
+        memory.finish().unwrap();
+
+        let mut spilled = setup("near-limit-spilled", 3, 4096);
+        push(&mut spilled, &vec![1; 512]).unwrap();
+        push(&mut spilled, &vec![2; 512]).unwrap();
+        let collected = spilled.collect_for_commit().unwrap();
+        assert_eq!(collected.iter().map(Vec::len).sum::<usize>(), 1024);
+        drop(collected);
+        spilled.finish().unwrap();
     }
     #[test]
     fn frame_event_transaction_limits_poison_and_never_permit_feedback() {

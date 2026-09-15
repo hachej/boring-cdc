@@ -10,7 +10,8 @@ use crate::m1_decoder::{
     CopyBothEvent, Decoder, PgoutputEvent, RelationContract, RowChange, TupleValue, WireLimits,
 };
 use crate::m2_journal::{
-    DurableCommit, JournalError, JournalEvent, JournalStore, SourceCommit, transaction_checksum,
+    CommitFault, DurableCommit, JournalError, JournalEvent, JournalStore, JournalWriterService,
+    SourceCommit, WorkOutcome, transaction_checksum,
 };
 use crate::m2_spool::{SpoolError, TxnBuffer};
 use pg_walstream::{CancellationToken, PgReplicationConnection};
@@ -68,10 +69,7 @@ impl RuntimeSpool for TxnBuffer {
         self.push_received(receive)
     }
     fn drain(&mut self) -> Result<Vec<Vec<u8>>, SpoolError> {
-        self.admit_commit_collection()?;
-        self.commit_iter()?
-            .map(|entry| entry.map(|bytes| bytes.as_ref().to_vec()))
-            .collect()
+        self.collect_for_commit()
     }
     fn finish(self: Box<Self>) -> Result<(), SpoolError> {
         (*self).finish()
@@ -92,10 +90,153 @@ where
 
 pub trait DurableJournal {
     fn commit(&mut self, commit: &SourceCommit) -> Result<DurableCommit, JournalError>;
+    fn load_failure(
+        &self,
+        _failure_id: &str,
+        _boundary: crate::failure_policy::FailedBoundary,
+    ) -> Result<Option<crate::failure_policy::FailureRecord>, JournalError> {
+        Ok(None)
+    }
+    fn persist_failure(
+        &mut self,
+        _operation: crate::failure_policy::PreparedFailureOperation,
+    ) -> Result<(), JournalError> {
+        Ok(())
+    }
 }
 impl DurableJournal for JournalStore {
     fn commit(&mut self, commit: &SourceCommit) -> Result<DurableCommit, JournalError> {
         self.commit_atomic(commit, crate::m2_journal::CommitFault::None)
+    }
+}
+impl DurableJournal for JournalWriterService {
+    fn commit(&mut self, commit: &SourceCommit) -> Result<DurableCommit, JournalError> {
+        self.enqueue_capture(commit.clone(), CommitFault::None)
+            .map_err(|_| JournalError::BusyBoundExceeded)?;
+        loop {
+            match self
+                .service_next()
+                .ok_or(JournalError::Conflict("writer queue lost capture"))??
+            {
+                WorkOutcome::Durable(durable) => return Ok(durable),
+                WorkOutcome::Serviced(_) => continue,
+            }
+        }
+    }
+    fn load_failure(
+        &self,
+        failure_id: &str,
+        boundary: crate::failure_policy::FailedBoundary,
+    ) -> Result<Option<crate::failure_policy::FailureRecord>, JournalError> {
+        JournalWriterService::load_failure(self, failure_id, boundary)
+    }
+    fn persist_failure(
+        &mut self,
+        operation: crate::failure_policy::PreparedFailureOperation,
+    ) -> Result<(), JournalError> {
+        JournalWriterService::persist_failure(self, operation)
+    }
+}
+
+impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G> {
+    /// Persist a capture failure through the shared policy and sole fair writer before the
+    /// generation is returned to the supervisor. The persisted deadline is therefore authoritative
+    /// after process restart.
+    pub fn enable_failure_policy(&mut self, capture_epoch: String, config_fingerprint: String) {
+        self.failure_policy_identity = Some((capture_epoch, config_fingerprint));
+    }
+    fn persist_if_enabled(
+        &mut self,
+        class: crate::failure_policy::FailureClass,
+        code: crate::failure_policy::StableErrorCode,
+    ) -> Result<(), RuntimeError> {
+        if self.failure_policy_identity.is_none() {
+            Ok(())
+        } else {
+            self.persist_capture_failure(class, code)
+        }
+    }
+    fn persist_capture_failure(
+        &mut self,
+        class: crate::failure_policy::FailureClass,
+        code: crate::failure_policy::StableErrorCode,
+    ) -> Result<(), RuntimeError> {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let (capture_epoch, config_fingerprint) = self
+            .failure_policy_identity
+            .clone()
+            .ok_or_else(|| RuntimeError::Journal("failure policy identity unavailable".into()))?;
+        let now_ms = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|_| RuntimeError::Journal("failure policy clock invalid".into()))?
+            .as_millis() as u64;
+        let mut random_bytes = [0_u8; 8];
+        std::fs::File::open("/dev/urandom")
+            .and_then(|mut source| std::io::Read::read_exact(&mut source, &mut random_bytes))
+            .map_err(|_| RuntimeError::Journal("failure policy randomness unavailable".into()))?;
+        let random_sample = u64::from_be_bytes(random_bytes);
+        use crate::failure_policy::{
+            Component, FailedBoundary, FailureObservation, FingerprintInput, PolicyAction,
+            PolicyEvent, PreparedFailureOperation,
+        };
+        use crate::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
+        struct One(u64);
+        impl Randomness for One {
+            fn next_u64(&mut self) -> u64 {
+                self.0
+            }
+        }
+        let boundary = FailedBoundary::Capture {
+            capture_epoch: capture_epoch.clone(),
+            end_lsn: format!("{:016X}", self.durable_end_lsn.unwrap_or(0)),
+        };
+        let observation = FailureObservation {
+            destination_id: None,
+            fingerprint: FingerprintInput {
+                component: Component::Capture,
+                class,
+                code,
+                boundary: boundary.clone(),
+                relevant_configuration_fingerprint: config_fingerprint.clone(),
+                context: BTreeMap::from([(
+                    crate::failure_policy::SafeContextKey::Operation,
+                    crate::failure_policy::SafeContextValue::Capture,
+                )]),
+            },
+        };
+        let clock = VirtualClock::new(now_ms);
+        let mut random = One(random_sample);
+        let mut context = TransitionContext {
+            clock: &clock,
+            randomness: &mut random,
+        };
+        let candidate = crate::failure_policy::transition(
+            None,
+            PolicyEvent::Observe(observation.clone()),
+            &mut context,
+        );
+        let PolicyAction::Persist(candidate_record) = candidate else {
+            return Err(RuntimeError::Journal(
+                "failure policy did not persist".into(),
+            ));
+        };
+        let current = self
+            .journal
+            .load_failure(&candidate_record.failure_id, boundary)
+            .map_err(|e| RuntimeError::Journal(e.to_string()))?;
+        let action = crate::failure_policy::transition(
+            current.as_ref(),
+            PolicyEvent::Observe(observation),
+            &mut context,
+        );
+        let operation = PreparedFailureOperation::from_policy_action(
+            action,
+            current.as_ref().map(|record| record.failure_id.clone()),
+        )
+        .ok_or_else(|| RuntimeError::Journal("failure policy suppressed persistence".into()))?;
+        self.journal
+            .persist_failure(operation)
+            .map_err(|e| RuntimeError::Journal(e.to_string()))
     }
 }
 
@@ -144,6 +285,7 @@ pub struct CaptureRuntime<J, S, G> {
     state: RuntimeState,
     feedback: Vec<FeedbackPacket>,
     committed_transactions: u64,
+    failure_policy_identity: Option<(String, String)>,
 }
 
 impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G> {
@@ -165,6 +307,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             state: RuntimeState::Starting,
             feedback: Vec::new(),
             committed_transactions: 0,
+            failure_policy_identity: None,
         }
     }
     pub fn state(&self) -> RuntimeState {
@@ -195,6 +338,11 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             return Err(RuntimeError::Protocol("runtime_not_receiving"));
         }
         self.state = RuntimeState::Capturing;
+        if frame.len() > WireLimits::default().max_copy_data_bytes {
+            return self.safe_stop(RuntimeError::Spool(
+                "transport frame exceeds admitted limit".into(),
+            ));
+        }
         let decoded = self.decoder.decode_copy_data(frame).map_err(|failure| {
             self.state = RuntimeState::CaptureSafeStopped;
             RuntimeError::Decode(failure.fingerprint)
@@ -497,6 +645,29 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
     capture_copyboth_until_with_probe(config, cancellation, runtime, stop_after_commits, || true)
         .await
 }
+struct TransportReceiveLane {
+    admitted_bytes: usize,
+}
+impl TransportReceiveLane {
+    fn admit(max_frame_bytes: usize) -> Result<Self, CaptureFailure> {
+        if max_frame_bytes == 0 {
+            return Err(CaptureFailure::at(
+                "admission",
+                "M2_RECEIVE_ADMISSION_INVALID",
+            ));
+        }
+        Ok(Self {
+            admitted_bytes: max_frame_bytes,
+        })
+    }
+    fn validate(self, observed: usize) -> Result<(), CaptureFailure> {
+        if observed > self.admitted_bytes {
+            Err(CaptureFailure::at("admission", "M2_RECEIVE_FRAME_LIMIT"))
+        } else {
+            Ok(())
+        }
+    }
+}
 async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G: FeedbackGate>(
     config: &CaptureConfig,
     cancellation: &CancellationToken,
@@ -509,6 +680,12 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     loop {
         if !ownership_probe() {
             runtime.ownership_lost();
+            runtime
+                .persist_if_enabled(
+                    crate::failure_policy::FailureClass::OwnershipLost,
+                    crate::failure_policy::StableErrorCode::TransportUnavailable,
+                )
+                .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
             return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
         }
         if cancellation.is_cancelled() {
@@ -517,7 +694,35 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
             })?;
             return Ok(());
         }
-        let frame = match connection.get_copy_data_async(cancellation).await {
+        // Admit a maximum-sized CopyData allocation before transport receive. The read future is
+        // cancelled (not dropped) at every control tick, so a quiet source cannot starve ownership.
+        let admission = TransportReceiveLane::admit(WireLimits::default().max_copy_data_bytes)?;
+        let read_cancellation = cancellation.child_token();
+        let mut read = Box::pin(connection.get_copy_data_async(&read_cancellation));
+        // M0-PROVISIONAL: boring-cdc-m2-capture-runtime.1 (control-lane probe cadence).
+        let control_tick = tokio::time::sleep(std::time::Duration::from_millis(250));
+        tokio::pin!(control_tick);
+        let received = tokio::select! {
+            result = &mut read => Some(result),
+            _ = &mut control_tick => {
+                read_cancellation.cancel();
+                let result = read.as_mut().await;
+                if cancellation.is_cancelled() { Some(result) } else {
+                    if !ownership_probe() {
+                        runtime.ownership_lost();
+                        runtime.persist_if_enabled(
+                            crate::failure_policy::FailureClass::OwnershipLost,
+                            crate::failure_policy::StableErrorCode::TransportUnavailable,
+                        ).map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
+                        return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
+                    }
+                    match result { Ok(frame) => Some(Ok(frame)), Err(_) => None }
+                }
+            }
+        };
+        let Some(received) = received else { continue };
+        drop(read); // completed or cooperatively cancelled and awaited above
+        let frame = match received {
             Ok(frame) => frame,
             Err(_) if cancellation.is_cancelled() => {
                 runtime.graceful_shutdown().map_err(|_| {
@@ -527,18 +732,41 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
             }
             Err(_) => {
                 runtime.unexpected_eof();
+                runtime
+                    .persist_if_enabled(
+                        crate::failure_policy::FailureClass::TransientSource,
+                        crate::failure_policy::StableErrorCode::TransportUnavailable,
+                    )
+                    .map_err(|_| {
+                        CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED")
+                    })?;
                 return Err(CaptureFailure::at("runtime", "M2_COPYBOTH_UNEXPECTED_LOSS"));
             }
         };
-        if runtime.receive(&frame).is_err() && runtime.state() != RuntimeState::CaptureSafeStopped {
+        admission.validate(frame.len())?;
+        if runtime.receive(&frame).is_err() {
+            runtime
+                .persist_if_enabled(
+                    crate::failure_policy::FailureClass::Integrity,
+                    crate::failure_policy::StableErrorCode::InvalidRecord,
+                )
+                .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
             return Err(CaptureFailure::at("runtime", "M2_CAPTURE_FAILED"));
         }
         for packet in runtime.take_feedback() {
             if !ownership_probe() {
                 runtime.ownership_lost();
+                runtime
+                    .persist_if_enabled(
+                        crate::failure_policy::FailureClass::OwnershipLost,
+                        crate::failure_policy::StableErrorCode::TransportUnavailable,
+                    )
+                    .map_err(|_| {
+                        CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED")
+                    })?;
                 return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
             }
-            connection
+            if connection
                 .send_standby_status_update(
                     packet.write_lsn,
                     packet.flush_lsn,
@@ -546,10 +774,19 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                     packet.reply_requested,
                 )
                 .await
-                .map_err(|_| {
-                    runtime.unexpected_eof();
-                    CaptureFailure::at("runtime", "M2_FEEDBACK_TRANSPORT_LOSS")
-                })?;
+                .is_err()
+            {
+                runtime.unexpected_eof();
+                runtime
+                    .persist_if_enabled(
+                        crate::failure_policy::FailureClass::TransientSource,
+                        crate::failure_policy::StableErrorCode::TransportUnavailable,
+                    )
+                    .map_err(|_| {
+                        CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED")
+                    })?;
+                return Err(CaptureFailure::at("runtime", "M2_FEEDBACK_TRANSPORT_LOSS"));
+            }
         }
         if runtime.committed_transactions() >= stop_after_commits {
             runtime.graceful_shutdown().map_err(|_| {
@@ -599,7 +836,41 @@ pub fn acquire_production_ownership(
     config: &crate::m1_config::LoadedConfig,
     run_id: &str,
 ) -> Result<crate::m2_ownership::OwnershipGuard<PgSourceLock>, CaptureFailure> {
+    // Read the persisted schedule before any source connection or lock attempt. A supervisor
+    // restart therefore cannot shorten a transient delay or bypass deterministic safe-stop.
+    let journal_path = std::path::Path::new(&config.public().storage.sqlite_path);
+    if journal_path.exists() {
+        let connection = rusqlite::Connection::open_with_flags(
+            journal_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
+        let gate = connection.query_row(
+            "SELECT retry_class,next_retry_at FROM processing_failures WHERE component='capture' AND armed=1",
+            [],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+        ).optional().map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
+        if let Some((class, next)) = gate {
+            if class != "transient" {
+                return Err(CaptureFailure::at(
+                    "failure_policy",
+                    "M2_EXPLICIT_REARM_REQUIRED",
+                ));
+            }
+            let deadline = next
+                .and_then(|value| value.strip_prefix("unix-ms:")?.parse::<u64>().ok())
+                .ok_or_else(|| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?
+                .as_millis() as u64;
+            if deadline > now {
+                return Err(CaptureFailure::at("failure_policy", "M2_RETRY_NOT_DUE"));
+            }
+        }
+    }
     use crate::m2_ownership::{OwnerKind, OwnershipGuard};
+    use rusqlite::OptionalExtension;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     let dsn = config
         .runtime_dsn()
@@ -802,8 +1073,36 @@ pub async fn run_loaded_config(
         .map(|v| Box::new(v) as Box<dyn RuntimeSpool>)
         .map_err(|e| RuntimeError::Spool(e.to_string()))
     };
-    let mut runtime =
-        CaptureRuntime::new(store, factory, NoSnapshotGate, Default::default(), durable);
+    // M0-PROVISIONAL: boring-cdc-m2-capture-runtime.1 (writer queue caps and capture burst).
+    let writer_service = JournalWriterService::new(store, [8, 4, 2, 1], 4)
+        .map_err(|_| CaptureFailure::at("journal", "M2_WRITER_SERVICE_INVALID"))?;
+    if let Some((retry_class, next_retry_at_ms)) = writer_service
+        .capture_startup_gate()
+        .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?
+    {
+        let now_ms =
+            u64::try_from(now).map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?;
+        if retry_class != "transient" {
+            return Err(CaptureFailure::at(
+                "failure_policy",
+                "M2_EXPLICIT_REARM_REQUIRED",
+            ));
+        }
+        if next_retry_at_ms.is_some_and(|deadline| deadline > now_ms) {
+            return Err(CaptureFailure::at("failure_policy", "M2_RETRY_NOT_DUE"));
+        }
+    }
+    let mut runtime = CaptureRuntime::new(
+        writer_service,
+        factory,
+        NoSnapshotGate,
+        Default::default(),
+        durable,
+    );
+    runtime.enable_failure_policy(
+        config.fingerprints().runtime.clone(),
+        config.fingerprints().runtime.clone(),
+    );
     let result = capture_copyboth_until_with_probe(
         &CaptureConfig::article1(dsn, 1)?,
         cancellation,
@@ -1082,6 +1381,53 @@ pub mod tests {
         for x in [p, p2] {
             let _ = std::fs::remove_file(x);
         }
+    }
+    #[test]
+    fn production_writer_persists_retry_deadline_for_successor() {
+        let (p, store) = store("failure-policy");
+        let service = JournalWriterService::new(store, [2, 2, 1, 1], 1).unwrap();
+        let (_, contract) = relation();
+        let mut runtime = CaptureRuntime::new(
+            service,
+            MemorySpools,
+            Gate(FeedbackPermit::Hold),
+            BTreeMap::from([(7, contract)]),
+            Some(0x10),
+        );
+        runtime.enable_failure_policy("epoch-a".into(), "config-a".into());
+        runtime
+            .persist_capture_failure(
+                crate::failure_policy::FailureClass::TransientSource,
+                crate::failure_policy::StableErrorCode::TransportUnavailable,
+            )
+            .unwrap();
+        let deadline: String = rusqlite::Connection::open(&p).unwrap().query_row(
+            "SELECT next_retry_at FROM processing_failures WHERE component='capture' AND armed=1",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert!(deadline.starts_with("unix-ms:"));
+        assert!(
+            runtime
+                .journal
+                .active_capture_retry_at_ms()
+                .unwrap()
+                .is_some()
+        );
+        drop(runtime);
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn receive_lane_is_admitted_before_frame_validation() {
+        assert!(TransportReceiveLane::admit(0).is_err());
+        assert!(TransportReceiveLane::admit(8).unwrap().validate(8).is_ok());
+        assert_eq!(
+            TransportReceiveLane::admit(8)
+                .unwrap()
+                .validate(9)
+                .unwrap_err()
+                .code,
+            "M2_RECEIVE_FRAME_LIMIT"
+        );
     }
     #[test]
     fn persisted_retry_schedule_gates_successor_startup() {

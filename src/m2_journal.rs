@@ -918,6 +918,7 @@ impl ServiceCommand {
 }
 enum PendingWork {
     Capture(SourceCommit, CommitFault),
+    Failure(crate::failure_policy::PreparedFailureOperation, Instant),
     Service {
         class: WorkClass,
         command: ServiceCommand,
@@ -959,6 +960,90 @@ impl JournalWriterService {
         self.scheduler
             .enqueue(WorkClass::Capture, PendingWork::Capture(commit, fault))
     }
+    pub fn enqueue_failure(
+        &mut self,
+        operation: crate::failure_policy::PreparedFailureOperation,
+    ) -> Result<(), EnqueueError> {
+        self.scheduler.enqueue(
+            WorkClass::FailureControl,
+            PendingWork::Failure(operation, Instant::now()),
+        )
+    }
+    pub fn capture_startup_gate(&self) -> Result<Option<(String, Option<u64>)>, JournalError> {
+        let mut statement = self.store.writer.connection().prepare(
+            "SELECT retry_class,next_retry_at FROM processing_failures WHERE component='capture' AND armed=1",
+        )?;
+        let values = statement
+            .query_map([], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        if values.len() > 1 {
+            return Err(JournalError::Conflict("multiple armed capture failures"));
+        }
+        values
+            .into_iter()
+            .next()
+            .map(|(class, next)| {
+                let parsed = next
+                    .map(|value| {
+                        value
+                            .strip_prefix("unix-ms:")
+                            .and_then(|v| v.parse::<u64>().ok())
+                            .ok_or(JournalError::Conflict("invalid capture retry timestamp"))
+                    })
+                    .transpose()?;
+                Ok((class, parsed))
+            })
+            .transpose()
+    }
+    pub fn active_capture_retry_at_ms(&self) -> Result<Option<u64>, JournalError> {
+        let mut statement = self.store.writer.connection().prepare(
+            "SELECT next_retry_at FROM processing_failures WHERE component='capture' AND armed=1 AND retry_class='transient'",
+        )?;
+        let values = statement
+            .query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?;
+        if values.len() > 1 {
+            return Err(JournalError::Conflict("multiple armed capture failures"));
+        }
+        values
+            .into_iter()
+            .next()
+            .map(|value| {
+                value
+                    .strip_prefix("unix-ms:")
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .ok_or(JournalError::Conflict("invalid capture retry timestamp"))
+            })
+            .transpose()
+    }
+    pub fn load_failure(
+        &self,
+        failure_id: &str,
+        boundary: crate::failure_policy::FailedBoundary,
+    ) -> Result<Option<crate::failure_policy::FailureRecord>, JournalError> {
+        crate::failure_policy::load_failure(self.store.writer.connection(), failure_id, boundary)
+            .map_err(JournalError::from)
+    }
+    pub fn persist_failure(
+        &mut self,
+        operation: crate::failure_policy::PreparedFailureOperation,
+    ) -> Result<(), JournalError> {
+        self.enqueue_failure(operation)
+            .map_err(|_| JournalError::BusyBoundExceeded)?;
+        loop {
+            match self
+                .service_next()
+                .ok_or(JournalError::Conflict("writer queue lost failure"))??
+            {
+                WorkOutcome::Serviced(report) if report.class == WorkClass::FailureControl => {
+                    return Ok(());
+                }
+                WorkOutcome::Durable(_) | WorkOutcome::Serviced(_) => continue,
+            }
+        }
+    }
     pub fn enqueue_service(
         &mut self,
         class: WorkClass,
@@ -985,6 +1070,28 @@ impl JournalWriterService {
                 .store
                 .commit_atomic(&commit, fault)
                 .map(WorkOutcome::Durable),
+            PendingWork::Failure(operation, enqueued_at) => {
+                let queue_wait = enqueued_at.elapsed();
+                let started = Instant::now();
+                let result =
+                    self.store
+                        .writer
+                        .connection_mut()
+                        .transaction()
+                        .and_then(|transaction| {
+                            operation.execute(&transaction)?;
+                            transaction.commit()
+                        });
+                result
+                    .map(|()| {
+                        WorkOutcome::Serviced(ServiceReport {
+                            class: WorkClass::FailureControl,
+                            queue_wait,
+                            completed_in: started.elapsed(),
+                        })
+                    })
+                    .map_err(JournalError::from)
+            }
             PendingWork::Service {
                 class: expected,
                 command,
