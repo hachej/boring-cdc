@@ -22,7 +22,7 @@
       "exit_code": 0
     },
     {
-      "argv": "scripts/validate/m0_artifact.sh contracts/m0/artifacts.json",
+      "argv": "scripts/validate/m0_artifact.sh contracts/m0/artifacts.json --complete --expected-artifacts contracts/m0/expected-artifacts.json",
       "exit_code": 0
     },
     {
