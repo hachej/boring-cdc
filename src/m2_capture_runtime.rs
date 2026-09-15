@@ -509,6 +509,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         let (worst_index, decision) =
             crate::m2_pressure::decide_pressure_filesystems(&observations)
                 .map_err(|error| RuntimeError::JournalTransient(error.to_string()))?;
+        let capture_hard = capture_filesystem_is_hard(&config.filesystems, &observations)?;
         let free = decision.free_bytes;
         let thresholds = observations[worst_index].1;
         let now = std::time::SystemTime::now()
@@ -531,7 +532,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             .map_err(|e| RuntimeError::JournalTransient(e.to_string()))?;
         let result = result
             .ok_or_else(|| RuntimeError::JournalTransient("pressure service unavailable".into()))?;
-        if pressure_stops_capture(&result.decision, &config.filesystems[worst_index]) {
+        if pressure_stops_capture(&result.decision, capture_hard) {
             self.state = RuntimeState::CaptureSafeStopped;
         }
         Ok(())
@@ -901,11 +902,31 @@ fn classify_runtime_failure(
     }
 }
 
+fn capture_filesystem_is_hard(
+    filesystems: &[RuntimePressureFilesystem],
+    observations: &[(u64, crate::m2_pressure::PressureThresholds)],
+) -> Result<bool, RuntimeError> {
+    if filesystems.len() != observations.len() {
+        return Err(RuntimeError::JournalTransient(
+            "pressure filesystem profile mismatch".into(),
+        ));
+    }
+    filesystems
+        .iter()
+        .zip(observations)
+        .filter(|(filesystem, _)| filesystem.capture_critical)
+        .try_fold(false, |hard, (_, (free, thresholds))| {
+            crate::m2_pressure::decide_pressure(*free, *thresholds)
+                .map(|decision| hard || decision.state == crate::m2_pressure::PressureState::Hard)
+                .map_err(|error| RuntimeError::JournalTransient(error.to_string()))
+        })
+}
+
 fn pressure_stops_capture(
     decision: &crate::m2_pressure::PressureDecision,
-    filesystem: &RuntimePressureFilesystem,
+    capture_filesystem_hard: bool,
 ) -> bool {
-    decision.actions.safe_stop_capture && filesystem.capture_critical
+    decision.actions.safe_stop_capture && capture_filesystem_hard
 }
 
 fn configured_pressure_filesystems(
@@ -1983,9 +2004,16 @@ pub mod tests {
             thresholds,
             capture_critical: true,
         };
-        assert!(!pressure_stops_capture(&hard, &archive));
+        assert!(!pressure_stops_capture(&hard, false));
         assert!(hard.actions.stop_new_archive_backfill);
-        assert!(pressure_stops_capture(&hard, &shared_state_archive));
+        assert!(pressure_stops_capture(&hard, true));
+        assert!(
+            capture_filesystem_is_hard(
+                &[archive, shared_state_archive],
+                &[(40, thresholds), (40, thresholds)],
+            )
+            .unwrap()
+        );
     }
 
     #[test]
