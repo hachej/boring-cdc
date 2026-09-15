@@ -586,7 +586,54 @@ pub fn bounded_metadata_gc(
         .transaction_with_behavior(TransactionBehavior::Immediate)?;
     let n = limits.batch_max as i64;
     let alerts=tx.execute("DELETE FROM alerts WHERE rowid IN (SELECT rowid FROM alerts WHERE state='cleared' ORDER BY rowid LIMIT ?1) AND (SELECT count(*) FROM alerts)>?2",params![n,limits.alerts_rows as i64])? as u64;
-    let audits=tx.execute("DELETE FROM destination_audits WHERE audit_id IN (SELECT a.audit_id FROM destination_audits a JOIN terminal_metadata_retention m ON m.category='destination_audit' AND m.object_id=a.audit_id WHERE a.journal_cursor_seq>=a.round_target_seq AND a.self_cursor_seq>=a.round_target_seq ORDER BY m.terminal_at_unix_ms LIMIT ?1) AND (SELECT count(*) FROM destination_audits)>?2",params![n,limits.audit_rows as i64])? as u64;
+    let audit_count = tx.query_row("SELECT count(*) FROM destination_audits", [], |row| {
+        row.get::<_, u64>(0)
+    })?;
+    let audit_limit = audit_count
+        .saturating_sub(limits.audit_rows)
+        .min(limits.batch_max as u64) as i64;
+    let audit_ids = {
+        let mut statement = tx.prepare(
+            "SELECT a.audit_id FROM destination_audits a
+             JOIN terminal_metadata_retention m
+               ON m.category='destination_audit' AND m.object_id=a.audit_id
+             WHERE a.journal_cursor_seq>=a.round_target_seq
+               AND a.self_cursor_seq>=a.round_target_seq
+             ORDER BY m.terminal_at_unix_ms,a.audit_id LIMIT ?1",
+        )?;
+        statement
+            .query_map([audit_limit], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?
+    };
+    let mut audits = 0;
+    for audit_id in audit_ids {
+        // The terminal owner row and all of its logical pins are coordinated by this one
+        // IMMEDIATE transaction. Advancing active pins through release_pending preserves the
+        // lifecycle trigger, while also reconciling a release already requested by another turn.
+        tx.execute(
+            "UPDATE logical_range_pins SET state='release_pending',revision=revision+1
+             WHERE owner_kind='audit' AND owner_id=?1 AND state='active'",
+            [&audit_id],
+        )?;
+        tx.execute(
+            "UPDATE logical_range_pins SET state='released',revision=revision+1
+             WHERE owner_kind='audit' AND owner_id=?1 AND state='release_pending'",
+            [&audit_id],
+        )?;
+        let deleted = tx.execute(
+            "DELETE FROM destination_audits WHERE audit_id=?1
+             AND journal_cursor_seq>=round_target_seq AND self_cursor_seq>=round_target_seq",
+            [&audit_id],
+        )?;
+        if deleted == 1 {
+            tx.execute(
+                "DELETE FROM terminal_metadata_retention
+                 WHERE category='destination_audit' AND object_id=?1",
+                [&audit_id],
+            )?;
+            audits += 1;
+        }
+    }
     let commands=tx.execute("DELETE FROM operator_command_requests WHERE request_id IN (SELECT request_id FROM operator_command_requests WHERE state IN ('completed','failed','aborted_by_restart') AND expires_at<?1 ORDER BY expires_at LIMIT ?2)",params![limits.completed_command_cutoff,n])? as u64;
     let invalid_generations=tx.execute("DELETE FROM backfill_generations WHERE generation_id IN (SELECT g.generation_id FROM backfill_generations g JOIN terminal_metadata_retention m ON m.category='invalid_generation' AND m.object_id=g.generation_id WHERE g.state='invalidated' AND m.terminal_at_unix_ms<?1 ORDER BY m.terminal_at_unix_ms LIMIT ?2)",params![limits.invalid_generation_cutoff_ms,n])? as u64;
     let retired_generations=tx.execute("DELETE FROM archive_generations WHERE generation_id IN (SELECT g.generation_id FROM archive_generations g JOIN terminal_metadata_retention m ON m.category='retired_generation' AND m.object_id=g.generation_id WHERE g.state IN ('retired','invalidated') AND m.terminal_at_unix_ms<?1 ORDER BY m.terminal_at_unix_ms LIMIT ?2)",params![limits.retired_generation_cutoff_ms,n])? as u64;
@@ -929,6 +976,157 @@ pub(crate) mod tests {
         drop(w);
         let _ = std::fs::remove_file(p);
     }
+    #[test]
+    fn audit_metadata_gc_atomically_releases_active_and_pending_pins() {
+        let (mut w, p) = writer();
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','clickhouse','cfg','epoch',1)",[]).unwrap();
+        for (audit_id, terminal_at, terminal) in [
+            ("old", 1_i64, true),
+            ("next", 2, true),
+            ("active", 3, false),
+        ] {
+            let cursor = if terminal { 10 } else { 9 };
+            w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,budget_bytes_used,budget_events_used,budget_ms_used,freshness_window_started_at,freshness_expires_at,contract_digest) VALUES(?1,'d','cfg','epoch',1,10,'round',?2,?2,0,0,0,'2026','2027','contract')",params![audit_id,cursor]).unwrap();
+            w.connection().execute("INSERT INTO terminal_metadata_retention(category,object_id,terminal_at_unix_ms) VALUES('destination_audit',?1,?2)",params![audit_id,terminal_at]).unwrap();
+            create_pin(
+                &mut w,
+                PinSpec {
+                    pin_id: audit_id,
+                    owner_kind: "audit",
+                    owner_id: audit_id,
+                    capture_epoch: "epoch",
+                    start_seq: 1,
+                    end_seq: Some(10),
+                    expires_at_unix_ms: None,
+                },
+            )
+            .unwrap();
+        }
+        request_pin_release(&mut w, "next", 0).unwrap();
+        let limits = MetadataRetention {
+            alerts_rows: 1,
+            audit_rows: 1,
+            completed_command_cutoff: "2025",
+            invalid_generation_cutoff_ms: 1,
+            retired_generation_cutoff_ms: 1,
+            orphan_cutoff_ms: 1,
+            batch_max: 1,
+        };
+
+        assert_eq!(
+            bounded_metadata_gc(&mut w, limits.clone()).unwrap().audits,
+            1
+        );
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT state FROM logical_range_pins WHERE pin_id='old'",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+            "released"
+        );
+        assert_eq!(bounded_metadata_gc(&mut w, limits).unwrap().audits, 1);
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT state FROM logical_range_pins WHERE pin_id='next'",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+            "released"
+        );
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT state FROM logical_range_pins WHERE pin_id='active'",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+            "active"
+        );
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT group_concat(audit_id,',') FROM destination_audits",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+            "active"
+        );
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT count(*) FROM terminal_metadata_retention WHERE category='destination_audit'", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        drop(w);
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
+    fn audit_pin_release_rolls_back_when_metadata_delete_fails() {
+        let (mut w, p) = writer();
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','clickhouse','cfg','epoch',1)",[]).unwrap();
+        for audit_id in ["blocked", "keeper"] {
+            w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,budget_bytes_used,budget_events_used,budget_ms_used,freshness_window_started_at,freshness_expires_at,contract_digest) VALUES(?1,'d','cfg','epoch',1,10,'round',10,10,0,0,0,'2026','2027','contract')",[audit_id]).unwrap();
+            w.connection().execute("INSERT INTO terminal_metadata_retention(category,object_id,terminal_at_unix_ms) VALUES('destination_audit',?1,1)",[audit_id]).unwrap();
+        }
+        create_pin(
+            &mut w,
+            PinSpec {
+                pin_id: "blocked-pin",
+                owner_kind: "audit",
+                owner_id: "blocked",
+                capture_epoch: "epoch",
+                start_seq: 1,
+                end_seq: Some(10),
+                expires_at_unix_ms: None,
+            },
+        )
+        .unwrap();
+        w.connection().execute_batch("CREATE TRIGGER reject_blocked_audit BEFORE DELETE ON destination_audits WHEN OLD.audit_id='blocked' BEGIN SELECT RAISE(ABORT,'injected delete failure'); END;").unwrap();
+        let result = bounded_metadata_gc(
+            &mut w,
+            MetadataRetention {
+                alerts_rows: 1,
+                audit_rows: 1,
+                completed_command_cutoff: "2025",
+                invalid_generation_cutoff_ms: 1,
+                retired_generation_cutoff_ms: 1,
+                orphan_cutoff_ms: 1,
+                batch_max: 1,
+            },
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT state FROM logical_range_pins WHERE pin_id='blocked-pin'",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+            "active"
+        );
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT count(*) FROM destination_audits WHERE audit_id='blocked'",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            1
+        );
+        drop(w);
+        let _ = std::fs::remove_file(p);
+    }
+
     #[test]
     fn runtime_service_tick_executes_action_gc_and_maintenance() {
         let (mut w, p) = writer();
