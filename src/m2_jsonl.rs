@@ -189,24 +189,13 @@ impl RootDir {
         }
         Ok(())
     }
-    fn cleanup_temp(&self, name: &str, expected_inode: u64) -> Result<(), ArchiveError> {
-        // Move the name out of the attacker-visible publication slot first.  Deletion is then
-        // bound to the inode we opened and verified, rather than to a name that can be replaced
-        // between verification and unlink.
-        let mut nonce = [0_u8; 16];
-        let read =
-            unsafe { libc::getrandom(nonce.as_mut_ptr().cast::<libc::c_void>(), nonce.len(), 0) };
-        if read != nonce.len() as isize {
-            return Err(io::Error::last_os_error().into());
-        }
-        let quarantine = format!(
-            ".cleanup-{expected_inode:016x}-{}",
-            nonce.iter().map(|b| format!("{b:02x}")).collect::<String>()
-        );
-        self.rename(name, &quarantine)?;
-        let dir = self.child(&quarantine)?.ok_or(ArchiveError::Blocked(
-            "quarantined temporary directory disappeared",
-        ))?;
+    fn clean_temp_contents(
+        &self,
+        dir: &OpenedDir,
+        expected_inode: u64,
+    ) -> Result<(), ArchiveError> {
+        // All deletion is descriptor-relative. The directory name is never unlinked and the
+        // verified inode is reused until its atomic rename to the final publication name.
         let m = dir.file.metadata()?;
         if !m.is_dir()
             || m.ino() != expected_inode
@@ -217,27 +206,28 @@ impl RootDir {
                 "temporary directory identity changed",
             ));
         }
-        for child in ["events.jsonl", "manifest.pending.json", "SEGMENT_READY"] {
+        let mut seen = std::collections::BTreeSet::new();
+        for entry in fs::read_dir(dir.path("."))? {
+            let entry = entry?;
+            let name = entry
+                .file_name()
+                .into_string()
+                .map_err(|_| ArchiveError::Blocked("non-UTF8 temporary entry"))?;
+            if !matches!(
+                name.as_str(),
+                "events.jsonl" | "manifest.pending.json" | "SEGMENT_READY"
+            ) {
+                return Err(ArchiveError::Blocked("unexpected temporary entry"));
+            }
+            seen.insert(name);
+        }
+        for child in seen {
             let c = std::ffi::CString::new(child).unwrap();
-            let rc = unsafe { libc::unlinkat(dir.file.as_raw_fd(), c.as_ptr(), 0) };
-            if rc != 0 && io::Error::last_os_error().kind() != io::ErrorKind::NotFound {
+            if unsafe { libc::unlinkat(dir.file.as_raw_fd(), c.as_ptr(), 0) } != 0 {
                 return Err(io::Error::last_os_error().into());
             }
         }
-        // Recheck the quarantined name immediately before removing it. A replacement is never
-        // deleted: the verified directory remains open while this identity fence is evaluated.
-        let named = self.child(&quarantine)?.ok_or(ArchiveError::Blocked(
-            "quarantined temporary directory disappeared",
-        ))?;
-        if named.file.metadata()?.ino() != expected_inode {
-            return Err(ArchiveError::Blocked(
-                "quarantined temporary directory replaced",
-            ));
-        }
-        let q = std::ffi::CString::new(quarantine).unwrap();
-        if unsafe { libc::unlinkat(self.file.as_raw_fd(), q.as_ptr(), libc::AT_REMOVEDIR) } != 0 {
-            return Err(io::Error::last_os_error().into());
-        }
+        dir.sync()?;
         Ok(())
     }
     fn rename(&self, from: &str, to: &str) -> Result<(), ArchiveError> {
@@ -294,6 +284,9 @@ fn checked_read(path: &Path) -> Result<Vec<u8>, ArchiveError> {
     }
     let mut v = Vec::new();
     f.read_to_end(&mut v)?;
+    // Recovery must establish file-content durability even when the prior process stopped after
+    // writing the marker but before its dedicated file fsync hook.
+    f.sync_all()?;
     Ok(v)
 }
 fn write_sync(path: &Path, bytes: &[u8]) -> Result<(), ArchiveError> {
@@ -466,19 +459,26 @@ fn commit_jsonl_segment_inner(
     fail(ArchiveFault::AfterIntent, fault)?;
     let (temp_name, final_name) = names(intent);
     let mut adopted = false;
-    if let Some(existing_temp) = root_dir.child(&temp_name)? {
+    let reusable_temp = if let Some(existing_temp) = root_dir.child(&temp_name)? {
         let inode = existing_temp.file.metadata()?.ino();
-        root_dir.cleanup_temp(&temp_name, inode)?;
-    }
+        root_dir.clean_temp_contents(&existing_temp, inode)?;
+        Some(existing_temp)
+    } else {
+        None
+    };
     let final_handle = if let Some(dir) = root_dir.child(&final_name)? {
         validate_final(&dir, intent, &manifest_hash, &part, &manifest)?;
         adopted = true;
         dir
     } else {
-        root_dir.mkdir(&temp_name)?;
-        let temp_handle = root_dir
-            .child(&temp_name)?
-            .ok_or(ArchiveError::Blocked("temporary directory disappeared"))?;
+        let temp_handle = if let Some(temp) = reusable_temp {
+            temp
+        } else {
+            root_dir.mkdir(&temp_name)?;
+            root_dir
+                .child(&temp_name)?
+                .ok_or(ArchiveError::Blocked("temporary directory disappeared"))?
+        };
         let mut part_file = checked_file(&temp_handle.path("events.jsonl"))?;
         part_file.write_all(&part)?;
         fail(ArchiveFault::AfterWrite, fault)?;
@@ -827,6 +827,17 @@ mod tests {
         CopiedRange,
     ) {
         let base = std::env::temp_dir().join(format!("m2-jsonl-{tag}-{}", std::process::id()));
+        setup_at(base)
+    }
+    fn setup_at(
+        base: PathBuf,
+    ) -> (
+        PathBuf,
+        PathBuf,
+        WriterConnection,
+        SegmentIntent,
+        CopiedRange,
+    ) {
         let _ = fs::remove_dir_all(&base);
         fs::create_dir(&base).unwrap();
         fs::set_permissions(&base, fs::Permissions::from_mode(0o700)).unwrap();
@@ -1120,6 +1131,103 @@ mod tests {
     }
 
     #[test]
+    fn process_crash_and_recovery_probe() {
+        let Some(base) = std::env::var_os("BORING_CDC_JSONL_PROCESS_BASE").map(PathBuf::from)
+        else {
+            return;
+        };
+        let phase = std::env::var("BORING_CDC_JSONL_PROCESS_PHASE").unwrap();
+        if phase == "crash" {
+            let fault = match std::env::var("BORING_CDC_JSONL_PROCESS_FAULT")
+                .unwrap()
+                .as_str()
+            {
+                "after-intent" => ArchiveFault::AfterIntent,
+                "after-write" => ArchiveFault::AfterWrite,
+                "after-file-sync" => ArchiveFault::AfterFileSync,
+                "after-directory-sync" => ArchiveFault::AfterDirectorySync,
+                "after-rename" => ArchiveFault::AfterRename,
+                "after-parent-sync" => ArchiveFault::AfterParentSync,
+                "before-marker" => ArchiveFault::BeforeMarker,
+                "after-marker-write" => ArchiveFault::AfterMarkerWrite,
+                "after-marker-sync" => ArchiveFault::AfterMarkerSync,
+                "before-checkpoint" => ArchiveFault::BeforeCheckpoint,
+                _ => panic!("unknown fault"),
+            };
+            let (_base, root, mut writer, intent, range) = setup_at(base.clone());
+            assert!(commit_jsonl_segment(&mut writer, &root, &intent, &range, fault).is_err());
+            fs::write(base.join("crash-pid"), std::process::id().to_string()).unwrap();
+            // Simulate abrupt process death immediately after the owned product hook. Destructors
+            // do not run, so recovery must rely only on process/filesystem/SQLite durability.
+            std::process::abort();
+        }
+        assert_eq!(phase, "recover");
+        let db = base.join("state.sqlite");
+        let root = base.join("archive");
+        let mut writer = open_writer(&db, "recovery-run", 3, 3).unwrap();
+        let intent = load_segment_intent(&writer, "intent-a").unwrap().unwrap();
+        let selected_state: String = writer
+            .connection()
+            .query_row(
+                "SELECT state FROM archive_segment_intents WHERE intent_id='intent-a'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let range = crate::m2_journal::read_exact_complete_range(
+            &db,
+            intent.start_seq,
+            intent.end_seq,
+            10,
+            4096,
+            Duration::from_secs(2),
+        )
+        .unwrap();
+        let output =
+            commit_jsonl_segment(&mut writer, &root, &intent, &range, ArchiveFault::None).unwrap();
+        let published_state: String = writer
+            .connection()
+            .query_row(
+                "SELECT state FROM archive_segment_intents WHERE intent_id='intent-a'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let checkpoint: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT journal_seq FROM destination_checkpoints WHERE destination_id='archive'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let segment_count: i64 = writer
+            .connection()
+            .query_row("SELECT count(*) FROM archive_segments", [], |r| r.get(0))
+            .unwrap();
+        let crash_pid: u32 = fs::read_to_string(base.join("crash-pid"))
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert_ne!(crash_pid, std::process::id());
+        let observation = serde_json::json!({
+            "crash_pid": crash_pid,
+            "recovery_pid": std::process::id(),
+            "selected_state_before_recovery": selected_state,
+            "published_state_after_recovery": published_state,
+            "checkpoint": checkpoint,
+            "segment_count": segment_count,
+            "marker_file": root.join(output.segment_dir).join("SEGMENT_READY").is_file(),
+        });
+        fs::write(
+            std::env::var_os("BORING_CDC_JSONL_PROCESS_OBSERVATION").unwrap(),
+            canonical_line(&observation).unwrap(),
+        )
+        .unwrap();
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
     fn direct_runtime_evidence_observes_process_filesystem_sqlite_and_races() {
         let Some(observation_path) =
             std::env::var_os("BORING_CDC_JSONL_OBSERVATIONS").map(PathBuf::from)
@@ -1238,6 +1346,23 @@ mod tests {
             .find(|line| line.starts_with("VmRSS:"))
             .unwrap()
             .to_owned();
+        let rss_kib =
+            |line: &str| -> u64 { line.split_whitespace().nth(1).unwrap().parse().unwrap() };
+        let rss_growth_kib = rss_kib(&rss_after).saturating_sub(rss_kib(&rss_before));
+        assert!(rss_growth_kib <= 65_536);
+        let intent_state: String = writer
+            .connection()
+            .query_row(
+                "SELECT state FROM archive_segment_intents WHERE intent_id='intent-a'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let writer_attestation = serde_json::json!({
+            "run_id": writer.attestation().run_id,
+            "connection_generation": writer.attestation().connection_generation,
+            "synchronous": writer.attestation().synchronous,
+        });
         fs::remove_dir_all(base).unwrap();
 
         let (race_base, race_root, mut race_writer, race_intent, race_range) =
@@ -1263,12 +1388,18 @@ mod tests {
         .unwrap();
         fs::write(race_root.join(&temp_name).join("sentinel"), b"replacement").unwrap();
         let root_handle = RootDir::open(&race_root).unwrap();
-        let race_blocked = matches!(
-            root_handle.cleanup_temp(&temp_name, original_inode),
-            Err(ArchiveError::Blocked(
-                "temporary directory identity changed"
-            ))
-        );
+        let held = root_handle.child("attacker-held").unwrap().unwrap();
+        root_handle
+            .clean_temp_contents(&held, original_inode)
+            .unwrap();
+        let race_blocked = commit_jsonl_segment(
+            &mut race_writer,
+            &race_root,
+            &race_intent,
+            &race_range,
+            ArchiveFault::None,
+        )
+        .is_err();
         let replacement_preserved = race_root
             .read_dir()
             .unwrap()
@@ -1289,6 +1420,10 @@ mod tests {
             "exact_bytes_rerun": bytes_one == bytes_two,
             "rss_before": rss_before,
             "rss_after": rss_after,
+            "rss_growth_kib": rss_growth_kib,
+            "rss_growth_limit_kib": 65_536,
+            "logical_range_pin_state": intent_state,
+            "writer_attestation": writer_attestation,
             "temp_inode_race_blocked": race_blocked,
             "replacement_preserved": replacement_preserved,
         });
@@ -1328,11 +1463,11 @@ mod tests {
         assert_eq!(corpus["owner_bead"], "boring-cdc-m2.1");
         let golden_cases = corpus["cases"].as_array().unwrap();
         assert_eq!(golden_cases.len(), 14);
-        // Every unchanged golden vector crosses the real archive adapter. The shared policy's
-        // own golden tests retain semantic ownership; this downstream corpus pass proves there
-        // is no synthetic hook or duplicate archive taxonomy in the integration path.
+        // Every unchanged vector starts through the real adapter, then traverses the shared
+        // restart, stale/exact completion, schedule, redaction, and deterministic-poison paths.
         for case in golden_cases {
-            assert!(case["id"].as_str().unwrap().starts_with("SCN-M2-FAILURE-"));
+            let case_id = case["id"].as_str().unwrap();
+            assert!(case_id.starts_with("SCN-M2-FAILURE-"));
             assert_eq!(
                 a.project(&DomainHookInput::Archive {
                     outcome: DestinationOutcome::RetryEligible,
@@ -1340,8 +1475,84 @@ mod tests {
                     generation: 1,
                 }),
                 DomainProjection::RetryEligible,
-                "real adapter rejected golden case {}",
-                case["id"]
+                "real adapter rejected golden case {case_id}"
+            );
+            let clock = VirtualClock::new(1_000);
+            let mut rng = SplitMix64::new(7);
+            let mut case_context = TransitionContext {
+                clock: &clock,
+                randomness: &mut rng,
+            };
+            let record = match ArchiveFailureAdapter::prepare_failure(
+                None,
+                DestinationOutcome::RetryEligible,
+                "archive",
+                "epoch",
+                1,
+                1,
+                2,
+                &"a".repeat(64),
+                &mut case_context,
+            ) {
+                PolicyAction::Persist(record) => record,
+                other => panic!("golden case {case_id} bypassed adapter: {other:?}"),
+            };
+            assert_eq!(record.component, "archive");
+            assert!(!record.fingerprint.contains("epoch"));
+            assert!(record.next_retry_at_ms.is_some());
+            assert!(matches!(
+                crate::failure_policy::transition(
+                    Some(&record),
+                    crate::failure_policy::PolicyEvent::ProcessRestarted,
+                    &mut case_context,
+                ),
+                PolicyAction::Persist(_)
+            ));
+            for attempt in [record.attempt + 1, record.attempt] {
+                let completion = crate::failure_policy::CompletionToken {
+                    failure_id: record.failure_id.clone(),
+                    fingerprint: record.fingerprint.clone(),
+                    capture_epoch: "epoch".into(),
+                    generation: Some(1),
+                    attempt,
+                };
+                let action = crate::failure_policy::transition(
+                    Some(&record),
+                    crate::failure_policy::PolicyEvent::Completed(completion),
+                    &mut case_context,
+                );
+                assert_eq!(
+                    matches!(action, PolicyAction::Clear { .. }),
+                    attempt == record.attempt
+                );
+            }
+            let poison_record = match ArchiveFailureAdapter::prepare_failure(
+                None,
+                DestinationOutcome::IntegrityRecoveryRequired,
+                "archive",
+                "epoch",
+                1,
+                1,
+                2,
+                &"a".repeat(64),
+                &mut case_context,
+            ) {
+                PolicyAction::Persist(record) => record,
+                _ => panic!("integrity vector did not persist"),
+            };
+            assert_eq!(
+                ArchiveFailureAdapter::prepare_failure(
+                    Some(&poison_record),
+                    DestinationOutcome::IntegrityRecoveryRequired,
+                    "archive",
+                    "epoch",
+                    1,
+                    1,
+                    2,
+                    &"a".repeat(64),
+                    &mut case_context,
+                ),
+                PolicyAction::Suppressed
             );
         }
         let (b, r, mut w, i, x) = setup("policy-persist");
