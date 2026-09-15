@@ -24,7 +24,12 @@ pub struct LeaseToken {
     pub identity: LeaseIdentity,
     pub expires_mono_ms: u64,
     pub revision: u64,
-    pub external_namespace: String,
+    external_namespace: String,
+}
+impl LeaseToken {
+    pub fn external_namespace(&self) -> &str {
+        &self.external_namespace
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -55,7 +60,8 @@ pub enum SideEffectOutcome<T> {
 
 pub trait SideEffectAdapter {
     type Artifact;
-    fn apply(&mut self, external_namespace: &str) -> Result<Self::Artifact, String>;
+    /// Persist an immutable candidate artifact. Adapters must never mutate a live selector here.
+    fn apply_candidate(&mut self, external_namespace: &str) -> Result<Self::Artifact, String>;
 }
 
 fn nonempty(value: &str) -> bool {
@@ -82,11 +88,13 @@ pub fn derive_external_namespace(identity: &LeaseIdentity) -> Result<String, Lea
     }
     let mut encoded = b"boring-cdc-side-effect-namespace-v1".to_vec();
     for value in [
+        identity.lease_id.as_bytes(),
         identity.destination_id.as_bytes(),
         identity.capture_epoch.as_bytes(),
         &identity.generation.to_be_bytes(),
         identity.configuration_fingerprint.as_bytes(),
         identity.anchor_id.as_deref().unwrap_or("").as_bytes(),
+        identity.run_id.as_bytes(),
     ] {
         framed(&mut encoded, value);
     }
@@ -98,6 +106,9 @@ fn valid_in(
     token: &LeaseToken,
     now: u64,
 ) -> Result<bool, LeaseError> {
+    if derive_external_namespace(&token.identity)? != token.external_namespace {
+        return Ok(false);
+    }
     let now = as_i64(now)?;
     let expires = as_i64(token.expires_mono_ms)?;
     let revision = as_i64(token.revision)?;
@@ -245,7 +256,7 @@ pub fn renew(
         identity: token.identity.clone(),
         expires_mono_ms: expires_u64,
         revision: token.revision + 1,
-        external_namespace: token.external_namespace.clone(),
+        external_namespace: token.external_namespace().to_owned(),
     })
 }
 
@@ -259,26 +270,33 @@ pub fn expire_due(writer: &mut WriterConnection, now_mono_ms: u64) -> Result<usi
 
 /// Validate immediately before dispatch, then validate again after dispatch. A stale completion is
 /// returned as an artifact for reconciliation but is never eligible for local completion CAS.
-pub fn dispatch<A: SideEffectAdapter>(
+pub fn dispatch<A, C>(
     writer: &mut WriterConnection,
     token: &LeaseToken,
-    now_mono_ms: u64,
+    clock_mono_ms: &mut C,
     adapter: &mut A,
-) -> Result<SideEffectOutcome<A::Artifact>, LeaseError> {
+) -> Result<SideEffectOutcome<A::Artifact>, LeaseError>
+where
+    A: SideEffectAdapter,
+    C: FnMut() -> u64,
+{
+    let before_now = clock_mono_ms();
     let before = writer
         .connection_mut()
         .transaction_with_behavior(TransactionBehavior::Immediate)?;
-    if !valid_in(&before, token, now_mono_ms)? {
+    if !valid_in(&before, token, before_now)? {
         return Err(LeaseError::Stale);
     }
     before.commit()?;
+    let namespace = derive_external_namespace(&token.identity)?;
     let artifact = adapter
-        .apply(&token.external_namespace)
+        .apply_candidate(&namespace)
         .map_err(LeaseError::External)?;
+    let after_now = clock_mono_ms();
     let after = writer
         .connection_mut()
         .transaction_with_behavior(TransactionBehavior::Immediate)?;
-    let live = valid_in(&after, token, now_mono_ms)?;
+    let live = valid_in(&after, token, after_now)?;
     after.commit()?;
     Ok(if live {
         SideEffectOutcome::Live(artifact)
@@ -289,23 +307,26 @@ pub fn dispatch<A: SideEffectAdapter>(
 
 /// Run a local completion only while the exact lease tuple remains current. The callback and CAS
 /// execute in one IMMEDIATE transaction, which is the checkpoint/promotion boundary.
-pub fn complete_local<T, F>(
+pub fn complete_local<T, F, C>(
     writer: &mut WriterConnection,
     token: &LeaseToken,
-    now_mono_ms: u64,
+    clock_mono_ms: &mut C,
     completion: F,
 ) -> Result<T, LeaseError>
 where
     F: FnOnce(&Transaction<'_>) -> Result<T, LeaseError>,
+    C: FnMut() -> u64,
 {
+    let before_now = clock_mono_ms();
     let transaction = writer
         .connection_mut()
         .transaction_with_behavior(TransactionBehavior::Immediate)?;
-    if !valid_in(&transaction, token, now_mono_ms)? {
+    if !valid_in(&transaction, token, before_now)? {
         return Err(LeaseError::Stale);
     }
     let result = completion(&transaction)?;
-    if !valid_in(&transaction, token, now_mono_ms)? {
+    let after_now = clock_mono_ms();
+    if !valid_in(&transaction, token, after_now)? {
         return Err(LeaseError::Stale);
     }
     transaction.commit()?;
@@ -371,7 +392,7 @@ pub fn prepare_promotion(
     Ok(PromotionIntent {
         intent_id: intent_id.to_owned(),
         promotion_fence: u64::try_from(fence).map_err(|_| LeaseError::Invalid("negative fence"))?,
-        external_namespace: token.external_namespace.clone(),
+        external_namespace: token.external_namespace().to_owned(),
     })
 }
 
@@ -427,7 +448,10 @@ pub(crate) mod tests {
         assert_eq!(renew(&mut writer, &renewed, 50, 30), Err(LeaseError::Stale));
         writer.connection().execute("UPDATE destinations SET generation=2,revision=revision+1 WHERE destination_id='dest-a'", []).unwrap();
         let replacement = acquire(&mut writer, identity(2), 50, 30).unwrap();
-        assert_ne!(replacement.external_namespace, renewed.external_namespace);
+        assert_ne!(
+            replacement.external_namespace(),
+            renewed.external_namespace()
+        );
         assert_eq!(renew(&mut writer, &renewed, 51, 30), Err(LeaseError::Stale));
         cleanup(path);
     }
@@ -437,7 +461,7 @@ pub(crate) mod tests {
     }
     impl SideEffectAdapter for Fake {
         type Artifact = String;
-        fn apply(&mut self, namespace: &str) -> Result<String, String> {
+        fn apply_candidate(&mut self, namespace: &str) -> Result<String, String> {
             self.namespaces.push(namespace.to_owned());
             Ok(format!("artifact:{namespace}"))
         }
@@ -456,11 +480,11 @@ pub(crate) mod tests {
             .unwrap();
         let mut fake = Fake { namespaces: vec![] };
         assert_eq!(
-            dispatch(&mut writer, &token, 11, &mut fake),
+            dispatch(&mut writer, &token, &mut || 11, &mut fake),
             Err(LeaseError::Stale)
         );
         assert!(fake.namespaces.is_empty());
-        let changed = complete_local(&mut writer, &token, 11, |tx| {
+        let changed = complete_local(&mut writer, &token, &mut || 11, |tx| {
             Ok(tx.execute("UPDATE destinations SET revision=revision+1", [])?)
         });
         assert_eq!(changed, Err(LeaseError::Stale));
@@ -474,11 +498,11 @@ pub(crate) mod tests {
         writer.connection().execute("UPDATE destinations SET capture_epoch='epoch-b',generation=2,configuration_fingerprint='config-b',revision=revision+1", []).unwrap();
         let mut fake = Fake { namespaces: vec![] };
         assert_eq!(
-            dispatch(&mut writer, &old, 11, &mut fake),
+            dispatch(&mut writer, &old, &mut || 11, &mut fake),
             Err(LeaseError::Stale)
         );
         assert_eq!(
-            complete_local(&mut writer, &old, 11, |_| Ok(())),
+            complete_local(&mut writer, &old, &mut || 11, |_| Ok(())),
             Err(LeaseError::Stale)
         );
         cleanup(path);
@@ -490,7 +514,7 @@ pub(crate) mod tests {
     }
     impl SideEffectAdapter for RacingFake {
         type Artifact = String;
-        fn apply(&mut self, namespace: &str) -> Result<String, String> {
+        fn apply_candidate(&mut self, namespace: &str) -> Result<String, String> {
             self.namespaces.push(namespace.to_owned());
             let db = Connection::open(&self.db).map_err(|e| e.to_string())?;
             db.execute(
@@ -511,14 +535,121 @@ pub(crate) mod tests {
             namespaces: vec![],
         };
         assert_eq!(
-            dispatch(&mut writer, &token, 11, &mut fake).unwrap(),
+            dispatch(&mut writer, &token, &mut || 11, &mut fake).unwrap(),
             SideEffectOutcome::StaleArtifact("stale-object".into())
         );
-        assert_eq!(fake.namespaces, vec![token.external_namespace.clone()]);
+        assert_eq!(fake.namespaces, vec![token.external_namespace().to_owned()]);
         assert_eq!(
-            complete_local(&mut writer, &token, 11, |_| Ok(())),
+            complete_local(&mut writer, &token, &mut || 11, |_| Ok(())),
             Err(LeaseError::Stale)
         );
+        cleanup(path);
+    }
+
+    #[test]
+    fn expiry_during_effect_or_completion_is_stale_and_rolls_back() {
+        let (mut writer, path) = writer();
+        let token = acquire(&mut writer, identity(1), 10, 20).unwrap();
+        let mut fake = Fake { namespaces: vec![] };
+        let mut dispatch_times = [11_u64, 31].into_iter();
+        assert!(matches!(
+            dispatch(
+                &mut writer,
+                &token,
+                &mut || dispatch_times.next().unwrap(),
+                &mut fake
+            ),
+            Ok(SideEffectOutcome::StaleArtifact(_))
+        ));
+        let before: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT revision FROM destinations WHERE destination_id='dest-a'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let mut completion_times = [11_u64, 31].into_iter();
+        assert_eq!(
+            complete_local(
+                &mut writer,
+                &token,
+                &mut || completion_times.next().unwrap(),
+                |tx| {
+                    tx.execute(
+                        "UPDATE destinations SET revision=revision+1 WHERE destination_id='dest-a'",
+                        [],
+                    )?;
+                    Ok(())
+                }
+            ),
+            Err(LeaseError::Stale)
+        );
+        let after: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT revision FROM destinations WHERE destination_id='dest-a'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(before, after);
+        cleanup(path);
+    }
+
+    #[test]
+    fn tampered_namespace_ownership_loss_and_external_error_fail_closed() {
+        let (mut writer, path) = writer();
+        let token = acquire(&mut writer, identity(1), 10, 100).unwrap();
+        let mut tampered = token.clone();
+        tampered.external_namespace = "generation-attacker-selected".into();
+        let mut fake = Fake { namespaces: vec![] };
+        assert_eq!(
+            dispatch(&mut writer, &tampered, &mut || 11, &mut fake),
+            Err(LeaseError::Stale)
+        );
+        assert!(fake.namespaces.is_empty());
+        struct Broken;
+        impl SideEffectAdapter for Broken {
+            type Artifact = ();
+            fn apply_candidate(&mut self, _: &str) -> Result<(), String> {
+                Err("redacted-adapter-code".into())
+            }
+        }
+        assert_eq!(
+            dispatch(&mut writer, &token, &mut || 11, &mut Broken),
+            Err(LeaseError::External("redacted-adapter-code".into()))
+        );
+        writer.connection().execute("UPDATE runtime_ownership SET state='lost',revision=revision+1 WHERE run_id='run-a'", []).unwrap();
+        assert_eq!(
+            dispatch(&mut writer, &token, &mut || 11, &mut fake),
+            Err(LeaseError::Stale)
+        );
+        cleanup(path);
+    }
+
+    #[test]
+    fn invalid_identities_ttls_and_overflows_are_rejected() {
+        let (mut writer, path) = writer();
+        let mut invalid = identity(0);
+        invalid.destination_id.clear();
+        assert!(matches!(
+            derive_external_namespace(&invalid),
+            Err(LeaseError::Invalid(_))
+        ));
+        assert!(matches!(
+            acquire(&mut writer, identity(1), 10, 0),
+            Err(LeaseError::Invalid(_))
+        ));
+        assert!(matches!(
+            acquire(&mut writer, identity(1), u64::MAX, 1),
+            Err(LeaseError::Invalid(_))
+        ));
+        let token = acquire(&mut writer, identity(1), 10, 20).unwrap();
+        assert!(matches!(
+            renew(&mut writer, &token, 11, 0),
+            Err(LeaseError::Invalid(_))
+        ));
         cleanup(path);
     }
 
