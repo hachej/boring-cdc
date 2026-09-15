@@ -1143,7 +1143,8 @@ fn observe_live_source(
     let mut connection = PgReplicationConnection::connect(dsn).map_err(|_| {
         CaptureFailure::at("reconciliation", "M2_SOURCE_OBSERVATION_CONNECT_FAILED")
     })?;
-    let identity = connection.exec("SELECT (SELECT system_identifier::text FROM pg_control_system()),(SELECT timeline_id::text FROM pg_control_checkpoint()),(SELECT oid::text FROM pg_database WHERE datname=current_database())")
+    let identity = connection
+        .exec("IDENTIFY_SYSTEM")
         .map_err(|_| CaptureFailure::at("reconciliation", "M2_SOURCE_IDENTITY_QUERY_FAILED"))?;
     let value = |column| {
         identity
@@ -1152,8 +1153,10 @@ fn observe_live_source(
     };
     let source_system_id = value(0)?;
     let timeline_id = value(1)?;
-    let database_id = value(2)?;
-    let slot = connection.exec(&format!("SELECT plugin,coalesce(confirmed_flush_lsn::text,''),coalesce(restart_lsn::text,''),coalesce(wal_status,'') FROM pg_replication_slots WHERE slot_name='{}'", SLOT))
+    let database_id = identity
+        .get_value(0, 3)
+        .unwrap_or_else(|| "unknown_database".into());
+    let slot = connection.exec(&format!("SELECT plugin,coalesce(confirmed_flush_lsn::text,''),coalesce(restart_lsn::text,''),coalesce(wal_status,''),coalesce(invalidation_reason,'') FROM pg_replication_slots WHERE slot_name='{}'", SLOT))
         .map_err(|_| CaptureFailure::at("reconciliation", "M2_SLOT_OBSERVATION_FAILED"))?;
     let plugin = slot.get_value(0, 0);
     let position = |column| {
@@ -1163,6 +1166,12 @@ fn observe_live_source(
             .map(|v| format!("{v:016X}"))
     };
     let wal_status = slot.get_value(0, 3).unwrap_or_default();
+    let invalidation = slot.get_value(0, 4).unwrap_or_default();
+    let restart_lsn = position(2);
+    let slot_healthy = plugin.as_deref() == Some("pgoutput")
+        && matches!(wal_status.as_str(), "reserved" | "extended")
+        && invalidation.is_empty()
+        && restart_lsn.is_some();
     Ok(crate::m2_reconcile::LiveSourceObservation {
         source_system_id,
         timeline_id,
@@ -1172,10 +1181,10 @@ fn observe_live_source(
         publication_fingerprint: publication_fingerprint.into(),
         protocol_fingerprint: "pgoutput-v1".into(),
         slot_exists: plugin.is_some(),
-        slot_valid: plugin.as_deref() == Some("pgoutput") && wal_status != "lost",
-        resume_wal_available: plugin.is_some() && wal_status != "lost",
+        slot_valid: slot_healthy,
+        resume_wal_available: slot_healthy,
         confirmed_flush_lsn: position(1),
-        restart_lsn: position(2),
+        restart_lsn,
     })
 }
 
@@ -1218,25 +1227,6 @@ pub async fn run_loaded_config(
         .ok_or_else(|| CaptureFailure::at("configuration", "M2_CONTROL_DSN_UNAVAILABLE"))?
         .to_owned();
     let journal_path = PathBuf::from(&public.storage.sqlite_path);
-    let live_source = observe_live_source(&dsn, config.fingerprints().source.as_str())?;
-    if journal_path.exists() {
-        let receipt = crate::m2_reconcile::reconcile_startup(
-            &journal_path,
-            "production-startup",
-            &live_source,
-            &[],
-            &mut ProductionArchiveInspection,
-        )
-        .map_err(|_| CaptureFailure::at("reconciliation", "M2_STARTUP_RECONCILIATION_FAILED"))?;
-        if matches!(
-            receipt.outcome,
-            crate::m2_reconcile::StartupOutcome::Blocked
-                | crate::m2_reconcile::StartupOutcome::RequiresReseed
-                | crate::m2_reconcile::StartupOutcome::BootstrapAmbiguousRequiresRestart
-        ) {
-            return Err(CaptureFailure::at("reconciliation", "M2_STARTUP_BLOCKED"));
-        }
-    }
     let spool_path = PathBuf::from(&public.storage.spool_path);
     if let Some(parent) = journal_path.parent() {
         std::fs::create_dir_all(parent)
@@ -1244,10 +1234,34 @@ pub async fn run_loaded_config(
     }
     std::fs::create_dir_all(&spool_path)
         .map_err(|_| CaptureFailure::at("storage", "M2_SPOOL_DIRECTORY_UNAVAILABLE"))?;
-    let now = SystemTime::now()
+    let elapsed = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?
-        .as_millis() as i64;
+        .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?;
+    let now = elapsed.as_millis() as i64;
+    let startup_run_id = format!("production-startup-{}", elapsed.as_nanos());
+    let live_source = observe_live_source(&dsn, config.fingerprints().source.as_str())?;
+    if !journal_path.exists() {
+        let initial = open_writer(&journal_path, &startup_run_id, 1, now)
+            .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_OPEN_FAILED"))?;
+        initial.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,?1,?2,?3,?4,?5,?6,?7,?8)",rusqlite::params![config.fingerprints().runtime,live_source.source_system_id,live_source.timeline_id,live_source.database_id,live_source.slot_name,live_source.plugin,live_source.publication_fingerprint,live_source.protocol_fingerprint]).map_err(|_|CaptureFailure::at("journal","M2_SOURCE_STATE_INIT_FAILED"))?;
+        drop(initial);
+    }
+    let receipt = crate::m2_reconcile::reconcile_startup(
+        &journal_path,
+        &startup_run_id,
+        &live_source,
+        &[],
+        &mut ProductionArchiveInspection,
+    )
+    .map_err(|_| CaptureFailure::at("reconciliation", "M2_STARTUP_RECONCILIATION_FAILED"))?;
+    if matches!(
+        receipt.outcome,
+        crate::m2_reconcile::StartupOutcome::Blocked
+            | crate::m2_reconcile::StartupOutcome::RequiresReseed
+            | crate::m2_reconcile::StartupOutcome::BootstrapAmbiguousRequiresRestart
+    ) {
+        return Err(CaptureFailure::at("reconciliation", "M2_STARTUP_BLOCKED"));
+    }
     let cadence_ms = public.source.heartbeat_cadence_ms.0;
     let initial_retry_ms = (cadence_ms / 10).max(1);
     let heartbeat_lane = crate::m2_heartbeat::PublishedHeartbeatLane::start(

@@ -234,15 +234,20 @@ pub fn reconcile_startup(
     } else {
         archive.inspect()
     };
+    let selector_corrupt = external.iter().any(|observed| {
+        local_fences
+            .iter()
+            .find(|(id, _, _)| id == &observed.destination_id)
+            .is_some_and(|(_, fence, digest)| {
+                observed.highest_fence == *fence
+                    && digest.as_deref() != Some(observed.selector_digest.as_str())
+            })
+    });
     let external_ahead = external.iter().any(|observed| {
         local_fences
             .iter()
             .find(|(id, _, _)| id == &observed.destination_id)
-            .is_none_or(|(_, fence, digest)| {
-                observed.highest_fence > *fence
-                    || (observed.highest_fence == *fence
-                        && digest.as_deref() != Some(observed.selector_digest.as_str()))
-            })
+            .is_none_or(|(_, fence, _)| observed.highest_fence > *fence)
     });
 
     let greatest_local = maximum_lsn(
@@ -306,6 +311,13 @@ pub fn reconcile_startup(
         (
             StartupOutcome::RequiresReseed,
             "RESUME_WAL_UNAVAILABLE",
+            None,
+            None,
+        )
+    } else if selector_corrupt {
+        (
+            StartupOutcome::Blocked,
+            "EXTERNAL_SELECTOR_CORRUPT",
             None,
             None,
         )
