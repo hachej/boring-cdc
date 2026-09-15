@@ -4,6 +4,20 @@
   "prior_terminal_proof": "boring-cdc-m1-raw-demo",
   "required_leaves": [
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-heartbeat",
+          "comment_id": 668,
+          "target_sha": "6fa8eef8d4f4925510989001b33f8af8b79726ae",
+          "text_sha256": "4f4399345f7c59cd35e24cf6863b980ddbc9ef6a4e3bfc07e382632f34a28253"
+        },
+        {
+          "bead": "boring-cdc-0a8y",
+          "comment_id": 693,
+          "target_sha": "d7cd7f1b41db8a9924665c330011f21d378d87d6",
+          "text_sha256": "67b5e2282f82c9cc0be449b2038121e62747d354812cf6b4fcd129bbaac0c5c7"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/m2_heartbeat.sh",
         "scripts/faults/m2_heartbeat.sh",
@@ -31,6 +45,14 @@
       "unit_target": "m2_heartbeat::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-init-recovery",
+          "comment_id": 711,
+          "target_sha": "b37fb30e2e5fdc8a367e03ec06a5062624216ab0",
+          "text_sha256": "2d8af67db943eb0b368dcc9d78995153d027f94fd530e0f2be5b958cc0b62061"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/m2_init_recovery.sh",
         "scripts/faults/m2_init_recovery.sh"
@@ -47,6 +69,20 @@
       "unit_target": "m2_init_recovery::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-journal",
+          "comment_id": 336,
+          "target_sha": "23d1f6cb8a654a7f1e9df58e1ebfadc1d64e1ce7",
+          "text_sha256": "8336d739c77ccb3999aa7c68a2532a72cb8f7cfa4189139dc0ca0acc44e0804a"
+        },
+        {
+          "bead": "boring-cdc-m2-journal.1",
+          "comment_id": 349,
+          "target_sha": "10bb0b2da6038cca30b071077ab37d5aaf35bcf5",
+          "text_sha256": "bff09e085aed48e17f305509ad01d04d809597e10bb5ee54faf7b7113fa1f60f"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/m2_journal.sh",
         "scripts/faults/m2_journal.sh",
@@ -118,6 +154,20 @@
       "unit_target": "m2_journal::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-jsonl",
+          "comment_id": 659,
+          "target_sha": "645ef1a00e6e324df2536c465ece1f70e48de1ad",
+          "text_sha256": "99773841ba75f97a031bcbb1dfdc980ffb66a8407d3ccac6c2c60836969f73c9"
+        },
+        {
+          "bead": "boring-cdc-m2-jsonl.1",
+          "comment_id": 665,
+          "target_sha": "cadd1c26c0421b518f123b891cb2f907f34b9cb7",
+          "text_sha256": "f1feb788f0664308c00a19bc3d09f6a5587f8375aa930bec2f6cf91f06d6f5a0"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/m2_jsonl.sh",
         "scripts/faults/m2_jsonl.sh",
@@ -144,6 +194,20 @@
       "unit_target": "m2_jsonl::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-leases",
+          "comment_id": 675,
+          "target_sha": "d25372efcba28fb0fc33bdb73f1a5dc9a61ff86a",
+          "text_sha256": "9eb22bf0a46ce7ad219626fc7d85053c2d638db4cc159473326a1991c271947f"
+        },
+        {
+          "bead": "boring-cdc-m2-leases.1",
+          "comment_id": 678,
+          "target_sha": "c57dbf74f527380d6e01d19758cb0a48a941d887",
+          "text_sha256": "6e6fe29721599ab695924a77669e594bb4ff540f5256aee3f7d5624b5a64b377"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/validate/m2_leases.py"
       ],
@@ -164,6 +228,14 @@
       "unit_target": "m2_leases::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-ownership",
+          "comment_id": 311,
+          "target_sha": "536bdfdf98b10dcaa8b85e342d839fd2c4bca21a",
+          "text_sha256": "9d9975399a9b9367aa31ce4a8ae8e81c856f98e0f7945b7053acec5185e79d06"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/m2_ownership.sh",
         "scripts/faults/m2_ownership.sh",
@@ -193,6 +265,32 @@
       "unit_target": "m2_ownership::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-pressure",
+          "comment_id": 684,
+          "target_sha": "5513b0e0dc2ebd7267611c30b4c2aff5b9188f5d",
+          "text_sha256": "13c24ced35d6eb6987f811940f961c6ab242d3a80d1ed5362fc36c7fb84012c5"
+        },
+        {
+          "bead": "boring-cdc-m2-pressure.1",
+          "comment_id": 688,
+          "target_sha": "3e9382aea2caaf93d338948f97a38359beb7c09c",
+          "text_sha256": "3f409a5b8044ca0abf9e5f2f65741c0176f28e1f1ce84dfa489f03ddda7ddf40"
+        },
+        {
+          "bead": "boring-cdc-m2-pressure.2",
+          "comment_id": 703,
+          "target_sha": "957dd653631dfae99b62b5515ecfe87a6aecd1bb",
+          "text_sha256": "0950b9c74974b2e67b720146d643eca89e80bf0af65026823c092bbf1fadadd4"
+        },
+        {
+          "bead": "boring-cdc-m2-pressure.3",
+          "comment_id": 707,
+          "target_sha": "0cf677630e634d320231d776c9635b205622e8e6",
+          "text_sha256": "db185e381944807eed4d89fa0b7460959ee2ce2d01d40533e74d72a39cb78c96"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/m2_pressure.sh",
         "scripts/faults/m2_pressure.sh",
@@ -221,6 +319,20 @@
       "unit_target": "m2_pressure::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-reconcile",
+          "comment_id": 670,
+          "target_sha": "20a23472699c2b4642d33eb380f072b981089023",
+          "text_sha256": "d7c0bc21027642b064af0622082933070f4dd871d9a869db482b4af166331af5"
+        },
+        {
+          "bead": "boring-cdc-m2-reconcile.1",
+          "comment_id": 720,
+          "target_sha": "a2e2595e97e0cdbaf1512494aafc66eec4b1b46b",
+          "text_sha256": "43f5ea46fcfd463c7ac1bcec10d0c5a7f32a5dfe75e41d039d3ca3c7e09ef86f"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/m2_reconcile.sh",
         "scripts/faults/m2_reconcile.sh",
@@ -238,6 +350,20 @@
       "unit_target": "m2_reconcile::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-schema",
+          "comment_id": 624,
+          "target_sha": "9e62d5b002c9933a50a5695b7576cae6f0070c11",
+          "text_sha256": "1a1a425ed58543186f4a99bd6475c166d6c2eed9c185de4964e20f115776f44d"
+        },
+        {
+          "bead": "boring-cdc-m2-schema.1",
+          "comment_id": 630,
+          "target_sha": "89ef00dc1108f36910c7ab7ae4e9bf6054f176b1",
+          "text_sha256": "b3622904f93dafe45f161de2dc978f7bdf68d36eb0a2f1b74e10bb54d7c1feae"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/m2_schema.sh",
         "scripts/faults/m2_schema.sh",
@@ -260,6 +386,20 @@
       "unit_target": "m2_schema::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-spool",
+          "comment_id": 637,
+          "target_sha": "ff54d225f5449fdfd020f1636c7a684c8b890b0c",
+          "text_sha256": "4a33740cf49b083d3014d7d9bab3a6aba191524e002858ef662d6b61ce637ebd"
+        },
+        {
+          "bead": "boring-cdc-m2-spool.1",
+          "comment_id": 644,
+          "target_sha": "01dc3af268d59db2e531a91282d8d0f85d6b265f",
+          "text_sha256": "42bb212774b686e23c21e50703af07b00052724266d30f7fd3cd21a53f262fa4"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/m2_spool.sh",
         "scripts/faults/m2_spool.sh",
@@ -286,6 +426,20 @@
       "unit_target": "m2_spool::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2-capture-runtime",
+          "comment_id": 646,
+          "target_sha": "264b7f9f3a39cdcca705b3332b770c955e9bcee9",
+          "text_sha256": "5a034b80c86e69698f44568e316a04840dfadd69cc77c9a0bb1b53ab48891657"
+        },
+        {
+          "bead": "boring-cdc-m2-capture-runtime.1",
+          "comment_id": 652,
+          "target_sha": "51998f09e38aa4d7ba474bd0c6788d25848b363e",
+          "text_sha256": "51f71e7d5b3ae3a33def1c327f3fcd2371ba6f5d811b3e4853ee59219d17c42a"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/m2_capture_runtime.sh",
         "scripts/faults/m2_capture_runtime.sh",
@@ -323,6 +477,20 @@
       "unit_target": "m2_capture_runtime::tests"
     },
     {
+      "completion_handoffs": [
+        {
+          "bead": "boring-cdc-m2.1",
+          "comment_id": 298,
+          "target_sha": "dd08533d2a53abd94d1a864b42cc04f54d5162d2",
+          "text_sha256": "d165a9e8b6666fce51f9fc5e3b1dad0018aa551bfd0b103608e67221120826c4"
+        },
+        {
+          "bead": "boring-cdc-m2.1.1",
+          "comment_id": 305,
+          "target_sha": "a6d6359653222834c39e8ef7059e455f56db7248",
+          "text_sha256": "48915724aa56a7df3f712d0328101f95b453195af25385b0f20baf411bc5f856"
+        }
+      ],
       "component_and_fault_scripts": [
         "scripts/e2e/failure_policy.sh",
         "scripts/faults/failure_policy.sh",

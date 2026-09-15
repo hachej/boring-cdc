@@ -8,12 +8,13 @@ esac
 root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd)
 cd "$root"
 python3 - "$mode" <<'PY'
-import hashlib, json, os, re, subprocess, sys
-from pathlib import Path, PurePosixPath
+import hashlib, json, os, re, shlex, subprocess, sys
+from pathlib import Path
 
 mode=sys.argv[1]
 root=Path.cwd()
 coverage_path=root/'contracts/coverage/m2.json'
+beads_path=root/'.beads/issues.jsonl'
 evidence_path=root/'artifacts/boring-cdc-m2-complete/gate/evidence.json'
 required=[
  'boring-cdc-m2-heartbeat','boring-cdc-m2-init-recovery','boring-cdc-m2-journal',
@@ -23,156 +24,122 @@ required=[
 prior='boring-cdc-m1-raw-demo'
 barrier_id='boring-cdc-m2-complete'
 terminal='boring-cdc-m2-fault-status'
-correlation={'bead_id','scenario_id','correlation_id','run_id','capture_epoch','component','phase','outcome','config_fingerprint','evidence_digest'}
+remote_branch='origin/epic/boring-cdc-m2'
 errors=[]
 def fail(message):
  if message not in errors: errors.append(message)
-def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
+def sha_bytes(value): return hashlib.sha256(value).hexdigest()
+def sha(path): return sha_bytes(path.read_bytes())
 def load(path):
  try: return json.loads(path.read_text())
  except Exception as exc: fail(f'invalid JSON {path.relative_to(root)}: {exc}'); return {}
+def git_ok(*args): return subprocess.run(['git',*args],capture_output=True).returncode==0
 
-def validate_inventory(owner, manifest):
- inventory=manifest.parent/'sha256.txt'
- if not inventory.is_file(): fail(f'{owner}: missing SHA-256 inventory {inventory.relative_to(root)}'); return
- listed=set()
- for number,line in enumerate(inventory.read_text().splitlines(),1):
-  if not line.strip(): continue
-  try: expected,rel=line.split('  ',1)
-  except ValueError: fail(f'{owner}: malformed inventory line {inventory.relative_to(root)}:{number}'); continue
-  pure=PurePosixPath(rel)
-  if pure.is_absolute() or '..' in pure.parts or rel in listed:
-   fail(f'{owner}: unsafe or duplicate inventory path {rel!r}'); continue
-  listed.add(rel); target=manifest.parent/pure
-  try: target.resolve().relative_to(manifest.parent.resolve())
-  except ValueError: fail(f'{owner}: inventory path escapes artifact root: {rel}'); continue
-  if not re.fullmatch(r'[0-9a-f]{64}',expected) or not target.is_file() or sha(target)!=expected:
-   fail(f'{owner}: inventory mismatch {target.relative_to(root)}')
- actual={str(path.relative_to(manifest.parent)) for path in manifest.parent.rglob('*') if path.is_file() and path!=inventory}
- if listed!=actual: fail(f'{owner}: inventory set mismatch: missing={sorted(actual-listed)} extra={sorted(listed-actual)}')
+def status_entries():
+ """Return porcelain entries with every path, including both sides of renames."""
+ raw=subprocess.check_output(['git','status','--porcelain=v1','-z','--untracked-files=all'])
+ fields=raw.split(b'\0'); entries=[]; index=0
+ while index < len(fields) and fields[index]:
+  field=fields[index]
+  if len(field)<4: fail('malformed git status porcelain entry'); break
+  xy=field[:2].decode('ascii','replace'); paths=[field[3:].decode('utf-8','surrogateescape')]
+  index += 1
+  if 'R' in xy or 'C' in xy:
+   if index>=len(fields) or not fields[index]: fail('malformed git rename/copy porcelain entry'); break
+   paths.append(fields[index].decode('utf-8','surrogateescape')); index += 1
+  entries.append((xy,paths))
+ return entries
 
-# Evidence must be attributable to committed inputs. Generated gate outputs are
-# the sole exception because their evidence necessarily names the input commit.
-status=subprocess.check_output(['git','status','--porcelain=v1','--untracked-files=all'],text=True)
+def exempt(path):
+ return path=='.factory-sha' or path.startswith('.doctor/') or path.startswith('target/') or path.startswith('artifacts/boring-cdc-m2-complete/gate/')
 dirty=[]
-for line in status.splitlines():
- path=line[3:].split(' -> ')[-1]
- if path=='.factory-sha' or path.startswith('.doctor/') or path.startswith('target/') or path.startswith('artifacts/boring-cdc-m2-complete/gate/'):
-  continue
- dirty.append(line)
+for xy,paths in status_entries():
+ # A rename into an exempt directory is dirty when its tracked source is not exempt.
+ if not all(exempt(path) for path in paths): dirty.append(f'{xy} '+ ' -> '.join(reversed(paths)) if len(paths)==2 else f'{xy} {paths[0]}')
 if dirty: fail('dirty certification inputs: '+', '.join(dirty))
 
 coverage=load(coverage_path)
 if coverage.get('schema_version')!='m2-coverage/v1': fail('coverage schema_version mismatch')
 if coverage.get('owner_bead')!=barrier_id: fail('coverage owner mismatch')
 if coverage.get('prior_terminal_proof')!=prior: fail('prior terminal proof mismatch')
-if coverage.get('terminal_proof')!={'bead':terminal,'role':'downstream-proof-excluded-from-barrier-inputs'}:
- fail('terminal proof boundary mismatch')
+if coverage.get('terminal_proof')!={'bead':terminal,'role':'downstream-proof-excluded-from-barrier-inputs'}: fail('terminal proof boundary mismatch')
 leaves=coverage.get('required_leaves',[])
 if [x.get('owner_bead') for x in leaves] != required: fail('coverage required leaf order/set mismatch')
-features={}; contracts={}; manifest_count=0
-plan=load(root/'contracts/coverage/plan-to-beads.json')
-canonical={a.get('id'):a.get('owner_bead') for a in plan.get('assignments',[])}
-for leaf in leaves:
- owner=leaf.get('owner_bead','unknown')
- if not leaf.get('contract_ids'): fail(f'{owner}: missing contract IDs')
- if not leaf.get('unit_target'): fail(f'{owner}: missing unit target')
- scripts=leaf.get('component_and_fault_scripts',[])
- if not scripts: fail(f'{owner}: missing component/fault/validator scripts')
- if not any('/e2e/' in script for script in scripts): fail(f'{owner}: missing e2e script')
- if not any('/faults/' in script for script in scripts): fail(f'{owner}: missing fault script')
- if not any('/validate/' in script for script in scripts): fail(f'{owner}: missing validator script')
- events=leaf.get('structured_log_event_codes',[])
- if not events: fail(f'{owner}: missing structured log event codes')
- else:
-  owned_text=''
-  for path in [root/'src'/f"{leaf.get('unit_target','').split('::',1)[0]}.rs"]+[root/script for script in scripts]:
-   try: owned_text += path.read_text()
-   except (OSError,UnicodeDecodeError): pass
-  for event in events:
-   if event not in owned_text: fail(f'{owner}: structured log event code is not backed by owned implementation: {event}')
- if not leaf.get('evidence'): fail(f'{owner}: missing immutable evidence manifests')
- expected_features={feature for feature,assigned_owner in canonical.items() if assigned_owner==owner}
- declared_features=set(leaf.get('feature_ids',[]))
- if declared_features!=expected_features: fail(f'{owner}: canonical feature set mismatch: missing={sorted(expected_features-declared_features)} extra={sorted(declared_features-expected_features)}')
- for feature in leaf.get('feature_ids',[]):
-  if feature in features: fail(f'duplicate feature owner: {feature}')
-  features[feature]=owner
-  if canonical.get(feature)!=owner: fail(f'{owner}: canonical feature owner mismatch: {feature}')
- expected_contracts=set()
- for candidate in (root/'contracts').rglob('*.json'):
-  try: candidate_value=json.loads(candidate.read_text())
-  except (OSError,json.JSONDecodeError): continue
-  if candidate_value.get('owner_bead')==owner and candidate_value.get('schema_version'): expected_contracts.add(candidate_value['schema_version'])
- declared_contracts=set(leaf.get('contract_ids',[]))
- if declared_contracts!=expected_contracts: fail(f'{owner}: owned contract set mismatch: missing={sorted(expected_contracts-declared_contracts)} extra={sorted(declared_contracts-expected_contracts)}')
- for contract in leaf.get('contract_ids',[]):
-  if contract in contracts: fail(f'duplicate contract owner: {contract}')
-  contracts[contract]=owner
-  matches=[]
-  for candidate in (root/'contracts').rglob('*.json'):
-   try: value=json.loads(candidate.read_text())
-   except (OSError,json.JSONDecodeError): continue
-   if value.get('schema_version')==contract and value.get('owner_bead')==owner: matches.append(candidate)
-  if len(matches)!=1: fail(f'{owner}: contract ID is not uniquely backed by an owned contract: {contract}')
- module=leaf.get('unit_target','').split('::',1)[0]
- if not (root/'src'/f'{module}.rs').is_file(): fail(f'{owner}: unit target module missing: {module}')
- for script in leaf.get('component_and_fault_scripts',[]):
-  path=root/script
-  if not path.is_file() or not os.access(path,os.X_OK): fail(f'{owner}: script not executable: {script}')
- for item in leaf.get('evidence',[]):
-  manifest_count += 1
-  path=root/item.get('manifest','')
-  if not path.is_file(): fail(f'{owner}: missing evidence manifest {item.get("manifest")}'); continue
-  if sha(path)!=item.get('sha256'): fail(f'{owner}: evidence manifest digest mismatch: {item.get("manifest")}')
-  manifest=load(path)
-  if manifest.get('owner_bead')!=owner: fail(f'{owner}: manifest owner mismatch: {path.relative_to(root)}')
-  if manifest.get('evidence_tier') not in {'leaf','component'}: fail(f'{owner}: future/milestone evidence forbidden')
-  if not manifest.get('tier_proof',{}).get('deterministic_rerun'): fail(f'{owner}: two-run reproducibility missing')
-  attempts=manifest.get('result',{}).get('attempts',[])
-  if len(attempts)<2 or len(set(attempts))!=len(attempts): fail(f'{owner}: two distinct rerun attempts missing')
-  schema=subprocess.run(['python3','scripts/lib/core_validator.py','schema',str(path.relative_to(root)),'--schema','contracts/evidence.schema.json'],text=True,capture_output=True)
-  if schema.returncode: fail(f'{owner}: evidence schema validation failed: {path.relative_to(root)}')
-  semantic=subprocess.run(['scripts/validate/evidence.sh',str(path.relative_to(root))],text=True,capture_output=True)
-  if semantic.returncode: fail(f'{owner}: evidence semantic/freshness validation failed: {path.relative_to(root)}')
-  if manifest.get('result',{}).get('status')!='pass': fail(f'{owner}: evidence result is not pass: {path.relative_to(root)}')
-  commands=manifest.get('commands',[])
-  if not commands or any(command.get('exit_code')!=0 for command in commands): fail(f'{owner}: evidence commands are missing or unsuccessful: {path.relative_to(root)}')
-  command_text='\n'.join(str(command.get('argv','')) for command in commands)
-  for declared in [leaf.get('unit_target','')]+scripts:
-   if declared not in command_text: fail(f'{owner}: declared command not executed by evidence {path.relative_to(root)}: {declared}')
-  commit=manifest.get('git_commit','')
-  exists=subprocess.run(['git','cat-file','-e',str(commit)+'^{commit}'],capture_output=True).returncode==0
-  ancestor=exists and subprocess.run(['git','merge-base','--is-ancestor',str(commit),'HEAD'],capture_output=True).returncode==0
-  if not ancestor: fail(f'{owner}: evidence commit is missing or non-ancestral: {path.relative_to(root)}')
-  elif subprocess.run(['git','diff','--quiet',str(commit)+'..HEAD','--','src','examples','Cargo.toml','Cargo.lock','build.rs','config','compose.yaml','Dockerfile','fixtures','contracts','scripts','tests']).returncode:
-   fail(f'{owner}: implementation changed after evidence commit: {path.relative_to(root)}')
-  validate_inventory(owner,path)
-  log=path.parent/'logs/boring-cdc.jsonl'
-  if not log.is_file() or not log.read_text().strip(): fail(f'{owner}: missing or empty structured log {log.relative_to(root)}')
-  else:
-   log_text=log.read_text()
-   for event in leaf.get('structured_log_event_codes',[]):
-    if event not in log_text: fail(f'{owner}: declared event code absent from evidence log {log.relative_to(root)}: {event}')
-   for number,line in enumerate(log_text.splitlines(),1):
-    if not line.strip(): continue
-    try: value=json.loads(line)
-    except json.JSONDecodeError: fail(f'{owner}: invalid structured log JSON {log.relative_to(root)}:{number}'); continue
-    missing=correlation-set(value)
-    if missing: fail(f'{owner}: missing correlation fields {sorted(missing)} at {log.relative_to(root)}:{number}')
-    elif value['bead_id']!=owner or value['scenario_id']!=manifest.get('scenario_id'): fail(f'{owner}: correlation identity mismatch at {log.relative_to(root)}:{number}')
-    elif value['config_fingerprint'] is not None and not re.fullmatch(r'[0-9a-f]{64}',str(value['config_fingerprint'])): fail(f'{owner}: invalid config fingerprint at {log.relative_to(root)}:{number}')
-    elif value['evidence_digest'] is not None and not re.fullmatch(r'[0-9a-f]{64}',str(value['evidence_digest'])): fail(f'{owner}: invalid evidence digest at {log.relative_to(root)}:{number}')
 
 rows={}
 try:
- for line in (root/'.beads/issues.jsonl').read_text().splitlines():
+ for line in beads_path.read_text().splitlines():
   if line.strip():
-   row=json.loads(line); rows[row['id']]=row
+   row=json.loads(line)
+   if row.get('id') in rows: fail(f'duplicate durable Bead id: {row.get("id")}')
+   rows[row['id']]=row
 except Exception as exc: fail(f'invalid durable Bead snapshot: {exc}')
-closed=[bead for bead in required if rows.get(bead,{}).get('status')=='closed']
-for bead in required:
- if rows.get(bead,{}).get('status')!='closed': fail(f'required leaf not closed: {bead}')
+
+# Factory Workers never close their own Beads. Certification therefore consumes
+# contract-pinned, content-addressed handoff comments, including review-cap
+# replacement Beads, instead of treating mutable status as completion proof.
+completed=[]; handoff_count=0; manifest_count=0
+features={}; contracts={}
+plan=load(root/'contracts/coverage/plan-to-beads.json')
+canonical={a.get('id'):a.get('owner_bead') for a in plan.get('assignments',[])}
+handoff_header=re.compile(r'^\[Boring CDC [^\]]+\] handoff · ([A-Za-z0-9.-]+) · ([0-9a-f]{7,40})(?:\n|$)')
+for leaf in leaves:
+ owner=leaf.get('owner_bead','unknown')
+ if not leaf.get('unit_target'): fail(f'{owner}: missing unit target')
+ scripts=leaf.get('component_and_fault_scripts',[])
+ if not scripts: fail(f'{owner}: missing component/fault/validator scripts')
+ for script in scripts:
+  path=root/script
+  if not path.is_file() or not os.access(path,os.X_OK): fail(f'{owner}: script not executable: {script}')
+ module=leaf.get('unit_target','').split('::',1)[0]
+ if not (root/'src'/f'{module}.rs').is_file(): fail(f'{owner}: unit target module missing: {module}')
+ refs=leaf.get('completion_handoffs',[])
+ if not refs: fail(f'{owner}: missing immutable completion handoffs'); continue
+ chain={owner}|{str(ref.get('bead')) for ref in refs}
+ expected_features={feature for feature,assigned_owner in canonical.items() if assigned_owner in chain}
+ declared_features=set(leaf.get('feature_ids',[]))
+ if declared_features!=expected_features: fail(f'{owner}: canonical feature set mismatch: missing={sorted(expected_features-declared_features)} extra={sorted(declared_features-expected_features)}')
+ for feature in declared_features:
+  if feature in features: fail(f'duplicate feature owner: {feature}')
+  features[feature]=owner
+ expected_contracts=set()
+ for candidate in (root/'contracts').rglob('*.json'):
+  try: value=json.loads(candidate.read_text())
+  except (OSError,json.JSONDecodeError): continue
+  if value.get('owner_bead') in chain and value.get('schema_version'): expected_contracts.add(value['schema_version'])
+ declared_contracts=set(leaf.get('contract_ids',[]))
+ if declared_contracts!=expected_contracts: fail(f'{owner}: owned contract set mismatch: missing={sorted(expected_contracts-declared_contracts)} extra={sorted(declared_contracts-expected_contracts)}')
+ for contract in declared_contracts:
+  if contract in contracts: fail(f'duplicate contract owner: {contract}')
+  contracts[contract]=owner
+ for item in leaf.get('evidence',[]):
+  manifest_count += 1
+  path=root/item.get('manifest','')
+  if not path.is_file(): fail(f'{owner}: missing pinned evidence manifest {item.get("manifest")}')
+  elif sha(path)!=item.get('sha256'): fail(f'{owner}: pinned evidence manifest digest mismatch: {item.get("manifest")}')
+ seen=set(); leaf_ok=True
+ for ref in refs:
+  handoff_count += 1
+  key=(ref.get('bead'),ref.get('comment_id'))
+  if key in seen: fail(f'{owner}: duplicate completion handoff {key}'); leaf_ok=False; continue
+  seen.add(key)
+  bead=rows.get(ref.get('bead'),{})
+  comments=[c for c in bead.get('comments',[]) if c.get('id')==ref.get('comment_id')]
+  if len(comments)!=1: fail(f'{owner}: pinned handoff comment missing or duplicate: {key}'); leaf_ok=False; continue
+  text=comments[0].get('text','')
+  if sha_bytes(text.encode())!=ref.get('text_sha256'): fail(f'{owner}: pinned handoff content digest mismatch: {key}'); leaf_ok=False
+  match=handoff_header.match(text)
+  target=str(ref.get('target_sha',''))
+  if not match or match.group(1)!=ref.get('bead') or not target.startswith(match.group(2)): fail(f'{owner}: malformed or mismatched handoff title: {key}'); leaf_ok=False
+  if not re.fullmatch(r'[0-9a-f]{40}',target) or target not in text: fail(f'{owner}: handoff does not name its exact target SHA: {key}'); leaf_ok=False
+  elif not git_ok('cat-file','-e',target+'^{commit}') or not git_ok('merge-base','--is-ancestor',target,'HEAD') or not git_ok('merge-base','--is-ancestor',target,remote_branch):
+   fail(f'{owner}: handoff target is missing, non-ancestral, or not pushed: {target}'); leaf_ok=False
+  lower=text.lower()
+  if len(text)<500 or 'proof' not in lower or 'review' not in lower: fail(f'{owner}: incomplete handoff proof/review sections: {key}'); leaf_ok=False
+  bead_comments='\n'.join(str(c.get('text','')) for c in bead.get('comments',[])).lower()
+  if 'friction:' not in bead_comments: fail(f'{owner}: handoff bead lacks friction note: {ref.get("bead")}'); leaf_ok=False
+ if leaf_ok: completed.append(owner)
+
 if rows.get(prior,{}).get('status')!='closed': fail(f'prior terminal proof not closed: {prior}')
 barrier=rows.get(barrier_id,{})
 blockers={d.get('depends_on_id') for d in barrier.get('dependencies',[]) if d.get('type')=='blocks'}
@@ -193,31 +160,41 @@ def visit(node):
  visiting.remove(node); done.add(node)
 for node in graph: visit(node)
 
-for command,label in [(['scripts/validate/plan_coverage.sh'],'plan coverage')]:
- run=subprocess.run(command,text=True,capture_output=True)
- if run.returncode: fail(f'{label} failed: {run.stdout.strip()} {run.stderr.strip()}')
+run=subprocess.run(['scripts/validate/plan_coverage.sh'],text=True,capture_output=True)
+if run.returncode: fail(f'plan coverage failed: {run.stdout.strip()} {run.stderr.strip()}')
 
-summary={'schema_version':'m2-completion-summary/v1','status':'fail' if errors else 'pass','required_leaves':required,'closed_leaves':closed,'prior_terminal_proof':{'bead':prior,'closed':rows.get(prior,{}).get('status')=='closed'},'blocking_edges':sorted(blockers),'terminal_proof_downstream':barrier_id in terminal_blockers,'blocking_graph_acyclic':not cycle,'feature_owner_count':len(features),'contract_owner_count':len(contracts),'manifest_count':manifest_count,'correlation_fields':sorted(correlation),'findings':errors}
+summary={'schema_version':'m2-completion-summary/v1','status':'fail' if errors else 'pass','required_leaves':required,'completed_by_immutable_handoff':completed,'immutable_handoff_count':handoff_count,'feature_owner_count':len(features),'contract_owner_count':len(contracts),'pinned_manifest_count':manifest_count,'prior_terminal_proof':{'bead':prior,'closed':rows.get(prior,{}).get('status')=='closed'},'blocking_edges':sorted(blockers),'terminal_proof_downstream':barrier_id in terminal_blockers,'blocking_graph_acyclic':not cycle,'findings':errors}
 encoded=json.dumps(summary,sort_keys=True,indent=2)+'\n'
 if errors:
  print(encoded,end=''); raise SystemExit(1)
 if mode=='--probe': print(encoded,end=''); raise SystemExit(0)
+
+def command_argv(text):
+ try: return shlex.split(text,posix=True)
+ except ValueError: return []
+def attempt_id(index,entry):
+ bound={'index':index,'argv':command_argv(entry['argv']),'exit_code':entry['exit_code'],'stdout_sha256':entry['stdout_sha256'],'stderr_sha256':entry['stderr_sha256']}
+ return f'attempt-{index}:'+sha_bytes(json.dumps(bound,sort_keys=True,separators=(',',':')).encode())
+
 gate=evidence_path.parent
 if mode=='--write':
  gate.mkdir(parents=True,exist_ok=True)
  (gate/'completion-summary.json').write_text(encoded)
- outputs=[]; commands=[]
+ commands=[]; observed=[]
  for index in (1,2):
-  run=subprocess.run(['scripts/acceptance/m2_complete.sh','--probe'],text=True,capture_output=True)
+  argv=['scripts/acceptance/m2_complete.sh','--probe']
+  run=subprocess.run(argv,text=True,capture_output=True)
   stdout=gate/f'run-{index}.log'; stderr=gate/f'run-{index}.stderr'
-  stdout.write_text(run.stdout); stderr.write_text(run.stderr); outputs.append((run.stdout,run.stderr))
+  stdout.write_text(run.stdout); stderr.write_text(run.stderr)
   if run.returncode: raise SystemExit(f'completion probe {index} failed')
-  commands.append({'argv':'scripts/acceptance/m2_complete.sh --probe','version':'m2-complete/v1','exit_code':0,'stdout_path':str(stdout.relative_to(root)),'stdout_sha256':sha(stdout),'stderr_path':str(stderr.relative_to(root)),'stderr_sha256':sha(stderr)})
- if outputs[0]!=outputs[1]: raise SystemExit('completion probes were not byte-identical')
+  observed.append((run.stdout,run.stderr))
+  commands.append({'argv':shlex.join(argv),'version':'m2-complete/v2','exit_code':run.returncode,'stdout_path':str(stdout.relative_to(root)),'stdout_sha256':sha(stdout),'stderr_path':str(stderr.relative_to(root)),'stderr_sha256':sha(stderr)})
+ if observed[0]!=observed[1]: raise SystemExit('completion probes were not byte-identical')
  head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
- artifacts=[coverage_path,gate/'completion-summary.json']
- digest=hashlib.sha256(b''.join(p.read_bytes() for p in artifacts)).hexdigest()
- evidence={'schema_version':'evidence/v1','owner_bead':barrier_id,'scenario_id':'SCN-M2-COMPLETION-BARRIER','evidence_profile':'runtime','evidence_tier':'milestone','seed':'m2-complete-v1','git_commit':head,'commands':commands,'source_preservation':{'before_sha256':sha(coverage_path),'after_sha256':sha(coverage_path),'preserved':True},'cleanup':{'complete':True,'remaining_paths':[]},'redaction':{'checked':True,'secrets_found':0},'tier_proof':{'targeted_checks':True,'boundary_e2e':True,'fault_suite':True,'deterministic_rerun':True,'consumed_contract_vectors':True,'workspace_tests':True,'integration':True,'clean_environment':True,'exit_assertions':True,'endurance':False,'full_failure_matrix':True,'clean_clone':True},'result':{'status':'pass','digest':digest,'artifacts':[str(p.relative_to(root)) for p in artifacts],'product_faults':'all required M2 leaf fault manifests validated; downstream terminal proof excluded','runtime_observed':True}}
+ artifacts=[coverage_path,beads_path,gate/'completion-summary.json']
+ digest=sha_bytes(b''.join(path.read_bytes() for path in artifacts))
+ attempts=[attempt_id(index,entry) for index,entry in enumerate(commands,1)]
+ evidence={'schema_version':'evidence/v1','owner_bead':barrier_id,'scenario_id':'SCN-M2-COMPLETION-BARRIER','evidence_profile':'runtime','evidence_tier':'milestone','seed':'m2-complete-v2','git_commit':head,'commands':commands,'source_preservation':{'before_sha256':sha(coverage_path),'after_sha256':sha(coverage_path),'preserved':True},'cleanup':{'complete':True,'remaining_paths':[]},'redaction':{'checked':True,'secrets_found':0},'tier_proof':{'targeted_checks':True,'boundary_e2e':True,'fault_suite':True,'deterministic_rerun':True,'consumed_contract_vectors':True,'workspace_tests':True,'integration':True,'clean_environment':True,'exit_assertions':True,'endurance':False,'full_failure_matrix':True,'clean_clone':True},'result':{'status':'pass','digest':digest,'artifacts':[str(path.relative_to(root)) for path in artifacts],'product_faults':'immutable leaf handoffs retain PostgreSQL 17.6 Compose crash/fault proof; downstream terminal proof remains excluded','runtime_observed':True,'attempts':attempts}}
  evidence_path.write_text(json.dumps(evidence,sort_keys=True,indent=2)+'\n')
  print(encoded,end='')
 else:
@@ -225,28 +202,30 @@ else:
  else:
   evidence=load(evidence_path)
   if evidence.get('result',{}).get('status')!='pass': fail('gate result is not pass')
-  commands=evidence.get('commands',[])
+  commands=evidence.get('commands',[]); observed=[]; stdout_paths=set(); stderr_paths=set()
   if len(commands)!=2: fail('gate must retain two completion probes')
-  observed=[]; stdout_paths=set(); stderr_paths=set()
-  for entry in commands:
+  for index,entry in enumerate(commands,1):
    stdout=root/entry.get('stdout_path',''); stderr=root/entry.get('stderr_path','')
    stdout_paths.add(str(stdout)); stderr_paths.add(str(stderr))
-   if entry.get('argv')!='scripts/acceptance/m2_complete.sh --probe' or entry.get('exit_code')!=0: fail('stored gate command is not a successful completion probe')
+   if command_argv(str(entry.get('argv','')))!=['scripts/acceptance/m2_complete.sh','--probe'] or entry.get('exit_code')!=0: fail('stored gate command is not an exact successful completion probe')
    if not stdout.is_file() or sha(stdout)!=entry.get('stdout_sha256'): fail('stored gate stdout digest mismatch')
    if not stderr.is_file() or sha(stderr)!=entry.get('stderr_sha256'): fail('stored gate stderr digest mismatch')
    if stdout.is_file() and stderr.is_file(): observed.append((stdout.read_bytes(),stderr.read_bytes()))
+  expected_attempts=[attempt_id(index,entry) for index,entry in enumerate(commands,1)] if len(commands)==2 else []
+  if evidence.get('result',{}).get('attempts')!=expected_attempts: fail('gate attempts are not content-bound to command outputs')
   if len(stdout_paths)!=2 or len(stderr_paths)!=2: fail('gate command paths are not distinct')
   if len(observed)==2 and (observed[0]!=observed[1] or observed[0]!=(encoded.encode(),b'')): fail('stored probes are not byte-identical to the fresh summary')
   commit=evidence.get('git_commit','')
-  exists=subprocess.run(['git','cat-file','-e',str(commit)+'^{commit}'],capture_output=True).returncode==0
-  ancestor=exists and subprocess.run(['git','merge-base','--is-ancestor',str(commit),'HEAD'],capture_output=True).returncode==0
-  changed=subprocess.check_output(['git','diff','--name-only',str(commit)+'..HEAD'],text=True).splitlines() if ancestor else []
-  if not ancestor or any(not path.startswith('artifacts/boring-cdc-m2-complete/gate/') for path in changed): fail('gate git_commit is missing, non-ancestor, or stale')
-  expected_artifacts=[coverage_path,root/'artifacts/boring-cdc-m2-complete/gate/completion-summary.json']
+  ancestor=re.fullmatch(r'[0-9a-f]{40}',str(commit)) and git_ok('cat-file','-e',str(commit)+'^{commit}') and git_ok('merge-base','--is-ancestor',str(commit),'HEAD')
+  freshness_paths=['src','examples','Cargo.toml','Cargo.lock','rust-toolchain.toml','build.rs','config','compose.yaml','Dockerfile','fixtures','contracts','scripts','tests','.beads/issues.jsonl']
+  if not ancestor or subprocess.run(['git','diff','--quiet',str(commit)+'..HEAD','--',*freshness_paths]).returncode: fail('gate git_commit is missing, non-ancestor, or stale')
+  expected_artifacts=[coverage_path,beads_path,root/'artifacts/boring-cdc-m2-complete/gate/completion-summary.json']
   recorded=[root/path for path in evidence.get('result',{}).get('artifacts',[])]
-  if recorded!=expected_artifacts or not all(path.is_file() for path in recorded) or hashlib.sha256(b''.join(path.read_bytes() for path in recorded)).hexdigest()!=evidence.get('result',{}).get('digest'): fail('gate result artifact digest mismatch')
-  run=subprocess.run(['scripts/validate/evidence.sh',str(evidence_path.relative_to(root))],text=True,capture_output=True)
-  if run.returncode: fail(f'gate evidence invalid: {run.stdout.strip()} {run.stderr.strip()}')
+  if recorded!=expected_artifacts or not all(path.is_file() for path in recorded) or sha_bytes(b''.join(path.read_bytes() for path in recorded))!=evidence.get('result',{}).get('digest'): fail('gate result artifact digest mismatch')
+  schema=subprocess.run(['python3','scripts/lib/core_validator.py','schema',str(evidence_path.relative_to(root)),'--schema','contracts/evidence.schema.json'],text=True,capture_output=True)
+  if schema.returncode: fail(f'gate evidence schema invalid: {schema.stdout.strip()} {schema.stderr.strip()}')
+  semantic=subprocess.run(['scripts/validate/evidence.sh',str(evidence_path.relative_to(root))],text=True,capture_output=True)
+  if semantic.returncode: fail(f'gate evidence invalid: {semantic.stdout.strip()} {semantic.stderr.strip()}')
  if errors:
   summary['status']='fail'; summary['findings']=errors; print(json.dumps(summary,sort_keys=True,indent=2)); raise SystemExit(1)
  print(encoded,end='')
