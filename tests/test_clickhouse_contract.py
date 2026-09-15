@@ -16,8 +16,12 @@ class ClickHouseContractTests(unittest.TestCase):
   self.assertEqual('explicit_null',m.simulate([event])[0]['columns'][0]['state'])
  def test_fixture_rows_are_ddl_complete_and_fault_pointers_resolve(self):
   f=m.load(m.F); required={'capture_epoch','generation','logical_table_id','journal_seq','batch_id','before_key','cells','hash','id','key','key_hash','mutation_kind','op','relation_schema_fingerprint','version'}
+  marker_required={'capture_epoch','generation','batch_id','first_journal_seq','last_journal_seq','event_count','ordered_event_digest','object_fingerprint','finalized_at_unix_ms'}
   for case in f['cases']:
-   self.assertTrue(all(set(row)==required for row in case['execution']['setup']['history_events']))
+   rows=case['execution']['setup']['history_events']; markers=case['execution']['setup']['batch_markers']
+   self.assertTrue(all(set(row)==required for row in rows))
+   self.assertTrue(all(set(marker)==marker_required for marker in markers))
+   self.assertTrue(all(marker['batch_id'] in {row['batch_id'] for row in rows} for marker in markers))
    m.resolve_pointer(case,case['execution']['fault']['arguments']['setup_pointer'])
  def test_fixture_scope(self):
   c=m.load(m.C); f=m.load(m.F); self.assertEqual(41,len(f['cases'])); self.assertEqual(c['fixture_ids'],[x['fixture_id'] for x in f['cases']])

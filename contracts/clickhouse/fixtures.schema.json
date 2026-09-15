@@ -181,10 +181,19 @@
                         "batch_id": {
                           "type": "string"
                         },
+                        "capture_epoch": {
+                          "type": "integer"
+                        },
                         "event_count": {
                           "type": "integer"
                         },
+                        "finalized_at_unix_ms": {
+                          "type": "integer"
+                        },
                         "first_journal_seq": {
+                          "type": "integer"
+                        },
+                        "generation": {
                           "type": "integer"
                         },
                         "last_journal_seq": {
@@ -203,7 +212,10 @@
                         "first_journal_seq",
                         "last_journal_seq",
                         "object_fingerprint",
-                        "ordered_event_digest"
+                        "ordered_event_digest",
+                        "capture_epoch",
+                        "generation",
+                        "finalized_at_unix_ms"
                       ],
                       "type": "object"
                     },

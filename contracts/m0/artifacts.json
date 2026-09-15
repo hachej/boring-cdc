@@ -109,21 +109,21 @@
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "bde2b4b9b4d8e93dfed0071704901e3eac33059a877a990e2668f9dc8bd3c2ec",
+      "sha256": "14bda17fd5bd64f8ac47e82ccbec91092bf6b0d84d5578fcbec82fb0a1b0c199",
       "status": "complete"
     },
     {
       "id": "ART-M0-CLICKHOUSE-FIXTURE-SCHEMA",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/fixtures.schema.json",
-      "sha256": "c344ce2607d548e154f0f6434463da9816e1db66200e28dd46f7bd58fb59bdf7",
+      "sha256": "894bed006fdc7b5b162024b68aed22e8d7e7b691b57a509bb33c2179b71bec81",
       "status": "complete"
     },
     {
       "id": "ART-M0-CLICKHOUSE-FIXTURES",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "fixtures/m0/clickhouse/scenarios.json",
-      "sha256": "7a74a89b5fc22bec360c5926234f4ae26d676606900edc3812a41de987bcb6a6",
+      "sha256": "6fbacee0d7bd56f3ebd270f1a5fd9bc45af57bdd8193d6fedacbfa39ed6bd52e",
       "status": "complete"
     },
     {
@@ -158,7 +158,7 @@
       "id": "ART-M0-CLICKHOUSE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "scripts/validate/clickhouse_contract.py",
-      "sha256": "9e8042ef355968436eb3d2aad17d43a56320d2b3c7511b38f2c5093e9204293f",
+      "sha256": "f651c951b22e0a9955d5a804cfcd2747e64dc41c0e6cd490cb4f8eb93bfe3fe7",
       "status": "complete"
     },
     {

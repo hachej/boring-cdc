@@ -1,24 +1,24 @@
 {
   "findings": [],
   "fixture_count": 41,
-  "input_tree_sha256": "1e4aa43f68c0a683ca5623a959f0ed0ffb3bf6a7397286dc2c4dc1640462c8ea",
+  "input_tree_sha256": "c46bbdcdcbe79156a2fd00ca8bec090656d6e2d96f93b9d48653c596755a8b69",
   "inputs": {
     "contracts/clickhouse/canonical-query.sql": "0c1a0008e94cc1104e2b6964d39cc9aae26cddb76ba1f38372dc7c5d5442c8df",
     "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
-    "contracts/clickhouse/fixtures.schema.json": "c344ce2607d548e154f0f6434463da9816e1db66200e28dd46f7bd58fb59bdf7",
+    "contracts/clickhouse/fixtures.schema.json": "894bed006fdc7b5b162024b68aed22e8d7e7b691b57a509bb33c2179b71bec81",
     "contracts/clickhouse/model.json": "8597fda59182e21a73776a5f3f90231c32b4fe79b16324e585c45d4b8679d320",
     "contracts/clickhouse/model.schema.json": "4ec898368ada9d0e64f77a05340e1155836b3320163e270a0462252a4e64de71",
     "contracts/clickhouse/result.schema.json": "80ad19fb794e6b6caba1dd45bbcfe63f75c83f6ae7c2d0b81b16da404b8ace8e",
     "contracts/clickhouse/retire-generation.sql": "0f18d6679a6b6bbf58fde38f6c35b09c3c8dca3e2b99a75f8623b0176fb9ae06",
     "docs/CLICKHOUSE_MODEL.md": "47528c341d172bd0b797eff7d9a0ebd6c3081730f1984d34c6c3eedd7044fc28",
-    "fixtures/m0/clickhouse/scenarios.json": "7a74a89b5fc22bec360c5926234f4ae26d676606900edc3812a41de987bcb6a6"
+    "fixtures/m0/clickhouse/scenarios.json": "6fbacee0d7bd56f3ebd270f1a5fd9bc45af57bdd8193d6fedacbfa39ed6bd52e"
   },
   "owner_bead": "boring-cdc-m0-ch-model",
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-clickhouse-contract-evidence/v1",
-  "source_parent_git_commit": "6d0101130926856210dcd65c16edd197567e2467",
+  "source_parent_git_commit": "e87bebceaca4739abbd1157181d831b89acdf4b7",
   "status": "pass",
   "validator": "scripts/validate/clickhouse_contract.py",
-  "validator_sha256": "9e8042ef355968436eb3d2aad17d43a56320d2b3c7511b38f2c5093e9204293f"
+  "validator_sha256": "f651c951b22e0a9955d5a804cfcd2747e64dc41c0e6cd490cb4f8eb93bfe3fe7"
 }

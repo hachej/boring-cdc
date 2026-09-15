@@ -117,6 +117,11 @@ def validate():
   for j,event in enumerate(setup.get('history_events',[])):
    if set(event)!=required_history:add(out,'E_HISTORY_ROW',f'cases/{i}/execution/setup/history_events/{j}','history row is not directly insertable into DDL projection')
    if event.get('capture_epoch')!=x['pre_state']['capture_epoch'] or event.get('generation')!=x['pre_state']['generation']:add(out,'E_HISTORY_ROW',f'cases/{i}/execution/setup/history_events/{j}','history row epoch/generation does not match case')
+  required_marker={'capture_epoch','generation','batch_id','first_journal_seq','last_journal_seq','event_count','ordered_event_digest','object_fingerprint','finalized_at_unix_ms'}
+  history_batches={e.get('batch_id') for e in setup.get('history_events',[])}
+  for j,marker in enumerate(setup.get('batch_markers',[])):
+   if set(marker)!=required_marker:add(out,'E_BATCH_MARKER',f'cases/{i}/execution/setup/batch_markers/{j}','batch marker is not directly insertable into DDL')
+   if marker.get('capture_epoch')!=x['pre_state']['capture_epoch'] or marker.get('generation')!=x['pre_state']['generation'] or marker.get('batch_id') not in history_batches:add(out,'E_BATCH_MARKER',f'cases/{i}/execution/setup/batch_markers/{j}','marker does not identify the scenario history batch')
   if set(setup)!=required_setup:add(out,'E_FIXTURE_SETUP',f'cases/{i}','scenario setup is not complete and exact')
   if hook=='higher_fence' and not any(r['promotion_fence']==10 and r['generation']==8 for r in setup.get('selector_rows',[])):add(out,'E_PROMOTION_FIXTURE',f'cases/{i}','higher selector missing')
   if hook=='same_fence_different_candidate' and len({(r['generation'],r['candidate_digest']) for r in setup.get('selector_rows',[]) if r['promotion_fence']==9})<2:add(out,'E_PROMOTION_FIXTURE',f'cases/{i}','same-fence conflict missing')
