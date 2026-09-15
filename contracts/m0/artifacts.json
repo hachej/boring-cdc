@@ -109,7 +109,7 @@
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "b9ed2e9b23ce1cc2154b4a1b8b3f06981eac187f8ca9e569d75b80fcf68dbc0f",
+      "sha256": "d527c151ef472b32e153779afaaa3b8da4741118594e3e1bca4b3ed57a530914",
       "status": "complete"
     },
     {
@@ -130,7 +130,7 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "8597fda59182e21a73776a5f3f90231c32b4fe79b16324e585c45d4b8679d320",
+      "sha256": "35b14707438eb70d1cef5b1fe8d92067094b12e1f37afdbc57d4cae21f1356eb",
       "status": "complete"
     },
     {
@@ -326,7 +326,7 @@
       "id": "ART-M0-PG-EVIDENCE",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "artifacts/boring-cdc-m0-pg-contract/spec/evidence.json",
-      "sha256": "48cfdd56c4a2c67465f063034af1c4fef97387051a3e63d6598bcf1af82ad04e",
+      "sha256": "7770f7fd4f8c991c266dd4ec8bd33d7721554b813d45fe6c9ef66f14d02e6fe9",
       "status": "complete"
     },
     {
@@ -361,7 +361,7 @@
       "id": "ART-M0-PG-VALIDATOR",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "scripts/validate/postgres_contract.py",
-      "sha256": "82d54e05e18877e1f4a96c7d7b9a10a46b1d5df724619d315ebb9e1934f2fa2b",
+      "sha256": "9c583fe3cf481efc542d96dcb4af71f4b906df25ae94ec9d4816b1e036a2d605",
       "status": "complete"
     },
     {

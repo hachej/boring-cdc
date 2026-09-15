@@ -1,6 +1,7 @@
 import copy
 import importlib.util
 import json
+import subprocess
 import unittest
 from pathlib import Path
 
@@ -105,15 +106,24 @@ class PostgresContractTests(unittest.TestCase):
         self.assertEqual(2, case["inputs"]["importer_acknowledged"])
 
     def test_forged_evidence_source_parent_is_rejected(self):
+        from types import SimpleNamespace
+        from unittest import mock
+
         inputs = postgres_contract.validate()[1]
         validator_sha = postgres_contract.hashlib.sha256(postgres_contract.VALIDATOR.read_bytes()).hexdigest()
-        prior = {
-            "inputs": inputs,
-            "validator_sha256": validator_sha,
-            "source_parent_git_commit": "0" * 40,
-        }
+        for candidate in ("HEAD", subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True).strip()):
+            prior = {"inputs": inputs, "validator_sha256": validator_sha, "source_parent_git_commit": candidate}
+            _, error = postgres_contract.resolve_source_parent(prior, inputs, validator_sha)
+            self.assertIn("canonical full lowercase commit OID", error)
+        prior = {"inputs": inputs, "validator_sha256": validator_sha, "source_parent_git_commit": "0" * 40}
         _, error = postgres_contract.resolve_source_parent(prior, inputs, validator_sha)
-        self.assertIn("must equal immediate parent", error)
+        self.assertIn("not an existing commit", error)
+        candidate = "1" * 40
+        prior["source_parent_git_commit"] = candidate
+        head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True)
+        with mock.patch.object(postgres_contract.subprocess, "check_output", side_effect=[head, candidate + "\n"]), mock.patch.object(postgres_contract.subprocess, "run", return_value=SimpleNamespace(returncode=1)):
+            _, error = postgres_contract.resolve_source_parent(prior, inputs, validator_sha)
+        self.assertIn("not an ancestor of HEAD", error)
 
     def test_safe_stop_close_does_not_mask_ownership_loss(self):
         policy = self.contract["safe_stop_close"]

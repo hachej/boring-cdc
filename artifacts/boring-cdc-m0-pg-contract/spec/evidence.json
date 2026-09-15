@@ -14,8 +14,8 @@
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-postgres-contract-evidence/v1",
-  "source_parent_git_commit": "fbeba1fc476fabfeb48b14c58c572f0e6f5c6511",
+  "source_parent_git_commit": "7612b4abcddc1d0cb3326a1a09a1c236745e9647",
   "status": "pass",
   "validator": "scripts/validate/postgres_contract.py",
-  "validator_sha256": "82d54e05e18877e1f4a96c7d7b9a10a46b1d5df724619d315ebb9e1934f2fa2b"
+  "validator_sha256": "9c583fe3cf481efc542d96dcb4af71f4b906df25ae94ec9d4816b1e036a2d605"
 }

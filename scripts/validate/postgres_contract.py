@@ -536,25 +536,26 @@ def validate():
 
 
 def resolve_source_parent(prior, inputs, validator_sha256):
-    """Bind generated evidence to the exact immediate source commit or reject tampering."""
+    """Preserve an immutable source commit across ledger-only descendants."""
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    prior_matches_inputs = prior.get("inputs") == inputs and prior.get("validator_sha256") == validator_sha256
-    if not prior_matches_inputs:
+    if prior.get("inputs") != inputs or prior.get("validator_sha256") != validator_sha256:
         return head, None
-    expected_parent = subprocess.check_output(["git", "rev-parse", "HEAD^"], cwd=ROOT, text=True).strip()
     candidate = prior.get("source_parent_git_commit")
-    if candidate != expected_parent:
-        return candidate or "", f"stored source parent must equal immediate parent {expected_parent}"
+    if not isinstance(candidate, str) or re.fullmatch(r"[0-9a-f]{40}", candidate) is None:
+        return candidate or "", "stored source parent must be a canonical full lowercase commit OID"
     try:
-        subprocess.run(
-            ["git", "cat-file", "-e", f"{candidate}^{{commit}}"],
+        resolved = subprocess.check_output(
+            ["git", "rev-parse", f"{candidate}^{{commit}}"],
             cwd=ROOT,
-            check=True,
-            stdout=subprocess.DEVNULL,
+            text=True,
             stderr=subprocess.DEVNULL,
-        )
+        ).strip()
     except subprocess.CalledProcessError:
         return candidate, "stored source parent is not an existing commit"
+    if resolved != candidate:
+        return candidate, "stored source parent does not resolve to its canonical commit OID"
+    if subprocess.run(["git", "merge-base", "--is-ancestor", candidate, head], cwd=ROOT).returncode != 0:
+        return candidate, "stored source parent is not an ancestor of HEAD"
     return candidate, None
 
 

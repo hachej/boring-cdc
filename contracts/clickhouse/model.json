@@ -46,7 +46,7 @@
   "consumes": {
     "compose": {
       "path": "contracts/m0/compose.json",
-      "sha256": "8a78b0a63d36a039eabae79768a35d66707f46d8c4c635508059d1a065cf8017"
+      "sha256": "2ee8964ab1d5c065f7df9020d5511e74a8df273845c23a302e2b95639829cfd4"
     },
     "confirmation": {
       "cards": [
