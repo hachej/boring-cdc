@@ -485,6 +485,7 @@ pub struct CopiedEvent {
     pub event_id: String,
     pub relation_schema_fingerprint: Option<String>,
     pub source_relation_id: Option<String>,
+    pub control_kind: Option<String>,
     pub payload: Vec<u8>,
     pub payload_hash: String,
 }
@@ -599,7 +600,7 @@ pub fn read_complete_range(
             .max()
             .map_or(0, |v| v + 1);
         let row_count = reader.for_each_bounded_params(
-            "SELECT e.journal_seq,e.transaction_id,e.transaction_ordinal,e.event_id,e.relation_schema_fingerprint,rs.relation_id,e.payload,e.payload_hash FROM journal_events e LEFT JOIN relation_schemas rs ON rs.schema_fingerprint=e.relation_schema_fingerprint WHERE e.transaction_id=?1 ORDER BY e.journal_seq",
+            "SELECT e.journal_seq,e.transaction_id,e.transaction_ordinal,e.event_id,e.relation_schema_fingerprint,rs.relation_id,e.control_kind,e.payload,e.payload_hash FROM journal_events e LEFT JOIN relation_schemas rs ON rs.schema_fingerprint=e.relation_schema_fingerprint WHERE e.transaction_id=?1 ORDER BY e.journal_seq",
             [txid.as_str()],
             |r| {
                 events.push(CopiedEvent {
@@ -610,8 +611,9 @@ pub fn read_complete_range(
                     event_id: r.get(3)?,
                     relation_schema_fingerprint: r.get(4)?,
                     source_relation_id: r.get(5)?,
-                    payload: r.get(6)?,
-                    payload_hash: r.get(7)?,
+                    control_kind: r.get(6)?,
+                    payload: r.get(7)?,
+                    payload_hash: r.get(8)?,
                 });
                 Ok(())
             },

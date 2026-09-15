@@ -17,6 +17,7 @@ pub mod m1_workload;
 pub mod m1_cli_contract;
 
 pub mod m2_capture_runtime;
+pub mod m2_heartbeat;
 pub mod m2_journal;
 pub mod m2_jsonl;
 pub mod m2_ownership;

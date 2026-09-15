@@ -1,0 +1,13 @@
+{"schema_version":"m2-heartbeat-cases/v1","owner_bead":"boring-cdc-m2-heartbeat","evidence_tier":"component","cases":[
+{"id":"INV-IDLE-PROGRESS-IS-PUBLISHED-NOT-INFERRED-INFORMATIONAL","test":"published_heartbeat_commits_before_feedback","assertion":"only the persisted end LSN of a real published heartbeat transaction reaches feedback; keepalive and unrelated WAL remain informational"},
+{"id":"SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL","test":"failed_or_non_heartbeat_commit_never_invokes_feedback","assertion":"a non-heartbeat event cannot enter the heartbeat feedback path"},
+{"id":"SCN-HEARTBEAT-PERMISSION-OUTAGE","test":"cadence_backoff_cardinality_and_degraded_health_are_bounded","assertion":"source write outage emits degraded status, bounded exponential retry and WAL headroom without feedback advancement"},
+{"id":"SCN-INTERNAL-CONTROL-EVENT-ROUTING","test":"generic_router_noops_complete_control_transaction_and_checkpoints","assertion":"generic materializer writes no user archive row for a control-only transaction and advances only its complete journal boundary"},
+{"id":"SCN-M2-HEARTBEAT-EXACTLY-ONE-ROW","test":"cadence_backoff_cardinality_and_degraded_health_are_bounded","assertion":"fixed UPDATE and immutable-key SELECT must each observe exactly one administration-seeded row"},
+{"id":"SCN-M2-HEARTBEAT-CADENCE-RETRY","test":"cadence_backoff_cardinality_and_degraded_health_are_bounded","assertion":"cadence, retry cap, attempt and healthy/degraded transitions are deterministic and bounded"},
+{"id":"SCN-M2-HEARTBEAT-DURABLE-BEFORE-FEEDBACK","test":"published_heartbeat_commits_before_feedback","assertion":"feedback callback is impossible before journal commit returns and receives only the persisted safe boundary"},
+{"id":"SCN-M2-HEARTBEAT-JOURNAL-FAILURE","test":"failed_or_non_heartbeat_commit_never_invokes_feedback","assertion":"journal failure or a non-isolated control transaction invokes no sender callback"},
+{"id":"SCN-M2-HEARTBEAT-GENERIC-NOOP","test":"generic_router_noops_complete_control_transaction_and_checkpoints","assertion":"control routing is destination-independent and has no user-table effect"},
+{"id":"SCN-M2-HEARTBEAT-CHECKPOINT-ATOMICITY","test":"generic_router_never_checkpoints_failed_user_transaction","assertion":"a failed user transaction cannot advance a destination checkpoint even when it contains a control event"},
+{"id":"SCN-M2-HEARTBEAT-INCOMPLETE-RANGE","test":"generic_router_rejects_gap_and_incomplete_ordinal","assertion":"gapped ranges and incomplete transaction ordinals fail closed before checkpoint"}
+]}
