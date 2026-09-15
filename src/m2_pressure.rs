@@ -177,13 +177,65 @@ pub fn confirm_pin_release(
     writer: &mut WriterConnection,
     pin_id: &str,
     revision: u64,
+    owner_reconciled_terminal: bool,
 ) -> Result<(), PressureError> {
+    if !owner_reconciled_terminal {
+        return Err(PressureError::StalePin);
+    }
     let n=writer.connection().execute("UPDATE logical_range_pins SET state='released',revision=revision+1 WHERE pin_id=?1 AND state='release_pending' AND revision=?2",params![pin_id,revision as i64])?;
     if n == 1 {
         Ok(())
     } else {
         Err(PressureError::StalePin)
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PressureObservation {
+    pub free_bytes: u64,
+    pub capture_epoch: &'static str,
+    pub replay_from_seq: u64,
+    pub now_unix_ms: i64,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PressureServiceResult {
+    pub decision: PressureDecision,
+    pub gc: Option<GcResult>,
+    pub checkpoint: Option<CheckpointProgress>,
+}
+/// The run-owned maintenance tick: evaluate actions and execute automatic GC/checkpoint work.
+/// Callers must invoke this from the journal writer's reserved essential-service turn.
+pub fn service_pressure_tick(
+    writer: &mut WriterConnection,
+    thresholds: PressureThresholds,
+    observation: PressureObservation,
+) -> Result<PressureServiceResult, PressureError> {
+    let decision = decide_pressure(observation.free_bytes, thresholds)?;
+    let gc = if decision.actions.automatic_gc {
+        Some(automatic_gc(
+            writer,
+            observation.capture_epoch,
+            observation.replay_from_seq,
+            observation.now_unix_ms,
+            GC_MAX_TRANSACTIONS,
+            GC_MAX_HOLD,
+        )?)
+    } else {
+        None
+    };
+    let checkpoint = if decision.state >= PressureState::Action {
+        Some(checkpoint_restart(writer)?)
+    } else {
+        None
+    };
+    if decision.state >= PressureState::Action {
+        incremental_vacuum(writer, INCREMENTAL_VACUUM_MAX_PAGES)?;
+    }
+    Ok(PressureServiceResult {
+        decision,
+        gc,
+        checkpoint,
+    })
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -214,6 +266,7 @@ pub fn automatic_gc(
         return Err(PressureError::Invalid("invalid GC bound"));
     }
     let started = Instant::now();
+    writer.connection().busy_timeout(max_hold)?;
     let tx = writer
         .connection_mut()
         .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -349,6 +402,58 @@ pub fn automatic_gc(
         last_seq: Some(last as u64),
         retain_from_seq: retain,
         blockers,
+    })
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MetadataRetention<'a> {
+    pub alerts_rows: u64,
+    pub audit_rows: u64,
+    pub completed_command_cutoff: &'a str,
+    pub invalid_generation_cutoff_ms: i64,
+    pub retired_generation_cutoff_ms: i64,
+    pub orphan_cutoff_ms: i64,
+    pub batch_max: usize,
+}
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct MetadataGcResult {
+    pub alerts: u64,
+    pub audits: u64,
+    pub commands: u64,
+    pub invalid_generations: u64,
+    pub retired_generations: u64,
+    pub orphan_diagnostics: u64,
+}
+pub fn bounded_metadata_gc(
+    writer: &mut WriterConnection,
+    limits: MetadataRetention<'_>,
+) -> Result<MetadataGcResult, PressureError> {
+    if limits.batch_max == 0
+        || limits.batch_max > GC_MAX_TRANSACTIONS
+        || limits.alerts_rows == 0
+        || limits.audit_rows == 0
+        || limits.completed_command_cutoff.is_empty()
+    {
+        return Err(PressureError::Invalid("invalid metadata retention"));
+    }
+    let tx = writer
+        .connection_mut()
+        .transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let n = limits.batch_max as i64;
+    let alerts=tx.execute("DELETE FROM alerts WHERE rowid IN (SELECT rowid FROM alerts WHERE state='cleared' ORDER BY rowid LIMIT ?1) AND (SELECT count(*) FROM alerts)>?2",params![n,limits.alerts_rows as i64])? as u64;
+    let audits=tx.execute("DELETE FROM destination_audits WHERE audit_id IN (SELECT a.audit_id FROM destination_audits a JOIN terminal_metadata_retention m ON m.category='destination_audit' AND m.object_id=a.audit_id ORDER BY m.terminal_at_unix_ms LIMIT ?1) AND (SELECT count(*) FROM destination_audits)>?2",params![n,limits.audit_rows as i64])? as u64;
+    let commands=tx.execute("DELETE FROM operator_command_requests WHERE request_id IN (SELECT request_id FROM operator_command_requests WHERE state IN ('completed','failed','aborted_by_restart') AND expires_at<?1 ORDER BY expires_at LIMIT ?2)",params![limits.completed_command_cutoff,n])? as u64;
+    let invalid_generations=tx.execute("DELETE FROM backfill_generations WHERE generation_id IN (SELECT g.generation_id FROM backfill_generations g JOIN terminal_metadata_retention m ON m.category='invalid_generation' AND m.object_id=g.generation_id WHERE g.state='invalidated' AND m.terminal_at_unix_ms<?1 ORDER BY m.terminal_at_unix_ms LIMIT ?2)",params![limits.invalid_generation_cutoff_ms,n])? as u64;
+    let retired_generations=tx.execute("DELETE FROM archive_generations WHERE generation_id IN (SELECT g.generation_id FROM archive_generations g JOIN terminal_metadata_retention m ON m.category='retired_generation' AND m.object_id=g.generation_id WHERE g.state IN ('retired','invalidated') AND m.terminal_at_unix_ms<?1 ORDER BY m.terminal_at_unix_ms LIMIT ?2)",params![limits.retired_generation_cutoff_ms,n])? as u64;
+    let orphan_diagnostics=tx.execute("DELETE FROM orphan_diagnostics WHERE diagnostic_id IN (SELECT diagnostic_id FROM orphan_diagnostics WHERE state='resolved' AND resolved_at_unix_ms<?1 ORDER BY resolved_at_unix_ms LIMIT ?2)",params![limits.orphan_cutoff_ms,n])? as u64;
+    tx.commit()?;
+    Ok(MetadataGcResult {
+        alerts,
+        audits,
+        commands,
+        invalid_generations,
+        retired_generations,
+        orphan_diagnostics,
     })
 }
 
@@ -512,7 +617,11 @@ pub(crate) mod tests {
             2
         );
         request_pin_release(&mut w, "p", 0).unwrap();
-        confirm_pin_release(&mut w, "p", 1).unwrap();
+        assert_eq!(
+            confirm_pin_release(&mut w, "p", 1, false),
+            Err(PressureError::StalePin)
+        );
+        confirm_pin_release(&mut w, "p", 1, true).unwrap();
         let g = automatic_gc(&mut w, "epoch", 6, 2, 10, GC_MAX_HOLD).unwrap();
         assert_eq!(g.transactions, 2);
         drop(w);
@@ -560,6 +669,70 @@ pub(crate) mod tests {
             )
             .unwrap();
         assert!(!sql.contains("VACUUM"));
+        drop(w);
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn metadata_gc_is_terminal_bounded_and_preserves_active_rows() {
+        let (mut w, p) = writer();
+        for i in 0..4 {
+            w.connection().execute("INSERT INTO alerts(alert_id,condition_id,state,opened_at) VALUES(?1,'pressure',?2,'2020')",params![format!("a{i}"),if i==0{"active"}else{"cleared"}]).unwrap();
+        }
+        let limits = MetadataRetention {
+            alerts_rows: 2,
+            audit_rows: 2,
+            completed_command_cutoff: "2025",
+            invalid_generation_cutoff_ms: 1,
+            retired_generation_cutoff_ms: 1,
+            orphan_cutoff_ms: 1,
+            batch_max: 1,
+        };
+        let result = bounded_metadata_gc(&mut w, limits).unwrap();
+        assert_eq!(result.alerts, 1);
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT count(*) FROM alerts WHERE state='active'",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT count(*) FROM alerts", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            3
+        );
+        drop(w);
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn runtime_service_tick_executes_action_gc_and_maintenance() {
+        let (mut w, p) = writer();
+        seed(&w);
+        let thresholds = PressureThresholds {
+            warning: 100,
+            action: 80,
+            critical: 60,
+            hard: 40,
+            reserve: 40,
+        };
+        let result = service_pressure_tick(
+            &mut w,
+            thresholds,
+            PressureObservation {
+                free_bytes: 80,
+                capture_epoch: "epoch",
+                replay_from_seq: 6,
+                now_unix_ms: 1,
+            },
+        )
+        .unwrap();
+        assert_eq!(result.decision.state, PressureState::Action);
+        assert_eq!(result.gc.unwrap().transactions, 5);
+        assert!(result.checkpoint.is_some());
         drop(w);
         let _ = std::fs::remove_file(p);
     }

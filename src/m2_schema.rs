@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 6;
+pub const SCHEMA_VERSION: i64 = 7;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -342,6 +342,23 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_6_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v7: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=7)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v7 {
+            connection.execute_batch(MIGRATION_7)?;
+            connection.execute("INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(7,'bounded-metadata-retention',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[MIGRATION_7_CHECKSUM])?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=7",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_7_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -664,6 +681,18 @@ CREATE TRIGGER logical_pin_transition BEFORE UPDATE OF state ON logical_range_pi
  BEGIN SELECT RAISE(ABORT,'invalid logical pin transition'); END;
 CREATE TRIGGER logical_pin_revision BEFORE UPDATE ON logical_range_pins
  WHEN NEW.revision!=OLD.revision+1 BEGIN SELECT RAISE(ABORT,'stale logical pin revision'); END;
+"#;
+
+const MIGRATION_7_CHECKSUM: &str =
+    "sha256:4be50222ede54887d74f07cdceb3c6c4a41d0a65fc23f885d0d14134775ecfcd";
+const MIGRATION_7: &str = r#"
+CREATE TABLE terminal_metadata_retention(
+ category TEXT NOT NULL CHECK(category IN ('destination_audit','invalid_generation','retired_generation')),
+ object_id TEXT NOT NULL, terminal_at_unix_ms INTEGER NOT NULL,
+ PRIMARY KEY(category,object_id));
+CREATE TABLE orphan_diagnostics(
+ diagnostic_id TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('active','resolved')),
+ created_at_unix_ms INTEGER NOT NULL, resolved_at_unix_ms INTEGER);
 "#;
 
 #[cfg(test)]

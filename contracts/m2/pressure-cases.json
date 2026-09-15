@@ -1,13 +1,47 @@
 {
-  "schema_version": "m2-pressure-cases/v1",
-  "owner_bead": "boring-cdc-m2-pressure",
-  "evidence_tier": "component",
   "cases": [
-    {"id":"SCN-M2-PRESSURE-TRANSITIONS","test":"transition_order_and_actions_are_exact","assertion":"warning, action, critical and hard thresholds occur in order; backfill throttles first, new archive/backfill stops at critical, consumers drain, and capture safe-stops at hard"},
-    {"id":"SCN-M2-PRESSURE-RESERVE","test":"per_filesystem_reserve_equal_admits_and_one_over_rejects","assertion":"each physical filesystem admits the exact reserve boundary and rejects one byte beyond it without borrowing from another filesystem"},
-    {"id":"SCN-M2-PRESSURE-PIN-GC","test":"pin_lifecycle_and_gc_preserve_whole_transactions","assertion":"runtime GC removes only complete transactions before every logical pin; expiry alone never releases a pin and every batch is audited and bounded"},
-    {"id":"SCN-M2-PRESSURE-PAUSED-DESTINATION","test":"paused_destination_is_a_visible_retention_pin","assertion":"an attached paused destination remains a named blocker and no unconsumed event is removed"},
-    {"id":"SCN-M2-PRESSURE-CHECKPOINT","test":"maintenance_is_bounded_and_never_full_vacuum","assertion":"owner-scheduled RESTART checkpoints report busy/progress and incremental vacuum is page-bounded; automatic full VACUUM is absent"},
-    {"id":"SCN-M2-PRESSURE-WAL-RISK","test":"wal_forecast_is_honest","assertion":"finite source WAL cap risk and unavailable rate metrics are explicit and may require re-seed; no automatic slot drop or fake feedback exists"}
-  ]
+    {
+      "assertion": "warning, action, critical and hard thresholds occur in order; backfill throttles first, new archive/backfill stops at critical, consumers drain, and capture safe-stops at hard",
+      "id": "SCN-M2-PRESSURE-TRANSITIONS",
+      "test": "transition_order_and_actions_are_exact"
+    },
+    {
+      "assertion": "each physical filesystem admits the exact reserve boundary and rejects one byte beyond it without borrowing from another filesystem",
+      "id": "SCN-M2-PRESSURE-RESERVE",
+      "test": "per_filesystem_reserve_equal_admits_and_one_over_rejects"
+    },
+    {
+      "assertion": "runtime GC removes only complete transactions before every logical pin; expiry alone never releases a pin and every batch is audited and bounded",
+      "id": "SCN-M2-PRESSURE-PIN-GC",
+      "test": "pin_lifecycle_and_gc_preserve_whole_transactions"
+    },
+    {
+      "assertion": "an attached paused destination remains a named blocker and no unconsumed event is removed",
+      "id": "SCN-M2-PRESSURE-PAUSED-DESTINATION",
+      "test": "paused_destination_is_a_visible_retention_pin"
+    },
+    {
+      "assertion": "owner-scheduled RESTART checkpoints report busy/progress and incremental vacuum is page-bounded; automatic full VACUUM is absent",
+      "id": "SCN-M2-PRESSURE-CHECKPOINT",
+      "test": "maintenance_is_bounded_and_never_full_vacuum"
+    },
+    {
+      "assertion": "finite source WAL cap risk and unavailable rate metrics are explicit and may require re-seed; no automatic slot drop or fake feedback exists",
+      "id": "SCN-M2-PRESSURE-WAL-RISK",
+      "test": "wal_forecast_is_honest"
+    },
+    {
+      "assertion": "metadata classes delete only terminal expired rows in bounded batches while preserving active workflows and configured row caps",
+      "id": "SCN-M2-PRESSURE-METADATA",
+      "test": "metadata_gc_is_terminal_bounded_and_preserves_active_rows"
+    },
+    {
+      "assertion": "the run-owned essential-service tick evaluates action pressure and executes automatic transaction-safe GC plus bounded checkpoint/vacuum work",
+      "id": "SCN-M2-PRESSURE-RUNTIME-SERVICE",
+      "test": "runtime_service_tick_executes_action_gc_and_maintenance"
+    }
+  ],
+  "evidence_tier": "component",
+  "owner_bead": "boring-cdc-m2-pressure",
+  "schema_version": "m2-pressure-cases/v1"
 }
