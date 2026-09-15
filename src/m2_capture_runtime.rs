@@ -929,6 +929,24 @@ fn pressure_stops_capture(
     decision.actions.safe_stop_capture && capture_filesystem_hard
 }
 
+fn validate_pressure_role_devices(
+    budget_devices: &[u64],
+    roles: &[(usize, u64, bool)],
+) -> Result<std::collections::BTreeSet<usize>, &'static str> {
+    let mut capture_budget_indexes = std::collections::BTreeSet::new();
+    for &(budget_index, role_device, capture_critical) in roles {
+        if budget_devices.get(budget_index).copied() != Some(role_device) {
+            return Err(
+                "pressure role path is on a different physical filesystem than its budget root",
+            );
+        }
+        if capture_critical {
+            capture_budget_indexes.insert(budget_index);
+        }
+    }
+    Ok(capture_budget_indexes)
+}
+
 fn configured_pressure_filesystems(
     config: &crate::m1_config::PublicConfig,
 ) -> Result<Vec<RuntimePressureFilesystem>, CaptureFailure> {
@@ -938,28 +956,49 @@ fn configured_pressure_filesystems(
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| std::path::Path::new("."));
-    let capture_budget_indexes = [
-        crate::m1_config::filesystem_budget_for_path(&config.budgets, sqlite_root),
-        crate::m1_config::filesystem_budget_for_path(
-            &config.budgets,
-            std::path::Path::new(&config.storage.sqlite_temp_path),
-        ),
-        crate::m1_config::filesystem_budget_for_path(
-            &config.budgets,
-            std::path::Path::new(&config.storage.spool_path),
-        ),
-    ]
-    .into_iter()
-    .collect::<Result<std::collections::BTreeSet<_>, _>>()
-    .map_err(|_| CaptureFailure::at("configuration", "M2_PRESSURE_BUDGET_PATH_UNCOVERED"))?;
+    let role_paths = [
+        (sqlite_root, true),
+        (std::path::Path::new(&config.storage.sqlite_temp_path), true),
+        (std::path::Path::new(&config.storage.spool_path), true),
+        (std::path::Path::new(&config.archive.root), false),
+    ];
+    let budget_devices = config
+        .budgets
+        .iter()
+        .map(|budget| {
+            std::fs::metadata(&budget.root)
+                .map(|metadata| metadata.dev())
+                .map_err(|_| CaptureFailure::at("storage", "M2_PRESSURE_BUDGET_PATH_UNAVAILABLE"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let roles = role_paths
+        .iter()
+        .map(|(path, capture_critical)| {
+            let budget_index = crate::m1_config::filesystem_budget_for_path(&config.budgets, path)
+                .map_err(|_| {
+                    CaptureFailure::at("configuration", "M2_PRESSURE_BUDGET_PATH_UNCOVERED")
+                })?;
+            let device = std::fs::metadata(path)
+                .map_err(|_| CaptureFailure::at("storage", "M2_PRESSURE_ROLE_PATH_UNAVAILABLE"))?
+                .dev();
+            Ok((budget_index, device, *capture_critical))
+        })
+        .collect::<Result<Vec<_>, CaptureFailure>>()?;
+    let capture_budget_indexes =
+        validate_pressure_role_devices(&budget_devices, &roles).map_err(|_| {
+            CaptureFailure::at(
+                "configuration",
+                "M2_PRESSURE_FILESYSTEM_ASSOCIATION_MISMATCH",
+            )
+        })?;
+
     let mut paths = BTreeMap::new();
     let mut budgets = Vec::with_capacity(config.budgets.len());
     for (index, budget) in config.budgets.iter().enumerate() {
-        let path = std::path::PathBuf::from(&budget.root);
-        let device = std::fs::metadata(&path)
-            .map_err(|_| CaptureFailure::at("storage", "M2_PRESSURE_BUDGET_PATH_UNAVAILABLE"))?
-            .dev();
-        paths.entry(device).or_insert(path);
+        let device = budget_devices[index];
+        paths
+            .entry(device)
+            .or_insert_with(|| std::path::PathBuf::from(&budget.root));
         budgets.push(crate::m2_pressure::FilesystemBudget {
             filesystem_id: device,
             total_bytes: budget.total_bytes.0,
@@ -2014,6 +2053,11 @@ pub mod tests {
             )
             .unwrap()
         );
+        assert_eq!(
+            validate_pressure_role_devices(&[7, 9], &[(0, 7, true), (1, 9, false)]),
+            Ok(std::collections::BTreeSet::from([0]))
+        );
+        assert!(validate_pressure_role_devices(&[7], &[(0, 9, true)]).is_err());
     }
 
     #[test]
