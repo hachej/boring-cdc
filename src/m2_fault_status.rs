@@ -150,6 +150,7 @@ pub struct M2SystemSnapshot {
     pub blocked_by: Vec<String>,
     pub allowed_actions: Vec<String>,
     pub next_commands: Vec<Value>,
+    pub action_causality: Vec<Value>,
     pub evidence_digest: String,
 }
 #[derive(Debug)]
@@ -178,16 +179,24 @@ fn cid(n: &str) -> String {
     format!("COND-{}", n.replace('_', "-").to_ascii_uppercase())
 }
 fn actions(n: &str) -> Vec<String> {
-    match n {
-        "slot_invalid_requires_reseed"
-        | "journal_corrupt_requires_reseed"
-        | "publication_drift_requires_reseed"
-        | "source_identity_blocked" => vec!["CMD-RECOVER-RESEED".into()],
-        "bootstrap_ambiguous_requires_restart" | "promotion_recovery_required" => {
-            vec!["CMD-RECOVER-INSPECT".into()]
-        }
-        _ => vec!["CMD-STATUS".into()],
-    }
+    let command = match n {
+        "healthy" => "CMD-STATUS",
+        "degraded" => "CMD-CHECK",
+        "destination_blocked" => "CMD-DESTINATION-LIST",
+        "schema_blocked" => "CMD-JOURNAL-INSPECT",
+        "capture_safe_stopped" => "CMD-JOURNAL-VERIFY",
+        "slot_invalid_requires_reseed" => "CMD-RECOVER-RESEED",
+        "journal_corrupt_requires_reseed" => "CMD-JOURNAL-GC",
+        "publication_drift_requires_reseed" => "CMD-INIT",
+        "bootstrap_ambiguous_requires_restart" => "CMD-RECOVER-INSPECT",
+        "heartbeat_degraded" => "CMD-RUN",
+        "promotion_recovery_required" => "CMD-RECOVER-PROMOTION",
+        "source_identity_blocked" => "CMD-ARCHIVE-VERIFY",
+        "ownership_lost" => "CMD-RUN-BOOTSTRAP",
+        "unsafe_durability" => "CMD-ARCHIVE-RECONSTRUCT",
+        _ => "CMD-STATUS",
+    };
+    vec![command.into()]
 }
 fn add(
     v: &mut Vec<(String, String, String, Option<String>)>,
@@ -224,8 +233,19 @@ pub fn snapshot(
         .duration_since(UNIX_EPOCH)
         .map_err(|_| StatusError::Clock)?
         .as_secs();
-    let observed = ts(now);
-    let fresh = ts(now + FRESHNESS_SECONDS);
+    let fact_seconds = std::fs::metadata(path)
+        .ok()
+        .and_then(|m| m.modified().ok())
+        .and_then(|m| m.duration_since(UNIX_EPOCH).ok())
+        .map(|d| d.as_secs().min(now))
+        .unwrap_or(now);
+    let observed = ts(fact_seconds);
+    let fresh = ts(fact_seconds.saturating_add(FRESHNESS_SECONDS));
+    let freshness = if now <= fact_seconds.saturating_add(FRESHNESS_SECONDS) {
+        "fresh"
+    } else {
+        "stale"
+    };
     let c = Connection::open_with_flags(
         path,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
@@ -396,6 +416,20 @@ pub fn snapshot(
     let mut dest = Vec::new();
     let mut dq=c.prepare("SELECT d.destination_id,d.kind,d.generation,d.highest_external_fence,coalesce(cp.journal_seq,0),coalesce(cp.revision,0) FROM destinations d LEFT JOIN destination_checkpoints cp USING(destination_id) ORDER BY d.destination_id LIMIT 100")?;
     for row in dq.query_map([],|r|{let id:String=r.get(0)?;Ok(json!({"destination_fingerprint":hash(&[&id]),"kind":r.get::<_,String>(1)?,"generation":r.get::<_,u64>(2)?,"highest_external_fence":r.get::<_,u64>(3)?,"checkpoint_seq":r.get::<_,u64>(4)?,"checkpoint_revision":r.get::<_,u64>(5)?}))})?{dest.push(row?)}
+    let mut action_causality = Vec::new();
+    let mut aq = c.prepare("SELECT request_id,payload_digest,run_id,state,observation_revision,control_revision FROM operator_command_requests ORDER BY request_id LIMIT 100")?;
+    for row in aq.query_map([], |r| Ok(json!({"request_id":r.get::<_,String>(0)?,"plan_digest":r.get::<_,String>(1)?,"run_id":r.get::<_,String>(2)?,"terminal_state":r.get::<_,String>(3)?,"before_state_revision":r.get::<_,u64>(4)?,"bound_control_revision":r.get::<_,u64>(5)?})))? { action_causality.push(row?); }
+    let control_revisions = BTreeMap::from([
+        ("source".into(), s.9),
+        ("ownership".into(), owner.as_ref().map(|x| x.3).unwrap_or(0)),
+        (
+            "destination_checkpoint".into(),
+            dest.iter()
+                .filter_map(|v| v["checkpoint_revision"].as_u64())
+                .max()
+                .unwrap_or(0),
+        ),
+    ]);
     let stable_conditions = conditions
         .iter()
         .map(|c| (&c.condition, &c.severity, &c.reason, &c.evidence_digest))
@@ -418,7 +452,7 @@ pub fn snapshot(
         .collect::<BTreeSet<_>>()
         .into_iter()
         .collect();
-    Ok(M2SystemSnapshot{schema_version:SNAPSHOT_SCHEMA.into(),snapshot_id:hash(&[&evidence,&revision.to_string()]),state_revision:revision,observed_at:observed,fresh_until:fresh,freshness:"fresh".into(),overall_health:overall,source_identity_fingerprint:Some(identity),capture_epoch:Some(s.0),run_id:owner.as_ref().map(|x|x.0.clone()),ownership:owner.map_or(json!({"state":"unowned","actual_writer":"unknown"}),|x|json!({"state":x.1,"connection_generation":x.2,"revision":x.3,"actual_writer":"persisted"})),configuration_fingerprint:config.into(),control_revisions:BTreeMap::from([("source".into(),s.9)]),boundaries:json!({"source_confirmed_flush_lsn":s.10,"source_restart_lsn":s.11,"durable_transaction_end_lsn":s.5,"durable_journal_seq":s.6,"feedback_lsn":s.7,"creation_floor_lsn":s.8}),budgets:json!({"sqlite_bytes":db_bytes,"pressure":"derived_by_m2_pressure","source_wal_headroom":"unknown"}),destinations:dest,failures,conditions,blocked_by:blocked,allowed_actions:allowed,next_commands:vec![json!({"command_id":"CMD-STATUS","argv":["status","--json"]})],evidence_digest:evidence})
+    Ok(M2SystemSnapshot{schema_version:SNAPSHOT_SCHEMA.into(),snapshot_id:hash(&[&evidence,&revision.to_string()]),state_revision:revision,observed_at:observed,fresh_until:fresh,freshness:freshness.into(),overall_health:overall,source_identity_fingerprint:Some(identity),capture_epoch:Some(s.0),run_id:owner.as_ref().map(|x|x.0.clone()),ownership:owner.map_or(json!({"state":"unowned","actual_writer":"unknown"}),|x|json!({"state":x.1,"connection_generation":x.2,"revision":x.3,"actual_writer":if freshness=="fresh"{"persisted"}else{"unknown"}})),configuration_fingerprint:config.into(),control_revisions,boundaries:json!({"source_confirmed_flush_lsn":s.10,"source_restart_lsn":s.11,"durable_transaction_end_lsn":s.5,"durable_journal_seq":s.6,"feedback_lsn":s.7,"creation_floor_lsn":s.8}),budgets:json!({"sqlite_bytes":db_bytes,"pressure":"derived_by_m2_pressure","source_wal_headroom":"unknown"}),destinations:dest,failures,conditions,blocked_by:blocked,allowed_actions:allowed,next_commands:vec![json!({"command_id":"CMD-STATUS","argv":["status","--json"]})],action_causality,evidence_digest:evidence})
 }
 #[cfg(test)]
 pub mod tests {
@@ -454,7 +488,7 @@ pub mod tests {
     fn failure_and_reseed_are_concurrent() {
         let (p, w) = fixture();
         w.connection().execute("INSERT INTO startup_reconciliations(run_id,capture_epoch,outcome,reason_code,created_at) VALUES('r','epoch','requires_reseed','JOURNAL_INTEGRITY_FAILED','now')",[]).unwrap();
-        w.connection().execute("INSERT INTO processing_failures(failure_id,component,failure_class,fingerprint,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES('f','capture','transient_source','sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','transient',2,'unix:99',1,'unix:1','unix:2')",[]).unwrap();
+        w.connection().execute("INSERT INTO processing_failures(failure_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES('f','capture','transient_source','sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',2,3,'transient',2,'unix:99',1,'unix:1','unix:2')",[]).unwrap();
         drop(w);
         let s = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
         assert!(
@@ -467,7 +501,19 @@ pub mod tests {
                 .iter()
                 .any(|x| x.condition == "capture_safe_stopped")
         );
-        assert_eq!(s.failures[0].attempt, 2)
+        assert_eq!(s.failures[0].attempt, 2);
+        assert_eq!(s.failures[0].failed_journal_range, Some([2, 3]));
+    }
+    #[test]
+    fn freshness_expires_and_causal_records_exclude_payloads() {
+        let (p, w) = fixture();
+        w.connection().execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at) VALUES('request-safe','nonce-secret',x'0102','sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','run-safe','peer-safe','completed',x'03',7,2,'unix:99')",[]).unwrap();
+        drop(w);
+        let s = snapshot(&p, "cfg", SystemTime::now() + Duration::from_secs(60)).unwrap();
+        assert_eq!(s.freshness, "stale");
+        assert_eq!(s.action_causality[0]["request_id"], "request-safe");
+        let text = serde_json::to_string(&s).unwrap();
+        assert!(!text.contains("nonce-secret") && !text.contains("0102"));
     }
     #[test]
     fn inventories_are_exact() {

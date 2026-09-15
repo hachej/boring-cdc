@@ -1,7 +1,7 @@
 use boring_cdc::article1_capture::{CaptureConfig, CaptureFailure, capture_jsonl};
 use boring_cdc::m1_cli_contract::{
-    CLI_SCHEMA_VERSION, CliEnvelope, ExitCode, MutationTerminal, MutationTrace, NextCommand,
-    command_help, error_envelope, parse, root_help, unavailable,
+    CLI_SCHEMA_VERSION, CliEnvelope, Condition, ExitCode, MutationTerminal, MutationTrace,
+    NextCommand, SystemSnapshot, command_help, error_envelope, parse, root_help, unavailable,
 };
 use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
 use boring_cdc::m1_preflight::{
@@ -385,6 +385,62 @@ fn status_command() -> Result<CliEnvelope, ReaderFailure> {
         message: "fresh status evidence is unavailable",
         exit: ExitCode::Unavailable,
     })?;
+    let mut extensions = std::collections::BTreeMap::new();
+    extensions.insert(
+        "overall_health".into(),
+        serde_json::json!(report.overall_health),
+    );
+    extensions.insert("failures".into(), serde_json::json!(report.failures));
+    extensions.insert(
+        "control_revisions".into(),
+        serde_json::json!(report.control_revisions),
+    );
+    extensions.insert(
+        "condition_details".into(),
+        serde_json::json!(report.conditions),
+    );
+    extensions.insert(
+        "action_causality".into(),
+        serde_json::json!(report.action_causality),
+    );
+    let canonical = SystemSnapshot {
+        schema_version: 1,
+        snapshot_id: report.snapshot_id.clone(),
+        state_revision: report.state_revision,
+        observed_at: report.observed_at.clone(),
+        fresh_until: report.fresh_until.clone(),
+        freshness: report.freshness.clone(),
+        source_identity: report.source_identity_fingerprint.clone(),
+        capture_epoch: report.capture_epoch.clone(),
+        run_id: report.run_id.clone(),
+        ownership: report.ownership.clone(),
+        fingerprints: std::collections::BTreeMap::from([(
+            "configuration".into(),
+            report.configuration_fingerprint.clone(),
+        )]),
+        durability_boundaries: report.boundaries.clone(),
+        budgets: report.budgets.clone(),
+        destinations: report.destinations.clone(),
+        conditions: report
+            .conditions
+            .iter()
+            .map(|c| Condition {
+                code: c.condition_id.clone(),
+                severity: c.severity.clone(),
+                runbook_id: c.runbook_id.clone(),
+                evidence_digest: c.evidence_digest.clone(),
+            })
+            .collect(),
+        blocked_by: report.blocked_by.clone(),
+        allowed_actions: report.allowed_actions.clone(),
+        next_commands: report
+            .next_commands
+            .iter()
+            .filter_map(|v| serde_json::from_value(v.clone()).ok())
+            .collect(),
+        evidence_digest: report.evidence_digest.clone(),
+        extensions,
+    };
     Ok(CliEnvelope {
         schema_version: CLI_SCHEMA_VERSION,
         command: "CMD-STATUS".into(),
@@ -392,11 +448,11 @@ fn status_command() -> Result<CliEnvelope, ReaderFailure> {
         code: "OK".into(),
         message: "fresh read-only system snapshot".into(),
         request_id: None,
-        run_id: report.run_id.clone(),
-        capture_epoch: report.capture_epoch.clone(),
-        condition: Some(report.overall_health.clone()),
+        run_id: report.run_id,
+        capture_epoch: report.capture_epoch,
+        condition: Some(report.overall_health),
         runbook_id: None,
-        data: serde_json::to_value(report).expect("status snapshot"),
+        data: serde_json::to_value(canonical).expect("status snapshot"),
         warnings: vec![],
         next_commands: vec![],
         plan_digest: None,
@@ -572,7 +628,9 @@ fn main() {
                                 report["snapshot_id"].as_str().unwrap_or("unknown"),
                                 report["state_revision"]
                             );
-                            for condition in report["conditions"].as_array().into_iter().flatten() {
+                            for condition in
+                                report["condition_details"].as_array().into_iter().flatten()
+                            {
                                 text.push_str(&format!(
                                     "condition: {} severity={} reason={} runbook={} procedure={}\n",
                                     condition["condition"].as_str().unwrap_or("unknown"),

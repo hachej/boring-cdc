@@ -131,4 +131,8 @@ assert r['outcome']=='success' and r['data']['latest_reason_code']=='SLOT_INVALI
 for p in sys.argv[3:]:
  s=open(p).read(); assert 'postgresql://' not in s and 'm2-reconcile-' not in s and s.strip()
 PY
-printf '{"postgres":"17.6","database_oid_observed":true,"live_publication_fingerprint":true,"fresh_slot_ambiguous":true,"migration_receipt_retry":true,"slot_reasons":["SLOT_MISSING","RESUME_WAL_STATUS_UNAVAILABLE","SLOT_INVALID_WAL_REMOVED"],"abrupt_process_restart":true,"cli_json_text_matrix":true}\n'
+summary='{"postgres":"17.6","database_oid_observed":true,"live_publication_fingerprint":true,"fresh_slot_ambiguous":true,"migration_receipt_retry":true,"slot_reasons":["SLOT_MISSING","RESUME_WAL_STATUS_UNAVAILABLE","SLOT_INVALID_WAL_REMOVED"],"abrupt_process_restart":true,"cli_json_text_matrix":true}'
+printf '%s\n' "$summary"
+if [[ -n "${M2_RECONCILE_PROOF_OUT:-}" ]]; then
+  printf '{"schema_version":"m2-reconcile-crash-proof/v1","postgres":"17.6","crash_pid":%s,"executable":"boring-cdc","boundary_marker":"before-source-state-receipt","sigkill_reaped":true,"process_absent_after_wait":true,"source_receipt_absent_before_restart":true,"slot_reasons":["SLOT_MISSING","RESUME_WAL_STATUS_UNAVAILABLE","SLOT_INVALID_WAL_REMOVED"]}\n' "$crash_pid" > "$M2_RECONCILE_PROOF_OUT"
+fi

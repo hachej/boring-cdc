@@ -456,6 +456,7 @@ fn commit_jsonl_segment_inner(
         }
         tx.commit()?;
     }
+    crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::ArchiveIntentDurable);
     fail(ArchiveFault::AfterIntent, fault)?;
     let (temp_name, final_name) = names(intent);
     let mut adopted = false;
@@ -483,9 +484,13 @@ fn commit_jsonl_segment_inner(
         part_file.write_all(&part)?;
         fail(ArchiveFault::AfterWrite, fault)?;
         part_file.sync_all()?;
+        crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::ArchiveFileSynced);
         fail(ArchiveFault::AfterFileSync, fault)?;
         write_sync(&temp_handle.path("manifest.pending.json"), &manifest)?;
         temp_handle.sync()?;
+        crate::m2_fault_status::fault_hook(
+            crate::m2_fault_status::FaultHook::ArchiveDirectorySynced,
+        );
         fail(ArchiveFault::AfterDirectorySync, fault)?;
         root_dir.rename(&temp_name, &final_name)?;
         fail(ArchiveFault::AfterRename, fault)?;
@@ -517,6 +522,7 @@ fn commit_jsonl_segment_inner(
     fail(ArchiveFault::AfterMarkerSync, fault)?;
     final_handle.sync()?;
     root_dir.sync()?;
+    crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::CheckpointBeforeCommit);
     fail(ArchiveFault::BeforeCheckpoint, fault)?;
     let marker_hash = sha256(&marker);
     let tx = writer
@@ -604,6 +610,7 @@ fn commit_jsonl_segment_inner(
         return Err(ArchiveError::Blocked("checkpoint readback mismatch"));
     }
     tx.commit()?;
+    crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::CheckpointAfterCommit);
     Ok(PublishedSegment {
         segment_dir: PathBuf::from(final_name),
         manifest_hash,

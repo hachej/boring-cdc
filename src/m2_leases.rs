@@ -202,7 +202,7 @@ pub fn acquire(
     if destination.is_none() || owner.is_none() || !anchor_ok {
         return Err(LeaseError::Stale);
     }
-    transaction.execute(
+    let fenced = transaction.execute(
         "UPDATE destination_generation_leases SET state='fenced',revision=revision+1
          WHERE destination_id=?1 AND state='held'
            AND (capture_epoch<>?2 OR generation<>?3 OR configuration_fingerprint<>?4)",
@@ -263,6 +263,9 @@ pub fn acquire(
         return Err(LeaseError::Conflict);
     }
     transaction.commit()?;
+    if fenced != 0 {
+        crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::LeaseFenced);
+    }
     Ok(LeaseToken {
         identity,
         expires_mono_ms: expires_u64,
@@ -375,6 +378,11 @@ where
         .transaction_with_behavior(TransactionBehavior::Immediate)?;
     let live = valid_in(&after, token, after_now)?;
     after.commit()?;
+    if live {
+        crate::m2_fault_status::fault_hook(
+            crate::m2_fault_status::FaultHook::PromotionAfterSelector,
+        );
+    }
     Ok(if live {
         SideEffectOutcome::Live(artifact)
     } else {
@@ -466,6 +474,7 @@ pub fn prepare_promotion(
         ],
     )?;
     transaction.commit()?;
+    crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::PromotionBeforeSelector);
     Ok(PromotionIntent {
         intent_id: intent_id.to_owned(),
         promotion_fence: u64::try_from(fence).map_err(|_| LeaseError::Invalid("negative fence"))?,

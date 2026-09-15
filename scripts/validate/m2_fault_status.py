@@ -8,6 +8,9 @@ assert cases['owner_bead']=='boring-cdc-m2-fault-status' and len(expected)==14 a
 assert len({r['id'] for r in rows})==14 and len({r['condition_id'] for r in rows})==14
 assert all(r['condition_owner']=='boring-cdc-m2-fault-status' and r['procedure_owner']=='boring-cdc-m6-runbooks' and r['procedure'] is None for r in rows)
 src=(root/'src/m2_fault_status.rs').read_text(); assert 'BORING_CDC_M2_FAULT_HOOK' in src and 'SQLITE_OPEN_READ_ONLY' in src
+hook_names=re.findall(r'Self::([A-Z][A-Za-z]+) =>',src)
+product='\n'.join(p.read_text() for p in (root/'src').glob('*.rs') if p.name!='m2_fault_status.rs')
+assert len(set(hook_names))==16 and all(f'FaultHook::{name}' in product for name in hook_names)
 for forbidden in ('raw_driver_error','snapshot_token','canonical_key','postgresql://'):
     assert forbidden not in src
 print(json.dumps({'schema_version':'validation-result/v1','status':'pass','owner_bead':'boring-cdc-m2-fault-status','validator_version':'m2-fault-status/v1','findings':[]}))

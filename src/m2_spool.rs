@@ -582,6 +582,7 @@ impl TxnBuffer {
             }
         };
         self.spool = Some((file, path, prefix_len, dev));
+        crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::SpoolCreated);
         let prior = std::mem::take(&mut self.memory_events);
         let prior_payload: usize = prior.iter().map(Vec::len).sum();
         let flush_result = prior.iter().try_for_each(|event| self.append_file(event));
@@ -708,6 +709,7 @@ impl TxnBuffer {
             let prepared = (|| {
                 let (file, _, _, _) = self.spool.as_mut().expect("spool");
                 file.sync_all()?;
+                crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::SpoolSynced);
                 file.seek(SeekFrom::Start(0))?;
                 let mut reader = BufReader::new(file.try_clone()?);
                 read_header(&mut reader)?;

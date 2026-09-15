@@ -134,6 +134,11 @@ fn persist(
         tx.execute("INSERT INTO reseed_intents(intent_id,destination_id,capture_epoch,state,revision,evidence_digest) VALUES('startup-'||?1,NULL,?2,'blocked',0,?3)", params![run_id,local.capture_epoch,receipt.reason_code])?;
     }
     tx.commit()?;
+    if receipt.outcome == StartupOutcome::BootstrapAmbiguousRequiresRestart {
+        crate::m2_fault_status::fault_hook(
+            crate::m2_fault_status::FaultHook::BootstrapIntentDurable,
+        );
+    }
     Ok(())
 }
 
