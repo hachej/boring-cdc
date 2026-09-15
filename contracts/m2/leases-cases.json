@@ -1,0 +1,37 @@
+{
+  "schema_version": "m2-leases-cases/v1",
+  "owner_bead": "boring-cdc-m2-leases",
+  "evidence_tier": "leaf",
+  "cases": [
+    {
+      "id": "SCN-M2-LEASE-CAS-EXPIRY",
+      "test": "acquire_renew_expire_and_stale_cas_are_exact",
+      "assertion": "acquire, renewal, expiry and generation replacement use exact tuple/revision CAS; an old token cannot renew"
+    },
+    {
+      "id": "SCN-M2-LEASE-PAUSE-DETACH",
+      "test": "pause_and_detach_prevent_dispatch_and_checkpoint",
+      "assertion": "a released lease prevents both external dispatch and local checkpoint completion"
+    },
+    {
+      "id": "SCN-M2-LEASE-RESEED",
+      "test": "reseed_generation_and_configuration_fence_old_workers",
+      "assertion": "capture epoch, generation or configuration replacement makes old dispatch and completion stale"
+    },
+    {
+      "id": "SCN-M2-LEASE-TWO-RUNTIME-RACE",
+      "test": "two_runtime_race_keeps_stale_artifact_out_of_live_state",
+      "assertion": "a worker fenced during its fake external call returns a stale namespaced artifact and cannot complete local live state"
+    },
+    {
+      "id": "SCN-M2-LEASE-NAMESPACE",
+      "test": "namespaces_are_epoch_generation_anchor_and_config_scoped",
+      "assertion": "opaque external namespaces change with epoch, generation, anchor and configuration without exposing destination identity"
+    },
+    {
+      "id": "SCN-M2-LEASE-PROMOTION-INTENT",
+      "test": "promotion_intent_allocates_increasing_fence_and_stale_token_cannot_prepare",
+      "assertion": "a current anchored lease may allocate a monotonically increasing local promotion intent; stale leases cannot prepare one and M2 executes no selector"
+    }
+  ]
+}

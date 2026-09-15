@@ -20,6 +20,7 @@ pub mod m2_capture_runtime;
 pub mod m2_heartbeat;
 pub mod m2_journal;
 pub mod m2_jsonl;
+pub mod m2_leases;
 pub mod m2_ownership;
 pub mod m2_reconcile;
 pub mod m2_schema;
