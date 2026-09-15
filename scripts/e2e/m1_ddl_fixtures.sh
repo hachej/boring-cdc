@@ -6,7 +6,7 @@ root=$(CDPATH= cd -- "$(dirname "$0")/../.." && pwd); cd "$root"
 tmp=$(mktemp -d); name=''; guard_pid=''
 cleanup() { [ -z "$guard_pid" ] || kill "$guard_pid" >/dev/null 2>&1 || true; [ -z "$name" ] || docker rm -f "$name" >/dev/null 2>&1 || true; rm -rf "$tmp"; }
 trap cleanup EXIT HUP INT TERM
-# M0-PROVISIONAL: boring-cdc-d-ddl (RECOMMENDED PostgreSQL majors and immutable image digests).
+# M0-RECONCILED: boring-cdc-d-ddl (RECOMMENDED PostgreSQL majors and immutable image digests).
 for major in 15 16 17; do
  case "$major" in
  15) image='postgres@sha256:fe0737ba566a2c5b2a28f34433c0a423261900ec17b9bf7ad115e1aae7e57f1b' ;;

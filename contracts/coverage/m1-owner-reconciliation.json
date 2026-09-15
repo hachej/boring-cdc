@@ -1,0 +1,133 @@
+{
+  "answered_at": "2026-09-10T14:03:30Z",
+  "cards": {
+    "5a994cfd-e4e2-46a7-b512-5dae280acae0": {
+      "decision": "accept",
+      "submitted_at": "2026-09-10T14:03:30.910Z",
+      "title": "Security limits decision"
+    },
+    "765bd3b2-4b68-4102-a9ec-43ca93357390": {
+      "decision": "accept",
+      "field_sha256": {
+        "compose": "0a6ab04dad4bd33fa33e9d2b2aeee83b684475d63352f9f6db75125b527fa2e5",
+        "failure_policy": "ddab35a80846d75dee6a69904c3fa7bf18066cddbfd89cb51de3903f1c39d10c",
+        "keys": "30c14e8b953c11dfb9ab4ac10ccde0cbad9c7ae4d25097d62258e7d71d7a510d",
+        "sqlite": "57620390212e1ba9ef6a1e32edaa8f4de39b08941696b78197fd7debdb107a4b",
+        "values": "b03d04460a78c4cd0b02817952e6bcc21d89c9b712b027b1b866cf5e62c7acc8",
+        "wal_cap": "17db93c79a239255a234a9c9deaefa0b1aede76afb8ed5ad939e0a08d096f589"
+      },
+      "submitted_at": "2026-09-10T14:03:30.949Z",
+      "title": "Remaining literals (accept recommended)"
+    }
+  },
+  "constants": [
+    {
+      "decision": "boring-cdc-d-security",
+      "disposition": "confirmed",
+      "name": "status_listen_addr",
+      "value": "127.0.0.1:8787"
+    },
+    {
+      "decision": "boring-cdc-d-security",
+      "disposition": "confirmed",
+      "name": "prometheus_listen_addr",
+      "value": "127.0.0.1:8788"
+    },
+    {
+      "decision": "boring-cdc-d-security",
+      "disposition": "confirmed",
+      "name": "operator_modes",
+      "value": "directory 0700; socket 0600"
+    },
+    {
+      "decision": "boring-cdc-d-security",
+      "disposition": "corrected from 65536",
+      "name": "max_request_bytes",
+      "value": 1048576
+    },
+    {
+      "decision": "boring-cdc-d-security",
+      "disposition": "corrected from 65536",
+      "name": "max_response_bytes",
+      "value": 4194304
+    },
+    {
+      "decision": "boring-cdc-d-security",
+      "disposition": "corrected from shared 5000 ms timeout",
+      "name": "read_timeout_ms",
+      "value": 10000
+    },
+    {
+      "decision": "boring-cdc-d-security",
+      "disposition": "materialized from shared 5000 ms timeout",
+      "name": "write_timeout_ms",
+      "value": 30000
+    },
+    {
+      "decision": "boring-cdc-d-security",
+      "disposition": "confirmed",
+      "name": "confirmation_expiry_ms",
+      "value": 300000
+    },
+    {
+      "decision": "boring-cdc-d-values",
+      "disposition": "confirmed",
+      "name": "VALUES_CONTRACT_DIGEST",
+      "value": "b03d04460a78c4cd0b02817952e6bcc21d89c9b712b027b1b866cf5e62c7acc8"
+    },
+    {
+      "decision": "boring-cdc-d-keys",
+      "disposition": "confirmed",
+      "name": "KEYS_CONTRACT_DIGEST",
+      "value": "30c14e8b953c11dfb9ab4ac10ccde0cbad9c7ae4d25097d62258e7d71d7a510d"
+    },
+    {
+      "decision": "boring-cdc-d-keys",
+      "disposition": "corrected from 32",
+      "name": "MAX_CANONICAL_KEY_COMPONENTS",
+      "value": 8
+    },
+    {
+      "decision": "boring-cdc-d-compose",
+      "disposition": "confirmed",
+      "name": "platform",
+      "value": "linux/amd64"
+    },
+    {
+      "decision": "boring-cdc-d-compose",
+      "disposition": "confirmed",
+      "name": "postgres_image_index",
+      "value": "docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929"
+    },
+    {
+      "decision": "boring-cdc-d-compose",
+      "disposition": "confirmed",
+      "name": "clickhouse_image_index",
+      "value": "docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f"
+    },
+    {
+      "decision": "boring-cdc-d-compose",
+      "disposition": "corrected generator policy from 28.2.2",
+      "name": "docker_engine_policy",
+      "value": "28.3.3"
+    },
+    {
+      "decision": "boring-cdc-d-compose",
+      "disposition": "corrected generator policy from 2.37.1",
+      "name": "compose_policy",
+      "value": "2.39.2"
+    }
+  ],
+  "marker_inventory": {
+    "boring-cdc-d-compose": 14,
+    "boring-cdc-d-failure-policy": 0,
+    "boring-cdc-d-keys": 3,
+    "boring-cdc-d-security": 3,
+    "boring-cdc-d-sqlite": 0,
+    "boring-cdc-d-values": 2,
+    "boring-cdc-d-wal-cap": 0
+  },
+  "owner_bead": "boring-cdc-m1-complete",
+  "remaining_markers_policy": "Markers for decisions not answered by these two cards remain unchanged, including boring-cdc-d-oracle.",
+  "schema_version": "m1-owner-reconciliation/v1"
+}

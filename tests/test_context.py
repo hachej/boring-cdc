@@ -25,16 +25,20 @@ class ContextTests(unittest.TestCase):
   _,x=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--observed-at','2026-01-01T00:00:00Z')
   self.assertLessEqual(x['summary_bytes'],16384);self.assertGreater(x['total_bytes'],x['summary_bytes']);self.assertTrue(x['attachments'][0]['complete']);self.assertIn('acceptance_criteria',x['attachments'][0]['content']);self.assertEqual(len(x['omitted_ids']),len(x['expansion_plan']))
   _,y=self.cli(str(ROOT/'scripts/agent/context'),'boring-cdc-m0.2','--expand','all','--observed-at','2026-01-01T00:00:00Z');self.assertEqual(y['attachments'][-1]['name'],'expansion')
- def test_no_decisions_closed_and_claim_index_absent(self):
-  rows=ac.rows();dec=[r for r in rows if r.get('issue_type')=='decision'];self.assertEqual(len(dec),25);self.assertTrue(all(r['status'] in ('open','in_progress') for r in dec))
+ def test_answered_decisions_and_claim_index_absent(self):
+  rows=ac.rows();dec=[r for r in rows if r.get('issue_type')=='decision'];self.assertEqual(len(dec),25)
+  self.assertTrue(all(r['status'] in ('open','in_progress','blocked','closed') for r in dec));self.assertTrue(any(r['status']=='closed' for r in dec))
   _,x=self.cli(str(ROOT/'scripts/agent/doctor'),'--observed-at','2026-01-01T00:00:00Z');self.assertEqual(x['claim_index'],'pending_unavailable');self.assertFalse(x['claim_reuse'])
  def test_source_change_reports_exact_stale_owner_without_rewriting_closed(self):
   old=ac.REG;self.addCleanup(setattr,ac,'REG',old)
   with tempfile.TemporaryDirectory() as td:
-   p=Path(td)/'reg.json';r=ac.registry();r['source_files']['docs/PLAN.md']='0'*64;changed=next(e for e in r['entries'] if e['source']=='docs/PLAN.md' and e['owner_bead']=='boring-cdc-d-owner');changed['source_anchor']='synthetic changed canonical row';p.write_text(json.dumps(r));ac.REG=p
+   p=Path(td)/'reg.json';r=ac.registry();r['source_files']['docs/PLAN.md']='0'*64
+   stale=next(e for e in r['entries'] if e['source']=='docs/PLAN.md' and e['owner_bead']=='boring-cdc-d-additive')
+   closed=next(e for e in r['entries'] if e['source']=='docs/PLAN.md' and e['owner_bead']=='boring-cdc-d-owner')
+   stale['source_anchor']='synthetic changed open canonical row';closed['source_anchor']='synthetic changed closed canonical row';p.write_text(json.dumps(r));ac.REG=p
    out=io.StringIO();ns=type('N',(),{'target':'docs/PLAN.md'})()
    with contextlib.redirect_stdout(out):ac.cmd_impact(ns)
-   x=json.loads(out.getvalue());self.assertEqual(x['stale_open_or_in_progress'],['boring-cdc-d-owner']);self.assertEqual(x['affected_ids'],[changed['id']]);self.assertIsInstance(x['historical_closed'],list);self.assertEqual(x['conflicts'][0]['owner_bead'],'boring-cdc-m0.2')
+   x=json.loads(out.getvalue());self.assertEqual(x['stale_open_or_in_progress'],['boring-cdc-d-additive']);self.assertEqual(x['historical_closed'],['boring-cdc-d-owner']);self.assertEqual(x['affected_ids'],sorted([stale['id'],closed['id']]));self.assertEqual(x['conflicts'][0]['owner_bead'],'boring-cdc-m0.2')
   ac.REG=old
  def test_hostile_duplicate_dangling_unknown_and_changed_source(self):
   old=ac.REG;self.addCleanup(setattr,ac,'REG',old)

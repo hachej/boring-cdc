@@ -1,0 +1,2 @@
+scripts/faults/m1_raw_demo.sh raw-demo-v1
+scripts/faults/m1_raw_demo.sh raw-demo-v1

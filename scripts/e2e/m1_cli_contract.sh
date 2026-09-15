@@ -30,13 +30,16 @@ rm -f e2e.stderr
 # handlers are intentionally unavailable, so parse success is stable exit 4.
 while IFS= read -r invocation; do
   [ -n "$invocation" ] || continue
+  # Implemented handlers have dedicated validators: CMD-CHECK uses preflight,
+  # and CMD-RUN uses the pinned fixture in scripts/validate/article1_cli.py.
+  case "$invocation" in check|run) continue;; esac
   set +e
   eval "$bin $invocation" >e2e.stdout 2>e2e.stderr
   code=$?
   set -e
   [ "$code" -eq 4 ] || { echo "parse failure ($code): $invocation" >&2; exit 1; }
   [ ! -s e2e.stdout ]; grep -q '^CLI_HANDLER_UNAVAILABLE:' e2e.stderr
-  case "$invocation" in 'run'|'run --bootstrap') continue;; esac
+  case "$invocation" in 'run --bootstrap') continue;; esac
   set +e
   eval "$bin $invocation --json" >e2e.stdout 2>e2e.stderr
   code=$?
@@ -82,5 +85,5 @@ printf '%s' "$json" | python3 -c 'import json,sys; x=json.load(sys.stdin); asser
 after=$(snapshot)
 printf '%s\n' "$after" > "$out/source-after.sha256"
 [ "$before" = "$after" ]
-printf 'm1 cli e2e pass seed=%s help=28 parse_paths=28 text=golden json=versioned source_mutation=none store_mutation=none cleanup=complete\n' "$seed" | tee "$out/e2e.stdout"
+printf 'm1 cli e2e pass seed=%s help=28 parse_paths=28 unavailable_handlers=26 implemented_handlers=check,article1_run text=golden json=versioned source_mutation=none store_mutation=none cleanup=complete\n' "$seed" | tee "$out/e2e.stdout"
 : > "$out/e2e.stderr"

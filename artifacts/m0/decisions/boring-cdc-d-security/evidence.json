@@ -1,0 +1,9 @@
+{
+  "findings": [],
+  "git_commit": "5dc15ad197526172f0c7cb62b221d926f537ff6c",
+  "input_sha256": "9726e81d32db728d270fd387f0903dd61eeabdf8c89c7ed12d68a6662d65feda",
+  "owner_bead": "boring-cdc-m0.1",
+  "schema_version": "validation-result/v1",
+  "status": "pass",
+  "validator_version": "core-validators/1.0.0"
+}

@@ -17,21 +17,22 @@ Authority is domain-specific:
 
 If authorities conflict, stop and resolve the conflict through the canonical owner. Do not silently choose one copy or turn a handoff observation into a contract.
 
-## Current bootstrap commands
+## Repository-local agent commands
 
-The planned `scripts/agent/` interface is specified in `docs/AGENT_SYSTEM.md` but does not exist until its owning Beads implement it. Until then use these explicit commands:
+Use the transparent read-only entry points before invoking the displayed underlying `git` and `br` operations:
 
 ```bash
-br sync --import-only              # after tracked JSONL changes from Git
-br sync --status                   # compare SQLite and JSONL
-br doctor                          # diagnose workspace state
-br ready                           # find unblocked work
-br show <id>                       # read the complete Bead
-br update <id> --claim             # claim atomically
-br blocked                         # inspect blocked work
-br lint                            # validate Bead templates
-br sync --flush-only               # export SQLite changes to tracked JSONL
+scripts/agent/doctor
+scripts/agent/next
+scripts/agent/context <id>
+scripts/agent/impact <id>
+scripts/agent/verify <id>
+scripts/agent/handoff <id>
+scripts/agent/recover <id>
+scripts/agent/finish <id>
 ```
+
+The helpers never claim, mutate product state, commit, push, or close. Claims and tracker synchronization remain explicit operator actions (`br update <id> --claim`, `br sync --import-only`, and `br sync --flush-only`).
 
 Use non-interactive commands. In particular, use `cp -f`, `mv -f`, `rm -f`, and `rm -rf`; never invoke an editor-based command.
 

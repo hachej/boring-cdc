@@ -47,7 +47,7 @@
     "HASH_LENGTH_FRAMING=u64-be",
     "COLUMN_STATE_TAGS=Absent:0,Null:1,UnchangedToast:2,Value:3",
     "MUTATION_KIND_TAGS=Delete:0,Upsert:1",
-    "MAX_CANONICAL_KEY_COMPONENTS=32"
+    "MAX_CANONICAL_KEY_COMPONENTS=8"
   ],
   "schema_version": "m1-ordering-proof/v1"
 }

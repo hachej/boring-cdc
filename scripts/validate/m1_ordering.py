@@ -13,8 +13,8 @@ assert len(ids) == len(set(ids)) == 10
 assert all(value.startswith("SCN-M1-ORDERING-") for value in ids)
 for case in cases["cases"]:
     assert f"fn {case['unit_test']}" in source, case
-assert "M0-PROVISIONAL: boring-cdc-d-event-id" in source
-assert "M0-PROVISIONAL: boring-cdc-d-keys" not in source
+for marker in ("boring-cdc-d-event-id",):
+    assert f"M0-RECONCILED: {marker}" in source
 for provisional_literal in (
     "fn canonical_length_bytes(len: usize) -> [u8; 8]",
     "COLUMN_ABSENT_TAG: u8 = 0",

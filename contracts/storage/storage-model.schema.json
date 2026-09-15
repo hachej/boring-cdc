@@ -1,0 +1,986 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "admission": {
+      "additionalProperties": false,
+      "properties": {
+        "filesystem_equation": {
+          "type": "string"
+        },
+        "limits": {
+          "additionalProperties": false,
+          "properties": {
+            "archive_publish_and_directory_overhead_bytes": {
+              "type": "integer"
+            },
+            "backfill_worker_count": {
+              "type": "integer"
+            },
+            "fixed_metadata_and_rounding_headroom_bytes": {
+              "type": "integer"
+            },
+            "max_backfill_chunk_reservation_bytes": {
+              "type": "integer"
+            },
+            "max_backfill_worker_memory_bytes": {
+              "type": "integer"
+            },
+            "max_capture_spool_reservation_bytes": {
+              "type": "integer"
+            },
+            "max_concurrent_archive_segment_reservation_bytes": {
+              "type": "integer"
+            },
+            "max_event_bytes": {
+              "type": "integer"
+            },
+            "max_sqlite_main_and_wal_growth_bytes": {
+              "type": "integer"
+            },
+            "max_sqlite_temp_reservation_bytes": {
+              "type": "integer"
+            },
+            "max_transaction_bytes": {
+              "type": "integer"
+            },
+            "max_transaction_events": {
+              "type": "integer"
+            },
+            "max_wire_frame_bytes": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "archive_publish_and_directory_overhead_bytes",
+            "backfill_worker_count",
+            "fixed_metadata_and_rounding_headroom_bytes",
+            "max_backfill_chunk_reservation_bytes",
+            "max_backfill_worker_memory_bytes",
+            "max_capture_spool_reservation_bytes",
+            "max_concurrent_archive_segment_reservation_bytes",
+            "max_event_bytes",
+            "max_sqlite_main_and_wal_growth_bytes",
+            "max_sqlite_temp_reservation_bytes",
+            "max_transaction_bytes",
+            "max_transaction_events",
+            "max_wire_frame_bytes"
+          ],
+          "type": "object"
+        },
+        "profiles": {
+          "additionalProperties": false,
+          "properties": {
+            "archive": {
+              "additionalProperties": false,
+              "properties": {
+                "action_free_bytes": {
+                  "type": "integer"
+                },
+                "critical_free_bytes": {
+                  "type": "integer"
+                },
+                "hard_free_bytes": {
+                  "type": "integer"
+                },
+                "reserved_free_bytes": {
+                  "type": "integer"
+                },
+                "warning_free_bytes": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "action_free_bytes",
+                "critical_free_bytes",
+                "hard_free_bytes",
+                "reserved_free_bytes",
+                "warning_free_bytes"
+              ],
+              "type": "object"
+            },
+            "state": {
+              "additionalProperties": false,
+              "properties": {
+                "action_free_bytes": {
+                  "type": "integer"
+                },
+                "critical_free_bytes": {
+                  "type": "integer"
+                },
+                "hard_free_bytes": {
+                  "type": "integer"
+                },
+                "reserved_free_bytes": {
+                  "type": "integer"
+                },
+                "warning_free_bytes": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "action_free_bytes",
+                "critical_free_bytes",
+                "hard_free_bytes",
+                "reserved_free_bytes",
+                "warning_free_bytes"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "archive",
+            "state"
+          ],
+          "type": "object"
+        },
+        "reservation_rules": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "runtime_memory": {
+          "additionalProperties": false,
+          "properties": {
+            "admission": {
+              "type": "string"
+            },
+            "destination_workers": {
+              "additionalProperties": false,
+              "properties": {
+                "archive": {
+                  "type": "integer"
+                },
+                "clickhouse": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "archive",
+                "clickhouse"
+              ],
+              "type": "object"
+            },
+            "equation": {
+              "type": "string"
+            },
+            "fixed_runtime_overhead_budget": {
+              "type": "integer"
+            },
+            "max_copyboth_receive_buffer_bytes": {
+              "type": "integer"
+            },
+            "max_decoder_queue_bytes": {
+              "type": "integer"
+            },
+            "max_in_memory_event_staging_bytes": {
+              "type": "integer"
+            },
+            "max_sqlite_writer_staging_bytes": {
+              "type": "integer"
+            },
+            "required_runtime_memory_bytes": {
+              "type": "integer"
+            },
+            "telemetry_and_command_headroom_bytes": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "admission",
+            "destination_workers",
+            "equation",
+            "fixed_runtime_overhead_budget",
+            "max_copyboth_receive_buffer_bytes",
+            "max_decoder_queue_bytes",
+            "max_in_memory_event_staging_bytes",
+            "max_sqlite_writer_staging_bytes",
+            "required_runtime_memory_bytes",
+            "telemetry_and_command_headroom_bytes"
+          ],
+          "type": "object"
+        },
+        "source_wal_reaction_reserve_seconds": {
+          "type": "integer"
+        },
+        "units": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "filesystem_equation",
+        "limits",
+        "profiles",
+        "reservation_rules",
+        "runtime_memory",
+        "source_wal_reaction_reserve_seconds",
+        "units"
+      ],
+      "type": "object"
+    },
+    "artifact_id": {
+      "const": "ART-M0-STORAGE-MODEL"
+    },
+    "artifact_root": {
+      "type": "string"
+    },
+    "authority": {
+      "additionalProperties": false,
+      "properties": {
+        "architecture": {
+          "type": "string"
+        },
+        "owner_cards": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "requirements": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "architecture",
+        "owner_cards",
+        "requirements",
+        "status"
+      ],
+      "type": "object"
+    },
+    "executors": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "filesystem": {
+      "additionalProperties": false,
+      "properties": {
+        "allowlist": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "requirements": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "requirements",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "denied": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "modes": {
+          "additionalProperties": false,
+          "properties": {
+            "command_socket": {
+              "type": "string"
+            },
+            "database_and_sidecars": {
+              "type": "string"
+            },
+            "roots": {
+              "type": "string"
+            },
+            "spool_intents_manifests": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "command_socket",
+            "database_and_sidecars",
+            "roots",
+            "spool_intents_manifests"
+          ],
+          "type": "object"
+        },
+        "ownership": {
+          "type": "string"
+        },
+        "probe": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "allowlist",
+        "denied",
+        "modes",
+        "ownership",
+        "probe"
+      ],
+      "type": "object"
+    },
+    "fixture_ids": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "fixture_path": {
+      "type": "string"
+    },
+    "owner_bead": {
+      "const": "boring-cdc-m0-storage-model"
+    },
+    "ownership_commands": {
+      "additionalProperties": false,
+      "properties": {
+        "command_endpoint": {
+          "additionalProperties": false,
+          "properties": {
+            "offline": {
+              "type": "string"
+            },
+            "peer": {
+              "type": "string"
+            },
+            "persistence": {
+              "type": "string"
+            },
+            "read_timeout_ms": {
+              "type": "integer"
+            },
+            "request_identity": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "request_max_bytes": {
+              "type": "integer"
+            },
+            "response_max_bytes": {
+              "type": "integer"
+            },
+            "socket_backlog": {
+              "type": "integer"
+            },
+            "transport": {
+              "type": "string"
+            },
+            "write_timeout_ms": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "offline",
+            "peer",
+            "persistence",
+            "read_timeout_ms",
+            "request_identity",
+            "request_max_bytes",
+            "response_max_bytes",
+            "socket_backlog",
+            "transport",
+            "write_timeout_ms"
+          ],
+          "type": "object"
+        },
+        "loss": {
+          "type": "string"
+        },
+        "ownership_deadline_ms": {
+          "type": "integer"
+        },
+        "probe_interval_ms": {
+          "type": "integer"
+        },
+        "source_lock": {
+          "type": "string"
+        },
+        "state_lock": {
+          "type": "string"
+        },
+        "takeover_wait_ms": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "command_endpoint",
+        "loss",
+        "ownership_deadline_ms",
+        "probe_interval_ms",
+        "source_lock",
+        "state_lock",
+        "takeover_wait_ms"
+      ],
+      "type": "object"
+    },
+    "pins_gc": {
+      "additionalProperties": false,
+      "properties": {
+        "automatic_gc": {
+          "type": "string"
+        },
+        "expired_pin": {
+          "type": "string"
+        },
+        "gc_batch_max_ms": {
+          "type": "integer"
+        },
+        "gc_batch_max_transactions": {
+          "type": "integer"
+        },
+        "logical_pin_fields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "metadata_retention": {
+          "additionalProperties": false,
+          "properties": {
+            "alerts_rows": {
+              "type": "integer"
+            },
+            "audit_rows": {
+              "type": "integer"
+            },
+            "completed_command_days": {
+              "type": "integer"
+            },
+            "invalid_generation_days": {
+              "type": "integer"
+            },
+            "retired_generation_days": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "alerts_rows",
+            "audit_rows",
+            "completed_command_days",
+            "invalid_generation_days",
+            "retired_generation_days"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "automatic_gc",
+        "expired_pin",
+        "gc_batch_max_ms",
+        "gc_batch_max_transactions",
+        "logical_pin_fields",
+        "metadata_retention"
+      ],
+      "type": "object"
+    },
+    "result_schema": {
+      "type": "string"
+    },
+    "safe_stop": {
+      "additionalProperties": false,
+      "properties": {
+        "exit_codes": {
+          "additionalProperties": false,
+          "properties": {
+            "configuration": {
+              "type": "integer"
+            },
+            "ownership_lost": {
+              "type": "integer"
+            },
+            "state_unpersistable": {
+              "type": "integer"
+            },
+            "temporary_dependency": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "configuration",
+            "ownership_lost",
+            "state_unpersistable",
+            "temporary_dependency"
+          ],
+          "type": "object"
+        },
+        "feedback": {
+          "type": "string"
+        },
+        "redaction": {
+          "type": "string"
+        },
+        "states": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "status_fields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "exit_codes",
+        "feedback",
+        "redaction",
+        "states",
+        "status_fields"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": "storage-contract/v1"
+    },
+    "spool": {
+      "additionalProperties": false,
+      "properties": {
+        "lifecycle": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "no_transaction_splitting": {
+          "type": "boolean"
+        },
+        "orphan_policy": {
+          "type": "string"
+        },
+        "states": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "lifecycle",
+        "no_transaction_splitting",
+        "orphan_policy",
+        "states"
+      ],
+      "type": "object"
+    },
+    "sqlite": {
+      "additionalProperties": false,
+      "properties": {
+        "actual_connection_attestation": {
+          "additionalProperties": false,
+          "properties": {
+            "bound_fields": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "freshness_ms": {
+              "type": "integer"
+            },
+            "observer_may_certify_writer": {
+              "type": "boolean"
+            },
+            "required_observed_values": {
+              "additionalProperties": false,
+              "properties": {
+                "auto_vacuum": {
+                  "type": "integer"
+                },
+                "foreign_keys": {
+                  "type": "integer"
+                },
+                "journal_mode": {
+                  "type": "string"
+                },
+                "synchronous": {
+                  "type": "integer"
+                },
+                "temp_store": {
+                  "type": "integer"
+                },
+                "trusted_schema": {
+                  "type": "integer"
+                },
+                "wal_autocheckpoint": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "journal_mode",
+                "synchronous",
+                "auto_vacuum",
+                "foreign_keys",
+                "trusted_schema",
+                "wal_autocheckpoint",
+                "temp_store"
+              ],
+              "type": "object"
+            },
+            "stale_or_offline": {
+              "type": "string"
+            },
+            "writer_applies_and_reads_back": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "bound_fields",
+            "freshness_ms",
+            "observer_may_certify_writer",
+            "stale_or_offline",
+            "writer_applies_and_reads_back",
+            "required_observed_values"
+          ],
+          "type": "object"
+        },
+        "connection_pragmas": {
+          "additionalProperties": false,
+          "properties": {
+            "busy_timeout_ms": {
+              "type": "integer"
+            },
+            "foreign_keys": {
+              "type": "string"
+            },
+            "synchronous": {
+              "type": "string"
+            },
+            "temp_store": {
+              "type": "string"
+            },
+            "trusted_schema": {
+              "type": "string"
+            },
+            "wal_autocheckpoint_pages": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "busy_timeout_ms",
+            "foreign_keys",
+            "synchronous",
+            "temp_store",
+            "trusted_schema",
+            "wal_autocheckpoint_pages"
+          ],
+          "type": "object"
+        },
+        "connections": {
+          "additionalProperties": false,
+          "properties": {
+            "external_io_while_read_txn": {
+              "type": "boolean"
+            },
+            "max_copied_batch_bytes": {
+              "type": "integer"
+            },
+            "max_reader_age_ms": {
+              "type": "integer"
+            },
+            "max_reader_pages": {
+              "type": "integer"
+            },
+            "max_readers": {
+              "type": "integer"
+            },
+            "sole_mutating_runtime": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "external_io_while_read_txn",
+            "max_copied_batch_bytes",
+            "max_reader_age_ms",
+            "max_reader_pages",
+            "max_readers",
+            "sole_mutating_runtime"
+          ],
+          "type": "object"
+        },
+        "crash_claim": {
+          "additionalProperties": false,
+          "properties": {
+            "covered": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "excluded": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "feedback_boundary": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "covered",
+            "excluded",
+            "feedback_boundary"
+          ],
+          "type": "object"
+        },
+        "init_order": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "integrity": {
+          "additionalProperties": false,
+          "properties": {
+            "maintenance_interval_seconds": {
+              "type": "integer"
+            },
+            "maintenance_rows_per_pass": {
+              "type": "integer"
+            },
+            "missing_or_mismatch": {
+              "type": "string"
+            },
+            "recovery": {
+              "type": "string"
+            },
+            "startup": {
+              "type": "string"
+            },
+            "startup_checksum_rows_per_batch": {
+              "type": "integer"
+            },
+            "transaction_checksum": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "maintenance_interval_seconds",
+            "maintenance_rows_per_pass",
+            "missing_or_mismatch",
+            "recovery",
+            "startup",
+            "startup_checksum_rows_per_batch",
+            "transaction_checksum"
+          ],
+          "type": "object"
+        },
+        "maintenance": {
+          "additionalProperties": false,
+          "properties": {
+            "automatic_full_vacuum": {
+              "type": "string"
+            },
+            "checkpoint_busy_timeout_ms": {
+              "type": "integer"
+            },
+            "checkpoint_cadence_ms": {
+              "type": "integer"
+            },
+            "checkpoint_max_wal_pages_per_attempt": {
+              "type": "integer"
+            },
+            "checkpoint_mode": {
+              "type": "string"
+            },
+            "incremental_vacuum_cadence_ms": {
+              "type": "integer"
+            },
+            "incremental_vacuum_max_pages": {
+              "type": "integer"
+            },
+            "offline_full_vacuum": {
+              "type": "string"
+            },
+            "owner": {
+              "type": "string"
+            },
+            "wal_autocheckpoint_pages": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "automatic_full_vacuum",
+            "checkpoint_busy_timeout_ms",
+            "checkpoint_cadence_ms",
+            "checkpoint_max_wal_pages_per_attempt",
+            "checkpoint_mode",
+            "incremental_vacuum_cadence_ms",
+            "incremental_vacuum_max_pages",
+            "offline_full_vacuum",
+            "owner",
+            "wal_autocheckpoint_pages"
+          ],
+          "type": "object"
+        },
+        "migration": {
+          "additionalProperties": false,
+          "properties": {
+            "directory_sync_edges": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "exclusive_locks": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "failure": {
+              "type": "string"
+            },
+            "preflight_backup_required": {
+              "type": "boolean"
+            },
+            "transactional": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "directory_sync_edges",
+            "exclusive_locks",
+            "failure",
+            "preflight_backup_required",
+            "transactional"
+          ],
+          "type": "object"
+        },
+        "page_size_bytes": {
+          "type": "integer"
+        },
+        "payload_log_file": {
+          "type": "boolean"
+        },
+        "persistent_pragmas": {
+          "additionalProperties": false,
+          "properties": {
+            "auto_vacuum": {
+              "type": "string"
+            },
+            "journal_mode": {
+              "type": "string"
+            },
+            "page_size": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "auto_vacuum",
+            "journal_mode",
+            "page_size"
+          ],
+          "type": "object"
+        },
+        "schema_path": {
+          "type": "string"
+        },
+        "single_database": {
+          "type": "boolean"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actual_connection_attestation",
+        "connection_pragmas",
+        "connections",
+        "crash_claim",
+        "init_order",
+        "integrity",
+        "maintenance",
+        "migration",
+        "page_size_bytes",
+        "payload_log_file",
+        "persistent_pragmas",
+        "schema_path",
+        "single_database",
+        "version"
+      ],
+      "type": "object"
+    },
+    "writer_service": {
+      "additionalProperties": false,
+      "properties": {
+        "blocking_worker_capacity": {
+          "type": "integer"
+        },
+        "capture_max_hold_ms": {
+          "type": "integer"
+        },
+        "essential_classes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "noncapture_max_wait_ms": {
+          "type": "integer"
+        },
+        "overload": {
+          "type": "string"
+        },
+        "queue_capacity": {
+          "type": "integer"
+        },
+        "scheduling": {
+          "type": "string"
+        },
+        "single_writer": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "blocking_worker_capacity",
+        "capture_max_hold_ms",
+        "essential_classes",
+        "noncapture_max_wait_ms",
+        "overload",
+        "queue_capacity",
+        "scheduling",
+        "single_writer"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "admission",
+    "artifact_id",
+    "artifact_root",
+    "authority",
+    "executors",
+    "filesystem",
+    "fixture_ids",
+    "fixture_path",
+    "owner_bead",
+    "ownership_commands",
+    "pins_gc",
+    "result_schema",
+    "safe_stop",
+    "schema_version",
+    "spool",
+    "sqlite",
+    "writer_service"
+  ],
+  "title": "Boring CDC closed storage contract",
+  "type": "object"
+}

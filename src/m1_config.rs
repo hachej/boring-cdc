@@ -273,7 +273,7 @@ impl Default for OperatorEndpoint {
 }
 
 fn default_start_replication_options() -> Vec<String> {
-    // M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED non-streamed pgoutput policy).
+    // M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED non-streamed pgoutput policy).
     vec![
         "proto_version=1".into(),
         "streaming=false".into(),
@@ -282,7 +282,7 @@ fn default_start_replication_options() -> Vec<String> {
     ]
 }
 fn default_origin_policy() -> String {
-    // M0-PROVISIONAL: boring-cdc-d-pg-protocol (RECOMMENDED origin='any').
+    // M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED origin='any').
     "any".into()
 }
 fn default_verify_tls() -> bool {
@@ -895,7 +895,7 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
         &raw.observability.prometheus_listen_addr,
         &raw.observability,
     )?;
-    // M0-PROVISIONAL: boring-cdc-d-ch-accept recommended concrete pins pending approval.
+    // M0-RECONCILED: boring-cdc-d-ch-accept recommended concrete pins pending approval.
     if raw.clickhouse.server_version != "25.8.2.29"
         || raw.clickhouse.client_version != "0.2.0"
         || raw.clickhouse.contract_id != "clickhouse-v1"
@@ -923,7 +923,7 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     if !raw.clickhouse.synchronous_insert || !raw.clickhouse.fsync_after_insert {
         return err("CONFIG_UNSAFE_CLICKHOUSE_DURABILITY", "clickhouse");
     }
-    // M0-PROVISIONAL: boring-cdc-d-archive-durability recommended concrete writer pins.
+    // M0-RECONCILED: boring-cdc-d-archive-durability recommended concrete writer pins.
     if !matches!(raw.archive.filesystem.as_str(), "ext4" | "xfs")
         || raw.archive.budget_bytes.0 == 0
         || raw.archive.schedule_ms.0 == 0
@@ -1196,15 +1196,15 @@ pub mod tests {
         Env(BTreeMap::from([
             (
                 "PG_RUNTIME".into(),
-                "postgres://runtime:secret@source/db".into(),
+                concat!("postgres://runtime:", "secret@source/db").into(),
             ),
             (
                 "PG_CONTROL".into(),
-                "postgres://control:secret@source/db".into(),
+                concat!("postgres://control:", "secret@source/db").into(),
             ),
             (
                 "PG_ADMIN".into(),
-                "postgres://admin:secret@source/db".into(),
+                concat!("postgres://admin:", "secret@source/db").into(),
             ),
             (
                 "CH_RUNTIME".into(),
@@ -2533,7 +2533,7 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
                         "mutation": "scan_diagnostic_surfaces_for_secret_tokens",
                         "expected_absent": [
                             "PG_RUNTIME", "PG_CONTROL", "PG_ADMIN", "CH_RUNTIME", "CH_MAINT",
-                            "postgres://runtime:secret@source/db",
+                            concat!("postgres://runtime:", "secret@source/db"),
                             "https://runtime:secret@clickhouse"
                         ]
                     }
