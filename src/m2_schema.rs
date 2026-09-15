@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 8;
+pub const SCHEMA_VERSION: i64 = 9;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -376,6 +376,23 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_8_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v9: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=9)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v9 {
+            connection.execute_batch(MIGRATION_9)?;
+            connection.execute("INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(9,'backfill-journal-retention-clock',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[MIGRATION_9_CHECKSUM])?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=9",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_9_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -725,6 +742,16 @@ CREATE TRIGGER journal_retention_clock_insert AFTER INSERT ON source_transaction
  END;
 "#;
 
+// Existing rows receive the upgrade instant so every pre-v8 transaction is retained for
+// one complete configured replay window; after that cutoff, normal reclamation resumes.
+const MIGRATION_9_CHECKSUM: &str =
+    "sha256:9f7fb4d90362bf104819871c75d9b2a1220878c3eda59b587849103f8670a53c";
+const MIGRATION_9: &str = r#"
+INSERT OR IGNORE INTO journal_retention_clock(transaction_id,committed_at_unix_ms)
+SELECT transaction_id,CAST(unixepoch('subsec')*1000 AS INTEGER)
+FROM source_transactions WHERE state='committed';
+"#;
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -1068,6 +1095,52 @@ pub mod tests {
             0
         );
         drop(c);
+        let _ = fs::remove_file(upgrade);
+    }
+
+    #[test]
+    fn v8_upgrade_backfills_one_full_replay_window_and_then_expires() {
+        let (upgrade, w) = writer("v8-retention-upgrade");
+        w.connection()
+            .execute_batch(
+                "DELETE FROM schema_migrations WHERE version=9;
+             INSERT INTO source_transactions VALUES
+              ('old-1','epoch','sys','db','slot','1','0000000000000010',1,1,0,'sum-1','committed'),
+              ('old-2','epoch','sys','db','slot','2','0000000000000020',2,2,0,'sum-2','committed');
+             DELETE FROM journal_retention_clock;",
+            )
+            .unwrap();
+        drop(w);
+
+        let c = Connection::open(&upgrade).unwrap();
+        apply_migrations(&c).unwrap();
+        let (clock_rows, distinct_clocks, backfill_clock): (i64, i64, i64) = c
+            .query_row(
+                "SELECT count(*),count(DISTINCT committed_at_unix_ms),min(committed_at_unix_ms) FROM journal_retention_clock",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!((clock_rows, distinct_clocks), (2, 1));
+        apply_migrations(&c).unwrap();
+        assert_eq!(
+            c.query_row("SELECT count(*) FROM journal_retention_clock", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+        drop(c);
+
+        let w = open_writer(&upgrade, "run-after-upgrade", 2, backfill_clock).unwrap();
+        assert_eq!(
+            crate::m2_pressure::replay_floor_for_cutoff(&w, "epoch", backfill_clock).unwrap(),
+            1
+        );
+        assert_eq!(
+            crate::m2_pressure::replay_floor_for_cutoff(&w, "epoch", backfill_clock + 1).unwrap(),
+            3
+        );
+        drop(w);
         let _ = fs::remove_file(upgrade);
     }
 

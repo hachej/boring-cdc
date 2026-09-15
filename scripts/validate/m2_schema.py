@@ -4,7 +4,7 @@ from pathlib import Path
 root=Path(__file__).resolve().parents[2]
 src=(root/'src/m2_schema.rs').read_text()
 contract=json.loads((root/'contracts/m2/schema-cases.json').read_text())
-tables={'journal_events','source_transactions','source_state','runtime_ownership','operator_command_requests','relation_schemas','destinations','destination_checkpoints','backfill_runs','backfill_generations','backfill_chunks','bootstrap_intents','bootstrap_imports','durable_capture_fences','bootstrap_anchors','reseed_intents','destination_generation_leases','destination_promotion_intents','clickhouse_batch_intents','archive_generations','archive_segment_intents','archive_segments','archive_generation_markers','processing_failures','destination_audits','condition_hysteresis','alerts','schema_migrations'}
+tables={'journal_events','source_transactions','source_state','runtime_ownership','operator_command_requests','relation_schemas','destinations','destination_checkpoints','backfill_runs','backfill_generations','backfill_chunks','bootstrap_intents','bootstrap_imports','durable_capture_fences','bootstrap_anchors','reseed_intents','destination_generation_leases','destination_promotion_intents','clickhouse_batch_intents','archive_generations','archive_segment_intents','archive_segments','archive_generation_markers','processing_failures','destination_audits','condition_hysteresis','alerts','schema_migrations','startup_reconciliations','logical_range_pins','journal_gc_audits','terminal_metadata_retention','orphan_diagnostics','journal_retention_clock'}
 found=set(re.findall(r'CREATE TABLE(?: IF NOT EXISTS)? ([a-z_]+)',src))
 found.discard('forbidden')
 errors=[]
@@ -14,7 +14,7 @@ ids=[c['id'] for c in contract['cases']]
 if len(ids)!=len(set(ids)): errors.append('duplicate scenario IDs')
 for case in contract['cases']:
  if not re.search(r'fn\s+'+re.escape(case['test'])+r'\s*\(',src): errors.append(f"missing test {case['test']}")
-for version in (1,2,3,4):
+for version in (1,2,3,4,6,7,8,9):
  migration=re.search(rf'(?:pub )?const MIGRATION_{version}: &str = r#"(.*?)"#;',src,re.S).group(1)
  declared=re.search(rf'const MIGRATION_{version}_CHECKSUM: &str\s*=\s*"sha256:([0-9a-f]{{64}})";',src).group(1)
  import hashlib
