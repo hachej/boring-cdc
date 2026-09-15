@@ -32,6 +32,11 @@
         "warning_free_bytes": 17179869184
       }
     },
+    "provisional": [
+      "// M0-PROVISIONAL: boring-cdc-d-admission",
+      "// M0-PROVISIONAL: boring-cdc-d-values",
+      "// M0-PROVISIONAL: boring-cdc-d-wal-cap"
+    ],
     "reservation_rules": [
       "stat filesystem identity, group roots by device id",
       "compute every term conservatively before run and every bounded allocation",
@@ -64,11 +69,10 @@
   "authority": {
     "architecture": "docs/PLAN.md \u00a7\u00a78/11/13/16/19",
     "owner_cards": [
-      "5a994cfd",
-      "765bd3b2"
+      "59a63169"
     ],
     "requirements": "docs/REQUIREMENTS.md",
-    "status": "owner-confirmed recommended defaults from cards 5a994cfd and 765bd3b2; decision Beads remain separately governed"
+    "status": "provisional engineering artifact using card-recommended values; does not close decision Beads"
   },
   "executors": [
     "boring-cdc-m1-preflight",
@@ -117,7 +121,11 @@
       "spool_intents_manifests": "0600"
     },
     "ownership": "connector uid only; reject symlink, hardlink count != 1, type/uid/mode swaps",
-    "probe": "disposable child below each configured root; descriptor-relative no-follow operations; sync and remove then parent fsync"
+    "probe": "disposable child below each configured root; descriptor-relative no-follow operations; sync and remove then parent fsync",
+    "provisional": [
+      "// M0-PROVISIONAL: boring-cdc-d-sqlite",
+      "// M0-PROVISIONAL: boring-cdc-d-archive-durability"
+    ]
   },
   "fixture_ids": [
     "SCN-M0-STORAGE-FRESH-INIT",
@@ -215,6 +223,13 @@
       "retired_generation_days": 90
     }
   },
+  "provisional_markers": [
+    "// M0-PROVISIONAL: boring-cdc-d-sqlite",
+    "// M0-PROVISIONAL: boring-cdc-d-admission",
+    "// M0-PROVISIONAL: boring-cdc-d-archive-durability",
+    "// M0-PROVISIONAL: boring-cdc-d-values",
+    "// M0-PROVISIONAL: boring-cdc-d-wal-cap"
+  ],
   "result_schema": "contracts/storage/storage-result.schema.json",
   "safe_stop": {
     "exit_codes": {
@@ -393,6 +408,7 @@
       "journal_mode": "WAL",
       "page_size": 4096
     },
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-sqlite",
     "schema_path": "contracts/storage/sqlite-schema.sql",
     "single_database": true,
     "version": "3.45.3"
@@ -409,6 +425,7 @@
     ],
     "noncapture_max_wait_ms": 250,
     "overload": "reject new nonessential work; safe-stop capture before essential deadline or reserve breach; never split source transaction",
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-admission",
     "queue_capacity": 1024,
     "scheduling": "capture-priority weighted round robin; after each capture transaction, service oldest essential due class before next capture if deadline would be missed",
     "single_writer": true

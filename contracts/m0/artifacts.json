@@ -452,7 +452,7 @@
       "id": "ART-M0-STORAGE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "artifacts/boring-cdc-m0-storage-model/spec/evidence.json",
-      "sha256": "ec7f6abc7468fb24d022867dfd9f3e89662350d58d9767db7e0d29919b9efc1f",
+      "sha256": "c6d040aca599a967fada92f177b0754e6d65057cffce95c25f268cb9e826921a",
       "status": "complete"
     },
     {
@@ -473,7 +473,7 @@
       "id": "ART-M0-STORAGE-MODEL",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.json",
-      "sha256": "45dc34e9b1e90fe60a626bbbde8707487c67a804c285c03ad5e2128878f1713a",
+      "sha256": "c90ca7f4ebc1ea224ae4ec937bd1f834612b6df00a7bd734a551f94714ff3467",
       "status": "complete"
     },
     {
@@ -487,21 +487,21 @@
       "id": "ART-M0-STORAGE-SCHEMA",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.schema.json",
-      "sha256": "12375899dc9b72b66df0e4aeb7f46ceeccd85d1280c2e4a21acf81481717552a",
+      "sha256": "2d4204c9f88f946682ad874b342763592d88f900a20cad9edcad3ff6a2cd6bd2",
       "status": "complete"
     },
     {
       "id": "ART-M0-STORAGE-SQLITE-SCHEMA",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/sqlite-schema.sql",
-      "sha256": "4a3c95f4fade5068ace3e481315e25098d4ac55434398ed1e19f385476fce13d",
+      "sha256": "08480890e20840a4a0c0d3d477ec5b18b890c71cacef871c32501570ad857104",
       "status": "complete"
     },
     {
       "id": "ART-M0-STORAGE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "scripts/validate/storage_contract.py",
-      "sha256": "a92977533e45744a5a95966f0e84e89e2f71faac190a7f444db4efdefd94cb8f",
+      "sha256": "1218ee7a39a7d88024c94a4b87dd182c35f0e2f3b1e48f42d33d94ca05e1ddfc",
       "status": "complete"
     },
     {

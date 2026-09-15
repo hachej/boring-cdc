@@ -32,6 +32,12 @@ class StorageContractTests(unittest.TestCase):
   self.assertEqual(m.EXPECTED_CONTRACT_SHA256,hashlib.sha256(m.C.read_bytes()).hexdigest())
   self.assertEqual(m.EXPECTED_FIXTURES_SHA256,hashlib.sha256(m.F.read_bytes()).hexdigest())
   self.assertFalse([x for x in m.validate()[0] if x['code'].startswith('E_MANIFEST') or x['code'].startswith('E_ARTIFACT')])
+ def test_provisional_inventory_is_card_bound(self):
+  c=m.load(m.C); marker=lambda decision:f'// M0-PROVISIONAL: {decision}'
+  self.assertEqual(c['authority']['owner_cards'],['59a63169'])
+  self.assertEqual(set(c['provisional_markers']),{marker(x) for x in ('boring-cdc-d-sqlite','boring-cdc-d-admission','boring-cdc-d-archive-durability','boring-cdc-d-values','boring-cdc-d-wal-cap')})
+  self.assertEqual(c['sqlite']['provisional'],marker('boring-cdc-d-sqlite'))
+  self.assertIn(marker('boring-cdc-d-sqlite'),m.Q.read_text())
  def test_no_secrets(self):
   text=''.join(p.read_text() for p in (m.C,m.Q,m.F,m.FS,m.R)); self.assertNotIn('postgres'+'://',text); self.assertNotIn('password'+'=',text)
 if __name__=='__main__': unittest.main()
