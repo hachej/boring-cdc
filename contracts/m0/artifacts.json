@@ -452,7 +452,7 @@
       "id": "ART-M0-STORAGE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "artifacts/boring-cdc-m0-storage-model/spec/evidence.json",
-      "sha256": "c6d040aca599a967fada92f177b0754e6d65057cffce95c25f268cb9e826921a",
+      "sha256": "7ee6d2cfdf8aa2faeca430e044027e7cc3a9f11cda93e259fc15e99b7a523744",
       "status": "complete"
     },
     {
@@ -473,7 +473,7 @@
       "id": "ART-M0-STORAGE-MODEL",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.json",
-      "sha256": "c90ca7f4ebc1ea224ae4ec937bd1f834612b6df00a7bd734a551f94714ff3467",
+      "sha256": "8f09ff584867f45a7bb122f1142eab9afd17fc0384a0e711e665985d0b29e1ff",
       "status": "complete"
     },
     {
@@ -487,7 +487,7 @@
       "id": "ART-M0-STORAGE-SCHEMA",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.schema.json",
-      "sha256": "2d4204c9f88f946682ad874b342763592d88f900a20cad9edcad3ff6a2cd6bd2",
+      "sha256": "a3cb35624b35ca63634d0de5202102a6df03f24c0def0e4156d3fa2e1d041013",
       "status": "complete"
     },
     {
@@ -501,7 +501,7 @@
       "id": "ART-M0-STORAGE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "scripts/validate/storage_contract.py",
-      "sha256": "1218ee7a39a7d88024c94a4b87dd182c35f0e2f3b1e48f42d33d94ca05e1ddfc",
+      "sha256": "b8c08d9ac6fc6d32fc64ae7253dfc59b9b73d93536a58d7637ee18ee79bc02e7",
       "status": "complete"
     },
     {

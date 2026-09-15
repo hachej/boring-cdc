@@ -196,6 +196,7 @@
     "loss": "fence all dispatch and exit; no in-process reacquire or CopyBoth reopen",
     "ownership_deadline_ms": 15000,
     "probe_interval_ms": 5000,
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-compose",
     "source_lock": "dedicated non-pooled advisory backend PID + random nonce",
     "state_lock": "exclusive nonblocking lock on state root",
     "takeover_wait_ms": 90000
@@ -224,9 +225,10 @@
     }
   },
   "provisional_markers": [
-    "// M0-PROVISIONAL: boring-cdc-d-sqlite",
     "// M0-PROVISIONAL: boring-cdc-d-admission",
     "// M0-PROVISIONAL: boring-cdc-d-archive-durability",
+    "// M0-PROVISIONAL: boring-cdc-d-compose",
+    "// M0-PROVISIONAL: boring-cdc-d-sqlite",
     "// M0-PROVISIONAL: boring-cdc-d-values",
     "// M0-PROVISIONAL: boring-cdc-d-wal-cap"
   ],
