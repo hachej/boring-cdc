@@ -28,6 +28,6 @@
   ],
   "mutations_to_approved_schema_or_coverage": [],
   "provisional_inventory": [
-    "M0-PROVISIONAL: boring-cdc-m2-spool.1 recommends spool format version 1 pending M0 owner approval"
+    "M0-PROVISIONAL: boring-cdc-d-admission must approve the recommended spool format version 1; boring-cdc-m2-spool.1 only inventories it"
   ]
 }

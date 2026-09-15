@@ -15,7 +15,7 @@ for case in contract['cases']:
  if len(case.get('assertion',''))<50:errors.append('weak assertion '+case['id'])
 for symbol in ('MemoryBudget','DiskAdmission','TxnBuffer','CommitIter','classify_startup_spools','failure_observation'):
  if symbol not in src:errors.append('missing production boundary '+symbol)
-if '// M0-PROVISIONAL: boring-cdc-m2-spool.1' not in src:errors.append('spool format provisional marker missing')
+if '// M0-PROVISIONAL: boring-cdc-d-admission' not in src:errors.append('spool format provisional marker missing')
 reconciliation=json.loads((root/'contracts/m2/m0-provisional-reconciliation.json').read_text())
 if reconciliation['confirmed']['failure_policy']['version']!='failure-policy-v1' or reconciliation['confirmed']['sqlite_writer_busy_timeout_ms']!=5000:errors.append('confirmed M0 inputs changed')
 head=subprocess.run(['git','rev-parse','HEAD'],cwd=root,text=True,capture_output=True).stdout.strip();implementation=digest();selected={'e2e':['SCN-M2-SPOOL-COMPONENT'],'fault':['SCN-M2-SPOOL-FAULTS'],'all':['SCN-M2-SPOOL-COMPONENT','SCN-M2-SPOOL-FAULTS']}.get(sys.argv[1] if len(sys.argv)>1 else 'all',[])

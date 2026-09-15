@@ -24,7 +24,7 @@ use std::path::{Path, PathBuf};
 const MAGIC: &[u8; 8] = b"BCDCSP01";
 const HEADER_WORK_BYTES: usize = 8 * 1024;
 const READER_WORK_BYTES: usize = 32 * 1024;
-// M0-PROVISIONAL: boring-cdc-m2-spool.1 recommends version 1 pending M0 owner approval.
+// M0-PROVISIONAL: boring-cdc-d-admission must approve the recommended spool format version.
 pub const SPOOL_FORMAT_VERSION: u32 = 1;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -1020,107 +1020,133 @@ pub fn classify_startup_spools(
     let action_reservation = max_spools
         .checked_mul(std::mem::size_of::<StartupAction>() + 4096)
         .ok_or(SpoolError::MemoryLimit(MemoryClass::Staging))?;
-    startup_memory.reserve(MemoryClass::Staging, action_reservation)?;
-    // Keep all fallible startup work inside one scope so every read_dir/entry/remove/
-    // quarantine/sync error releases the action-vector reservation before returning.
-    let result = (|| {
-        let quarantine = directory.join("quarantine");
-        fs::create_dir_all(&quarantine)?;
-        let mut actions = Vec::with_capacity(max_spools);
-        for entry in fs::read_dir(directory)? {
-            let path = entry?.path();
-            if path.as_os_str().as_encoded_bytes().len() > 4096 {
-                return Err(SpoolError::Invalid("spool path too long"));
+    // Keep all fallible startup work inside one reservation scope so every
+    // read_dir/entry/remove/quarantine/sync error releases before returning.
+    with_memory_reservation(
+        startup_memory,
+        MemoryClass::Staging,
+        action_reservation,
+        |startup_memory| {
+            let quarantine = directory.join("quarantine");
+            fs::create_dir_all(&quarantine)?;
+            let mut actions = Vec::with_capacity(max_spools);
+            for entry in fs::read_dir(directory)? {
+                let path = entry?.path();
+                if path.as_os_str().as_encoded_bytes().len() > 4096 {
+                    return Err(SpoolError::Invalid("spool path too long"));
+                }
+                if path.extension().and_then(|x| x.to_str()) != Some("spool") {
+                    continue;
+                }
+                if actions.len() == max_spools {
+                    return Err(SpoolError::StartupBlocked);
+                }
+                // read_record allocates one event Vec. Admit it independently from reader/parser
+                // work; nested scopes release both reservations on every parse result.
+                let parsed = with_memory_reservation(
+                    startup_memory,
+                    MemoryClass::Decoder,
+                    READER_WORK_BYTES,
+                    |startup_memory| {
+                        with_memory_reservation(
+                            startup_memory,
+                            MemoryClass::Staging,
+                            max_event_bytes,
+                            |_| {
+                                let mut r = BufReader::new(File::open(&path)?);
+                                let h = read_header(&mut r)?;
+                                if path.file_name().and_then(|v| v.to_str())
+                                    != Some(spool_name(&h).as_str())
+                                {
+                                    return Err(SpoolError::Checksum);
+                                }
+                                let mut bytes = 0_u64;
+                                let mut events = 0_u64;
+                                loop {
+                                    let mut peek = [0; 1];
+                                    match r.read(&mut peek)? {
+                                        0 => break,
+                                        1 => {
+                                            r.seek_relative(-1)?;
+                                            if events >= max_transaction_events {
+                                                return Err(SpoolError::TransactionEventsLimit {
+                                                    limit: max_transaction_events,
+                                                    observed: events + 1,
+                                                });
+                                            }
+                                            let remaining =
+                                                max_transaction_bytes.saturating_sub(bytes);
+                                            let allocation_limit = max_event_bytes.min(
+                                                usize::try_from(remaining).unwrap_or(usize::MAX),
+                                            );
+                                            let event = read_record(&mut r, allocation_limit)?;
+                                            bytes = bytes.checked_add(event.len() as u64).ok_or(
+                                                SpoolError::TransactionBytesLimit {
+                                                    limit: max_transaction_bytes,
+                                                    observed: u64::MAX,
+                                                },
+                                            )?;
+                                            events += 1;
+                                            if bytes > max_transaction_bytes {
+                                                return Err(SpoolError::TransactionBytesLimit {
+                                                    limit: max_transaction_bytes,
+                                                    observed: bytes,
+                                                });
+                                            }
+                                        }
+                                        _ => unreachable!(),
+                                    }
+                                }
+                                Ok::<_, SpoolError>(h)
+                            },
+                        )
+                    },
+                );
+                let action = match parsed {
+                    Ok(h) if h.capture_epoch == current_epoch && h.creation_run != current_run => {
+                        match existing(&h.capture_epoch, &h.xid) {
+                            ExistingTransaction::CommittedSame => {
+                                fs::remove_file(&path)?;
+                                StartupAction::RemovedCommitted(path.clone())
+                            }
+                            ExistingTransaction::Uncommitted => {
+                                fs::remove_file(&path)?;
+                                StartupAction::RemovedUncommitted(path.clone())
+                            }
+                            ExistingTransaction::Contradictory => {
+                                quarantine_file(&path, &quarantine)?
+                            }
+                        }
+                    }
+                    _ => quarantine_file(&path, &quarantine)?,
+                };
+                actions.push(action);
             }
-            if path.extension().and_then(|x| x.to_str()) != Some("spool") {
-                continue;
-            }
-            if actions.len() == max_spools {
+            sync_dir(directory)?;
+            sync_dir(&quarantine)?;
+            if actions
+                .iter()
+                .any(|a| matches!(a, StartupAction::Quarantined(_)))
+            {
                 return Err(SpoolError::StartupBlocked);
             }
-            startup_memory.reserve(MemoryClass::Decoder, READER_WORK_BYTES)?;
-            // read_record allocates one event Vec. Admit that allocation independently from
-            // BufReader/parser work and release both reservations on every parse result.
-            if let Err(error) = startup_memory.reserve(MemoryClass::Staging, max_event_bytes) {
-                startup_memory.release(MemoryClass::Decoder, READER_WORK_BYTES);
-                return Err(error);
-            }
-            let parsed = (|| {
-                let mut r = BufReader::new(File::open(&path)?);
-                let h = read_header(&mut r)?;
-                if path.file_name().and_then(|v| v.to_str()) != Some(spool_name(&h).as_str()) {
-                    return Err(SpoolError::Checksum);
-                }
-                let mut bytes = 0_u64;
-                let mut events = 0_u64;
-                loop {
-                    let mut peek = [0; 1];
-                    match r.read(&mut peek)? {
-                        0 => break,
-                        1 => {
-                            r.seek_relative(-1)?;
-                            if events >= max_transaction_events {
-                                return Err(SpoolError::TransactionEventsLimit {
-                                    limit: max_transaction_events,
-                                    observed: events + 1,
-                                });
-                            }
-                            let remaining = max_transaction_bytes.saturating_sub(bytes);
-                            let allocation_limit = max_event_bytes
-                                .min(usize::try_from(remaining).unwrap_or(usize::MAX));
-                            let event = read_record(&mut r, allocation_limit)?;
-                            bytes = bytes.checked_add(event.len() as u64).ok_or(
-                                SpoolError::TransactionBytesLimit {
-                                    limit: max_transaction_bytes,
-                                    observed: u64::MAX,
-                                },
-                            )?;
-                            events += 1;
-                            if bytes > max_transaction_bytes {
-                                return Err(SpoolError::TransactionBytesLimit {
-                                    limit: max_transaction_bytes,
-                                    observed: bytes,
-                                });
-                            }
-                        }
-                        _ => unreachable!(),
-                    }
-                }
-                Ok::<_, SpoolError>(h)
-            })();
-            startup_memory.release(MemoryClass::Staging, max_event_bytes);
-            startup_memory.release(MemoryClass::Decoder, READER_WORK_BYTES);
-            let action = match parsed {
-                Ok(h) if h.capture_epoch == current_epoch && h.creation_run != current_run => {
-                    match existing(&h.capture_epoch, &h.xid) {
-                        ExistingTransaction::CommittedSame => {
-                            fs::remove_file(&path)?;
-                            StartupAction::RemovedCommitted(path.clone())
-                        }
-                        ExistingTransaction::Uncommitted => {
-                            fs::remove_file(&path)?;
-                            StartupAction::RemovedUncommitted(path.clone())
-                        }
-                        ExistingTransaction::Contradictory => quarantine_file(&path, &quarantine)?,
-                    }
-                }
-                _ => quarantine_file(&path, &quarantine)?,
-            };
-            actions.push(action);
-        }
-        sync_dir(directory)?;
-        sync_dir(&quarantine)?;
-        if actions
-            .iter()
-            .any(|a| matches!(a, StartupAction::Quarantined(_)))
-        {
-            return Err(SpoolError::StartupBlocked);
-        }
-        Ok(actions)
-    })();
-    startup_memory.release(MemoryClass::Staging, action_reservation);
+            Ok(actions)
+        },
+    )
+}
+
+fn with_memory_reservation<T>(
+    memory: &mut MemoryBudget,
+    class: MemoryClass,
+    bytes: usize,
+    operation: impl FnOnce(&mut MemoryBudget) -> Result<T, SpoolError>,
+) -> Result<T, SpoolError> {
+    memory.reserve(class, bytes)?;
+    let result = operation(memory);
+    memory.release(class, bytes);
     result
 }
+
 fn quarantine_file(path: &Path, dir: &Path) -> Result<StartupAction, SpoolError> {
     let name = path
         .file_name()
@@ -1614,12 +1640,24 @@ pub mod tests {
             &mut budget,
             |_, _| ExistingTransaction::Uncommitted,
         );
-        assert!(matches!(
-            result,
-            Err(SpoolError::MemoryLimit(MemoryClass::Staging))
-        ));
+        assert!(matches!(result, Err(SpoolError::StartupBlocked)));
+        assert_eq!(
+            budget.high_water().staging_bytes,
+            std::mem::size_of::<StartupAction>() + 4096,
+            "failed per-event reservation must not allocate the event"
+        );
         assert_eq!(budget.used(MemoryClass::Decoder), 0);
         assert_eq!(budget.used(MemoryClass::Staging), 0);
+
+        // Every named filesystem failure propagates through this same production scope. Inject
+        // each class at the operation boundary to prove the reservation is exception-safe.
+        for operation in ["read_dir", "entry", "remove", "quarantine", "sync"] {
+            let result = with_memory_reservation(&mut budget, MemoryClass::Staging, 32, |_| {
+                Err::<(), _>(SpoolError::Io(io::ErrorKind::Other))
+            });
+            assert!(result.is_err(), "{operation} error must propagate");
+            assert_eq!(budget.used(MemoryClass::Staging), 0, "{operation}");
+        }
         drop(lock);
         fs::remove_dir_all(store_dir).ok();
     }
