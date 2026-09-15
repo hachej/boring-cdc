@@ -456,6 +456,7 @@ fn init_command(
             ExitCode::Integrity
         },
     })?;
+    drop(config); // immediately volatile-zeroizes the request-scoped administration DSN
     complete_plan(execution, &store).map_err(|e| ReaderFailure {
         code: e.code,
         message: "init completion could not be made durable",

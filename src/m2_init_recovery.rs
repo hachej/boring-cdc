@@ -45,6 +45,14 @@ struct PersistedPlan {
 fn plan_path(store: &Path) -> PathBuf {
     store.with_extension("init-plan.json")
 }
+fn sync_parent(path: &Path) -> Result<(), InitFailure> {
+    let parent = path
+        .parent()
+        .ok_or_else(|| InitFailure::at("plan", "M2_INIT_PLAN_IO"))?;
+    std::fs::File::open(parent)
+        .and_then(|f| f.sync_all())
+        .map_err(|_| InitFailure::at("plan", "M2_INIT_PLAN_IO"))
+}
 
 /// Issue a CSPRNG-backed, expiring confirmation plan under the local ownership sidecar.
 pub fn issue_plan(
@@ -111,6 +119,7 @@ pub fn issue_plan(
     )
     .and_then(|_| f.sync_all())
     .map_err(|_| InitFailure::at("plan", "M2_INIT_PLAN_IO"))?;
+    sync_parent(&path)?;
     Ok((plan_digest, token))
 }
 
@@ -151,7 +160,7 @@ pub fn consume_plan(
     if !matches!(plan.state.as_str(), "issued" | "executing")
         || plan.token != token
         || plan.config_fingerprint != config_fingerprint
-        || now_ms > plan.expires_unix_ms
+        || (plan.state == "issued" && now_ms > plan.expires_unix_ms)
     {
         return Err(InitFailure::at(
             "confirmation",
@@ -177,7 +186,10 @@ pub fn complete_plan(execution: PlanExecution, store: &Path) -> Result<(), InitF
         .file
         .sync_all()
         .map_err(|_| InitFailure::at("confirmation", "M2_INIT_PLAN_COMPLETION_FAILED"))?;
-    std::fs::remove_file(plan_path(store))
+    let path = plan_path(store);
+    std::fs::remove_file(&path)
+        .map_err(|_| InitFailure::at("confirmation", "M2_INIT_PLAN_COMPLETION_FAILED"))?;
+    sync_parent(&path)
         .map_err(|_| InitFailure::at("confirmation", "M2_INIT_PLAN_COMPLETION_FAILED"))
 }
 
@@ -261,6 +273,7 @@ fn exec(
 
 fn acquire(
     config: &LoadedConfig,
+    expected: &PublicationSpec,
     dsn: &str,
     run_id: &str,
 ) -> Result<OwnershipGuard<AdminSourceLock>, InitFailure> {
@@ -273,8 +286,38 @@ fn acquire(
     )?
     .parse()
     .map_err(|_| InitFailure::at("ownership", "M2_INIT_SOURCE_IDENTITY_INVALID"))?;
-    let digest = Sha256::digest(config.fingerprints().source.as_bytes());
-    let key = i64::from_be_bytes(digest[..8].try_into().expect("digest width"));
+    let live=connection.exec("SELECT system_identifier::text,(pg_control_checkpoint()).timeline_id::text,(SELECT oid::text FROM pg_database WHERE datname=current_database()) FROM pg_control_system()")
+        .map_err(|_|InitFailure::at("ownership","M2_INIT_SOURCE_IDENTITY_INVALID"))?;
+    let system_identifier: u64 = live
+        .get_value(0, 0)
+        .and_then(|v| v.parse().ok())
+        .ok_or_else(|| InitFailure::at("ownership", "M2_INIT_SOURCE_IDENTITY_INVALID"))?;
+    let timeline: u32 = live
+        .get_value(0, 1)
+        .and_then(|v| v.parse().ok())
+        .ok_or_else(|| InitFailure::at("ownership", "M2_INIT_SOURCE_IDENTITY_INVALID"))?;
+    let database_identity: u32 = live
+        .get_value(0, 2)
+        .and_then(|v| v.parse().ok())
+        .ok_or_else(|| InitFailure::at("ownership", "M2_INIT_SOURCE_IDENTITY_INVALID"))?;
+    let definition = serde_json::to_vec(expected)
+        .map_err(|_| InitFailure::at("ownership", "M2_INIT_SOURCE_IDENTITY_INVALID"))?;
+    let identity = crate::m1_source_identity::SourceIdentity {
+        system_identifier,
+        timeline,
+        database_identity,
+        slot_name: config.public().source.slot.clone(),
+        plugin: "pgoutput".into(),
+        publication_fingerprint: crate::m1_source_identity::publication_fingerprint(
+            &config.public().source.publication,
+            &definition,
+        ),
+        protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
+    };
+    identity
+        .validate()
+        .map_err(|_| InitFailure::at("ownership", "M2_INIT_SOURCE_IDENTITY_INVALID"))?;
+    let key = identity.advisory_lock_key();
     let nonce = format!("{:x}", Sha256::digest(format!("{run_id}:{pid}").as_bytes()));
     let path = Path::new(&config.public().storage.sqlite_path);
     if let Some(parent) = path.parent() {
@@ -333,7 +376,7 @@ pub fn execute_confirmed(
         user_relations,
     );
     let publication_fingerprint = expected.fingerprint();
-    let mut ownership = acquire(config, admin_dsn, run_id)?;
+    let mut ownership = acquire(config, &expected, admin_dsn, run_id)?;
     ownership
         .admit_source_mutation(Duration::from_millis(
             config
@@ -507,11 +550,11 @@ fn verify(
         let constraints = scalar(
             c,
             &format!(
-                "SELECT count(*)::text FROM pg_constraint WHERE conrelid='{table}'::regclass AND (contype='p' OR (contype='c' AND pg_get_constraintdef(oid) LIKE '%singleton%'))"
+                "SELECT ((SELECT array_agg(a.attname::text ORDER BY a.attname::text)=ARRAY['id'] FROM pg_index i JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=ANY(i.indkey) WHERE i.indrelid='{table}'::regclass AND i.indisprimary) AND (SELECT count(*)=1 AND bool_and(pg_get_expr(conbin,conrelid)='(id = ''singleton''::text)') FROM pg_constraint WHERE conrelid='{table}'::regclass AND contype='c'))::int::text"
             ),
             "control_shape",
         )?;
-        if constraints != "2" {
+        if constraints != "1" {
             return Err(InitFailure::at(
                 "control_shape",
                 "M2_INIT_CONTROL_KEY_NOT_IMMUTABLE",
@@ -569,7 +612,7 @@ fn verify(
     let privilege = scalar(
         c,
         &format!(
-            "SELECT (has_table_privilege('{CONTROL_ROLE}','{HEARTBEAT}','SELECT') OR has_table_privilege('{CONTROL_ROLE}','{HEARTBEAT}','INSERT') OR has_table_privilege('{CONTROL_ROLE}','{HEARTBEAT}','DELETE') OR has_column_privilege('{CONTROL_ROLE}','{HEARTBEAT}','id','UPDATE') OR has_table_privilege('{CONTROL_ROLE}','{FENCE}','SELECT') OR has_table_privilege('{CONTROL_ROLE}','{FENCE}','INSERT') OR has_table_privilege('{CONTROL_ROLE}','{FENCE}','DELETE') OR has_column_privilege('{CONTROL_ROLE}','{FENCE}','id','UPDATE'))::int::text"
+            "SELECT (has_schema_privilege('{CONTROL_ROLE}','boring_cdc_control','CREATE') OR has_table_privilege('{CONTROL_ROLE}','{HEARTBEAT}','SELECT,INSERT,DELETE,TRUNCATE,REFERENCES,TRIGGER') OR has_column_privilege('{CONTROL_ROLE}','{HEARTBEAT}','nonce','SELECT') OR has_column_privilege('{CONTROL_ROLE}','{HEARTBEAT}','updated_at','SELECT') OR has_column_privilege('{CONTROL_ROLE}','{HEARTBEAT}','id','UPDATE') OR has_table_privilege('{CONTROL_ROLE}','{FENCE}','SELECT,INSERT,DELETE,TRUNCATE,REFERENCES,TRIGGER') OR has_column_privilege('{CONTROL_ROLE}','{FENCE}','capture_epoch','SELECT') OR has_column_privilege('{CONTROL_ROLE}','{FENCE}','generation','SELECT') OR has_column_privilege('{CONTROL_ROLE}','{FENCE}','table_set_fingerprint','SELECT') OR has_column_privilege('{CONTROL_ROLE}','{FENCE}','unique_nonce','SELECT') OR has_column_privilege('{CONTROL_ROLE}','{FENCE}','id','UPDATE'))::int::text"
         ),
         "privilege",
     )?;

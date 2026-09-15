@@ -503,7 +503,10 @@ impl Environment for ProcessEnvironment {
         std::env::var(name).ok()
     }
     fn names(&self) -> Vec<String> {
-        std::env::vars().map(|(k, _)| k).collect()
+        // Enumerate keys without materializing unrelated environment values (which may be secrets).
+        std::env::vars_os()
+            .filter_map(|(k, _)| k.into_string().ok())
+            .collect()
     }
 }
 
