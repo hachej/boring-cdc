@@ -1,7 +1,7 @@
 //! Pin-safe retention, per-filesystem admission and bounded SQLite maintenance.
 
 use crate::m2_schema::WriterConnection;
-use rusqlite::{TransactionBehavior, params};
+use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use std::fmt;
 use std::time::{Duration, Instant};
 
@@ -177,23 +177,38 @@ pub fn confirm_pin_release(
     writer: &mut WriterConnection,
     pin_id: &str,
     revision: u64,
-    owner_reconciled_terminal: bool,
 ) -> Result<(), PressureError> {
-    if !owner_reconciled_terminal {
+    let tx = writer
+        .connection_mut()
+        .transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let owner:Option<(String,String)>=tx.query_row("SELECT owner_kind,owner_id FROM logical_range_pins WHERE pin_id=?1 AND state='release_pending' AND revision=?2",params![pin_id,revision as i64],|r|Ok((r.get(0)?,r.get(1)?))).optional()?;
+    let Some((kind, id)) = owner else {
+        return Err(PressureError::StalePin);
+    };
+    let terminal=match kind.as_str(){
+      "destination"=>!tx.query_row("SELECT EXISTS(SELECT 1 FROM destinations WHERE destination_id=?1)",[&id],|r|r.get::<_,bool>(0))?,
+      "backfill_generation"=>tx.query_row("SELECT state IN ('complete','invalidated') FROM backfill_generations WHERE generation_id=?1",[&id],|r|r.get::<_,bool>(0)).optional()?.unwrap_or(false),
+      "bootstrap_intent"=>tx.query_row("SELECT state IN ('complete','invalidated','aborted') FROM bootstrap_intents WHERE intent_id=?1",[&id],|r|r.get::<_,bool>(0)).optional()?.unwrap_or(false),
+      "reseed_intent"=>tx.query_row("SELECT state IN ('complete','aborted') FROM reseed_intents WHERE intent_id=?1",[&id],|r|r.get::<_,bool>(0)).optional()?.unwrap_or(false),
+      "lease"=>tx.query_row("SELECT state IN ('fenced','expired','released') FROM destination_generation_leases WHERE lease_id=?1",[&id],|r|r.get::<_,bool>(0)).optional()?.unwrap_or(false),
+      "promotion_intent"=>tx.query_row("SELECT state='retired' FROM destination_promotion_intents WHERE intent_id=?1",[&id],|r|r.get::<_,bool>(0)).optional()?.unwrap_or(false),
+      "clickhouse_intent"=>tx.query_row("SELECT state IN ('verified','failed') FROM clickhouse_batch_intents WHERE intent_id=?1",[&id],|r|r.get::<_,bool>(0)).optional()?.unwrap_or(false),
+      "archive_intent"=>tx.query_row("SELECT state IN ('published','failed') FROM archive_segment_intents WHERE intent_id=?1",[&id],|r|r.get::<_,bool>(0)).optional()?.unwrap_or(false),
+      "audit"=>tx.query_row("SELECT journal_cursor_seq>=round_target_seq AND self_cursor_seq>=round_target_seq FROM destination_audits WHERE audit_id=?1",[&id],|r|r.get::<_,bool>(0)).optional()?.unwrap_or(false),
+      _=>false,
+    };
+    if !terminal {
         return Err(PressureError::StalePin);
     }
-    let n=writer.connection().execute("UPDATE logical_range_pins SET state='released',revision=revision+1 WHERE pin_id=?1 AND state='release_pending' AND revision=?2",params![pin_id,revision as i64])?;
-    if n == 1 {
-        Ok(())
-    } else {
-        Err(PressureError::StalePin)
-    }
+    tx.execute("UPDATE logical_range_pins SET state='released',revision=revision+1 WHERE pin_id=?1 AND state='release_pending' AND revision=?2",params![pin_id,revision as i64])?;
+    tx.commit()?;
+    Ok(())
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct PressureObservation {
+pub struct PressureObservation<'a> {
     pub free_bytes: u64,
-    pub capture_epoch: &'static str,
+    pub capture_epoch: &'a str,
     pub replay_from_seq: u64,
     pub now_unix_ms: i64,
 }
@@ -208,7 +223,7 @@ pub struct PressureServiceResult {
 pub fn service_pressure_tick(
     writer: &mut WriterConnection,
     thresholds: PressureThresholds,
-    observation: PressureObservation,
+    observation: PressureObservation<'_>,
 ) -> Result<PressureServiceResult, PressureError> {
     let decision = decide_pressure(observation.free_bytes, thresholds)?;
     let gc = if decision.actions.automatic_gc {
@@ -441,7 +456,7 @@ pub fn bounded_metadata_gc(
         .transaction_with_behavior(TransactionBehavior::Immediate)?;
     let n = limits.batch_max as i64;
     let alerts=tx.execute("DELETE FROM alerts WHERE rowid IN (SELECT rowid FROM alerts WHERE state='cleared' ORDER BY rowid LIMIT ?1) AND (SELECT count(*) FROM alerts)>?2",params![n,limits.alerts_rows as i64])? as u64;
-    let audits=tx.execute("DELETE FROM destination_audits WHERE audit_id IN (SELECT a.audit_id FROM destination_audits a JOIN terminal_metadata_retention m ON m.category='destination_audit' AND m.object_id=a.audit_id ORDER BY m.terminal_at_unix_ms LIMIT ?1) AND (SELECT count(*) FROM destination_audits)>?2",params![n,limits.audit_rows as i64])? as u64;
+    let audits=tx.execute("DELETE FROM destination_audits WHERE audit_id IN (SELECT a.audit_id FROM destination_audits a JOIN terminal_metadata_retention m ON m.category='destination_audit' AND m.object_id=a.audit_id WHERE a.journal_cursor_seq>=a.round_target_seq AND a.self_cursor_seq>=a.round_target_seq ORDER BY m.terminal_at_unix_ms LIMIT ?1) AND (SELECT count(*) FROM destination_audits)>?2",params![n,limits.audit_rows as i64])? as u64;
     let commands=tx.execute("DELETE FROM operator_command_requests WHERE request_id IN (SELECT request_id FROM operator_command_requests WHERE state IN ('completed','failed','aborted_by_restart') AND expires_at<?1 ORDER BY expires_at LIMIT ?2)",params![limits.completed_command_cutoff,n])? as u64;
     let invalid_generations=tx.execute("DELETE FROM backfill_generations WHERE generation_id IN (SELECT g.generation_id FROM backfill_generations g JOIN terminal_metadata_retention m ON m.category='invalid_generation' AND m.object_id=g.generation_id WHERE g.state='invalidated' AND m.terminal_at_unix_ms<?1 ORDER BY m.terminal_at_unix_ms LIMIT ?2)",params![limits.invalid_generation_cutoff_ms,n])? as u64;
     let retired_generations=tx.execute("DELETE FROM archive_generations WHERE generation_id IN (SELECT g.generation_id FROM archive_generations g JOIN terminal_metadata_retention m ON m.category='retired_generation' AND m.object_id=g.generation_id WHERE g.state IN ('retired','invalidated') AND m.terminal_at_unix_ms<?1 ORDER BY m.terminal_at_unix_ms LIMIT ?2)",params![limits.retired_generation_cutoff_ms,n])? as u64;
@@ -591,8 +606,8 @@ pub(crate) mod tests {
             &mut w,
             PinSpec {
                 pin_id: "p",
-                owner_kind: "backfill",
-                owner_id: "g",
+                owner_kind: "clickhouse_intent",
+                owner_id: "intent",
                 capture_epoch: "epoch",
                 start_seq: 4,
                 end_seq: None,
@@ -618,10 +633,12 @@ pub(crate) mod tests {
         );
         request_pin_release(&mut w, "p", 0).unwrap();
         assert_eq!(
-            confirm_pin_release(&mut w, "p", 1, false),
+            confirm_pin_release(&mut w, "p", 1),
             Err(PressureError::StalePin)
         );
-        confirm_pin_release(&mut w, "p", 1, true).unwrap();
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','clickhouse','cfg','epoch',1)",[]).unwrap();
+        w.connection().execute("INSERT INTO clickhouse_batch_intents VALUES('intent','d','epoch',1,4,4,'sum','verified')",[]).unwrap();
+        confirm_pin_release(&mut w, "p", 1).unwrap();
         let g = automatic_gc(&mut w, "epoch", 6, 2, 10, GC_MAX_HOLD).unwrap();
         assert_eq!(g.transactions, 2);
         drop(w);
@@ -642,6 +659,16 @@ pub(crate) mod tests {
     #[test]
     fn maintenance_is_bounded_and_never_full_vacuum() {
         let (mut w, p) = writer();
+        let expired =
+            crate::m2_schema::open_reader_with_limits(&p, Duration::from_millis(1), 10).unwrap();
+        std::thread::sleep(Duration::from_millis(2));
+        assert!(
+            expired
+                .query_one_bounded("SELECT count(*) FROM schema_migrations", |r| r
+                    .get::<_, i64>(0))
+                .is_err()
+        );
+        drop(expired);
         let reader = rusqlite::Connection::open(&p).unwrap();
         reader
             .execute_batch("BEGIN; SELECT count(*) FROM schema_migrations;")
