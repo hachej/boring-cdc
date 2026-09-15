@@ -67,7 +67,7 @@
       "id": "ART-M0-ARCHIVE-SCOPE-VALIDATION",
       "owner_bead": "boring-cdc-d-archive-scope",
       "path": "artifacts/m0/decisions/boring-cdc-d-archive-scope/evidence.json",
-      "sha256": "0c288a9558a7d6e78a43752594dee0951b909284bf3989e9a7a9d6bf8496c207",
+      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
       "status": "complete"
     },
     {
@@ -207,7 +207,7 @@
       "id": "ART-M0-COMPOSE-VALIDATION",
       "owner_bead": "boring-cdc-d-compose",
       "path": "artifacts/m0/decisions/boring-cdc-d-compose/evidence.json",
-      "sha256": "0c288a9558a7d6e78a43752594dee0951b909284bf3989e9a7a9d6bf8496c207",
+      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
       "status": "complete"
     },
     {
@@ -277,7 +277,7 @@
       "id": "ART-M0-FAILURE-POLICY-VALIDATION",
       "owner_bead": "boring-cdc-d-failure-policy",
       "path": "artifacts/m0/decisions/boring-cdc-d-failure-policy/evidence.json",
-      "sha256": "0c288a9558a7d6e78a43752594dee0951b909284bf3989e9a7a9d6bf8496c207",
+      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
       "status": "complete"
     },
     {
@@ -305,7 +305,7 @@
       "id": "ART-M0-LICENSE-VALIDATION",
       "owner_bead": "boring-cdc-d-license",
       "path": "artifacts/m0/decisions/boring-cdc-d-license/evidence.json",
-      "sha256": "0c288a9558a7d6e78a43752594dee0951b909284bf3989e9a7a9d6bf8496c207",
+      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
       "status": "complete"
     },
     {
@@ -396,7 +396,7 @@
       "id": "ART-M0-PUBLIC-OWNER-VALIDATION",
       "owner_bead": "boring-cdc-d-owner",
       "path": "artifacts/m0/decisions/boring-cdc-d-owner/evidence.json",
-      "sha256": "0c288a9558a7d6e78a43752594dee0951b909284bf3989e9a7a9d6bf8496c207",
+      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
       "status": "complete"
     },
     {
@@ -424,7 +424,7 @@
       "id": "ART-M0-SECURITY-EXPOSURE-VALIDATION",
       "owner_bead": "boring-cdc-d-security",
       "path": "artifacts/m0/decisions/boring-cdc-d-security/evidence.json",
-      "sha256": "0c288a9558a7d6e78a43752594dee0951b909284bf3989e9a7a9d6bf8496c207",
+      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
       "status": "complete"
     },
     {
@@ -445,7 +445,7 @@
       "id": "ART-M0-SQLITE-DURABILITY-VALIDATION",
       "owner_bead": "boring-cdc-d-sqlite",
       "path": "artifacts/m0/decisions/boring-cdc-d-sqlite/evidence.json",
-      "sha256": "0c288a9558a7d6e78a43752594dee0951b909284bf3989e9a7a9d6bf8496c207",
+      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
       "status": "complete"
     },
     {
@@ -522,7 +522,7 @@
       "id": "ART-M0-SUPPORTED-VALUES-VALIDATION",
       "owner_bead": "boring-cdc-d-values",
       "path": "artifacts/m0/decisions/boring-cdc-d-values/evidence.json",
-      "sha256": "0c288a9558a7d6e78a43752594dee0951b909284bf3989e9a7a9d6bf8496c207",
+      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
       "status": "complete"
     },
     {
@@ -543,7 +543,7 @@
       "id": "ART-M0-WAL-CAP-VALIDATION",
       "owner_bead": "boring-cdc-d-wal-cap",
       "path": "artifacts/m0/decisions/boring-cdc-d-wal-cap/evidence.json",
-      "sha256": "0c288a9558a7d6e78a43752594dee0951b909284bf3989e9a7a9d6bf8496c207",
+      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
       "status": "complete"
     }
   ],
