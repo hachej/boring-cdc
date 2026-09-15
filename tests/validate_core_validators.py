@@ -47,6 +47,28 @@ class Core(unittest.TestCase):
                 cp = run(*case); self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr); self.assertEqual(json.loads(cp.stdout)["status"], "pass")
         finally: (valid/"normalized.tmp.json").unlink(missing_ok=True)
 
+    def test_provisional_decisions_require_exact_markers_and_open_state(self):
+        valid = F / "valid"
+        marker = "// M0-" + "PROVISIONAL: boring-cdc-d-synthetic"
+        with tempfile.TemporaryDirectory(dir=ROOT / "tests") as td:
+            path = Path(td) / "decision.json"
+            document = json.loads((valid / "decisions.json").read_text())
+            row = document["decisions"][0]
+            row.pop("approval")
+            row["status"] = "open"
+            row["provisional_markers"] = [marker]
+            path.write_text(json.dumps(document))
+            self.assertEqual(run("decisions", path).returncode, 0)
+            for mutation, code in (
+                (lambda value: value.update(status="approved"), "E_PROVISIONAL_STATE"),
+                (lambda value: value.update(provisional_markers=[marker + "/forged"]), "E_PROVISIONAL_MARKER"),
+                (lambda value: value.update(provisional_markers=[marker, marker]), "E_PROVISIONAL_MARKER"),
+            ):
+                hostile = json.loads(json.dumps(document))
+                mutation(hostile["decisions"][0])
+                path.write_text(json.dumps(hostile))
+                self.assertCode(run("decisions", path), code)
+
     def test_empty_skeletons_valid_but_not_complete(self):
         with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
             root = Path(td)

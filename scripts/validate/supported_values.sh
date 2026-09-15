@@ -9,7 +9,8 @@ root=Path(sys.argv[1]); selected_case=sys.argv[2]
 owner='boring-cdc-d-values'; decision_id='DEC-SUPPORTED-VALUES'
 fixture_rel='fixtures/m0/decisions/boring-cdc-d-values.json'
 executors=['boring-cdc-m1-decoder','boring-cdc-m0-event-format']
-proposed='Envelope v1 uses type tags and distinct null, absent, and unchanged states for the approved bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; canonical bodies, destination mappings, and limits are fixed by owner intention 765bd3b2-4b68-4102-a9ec-43ca93357390.'
+markers=['// M0-PROVISIONAL: boring-cdc-d-values', '// M0-PROVISIONAL: boring-cdc-d-values.1']
+proposed='Envelope v1 uses type tags and distinct null, absent, and unchanged states for the approved bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; canonical bodies, destination mappings, and limits are retained as a provisional owner-card recommendation.'
 SCALARS=[('bool',16,'boolean','Bool','BOOLEAN'),('int2',21,'signed_integer','Int16','INT32'),('int4',23,'signed_integer','Int32','INT32'),('int8',20,'signed_integer','Int64','INT64'),('numeric',1700,'arbitrary_precision_numeric','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('float4',700,'ieee754','Float32','FLOAT'),('float8',701,'ieee754','Float64','DOUBLE'),('date',1082,'date','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('timestamp',1114,'timestamp_without_time_zone','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('timestamptz',1184,'timestamp_with_time_zone','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('uuid',2950,'uuid','UUID','FIXED_LEN_BYTE_ARRAY(16, UUID)'),('text',25,'utf8_text','String','BYTE_ARRAY(UTF8)'),('varchar',1043,'utf8_text','String','BYTE_ARRAY(UTF8)'),('bpchar',1042,'utf8_text','String','BYTE_ARRAY(UTF8)'),('bytea',17,'bytes','String(base64url unpadded)','BYTE_ARRAY')]
 ARRAY_OIDS=[1000,1005,1007,1016,1231,1021,1022,1182,1115,1185,2951,1009,1015,1014,1001]
 EXPECTED_MATRIX=[{'array_oid':a,'canonical_family':f,'clickhouse':ch,'clickhouse_array':'String(tagged canonical array body)','jsonl':'envelope_v1 tagged value','name':n,'oid':o,'parquet':pq+' plus value-state tag metadata','parquet_array':'BYTE_ARRAY(canonical tagged array body) plus value-state tag metadata'} for (n,o,f,ch,pq),a in zip(SCALARS,ARRAY_OIDS)]
@@ -111,7 +112,7 @@ try:
  required=('inputs','preconditions','type_matrix','canonical_contract','destination_contract','limits','golden_vectors','failure_vectors','deterministic_phase','expected','expected_failure','result_contract','redaction_assertions','later_executors')
  if any(not spec.get(x) for x in required): fail()
  if spec['schema_version']!='m0-decision-fixture/v1' or spec['fixture_id']!=decision_id or spec['decision_id']!=decision_id or spec['owner_bead']!=owner or spec['later_executors']!=executors: fail()
- if spec['approval']!={'approved_at':'2026-09-10T14:03:30.949Z','approved_by':'Julien Hurault (repository owner)','intention_id':'765bd3b2-4b68-4102-a9ec-43ca93357390','selection':'Accept recommended defaults'}: fail()
+ if spec['provisional_markers']!=markers: fail()
  if spec['fixed_seed']!={'ascii':'BCDC_VALUES_V01','hex':'0x424344435f56414c5545535f563031'} or spec['type_matrix']!=EXPECTED_MATRIX: fail()
  if spec['limits']!={'array_dimensions_max':1,'array_elements_max':10000,'event_bytes_max':8388608,'numeric_precision_max':1000,'numeric_scale_max':16383,'numeric_scale_min':-16383,'row_bytes_max':4194304,'scalar_bytes_max':1048576,'units':'bytes'}: fail()
  envelope=spec['canonical_contract']['envelope']
@@ -143,8 +144,8 @@ try:
  expected_probe=[{'code':'SUPPORTED_VALUES_FIXTURE_VALID','golden_vectors':len(expected_vectors),'outcome':'pass','phase':'validate_spec','type_oids':30}]
  if probe!=expected_probe or spec['execution_probe']!={'expected_lines':expected_probe,'path':probe_rel,'sha256':sha(root/probe_rel)}: fail()
  decision=next(x for x in decisions['decisions'] if x['id']==decision_id)
- approval={'approved_at':'2026-09-10T14:03:30.949Z','approved_by':'Julien Hurault (repository owner), intention 765bd3b2-4b68-4102-a9ec-43ca93357390','value_digest':hashlib.sha256(proposed.encode()).hexdigest()}
- if decision!={'approval':approval,'executor_beads':executors,'fixture_sha256':sha(root/fixture_rel),'fixture_spec':fixture_rel,'id':decision_id,'owner_bead':owner,'proposed_value':proposed,'status':'approved'}: fail()
+ markers=['// M0-PROVISIONAL: boring-cdc-d-values','// M0-PROVISIONAL: boring-cdc-d-values.1']
+ if decision!={'executor_beads':executors,'fixture_sha256':sha(root/fixture_rel),'fixture_spec':fixture_rel,'id':decision_id,'owner_bead':owner,'proposed_value':proposed,'status':'open','provisional_markers':markers}: fail()
  needed={'ART-M0-SUPPORTED-VALUES-FIXTURE':fixture_rel,'ART-M0-SUPPORTED-VALUES-PROBE':probe_rel,'ART-M0-SUPPORTED-VALUES-VALIDATION':'artifacts/m0/decisions/boring-cdc-d-values/evidence.json'}
  owned={x['id']:x for x in artifacts['artifacts'] if x.get('owner_bead')==owner}
  if set(owned)!=set(needed): fail()

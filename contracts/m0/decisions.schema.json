@@ -55,6 +55,15 @@
           "minLength": 1,
           "type": "string"
         },
+        "provisional_markers": {
+          "items": {
+            "pattern": "^// M0-\u0050ROVISIONAL: boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        },
         "status": {
           "enum": [
             "open",

@@ -28,6 +28,12 @@ def canonical(obj:object)->bytes:return (json.dumps(obj,sort_keys=True,separator
 def write_json(path:Path,obj:object)->None:path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(canonical(obj))
 
 PROVISIONAL_AUTHORITIES = {
+ "contracts/m0/compose.json":{"boring-cdc-d-compose"},
+ "contracts/m0/decisions.json":{"boring-cdc-d-compose","boring-cdc-d-sqlite","boring-cdc-d-values","boring-cdc-d-values.1","boring-cdc-d-wal-cap"},
+ "fixtures/m0/decisions/boring-cdc-d-compose.json":{"boring-cdc-d-compose"},
+ "fixtures/m0/decisions/boring-cdc-d-sqlite.json":{"boring-cdc-d-sqlite"},
+ "fixtures/m0/decisions/boring-cdc-d-values.json":{"boring-cdc-d-values","boring-cdc-d-values.1"},
+ "fixtures/m0/decisions/boring-cdc-d-wal-cap.json":{"boring-cdc-d-wal-cap"},
  "contracts/archive/archive-model.json":{"boring-cdc-d-archive-durability","boring-cdc-d-compose"},
  "contracts/archive/archive-model.schema.json":{"boring-cdc-d-archive-durability","boring-cdc-d-compose"},
  "contracts/clickhouse/model.json":{"boring-cdc-d-compose","boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
@@ -36,7 +42,12 @@ PROVISIONAL_AUTHORITIES = {
  "contracts/storage/storage-model.json":{"boring-cdc-d-admission","boring-cdc-d-archive-durability","boring-cdc-d-compose","boring-cdc-d-sqlite","boring-cdc-d-values","boring-cdc-d-wal-cap"},
  "docs/CLICKHOUSE_MODEL.md":{"boring-cdc-d-compose","boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
  "docs/EVENT_FORMAT.md":{"boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
+ "scripts/lib/core_validator.py":{"boring-cdc-d-compose","boring-cdc-d-sqlite","boring-cdc-d-values","boring-cdc-d-values.1","boring-cdc-d-wal-cap"},
  "scripts/validate/archive_contract.py":{"boring-cdc-d-archive-durability","boring-cdc-d-compose"},
+ "scripts/validate/compose_spec.sh":{"boring-cdc-d-compose"},
+ "scripts/validate/sqlite_durability.sh":{"boring-cdc-d-sqlite"},
+ "scripts/validate/supported_values.sh":{"boring-cdc-d-values","boring-cdc-d-values.1"},
+ "scripts/validate/wal_cap.sh":{"boring-cdc-d-wal-cap"},
  "scripts/validate/clickhouse_contract.py":{"boring-cdc-d-compose","boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
  "scripts/validate/event_format.py":{"boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
  "scripts/validate/storage_contract.py":{"boring-cdc-d-admission","boring-cdc-d-archive-durability","boring-cdc-d-compose","boring-cdc-d-sqlite","boring-cdc-d-values","boring-cdc-d-wal-cap"},

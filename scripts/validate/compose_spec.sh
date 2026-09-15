@@ -8,9 +8,10 @@ from pathlib import Path
 root=Path(sys.argv[1]); selected=sys.argv[2]
 owner='boring-cdc-d-compose'; decision_id='DEC-COMPOSE-IMAGES-RUNTIME-RECOVERY'
 contract_rel='contracts/m0/compose.json'; fixture_rel='fixtures/m0/decisions/boring-cdc-d-compose.json'
-contract_sha='8a78b0a63d36a039eabae79768a35d66707f46d8c4c635508059d1a065cf8017'; result_schema_rel='contracts/m0/compose-execution-result.schema.json'; result_schema_sha='1bf2a5ce493239bbd173d3b23c36d1c7aa15703e044a5c45a64687f0f8ae1291'
+contract_sha='2ee8964ab1d5c065f7df9020d5511e74a8df273845c23a302e2b95639829cfd4'; result_schema_rel='contracts/m0/compose-execution-result.schema.json'; result_schema_sha='1bf2a5ce493239bbd173d3b23c36d1c7aa15703e044a5c45a64687f0f8ae1291'
 executors=['boring-cdc-m0-scaffold','boring-cdc-m6-failure-matrix','boring-cdc-m7-artifacts']
-proposed='linux/amd64 only; PostgreSQL 17.6, ClickHouse 25.8.2.29, Rust 1.89.0 Bookworm builder, and Debian bookworm-20250811-slim runtime are pinned by accepted OCI index and amd64 digests; Docker Engine 28.3.3, Compose 2.39.2, BuildKit 0.24.0, and Dockerfile frontend 1.12.0; cargo build --locked --release; project boring-cdc with postgres, clickhouse, connector and pgdata, chdata, cdcdata; connector restart unless-stopped with unlimited supervisor attempts while the approved persisted FailurePolicy remains retry authority; PostgreSQL keepalive 30/10/3 and client check 10 seconds, measured reap <=70 seconds, takeover at 90 seconds; health 5/3/12 with 30-second start period and 120-second readiness; patch/minor changes rerun clean-pull with rollback-compatible state, major PostgreSQL/ClickHouse changes require migration plan and reseed.'
+markers=['// M0-PROVISIONAL: boring-cdc-d-compose']
+proposed='linux/amd64 only; PostgreSQL 17.6, ClickHouse 25.8.2.29, Rust 1.89.0 Bookworm builder, and Debian bookworm-20250811-slim runtime are pinned by recommended OCI index and amd64 digests; Docker Engine 28.3.3, Compose 2.39.2, BuildKit 0.24.0, and Dockerfile frontend 1.12.0; cargo build --locked --release; project boring-cdc with postgres, clickhouse, connector and pgdata, chdata, cdcdata; connector restart unless-stopped with unlimited supervisor attempts while the provisional persisted FailurePolicy remains retry authority; PostgreSQL keepalive 30/10/3 and client check 10 seconds, measured reap <=70 seconds, takeover at 90 seconds; health 5/3/12 with 30-second start period and 120-second readiness; patch/minor changes rerun clean-pull with rollback-compatible state, major PostgreSQL/ClickHouse changes require migration plan and reseed.'
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 def canonical_digest(obj): return hashlib.sha256(json.dumps(obj,sort_keys=True,separators=(',',':')).encode()).hexdigest()
 def fail():
@@ -23,11 +24,11 @@ try:
  decisions=json.loads((root/'contracts/m0/decisions.json').read_text()); artifacts=json.loads((root/'contracts/m0/artifacts.json').read_text())
  registry=json.loads((root/'contracts/agent/stable-ids.json').read_text()); coverage=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text())
  graph=[json.loads(x) for x in (root/'.beads/issues.jsonl').read_text().splitlines() if x.strip()]
- approval={'approved_at':'2026-09-10T14:03:30.949Z','approved_by':'Julien Hurault (repository owner)','intention_id':'765bd3b2-4b68-4102-a9ec-43ca93357390','selection':'Accept recommended defaults'}
- ensure(contract.get('schema_version')=='compose-reproducibility-contract/v1' and contract.get('decision_id')==decision_id and contract.get('owner_bead')==owner and contract.get('approval')==approval)
- ensure(spec.get('schema_version')=='m0-decision-fixture/v1' and spec.get('fixture_id')==decision_id and spec.get('decision_id')==decision_id and spec.get('owner_bead')==owner and spec.get('approval')==approval)
- required=('inputs','preconditions','supported_matrix','deterministic_phase','expected','expected_failure','result_contract','redaction_assertions','later_executors','vectors','approved_boundary')
- ensure(all(spec.get(x) for x in required) and spec['approved_boundary']==contract and spec['later_executors']==executors)
+ markers=['// M0-PROVISIONAL: boring-cdc-d-compose']
+ ensure(contract.get('schema_version')=='compose-reproducibility-contract/v1' and contract.get('decision_id')==decision_id and contract.get('owner_bead')==owner and contract.get('provisional_markers')==markers)
+ ensure(spec.get('schema_version')=='m0-decision-fixture/v1' and spec.get('fixture_id')==decision_id and spec.get('decision_id')==decision_id and spec.get('owner_bead')==owner and spec.get('provisional_markers')==markers)
+ required=('inputs','preconditions','supported_matrix','deterministic_phase','expected','expected_failure','result_contract','redaction_assertions','later_executors','vectors','provisional_boundary')
+ ensure(all(spec.get(x) for x in required) and spec['provisional_boundary']==contract and spec['later_executors']==executors)
  ensure(contract.get('architecture_allowlist')==['linux/amd64'])
  expected_images={
   'postgres':('docker.io/library/postgres','17.6','00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929','b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409'),
@@ -82,8 +83,8 @@ try:
  probe=[json.loads(x) for x in (root/probe_rel).read_text().splitlines() if x.strip()]
  ensure(probe==expected_probe and spec['execution_probe']=={'expected_lines':expected_probe,'path':probe_rel,'sha256':sha(root/probe_rel)})
  decision=next(x for x in decisions['decisions'] if x['id']==decision_id)
- decision_approval={'approved_at':'2026-09-10T14:03:30.949Z','approved_by':'Julien Hurault (repository owner), intention 765bd3b2-4b68-4102-a9ec-43ca93357390','value_digest':hashlib.sha256(proposed.encode()).hexdigest()}
- ensure(decision=={'approval':decision_approval,'executor_beads':executors,'fixture_sha256':sha(root/fixture_rel),'fixture_spec':fixture_rel,'id':decision_id,'owner_bead':owner,'proposed_value':proposed,'status':'approved'})
+ decision_markers=['// M0-PROVISIONAL: boring-cdc-d-compose']
+ ensure(decision=={'executor_beads':executors,'fixture_sha256':sha(root/fixture_rel),'fixture_spec':fixture_rel,'id':decision_id,'owner_bead':owner,'proposed_value':proposed,'status':'open','provisional_markers':markers})
  needed={'ART-M0-COMPOSE-CONTRACT':contract_rel,'ART-M0-COMPOSE-FIXTURE':fixture_rel,'ART-M0-COMPOSE-PROBE':probe_rel,'ART-M0-COMPOSE-RESULT-SCHEMA':result_schema_rel,'ART-M0-COMPOSE-RESULT-VALID':'fixtures/m0/compose-execution-result/valid.json','ART-M0-COMPOSE-RESULT-REJECT-UNKNOWN':'fixtures/m0/compose-execution-result/reject-unknown-field.json','ART-M0-COMPOSE-VALIDATION':'artifacts/m0/decisions/boring-cdc-d-compose/evidence.json'}
  owned={x['id']:x for x in artifacts['artifacts'] if x.get('owner_bead')==owner}; ensure(set(owned)==set(needed))
  for ident,path in needed.items(): ensure(owned[ident]=={'id':ident,'owner_bead':owner,'path':path,'sha256':sha(root/path),'status':'complete'})

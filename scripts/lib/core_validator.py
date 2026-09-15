@@ -104,7 +104,7 @@ def validate_decisions(obj, findings, args):
     rows=obj.get("decisions",[])
     if not isinstance(rows,list): add(findings,"E_TYPE","/decisions","expected array"); return
     duplicates(rows,"id",findings,"/decisions"); owners=inventory(args.owners,findings,"owners"); fixtures=inventory(args.fixtures,findings,"fixtures"); executors=inventory(args.executors,findings,"executors")
-    allowed=["id","owner_bead","status","proposed_value","approval","fixture_spec","fixture_sha256","executor_beads"]
+    allowed=["id","owner_bead","status","proposed_value","approval","provisional_markers","fixture_spec","fixture_sha256","executor_beads"]
     for i,r in enumerate(rows):
         p=f"/decisions/{i}";
         if not req_obj(r,["id","owner_bead","status","proposed_value","fixture_spec","fixture_sha256","executor_beads"],findings,p): continue
@@ -121,6 +121,15 @@ def validate_decisions(obj, findings, args):
                 if not SHA256.fullmatch(str(a.get("value_digest",""))): add(findings,"E_DIGEST",p+"/approval/value_digest","expected lowercase sha256")
                 elif a.get("value_digest") != digest(r.get("proposed_value","").encode()): add(findings,"E_APPROVAL_DIGEST",p+"/approval/value_digest","approval digest must bind the proposed value")
         elif "approval" in r: add(findings,"E_APPROVAL_STATE",p+"/approval","approval is allowed only for approved rows")
+        markers=r.get("provisional_markers")
+        if markers is not None:
+            if r.get("status") != "open": add(findings,"E_PROVISIONAL_STATE",p+"/provisional_markers","provisional markers are allowed only for open rows")
+            if not isinstance(markers,list) or not markers: add(findings,"E_PROVISIONAL_MARKER",p+"/provisional_markers","expected a nonempty marker array")
+            else:
+                if len(set(map(str,markers))) != len(markers): add(findings,"E_PROVISIONAL_MARKER",p+"/provisional_markers","markers must be unique")
+                for j,marker in enumerate(markers):
+                    expected_prefix="// M0-"+"PROVISIONAL: boring-cdc-"
+                    if not isinstance(marker,str) or not marker.startswith(expected_prefix) or not re.fullmatch(r"[A-Za-z0-9.-]+",marker[len(expected_prefix):]): add(findings,"E_PROVISIONAL_MARKER",f"{p}/provisional_markers/{j}","invalid exact provisional marker")
         fp=r.get("fixture_spec"); target=safe_path(fp,p+"/fixture_spec",findings)
         expected_hash=r.get("fixture_sha256")
         if not SHA256.fullmatch(str(expected_hash or "")): add(findings,"E_DIGEST",p+"/fixture_sha256","expected lowercase sha256")
