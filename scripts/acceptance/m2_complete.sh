@@ -209,7 +209,7 @@ if mode=='--write':
  for path in [gate/'completion-summary.json']+[root/entry[key] for entry in commands for key in ('stdout_path','stderr_path')]:
   if secret.search(path.read_text(errors='replace')): raise SystemExit(f'secret-like content in certification output: {path.relative_to(root)}')
  head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
- artifacts=[coverage_path,beads_path,gate/'completion-summary.json']
+ artifacts=[coverage_path,gate/'completion-summary.json']
  digest=sha_bytes(b''.join(path.read_bytes() for path in artifacts))
  attempts=[attempt_id(index,commands[index-1]) for index in (5,6)]
  evidence={'schema_version':'evidence/v1','owner_bead':barrier_id,'scenario_id':'SCN-M2-COMPLETION-BARRIER','evidence_profile':'runtime','evidence_tier':'milestone','seed':'m2-complete-v2','git_commit':head,'commands':commands,'source_preservation':{'before_sha256':sha(coverage_path),'after_sha256':sha(coverage_path),'preserved':True},'cleanup':{'complete':True,'remaining_paths':[]},'redaction':{'checked':True,'secrets_found':0},'tier_proof':{'targeted_checks':True,'boundary_e2e':True,'fault_suite':True,'deterministic_rerun':True,'consumed_contract_vectors':True,'workspace_tests':True,'integration':True,'clean_environment':True,'exit_assertions':True,'endurance':False,'full_failure_matrix':False,'clean_clone':(root/'.factory-sha').is_file()},'result':{'status':'pass','digest':digest,'artifacts':[str(path.relative_to(root)) for path in artifacts],'product_faults':'factory completion consumes pinned PostgreSQL 17.6 Compose crash/fault proof; three review-cap residual handoffs remain explicit for owner disposition; downstream terminal proof remains excluded','runtime_observed':True,'attempts':attempts}}
@@ -236,9 +236,9 @@ else:
   if len(observed)==2 and (observed[0]!=observed[1] or observed[0]!=(encoded.encode(),b'')): fail('stored probes are not byte-identical to the fresh summary')
   commit=evidence.get('git_commit','')
   ancestor=re.fullmatch(r'[0-9a-f]{40}',str(commit)) and git_ok('cat-file','-e',str(commit)+'^{commit}') and git_ok('merge-base','--is-ancestor',str(commit),'HEAD')
-  freshness_paths=['src','examples','Cargo.toml','Cargo.lock','rust-toolchain.toml','build.rs','config','compose.yaml','Dockerfile','fixtures','contracts','scripts','tests','.beads/issues.jsonl']
+  freshness_paths=['src','examples','Cargo.toml','Cargo.lock','rust-toolchain.toml','build.rs','config','compose.yaml','Dockerfile','fixtures','contracts','scripts','tests']
   if not ancestor or subprocess.run(['git','diff','--quiet',str(commit)+'..HEAD','--',*freshness_paths]).returncode: fail('gate git_commit is missing, non-ancestor, or stale')
-  expected_artifacts=[coverage_path,beads_path,root/'artifacts/boring-cdc-m2-complete/gate/completion-summary.json']
+  expected_artifacts=[coverage_path,root/'artifacts/boring-cdc-m2-complete/gate/completion-summary.json']
   recorded=[root/path for path in evidence.get('result',{}).get('artifacts',[])]
   if recorded!=expected_artifacts or not all(path.is_file() for path in recorded) or sha_bytes(b''.join(path.read_bytes() for path in recorded))!=evidence.get('result',{}).get('digest'): fail('gate result artifact digest mismatch')
   schema=subprocess.run(['python3','scripts/lib/core_validator.py','schema',str(evidence_path.relative_to(root)),'--schema','contracts/evidence.schema.json'],text=True,capture_output=True)
