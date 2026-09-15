@@ -121,6 +121,18 @@ fn check_component(v: &str) -> Result<(), ArchiveError> {
         Ok(())
     }
 }
+struct OpenedDir {
+    file: File,
+}
+impl OpenedDir {
+    fn path(&self, name: &str) -> PathBuf {
+        PathBuf::from(format!("/proc/self/fd/{}/{}", self.file.as_raw_fd(), name))
+    }
+    fn sync(&self) -> Result<(), ArchiveError> {
+        self.file.sync_all()?;
+        Ok(())
+    }
+}
 struct RootDir {
     file: File,
 }
@@ -140,8 +152,31 @@ impl RootDir {
         }
         Ok(Self { file })
     }
-    fn path(&self, name: &str) -> PathBuf {
-        PathBuf::from(format!("/proc/self/fd/{}/{}", self.file.as_raw_fd(), name))
+    fn child(&self, name: &str) -> Result<Option<OpenedDir>, ArchiveError> {
+        let n = std::ffi::CString::new(name).map_err(|_| ArchiveError::Invalid("path NUL"))?;
+        let fd = unsafe {
+            libc::openat(
+                self.file.as_raw_fd(),
+                n.as_ptr(),
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+            )
+        };
+        if fd < 0 {
+            let e = io::Error::last_os_error();
+            if e.kind() == io::ErrorKind::NotFound {
+                return Ok(None);
+            }
+            return Err(e.into());
+        }
+        let file = unsafe { File::from_raw_fd(fd) };
+        let m = file.metadata()?;
+        if !m.is_dir()
+            || m.uid() != unsafe { libc::geteuid() }
+            || m.permissions().mode() & 0o777 != DIR_MODE
+        {
+            return Err(ArchiveError::Blocked("unsafe archive directory"));
+        }
+        Ok(Some(OpenedDir { file }))
     }
     fn sync(&self) -> Result<(), ArchiveError> {
         self.file.sync_all()?;
@@ -242,14 +277,6 @@ fn checked_read(path: &Path) -> Result<Vec<u8>, ArchiveError> {
     let mut v = Vec::new();
     f.read_to_end(&mut v)?;
     Ok(v)
-}
-fn sync_dir(path: &Path) -> Result<(), ArchiveError> {
-    let f = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
-        .open(path)?;
-    f.sync_all()?;
-    Ok(())
 }
 fn write_sync(path: &Path, bytes: &[u8]) -> Result<(), ArchiveError> {
     let mut f = checked_file(path)?;
@@ -371,35 +398,44 @@ pub fn commit_jsonl_segment(
     }
     fail(ArchiveFault::AfterIntent, fault)?;
     let (temp_name, final_name) = names(intent);
-    let temp = root_dir.path(&temp_name);
-    let final_dir = root_dir.path(&final_name);
     let mut adopted = false;
-    if temp.exists() {
-        root_dir.cleanup_temp(&temp_name)?
+    if root_dir.child(&temp_name)?.is_some() {
+        root_dir.cleanup_temp(&temp_name)?;
     }
-    if final_dir.exists() {
-        validate_final(&final_dir, intent, &manifest_hash, &part, &manifest)?;
+    let final_handle = if let Some(dir) = root_dir.child(&final_name)? {
+        validate_final(&dir, intent, &manifest_hash, &part, &manifest)?;
         adopted = true;
+        dir
     } else {
         root_dir.mkdir(&temp_name)?;
-        let mut part_file = checked_file(&temp.join("events.jsonl"))?;
+        let temp_handle = root_dir
+            .child(&temp_name)?
+            .ok_or(ArchiveError::Blocked("temporary directory disappeared"))?;
+        let mut part_file = checked_file(&temp_handle.path("events.jsonl"))?;
         part_file.write_all(&part)?;
         fail(ArchiveFault::AfterWrite, fault)?;
         part_file.sync_all()?;
         fail(ArchiveFault::AfterFileSync, fault)?;
-        write_sync(&temp.join("manifest.pending.json"), &manifest)?;
-        sync_dir(&temp)?;
+        write_sync(&temp_handle.path("manifest.pending.json"), &manifest)?;
+        temp_handle.sync()?;
         fail(ArchiveFault::AfterDirectorySync, fault)?;
         root_dir.rename(&temp_name, &final_name)?;
         fail(ArchiveFault::AfterRename, fault)?;
         root_dir.sync()?;
         fail(ArchiveFault::AfterParentSync, fault)?;
-    }
+        let final_handle = root_dir
+            .child(&final_name)?
+            .ok_or(ArchiveError::Blocked("renamed directory disappeared"))?;
+        if final_handle.file.metadata()?.ino() != temp_handle.file.metadata()?.ino() {
+            return Err(ArchiveError::Blocked("renamed directory identity changed"));
+        }
+        final_handle
+    };
     fail(ArchiveFault::BeforeMarker, fault)?;
     let marker = canonical_line(
         &serde_json::json!({"format_version":FORMAT_VERSION,"intent_id":intent.intent_id,"manifest_sha256":manifest_hash}),
     )?;
-    let marker_path = final_dir.join("SEGMENT_READY");
+    let marker_path = final_handle.path("SEGMENT_READY");
     if marker_path.exists() {
         if checked_read(&marker_path)? != marker {
             return Err(ArchiveError::Blocked("ready marker mismatch"));
@@ -408,7 +444,7 @@ pub fn commit_jsonl_segment(
         write_sync(&marker_path, &marker)?;
     }
     fail(ArchiveFault::AfterMarkerWrite, fault)?;
-    sync_dir(&final_dir)?;
+    final_handle.sync()?;
     fail(ArchiveFault::AfterMarkerSync, fault)?;
     root_dir.sync()?;
     fail(ArchiveFault::BeforeCheckpoint, fault)?;
@@ -416,7 +452,20 @@ pub fn commit_jsonl_segment(
     let tx = writer
         .connection_mut()
         .transaction_with_behavior(TransactionBehavior::Immediate)?;
-    tx.execute("UPDATE archive_segment_intents SET state='writing' WHERE intent_id=?1 AND state='selected'",[&intent.intent_id])?;
+    let intent_state: String = tx.query_row(
+        "SELECT state FROM archive_segment_intents WHERE intent_id=?1",
+        [&intent.intent_id],
+        |r| r.get(0),
+    )?;
+    if !matches!(intent_state.as_str(), "selected" | "writing" | "published") {
+        return Err(ArchiveError::Blocked("intent is not publishable"));
+    }
+    if intent_state == "selected" {
+        let changed=tx.execute("UPDATE archive_segment_intents SET state='writing' WHERE intent_id=?1 AND state='selected'",[&intent.intent_id])?;
+        if changed != 1 {
+            return Err(ArchiveError::Blocked("intent state CAS rejected"));
+        }
+    }
     tx.execute("INSERT INTO archive_segments(segment_id,intent_id,manifest_digest,ready_marker_digest,first_seq,last_seq) VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(intent_id) DO NOTHING",params![opaque("record",&intent.intent_id),intent.intent_id,manifest_hash,marker_hash,intent.start_seq,intent.end_seq])?;
     let existing: (String, String) = tx.query_row(
         "SELECT manifest_digest,ready_marker_digest FROM archive_segments WHERE intent_id=?1",
@@ -426,19 +475,25 @@ pub fn commit_jsonl_segment(
     if existing != (manifest_hash.clone(), marker_hash) {
         return Err(ArchiveError::Blocked("durable segment hash mismatch"));
     }
-    tx.execute("UPDATE archive_segment_intents SET state='published' WHERE intent_id=?1 AND state='writing'",[&intent.intent_id])?;
+    if intent_state != "published" {
+        let changed=tx.execute("UPDATE archive_segment_intents SET state='published' WHERE intent_id=?1 AND state='writing'",[&intent.intent_id])?;
+        if changed != 1 {
+            return Err(ArchiveError::Blocked("intent publish CAS rejected"));
+        }
+    }
     let complete:String=tx.query_row("SELECT transaction_id FROM source_transactions WHERE capture_epoch=?1 AND last_seq=?2 AND state='committed'",params![intent.capture_epoch,intent.end_seq],|r|r.get(0)).map_err(|_|ArchiveError::Blocked("checkpoint is not complete transaction boundary"))?;
-    let changed=tx.execute("INSERT INTO destination_checkpoints(destination_id,capture_epoch,anchor_id,configuration_fingerprint,generation,complete_transaction_id,journal_seq,current_failure_id,revision) VALUES(?1,?2,?3,?4,?5,?6,?7,NULL,0) ON CONFLICT(destination_id) DO UPDATE SET complete_transaction_id=excluded.complete_transaction_id,journal_seq=excluded.journal_seq,revision=destination_checkpoints.revision+1 WHERE destination_checkpoints.capture_epoch=excluded.capture_epoch AND destination_checkpoints.generation=excluded.generation AND destination_checkpoints.configuration_fingerprint=excluded.configuration_fingerprint AND destination_checkpoints.journal_seq<=excluded.journal_seq",params![intent.destination_id,intent.capture_epoch,intent.anchor_id,intent.writer_configuration_hash,intent.generation,complete,intent.end_seq])?;
+    let changed=tx.execute("INSERT INTO destination_checkpoints(destination_id,capture_epoch,anchor_id,configuration_fingerprint,generation,complete_transaction_id,journal_seq,current_failure_id,revision) VALUES(?1,?2,?3,?4,?5,?6,?7,NULL,0) ON CONFLICT(destination_id) DO UPDATE SET complete_transaction_id=excluded.complete_transaction_id,journal_seq=excluded.journal_seq,revision=destination_checkpoints.revision+1 WHERE destination_checkpoints.capture_epoch=excluded.capture_epoch AND destination_checkpoints.generation=excluded.generation AND destination_checkpoints.configuration_fingerprint=excluded.configuration_fingerprint AND destination_checkpoints.anchor_id IS excluded.anchor_id AND destination_checkpoints.journal_seq<=excluded.journal_seq",params![intent.destination_id,intent.capture_epoch,intent.anchor_id,intent.writer_configuration_hash,intent.generation,complete,intent.end_seq])?;
     if changed != 1 {
         return Err(ArchiveError::Blocked("checkpoint CAS rejected"));
     }
-    let durable:(String,i64,i64,String)=tx.query_row("SELECT capture_epoch,generation,journal_seq,configuration_fingerprint FROM destination_checkpoints WHERE destination_id=?1",[&intent.destination_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)))?;
+    let durable:(String,i64,i64,String,Option<String>)=tx.query_row("SELECT capture_epoch,generation,journal_seq,configuration_fingerprint,anchor_id FROM destination_checkpoints WHERE destination_id=?1",[&intent.destination_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)))?;
     if durable
         != (
             intent.capture_epoch.clone(),
             intent.generation as i64,
             intent.end_seq as i64,
             intent.writer_configuration_hash.clone(),
+            intent.anchor_id.clone(),
         )
     {
         return Err(ArchiveError::Blocked("checkpoint readback mismatch"));
@@ -452,13 +507,13 @@ pub fn commit_jsonl_segment(
     })
 }
 fn validate_final(
-    dir: &Path,
+    dir: &OpenedDir,
     _intent: &SegmentIntent,
     manifest_hash: &str,
     part: &[u8],
     manifest: &[u8],
 ) -> Result<(), ArchiveError> {
-    let m = fs::symlink_metadata(dir)?;
+    let m = dir.file.metadata()?;
     if !m.is_dir()
         || m.file_type().is_symlink()
         || m.uid() != unsafe { libc::geteuid() }
@@ -467,7 +522,7 @@ fn validate_final(
         return Err(ArchiveError::Blocked("unsafe final directory"));
     }
     for (name, expected) in [("events.jsonl", part), ("manifest.pending.json", manifest)] {
-        let p = dir.join(name);
+        let p = dir.path(name);
         let md = fs::symlink_metadata(&p)?;
         if !md.is_file()
             || md.file_type().is_symlink()
@@ -481,7 +536,7 @@ fn validate_final(
     if sha256(manifest) != manifest_hash {
         return Err(ArchiveError::Blocked("manifest mismatch"));
     }
-    sync_dir(dir)?;
+    dir.sync()?;
     Ok(())
 }
 
@@ -492,7 +547,7 @@ pub fn load_segment_intent(
     writer: &WriterConnection,
     intent_id: &str,
 ) -> Result<Option<SegmentIntent>, ArchiveError> {
-    let row=writer.connection().query_row("SELECT i.intent_id,g.destination_id,i.generation_id,g.capture_epoch,g.generation,g.anchor_id,i.first_seq,i.last_seq,d.configuration_fingerprint,i.selection_digest FROM archive_segment_intents i JOIN archive_generations g ON g.generation_id=i.generation_id JOIN destinations d ON d.destination_id=g.destination_id WHERE i.intent_id=?1 AND i.state IN ('selected','writing','failed')",[intent_id],|r|Ok(SegmentIntent{intent_id:r.get(0)?,destination_id:r.get(1)?,generation_id:r.get(2)?,capture_epoch:r.get(3)?,generation:r.get::<_,i64>(4)? as u64,anchor_id:r.get(5)?,start_seq:r.get::<_,i64>(6)? as u64,end_seq:r.get::<_,i64>(7)? as u64,writer_configuration_hash:r.get(8)?})).optional()?;
+    let row=writer.connection().query_row("SELECT i.intent_id,g.destination_id,i.generation_id,g.capture_epoch,g.generation,g.anchor_id,i.first_seq,i.last_seq,d.configuration_fingerprint,i.selection_digest FROM archive_segment_intents i JOIN archive_generations g ON g.generation_id=i.generation_id JOIN destinations d ON d.destination_id=g.destination_id WHERE i.intent_id=?1 AND i.state IN ('selected','writing')",[intent_id],|r|Ok(SegmentIntent{intent_id:r.get(0)?,destination_id:r.get(1)?,generation_id:r.get(2)?,capture_epoch:r.get(3)?,generation:r.get::<_,i64>(4)? as u64,anchor_id:r.get(5)?,start_seq:r.get::<_,i64>(6)? as u64,end_seq:r.get::<_,i64>(7)? as u64,writer_configuration_hash:r.get(8)?})).optional()?;
     if let Some(value) = &row {
         let stored: String = writer.connection().query_row(
             "SELECT selection_digest FROM archive_segment_intents WHERE intent_id=?1",
@@ -508,6 +563,57 @@ pub fn load_segment_intent(
 
 /// The real archive adapter consumes the shared typed hook; it does not define another policy.
 pub struct ArchiveFailureAdapter;
+impl ArchiveFailureAdapter {
+    pub fn prepare_failure(
+        current: Option<&crate::failure_policy::FailureRecord>,
+        outcome: DestinationOutcome,
+        destination_id: &str,
+        capture_epoch: &str,
+        generation: u64,
+        start_seq: u64,
+        end_seq: u64,
+        configuration_fingerprint: &str,
+        context: &mut crate::m1_transition_kernel::TransitionContext<'_>,
+    ) -> crate::failure_policy::PolicyAction {
+        use crate::failure_policy::{
+            Component, FailedBoundary, FailureClass, FailureObservation, FingerprintInput,
+            PolicyEvent, StableErrorCode,
+        };
+        let (class, code) = match outcome {
+            DestinationOutcome::RetryEligible => (
+                FailureClass::TransientIo,
+                StableErrorCode::TransportUnavailable,
+            ),
+            DestinationOutcome::Blocked | DestinationOutcome::IntegrityRecoveryRequired => {
+                (FailureClass::Integrity, StableErrorCode::ChecksumMismatch)
+            }
+            DestinationOutcome::ContinuityRecoveryRequired => (
+                FailureClass::OwnershipLost,
+                StableErrorCode::HistoryUnavailable,
+            ),
+        };
+        crate::failure_policy::transition(
+            current,
+            PolicyEvent::Observe(FailureObservation {
+                destination_id: Some(destination_id.into()),
+                fingerprint: FingerprintInput {
+                    component: Component::Archive,
+                    class,
+                    code,
+                    boundary: FailedBoundary::Destination {
+                        capture_epoch: capture_epoch.into(),
+                        generation,
+                        first_seq: start_seq,
+                        last_seq: end_seq,
+                    },
+                    relevant_configuration_fingerprint: configuration_fingerprint.into(),
+                    context: Default::default(),
+                },
+            }),
+            context,
+        )
+    }
+}
 impl DomainRecoveryHook for ArchiveFailureAdapter {
     fn project(&self, input: &DomainHookInput) -> DomainProjection {
         match input {
@@ -533,6 +639,8 @@ impl DomainRecoveryHook for ArchiveFailureAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::failure_policy::{PolicyAction, PreparedFailureOperation};
+    use crate::m1_transition_kernel::{SplitMix64, TransitionContext, VirtualClock};
     use crate::m2_journal::{
         CommitLimits, JournalEvent, JournalStore, SourceCommit, SourceIdentity,
         read_complete_range, transaction_checksum,
@@ -662,12 +770,20 @@ mod tests {
         {
             let (b, r, mut w, i, x) = setup(&format!("fault-{n}"));
             assert!(commit_jsonl_segment(&mut w, &r, &i, &x, f).is_err());
-            assert_eq!(
-                load_segment_intent(&w, &i.intent_id).unwrap(),
-                Some(i.clone())
-            );
+            let resumed = load_segment_intent(&w, &i.intent_id).unwrap().unwrap();
+            assert_eq!(resumed, i);
+            let exact = crate::m2_journal::read_exact_complete_range(
+                &b.join("state.sqlite"),
+                resumed.start_seq,
+                resumed.end_seq,
+                10,
+                4096,
+                Duration::from_secs(2),
+            )
+            .unwrap();
             let _ = fs::remove_dir_all(r.join(names(&i).0));
-            let out = commit_jsonl_segment(&mut w, &r, &i, &x, ArchiveFault::None).unwrap();
+            let out =
+                commit_jsonl_segment(&mut w, &r, &resumed, &exact, ArchiveFault::None).unwrap();
             assert_eq!(out.checkpoint, 2);
             fs::remove_dir_all(b).unwrap()
         }
@@ -758,5 +874,70 @@ mod tests {
                 expected
             )
         }
+        let corpus: serde_json::Value =
+            serde_json::from_str(include_str!("../contracts/m2/failure-policy-cases.json"))
+                .unwrap();
+        assert_eq!(corpus["owner_bead"], "boring-cdc-m2.1");
+        assert!(corpus["cases"].as_array().unwrap().len() >= 14);
+        let (b, _r, mut w, _i, _x) = setup("policy-persist");
+        let clock = VirtualClock::new(1000);
+        let mut rng = SplitMix64::new(7);
+        let mut cx = TransitionContext {
+            clock: &clock,
+            randomness: &mut rng,
+        };
+        let action = ArchiveFailureAdapter::prepare_failure(
+            None,
+            DestinationOutcome::IntegrityRecoveryRequired,
+            "archive",
+            "epoch",
+            1,
+            1,
+            2,
+            &"a".repeat(64),
+            &mut cx,
+        );
+        let record = match &action {
+            PolicyAction::Persist(r) => r.clone(),
+            _ => panic!("shared policy did not persist"),
+        };
+        let op = PreparedFailureOperation::from_policy_action(action, None).unwrap();
+        let tx = w.connection_mut().transaction().unwrap();
+        op.execute(&tx).unwrap();
+        tx.commit().unwrap();
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT attempt FROM processing_failures WHERE failure_id=?1",
+                    [&record.failure_id],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            1
+        );
+        let suppressed = ArchiveFailureAdapter::prepare_failure(
+            Some(&record),
+            DestinationOutcome::IntegrityRecoveryRequired,
+            "archive",
+            "epoch",
+            1,
+            1,
+            2,
+            &"a".repeat(64),
+            &mut cx,
+        );
+        assert_eq!(suppressed, PolicyAction::Suppressed);
+        assert!(w.connection().query_row("SELECT journal_seq FROM destination_checkpoints WHERE destination_id='archive'",[],|r|r.get::<_,i64>(0)).optional().unwrap().is_none());
+        drop(w);
+        let reopened = open_writer(&b.join("state.sqlite"), "run-reopen", 3, 3).unwrap();
+        assert_eq!(
+            reopened
+                .connection()
+                .query_row("SELECT attempt FROM processing_failures", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        fs::remove_dir_all(b).unwrap();
     }
 }

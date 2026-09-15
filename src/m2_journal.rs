@@ -566,7 +566,7 @@ pub fn read_complete_range(
             break;
         }
         let measure: Option<(i64, i64, Option<i64>, Option<i64>)> = reader.query_one_bounded_params(
-            "SELECT count(*),coalesce(sum(length(payload)+length(CAST(transaction_id AS BLOB))+length(CAST(event_id AS BLOB))+length(CAST(payload_hash AS BLOB))),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id=?1",
+            "SELECT count(*),coalesce(sum(length(payload)+length(CAST(transaction_id AS BLOB))+length(CAST(event_id AS BLOB))+length(CAST(payload_hash AS BLOB))+coalesce(length(CAST(relation_schema_fingerprint AS BLOB)),0)+coalesce((SELECT length(CAST(rs.relation_id AS BLOB)) FROM relation_schemas rs WHERE rs.schema_fingerprint=journal_events.relation_schema_fingerprint),0)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id=?1",
             [txid.as_str()],
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )?;
@@ -636,6 +636,52 @@ pub fn read_complete_range(
         last_seq,
         copied_bytes: copied,
     }))
+}
+
+/// Re-copies exactly one persisted intent range and never admits newer transactions.
+pub fn read_exact_complete_range(
+    path: &std::path::Path,
+    start_seq: u64,
+    end_seq: u64,
+    max_events: usize,
+    max_bytes: usize,
+    max_age: Duration,
+) -> Result<CopiedRange, JournalError> {
+    if start_seq == 0 || end_seq < start_seq {
+        return Err(JournalError::Invalid("invalid exact range"));
+    }
+    let range = read_complete_range(path, start_seq - 1, max_events, max_bytes, max_age)?
+        .ok_or(JournalError::Unavailable("exact intent range unavailable"))?;
+    if range.first_seq != start_seq || range.last_seq < end_seq {
+        return Err(JournalError::Unavailable("exact intent range incomplete"));
+    }
+    if range.last_seq != end_seq {
+        let keep = range
+            .events
+            .into_iter()
+            .take_while(|e| e.journal_seq <= end_seq)
+            .collect::<Vec<_>>();
+        if keep.last().map(|e| e.journal_seq) != Some(end_seq) {
+            return Err(JournalError::Unavailable("exact intent end unavailable"));
+        }
+        let boundary = open_reader_with_limits(path, max_age, 1)?.query_one_bounded_params(
+            "SELECT last_seq FROM source_transactions WHERE last_seq=?1",
+            [end_seq as i64],
+            |r| r.get::<_, i64>(0),
+        )?;
+        if boundary != Some(end_seq as i64) {
+            return Err(JournalError::Unavailable(
+                "exact intent end is not a complete transaction",
+            ));
+        }
+        return Ok(CopiedRange {
+            first_seq: start_seq,
+            last_seq: end_seq,
+            copied_bytes: range.copied_bytes,
+            events: keep,
+        });
+    }
+    Ok(range)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

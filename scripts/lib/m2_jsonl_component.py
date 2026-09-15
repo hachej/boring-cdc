@@ -7,7 +7,7 @@ def h(v):return hashlib.sha256(v).hexdigest()
 def w(p,v):p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(v if isinstance(v,bytes) else v.encode())
 def run(a):return subprocess.run(a,cwd=R,text=True,capture_output=True,timeout=300)
 def impl():
- names=['src/m2_jsonl.rs','src/lib.rs','contracts/m2/jsonl-cases.json','contracts/m2/failure-policy-cases.json','scripts/lib/m2_jsonl_component.py','scripts/validate/m2_jsonl.py','scripts/e2e/m2_jsonl.sh','scripts/faults/m2_jsonl.sh'];x=hashlib.sha256()
+ names=['src/m2_jsonl.rs','src/m2_journal.rs','src/lib.rs','contracts/m2/jsonl-cases.json','contracts/m2/failure-policy-cases.json','scripts/lib/m2_jsonl_component.py','scripts/validate/m2_jsonl.py','scripts/e2e/m2_jsonl.sh','scripts/faults/m2_jsonl.sh'];x=hashlib.sha256()
  for n in names:q=(R/n).read_bytes();x.update(len(n).to_bytes(8,'big')+n.encode()+len(q).to_bytes(8,'big')+q)
  return x.hexdigest()
 def main():
