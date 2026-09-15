@@ -1,5 +1,0 @@
-cargo clippy --locked --all-targets
-cargo test --locked --workspace --all-targets
-cargo test --locked m2_reconcile::tests
-scripts/e2e/m2_reconcile.sh
-scripts/faults/m2_reconcile.sh
