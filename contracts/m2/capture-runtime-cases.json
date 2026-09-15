@@ -1,0 +1,18 @@
+{"schema_version":"m2-capture-runtime-cases/v1","owner_bead":"boring-cdc-m2-capture-runtime","cases":[
+{"id":"SCN-M2-CAPTURE-RECEIVE-SPOOL-JOURNAL-FEEDBACK","test":"receive_spool_atomic_journal_then_feedback_and_origin","assertion":"multi-message transaction and Origin commit atomically before equal write/flush/apply feedback"},
+{"id":"SCN-M2-CAPTURE-KEEPALIVE-REQUEST","test":"requested_keepalive_never_copies_server_wal_end_and_gate_holds","assertion":"requested reply uses only typed safe boundary and never copies server wal_end"},
+{"id":"SCN-M2-CAPTURE-GATE-HOLD-RELEASE-STALE","test":"requested_keepalive_never_copies_server_wal_end_and_gate_holds","assertion":"allow hold and stale FeedbackPermit branches cannot exceed durable progress"},
+{"id":"SCN-M2-CAPTURE-COPYBOTH-LOSS","test":"deterministic_safe_stop_shutdown_and_no_in_process_reopen","assertion":"unexpected CopyBoth loss fences generation and requires supervised successor"},
+{"id":"SCN-M2-CAPTURE-CRASH-BEFORE-COMMIT","test":"crash_boundaries_never_create_a_feedback_token","assertion":"pre-commit failure leaves no durable token and cannot produce feedback"},
+{"id":"SCN-M2-CAPTURE-CRASH-AFTER-COMMIT","test":"crash_boundaries_never_create_a_feedback_token","assertion":"ambiguous post-commit result is reconciled idempotently before feedback"},
+{"id":"SCN-M2-CAPTURE-CLEAN-SHUTDOWN","test":"deterministic_safe_stop_shutdown_and_no_in_process_reopen","assertion":"clean shutdown closes only without an incomplete transaction"},
+{"id":"SCN-M2-CAPTURE-ABRUPT-TAKEOVER","test":"deterministic_safe_stop_shutdown_and_no_in_process_reopen","assertion":"abrupt ownership loss has no in-process lock reacquire or replication reopen"},
+{"id":"SCN-M2-CAPTURE-PERSISTED-RETRY","test":"persisted_retry_schedule_gates_successor_startup","assertion":"successor reads persisted next_retry_at and cannot reconnect early"},
+{"id":"SCN-M2-CAPTURE-SAFE-STOP-REARM","test":"deterministic_safe_stop_shutdown_and_no_in_process_reopen","assertion":"deterministic failure remains alive safe-stopped with feedback suppressed"},
+{"id":"SCN-M2-CAPTURE-OVERSIZED","test":"deterministic_safe_stop_shutdown_and_no_in_process_reopen","assertion":"decoder and spool limits fail closed without feedback advancement"},
+{"id":"SCN-M2-CAPTURE-CONTROL-NOOP","test":"receive_spool_atomic_journal_then_feedback_and_origin","assertion":"control rows are journaled as typed no-op control events, not destination effects"},
+{"id":"SCN-M2-CAPTURE-TWO-STATE-PATHS","consumed_test":"m2_ownership::tests::two_state_paths_same_source_fail_closed","assertion":"canonical ownership fixture rejects two state paths for one source advisory lock"},
+{"id":"SCN-M2-CAPTURE-STARTUP-RECONCILE","test":"persisted_retry_schedule_gates_successor_startup","assertion":"ownership and spool reconciliation both precede replication start"},
+{"id":"SCN-M2-CAPTURE-SLOW-SERVICE","consumed_test":"m2_journal::tests::saturated_real_writer_service_bounds_slow_capture_and_reserved_work","assertion":"bounded sole writer keeps reserved control work serviceable during slow commits"},
+{"id":"TRANS-CAPTURE-SAFE-STOPPED","test":"deterministic_safe_stop_shutdown_and_no_in_process_reopen","assertion":"capture enters deterministic persisted safe-stop and dispatch remains fenced"}
+]}

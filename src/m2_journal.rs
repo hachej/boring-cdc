@@ -145,7 +145,7 @@ impl JournalStore {
     /// Publishes schemas, transaction metadata, events and durable end LSN in one SQLite commit.
     /// The returned value is the only feedback-eligible token; an after-commit fault is ambiguous
     /// and must be reconciled by replaying the same positional transaction.
-    fn commit_atomic(
+    pub fn commit_atomic(
         &mut self,
         commit: &SourceCommit,
         fault: CommitFault,

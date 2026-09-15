@@ -66,7 +66,7 @@ pub struct CaptureFailure {
 }
 
 impl CaptureFailure {
-    fn at(boundary: &'static str, code: &'static str) -> Self {
+    pub(crate) fn at(boundary: &'static str, code: &'static str) -> Self {
         Self { boundary, code }
     }
 }
@@ -122,10 +122,9 @@ where
     F: FnMut(String) -> Result<(), CaptureFailure>,
 {
     let owned = config.clone();
-    let (mut connection, contracts) =
-        tokio::task::spawn_blocking(move || setup(&owned))
-            .await
-            .map_err(|_| CaptureFailure::at("connection", "ARTICLE1_SETUP_TASK_FAILED"))??;
+    let (mut connection, contracts) = tokio::task::spawn_blocking(move || setup_runtime(&owned))
+        .await
+        .map_err(|_| CaptureFailure::at("connection", "ARTICLE1_SETUP_TASK_FAILED"))??;
     let mut decoder = Decoder::new(WireLimits::default());
     let mut row_view = Article1RowView::new(&contracts);
     let mut commits = 0usize;
@@ -185,7 +184,7 @@ where
     Ok(commits)
 }
 
-fn setup(
+pub(crate) fn setup_runtime(
     config: &CaptureConfig,
 ) -> Result<(PgReplicationConnection, BTreeMap<u32, RelationContract>), CaptureFailure> {
     let contracts = preflight(config, &PROVISIONAL_EXPECTATIONS)?;
