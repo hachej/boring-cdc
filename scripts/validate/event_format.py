@@ -8,6 +8,7 @@ import importlib.util
 import json
 import re
 import struct
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -17,6 +18,7 @@ SCHEMA = ROOT / "contracts/event/event.schema.json"
 VECTORS = ROOT / "fixtures/m0/event-format/golden-vectors.json"
 DOC = ROOT / "docs/EVENT_FORMAT.md"
 EVIDENCE = ROOT / "artifacts/boring-cdc-m0-event-format/spec/evidence.json"
+VALIDATOR = ROOT / "scripts/validate/event_format.py"
 U64_MAX = (1 << 64) - 1
 CORE_SPEC = importlib.util.spec_from_file_location(
     "core_validator", ROOT / "scripts/lib/core_validator.py"
@@ -504,14 +506,39 @@ def validate() -> tuple[list[dict], dict]:
     return findings, bundle
 
 
+def resolve_source_parent(prior, inputs, validator_sha256):
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    if prior.get("inputs") != inputs or prior.get("validator_sha256") != validator_sha256:
+        return head, None
+    candidate = prior.get("source_parent_git_commit")
+    if not isinstance(candidate, str) or re.fullmatch(r"[0-9a-f]{40}", candidate) is None:
+        return candidate or "", "stored source parent must be a canonical full lowercase commit OID"
+    try:
+        resolved = subprocess.check_output(["git", "rev-parse", f"{candidate}^{{commit}}"], cwd=ROOT, text=True, stderr=subprocess.DEVNULL).strip()
+    except subprocess.CalledProcessError:
+        return candidate, "stored source parent is not an existing commit"
+    if resolved != candidate:
+        return candidate, "stored source parent does not resolve to its canonical commit OID"
+    if subprocess.run(["git", "merge-base", "--is-ancestor", candidate, head], cwd=ROOT).returncode != 0:
+        return candidate, "stored source parent is not an ancestor of HEAD"
+    return candidate, None
+
+
 def main():
     findings, bundle = validate()
+    prior = load(EVIDENCE) if EVIDENCE.exists() else {}
+    validator_sha256 = hashlib.sha256(VALIDATOR.read_bytes()).hexdigest()
+    source_parent, provenance_error = resolve_source_parent(prior, bundle, validator_sha256)
+    if provenance_error:
+        fail(findings, "E_EVIDENCE_PROVENANCE", "evidence/source_parent_git_commit", provenance_error)
     status = "pass" if not findings else "fail"
     evidence = {
         "schema_version": "m0-event-format-evidence/v1",
         "owner_bead": OWNER,
         "status": status,
         "validator": "scripts/validate/event_format.py",
+        "validator_sha256": validator_sha256,
+        "source_parent_git_commit": source_parent,
         "inputs": bundle,
         "fixture_count": len(load(VECTORS)["vectors"]),
         "findings": findings,

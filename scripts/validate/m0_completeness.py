@@ -86,7 +86,8 @@ DOMAIN_COMMANDS = [
         "boring-cdc-m0-ch-model",
     )
 ] + [
-    ["scripts/validate/m0_artifact.sh", "contracts/m0/artifacts.json"],
+    ["scripts/validate/m0_artifact.sh", "contracts/m0/artifacts.json", "--complete",
+     "--expected-artifacts", "contracts/m0/expected-artifacts.json"],
     ["scripts/validate/m0_decisions.sh", "contracts/m0/decisions.json"],
     ["scripts/validate/m0_scaffold.sh"],
     ["scripts/validate/plan_coverage.sh"],
@@ -120,6 +121,7 @@ def aggregate_findings(root: Path = ROOT) -> list[str]:
         manifest = load(root / "contracts/m0/manifest.json")
         artifacts = load(root / "contracts/m0/artifacts.json")
         decisions = load(root / "contracts/m0/decisions.json")
+        expected_artifacts = load(root / "contracts/m0/expected-artifacts.json")
     except Exception as exc:
         return [f"manifest JSON invalid: {exc}"]
 
@@ -149,6 +151,8 @@ def aggregate_findings(root: Path = ROOT) -> list[str]:
     by_artifact = {row.get("id"): row for row in registry_rows if isinstance(row, dict)}
     if len(by_artifact) != len(registry_rows):
         findings.append("artifact registry contains duplicate or malformed rows")
+    if not isinstance(expected_artifacts, list) or set(by_artifact) != set(expected_artifacts) or len(expected_artifacts) != len(set(expected_artifacts)):
+        findings.append("artifact registry expected ID set mismatch")
     for artifact_id, (registry_id, owner) in PRIMARY_ARTIFACTS.items():
         row = by_primary.get(artifact_id, {})
         registered = by_artifact.get(registry_id, {})
@@ -197,6 +201,20 @@ def aggregate_findings(root: Path = ROOT) -> list[str]:
             value = load(evidence)
             if value.get("runtime_observed") is not False:
                 findings.append(f"{owner}: M0 specification evidence claims runtime observation")
+            source = value.get("source_parent_git_commit")
+            if not isinstance(source, str) or len(source) != 40 or any(char not in "0123456789abcdef" for char in source):
+                findings.append(f"{owner}: evidence source commit is not a canonical full OID")
+            else:
+                exists = subprocess.run(["git", "cat-file", "-e", source + "^{commit}"], cwd=root, capture_output=True).returncode == 0
+                ancestor = exists and subprocess.run(["git", "merge-base", "--is-ancestor", source, "HEAD"], cwd=root, capture_output=True).returncode == 0
+                if not ancestor:
+                    findings.append(f"{owner}: evidence source commit is missing or not an ancestor")
+            validator = root / str(value.get("validator", ""))
+            if not validator.is_file() or sha(validator) != value.get("validator_sha256"):
+                findings.append(f"{owner}: evidence validator provenance mismatch")
+            inputs = value.get("inputs")
+            if not isinstance(inputs, dict) or any(not (root / path).is_file() or sha(root / path) != digest for path, digest in inputs.items()):
+                findings.append(f"{owner}: evidence input provenance mismatch")
         except Exception as exc:
             findings.append(f"{owner}: evidence missing or invalid: {exc}")
 

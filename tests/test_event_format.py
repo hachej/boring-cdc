@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,6 +16,17 @@ class EventFormatContractTests(unittest.TestCase):
     def setUpClass(cls):
         cls.contract = json.loads((ROOT / "contracts/event/event-format.json").read_text())
         cls.vectors = json.loads((ROOT / "fixtures/m0/event-format/golden-vectors.json").read_text())
+
+    def test_evidence_source_parent_rejects_mutable_or_missing_revisions(self):
+        inputs = event_format.validate()[1]
+        validator_sha = event_format.hashlib.sha256(event_format.VALIDATOR.read_bytes()).hexdigest()
+        for candidate in ("HEAD", subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, text=True).strip()):
+            prior = {"inputs": inputs, "validator_sha256": validator_sha, "source_parent_git_commit": candidate}
+            _, error = event_format.resolve_source_parent(prior, inputs, validator_sha)
+            self.assertIn("canonical full lowercase commit OID", error)
+        prior = {"inputs": inputs, "validator_sha256": validator_sha, "source_parent_git_commit": "0" * 40}
+        _, error = event_format.resolve_source_parent(prior, inputs, validator_sha)
+        self.assertIn("not an existing commit", error)
 
     def test_complete_contract_and_goldens_validate(self):
         findings, bundle = event_format.validate()

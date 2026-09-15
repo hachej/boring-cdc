@@ -228,7 +228,7 @@
       "id": "ART-M0-EVENT-FORMAT-EVIDENCE",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "artifacts/boring-cdc-m0-event-format/spec/evidence.json",
-      "sha256": "e72fe0be68df104bb549bb7b57d0a73f265a6a9a2ef62555379ab71dce57e69a",
+      "sha256": "fcaa80bf54af5e1e071ed0e3b1bbaaf05b75a2b50cd6abb8c75bc5e4ad84aeb7",
       "status": "complete"
     },
     {
@@ -242,7 +242,7 @@
       "id": "ART-M0-EVENT-FORMAT-VALIDATOR",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "scripts/validate/event_format.py",
-      "sha256": "03a74567dec85c50cceff36be78243f8bc27e516ca0b2786e701a6f1c589f014",
+      "sha256": "603127eeeeaaf79745c17a4b1743b42e72c02d31fb975b6dfe9932fcd9df89be",
       "status": "complete"
     },
     {

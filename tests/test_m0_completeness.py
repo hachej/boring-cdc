@@ -24,6 +24,7 @@ class M0CompletenessTests(unittest.TestCase):
             Path("contracts/m0/manifest.json"),
             Path("contracts/m0/artifacts.json"),
             Path("contracts/m0/decisions.json"),
+            Path("contracts/m0/expected-artifacts.json"),
             Path(".beads/issues.jsonl"),
         }
         artifacts = json.loads((ROOT / "contracts/m0/artifacts.json").read_text())["artifacts"]
@@ -50,6 +51,15 @@ class M0CompletenessTests(unittest.TestCase):
         findings = m0.aggregate_findings(target)
         self.assertTrue(any(item.startswith("duplicate Bead IDs") for item in findings), findings)
         self.assertTrue(any("primary owner mismatch" in item for item in findings), findings)
+
+    def test_supporting_artifact_cannot_disappear_from_registry(self):
+        temporary, target = self.fixture_root()
+        self.addCleanup(temporary.cleanup)
+        registry = target / "contracts/m0/artifacts.json"
+        value = json.loads(registry.read_text())
+        value["artifacts"] = [row for row in value["artifacts"] if row["id"] != "ART-M0-PG-VALIDATOR"]
+        registry.write_text(json.dumps(value, sort_keys=True) + "\n")
+        self.assertIn("artifact registry expected ID set mismatch", m0.aggregate_findings(target))
 
     def test_provisional_manifest_rows_cannot_claim_approval(self):
         temporary, target = self.fixture_root()
