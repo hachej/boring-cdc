@@ -612,6 +612,7 @@ fn reject_unapproved_overrides(
     for name in env.names() {
         if name.starts_with("BORING_CDC_")
             && !APPROVED_OVERRIDES.contains(&name.as_str())
+            && !(cfg!(debug_assertions) && name == "BORING_CDC_M2_FAULT_HOOK")
             && !secret_names.iter().any(|secret| secret.as_str() == name)
         {
             return Err(ConfigError {
