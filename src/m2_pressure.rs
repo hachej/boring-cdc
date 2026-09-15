@@ -2,6 +2,7 @@
 
 use crate::m2_schema::WriterConnection;
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
+use std::collections::BTreeMap;
 use std::fmt;
 use std::time::{Duration, Instant};
 
@@ -25,6 +26,86 @@ pub struct PressureThresholds {
     pub hard: u64,
     pub reserve: u64,
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FilesystemBudget {
+    pub filesystem_id: u64,
+    pub total_bytes: u64,
+    pub reserved_free_bytes: u64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PhysicalFilesystemThresholds {
+    pub filesystem_id: u64,
+    pub thresholds: PressureThresholds,
+}
+
+/// Convert configured used-capacity percentages into free-byte thresholds after grouping every
+/// configured budget that resolves to the same physical filesystem. Grouping prevents state and
+/// archive roots on one device from each assuming that they own the device's emergency space.
+pub fn derive_physical_filesystem_thresholds(
+    budgets: &[FilesystemBudget],
+    percentages: [u64; 4],
+) -> Result<Vec<PhysicalFilesystemThresholds>, PressureError> {
+    let [warning, action, critical, hard] = percentages;
+    if budgets.is_empty()
+        || !(warning < action && action < critical && critical < hard && hard <= 100)
+    {
+        return Err(PressureError::Invalid(
+            "invalid filesystem budgets or pressure percentages",
+        ));
+    }
+    let mut grouped = BTreeMap::<u64, (u64, u64)>::new();
+    for budget in budgets {
+        if budget.total_bytes == 0
+            || budget.reserved_free_bytes == 0
+            || budget.reserved_free_bytes > budget.total_bytes
+        {
+            return Err(PressureError::Invalid("invalid filesystem budget"));
+        }
+        let entry = grouped.entry(budget.filesystem_id).or_default();
+        entry.0 = entry
+            .0
+            .checked_add(budget.total_bytes)
+            .ok_or(PressureError::Invalid("filesystem budget overflow"))?;
+        entry.1 = entry
+            .1
+            .checked_add(budget.reserved_free_bytes)
+            .ok_or(PressureError::Invalid("filesystem reserve overflow"))?;
+    }
+    grouped
+        .into_iter()
+        .map(|(filesystem_id, (total, reserve))| {
+            let usable = total
+                .checked_sub(reserve)
+                .ok_or(PressureError::Invalid("filesystem reserve exceeds budget"))?;
+            let free_at = |used_percent: u64| -> Result<u64, PressureError> {
+                let remaining = (usable as u128)
+                    .checked_mul((100 - used_percent) as u128)
+                    .ok_or(PressureError::Invalid("pressure threshold overflow"))?
+                    / 100;
+                reserve
+                    .checked_add(remaining as u64)
+                    .ok_or(PressureError::Invalid("pressure threshold overflow"))
+            };
+            let thresholds = PressureThresholds {
+                warning: free_at(warning)?,
+                action: free_at(action)?,
+                critical: free_at(critical)?,
+                hard: free_at(hard)?,
+                reserve,
+            };
+            // Small or badly proportioned budgets can collapse distinct percentage boundaries.
+            // Reject rather than silently changing transition ordering.
+            decide_pressure(thresholds.warning, thresholds)?;
+            Ok(PhysicalFilesystemThresholds {
+                filesystem_id,
+                thresholds,
+            })
+        })
+        .collect()
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct PressureActions {
     pub throttle_backfill: bool,
@@ -100,6 +181,27 @@ pub fn decide_pressure(
             safe_stop_capture: state >= PressureState::Hard,
         },
     })
+}
+
+/// Evaluate every distinct physical filesystem and return the decision requiring the most
+/// conservative system action. A separate archive device can therefore drive pressure even while
+/// the state device remains normal.
+pub fn decide_pressure_filesystems(
+    observations: &[(u64, PressureThresholds)],
+) -> Result<(usize, PressureDecision), PressureError> {
+    let mut worst = None;
+    for (index, &(free, thresholds)) in observations.iter().enumerate() {
+        let decision = decide_pressure(free, thresholds)?;
+        if worst
+            .as_ref()
+            .is_none_or(|(_, current): &(usize, PressureDecision)| decision.state > current.state)
+        {
+            worst = Some((index, decision));
+        }
+    }
+    worst.ok_or(PressureError::Invalid(
+        "no pressure filesystem observations",
+    ))
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -608,6 +710,65 @@ pub(crate) mod tests {
         assert!(decide_pressure(40, t).unwrap().actions.safe_stop_capture);
         assert!(decide_pressure(60, t).unwrap().actions.drain_materializers);
     }
+    #[test]
+    fn configured_thresholds_group_shared_devices_and_preserve_boundaries() {
+        let budgets = [
+            FilesystemBudget {
+                filesystem_id: 7,
+                total_bytes: 1_000,
+                reserved_free_bytes: 100,
+            },
+            FilesystemBudget {
+                filesystem_id: 7,
+                total_bytes: 2_000,
+                reserved_free_bytes: 200,
+            },
+            FilesystemBudget {
+                filesystem_id: 9,
+                total_bytes: 2_000,
+                reserved_free_bytes: 200,
+            },
+        ];
+        let grouped = derive_physical_filesystem_thresholds(&budgets, [60, 75, 90, 100]).unwrap();
+        assert_eq!(grouped.len(), 2);
+        assert_eq!(
+            grouped[0],
+            PhysicalFilesystemThresholds {
+                filesystem_id: 7,
+                thresholds: PressureThresholds {
+                    warning: 1_380,
+                    action: 975,
+                    critical: 570,
+                    hard: 300,
+                    reserve: 300,
+                },
+            }
+        );
+        let separate = grouped[1].thresholds;
+        assert_eq!((separate.warning, separate.hard), (920, 200));
+        let (index, worst) = decide_pressure_filesystems(&[
+            (grouped[0].thresholds.warning + 1, grouped[0].thresholds),
+            (separate.hard, separate),
+        ])
+        .unwrap();
+        assert_eq!(index, 1);
+        assert_eq!(worst.state, PressureState::Hard);
+        assert_eq!(worst.required_free_bytes, 200);
+        assert_eq!(
+            decide_pressure(grouped[0].thresholds.warning, grouped[0].thresholds)
+                .unwrap()
+                .state,
+            PressureState::Warning
+        );
+        assert_eq!(
+            decide_pressure(grouped[0].thresholds.warning + 1, grouped[0].thresholds)
+                .unwrap()
+                .state,
+            PressureState::Normal
+        );
+        assert!(derive_physical_filesystem_thresholds(&budgets, [60, 75, 90, 101]).is_err());
+    }
+
     #[test]
     fn per_filesystem_reserve_equal_admits_and_one_over_rejects() {
         let r = FilesystemReservations {

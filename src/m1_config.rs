@@ -800,7 +800,8 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     }
     if !(raw.conditions.warning < raw.conditions.action
         && raw.conditions.action < raw.conditions.critical
-        && raw.conditions.critical < raw.conditions.hard)
+        && raw.conditions.critical < raw.conditions.hard
+        && raw.conditions.hard <= 100)
     {
         return err("CONFIG_INVALID_THRESHOLDS", "conditions");
     }
@@ -1750,6 +1751,7 @@ archive_segment_bytes = 0
                 "CONFIG_ZERO_BOUND",
             ),
             ("warning = 60", "warning = 99", "CONFIG_INVALID_THRESHOLDS"),
+            ("hard = 100", "hard = 101", "CONFIG_INVALID_THRESHOLDS"),
             (
                 "concurrency = 2",
                 "concurrency = 0",

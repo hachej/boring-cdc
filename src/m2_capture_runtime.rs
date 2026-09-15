@@ -394,9 +394,14 @@ struct ActiveTransaction {
 }
 
 #[derive(Clone, Debug)]
-struct RuntimePressureConfig {
-    journal_path: std::path::PathBuf,
+struct RuntimePressureFilesystem {
+    observation_path: std::path::PathBuf,
     thresholds: crate::m2_pressure::PressureThresholds,
+}
+
+#[derive(Clone, Debug)]
+struct RuntimePressureConfig {
+    filesystems: Vec<RuntimePressureFilesystem>,
     capture_epoch: String,
     replay_window_ms: u64,
 }
@@ -461,9 +466,26 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         capture_epoch: String,
         replay_window_ms: u64,
     ) {
+        self.enable_pressure_filesystems(
+            vec![(journal_path, thresholds)],
+            capture_epoch,
+            replay_window_ms,
+        );
+    }
+    fn enable_pressure_filesystems(
+        &mut self,
+        filesystems: Vec<(std::path::PathBuf, crate::m2_pressure::PressureThresholds)>,
+        capture_epoch: String,
+        replay_window_ms: u64,
+    ) {
         self.pressure = Some(RuntimePressureConfig {
-            journal_path,
-            thresholds,
+            filesystems: filesystems
+                .into_iter()
+                .map(|(observation_path, thresholds)| RuntimePressureFilesystem {
+                    observation_path,
+                    thresholds,
+                })
+                .collect(),
             capture_epoch,
             replay_window_ms,
         });
@@ -472,9 +494,24 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         let Some(config) = self.pressure.clone() else {
             return Ok(());
         };
-        let free = filesystem_free_bytes(&config.journal_path).map_err(|_| {
-            RuntimeError::JournalTransient("pressure filesystem observation failed".into())
-        })?;
+        let observations = config
+            .filesystems
+            .iter()
+            .map(|filesystem| {
+                filesystem_free_bytes(&filesystem.observation_path)
+                    .map(|free| (free, filesystem.thresholds))
+                    .map_err(|_| {
+                        RuntimeError::JournalTransient(
+                            "pressure filesystem observation failed".into(),
+                        )
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let (worst_index, decision) =
+            crate::m2_pressure::decide_pressure_filesystems(&observations)
+                .map_err(|error| RuntimeError::JournalTransient(error.to_string()))?;
+        let free = decision.free_bytes;
+        let thresholds = observations[worst_index].1;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|_| RuntimeError::JournalTransient("pressure clock invalid".into()))?
@@ -483,7 +520,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         let result = self
             .journal
             .pressure_tick(
-                config.thresholds,
+                thresholds,
                 crate::m2_pressure::PressureObservation {
                     free_bytes: free,
                     capture_epoch: &config.capture_epoch,
@@ -863,6 +900,45 @@ fn classify_runtime_failure(
         RuntimeError::Feedback => (Class::TransientSource, Code::TransportUnavailable, true),
         RuntimeError::RetryNotDue { .. } => (Class::TransientSource, Code::DeadlineExceeded, true),
     }
+}
+
+fn configured_pressure_filesystems(
+    config: &crate::m1_config::PublicConfig,
+) -> Result<Vec<(std::path::PathBuf, crate::m2_pressure::PressureThresholds)>, CaptureFailure> {
+    use std::os::unix::fs::MetadataExt;
+    let mut paths = BTreeMap::new();
+    let mut budgets = Vec::with_capacity(config.budgets.len());
+    for budget in &config.budgets {
+        let path = std::path::PathBuf::from(&budget.root);
+        let device = std::fs::metadata(&path)
+            .map_err(|_| CaptureFailure::at("storage", "M2_PRESSURE_BUDGET_PATH_UNAVAILABLE"))?
+            .dev();
+        paths.entry(device).or_insert(path);
+        budgets.push(crate::m2_pressure::FilesystemBudget {
+            filesystem_id: device,
+            total_bytes: budget.total_bytes.0,
+            reserved_free_bytes: budget.reserved_free_bytes.0,
+        });
+    }
+    let derived = crate::m2_pressure::derive_physical_filesystem_thresholds(
+        &budgets,
+        [
+            config.conditions.warning,
+            config.conditions.action,
+            config.conditions.critical,
+            config.conditions.hard,
+        ],
+    )
+    .map_err(|_| CaptureFailure::at("configuration", "M2_PRESSURE_BUDGET_INVALID"))?;
+    derived
+        .into_iter()
+        .map(|profile| {
+            let path = paths
+                .remove(&profile.filesystem_id)
+                .ok_or_else(|| CaptureFailure::at("configuration", "M2_PRESSURE_DEVICE_MISSING"))?;
+            Ok((path, profile.thresholds))
+        })
+        .collect()
 }
 
 fn filesystem_free_bytes(path: &std::path::Path) -> std::io::Result<u64> {
@@ -1521,15 +1597,8 @@ pub async fn run_loaded_config(
         config.fingerprints().runtime.clone(),
         config.fingerprints().runtime.clone(),
     );
-    runtime.enable_pressure_service(
-        journal_path.clone(),
-        crate::m2_pressure::PressureThresholds {
-            warning: 17_179_869_184,
-            action: 15_032_385_536,
-            critical: 12_884_901_888,
-            hard: 10_737_418_240,
-            reserve: 10_737_418_240,
-        },
+    runtime.enable_pressure_filesystems(
+        configured_pressure_filesystems(public)?,
         config.fingerprints().runtime.clone(),
         public.retention.replay_window_ms.0,
     );
