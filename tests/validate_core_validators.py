@@ -77,6 +77,43 @@ class Core(unittest.TestCase):
             path.write_text(json.dumps(approved_without_approval))
             self.assertCode(run("schema", path, "--schema", schema), "E_SCHEMA_ONE_OF")
 
+    def test_decision_schema_isolates_state_contradictions(self):
+        valid = F / "valid"
+        schema = ROOT / "contracts/m0/decisions.schema.json"
+        approved = json.loads((valid / "decisions.json").read_text())
+        open_decision = json.loads(json.dumps(approved))
+        open_decision["decisions"][0]["status"] = "open"
+        open_decision["decisions"][0].pop("approval")
+
+        with tempfile.TemporaryDirectory(dir=ROOT / "tests") as td:
+            path = Path(td) / "decision.json"
+            for control in (approved, open_decision):
+                path.write_text(json.dumps(control))
+                self.assertEqual(run("schema", path, "--schema", schema).returncode, 0)
+
+            open_with_approval = json.loads(json.dumps(open_decision))
+            open_with_approval["decisions"][0]["approval"] = approved["decisions"][0]["approval"]
+            approved_with_marker = json.loads(json.dumps(approved))
+            approved_with_marker["decisions"][0]["provisional_markers"] = ["// M0-" + "PROVISIONAL: boring-cdc-d-synthetic"]
+            approved_without_approval = json.loads(json.dumps(approved))
+            approved_without_approval["decisions"][0].pop("approval")
+
+            for name, hostile in (
+                ("open_with_approval", open_with_approval),
+                ("approved_with_provisional_marker", approved_with_marker),
+                ("approved_without_approval", approved_without_approval),
+            ):
+                with self.subTest(name=name):
+                    path.write_text(json.dumps(hostile))
+                    cp = run("schema", path, "--schema", schema)
+                    self.assertNotEqual(cp.returncode, 0, cp.stdout + cp.stderr)
+                    self.assertFalse(cp.stderr)
+                    findings = json.loads(cp.stdout)["findings"]
+                    self.assertEqual(
+                        [(item["code"], item["pointer"]) for item in findings],
+                        [("E_SCHEMA_ONE_OF", "/decisions/0")],
+                    )
+
     def test_empty_skeletons_valid_but_not_complete(self):
         with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
             root = Path(td)
