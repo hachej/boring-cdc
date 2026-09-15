@@ -53,6 +53,25 @@ class EventFormatContractTests(unittest.TestCase):
             event_format.relation_fingerprint(primitives["relation_fingerprint"]["input"]),
         )
 
+    def test_relation_component_derivation_is_bound_transitively(self):
+        vectors = json.loads(json.dumps(self.vectors))
+        component = vectors["identity_primitives"]["relation_components"][0]
+        component["definition"] = "primary key (other_id)"
+        component["expected_sha256"] = event_format.digest(
+            "boring-cdc/relation-component/v1",
+            [component["kind"].encode(), component["definition"].encode()],
+        )
+        with tempfile.TemporaryDirectory(dir=ROOT / "fixtures/m0/event-format") as directory:
+            vector_path = Path(directory) / "vectors.json"
+            vector_path.write_text(json.dumps(vectors))
+            original = event_format.VECTORS
+            try:
+                event_format.VECTORS = vector_path
+                findings, _ = event_format.validate()
+            finally:
+                event_format.VECTORS = original
+        self.assertIn("E_RELATION_COMPONENT_BINDING", {finding["code"] for finding in findings})
+
     def test_golden_hashes_are_content_sensitive(self):
         wal = self.vectors["vectors"][0]
         self.assertEqual(wal["event"]["connector_event_id"], event_format.wal_id(wal["identity_input"]))
@@ -74,6 +93,22 @@ class EventFormatContractTests(unittest.TestCase):
         right = [{"kind":"bytes","type_oid":17,"type_modifier":-1,"value":"YQ"},{"kind":"bytes","type_oid":17,"type_modifier":-1,"value":"YmM"}]
         self.assertNotEqual(event_format.key_hash(left), event_format.key_hash(right))
         self.assertNotEqual(event_format.key_hash([{"kind":"int64","type_oid":20,"type_modifier":-1,"value":1}]), event_format.key_hash([{"kind":"text","type_oid":25,"type_modifier":-1,"value":"1"}]))
+
+    def test_key_canonicalization_rejects_hostile_boundaries(self):
+        emitted = json.loads(json.dumps(self.vectors["vectors"][0]["event"]))
+        hostile = []
+        bad = json.loads(json.dumps(emitted))
+        bad["canonical_key"] = [{"kind": "bytes", "type_oid": 17, "type_modifier": -1, "value": "AB"}]
+        hostile.append(bad)
+        bad = json.loads(json.dumps(emitted))
+        bad["canonical_key"] = [{"kind": "bytes", "type_oid": 2950, "type_modifier": -1, "value": "AA"}]
+        hostile.append(bad)
+        bad = json.loads(json.dumps(emitted))
+        bad["operation"] = "update"
+        bad["before_key"] = [{"kind": "text", "type_oid": 25, "type_modifier": -1, "value": "é" * 513}]
+        hostile.append(bad)
+        for event in hostile:
+            self.assertTrue(event_format.event_semantic_findings(event), event)
 
     def test_control_events_are_not_business_payloads(self):
         controls = [c["event"] for c in self.vectors["vectors"] if c["category"] == "control_routing"]

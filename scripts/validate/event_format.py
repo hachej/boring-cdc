@@ -119,7 +119,22 @@ def relation_fingerprint(value: dict) -> str:
 def decode_b64url(value: str) -> bytes:
     if not re.fullmatch(r"(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-]{2}|[A-Za-z0-9_-]{3})?", value):
         raise ValueError("invalid unpadded base64url")
-    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+    decoded = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+    if base64.urlsafe_b64encode(decoded).decode().rstrip("=") != value:
+        raise ValueError("non-canonical unpadded base64url")
+    return decoded
+
+
+def key_component_bytes(component: dict) -> bytes:
+    kind, value = component["kind"], component["value"]
+    if kind == "bytes":
+        decoded = decode_b64url(value)
+        if component["type_oid"] == 2950 and len(decoded) != 16:
+            raise ValueError("UUID key must contain exactly 16 bytes")
+        return decoded
+    if kind == "text":
+        return value.encode()
+    return b""
 
 
 def encode_key(key: list[dict]) -> bytes:
@@ -272,11 +287,10 @@ def event_semantic_findings(event: dict) -> list[str]:
             ids = [column["column_id"] for column in event["columns"]]
             if ids != sorted(set(ids)):
                 issues.append("column IDs must be unique and ascending")
-            if any(
-                component["kind"] in ("bytes", "text")
-                and len(decode_b64url(component["value"]) if component["kind"] == "bytes" else component["value"].encode()) > 1024
-                for component in event["canonical_key"]
-            ):
+            keys = [event["canonical_key"]]
+            if event.get("before_key") is not None:
+                keys.append(event["before_key"])
+            if any(len(key_component_bytes(component)) > 1024 for key in keys for component in key):
                 issues.append("key component exceeds 1024 decoded bytes")
             operation = event["operation"]
             mutation = event["mutation_kind"]
@@ -318,13 +332,32 @@ def validate() -> tuple[list[dict], dict]:
     for title in required_sections:
         if f"## {title}" not in document:
             fail(findings, "E_DOC_SECTION", "docs/EVENT_FORMAT.md", title)
-    if "M0-" + "PROVISIONAL" in document or "M0-" + "PROVISIONAL" in CONTRACT.read_text():
-        fail(findings, "E_PROVISIONAL", "contract", "reconciled artifact contains a provisional marker")
+    provisional_markers = {
+        "// M0-PROVISIONAL: boring-cdc-d-values",
+        "// M0-PROVISIONAL: boring-cdc-d-values.1",
+        "// M0-PROVISIONAL: boring-cdc-d-keys",
+    }
+    if set(contract.get("provisional_markers", [])) != provisional_markers or any(
+        marker not in document for marker in provisional_markers
+    ):
+        fail(findings, "E_PROVISIONAL", "contract", "owner-pending recommendation markers changed or are missing")
 
     primitives = vectors["identity_primitives"]
     observed_slot = source_slot_identity(primitives["source_slot"]["input"])
     observed_table = logical_table_id(primitives["logical_table"]["input"])
     relation_input = primitives["relation_fingerprint"]["input"]
+    component_fields = {
+        "default_expression": "default_expression_hash",
+        "generated_expression": "generated_expression_hash",
+        "identity_expression": "identity_expression_hash",
+        "replica_index_definition": "replica_index_definition_hash",
+        "effective_key_definition": "effective_key_definition_hash",
+        "partition_routing_definition": "partition_routing_definition_hash",
+        "partition_key": "partition_key_hash",
+        "partition_bounds": "partition_bounds_hash",
+        "publication_row_filter": "publication_row_filter_hash",
+        "publication_column_projection": "publication_column_projection_hash",
+    }
     for number, component in enumerate(primitives["relation_components"]):
         observed = digest(
             "boring-cdc/relation-component/v1",
@@ -332,6 +365,10 @@ def validate() -> tuple[list[dict], dict]:
         )
         if observed != component["expected_sha256"]:
             fail(findings, "E_RELATION_COMPONENT", f"identity_primitives/relation_components/{number}", "digest mismatch")
+        field_name = component_fields.get(component["kind"])
+        embedded = relation_input.get(field_name) if field_name else None
+        if field_name is None or embedded != observed:
+            fail(findings, "E_RELATION_COMPONENT_BINDING", f"identity_primitives/relation_components/{number}", "derived component digest is not bound into relation input")
     if observed_slot != primitives["source_slot"]["expected_sha256"]:
         fail(findings, "E_SOURCE_SLOT_ID", "identity_primitives/source_slot", "digest mismatch")
     if observed_table != primitives["logical_table"]["expected_sha256"]:

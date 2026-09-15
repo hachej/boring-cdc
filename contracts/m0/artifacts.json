@@ -214,35 +214,35 @@
       "id": "ART-M0-EVENT-FORMAT-CONTRACT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",
-      "sha256": "ec09bf8ab2df2fd9fc035ee6021297a0b5c31551cc183c2d26e4d91f0a918547",
+      "sha256": "ab44eb632693bb2eeef84b8a030452f730d5e00a1d08d56bc86c221a213eaf1f",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-DOC",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "docs/EVENT_FORMAT.md",
-      "sha256": "c2c5fe3c6eeb34827a817136e9f7f0ad9b6974fb0bb49334f2b14773665b1cbc",
+      "sha256": "af3fc750496ab947f928c23b74dbbab9baf2a90372d34968be0a6df78d54dca5",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-EVIDENCE",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "artifacts/boring-cdc-m0-event-format/spec/evidence.json",
-      "sha256": "7a25254d7cfeaa0b46ba663989c560d02100735efb41faff34261fce06c69606",
+      "sha256": "55ea01a84b3f549c0ce6a843d5d9ebbc880b1dfee3302b7afc6b7a3510441f60",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-SCHEMA",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event.schema.json",
-      "sha256": "55c977f3f17d4854c3d9bc23f9aecdc24c20945eee4308ac6522a2fbcc60ef96",
+      "sha256": "a287cf6759c77be032ae704aab24d44d8ccef75b4125016aeb766ca97327176d",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-VALIDATOR",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "scripts/validate/event_format.py",
-      "sha256": "3cb3bc3008ee371a797b777428db8c2af8f8bc22f30023da44ba6cea2bcd40d1",
+      "sha256": "03a74567dec85c50cceff36be78243f8bc27e516ca0b2786e701a6f1c589f014",
       "status": "complete"
     },
     {
