@@ -217,6 +217,22 @@ class KickoffContracts(unittest.TestCase):
         self.assertIn("originating prompts", self.series)
         self.assertIn("no publication or m0-completion date", self.series.lower())
 
+    def test_article_one_uses_shipped_teaching_view_without_article_four_evidence(self):
+        rows = [line for line in self.series.splitlines()
+                if line.startswith("| 1. How Postgres CDC Works |")]
+        self.assertEqual(len(rows), 1)
+        article_one = rows[0]
+        for evidence in ["PR #3", "../evidence/article1/README.md", "raw `pgoutput` events",
+                         "same-stream", "non-durable", "`article1_row_view`", "TEACHING VIEW"]:
+            self.assertIn(evidence, article_one)
+        self.assertIn(
+            "ClickHouse, durability, checkpoints and exactly-once are deferred to Article 4/M4",
+            article_one,
+        )
+        self.assertNotIn("boring-cdc-m4-bench", article_one)
+        self.assertNotIn("boring-cdc-m4-toast", article_one)
+        self.assertNotIn("canonical destination row", article_one)
+
     def test_document_bead_links_resolve(self):
         for name in ["docs/PLAN.md", "docs/AGENT_SYSTEM.md", "docs/SERIES_EXECUTION.md"]:
             text = (ROOT / name).read_text()
