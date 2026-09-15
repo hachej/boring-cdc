@@ -1,3 +1,4 @@
+import copy
 import importlib.util
 import json
 import unittest
@@ -36,6 +37,35 @@ class PostgresContractTests(unittest.TestCase):
             self.assertIsNone(case["inputs"]["durable_transaction_end_lsn"])
             self.assertEqual("requires_reseed", case["expected"]["state"])
             self.assertEqual("unchanged", case["expected"]["feedback"])
+
+    def test_lifecycle_profiles_reject_generic_and_impossible_state(self):
+        cases = copy.deepcopy(self.fixtures["cases"])
+        before_slot = next(case for case in cases if case["fixture_id"] == "SCN-M0-PG-BEFORE-SLOT-CREATE")
+        before_slot["inputs"]["pre_state"] = "fixture_precondition_ready"
+        before_slot["inputs"]["fault_action"] = "inject_once_before_named_effect"
+        before_slot["inputs"]["exporter_backend_pid"] = 4101
+        before_slot["inputs"]["importer_acknowledged"] = 2
+        before_slot["inputs"]["importer_expected"] = 2
+        findings = []
+        postgres_contract.validate_fixture_semantics(cases, findings)
+        self.assertEqual(
+            {"E_FIXTURE_INPUT_DIGEST", "E_FIXTURE_LIFECYCLE", "E_FIXTURE_PROCESS_STATE"},
+            {item["code"] for item in findings},
+        )
+
+    def test_fixture_schema_is_discriminated_by_fixture_id(self):
+        fixtures = copy.deepcopy(self.fixtures)
+        fixtures["cases"][25]["inputs"]["pre_state"] = "replication_streaming"
+        findings = []
+        schema = postgres_contract.load(postgres_contract.FIXTURE_SCHEMA)
+        postgres_contract.CORE.validate_schema_instance(
+            fixtures,
+            schema,
+            findings,
+            base=postgres_contract.FIXTURE_SCHEMA.parent,
+            root=schema,
+        )
+        self.assertTrue(findings)
 
     def test_feedback_service_never_uses_received_or_keepalive_lsn(self):
         forbidden = set(self.contract["feedback"]["forbidden_inputs"])
