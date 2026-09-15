@@ -304,6 +304,9 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
         }
         !self.fenced && self.reconciled
     }
+    pub fn state_lock(&self) -> &StateLock {
+        &self.state
+    }
     pub fn backend_pid(&self) -> i32 {
         self.backend_pid
     }

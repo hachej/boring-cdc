@@ -361,6 +361,7 @@ pub struct TxnBuffer {
     spill_bytes: u64,
     failed: bool,
     receive_admitted: Option<usize>,
+    commit_collection_reserved: usize,
 }
 impl TxnBuffer {
     pub fn new(
@@ -423,6 +424,7 @@ impl TxnBuffer {
             spill_bytes: 0,
             failed: false,
             receive_admitted: None,
+            commit_collection_reserved: 0,
         })
     }
     /// Reserves receive memory before the transport reads or allocates the frame.
@@ -647,6 +649,17 @@ impl TxnBuffer {
     }
     pub fn stream_events(&self) -> u64 {
         0
+    }
+    /// Admits the journal API's owned transaction representation before collecting a spill iterator.
+    pub fn admit_commit_collection(&mut self) -> Result<(), SpoolError> {
+        if self.commit_collection_reserved != 0 {
+            return Err(SpoolError::Invalid("commit collection already admitted"));
+        }
+        let bytes = usize::try_from(self.bytes)
+            .map_err(|_| SpoolError::MemoryLimit(MemoryClass::Staging))?;
+        self.memory.reserve(MemoryClass::Staging, bytes)?;
+        self.commit_collection_reserved = bytes;
+        Ok(())
     }
     pub fn commit_iter(&mut self) -> Result<CommitIter<'_>, SpoolError> {
         if self.failed || self.events == 0 {

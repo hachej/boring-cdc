@@ -204,9 +204,16 @@ fn run_m2() -> Result<(), ReaderFailure> {
     })?;
     let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Run)
         .map_err(|e| ReaderFailure::unavailable(e.code, "runtime configuration is invalid"))?;
-    let _ownership = acquire_production_ownership(&config, "production-run")
+    let mut ownership = acquire_production_ownership(&config, "production-run")
         .map_err(|e| ReaderFailure::unavailable(e.code, "capture ownership unavailable"))?;
     let cancellation = cancellation_for_signals();
+    let signal_cancellation = cancellation.clone();
+    thread::spawn(move || {
+        while !signal_received() {
+            thread::sleep(Duration::from_millis(25));
+        }
+        signal_cancellation.cancel();
+    });
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -214,7 +221,7 @@ fn run_m2() -> Result<(), ReaderFailure> {
             ReaderFailure::unavailable("M2_RUNTIME_UNAVAILABLE", "capture runtime is unavailable")
         })?;
     runtime
-        .block_on(run_loaded_config(&config, &cancellation))
+        .block_on(run_loaded_config(&config, &cancellation, &mut ownership))
         .map_err(|e| ReaderFailure::unavailable(e.code, "capture runtime failed"))
 }
 

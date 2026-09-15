@@ -68,6 +68,7 @@ impl RuntimeSpool for TxnBuffer {
         self.push_received(receive)
     }
     fn drain(&mut self) -> Result<Vec<Vec<u8>>, SpoolError> {
+        self.admit_commit_collection()?;
         self.commit_iter()?
             .map(|entry| entry.map(|bytes| bytes.as_ref().to_vec()))
             .collect()
@@ -493,9 +494,23 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
     runtime: &mut CaptureRuntime<J, S, G>,
     stop_after_commits: u64,
 ) -> Result<(), CaptureFailure> {
+    capture_copyboth_until_with_probe(config, cancellation, runtime, stop_after_commits, || true)
+        .await
+}
+async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G: FeedbackGate>(
+    config: &CaptureConfig,
+    cancellation: &CancellationToken,
+    runtime: &mut CaptureRuntime<J, S, G>,
+    stop_after_commits: u64,
+    mut ownership_probe: impl FnMut() -> bool,
+) -> Result<(), CaptureFailure> {
     let (mut connection, contracts) = setup_runtime(config)?;
     runtime.contracts = contracts;
     loop {
+        if !ownership_probe() {
+            runtime.ownership_lost();
+            return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
+        }
         if cancellation.is_cancelled() {
             runtime.graceful_shutdown().map_err(|_| {
                 CaptureFailure::at("runtime", "M2_SHUTDOWN_RECONCILIATION_REQUIRED")
@@ -513,6 +528,10 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
             return Err(CaptureFailure::at("runtime", "M2_CAPTURE_FAILED"));
         }
         for packet in runtime.take_feedback() {
+            if !ownership_probe() {
+                runtime.ownership_lost();
+                return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
+            }
             connection
                 .send_standby_status_update(
                     packet.write_lsn,
@@ -622,6 +641,7 @@ pub fn acquire_production_ownership(
 pub async fn run_loaded_config(
     config: &crate::m1_config::LoadedConfig,
     cancellation: &CancellationToken,
+    ownership: &mut crate::m2_ownership::OwnershipGuard<PgSourceLock>,
 ) -> Result<(), CaptureFailure> {
     use crate::m2_journal::{CommitLimits, SourceIdentity};
     use crate::m2_schema::open_writer;
@@ -669,6 +689,44 @@ pub async fn run_loaded_config(
         .map(|v| parse_lsn(&v))
         .transpose()
         .map_err(|_| CaptureFailure::at("journal", "M2_DURABLE_LSN_INVALID"))?;
+    let mut startup_memory = MemoryBudget::new(MemoryLimits {
+        process_limit: public.limits.process_memory_bytes.0 as usize,
+        runtime_fixed: 1,
+        receive: public.limits.max_wire_frame_bytes.0 as usize,
+        decoder: public.limits.max_event_bytes.0 as usize,
+        staging: public.limits.max_transaction_bytes.0 as usize,
+    })
+    .map_err(|_| CaptureFailure::at("reconciliation", "M2_STARTUP_MEMORY_INVALID"))?;
+    crate::m2_spool::classify_startup_spools(
+        ownership.state_lock(),
+        &journal_path,
+        &spool_path,
+        config.fingerprints().runtime.as_str(),
+        "production-run",
+        public.limits.max_event_bytes.0 as usize,
+        public.limits.max_transaction_bytes.0,
+        public.limits.max_transaction_events,
+        1024,
+        &mut startup_memory,
+        |epoch, xid| {
+            let count = writer
+                .connection()
+                .query_row(
+                    "SELECT count(*) FROM source_transactions WHERE capture_epoch=?1 AND xid=?2",
+                    rusqlite::params![epoch, xid],
+                    |r| r.get::<_, u64>(0),
+                )
+                .unwrap_or(u64::MAX);
+            if count == 0 {
+                crate::m2_spool::ExistingTransaction::Uncommitted
+            } else if count == 1 {
+                crate::m2_spool::ExistingTransaction::CommittedSame
+            } else {
+                crate::m2_spool::ExistingTransaction::Contradictory
+            }
+        },
+    )
+    .map_err(|_| CaptureFailure::at("reconciliation", "M2_STARTUP_SPOOL_RECONCILIATION_FAILED"))?;
     let store = JournalStore::new(
         writer,
         SourceIdentity {
@@ -740,10 +798,18 @@ pub async fn run_loaded_config(
     };
     let mut runtime =
         CaptureRuntime::new(store, factory, NoSnapshotGate, Default::default(), durable);
-    capture_copyboth(
+    capture_copyboth_until_with_probe(
         &CaptureConfig::article1(dsn, 1)?,
         cancellation,
         &mut runtime,
+        u64::MAX,
+        || {
+            ownership
+                .probe(std::time::Duration::from_millis(
+                    public.source.ownership_deadline_ms.0,
+                ))
+                .is_ok()
+        },
     )
     .await
 }
