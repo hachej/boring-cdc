@@ -15,8 +15,8 @@
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-archive-contract-evidence/v1",
-  "source_parent_git_commit": "c072512511d4d902df956da6199740d4cbd2c6d8",
+  "source_parent_git_commit": "a5841171081d00546c221e2b5c4d9eefc3818382",
   "status": "pass",
   "validator": "scripts/validate/archive_contract.py",
-  "validator_sha256": "7bf09a22bf7b6b0dd1daedd92f22292430096649a49fff2b103dba22a68c3a93"
+  "validator_sha256": "fae2d88199b265e6d05056b3903db0e41c86d9e2692442c74e68fb25c99c5cb6"
 }
