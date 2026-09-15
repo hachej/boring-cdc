@@ -81,7 +81,7 @@ def validate():
  if -1 in pos or pos!=sorted(pos):add(out,'E_ACCEPT_ORDER','insert_acceptance/ordered_steps','acceptance ordering incomplete')
  for term in ('argMax','payload_variants',"latest_mutation.2!='delete'",'ARRAY JOIN','promotion_fence',"raw_value.1='absent_for_schema'", "if(raw_value.1='absent_for_schema','explicit_null'"):
   if term not in query:add(out,'E_QUERY','files/canonical_query','missing '+term)
- if ddl.count('capture_epoch UInt64')!=3 or 'capture_epoch FixedString' in ddl or '{capture_epoch:UInt64}' not in query:add(out,'E_CAPTURE_EPOCH','files','capture_epoch must map directly from event ABI u64 to ClickHouse UInt64')
+ if ddl.count('capture_epoch UInt64')!=3 or 'capture_epoch FixedString' in ddl or '{capture_epoch:UInt64}' not in query or '{capture_epoch:UInt64}' not in retire or 'capture_epoch:FixedString' in retire:add(out,'E_CAPTURE_EPOCH','files','capture_epoch must map directly from event ABI u64 to ClickHouse UInt64 in DDL, queries, and retirement')
  if 'FINAL' in query and 'FINAL is intentionally absent' not in query:add(out,'E_FINAL','files/canonical_query','FINAL must not provide correctness')
  if 'DROP PARTITION' not in retire or re.search(r'ALTER TABLE\s+boring_cdc\.generation_selectors_v1',retire,re.I):add(out,'E_RETIRE','files/retirement','retirement scope unsafe')
  source=c['event_projection']['source_order']

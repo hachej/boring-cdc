@@ -109,7 +109,7 @@
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "68a5d00a43db31ab80192d3feccecdc8d0404527b36cdfcc9c65ca2dc1d4fadc",
+      "sha256": "bde2b4b9b4d8e93dfed0071704901e3eac33059a877a990e2668f9dc8bd3c2ec",
       "status": "complete"
     },
     {
@@ -151,14 +151,14 @@
       "id": "ART-M0-CLICKHOUSE-RETIREMENT",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/retire-generation.sql",
-      "sha256": "12becfbfd61eba750e3df9b635bbb8cce61c78575efda675a61f27f433b0df01",
+      "sha256": "0f18d6679a6b6bbf58fde38f6c35b09c3c8dca3e2b99a75f8623b0176fb9ae06",
       "status": "complete"
     },
     {
       "id": "ART-M0-CLICKHOUSE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "scripts/validate/clickhouse_contract.py",
-      "sha256": "dd7bdc0c303b5eb91311b7972bad6c4b6db5b7e68b80a8325077f048f23665ca",
+      "sha256": "9e8042ef355968436eb3d2aad17d43a56320d2b3c7511b38f2c5093e9204293f",
       "status": "complete"
     },
     {
