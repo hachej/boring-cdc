@@ -1,0 +1,1 @@
+scripts/e2e/m2_capture_runtime.sh

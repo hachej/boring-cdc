@@ -1,0 +1,1 @@
+{"command":"CMD-RUN","durable_before_feedback":true,"exit":0,"journal_events":2,"journal_transactions":1,"postgres":"17.6 (Debian 17.6-2.pgdg13+1)","server_feedback_positions":"0/194CD70,0/194CD70,0/194CD70"}
