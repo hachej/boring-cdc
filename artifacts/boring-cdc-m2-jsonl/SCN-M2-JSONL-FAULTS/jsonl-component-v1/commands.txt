@@ -1,2 +1,52 @@
 cargo test --locked --workspace --all-targets
 cargo test --quiet --locked m2_jsonl::tests::direct_runtime_evidence_observes_process_filesystem_sqlite_and_races -- --nocapture
+scripts/faults/m2_jsonl.sh
+cargo test --quiet --locked failure_policy::tests::exhaustive_classes_have_closed_stable_serialization -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-ENUM cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::deterministic_schedule_caps_jitters_and_ignores_clock_rollback -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-SCHEDULE cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::approved_chacha20_seed_expansion_and_draw_order_match_golden_vectors -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-JITTER-GOLDEN cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::restart_preserves_attempt_and_same_deterministic_failure_is_suppressed -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-RESTART-SUPPRESS cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::fingerprint_changes_only_for_allowed_canonical_inputs_and_contains_no_raw_data -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-FINGERPRINT cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::rearm_requires_class_specific_proofs_and_rejects_unrelated_change -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-REARM cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::stale_epoch_generation_attempt_and_fingerprint_completions_cannot_clear -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-STALE cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::synthetic_hooks_fail_closed_on_close_run_and_generation_mismatch -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-HOOKS cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::prepared_adapter_persists_reopens_and_clears_via_supplied_transaction -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-PERSISTENCE cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::retry_due_boundaries_and_cleared_recurrence_fail_closed -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-DUE-RECURRENCE cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::non_transient_rearm_is_persistable_and_stale_operations_are_rejected -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-PERSISTENCE-CAS cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::shared_bounded_harness_replays_policy_vectors_deterministically -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-BOUNDED-HARNESS cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::complete_policy_vector_inventory_uses_bounded_harness_schedules -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-COMPLETE-HARNESS-INVENTORY cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+cargo test --quiet --locked failure_policy::tests::persistence_cas_projections_execute_inside_bounded_harness -- --exact
+env BORING_CDC_FAILURE_GOLDEN_CASE=SCN-M2-FAILURE-HARNESS-PERSISTENCE-CAS cargo test --quiet --locked m2_jsonl::tests::shared_policy_real_archive_adapter_matches_golden_outcomes -- --exact
+env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT=after-intent cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT=after-write cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT=after-file-sync cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT=after-directory-sync cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT=after-rename cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT=after-parent-sync cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT=before-marker cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT=after-marker-write cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT=after-marker-sync cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=crash BORING_CDC_JSONL_PROCESS_FAULT=before-checkpoint cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+env BORING_CDC_JSONL_PROCESS_PHASE=recover cargo test --quiet --locked m2_jsonl::tests::process_crash_and_recovery_probe -- --exact --nocapture
+cargo test --quiet --locked m2_jsonl::tests
