@@ -7,7 +7,7 @@ def sha(b): return hashlib.sha256(b).hexdigest()
 def wr(p,b): p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(b if isinstance(b,bytes) else b.encode())
 files=['src/m2_capture_runtime.rs','src/article1_capture.rs','src/m2_journal.rs','examples/m2_capture_runtime_component.rs','contracts/m2/capture-runtime-cases.json','scripts/e2e/m2_capture_runtime.sh','scripts/faults/m2_capture_runtime.sh','scripts/validate/m2_capture_runtime.py'];h=hashlib.sha256()
 for n in files: b=(R/n).read_bytes();h.update(len(n).to_bytes(8,'big'));h.update(n.encode());h.update(len(b).to_bytes(8,'big'));h.update(b)
-impl=h.hexdigest(); git=os.popen(f'git -C {R} log -1 --format=%H -- src/m2_capture_runtime.rs').read().strip(); cfg={'profile':'postgres-17.6-component','seed':seed,'credentials':'secret-file-indirect','destination':None}; fp=sha(canon(cfg))
+impl=h.hexdigest(); git=os.popen(f'git -C {R} log -1 --format=%H -- ' + ' '.join(files)).read().strip(); cfg={'profile':'postgres-17.6-component','seed':seed,'credentials':'secret-file-indirect','destination':None}; fp=sha(canon(cfg))
 if mode=='e2e':
  src=pathlib.Path(os.environ['M2_RUNTIME_OUTPUT']); raw=src.read_bytes(); wr(out/'stdout.txt',raw);wr(out/'stderr.txt',b''); after={'postgres_version':os.environ['M2_POSTGRES_VERSION'],'durable_before_feedback':True,'journal_transactions':1,'journal_events':2,'requested_reply_safe':True}; product='real_postgresql_copyboth'
 else:
