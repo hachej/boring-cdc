@@ -990,9 +990,80 @@ pub enum StartupAction {
     RemovedUncommitted(PathBuf),
     Quarantined(PathBuf),
 }
+
+trait StartupFilesystem {
+    fn create_dir_all(&self, path: &Path) -> Result<(), SpoolError>;
+    fn paths(
+        &self,
+        directory: &Path,
+    ) -> Result<Box<dyn Iterator<Item = Result<PathBuf, SpoolError>>>, SpoolError>;
+    fn remove_file(&self, path: &Path) -> Result<(), SpoolError>;
+    fn quarantine(&self, path: &Path, directory: &Path) -> Result<PathBuf, SpoolError>;
+    fn sync_dir(&self, path: &Path) -> Result<(), SpoolError>;
+}
+
+struct RealStartupFilesystem;
+impl StartupFilesystem for RealStartupFilesystem {
+    fn create_dir_all(&self, path: &Path) -> Result<(), SpoolError> {
+        fs::create_dir_all(path).map_err(Into::into)
+    }
+    fn paths(
+        &self,
+        directory: &Path,
+    ) -> Result<Box<dyn Iterator<Item = Result<PathBuf, SpoolError>>>, SpoolError> {
+        Ok(Box::new(fs::read_dir(directory)?.map(|entry| {
+            entry.map(|value| value.path()).map_err(Into::into)
+        })))
+    }
+    fn remove_file(&self, path: &Path) -> Result<(), SpoolError> {
+        fs::remove_file(path).map_err(Into::into)
+    }
+    fn quarantine(&self, path: &Path, directory: &Path) -> Result<PathBuf, SpoolError> {
+        let name = path
+            .file_name()
+            .ok_or(SpoolError::Invalid("spool filename"))?;
+        let target = directory.join(name);
+        fs::rename(path, &target)?;
+        Ok(target)
+    }
+    fn sync_dir(&self, path: &Path) -> Result<(), SpoolError> {
+        sync_dir(path)
+    }
+}
+
 /// Requires the caller to hold the repository's exclusive runtime state lock. Unknown entries are
 /// never deleted. Every malformed, unowned, or contradictory spool is quarantined and blocks.
 pub fn classify_startup_spools(
+    lock: &crate::m2_ownership::StateLock,
+    store: &Path,
+    directory: &Path,
+    current_epoch: &str,
+    current_run: &str,
+    max_event_bytes: usize,
+    max_transaction_bytes: u64,
+    max_transaction_events: u64,
+    max_spools: usize,
+    startup_memory: &mut MemoryBudget,
+    existing: impl FnMut(&str, &str) -> ExistingTransaction,
+) -> Result<Vec<StartupAction>, SpoolError> {
+    classify_startup_spools_with(
+        &RealStartupFilesystem,
+        lock,
+        store,
+        directory,
+        current_epoch,
+        current_run,
+        max_event_bytes,
+        max_transaction_bytes,
+        max_transaction_events,
+        max_spools,
+        startup_memory,
+        existing,
+    )
+}
+
+fn classify_startup_spools_with(
+    filesystem: &impl StartupFilesystem,
     lock: &crate::m2_ownership::StateLock,
     store: &Path,
     directory: &Path,
@@ -1028,10 +1099,10 @@ pub fn classify_startup_spools(
         action_reservation,
         |startup_memory| {
             let quarantine = directory.join("quarantine");
-            fs::create_dir_all(&quarantine)?;
+            filesystem.create_dir_all(&quarantine)?;
             let mut actions = Vec::with_capacity(max_spools);
-            for entry in fs::read_dir(directory)? {
-                let path = entry?.path();
+            for path in filesystem.paths(directory)? {
+                let path = path?;
                 if path.as_os_str().as_encoded_bytes().len() > 4096 {
                     return Err(SpoolError::Invalid("spool path too long"));
                 }
@@ -1106,24 +1177,24 @@ pub fn classify_startup_spools(
                     Ok(h) if h.capture_epoch == current_epoch && h.creation_run != current_run => {
                         match existing(&h.capture_epoch, &h.xid) {
                             ExistingTransaction::CommittedSame => {
-                                fs::remove_file(&path)?;
+                                filesystem.remove_file(&path)?;
                                 StartupAction::RemovedCommitted(path.clone())
                             }
                             ExistingTransaction::Uncommitted => {
-                                fs::remove_file(&path)?;
+                                filesystem.remove_file(&path)?;
                                 StartupAction::RemovedUncommitted(path.clone())
                             }
-                            ExistingTransaction::Contradictory => {
-                                quarantine_file(&path, &quarantine)?
-                            }
+                            ExistingTransaction::Contradictory => StartupAction::Quarantined(
+                                filesystem.quarantine(&path, &quarantine)?,
+                            ),
                         }
                     }
-                    _ => quarantine_file(&path, &quarantine)?,
+                    _ => StartupAction::Quarantined(filesystem.quarantine(&path, &quarantine)?),
                 };
                 actions.push(action);
             }
-            sync_dir(directory)?;
-            sync_dir(&quarantine)?;
+            filesystem.sync_dir(directory)?;
+            filesystem.sync_dir(&quarantine)?;
             if actions
                 .iter()
                 .any(|a| matches!(a, StartupAction::Quarantined(_)))
@@ -1147,15 +1218,6 @@ fn with_memory_reservation<T>(
     result
 }
 
-fn quarantine_file(path: &Path, dir: &Path) -> Result<StartupAction, SpoolError> {
-    let name = path
-        .file_name()
-        .ok_or(SpoolError::Invalid("spool filename"))?;
-    let target = dir.join(name);
-    fs::rename(path, &target)?;
-    Ok(StartupAction::Quarantined(target))
-}
-
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -1173,6 +1235,50 @@ pub mod tests {
     impl FreeSpace for FixedSpace {
         fn available_bytes(&self, _: &Path) -> io::Result<u64> {
             Ok(self.0)
+        }
+    }
+    struct FaultingStartupFilesystem {
+        operation: &'static str,
+        paths: Vec<PathBuf>,
+    }
+    impl StartupFilesystem for FaultingStartupFilesystem {
+        fn create_dir_all(&self, _: &Path) -> Result<(), SpoolError> {
+            Ok(())
+        }
+        fn paths(
+            &self,
+            _: &Path,
+        ) -> Result<Box<dyn Iterator<Item = Result<PathBuf, SpoolError>>>, SpoolError> {
+            if self.operation == "read_dir" {
+                return Err(SpoolError::Io(io::ErrorKind::Other));
+            }
+            if self.operation == "entry" {
+                return Ok(Box::new(std::iter::once(Err(SpoolError::Io(
+                    io::ErrorKind::Other,
+                )))));
+            }
+            Ok(Box::new(self.paths.clone().into_iter().map(Ok)))
+        }
+        fn remove_file(&self, _: &Path) -> Result<(), SpoolError> {
+            if self.operation == "remove" {
+                Err(SpoolError::Io(io::ErrorKind::Other))
+            } else {
+                Ok(())
+            }
+        }
+        fn quarantine(&self, path: &Path, directory: &Path) -> Result<PathBuf, SpoolError> {
+            if self.operation == "quarantine" {
+                Err(SpoolError::Io(io::ErrorKind::Other))
+            } else {
+                Ok(directory.join(path.file_name().unwrap()))
+            }
+        }
+        fn sync_dir(&self, _: &Path) -> Result<(), SpoolError> {
+            if self.operation == "sync" {
+                Err(SpoolError::Io(io::ErrorKind::Other))
+            } else {
+                Ok(())
+            }
         }
     }
     fn dir(name: &str) -> PathBuf {
@@ -1649,14 +1755,79 @@ pub mod tests {
         assert_eq!(budget.used(MemoryClass::Decoder), 0);
         assert_eq!(budget.used(MemoryClass::Staging), 0);
 
-        // Every named filesystem failure propagates through this same production scope. Inject
-        // each class at the operation boundary to prove the reservation is exception-safe.
+        let dev = fs::metadata(&store_dir).unwrap().dev();
+        let mut disk = DiskAdmission::default();
+        disk.configure(
+            dev,
+            FilesystemLimit {
+                total_budget: 4096,
+                emergency_reserve: 512,
+            },
+        )
+        .unwrap();
+        let memory = MemoryBudget::new(MemoryLimits {
+            process_limit: 65_536,
+            runtime_fixed: 4_096,
+            receive: 1_024,
+            decoder: 32_768,
+            staging: 16_384,
+        })
+        .unwrap();
+        let mut valid = TxnBuffer::new(
+            store_dir.clone(),
+            "epoch".into(),
+            "xid".into(),
+            "dead".into(),
+            SpoolLimits {
+                max_frame_bytes: 512,
+                max_event_bytes: 512,
+                max_transaction_bytes: 1024,
+                max_transaction_events: 4,
+                memory_prefix_bytes: 0,
+            },
+            memory,
+            FilesystemAdmissionController::new(disk),
+            Box::new(FixedSpace(4096)),
+            Box::new(PosixAllocation),
+        )
+        .unwrap();
+        push(&mut valid, b"event").unwrap();
+        let valid_path = valid.spool.as_ref().unwrap().1.clone();
+        drop(valid);
+
+        // Inject each named filesystem error at the operation used by the production scan.
         for operation in ["read_dir", "entry", "remove", "quarantine", "sync"] {
-            let result = with_memory_reservation(&mut budget, MemoryClass::Staging, 32, |_| {
-                Err::<(), _>(SpoolError::Io(io::ErrorKind::Other))
-            });
-            assert!(result.is_err(), "{operation} error must propagate");
-            assert_eq!(budget.used(MemoryClass::Staging), 0, "{operation}");
+            let filesystem = FaultingStartupFilesystem {
+                operation,
+                paths: vec![valid_path.clone()],
+            };
+            let mut injected_budget = startup_budget();
+            let result = classify_startup_spools_with(
+                &filesystem,
+                &lock,
+                &store,
+                &store_dir,
+                "epoch",
+                "owner",
+                512,
+                1024,
+                4,
+                1,
+                &mut injected_budget,
+                |_, _| {
+                    if operation == "quarantine" {
+                        ExistingTransaction::Contradictory
+                    } else {
+                        ExistingTransaction::Uncommitted
+                    }
+                },
+            );
+            assert!(
+                matches!(result, Err(SpoolError::Io(io::ErrorKind::Other))),
+                "{operation} error must propagate: {result:?}"
+            );
+            assert_eq!(injected_budget.used(MemoryClass::Decoder), 0, "{operation}");
+            assert_eq!(injected_budget.used(MemoryClass::Staging), 0, "{operation}");
         }
         drop(lock);
         fs::remove_dir_all(store_dir).ok();
