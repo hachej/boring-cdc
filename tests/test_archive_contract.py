@@ -33,8 +33,15 @@ class ArchiveContractTests(unittest.TestCase):
   for name in ('event_contract','archive_scope','failure_policy','promotion','durability'):
    item=c['consumes'][name]; path=item.get('path') or item.get('confirmed_projection_source'); expected=item.get('sha256') or item.get('source_sha256'); self.assertEqual(expected,m.digest(m.ROOT/path),name)
  def test_forged_evidence_source_parent_is_rejected(self):
-  inputs=m.validate()[1]; validator_sha=m.digest(m.V); prior={'inputs':inputs,'validator_sha256':validator_sha,'source_parent_git_commit':'0'*40}
-  _,error=m.resolve_source_parent(prior,inputs,validator_sha); self.assertIn('not an existing commit',error)
+  from unittest import mock
+  from types import SimpleNamespace
+  inputs=m.validate()[1]; validator_sha=m.digest(m.V)
+  for candidate in ('HEAD',m.subprocess.check_output(['git','rev-parse','--short','HEAD'],cwd=m.ROOT,text=True).strip()):
+   _,error=m.resolve_source_parent({'inputs':inputs,'validator_sha256':validator_sha,'source_parent_git_commit':candidate},inputs,validator_sha); self.assertIn('canonical full lowercase commit OID',error)
+  _,error=m.resolve_source_parent({'inputs':inputs,'validator_sha256':validator_sha,'source_parent_git_commit':'0'*40},inputs,validator_sha); self.assertIn('not an existing commit',error)
+  candidate='1'*40
+  with mock.patch.object(m.subprocess,'check_output',side_effect=[m.subprocess.check_output(['git','rev-parse','HEAD'],cwd=m.ROOT,text=True),candidate+'\n']), mock.patch.object(m.subprocess,'run',return_value=SimpleNamespace(returncode=1)):
+   _,error=m.resolve_source_parent({'inputs':inputs,'validator_sha256':validator_sha,'source_parent_git_commit':candidate},inputs,validator_sha); self.assertIn('not an ancestor of HEAD',error)
  def test_no_secrets(self):
   text=''.join(p.read_text() for p in (m.C,m.S,m.F,m.FS,m.RS)); self.assertNotIn('postgres'+'://',text)
 if __name__=='__main__': unittest.main()

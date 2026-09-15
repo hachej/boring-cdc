@@ -226,15 +226,19 @@ def validate():
     return out, inputs
 
 def resolve_source_parent(prior, inputs, validator_sha256):
-    """Bind generated evidence to the exact immediate source commit or reject tampering."""
+    """Preserve an immutable source commit across ledger-only descendants."""
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     if prior.get("inputs") != inputs or prior.get("validator_sha256") != validator_sha256:
         return head, None
     candidate = prior.get("source_parent_git_commit")
+    if not isinstance(candidate, str) or re.fullmatch(r"[0-9a-f]{40}", candidate) is None:
+        return candidate or "", "stored source parent must be a canonical full lowercase commit OID"
     try:
-        subprocess.run(["git", "cat-file", "-e", f"{candidate}^{{commit}}"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        resolved = subprocess.check_output(["git", "rev-parse", f"{candidate}^{{commit}}"], cwd=ROOT, text=True, stderr=subprocess.DEVNULL).strip()
     except subprocess.CalledProcessError:
-        return candidate or "", "stored source parent is not an existing commit"
+        return candidate, "stored source parent is not an existing commit"
+    if resolved != candidate:
+        return candidate, "stored source parent does not resolve to its canonical commit OID"
     if subprocess.run(["git", "merge-base", "--is-ancestor", candidate, head], cwd=ROOT).returncode != 0:
         return candidate, "stored source parent is not an ancestor of HEAD"
     return candidate, None
