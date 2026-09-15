@@ -172,7 +172,7 @@
       "id": "ART-M0-COMPOSE-FIXTURE",
       "owner_bead": "boring-cdc-d-compose",
       "path": "fixtures/m0/decisions/boring-cdc-d-compose.json",
-      "sha256": "8f3a93e61ca9f8e94222bbe6920889e997e5058d26720631bcd520f210609973",
+      "sha256": "6a006e66448934224f60083677f3b8a6ab0de09550b2a1757144d3fc033e3c0b",
       "status": "complete"
     },
     {
@@ -508,7 +508,7 @@
       "id": "ART-M0-SUPPORTED-VALUES-FIXTURE",
       "owner_bead": "boring-cdc-d-values",
       "path": "fixtures/m0/decisions/boring-cdc-d-values.json",
-      "sha256": "1e5e415ed62f941b5f48dd85fb05da9d8273131430f20a1dc7222aca89f58d0c",
+      "sha256": "491c789ebc5802aca0b2086e5cf0d50f31426de2d273b96c22621436003b504a",
       "status": "complete"
     },
     {

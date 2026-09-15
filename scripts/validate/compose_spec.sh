@@ -29,6 +29,8 @@ try:
  ensure(spec.get('schema_version')=='m0-decision-fixture/v1' and spec.get('fixture_id')==decision_id and spec.get('decision_id')==decision_id and spec.get('owner_bead')==owner and spec.get('provisional_markers')==markers)
  required=('inputs','preconditions','supported_matrix','deterministic_phase','expected','expected_failure','result_contract','redaction_assertions','later_executors','vectors','provisional_boundary')
  ensure(all(spec.get(x) for x in required) and spec['provisional_boundary']==contract and spec['later_executors']==executors)
+ ensure(spec['deterministic_phase']=='validate provisional recommendation literals, ownership, vectors, hashes and expected transitions without pulling images or running services')
+ ensure(spec['preconditions']==['supervisor override 2026-09-15 permits recommendation use only with the exact provisional marker while the owner decision remains open','all inputs and artifact hashes resolve','runtime results are not an M0 prerequisite'])
  ensure(contract.get('architecture_allowlist')==['linux/amd64'])
  expected_images={
   'postgres':('docker.io/library/postgres','17.6','00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929','b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409'),
