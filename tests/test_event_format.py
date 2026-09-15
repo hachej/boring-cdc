@@ -99,6 +99,7 @@ class EventFormatContractTests(unittest.TestCase):
         hostile = []
         bad = json.loads(json.dumps(emitted))
         bad["canonical_key"] = [{"kind": "bytes", "type_oid": 17, "type_modifier": -1, "value": "AB"}]
+        noncanonical_base64 = bad
         hostile.append(bad)
         bad = json.loads(json.dumps(emitted))
         bad["canonical_key"] = [{"kind": "bytes", "type_oid": 2950, "type_modifier": -1, "value": "AA"}]
@@ -109,6 +110,19 @@ class EventFormatContractTests(unittest.TestCase):
         hostile.append(bad)
         for event in hostile:
             self.assertTrue(event_format.event_semantic_findings(event), event)
+        noncanonical_column = json.loads(json.dumps(emitted))
+        noncanonical_column["columns"][0]["bytes"] = "AB"
+        schema = json.loads(event_format.SCHEMA.read_text())
+        for event in (noncanonical_base64, noncanonical_column):
+            schema_findings = []
+            event_format.CORE.validate_schema_instance(
+                event,
+                schema,
+                schema_findings,
+                base=event_format.SCHEMA.parent,
+                root=schema,
+            )
+            self.assertTrue(schema_findings, "schema accepted noncanonical base64url trailing bits")
 
     def test_control_events_are_not_business_payloads(self):
         controls = [c["event"] for c in self.vectors["vectors"] if c["category"] == "control_routing"]

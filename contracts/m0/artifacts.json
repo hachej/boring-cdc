@@ -228,14 +228,14 @@
       "id": "ART-M0-EVENT-FORMAT-EVIDENCE",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "artifacts/boring-cdc-m0-event-format/spec/evidence.json",
-      "sha256": "55ea01a84b3f549c0ce6a843d5d9ebbc880b1dfee3302b7afc6b7a3510441f60",
+      "sha256": "e72fe0be68df104bb549bb7b57d0a73f265a6a9a2ef62555379ab71dce57e69a",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-SCHEMA",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event.schema.json",
-      "sha256": "a287cf6759c77be032ae704aab24d44d8ccef75b4125016aeb766ca97327176d",
+      "sha256": "bef8393066708831ee19352466f862dd7151fa049f6d57f3e1a93791e9d11ede",
       "status": "complete"
     },
     {
