@@ -65,6 +65,27 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIsNone(m0_scaffold.evidence_path(evidence_root, "/etc/passwd"))
         self.assertIsNone(m0_scaffold.evidence_path(evidence_root, "Cargo.lock"))
 
+    def test_scaffold_rejects_unauthorized_provisional_marker(self):
+        marker = ROOT / "config" / ".test-provisional-marker"
+        marker.write_text("// M0-" + "PROVISIONAL: boring-cdc-d-values\n")
+        try:
+            result = subprocess.run(
+                ["scripts/validate/m0_scaffold.sh"], cwd=ROOT, text=True, capture_output=True
+            )
+        finally:
+            marker.unlink(missing_ok=True)
+        self.assertNotEqual(result.returncode, 0)
+        findings = json.loads(result.stdout)["findings"]
+        self.assertIn(
+            "provisional-marker-unauthorized:config/.test-provisional-marker",
+            findings,
+        )
+
+    def test_package_excludes_internal_metadata_and_evidence(self):
+        out = json.loads(run("scripts/validate/scaffold_package.sh").stdout)
+        self.assertEqual(out["status"], "pass")
+        self.assertFalse(out["sensitive_repository_metadata"])
+
     def test_m1_completion_rejects_reintroduced_provisional_marker(self):
         marker = ROOT / "config" / ".test-provisional-marker"
         marker.write_text("M0-" + "PROVISIONAL")

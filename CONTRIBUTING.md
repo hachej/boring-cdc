@@ -8,6 +8,7 @@ Run the component quality gate before proposing a change:
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace --all-targets
+scripts/validate/scaffold_package.sh
 scripts/validate/m0_scaffold.sh
 scripts/validate/scaffold_license.sh
 scripts/validate/scaffold_secrets.sh

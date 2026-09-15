@@ -27,21 +27,58 @@ def git(*args:str)->str:return subprocess.check_output(["git",*args],cwd=ROOT,te
 def canonical(obj:object)->bytes:return (json.dumps(obj,sort_keys=True,separators=(",",":"))+"\n").encode()
 def write_json(path:Path,obj:object)->None:path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(canonical(obj))
 
+PROVISIONAL_AUTHORITIES = {
+ "contracts/archive/archive-model.json":{"boring-cdc-d-archive-durability","boring-cdc-d-compose"},
+ "contracts/archive/archive-model.schema.json":{"boring-cdc-d-archive-durability","boring-cdc-d-compose"},
+ "contracts/clickhouse/model.json":{"boring-cdc-d-compose","boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
+ "contracts/event/event-format.json":{"boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
+ "contracts/storage/sqlite-schema.sql":{"boring-cdc-d-sqlite"},
+ "contracts/storage/storage-model.json":{"boring-cdc-d-admission","boring-cdc-d-archive-durability","boring-cdc-d-compose","boring-cdc-d-sqlite","boring-cdc-d-values","boring-cdc-d-wal-cap"},
+ "docs/CLICKHOUSE_MODEL.md":{"boring-cdc-d-compose","boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
+ "docs/EVENT_FORMAT.md":{"boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
+ "scripts/validate/archive_contract.py":{"boring-cdc-d-archive-durability","boring-cdc-d-compose"},
+ "scripts/validate/clickhouse_contract.py":{"boring-cdc-d-compose","boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
+ "scripts/validate/event_format.py":{"boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
+ "scripts/validate/storage_contract.py":{"boring-cdc-d-admission","boring-cdc-d-archive-durability","boring-cdc-d-compose","boring-cdc-d-sqlite","boring-cdc-d-values","boring-cdc-d-wal-cap"},
+ "tests/test_archive_contract.py":{"boring-cdc-d-archive-durability","boring-cdc-d-compose"},
+ "tests/test_clickhouse_contract.py":{"boring-cdc-d-compose","boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
+ "tests/test_event_format.py":{"boring-cdc-d-keys","boring-cdc-d-values","boring-cdc-d-values.1"},
+ "tests/test_storage_contract.py":{"boring-cdc-d-admission","boring-cdc-d-archive-durability","boring-cdc-d-compose","boring-cdc-d-sqlite","boring-cdc-d-values","boring-cdc-d-wal-cap"},
+}
+
+def provisional_marker_errors(source_paths:list[Path])->list[str]:
+ token="M0-"+"PROVISIONAL"
+ pattern=re.compile(re.escape(token)+r": ([A-Za-z0-9._-]+)")
+ errors=[]
+ for path in source_paths:
+  text=path.read_text(errors="replace")
+  if token not in text:continue
+  relative=str(path.relative_to(ROOT))
+  decisions=pattern.findall(text)
+  allowed=PROVISIONAL_AUTHORITIES.get(relative)
+  if allowed is None:errors.append(f"provisional-marker-unauthorized:{relative}");continue
+  for decision in decisions:
+   if decision not in allowed:errors.append(f"provisional-marker-unauthorized:{relative}:{decision}")
+ return errors
+
 def validate()->list[str]:
  errors=[]
- required=["Cargo.toml","Cargo.lock","rust-toolchain.toml","src/main.rs","Dockerfile","compose.yaml","config/boring-cdc.schema.json","config/boring-cdc.example.json",".github/workflows/ci.yml","CONTRIBUTING.md","SECURITY.md","scripts/validate/m0_scaffold_evidence.py",*[f"scripts/agent/{x}" for x in ("doctor","next","context","impact","verify","handoff","recover","finish")]]
+ required=["Cargo.toml","Cargo.lock","rust-toolchain.toml","src/main.rs","Dockerfile","compose.yaml","config/boring-cdc.schema.json","config/boring-cdc.example.json",".github/workflows/ci.yml","CONTRIBUTING.md","SECURITY.md","scripts/validate/m0_scaffold_evidence.py","scripts/validate/scaffold_package.sh",*[f"scripts/agent/{x}" for x in ("doctor","next","context","impact","verify","handoff","recover","finish")]]
  for path in required:
   if not (ROOT/path).is_file():errors.append(f"missing:{path}")
  if errors:return errors
  cargo=read("Cargo.toml").decode(); deploy=read("compose.yaml").decode()+read("Dockerfile").decode()
  if cargo.count("[[bin]]")!=1 or 'license = "Apache-2.0"' not in cargo:errors.append("cargo:single-binary-or-license")
+ if 'include = [' not in cargo or '"/src/**"' not in cargo:errors.append("cargo:package-boundary")
+ ci=read(".github/workflows/ci.yml").decode()
+ for token in ("actions/checkout@11d5960a326750d5838078e36cf38b85af677262","rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update","cargo install cargo-audit --version 0.22.2 --locked","scripts/validate/scaffold_package.sh"):
+  if token not in ci:errors.append(f"ci:unpinned-or-missing:{token}")
  for name,digest in PINS.items():
   if digest not in deploy and digest not in read("contracts/scaffold/m0-scaffold.json").decode():errors.append(f"pin:{name}")
  for token in ("restart: unless-stopped","tcp_keepalives_idle=30","tcp_keepalives_interval=10","tcp_keepalives_count=3","client_connection_check_interval=10s","condition: service_healthy"):
   if token not in deploy:errors.append(f"compose:{token}")
  source_paths=[p for p in ROOT.rglob("*") if p.is_file() and not any(x in p.parts for x in (".git","target","artifacts",".beads",".handoff","__pycache__")) and not ("docs" in p.parts and "issues" in p.parts)]
- all_text="\n".join(p.read_text(errors="replace") for p in source_paths)
- if "M0-" + "PROVISIONAL" in all_text:errors.append("provisional-marker-after-reconciliation")
+ errors.extend(provisional_marker_errors(source_paths))
  schema=json.loads(read("config/boring-cdc.schema.json"));example=json.loads(read("config/boring-cdc.example.json"))
  if set(schema["required"])!=set(example):errors.append("config:root-fields")
  manifest_doc=json.loads(read("contracts/m0/manifest.json")); schema_findings=[]
