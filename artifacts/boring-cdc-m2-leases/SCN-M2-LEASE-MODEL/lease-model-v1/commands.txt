@@ -1,1 +1,3 @@
+TMPDIR=/var/tmp cargo fmt --all -- --check
+TMPDIR=/var/tmp cargo test --locked m2_leases::tests
 TMPDIR=/var/tmp cargo test --locked m2_leases::tests
