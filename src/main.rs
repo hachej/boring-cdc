@@ -6,6 +6,7 @@ use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
 use boring_cdc::m1_preflight::{
     CheckStatus, PreflightObservation, envelope, evaluate_untrusted, input_failure,
 };
+use boring_cdc::m2_capture_runtime::{acquire_production_ownership, run_loaded_config};
 use pg_walstream::CancellationToken;
 use serde::Deserialize;
 use std::io::{self, Read, Write};
@@ -194,6 +195,29 @@ fn capture_article1(
     }
 }
 
+fn run_m2() -> Result<(), ReaderFailure> {
+    let text = std::fs::read_to_string("boring-cdc.toml").map_err(|_| {
+        ReaderFailure::unavailable(
+            "M2_CONFIG_UNAVAILABLE",
+            "runtime configuration is unavailable",
+        )
+    })?;
+    let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Run)
+        .map_err(|e| ReaderFailure::unavailable(e.code, "runtime configuration is invalid"))?;
+    let _ownership = acquire_production_ownership(&config, "production-run")
+        .map_err(|e| ReaderFailure::unavailable(e.code, "capture ownership unavailable"))?;
+    let cancellation = cancellation_for_signals();
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .map_err(|_| {
+            ReaderFailure::unavailable("M2_RUNTIME_UNAVAILABLE", "capture runtime is unavailable")
+        })?;
+    runtime
+        .block_on(run_loaded_config(&config, &cancellation))
+        .map_err(|e| ReaderFailure::unavailable(e.code, "capture runtime failed"))
+}
+
 fn run_article1() -> Result<(), ReaderFailure> {
     let config = load_article1_config()?;
     let cancellation = cancellation_for_signals();
@@ -272,7 +296,12 @@ fn main() {
         }
         Ok(parsed) => {
             if parsed.spec.id == "CMD-RUN" {
-                match run_article1() {
+                let result = if std::path::Path::new("boring-cdc.toml").exists() {
+                    run_m2()
+                } else {
+                    run_article1()
+                };
+                match result {
                     Ok(()) => return,
                     Err(error) => {
                         eprintln!("{}: {}", error.code, error.message);

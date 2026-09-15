@@ -13,7 +13,7 @@ use crate::m2_journal::{
     DurableCommit, JournalError, JournalEvent, JournalStore, SourceCommit, transaction_checksum,
 };
 use crate::m2_spool::{SpoolError, TxnBuffer};
-use pg_walstream::CancellationToken;
+use pg_walstream::{CancellationToken, PgReplicationConnection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -180,11 +180,16 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
     }
 
     pub fn receive(&mut self, frame: &[u8]) -> Result<(), RuntimeError> {
+        if self.state == RuntimeState::CaptureSafeStopped {
+            if frame.len() == 18 && frame[0] == b'k' && frame[17] == 1 {
+                self.queue_feedback(true);
+                return Ok(());
+            }
+            return Ok(()); // alive and fenced: drain transport without decoding or dispatch
+        }
         if matches!(
             self.state,
-            RuntimeState::CaptureSafeStopped
-                | RuntimeState::OwnershipLost
-                | RuntimeState::ExpectedClose
+            RuntimeState::OwnershipLost | RuntimeState::ExpectedClose
         ) {
             return Err(RuntimeError::Protocol("runtime_not_receiving"));
         }
@@ -353,15 +358,15 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         Ok(())
     }
 
-    fn queue_feedback(&mut self, requested: bool) {
+    fn queue_feedback(&mut self, _requested: bool) {
         let durable = self.durable_end_lsn;
         if let FeedbackPermit::AllowSafeBoundary { lsn: permitted } = self.gate.permit(durable) {
-            let safe = durable.map_or(permitted, |value| value.min(permitted));
+            let safe = durable.map_or(0, |value| value.min(permitted));
             self.feedback.push(FeedbackPacket {
                 write_lsn: safe,
                 flush_lsn: safe,
                 apply_lsn: safe,
-                reply_requested: requested,
+                reply_requested: false,
             });
         }
     }
@@ -504,9 +509,9 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
                 runtime.unexpected_eof();
                 CaptureFailure::at("runtime", "M2_COPYBOTH_UNEXPECTED_LOSS")
             })?;
-        runtime
-            .receive(&frame)
-            .map_err(|_| CaptureFailure::at("runtime", "M2_CAPTURE_SAFE_STOPPED"))?;
+        if runtime.receive(&frame).is_err() && runtime.state() != RuntimeState::CaptureSafeStopped {
+            return Err(CaptureFailure::at("runtime", "M2_CAPTURE_FAILED"));
+        }
         for packet in runtime.take_feedback() {
             connection
                 .send_standby_status_update(
@@ -528,6 +533,219 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
             return Ok(());
         }
     }
+}
+
+pub struct PgSourceLock {
+    connection: PgReplicationConnection,
+    backend_pid: i32,
+    nonce: String,
+    key: i64,
+}
+impl crate::m2_ownership::SourceLockSession for PgSourceLock {
+    fn backend_pid(&self) -> i32 {
+        self.backend_pid
+    }
+    fn connection_nonce(&self) -> &str {
+        &self.nonce
+    }
+    fn advisory_lock_key(&self) -> i64 {
+        self.key
+    }
+    fn try_lock(&mut self) -> Result<bool, crate::m2_ownership::OwnershipError> {
+        self.connection
+            .exec(&format!("SELECT pg_try_advisory_lock({})::int", self.key))
+            .ok()
+            .and_then(|r| r.get_value(0, 0))
+            .map(|v| v == "1")
+            .ok_or(crate::m2_ownership::OwnershipError::SourceSessionLost)
+    }
+    fn healthy(&mut self) -> bool {
+        self.connection.is_alive() && self.connection.exec("SELECT 1").is_ok()
+    }
+    fn unlock(&mut self) -> Result<(), crate::m2_ownership::OwnershipError> {
+        self.connection
+            .exec(&format!("SELECT pg_advisory_unlock({})::int", self.key))
+            .map(|_| ())
+            .map_err(|_| crate::m2_ownership::OwnershipError::SourceSessionLost)
+    }
+}
+
+pub fn acquire_production_ownership(
+    config: &crate::m1_config::LoadedConfig,
+    run_id: &str,
+) -> Result<crate::m2_ownership::OwnershipGuard<PgSourceLock>, CaptureFailure> {
+    use crate::m2_ownership::{OwnerKind, OwnershipGuard};
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    let dsn = config
+        .runtime_dsn()
+        .ok_or_else(|| CaptureFailure::at("ownership", "M2_RUNTIME_DSN_UNAVAILABLE"))?;
+    let mut connection = PgReplicationConnection::connect(dsn)
+        .map_err(|_| CaptureFailure::at("ownership", "M2_SOURCE_LOCK_CONNECTION_FAILED"))?;
+    let backend_pid = connection
+        .exec("SELECT pg_backend_pid()::text")
+        .ok()
+        .and_then(|r| r.get_value(0, 0))
+        .and_then(|v| v.parse().ok())
+        .ok_or_else(|| CaptureFailure::at("ownership", "M2_SOURCE_LOCK_PID_FAILED"))?;
+    let digest = Sha256::digest(config.fingerprints().source.as_bytes());
+    let key = i64::from_be_bytes(digest[..8].try_into().expect("sha256 width"));
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| CaptureFailure::at("ownership", "M2_CLOCK_INVALID"))?
+        .as_nanos();
+    let nonce = format!(
+        "{:x}",
+        Sha256::digest(format!("{run_id}:{backend_pid}:{now}").as_bytes())
+    );
+    let source = PgSourceLock {
+        connection,
+        backend_pid,
+        nonce,
+        key,
+    };
+    let mut guard = OwnershipGuard::acquire(
+        std::path::Path::new(&config.public().storage.sqlite_path),
+        run_id.into(),
+        OwnerKind::Runtime,
+        Duration::from_millis(config.public().source.ownership_deadline_ms.0),
+        source,
+    )
+    .map_err(|_| CaptureFailure::at("ownership", "M2_OWNERSHIP_UNAVAILABLE"))?;
+    guard
+        .reconcile_after_unclean_release(|| true)
+        .map_err(|_| CaptureFailure::at("ownership", "M2_STARTUP_RECONCILIATION_FAILED"))?;
+    Ok(guard)
+}
+
+/// Builds the bounded durable runtime from the canonical loaded configuration. The caller owns
+/// process supervision and the source advisory-lock guard for the full future lifetime.
+pub async fn run_loaded_config(
+    config: &crate::m1_config::LoadedConfig,
+    cancellation: &CancellationToken,
+) -> Result<(), CaptureFailure> {
+    use crate::m2_journal::{CommitLimits, SourceIdentity};
+    use crate::m2_schema::open_writer;
+    use crate::m2_spool::{
+        DiskAdmission, FilesystemAdmissionController, FilesystemLimit, MemoryBudget, MemoryLimits,
+        PosixAllocation, SpoolLimits, StatvfsSpace,
+    };
+    use std::os::unix::fs::MetadataExt;
+    use std::path::PathBuf;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    let public = config.public();
+    if public.source.publication != PUBLICATION || public.source.slot != SLOT {
+        return Err(CaptureFailure::at(
+            "configuration",
+            "M2_ARTICLE1_PROTOCOL_LITERAL_MISMATCH",
+        ));
+    }
+    let dsn = config
+        .runtime_dsn()
+        .ok_or_else(|| CaptureFailure::at("configuration", "M2_RUNTIME_DSN_UNAVAILABLE"))?
+        .to_owned();
+    let journal_path = PathBuf::from(&public.storage.sqlite_path);
+    let spool_path = PathBuf::from(&public.storage.spool_path);
+    if let Some(parent) = journal_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|_| CaptureFailure::at("storage", "M2_STATE_DIRECTORY_UNAVAILABLE"))?;
+    }
+    std::fs::create_dir_all(&spool_path)
+        .map_err(|_| CaptureFailure::at("storage", "M2_SPOOL_DIRECTORY_UNAVAILABLE"))?;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?
+        .as_millis() as i64;
+    let writer = open_writer(&journal_path, "production-run", 1, now)
+        .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_OPEN_FAILED"))?;
+    let durable = writer
+        .connection()
+        .query_row(
+            "SELECT durable_transaction_end_lsn FROM source_state WHERE singleton=1",
+            [],
+            |r| r.get::<_, Option<String>>(0),
+        )
+        .ok()
+        .flatten()
+        .map(|v| parse_lsn(&v))
+        .transpose()
+        .map_err(|_| CaptureFailure::at("journal", "M2_DURABLE_LSN_INVALID"))?;
+    let store = JournalStore::new(
+        writer,
+        SourceIdentity {
+            capture_epoch: config.fingerprints().runtime.clone(),
+            source_system_id: config.fingerprints().source.clone(),
+            timeline_id: "startup-attested".into(),
+            database_id: "startup-attested".into(),
+            slot_name: SLOT.into(),
+            publication_fingerprint: config.fingerprints().source.clone(),
+            protocol_fingerprint: "pgoutput-v1".into(),
+        },
+        CommitLimits {
+            max_events: public.limits.max_transaction_events as usize,
+            max_copied_bytes: public.limits.max_transaction_bytes.0 as usize,
+            max_writer_hold: Duration::from_millis(public.source.maximum_operation_ms.0),
+        },
+    )
+    .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_CONFIG_INVALID"))?;
+    let dev = std::fs::metadata(&spool_path)
+        .map_err(|_| CaptureFailure::at("storage", "M2_SPOOL_METADATA_FAILED"))?
+        .dev();
+    let budget = public
+        .budgets
+        .iter()
+        .filter(|b| b.capture_spool_bytes.0 > 0)
+        .max_by_key(|b| b.capture_spool_bytes.0)
+        .ok_or_else(|| CaptureFailure::at("configuration", "M2_SPOOL_BUDGET_MISSING"))?;
+    let disk = FilesystemAdmissionController::new(DiskAdmission::default());
+    disk.configure(
+        dev,
+        FilesystemLimit {
+            total_budget: budget.capture_spool_bytes.0,
+            emergency_reserve: budget.reserved_free_bytes.0,
+        },
+    )
+    .map_err(|_| CaptureFailure::at("configuration", "M2_SPOOL_BUDGET_INVALID"))?;
+    let limits = public.limits.clone();
+    let make_disk = disk.clone();
+    let make_path = spool_path.clone();
+    let epoch = config.fingerprints().runtime.clone();
+    let factory = move |xid: u32| -> Result<Box<dyn RuntimeSpool>, RuntimeError> {
+        let memory = MemoryBudget::new(MemoryLimits {
+            process_limit: limits.process_memory_bytes.0 as usize,
+            runtime_fixed: 1,
+            receive: limits.max_wire_frame_bytes.0 as usize,
+            decoder: limits.max_event_bytes.0 as usize,
+            staging: limits.max_transaction_bytes.0 as usize,
+        })
+        .map_err(|e| RuntimeError::Spool(e.to_string()))?;
+        TxnBuffer::new(
+            make_path.clone(),
+            epoch.clone(),
+            xid.to_string(),
+            "production-run".into(),
+            SpoolLimits {
+                max_frame_bytes: limits.max_wire_frame_bytes.0 as usize,
+                max_event_bytes: limits.max_event_bytes.0 as usize,
+                max_transaction_bytes: limits.max_transaction_bytes.0,
+                max_transaction_events: limits.max_transaction_events,
+                memory_prefix_bytes: limits.max_event_bytes.0 as usize,
+            },
+            memory,
+            make_disk.clone(),
+            Box::new(StatvfsSpace),
+            Box::new(PosixAllocation),
+        )
+        .map(|v| Box::new(v) as Box<dyn RuntimeSpool>)
+        .map_err(|e| RuntimeError::Spool(e.to_string()))
+    };
+    let mut runtime =
+        CaptureRuntime::new(store, factory, NoSnapshotGate, Default::default(), durable);
+    capture_copyboth(
+        &CaptureConfig::article1(dsn, 1)?,
+        cancellation,
+        &mut runtime,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -772,8 +990,10 @@ pub mod tests {
         let (p, mut r) = runtime(FeedbackPermit::AllowSafeBoundary { lsn: u64::MAX });
         assert!(r.receive(b"bad").is_err());
         assert_eq!(r.state(), RuntimeState::CaptureSafeStopped);
-        assert!(r.receive(&keepalive(1, true)).is_err());
-        assert!(r.take_feedback().is_empty());
+        assert!(r.receive(&keepalive(1, true)).is_ok());
+        let safe_reply = r.take_feedback();
+        assert_eq!(safe_reply.len(), 1);
+        assert_eq!(safe_reply[0].write_lsn, 0);
         let (p2, mut r2) = runtime(FeedbackPermit::Hold);
         r2.receive(&begin(1, 0x10)).unwrap();
         assert_eq!(
