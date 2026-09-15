@@ -22,6 +22,42 @@
       "exit_code": 0
     },
     {
+      "argv": "scripts/validate/archive_scope.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/compose_spec.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/failure_policy.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/license.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/fixtures/validate_m0_repository_identity.py",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/security_exposure.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/sqlite_durability.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/supported_values.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/wal_cap.sh",
+      "exit_code": 0
+    },
+    {
       "argv": "scripts/validate/m0_artifact.sh contracts/m0/artifacts.json --complete --expected-artifacts contracts/m0/expected-artifacts.json",
       "exit_code": 0
     },

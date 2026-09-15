@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location(
@@ -84,6 +85,45 @@ class M0CompletenessTests(unittest.TestCase):
         decisions.write_text(json.dumps(value, sort_keys=True) + "\n")
         findings = m0.aggregate_findings(target)
         self.assertIn("boring-cdc-d-compose: provisional decision state/marker mismatch", findings)
+
+    def test_every_decision_domain_validator_is_fail_closed(self):
+        expected = {
+            "boring-cdc-d-archive-scope": ("scripts/validate/archive_scope.sh",),
+            "boring-cdc-d-compose": ("scripts/validate/compose_spec.sh",),
+            "boring-cdc-d-failure-policy": ("scripts/validate/failure_policy.sh",),
+            "boring-cdc-d-license": ("scripts/validate/license.sh",),
+            "boring-cdc-d-owner": ("scripts/fixtures/validate_m0_repository_identity.py",),
+            "boring-cdc-d-security": ("scripts/validate/security_exposure.sh",),
+            "boring-cdc-d-sqlite": ("scripts/validate/sqlite_durability.sh",),
+            "boring-cdc-d-values": ("scripts/validate/supported_values.sh",),
+            "boring-cdc-d-wal-cap": ("scripts/validate/wal_cap.sh",),
+        }
+        self.assertEqual(expected, m0.DECISION_DOMAIN_COMMANDS)
+        original_commands = m0.DOMAIN_COMMANDS
+        self.addCleanup(setattr, m0, "DOMAIN_COMMANDS", original_commands)
+        for owner, required in expected.items():
+            with self.subTest(owner=owner, failure="omitted"):
+                m0.DOMAIN_COMMANDS = [command for command in original_commands if tuple(command) != required]
+                with mock.patch.object(m0, "aggregate_findings", return_value=[]), \
+                     mock.patch.object(m0.subprocess, "run", return_value=mock.Mock(returncode=0, stdout="", stderr="")):
+                    result = m0.probe()
+                self.assertEqual("fail", result["status"])
+                self.assertIn(f"{owner}: decision-domain validator must execute exactly once", result["findings"])
+            with self.subTest(owner=owner, failure="semantic"):
+                m0.DOMAIN_COMMANDS = original_commands
+
+                def run(command, **_kwargs):
+                    return mock.Mock(
+                        returncode=1 if tuple(command) == required else 0,
+                        stdout="semantic failure" if tuple(command) == required else "",
+                        stderr="",
+                    )
+
+                with mock.patch.object(m0, "aggregate_findings", return_value=[]), \
+                     mock.patch.object(m0.subprocess, "run", side_effect=run):
+                    result = m0.probe()
+                self.assertEqual("fail", result["status"])
+                self.assertTrue(any(item.startswith(f"command failed ({' '.join(required)})") for item in result["findings"]), result)
 
 
 if __name__ == "__main__":

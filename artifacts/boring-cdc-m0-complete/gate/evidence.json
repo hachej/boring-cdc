@@ -10,7 +10,7 @@
       "stderr_path": "artifacts/boring-cdc-m0-complete/gate/run-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-complete/gate/run-1.log",
-      "stdout_sha256": "8a58c14da34e880710bb7a6bc3ef6db22495b528a6a6fbb985ec6f5c62d214f9",
+      "stdout_sha256": "66262b31cea18e2162f61a094363bd5c572fab38f22d6cd086349ea4ceb8a100",
       "version": "m0-complete/v1"
     },
     {
@@ -19,13 +19,13 @@
       "stderr_path": "artifacts/boring-cdc-m0-complete/gate/run-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-complete/gate/run-2.log",
-      "stdout_sha256": "8a58c14da34e880710bb7a6bc3ef6db22495b528a6a6fbb985ec6f5c62d214f9",
+      "stdout_sha256": "66262b31cea18e2162f61a094363bd5c572fab38f22d6cd086349ea4ceb8a100",
       "version": "m0-complete/v1"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "milestone",
-  "git_commit": "f3812875c63ebae0313d061bd07a461342bca694",
+  "git_commit": "97ef7446469db172a2d1259920a8137735779acf",
   "owner_bead": "boring-cdc-m0-complete",
   "redaction": {
     "checked": true,
@@ -38,7 +38,7 @@
       "contracts/m0/decisions.json",
       "artifacts/boring-cdc-m0-complete/gate/completion-summary.json"
     ],
-    "digest": "8d7183c0f306455caad035c95c53acf358b427226bb7566217529b15faa1e621",
+    "digest": "bb0305fb9ea206f5644946be42a84d5452e013f5e0bc00e508ddcca17430ce6e",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"

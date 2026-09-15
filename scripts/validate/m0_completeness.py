@@ -110,6 +110,17 @@ REQUIRED_M0_OWNERS = {
     "boring-cdc-m0-storage-model", "boring-cdc-m0-validation-tooling",
     "boring-cdc-m0.1", "boring-cdc-m0.2", "boring-cdc-m0.3",
 }
+DECISION_DOMAIN_COMMANDS = {
+    "boring-cdc-d-archive-scope": ("scripts/validate/archive_scope.sh",),
+    "boring-cdc-d-compose": ("scripts/validate/compose_spec.sh",),
+    "boring-cdc-d-failure-policy": ("scripts/validate/failure_policy.sh",),
+    "boring-cdc-d-license": ("scripts/validate/license.sh",),
+    "boring-cdc-d-owner": ("scripts/fixtures/validate_m0_repository_identity.py",),
+    "boring-cdc-d-security": ("scripts/validate/security_exposure.sh",),
+    "boring-cdc-d-sqlite": ("scripts/validate/sqlite_durability.sh",),
+    "boring-cdc-d-values": ("scripts/validate/supported_values.sh",),
+    "boring-cdc-d-wal-cap": ("scripts/validate/wal_cap.sh",),
+}
 DOMAIN_COMMANDS = [
     ["scripts/validate/m0_artifact.sh", owner]
     for owner in (
@@ -117,7 +128,7 @@ DOMAIN_COMMANDS = [
         "boring-cdc-m0-event-format", "boring-cdc-m0-archive-model",
         "boring-cdc-m0-ch-model",
     )
-] + [
+] + [list(command) for command in DECISION_DOMAIN_COMMANDS.values()] + [
     ["scripts/validate/m0_artifact.sh", "contracts/m0/artifacts.json", "--complete",
      "--expected-artifacts", "contracts/m0/expected-artifacts.json"],
     ["scripts/validate/m0_decisions.sh", "contracts/m0/decisions.json"],
@@ -260,6 +271,12 @@ def aggregate_findings(root: Path = ROOT) -> list[str]:
 def probe() -> dict:
     findings = aggregate_findings()
     checks = []
+    command_counts = Counter(tuple(command) for command in DOMAIN_COMMANDS)
+    if set(DECISION_DOMAIN_COMMANDS) != DECISION_OWNERS:
+        findings.append("decision-domain validator owner set mismatch")
+    for owner, command in DECISION_DOMAIN_COMMANDS.items():
+        if command_counts[command] != 1:
+            findings.append(f"{owner}: decision-domain validator must execute exactly once")
     for command in DOMAIN_COMMANDS:
         run = subprocess.run(command, cwd=ROOT, text=True, capture_output=True)
         checks.append({"argv": " ".join(command), "exit_code": run.returncode})
