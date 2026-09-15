@@ -1,0 +1,353 @@
+{
+  "owner_bead": "boring-cdc-m2-complete",
+  "plan_coverage": "contracts/coverage/plan-to-beads.json",
+  "prior_terminal_proof": "boring-cdc-m1-raw-demo",
+  "required_leaves": [
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m2_heartbeat.sh",
+        "scripts/faults/m2_heartbeat.sh",
+        "scripts/validate/m2_heartbeat.py"
+      ],
+      "contract_ids": [
+        "m2-heartbeat-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m2-heartbeat/SCN-M2-HEARTBEAT-COMPONENT/heartbeat-component-v1/manifest.json",
+          "sha256": "c591897f04549f973ead2f6d7d445d5c5c314e836a4aeb3f6e193c65061faff9"
+        },
+        {
+          "manifest": "artifacts/boring-cdc-m2-heartbeat/SCN-M2-HEARTBEAT-FAULTS/heartbeat-component-v1/manifest.json",
+          "sha256": "0b315aba82f17a9e641f30ef82529df16120973177e6f44839eff16d4c14b457"
+        }
+      ],
+      "feature_ids": [],
+      "owner_bead": "boring-cdc-m2-heartbeat",
+      "structured_log_event_codes": [
+        "HEARTBEAT_WRITE_UNAVAILABLE",
+        "HEARTBEAT_STATUS_UNAVAILABLE"
+      ],
+      "unit_target": "m2_heartbeat::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m2_init_recovery.sh",
+        "scripts/faults/m2_init_recovery.sh"
+      ],
+      "contract_ids": [
+        "m2-init-recovery-cases/v1"
+      ],
+      "evidence": [],
+      "feature_ids": [],
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "structured_log_event_codes": [
+        "M2_INIT_RECONCILIATION_REQUIRED"
+      ],
+      "unit_target": "m2_init_recovery::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m2_journal.sh",
+        "scripts/faults/m2_journal.sh",
+        "scripts/validate/m2_journal.py"
+      ],
+      "contract_ids": [
+        "m2-journal-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-COMPONENT/journal-component-v1/manifest.json",
+          "sha256": "01e33283cc447bc802a30799d0ff93aff6bea2cb27ba01a86bebeca506ac488b"
+        },
+        {
+          "manifest": "artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-CRASH-BOUNDARY/journal-component-v1/manifest.json",
+          "sha256": "f71c5a31eadd63706e930f7b89d6ce122adeb9dfb2dcb6be1114a36ed0cbb981"
+        }
+      ],
+      "feature_ids": [
+        "CMD-JOURNAL-GC-DRY-RUN",
+        "CMD-JOURNAL-INSPECT-EVENT-ID-ID-EXPLAIN-JSON",
+        "CMD-JOURNAL-VERIFY",
+        "INV-DURABLE-BEFORE-FEEDBACK-POSTGRESQL-FLUSHLSN-AND-APPLYLSN",
+        "INV-IDLE-PROGRESS-IS-PUBLISHED-NOT-INFERRED-INFORMATIONAL",
+        "INV-JOURNAL-ORDER-IS-NOT-SOURCE-ORDER-JOURNALSEQ",
+        "INV-ONE-SQLITE-DATABASE-JOURNALEVENTS-IS-THE-LOGICAL",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-BE-APPEND-ONLY-FOR-CAPTURED-EVENTS",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-BOUND-SQLITE-READER-LIFETIMES-AND-RANGE-SIZES",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-COMMIT-EVENTS-AND-SOURCE-CHECKPOINT-CONSISTENTLY",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-DEFINE-WHAT-HAPPENS-WHEN-A-DESTINATION-FALLS",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-DETECT-JOURNAL-CORRUPTION-AND-UNAVAILABLE-REPLAY-POSITIONS",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-DISTINGUISH-PERSISTENT-DATABASE-SETTINGS-FROM-ACTUAL-WRITER",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-ENFORCE-AN-EXPLICIT-DISK-BUDGET-AND-REPLAY",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-ENTER-A-DOCUMENTED-SAFE-STOP-FAIL-LOUD",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-EXPOSE-LOCAL-BYTES-USED-OLDEST-NEWEST-REPLAY",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-STORE-INDEPENDENT-DESTINATION-CHECKPOINTS",
+        "REQ-DURABLE-JOURNAL-AND-RETENTION-SUPPORT-ORDERED-REPLAY-FROM-A-STABLE-JOURNAL",
+        "RISK-DELAYED-STALE-WORKER-PROMOTION-OR-LOCAL-STATE",
+        "RISK-IDLE-SOURCE-RECEIVES-UNRELATED-WAL",
+        "RISK-ROUTINE-CLI-OPENS-A-SECOND-SQLITE-WRITER",
+        "RISK-SLOT-CREATION-FLOOR-IS-MISTAKEN-FOR-A",
+        "RISK-SQLITE-CORRUPTION-LOCAL-RESTORE-DIVERGENCE",
+        "RISK-SQLITE-SETTINGS-STORAGE-DO-NOT-HONOR-SYNC",
+        "RISK-SQLITE-WRITER-BOTTLENECKS-BEFORE-DECODING",
+        "SCN-CRASH-AFTER-SQLITE-COMMIT-BEFORE-POSTGRESQL-FEEDBACK",
+        "SCN-CRASH-BEFORE-SQLITE-COMMIT",
+        "SCN-DETERMINISTIC-DESTINATION-POISON-RETRY-EXHAUSTION",
+        "SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL",
+        "SCN-JOURNAL-CORRUPTION-MISSING-SEQUENCE",
+        "SCN-JOURNAL-PRESSURE-TRANSITIONS",
+        "SCN-MULTI-TABLE-TRANSACTION",
+        "SCN-OFFLINE-MUTATION-AND-STATUS-LISTENER-ABUSE",
+        "SCN-PROCESS-JOURNAL-UPGRADE",
+        "SCN-READ-ONLY-CHECK",
+        "SCN-SLOT-AHEAD-OF-RESTORED-SQLITE",
+        "SCN-SPOOL-SQLITE-ENOSPC",
+        "SCN-SQLITE-VACUUM-CHECKPOINT-LIFECYCLE",
+        "SCN-STABLE-IDENTITY-HASH-GOLDEN-VECTORS",
+        "SCN-STALLED-SQLITE-READER-DURING-SUSTAINED-CAPTURE",
+        "SCN-TWO-RUNTIME-INSTANCES-SAME-SQLITE-PATH",
+        "SCN-TWO-RUNTIMES-DIFFERENT-SQLITE-PATHS-SAME-SOURCE",
+        "SCN-UNSUPPORTED-SQLITE-SETTINGS-FILESYSTEM",
+        "SCN-WRITER-VERSUS-OBSERVER-SQLITE-SETTINGS"
+      ],
+      "owner_bead": "boring-cdc-m2-journal",
+      "structured_log_event_codes": [
+        "JOURNAL_INTEGRITY_FAILED"
+      ],
+      "unit_target": "m2_journal::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m2_jsonl.sh",
+        "scripts/faults/m2_jsonl.sh",
+        "scripts/validate/m2_jsonl.py"
+      ],
+      "contract_ids": [
+        "m2-jsonl-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m2-jsonl/SCN-M2-JSONL-COMPONENT/jsonl-component-v1/manifest.json",
+          "sha256": "f35d6bd38f396cb6a643cd6b2ec0ae5b421bb58994231bef5eff79b60b265022"
+        },
+        {
+          "manifest": "artifacts/boring-cdc-m2-jsonl/SCN-M2-JSONL-FAULTS/jsonl-component-v1/manifest.json",
+          "sha256": "f5092fbd0f16f07b7db4b562ac6bbfd8d7cdc2883478110256d3d0732653fe2b"
+        }
+      ],
+      "feature_ids": [],
+      "owner_bead": "boring-cdc-m2-jsonl",
+      "structured_log_event_codes": [
+        "SEGMENT_READY"
+      ],
+      "unit_target": "m2_jsonl::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/validate/m2_leases.py"
+      ],
+      "contract_ids": [
+        "m2-leases-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m2-leases/SCN-M2-LEASE-MODEL/lease-model-v1/manifest.json",
+          "sha256": "134f1f7020bbbe977275037e2642fd0bf32c9b5df00b9cae5f48c52b9e8ae3d1"
+        }
+      ],
+      "feature_ids": [],
+      "owner_bead": "boring-cdc-m2-leases",
+      "structured_log_event_codes": [
+        "M2_EXPLICIT_REARM_REQUIRED"
+      ],
+      "unit_target": "m2_leases::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m2_ownership.sh",
+        "scripts/faults/m2_ownership.sh",
+        "scripts/validate/m2_ownership.py"
+      ],
+      "contract_ids": [
+        "m2-ownership-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m2-ownership/SCN-M2-OWN-COMPONENT/ownership-component-v1/manifest.json",
+          "sha256": "a78a6c96176450e9d6ad5c72e5707f94841e2d58f697221d2e59bb1b88034e1f"
+        },
+        {
+          "manifest": "artifacts/boring-cdc-m2-ownership/SCN-M2-OWN-CRASH-RECONCILE/ownership-component-v1/manifest.json",
+          "sha256": "0ab9015ab6dde0d12df0c3a4bc5ad18dc8b4b9e2c8038d2f5a0ebc1fdd1d7066"
+        }
+      ],
+      "feature_ids": [
+        "COND-OWNERSHIP-LOSS",
+        "TRANS-ABORTED-BY-RESTART"
+      ],
+      "owner_bead": "boring-cdc-m2-ownership",
+      "structured_log_event_codes": [
+        "M2_OWNERSHIP_LOST"
+      ],
+      "unit_target": "m2_ownership::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m2_pressure.sh",
+        "scripts/faults/m2_pressure.sh",
+        "scripts/validate/m2_pressure.py"
+      ],
+      "contract_ids": [
+        "m2-pressure-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m2-pressure/SCN-M2-PRESSURE-COMPONENT/pressure-component-v1/manifest.json",
+          "sha256": "74f4747568fbcfd109b54185ee901ac04f5b174109cfb788e94d6076c938479c"
+        },
+        {
+          "manifest": "artifacts/boring-cdc-m2-pressure/SCN-M2-PRESSURE-READER-CONTENTION/pressure-component-v1/manifest.json",
+          "sha256": "7b0ee265fcc22c8dd57a82bbcf9d3516802f82f2d4e66b502f05e34668226f20"
+        }
+      ],
+      "feature_ids": [
+        "COND-JOURNAL-PRESSURE"
+      ],
+      "owner_bead": "boring-cdc-m2-pressure",
+      "structured_log_event_codes": [
+        "M2_RECEIVE_ADMISSION_DENIED"
+      ],
+      "unit_target": "m2_pressure::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m2_reconcile.sh",
+        "scripts/faults/m2_reconcile.sh",
+        "scripts/validate/m2_reconcile.py"
+      ],
+      "contract_ids": [],
+      "evidence": [],
+      "feature_ids": [
+        "TRANS-JOURNAL-CORRUPT-REQUIRES-RESEED"
+      ],
+      "owner_bead": "boring-cdc-m2-reconcile",
+      "structured_log_event_codes": [
+        "PROMOTION_RECOVERY_REQUIRED"
+      ],
+      "unit_target": "m2_reconcile::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m2_schema.sh",
+        "scripts/faults/m2_schema.sh",
+        "scripts/validate/m2_schema.py"
+      ],
+      "contract_ids": [
+        "m2-schema-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/manifest.json",
+          "sha256": "519d14f4de8086b1150d1208676d766e6d39e43e569f547dfd5d6b6d3f140061"
+        }
+      ],
+      "feature_ids": [],
+      "owner_bead": "boring-cdc-m2-schema",
+      "structured_log_event_codes": [
+        "CREATION_FLOOR_NOT_DURABLE_PROGRESS"
+      ],
+      "unit_target": "m2_schema::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m2_spool.sh",
+        "scripts/faults/m2_spool.sh",
+        "scripts/validate/m2_spool.py"
+      ],
+      "contract_ids": [
+        "m2-spool-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-COMPONENT/spool-component-v1/manifest.json",
+          "sha256": "d6b8bc7d1666829b5cbc7ae10bd4bb09474f97559a2e95ba3e31602c35743d0f"
+        },
+        {
+          "manifest": "artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-FAULTS/spool-component-v1/manifest.json",
+          "sha256": "dd9245ab6ff867908269211079e611a2eb2fa622608b3dd9cca1c246c2c5d8a3"
+        }
+      ],
+      "feature_ids": [],
+      "owner_bead": "boring-cdc-m2-spool",
+      "structured_log_event_codes": [
+        "M2_STARTUP_SPOOL_RECONCILIATION_FAILED"
+      ],
+      "unit_target": "m2_spool::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/m2_capture_runtime.sh",
+        "scripts/faults/m2_capture_runtime.sh",
+        "scripts/validate/m2_capture_runtime.py"
+      ],
+      "contract_ids": [
+        "m2-capture-runtime-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-E2E/capture-runtime-component-v1/manifest.json",
+          "sha256": "ed6ff90ce31943952cd0f2fd9b935e03ce34cb2089bfb8bce787062691dcc467"
+        },
+        {
+          "manifest": "artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-E2E/capture-runtime-production-v1/manifest.json",
+          "sha256": "ac23fda1bea5e4c81cf8e107931c1b922b1fc48edc3e60ccb67a68301df5e3a3"
+        },
+        {
+          "manifest": "artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-FAULTS/capture-runtime-component-v1/manifest.json",
+          "sha256": "a98ff1fc1c238f52f13629afd1f0325c56704b2b43fb5ca20c20e645df87702c"
+        },
+        {
+          "manifest": "artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-FAULTS/capture-runtime-production-v1/manifest.json",
+          "sha256": "1457fc725b52d11d83fccf4b875d9bb61221573fb20100b41014e25d57a65e63"
+        }
+      ],
+      "feature_ids": [
+        "TRANS-CAPTURE-SAFE-STOPPED"
+      ],
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "structured_log_event_codes": [
+        "M2_CAPTURE_FAILED",
+        "M2_FEEDBACK_TRANSPORT_LOSS"
+      ],
+      "unit_target": "m2_capture_runtime::tests"
+    },
+    {
+      "component_and_fault_scripts": [
+        "scripts/e2e/failure_policy.sh",
+        "scripts/faults/failure_policy.sh",
+        "scripts/validate/failure_policy.sh"
+      ],
+      "contract_ids": [
+        "m2-failure-policy-cases/v1"
+      ],
+      "evidence": [
+        {
+          "manifest": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/manifest.json",
+          "sha256": "fdba5476792576a814aeb787577a537f767e08c4a4a93888a4f289b286b7974e"
+        }
+      ],
+      "feature_ids": [],
+      "owner_bead": "boring-cdc-m2.1",
+      "structured_log_event_codes": [
+        "M2_RETRY_NOT_DUE"
+      ],
+      "unit_target": "failure_policy::tests"
+    }
+  ],
+  "schema_version": "m2-coverage/v1",
+  "terminal_proof": {
+    "bead": "boring-cdc-m2-fault-status",
+    "role": "downstream-proof-excluded-from-barrier-inputs"
+  }
+}
