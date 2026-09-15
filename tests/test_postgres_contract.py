@@ -98,6 +98,17 @@ class PostgresContractTests(unittest.TestCase):
         self.assertTrue(all(row["minimum_lock"] == "ACCESS EXCLUSIVE" for row in rows))
         self.assertTrue(all(row["guard_conflicts"] for row in rows))
 
+    def test_forged_evidence_source_parent_is_rejected(self):
+        inputs = postgres_contract.validate()[1]
+        validator_sha = postgres_contract.hashlib.sha256(postgres_contract.VALIDATOR.read_bytes()).hexdigest()
+        prior = {
+            "inputs": inputs,
+            "validator_sha256": validator_sha,
+            "source_parent_git_commit": "0" * 40,
+        }
+        _, error = postgres_contract.resolve_source_parent(prior, inputs, validator_sha)
+        self.assertIn("must equal immediate parent", error)
+
     def test_safe_stop_close_does_not_mask_ownership_loss(self):
         policy = self.contract["safe_stop_close"]
         self.assertEqual("ownership loss and nonzero exit", policy["advisory_loss_always"])

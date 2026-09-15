@@ -326,7 +326,7 @@
       "id": "ART-M0-PG-EVIDENCE",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "artifacts/boring-cdc-m0-pg-contract/spec/evidence.json",
-      "sha256": "239b153ba7ce4e495c6bc01b1a355738a86e828065e40f0a523728a1029fe693",
+      "sha256": "3d2b4484cd2795d8f5dd5043ffba0ab1cfbefe6fae613d113d1582f834a917d0",
       "status": "complete"
     },
     {
@@ -361,7 +361,7 @@
       "id": "ART-M0-PG-VALIDATOR",
       "owner_bead": "boring-cdc-m0-pg-contract",
       "path": "scripts/validate/postgres_contract.py",
-      "sha256": "ca2a7e667ef05489925e3b675446fba7c7191ceb03ebba75771691dd6126bc97",
+      "sha256": "607a71a246f5e0c1afb1fd508a6f05b1e93461d97349fe3873bf9f9367290f2e",
       "status": "complete"
     },
     {

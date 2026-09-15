@@ -534,15 +534,36 @@ def validate():
     return findings, inputs
 
 
+def resolve_source_parent(prior, inputs, validator_sha256):
+    """Bind generated evidence to the exact immediate source commit or reject tampering."""
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    prior_matches_inputs = prior.get("inputs") == inputs and prior.get("validator_sha256") == validator_sha256
+    if not prior_matches_inputs:
+        return head, None
+    expected_parent = subprocess.check_output(["git", "rev-parse", "HEAD^"], cwd=ROOT, text=True).strip()
+    candidate = prior.get("source_parent_git_commit")
+    if candidate != expected_parent:
+        return candidate or "", f"stored source parent must equal immediate parent {expected_parent}"
+    try:
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{candidate}^{{commit}}"],
+            cwd=ROOT,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except subprocess.CalledProcessError:
+        return candidate, "stored source parent is not an existing commit"
+    return candidate, None
+
+
 def main():
     findings, inputs = validate()
     prior = load(EVIDENCE) if EVIDENCE.exists() else {}
     validator_sha256 = hashlib.sha256(VALIDATOR.read_bytes()).hexdigest()
-    prior_matches_inputs = prior.get("inputs") == inputs and prior.get("validator_sha256") == validator_sha256
-    source_parent = prior.get("source_parent_git_commit") if prior_matches_inputs else None
-    source_parent = source_parent or subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
-    ).strip()
+    source_parent, provenance_error = resolve_source_parent(prior, inputs, validator_sha256)
+    if provenance_error:
+        finding(findings, "E_EVIDENCE_PROVENANCE", "evidence/source_parent_git_commit", provenance_error)
     tree_material = b"".join((path + "\0" + digest + "\n").encode() for path, digest in sorted(inputs.items()))
     evidence = {
         "schema_version": "m0-postgres-contract-evidence/v1", "owner_bead": OWNER,
