@@ -49,16 +49,30 @@ PROVISIONAL_AUTHORITIES = {
 def provisional_marker_errors(source_paths:list[Path])->list[str]:
  token="M0-"+"PROVISIONAL"
  pattern=re.compile(re.escape(token)+r": ([A-Za-z0-9._-]+)")
+ template=token+": {decision}"
+ template_paths={
+  "scripts/validate/archive_contract.py","scripts/validate/storage_contract.py",
+  "tests/test_archive_contract.py","tests/test_storage_contract.py",
+ }
+ delimiters=set(" \t\r\n\"'`,.;)]}")
  errors=[]
  for path in source_paths:
   text=path.read_text(errors="replace")
-  if token not in text:continue
   relative=str(path.relative_to(ROOT))
-  decisions=pattern.findall(text)
   allowed=PROVISIONAL_AUTHORITIES.get(relative)
-  if allowed is None:errors.append(f"provisional-marker-unauthorized:{relative}");continue
-  for decision in decisions:
-   if decision not in allowed:errors.append(f"provisional-marker-unauthorized:{relative}:{decision}")
+  offset=0
+  while (position:=text.find(token,offset))!=-1:
+   offset=position+len(token)
+   match=pattern.match(text,position)
+   if match:
+    decision=match.group(1)
+    end=match.end()
+    if allowed is None or decision not in allowed:
+     errors.append(f"provisional-marker-unauthorized:{relative}:{decision}")
+    elif end<len(text) and text[end] not in delimiters:
+     errors.append(f"provisional-marker-malformed:{relative}")
+   elif relative not in template_paths or not text.startswith(template,position):
+    errors.append(f"provisional-marker-malformed:{relative}")
  return errors
 
 def validate()->list[str]:

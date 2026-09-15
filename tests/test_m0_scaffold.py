@@ -77,9 +77,27 @@ class ScaffoldTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         findings = json.loads(result.stdout)["findings"]
         self.assertIn(
-            "provisional-marker-unauthorized:config/.test-provisional-marker",
+            "provisional-marker-unauthorized:config/.test-provisional-marker:boring-cdc-d-values",
             findings,
         )
+
+    def test_scaffold_rejects_malformed_marker_in_authorized_path(self):
+        marker = ROOT / "config" / ".test-authorized-marker"
+        relative = str(marker.relative_to(ROOT))
+        m0_scaffold.PROVISIONAL_AUTHORITIES[relative] = {"boring-cdc-d-values"}
+        try:
+            for value in (
+                "// M0-" + "PROVISIONAL\n",
+                "// M0-" + "PROVISIONAL: boring-cdc-d-values/forged\n",
+            ):
+                marker.write_text(value)
+                self.assertEqual(
+                    [f"provisional-marker-malformed:{relative}"],
+                    m0_scaffold.provisional_marker_errors([marker]),
+                )
+        finally:
+            marker.unlink(missing_ok=True)
+            m0_scaffold.PROVISIONAL_AUTHORITIES.pop(relative, None)
 
     def test_package_excludes_internal_metadata_and_evidence(self):
         out = json.loads(run("scripts/validate/scaffold_package.sh").stdout)
