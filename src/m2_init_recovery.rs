@@ -114,15 +114,25 @@ pub fn issue_plan(
     Ok((plan_digest, token))
 }
 
-/// Atomically marks the exact issued plan executing. Executing remnants are ambiguous and block.
+/// Holds the plan-file lock across confirmation, source effects, and durable completion.
+pub struct PlanExecution {
+    file: std::fs::File,
+    pub plan_digest: String,
+}
+/// Atomically claims an issued plan, or resumes the exact same nonterminal plan after a crash.
 pub fn consume_plan(
     store: &Path,
     config_fingerprint: &str,
     token: &str,
     now_ms: u64,
-) -> Result<String, InitFailure> {
+) -> Result<PlanExecution, InitFailure> {
     let path = plan_path(store);
-    let meta = path
+    let mut file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .open(&path)
+        .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
+    let meta = file
         .metadata()
         .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
     if meta.permissions().mode() & 0o077 != 0 || !meta.is_file() {
@@ -131,37 +141,42 @@ pub fn consume_plan(
             "M2_INIT_CONFIRMATION_INVALID",
         ));
     }
-    let mut plan: PersistedPlan = serde_json::from_slice(
-        &std::fs::read(&path)
-            .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?,
-    )
-    .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
-    if plan.state != "issued"
+    file.try_lock()
+        .map_err(|_| InitFailure::at("ownership", "M2_INIT_OWNERSHIP_CONFLICT"))?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)
+        .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
+    let mut plan: PersistedPlan = serde_json::from_slice(&bytes)
+        .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
+    if !matches!(plan.state.as_str(), "issued" | "executing")
         || plan.token != token
         || plan.config_fingerprint != config_fingerprint
         || now_ms > plan.expires_unix_ms
     {
         return Err(InitFailure::at(
             "confirmation",
-            if plan.state == "executing" {
-                "M2_INIT_RECONCILIATION_REQUIRED"
-            } else {
-                "M2_INIT_CONFIRMATION_INVALID"
-            },
+            "M2_INIT_CONFIRMATION_INVALID",
         ));
     }
     plan.state = "executing".into();
-    let mut f = OpenOptions::new()
-        .write(true)
-        .truncate(true)
-        .open(&path)
+    file.set_len(0)
+        .and_then(|_| {
+            use std::io::Seek;
+            file.rewind()
+        })
+        .and_then(|_| file.write_all(&serde_json::to_vec(&plan).unwrap()))
+        .and_then(|_| file.sync_all())
         .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
-    f.write_all(&serde_json::to_vec(&plan).unwrap())
-        .and_then(|_| f.sync_all())
-        .map_err(|_| InitFailure::at("confirmation", "M2_INIT_CONFIRMATION_INVALID"))?;
-    Ok(plan.plan_digest)
+    Ok(PlanExecution {
+        file,
+        plan_digest: plan.plan_digest,
+    })
 }
-pub fn complete_plan(store: &Path) -> Result<(), InitFailure> {
+pub fn complete_plan(execution: PlanExecution, store: &Path) -> Result<(), InitFailure> {
+    execution
+        .file
+        .sync_all()
+        .map_err(|_| InitFailure::at("confirmation", "M2_INIT_PLAN_COMPLETION_FAILED"))?;
     std::fs::remove_file(plan_path(store))
         .map_err(|_| InitFailure::at("confirmation", "M2_INIT_PLAN_COMPLETION_FAILED"))
 }
@@ -601,24 +616,31 @@ pub mod tests {
         let store = root.join("state.sqlite");
         let (digest, token) = issue_plan(&store, "config", 100).unwrap();
         assert_eq!(token.len(), 32);
-        assert_eq!(consume_plan(&store, "config", &token, 200).unwrap(), digest);
-        assert_eq!(
-            consume_plan(&store, "config", &token, 201)
-                .unwrap_err()
-                .code,
-            "M2_INIT_RECONCILIATION_REQUIRED"
-        );
-        complete_plan(&store).unwrap();
+        let execution = consume_plan(&store, "config", &token, 200).unwrap();
+        assert_eq!(execution.plan_digest, digest);
+        assert!(matches!(
+            consume_plan(&store, "config", &token, 201),
+            Err(InitFailure {
+                code: "M2_INIT_OWNERSHIP_CONFLICT",
+                ..
+            })
+        ));
+        drop(execution); // models process death after the intent became nonterminal
+        let resumed = consume_plan(&store, "config", &token, 202).unwrap();
+        assert_eq!(resumed.plan_digest, digest);
+        complete_plan(resumed, &store).unwrap();
         let (_, next) = issue_plan(&store, "config", 300).unwrap();
         assert_ne!(token, next);
-        complete_plan(&store).unwrap();
+        let next_execution = consume_plan(&store, "config", &next, 301).unwrap();
+        complete_plan(next_execution, &store).unwrap();
         let (_, expired) = issue_plan(&store, "config", 0).unwrap();
-        assert_eq!(
-            consume_plan(&store, "config", &expired, 300_001)
-                .unwrap_err()
-                .code,
-            "M2_INIT_CONFIRMATION_INVALID"
-        );
+        assert!(matches!(
+            consume_plan(&store, "config", &expired, 300_001),
+            Err(InitFailure {
+                code: "M2_INIT_CONFIRMATION_INVALID",
+                ..
+            })
+        ));
         let _ = std::fs::remove_dir_all(root);
     }
     #[test]

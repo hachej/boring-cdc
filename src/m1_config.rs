@@ -298,8 +298,12 @@ impl SecretString {
 }
 impl Drop for SecretString {
     fn drop(&mut self) {
-        // String owns this allocation exclusively; erase its initialized bytes before release.
-        unsafe { self.0.as_mut_vec().fill(0) };
+        // String owns this allocation exclusively; volatile stores prevent dead-store removal.
+        unsafe {
+            for byte in self.0.as_mut_vec() {
+                std::ptr::write_volatile(byte, 0);
+            }
+        }
     }
 }
 

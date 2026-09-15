@@ -375,20 +375,16 @@ fn init_command(
         )
     })?;
     let confirmed = parsed.argv.iter().any(|v| v == "--confirm");
-    let purpose = if confirmed {
-        LoadPurpose::PostgresAdmin
-    } else {
-        LoadPurpose::Status
-    };
-    let config = load_str_for(&text, &ProcessEnvironment, purpose)
+    // Confirmation is authorized against public configuration before the admin secret is loaded.
+    let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Status)
         .map_err(|e| ReaderFailure::unavailable(e.code, "init configuration is invalid"))?;
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_err(|_| ReaderFailure::unavailable("M2_INIT_CLOCK_INVALID", "init clock is invalid"))?
         .as_millis() as u64;
-    let store = std::path::Path::new(&config.public().storage.sqlite_path);
+    let store = std::path::PathBuf::from(&config.public().storage.sqlite_path);
     if !confirmed {
-        let (plan_digest, token) = issue_plan(store, &config.fingerprints().runtime, now_ms)
+        let (plan_digest, token) = issue_plan(&store, &config.fingerprints().runtime, now_ms)
             .map_err(|e| ReaderFailure {
                 code: e.code,
                 message: "init dry-run could not be issued",
@@ -432,11 +428,17 @@ fn init_command(
         message: "init confirmation is invalid or stale",
         exit: ExitCode::SafetyBlocked,
     })?;
-    let plan_digest = consume_plan(store, &config.fingerprints().runtime, supplied, now_ms)
+    let execution = consume_plan(&store, &config.fingerprints().runtime, supplied, now_ms)
         .map_err(|e| ReaderFailure {
             code: e.code,
             message: "init confirmation is invalid, stale, or ambiguous",
             exit: ExitCode::SafetyBlocked,
+        })?;
+    let plan_digest = execution.plan_digest.clone();
+    drop(config);
+    let config =
+        load_str_for(&text, &ProcessEnvironment, LoadPurpose::PostgresAdmin).map_err(|e| {
+            ReaderFailure::unavailable(e.code, "init administration configuration is invalid")
         })?;
     let admin = config.administration_dsn().ok_or_else(|| {
         ReaderFailure::unavailable(
@@ -454,7 +456,7 @@ fn init_command(
             ExitCode::Integrity
         },
     })?;
-    complete_plan(store).map_err(|e| ReaderFailure {
+    complete_plan(execution, &store).map_err(|e| ReaderFailure {
         code: e.code,
         message: "init completion could not be made durable",
         exit: ExitCode::Integrity,
