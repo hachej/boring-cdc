@@ -15,7 +15,7 @@ FS = ROOT / "contracts/archive/archive-fixtures.schema.json"
 RS = ROOT / "contracts/archive/archive-result.schema.json"
 SMS = ROOT / "contracts/archive/segment-manifest.schema.json"
 GMS = ROOT / "contracts/archive/generation-manifest.schema.json"
-EXPECTED_CONTRACT_SHA256 = "df4d5b5cf01f3f7b68ac5682d8d864e6074ec346e75227470e2b164b1d376f8e"
+EXPECTED_CONTRACT_SHA256 = "0acaa38c019856d93de33037bc5344ee34ecf53a8c703fce2d6efa5dc2d5ad67"
 EXPECTED_FIXTURES_SHA256 = "8b1f4f0561d9d06037f9985327064ec63c1c90afa1ab08705d3d6224bc0b8e69"
 E = ROOT / "artifacts/boring-cdc-m0-archive-model/spec/evidence.json"
 M = ROOT / "contracts/m0/manifest.json"
@@ -76,8 +76,17 @@ def validate():
         for item in failures:
             finding(out, code, item["pointer"], item["message"])
     text = "\n".join(path.read_text(errors="replace") for path in (C, S, F, FS, RS, SMS, GMS))
-    if "// M0-" + "PROVISIONAL:" in text:
-        finding(out, "E_PROVISIONAL", "inputs", "owner-confirmed artifact retains a provisional marker")
+    marker = lambda decision: f"// M0-PROVISIONAL: {decision}"
+    expected_markers = {marker("boring-cdc-d-archive-durability"), marker("boring-cdc-d-compose")}
+    if set(contract.get("provisional_markers", [])) != expected_markers:
+        finding(out, "E_PROVISIONAL", "provisional_markers", "exact provisional dependency inventory changed")
+    if contract["consumes"]["durability"].get("provisional") != marker("boring-cdc-d-archive-durability") or contract["layout"].get("provisional") != marker("boring-cdc-d-archive-durability"):
+        finding(out, "E_PROVISIONAL", "consumes/durability", "archive durability recommendations must retain their exact decision marker")
+    if contract["writer_profile"].get("provisional") != marker("boring-cdc-d-compose"):
+        finding(out, "E_PROVISIONAL", "writer_profile", "linux/amd64 writer recommendation must retain the Compose decision marker")
+    authority = contract["authority"]
+    if authority.get("owner_cards") != ["59a63169"] or not authority.get("status", "").startswith("provisional engineering artifact"):
+        finding(out, "E_PROVISIONAL", "authority", "blocked recommendations must remain bound to owner card 59a63169 without decision closure")
     profile = contract["writer_profile"]
     expected_profile = ("2.6", "parquet 57.0.0", "arrow 57.0.0", "zstd 1.5.7", 3, True, True, 0, 65536, 1048576, False)
     observed_profile = (profile["parquet_format_version"], profile["parquet_writer_crate"], profile["arrow_crate"], profile["zstd_library"], profile["zstd_level"], profile["zstd_checksum"], profile["zstd_content_size"], profile["zstd_workers"], profile["row_group_max_rows"], profile["data_page_max_bytes"], profile["dictionary_enabled"])
@@ -117,7 +126,7 @@ def validate():
         finding(out, "E_SEGMENT_MANIFEST", "segment_manifest/required_fields", "recovery and reader binding fields missing")
     if "intent:{intent_id64}" not in hashes["ready_bytes"] or "manifest-sha256" not in hashes["ready_bytes"]:
         finding(out, "E_READY_BINDING", "hashes/ready_bytes", "SEGMENT_READY must bind intent and manifest")
-    for consumed in ("archive_scope", "failure_policy", "promotion", "durability"):
+    for consumed in ("event_contract", "archive_scope", "failure_policy", "promotion", "durability"):
         item = contract["consumes"][consumed]
         source_hash = item.get("sha256") or item.get("source_sha256")
         source_path = item.get("path") or item.get("confirmed_projection_source")
@@ -216,12 +225,31 @@ def validate():
     inputs = {str(path.relative_to(ROOT)): digest(path) for path in (C, S, F, FS, RS, SMS, GMS)}
     return out, inputs
 
+def resolve_source_parent(prior, inputs, validator_sha256):
+    """Bind generated evidence to the exact immediate source commit or reject tampering."""
+    head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    if prior.get("inputs") != inputs or prior.get("validator_sha256") != validator_sha256:
+        return head, None
+    expected_parent = subprocess.check_output(["git", "rev-parse", "HEAD^"], cwd=ROOT, text=True).strip()
+    candidate = prior.get("source_parent_git_commit")
+    if candidate != expected_parent:
+        return candidate or "", f"stored source parent must equal immediate parent {expected_parent}"
+    try:
+        subprocess.run(["git", "cat-file", "-e", f"{candidate}^{{commit}}"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        return candidate, "stored source parent is not an existing commit"
+    return candidate, None
+
+
 def main():
     findings, inputs = validate()
-    previous = load(E) if E.exists() else {}
-    parent = previous.get("source_parent_git_commit") or subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    prior = load(E) if E.exists() else {}
+    validator_sha256 = digest(V)
+    parent, provenance_error = resolve_source_parent(prior, inputs, validator_sha256)
+    if provenance_error:
+        finding(findings, "E_EVIDENCE_PROVENANCE", "evidence/source_parent_git_commit", provenance_error)
     material = "".join(key + "\0" + value + "\n" for key, value in sorted(inputs.items())).encode()
-    evidence = {"schema_version": "m0-archive-contract-evidence/v1", "owner_bead": OWNER, "status": "pass" if not findings else "fail", "validator": str(V.relative_to(ROOT)), "validator_sha256": digest(V), "source_parent_git_commit": parent, "input_tree_sha256": hashlib.sha256(material).hexdigest(), "inputs": inputs, "fixture_count": len(load(F)["cases"]), "runtime_observed": False, "product_faults": "fault_not_applicable", "findings": findings}
+    evidence = {"schema_version": "m0-archive-contract-evidence/v1", "owner_bead": OWNER, "status": "pass" if not findings else "fail", "validator": str(V.relative_to(ROOT)), "validator_sha256": validator_sha256, "source_parent_git_commit": parent, "input_tree_sha256": hashlib.sha256(material).hexdigest(), "inputs": inputs, "fixture_count": len(load(F)["cases"]), "runtime_observed": False, "product_faults": "fault_not_applicable", "findings": findings}
     E.parent.mkdir(parents=True, exist_ok=True)
     E.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
     print(json.dumps(evidence, sort_keys=True, separators=(",", ":")))

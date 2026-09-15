@@ -1,11 +1,11 @@
 {
   "findings": [],
   "fixture_count": 41,
-  "input_tree_sha256": "46258a049d5e887e97b2c25f07d8a2a70e67a5a116621c8779c5022902880c19",
+  "input_tree_sha256": "885bd3313f659c3fbe8ff689c66b915ab57c1fad44e4e8e120d2f062b72f196e",
   "inputs": {
     "contracts/archive/archive-fixtures.schema.json": "d30612ef3a4fddcc2e99aff383814610802c3966af49b1dbc413cc011f5e99a6",
-    "contracts/archive/archive-model.json": "df4d5b5cf01f3f7b68ac5682d8d864e6074ec346e75227470e2b164b1d376f8e",
-    "contracts/archive/archive-model.schema.json": "03ead5ecc65d0c630379b523e047ea8fc1ed3f42d8cfbf339cb1551e97e3b030",
+    "contracts/archive/archive-model.json": "0acaa38c019856d93de33037bc5344ee34ecf53a8c703fce2d6efa5dc2d5ad67",
+    "contracts/archive/archive-model.schema.json": "4d9f9ac3f9beacb23fd4515c6bbb51eeaeceeca390b7a662b3ccac0e55378506",
     "contracts/archive/archive-result.schema.json": "9760edf105c164adf49fee4b126c2d0a741630cf4a05ff7c966bfd678e881d71",
     "contracts/archive/generation-manifest.schema.json": "d17bfac2e0d3feb40958ed63e0f3d3b03eb04039995694c541d98cf821741a8c",
     "contracts/archive/segment-manifest.schema.json": "047aceed0b73ef36a1cfeb5f6746316caba917c7f16db020ded32e02af442dd0",
@@ -15,8 +15,8 @@
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-archive-contract-evidence/v1",
-  "source_parent_git_commit": "a16951d2772b5f183db762ae0d65349d0bf589c3",
+  "source_parent_git_commit": "3683cd36cd330e912dbccd9f269d677ce8fb5b9b",
   "status": "pass",
   "validator": "scripts/validate/archive_contract.py",
-  "validator_sha256": "daac4bd0eb3a23508623e273ee0ffc90db2bdfb81d6203bac6496fd10c2ee5e4"
+  "validator_sha256": "a60c66743f971672fa8556228d849be2e32d5752eaeffc7e04a2a0e9524d6bcb"
 }
