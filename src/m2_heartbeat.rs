@@ -199,11 +199,46 @@ pub fn publish_once(dsn: &str, nonce: u64) -> Result<(u64, u64), HeartbeatError>
     Ok((affected, selected_keys))
 }
 
+/// Redacted identity fields required on every production heartbeat health event.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HeartbeatLogContext {
+    pub scenario_id: String,
+    pub correlation_id: String,
+    pub run_id: String,
+    pub capture_epoch: String,
+    pub config_fingerprint: String,
+}
+
+impl HeartbeatLogContext {
+    fn valid(&self) -> bool {
+        [
+            self.scenario_id.as_str(),
+            self.correlation_id.as_str(),
+            self.run_id.as_str(),
+            self.capture_epoch.as_str(),
+            self.config_fingerprint.as_str(),
+        ]
+        .into_iter()
+        .all(|value| !value.is_empty())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct HeartbeatLaneDiagnostics {
+    pub attempts_started: u64,
+    pub attempts_finished: u64,
+    pub operation_timed_out: bool,
+    pub lane_fenced: bool,
+}
+
+type Publisher = dyn Fn(&str, u64) -> Result<(u64, u64), HeartbeatError> + Send + Sync + 'static;
+
 /// Long-lived production scheduler. Source outages degrade this lane and retry with bounded
 /// backoff; they never synthesize feedback or terminate the capture stream.
 pub struct PublishedHeartbeatLane {
     stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
     status: std::sync::Arc<std::sync::Mutex<HeartbeatStatus>>,
+    diagnostics: std::sync::Arc<std::sync::Mutex<HeartbeatLaneDiagnostics>>,
     worker: Option<std::thread::JoinHandle<()>>,
 }
 impl PublishedHeartbeatLane {
@@ -212,19 +247,51 @@ impl PublishedHeartbeatLane {
         policy: HeartbeatPolicy,
         now_ms: u64,
         maximum_operation: std::time::Duration,
+        log_context: HeartbeatLogContext,
     ) -> Result<Self, HeartbeatError> {
-        if maximum_operation.is_zero() {
-            return Err(HeartbeatError::Invalid("zero heartbeat operation deadline"));
+        Self::start_with_publisher(
+            dsn,
+            policy,
+            now_ms,
+            maximum_operation,
+            log_context,
+            std::sync::Arc::new(publish_once),
+        )
+    }
+
+    /// Injectable publisher used by deterministic component fault evidence. Production calls
+    /// [`Self::start`] and always supplies the real PostgreSQL publisher.
+    #[doc(hidden)]
+    pub fn start_with_publisher(
+        dsn: String,
+        policy: HeartbeatPolicy,
+        now_ms: u64,
+        maximum_operation: std::time::Duration,
+        log_context: HeartbeatLogContext,
+        publisher: std::sync::Arc<Publisher>,
+    ) -> Result<Self, HeartbeatError> {
+        if maximum_operation.is_zero() || !log_context.valid() {
+            return Err(HeartbeatError::Invalid(
+                "invalid heartbeat operation deadline or log context",
+            ));
         }
         let writer = HeartbeatWriter::new(policy, now_ms, now_ms.saturating_sub(1))?;
         let status = std::sync::Arc::new(std::sync::Mutex::new(writer.status()));
         let lane_status = status.clone();
+        let diagnostics = std::sync::Arc::new(std::sync::Mutex::new(HeartbeatLaneDiagnostics {
+            attempts_started: 0,
+            attempts_finished: 0,
+            operation_timed_out: false,
+            lane_fenced: false,
+        }));
+        let lane_diagnostics = diagnostics.clone();
         let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
         let lane_stop = stop.clone();
         let worker = std::thread::Builder::new()
             .name("published-heartbeat".into())
             .spawn(move || {
                 let mut writer = writer;
+                let mut case_event_seq = 0_u64;
                 while !lane_stop.load(std::sync::atomic::Ordering::Acquire) {
                     let now = std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
@@ -232,17 +299,32 @@ impl PublishedHeartbeatLane {
                     if let Some(command) = writer.due(now) {
                         let (send, receive) = std::sync::mpsc::sync_channel(1);
                         let attempt_dsn = dsn.clone();
+                        let attempt_publisher = publisher.clone();
+                        if let Ok(mut current) = lane_diagnostics.lock() {
+                            current.attempts_started = current.attempts_started.saturating_add(1);
+                        }
+                        let completion_diagnostics = lane_diagnostics.clone();
                         let spawned = std::thread::Builder::new()
                             .name("published-heartbeat-attempt".into())
                             .spawn(move || {
-                                let _ = send.send(publish_once(&attempt_dsn, command.nonce));
+                                let result = attempt_publisher(&attempt_dsn, command.nonce);
+                                if let Ok(mut current) = completion_diagnostics.lock() {
+                                    current.attempts_finished =
+                                        current.attempts_finished.saturating_add(1);
+                                }
+                                let _ = send.send(result);
                             });
                         let (result, operation_timed_out) = if spawned.is_err() {
                             (Err(HeartbeatError::SourceUnavailable), false)
                         } else {
                             match receive.recv_timeout(maximum_operation) {
                                 Ok(result) => (result, false),
-                                Err(_) => (Err(HeartbeatError::SourceUnavailable), true),
+                                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                                    (Err(HeartbeatError::SourceUnavailable), true)
+                                }
+                                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                                    (Err(HeartbeatError::SourceUnavailable), false)
+                                }
                             }
                         };
                         let next = match result {
@@ -251,14 +333,50 @@ impl PublishedHeartbeatLane {
                                 .unwrap_or_else(|_| writer.record_outage(now, 0)),
                             Err(_) => writer.record_outage(now, 0),
                         };
+                        if operation_timed_out
+                            && let Ok(mut current) = lane_diagnostics.lock()
+                        {
+                            current.operation_timed_out = true;
+                            current.lane_fenced = true;
+                        }
                         if let Ok(mut current) = lane_status.lock() {
                             *current = next;
                         }
                         if next.condition == HeartbeatCondition::Degraded {
-                            eprintln!(
-                                "{{\"schema_version\":\"heartbeat-health/v1\",\"component\":\"heartbeat\",\"outcome\":\"degraded\",\"attempt\":{},\"failure_fingerprint\":\"HEARTBEAT_WRITE_UNAVAILABLE\",\"wal_headroom_bytes\":{},\"feedback_advanced\":false}}",
-                                next.attempt, next.wal_headroom_bytes
-                            );
+                            case_event_seq = case_event_seq.saturating_add(1);
+                            let event = serde_json::json!({
+                                "schema_version": "heartbeat-health/v1",
+                                "case_event_seq": case_event_seq,
+                                "bead_id": OWNER_BEAD,
+                                "scenario_id": log_context.scenario_id,
+                                "correlation_id": log_context.correlation_id,
+                                "run_id": log_context.run_id,
+                                "capture_epoch": log_context.capture_epoch,
+                                "component": "heartbeat",
+                                "phase": "publish",
+                                "outcome": "degraded",
+                                "config_fingerprint": log_context.config_fingerprint,
+                                "generation": serde_json::Value::Null,
+                                "intent_id": serde_json::Value::Null,
+                                "request_id": serde_json::Value::Null,
+                                "xid": serde_json::Value::Null,
+                                "commit_lsn": serde_json::Value::Null,
+                                "end_lsn": serde_json::Value::Null,
+                                "journal_range": serde_json::Value::Null,
+                                "anchor": serde_json::Value::Null,
+                                "fence": operation_timed_out.then_some("operation_timeout"),
+                                "attempt": next.attempt,
+                                "fault_hook": operation_timed_out.then_some("maximum_operation_timeout"),
+                                "failure_class": "transient_source",
+                                "failure_fingerprint": "HEARTBEAT_WRITE_UNAVAILABLE",
+                                "metric_units": "bytes",
+                                "evidence_digest": serde_json::Value::Null,
+                                "wal_headroom_bytes": next.wal_headroom_bytes,
+                                "feedback_advanced": false,
+                                "operation_timed_out": operation_timed_out,
+                                "lane_fenced": operation_timed_out,
+                            });
+                            eprintln!("{event}");
                         }
                         // A timed-out synchronous driver may still own one detached attempt.
                         // Fence this lane instead of leaking one thread per retry; supervision
@@ -274,9 +392,11 @@ impl PublishedHeartbeatLane {
         Ok(Self {
             stop,
             status,
+            diagnostics,
             worker: Some(worker),
         })
     }
+
     pub fn status(&self) -> HeartbeatStatus {
         self.status.lock().map_or(
             HeartbeatStatus {
@@ -288,6 +408,18 @@ impl PublishedHeartbeatLane {
                 feedback_advanced: false,
             },
             |status| *status,
+        )
+    }
+
+    pub fn diagnostics(&self) -> HeartbeatLaneDiagnostics {
+        self.diagnostics.lock().map_or(
+            HeartbeatLaneDiagnostics {
+                attempts_started: u64::MAX,
+                attempts_finished: u64::MAX,
+                operation_timed_out: true,
+                lane_fenced: true,
+            },
+            |diagnostics| *diagnostics,
         )
     }
 }
@@ -674,6 +806,55 @@ pub mod tests {
         let mut command = writer.due(10).unwrap();
         command.nonce = 2;
         assert!(writer.record_success(10, command, 1, 1).is_err());
+    }
+
+    fn test_log_context() -> HeartbeatLogContext {
+        HeartbeatLogContext {
+            scenario_id: "SCN-M2-HEARTBEAT-MAXIMUM-OPERATION".into(),
+            correlation_id: "heartbeat-timeout:test".into(),
+            run_id: "heartbeat-timeout-test-run".into(),
+            capture_epoch: "heartbeat-test-epoch".into(),
+            config_fingerprint: "heartbeat-test-config".into(),
+        }
+    }
+
+    #[test]
+    fn maximum_operation_timeout_fences_one_attempt_and_drop_is_bounded() {
+        let lane = PublishedHeartbeatLane::start_with_publisher(
+            "redacted-test-dsn".into(),
+            HeartbeatPolicy {
+                cadence_ms: 10,
+                initial_retry_ms: 2,
+                max_retry_ms: 5,
+            },
+            0,
+            Duration::from_millis(10),
+            test_log_context(),
+            std::sync::Arc::new(|_, _| {
+                std::thread::sleep(Duration::from_millis(200));
+                Err(HeartbeatError::SourceUnavailable)
+            }),
+        )
+        .unwrap();
+        let deadline = std::time::Instant::now() + Duration::from_secs(1);
+        while !lane.diagnostics().lane_fenced {
+            assert!(std::time::Instant::now() < deadline, "lane fence deadline");
+            std::thread::sleep(Duration::from_millis(2));
+        }
+        let diagnostics = lane.diagnostics();
+        assert_eq!(diagnostics.attempts_started, 1);
+        assert_eq!(diagnostics.attempts_finished, 0);
+        assert!(diagnostics.operation_timed_out);
+        assert_eq!(lane.status().condition, HeartbeatCondition::Degraded);
+        std::thread::sleep(Duration::from_millis(25));
+        assert_eq!(
+            lane.diagnostics().attempts_started,
+            1,
+            "fenced lane retried"
+        );
+        let before_drop = std::time::Instant::now();
+        drop(lane);
+        assert!(before_drop.elapsed() < Duration::from_millis(50));
     }
 
     #[derive(Default)]

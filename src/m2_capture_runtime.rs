@@ -106,6 +106,13 @@ pub trait DurableJournal {
     fn active_capture_failure_id(&self) -> Result<Option<String>, JournalError> {
         Ok(None)
     }
+    fn pressure_tick(
+        &mut self,
+        _thresholds: crate::m2_pressure::PressureThresholds,
+        _observation: crate::m2_pressure::PressureObservation<'_>,
+    ) -> Result<Option<crate::m2_pressure::PressureServiceResult>, JournalError> {
+        Ok(None)
+    }
 }
 impl DurableJournal for JournalStore {
     fn commit(&mut self, commit: &SourceCommit) -> Result<DurableCommit, JournalError> {
@@ -141,6 +148,15 @@ impl DurableJournal for JournalWriterService {
     }
     fn active_capture_failure_id(&self) -> Result<Option<String>, JournalError> {
         JournalWriterService::active_capture_failure_id(self)
+    }
+    fn pressure_tick(
+        &mut self,
+        thresholds: crate::m2_pressure::PressureThresholds,
+        observation: crate::m2_pressure::PressureObservation<'_>,
+    ) -> Result<Option<crate::m2_pressure::PressureServiceResult>, JournalError> {
+        self.pressure_tick_reserved(thresholds, observation)
+            .map(Some)
+            .map_err(|_| JournalError::BusyBoundExceeded)
     }
 }
 
@@ -377,6 +393,14 @@ struct ActiveTransaction {
     spool: Box<dyn RuntimeSpool>,
 }
 
+#[derive(Clone, Debug)]
+struct RuntimePressureConfig {
+    journal_path: std::path::PathBuf,
+    thresholds: crate::m2_pressure::PressureThresholds,
+    capture_epoch: String,
+    replay_window_ms: u64,
+}
+
 pub struct CaptureRuntime<J, S, G> {
     decoder: Decoder,
     contracts: BTreeMap<u32, RelationContract>,
@@ -390,6 +414,7 @@ pub struct CaptureRuntime<J, S, G> {
     committed_transactions: u64,
     failure_policy_identity: Option<(String, String)>,
     active_failure: Option<crate::failure_policy::FailureRecord>,
+    pressure: Option<RuntimePressureConfig>,
 }
 
 impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G> {
@@ -413,6 +438,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             committed_transactions: 0,
             failure_policy_identity: None,
             active_failure: None,
+            pressure: None,
         }
     }
     pub fn state(&self) -> RuntimeState {
@@ -426,6 +452,53 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
     }
     pub fn take_feedback(&mut self) -> Vec<FeedbackPacket> {
         std::mem::take(&mut self.feedback)
+    }
+
+    pub fn enable_pressure_service(
+        &mut self,
+        journal_path: std::path::PathBuf,
+        thresholds: crate::m2_pressure::PressureThresholds,
+        capture_epoch: String,
+        replay_window_ms: u64,
+    ) {
+        self.pressure = Some(RuntimePressureConfig {
+            journal_path,
+            thresholds,
+            capture_epoch,
+            replay_window_ms,
+        });
+    }
+    fn service_pressure(&mut self) -> Result<(), RuntimeError> {
+        let Some(config) = self.pressure.clone() else {
+            return Ok(());
+        };
+        let free = filesystem_free_bytes(&config.journal_path).map_err(|_| {
+            RuntimeError::JournalTransient("pressure filesystem observation failed".into())
+        })?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|_| RuntimeError::JournalTransient("pressure clock invalid".into()))?
+            .as_millis() as i64;
+        let cutoff = now.saturating_sub(config.replay_window_ms.min(i64::MAX as u64) as i64);
+        let result = self
+            .journal
+            .pressure_tick(
+                config.thresholds,
+                crate::m2_pressure::PressureObservation {
+                    free_bytes: free,
+                    capture_epoch: &config.capture_epoch,
+                    replay_from_seq: 1,
+                    replay_cutoff_unix_ms: Some(cutoff),
+                    now_unix_ms: now,
+                },
+            )
+            .map_err(|e| RuntimeError::JournalTransient(e.to_string()))?;
+        let result = result
+            .ok_or_else(|| RuntimeError::JournalTransient("pressure service unavailable".into()))?;
+        if result.decision.actions.safe_stop_capture {
+            self.state = RuntimeState::CaptureSafeStopped;
+        }
+        Ok(())
     }
 
     pub fn receive(&mut self, frame: &[u8]) -> Result<(), RuntimeError> {
@@ -792,6 +865,18 @@ fn classify_runtime_failure(
     }
 }
 
+fn filesystem_free_bytes(path: &std::path::Path) -> std::io::Result<u64> {
+    use std::os::unix::ffi::OsStrExt;
+    let c = std::ffi::CString::new(path.as_os_str().as_bytes())
+        .map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
+    let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    if unsafe { libc::statvfs(c.as_ptr(), stat.as_mut_ptr()) } != 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    let stat = unsafe { stat.assume_init() };
+    Ok(stat.f_bavail.saturating_mul(stat.f_frsize))
+}
+
 struct TransportReceiveLane {
     admitted_bytes: usize,
     _reservation: Vec<u8>,
@@ -832,6 +917,9 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     let (mut connection, contracts) = setup_runtime(config)?;
     runtime.contracts = contracts;
     loop {
+        runtime
+            .service_pressure()
+            .map_err(|_| CaptureFailure::at("pressure", "M2_PRESSURE_SERVICE_FAILED"))?;
         if !ownership_probe() {
             runtime.ownership_lost();
             runtime
@@ -1273,6 +1361,13 @@ pub async fn run_loaded_config(
         },
         now as u64,
         Duration::from_millis(public.source.maximum_operation_ms.0),
+        crate::m2_heartbeat::HeartbeatLogContext {
+            scenario_id: "SCN-HEARTBEAT-PERMISSION-OUTAGE".into(),
+            correlation_id: format!("heartbeat:{startup_run_id}"),
+            run_id: startup_run_id.clone(),
+            capture_epoch: config.fingerprints().runtime.clone(),
+            config_fingerprint: config.fingerprints().runtime.clone(),
+        },
     )
     .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?;
     let writer = open_writer(&journal_path, "production-run", 1, now)
@@ -1425,6 +1520,18 @@ pub async fn run_loaded_config(
     runtime.enable_failure_policy(
         config.fingerprints().runtime.clone(),
         config.fingerprints().runtime.clone(),
+    );
+    runtime.enable_pressure_service(
+        journal_path.clone(),
+        crate::m2_pressure::PressureThresholds {
+            warning: 17_179_869_184,
+            action: 15_032_385_536,
+            critical: 12_884_901_888,
+            hard: 10_737_418_240,
+            reserve: 10_737_418_240,
+        },
+        config.fingerprints().runtime.clone(),
+        public.retention.replay_window_ms.0,
     );
     let control_lane = ProductionControlLane::start(
         dsn.clone(),
