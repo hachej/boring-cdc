@@ -23,7 +23,10 @@ pub struct LiveSourceObservation {
     pub publication_fingerprint: String,
     pub protocol_fingerprint: String,
     pub slot_exists: bool,
+    /// Slot identity/invalidation is valid independently of retained WAL availability.
     pub slot_valid: bool,
+    pub invalidation_reason: Option<String>,
+    pub wal_status: Option<String>,
     pub resume_wal_available: bool,
     pub confirmed_flush_lsn: Option<String>,
     pub restart_lsn: Option<String>,
@@ -84,7 +87,6 @@ struct LocalState {
     durable_lsn: Option<String>,
     creation_floor: Option<String>,
     bootstrap_intent_id: Option<String>,
-    bootstrap_state: Option<String>,
 }
 
 fn valid_lsn(value: &str) -> bool {
@@ -213,8 +215,8 @@ pub fn reconcile_startup(
 
     let reader = open_reader_with_limits(path, READER_MAX_AGE, READER_MAX_ROWS)?;
     let local = reader.query_one_bounded(
-        "SELECT s.capture_epoch,s.control_revision,s.source_system_id,s.timeline_id,s.database_id,s.slot_name,s.plugin,s.publication_fingerprint,s.protocol_fingerprint,s.durable_transaction_end_lsn,s.slot_creation_floor_lsn,coalesce(s.slot_creation_intent_id,(SELECT intent_id FROM bootstrap_intents bi WHERE bi.capture_epoch=s.capture_epoch AND bi.source_system_id=s.source_system_id AND bi.database_id=s.database_id AND bi.slot_name=s.slot_name AND bi.state NOT IN ('complete','invalidated','aborted') ORDER BY bi.created_at,bi.intent_id LIMIT 1)),coalesce(b.state,(SELECT state FROM bootstrap_intents bi WHERE bi.capture_epoch=s.capture_epoch AND bi.source_system_id=s.source_system_id AND bi.database_id=s.database_id AND bi.slot_name=s.slot_name AND bi.state NOT IN ('complete','invalidated','aborted') ORDER BY bi.created_at,bi.intent_id LIMIT 1)) FROM source_state s LEFT JOIN bootstrap_intents b ON b.intent_id=s.slot_creation_intent_id WHERE s.singleton=1",
-        |r| Ok(LocalState { capture_epoch:r.get(0)?,control_revision:r.get(1)?,source_system_id:r.get(2)?,timeline_id:r.get(3)?,database_id:r.get(4)?,slot_name:r.get(5)?,plugin:r.get(6)?,publication_fingerprint:r.get(7)?,protocol_fingerprint:r.get(8)?,durable_lsn:r.get(9)?,creation_floor:r.get(10)?,bootstrap_intent_id:r.get(11)?,bootstrap_state:r.get(12)? })
+        "SELECT s.capture_epoch,s.control_revision,s.source_system_id,s.timeline_id,s.database_id,s.slot_name,s.plugin,s.publication_fingerprint,s.protocol_fingerprint,s.durable_transaction_end_lsn,s.slot_creation_floor_lsn,coalesce(s.slot_creation_intent_id,(SELECT intent_id FROM bootstrap_intents bi WHERE bi.capture_epoch=s.capture_epoch AND bi.source_system_id=s.source_system_id AND bi.database_id=s.database_id AND bi.slot_name=s.slot_name AND bi.state NOT IN ('complete','invalidated','aborted') ORDER BY bi.created_at,bi.intent_id LIMIT 1)) FROM source_state s WHERE s.singleton=1",
+        |r| Ok(LocalState { capture_epoch:r.get(0)?,control_revision:r.get(1)?,source_system_id:r.get(2)?,timeline_id:r.get(3)?,database_id:r.get(4)?,slot_name:r.get(5)?,plugin:r.get(6)?,publication_fingerprint:r.get(7)?,protocol_fingerprint:r.get(8)?,durable_lsn:r.get(9)?,creation_floor:r.get(10)?,bootstrap_intent_id:r.get(11)? })
     )?.ok_or(ReconcileError::MissingSourceState)?;
     let local_fences = reader.query_bounded(
         "SELECT d.destination_id,d.highest_external_fence,(SELECT expected_selector_digest FROM destination_promotion_intents p WHERE p.destination_id=d.destination_id AND p.promotion_fence=d.highest_external_fence) FROM destinations d ORDER BY d.destination_id",
@@ -226,7 +228,7 @@ pub fn reconcile_startup(
         || local.timeline_id != live.timeline_id
         || local.database_id != live.database_id
         || local.slot_name != live.slot_name
-        || local.plugin != live.plugin
+        || (live.slot_exists && local.plugin != live.plugin)
         || local.publication_fingerprint != live.publication_fingerprint
         || local.protocol_fingerprint != live.protocol_fingerprint;
     let archive_state = if identity_mismatch {
@@ -262,9 +264,11 @@ pub fn reconcile_startup(
                 .as_deref()
                 .is_none_or(|local| confirmed > local)
         });
-    let ambiguous = local.bootstrap_state.as_deref() == Some("prepared")
-        && local.creation_floor.is_none()
-        && live.slot_exists;
+    // A slot observed before any durable transaction is not ours merely because its name and
+    // plugin match.  Only a durable creation floor tied to a bootstrap intent establishes the
+    // provenance needed to resume it.
+    let ambiguous =
+        local.creation_floor.is_none() && local.durable_lsn.is_none() && live.slot_exists;
     let floor_only = local.bootstrap_intent_id.is_some()
         && local.creation_floor.is_some()
         && local.durable_lsn.is_none()
@@ -305,12 +309,29 @@ pub fn reconcile_startup(
             None,
             None,
         )
-    } else if !live.slot_exists || !live.slot_valid {
-        (StartupOutcome::RequiresReseed, "SLOT_INVALID", None, None)
+    } else if !live.slot_exists {
+        (StartupOutcome::RequiresReseed, "SLOT_MISSING", None, None)
+    } else if !live.slot_valid {
+        let reason = match live.invalidation_reason.as_deref() {
+            Some("wal_removed") => "SLOT_INVALID_WAL_REMOVED",
+            Some("rows_removed") => "SLOT_INVALID_ROWS_REMOVED",
+            Some("wal_level_insufficient") => "SLOT_INVALID_WAL_LEVEL_INSUFFICIENT",
+            Some("idle_timeout") => "SLOT_INVALID_IDLE_TIMEOUT",
+            Some(_) => "SLOT_INVALID_OTHER",
+            None => "SLOT_INVALID",
+        };
+        (StartupOutcome::RequiresReseed, reason, None, None)
+    } else if live.restart_lsn.is_none() {
+        (
+            StartupOutcome::RequiresReseed,
+            "RESUME_RESTART_LSN_UNAVAILABLE",
+            None,
+            None,
+        )
     } else if !live.resume_wal_available {
         (
             StartupOutcome::RequiresReseed,
-            "RESUME_WAL_UNAVAILABLE",
+            "RESUME_WAL_STATUS_UNAVAILABLE",
             None,
             None,
         )
@@ -466,8 +487,13 @@ pub fn recover_report(path: &Path) -> Result<RecoveryReport, ReconcileError> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use crate::m2_journal::{
+        CommitFault, CommitLimits, JournalEvent, JournalStore, RelationSchema, SourceCommit,
+        SourceIdentity, sha256, transaction_checksum,
+    };
     use crate::m2_schema::open_writer;
     use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::Duration;
     static NEXT: AtomicU64 = AtomicU64::new(1);
     fn db(name: &str) -> std::path::PathBuf {
         let p = std::env::temp_dir().join(format!(
@@ -480,6 +506,51 @@ pub mod tests {
         drop(w);
         p
     }
+    fn seed_durable(path: &Path) {
+        let writer = open_writer(path, "fixture", 2, 0).unwrap();
+        let identity = SourceIdentity {
+            capture_epoch: "epoch".into(),
+            source_system_id: "sys".into(),
+            timeline_id: "tl".into(),
+            database_id: "db".into(),
+            slot_name: "slot".into(),
+            publication_fingerprint: "pub".into(),
+            protocol_fingerprint: "proto".into(),
+        };
+        let event = JournalEvent {
+            event_id: "event".into(),
+            transaction_ordinal: 0,
+            relation_schema_fingerprint: Some("schema".into()),
+            control_kind: None,
+            payload: b"payload".to_vec(),
+            payload_hash: sha256(b"payload"),
+        };
+        let commit = SourceCommit {
+            transaction_id: "tx".into(),
+            xid: "1".into(),
+            end_lsn: "0000000000000008".into(),
+            payload_checksum: transaction_checksum(std::slice::from_ref(&event)),
+            schemas: vec![RelationSchema {
+                fingerprint: "schema".into(),
+                relation_id: "public.t".into(),
+                canonical_schema: b"schema".to_vec(),
+                checksum: "schema-checksum".into(),
+            }],
+            events: vec![event],
+        };
+        let mut store = JournalStore::new(
+            writer,
+            identity,
+            CommitLimits {
+                max_events: 2,
+                max_copied_bytes: 1024,
+                max_writer_hold: Duration::from_secs(1),
+            },
+        )
+        .unwrap();
+        store.commit_atomic(&commit, CommitFault::None).unwrap();
+    }
+
     fn live() -> LiveSourceObservation {
         LiveSourceObservation {
             source_system_id: "sys".into(),
@@ -491,9 +562,11 @@ pub mod tests {
             protocol_fingerprint: "proto".into(),
             slot_exists: true,
             slot_valid: true,
+            invalidation_reason: None,
+            wal_status: Some("reserved".into()),
             resume_wal_available: true,
             confirmed_flush_lsn: None,
-            restart_lsn: None,
+            restart_lsn: Some("0000000000000008".into()),
         }
     }
     struct Archive(ArchiveReconciliation);
@@ -513,11 +586,12 @@ pub mod tests {
         .unwrap()
     }
     #[test]
-    fn compatible_requests_zero_and_persists_before_ready() {
+    fn compatible_requests_durable_position_and_persists_before_ready() {
         let p = db("ready");
+        seed_durable(&p);
         let r = run(&p, &live());
         assert_eq!(r.outcome, StartupOutcome::Ready);
-        assert_eq!(r.requested_lsn.as_deref(), Some("0000000000000000"));
+        assert_eq!(r.requested_lsn.as_deref(), Some("0000000000000008"));
         assert_eq!(
             recover_report(&p)
                 .unwrap()
@@ -529,20 +603,41 @@ pub mod tests {
     #[test]
     fn identity_mismatch_blocks() {
         let p = db("identity");
+        seed_durable(&p);
         let mut l = live();
         l.timeline_id = "other".into();
         assert_eq!(run(&p, &l).outcome, StartupOutcome::Blocked);
     }
     #[test]
     fn invalid_slot_and_missing_wal_require_reseed() {
-        for (name, valid, wal) in [("slot", false, true), ("wal", true, false)] {
+        for (name, valid, wal, expected) in [
+            ("slot", false, true, "SLOT_INVALID_WAL_REMOVED"),
+            ("wal", true, false, "RESUME_WAL_STATUS_UNAVAILABLE"),
+        ] {
             let p = db(name);
+            seed_durable(&p);
             let mut l = live();
             l.slot_valid = valid;
+            l.invalidation_reason = (!valid).then(|| "wal_removed".into());
             l.resume_wal_available = wal;
-            assert_eq!(run(&p, &l).outcome, StartupOutcome::RequiresReseed);
+            l.wal_status = Some(if wal { "reserved" } else { "unreserved" }.into());
+            l.restart_lsn = Some("0000000000000008".into());
+            let receipt = run(&p, &l);
+            assert_eq!(receipt.outcome, StartupOutcome::RequiresReseed);
+            assert_eq!(receipt.reason_code, expected);
         }
     }
+    #[test]
+    fn fresh_journal_with_preexisting_slot_is_ambiguous_without_provenance() {
+        let p = db("fresh-preexisting");
+        let receipt = run(&p, &live());
+        assert_eq!(
+            receipt.outcome,
+            StartupOutcome::BootstrapAmbiguousRequiresRestart
+        );
+        assert_eq!(receipt.reason_code, "BOOTSTRAP_PROVENANCE_AMBIGUOUS");
+    }
+
     #[test]
     fn ambiguous_bootstrap_is_transitioned_and_persisted() {
         let p = db("ambiguous");
@@ -565,6 +660,7 @@ pub mod tests {
     #[test]
     fn server_ahead_requires_reseed() {
         let p = db("server-ahead");
+        seed_durable(&p);
         let mut l = live();
         l.confirmed_flush_lsn = Some("0000000000000010".into());
         let r = run(&p, &l);
@@ -589,8 +685,8 @@ pub mod tests {
     #[test]
     fn creation_floor_compound_safety_precedes_floor_resume() {
         for (valid, wal, reason) in [
-            (false, true, "SLOT_INVALID"),
-            (true, false, "RESUME_WAL_UNAVAILABLE"),
+            (false, true, "SLOT_INVALID_WAL_REMOVED"),
+            (true, false, "RESUME_RESTART_LSN_UNAVAILABLE"),
         ] {
             let p = db("floor-safety");
             let w = open_writer(&p, "fixture", 2, 0).unwrap();
@@ -599,7 +695,9 @@ pub mod tests {
             drop(w);
             let mut l = live();
             l.slot_valid = valid;
+            l.invalidation_reason = (!valid).then(|| "wal_removed".into());
             l.resume_wal_available = wal;
+            l.restart_lsn = wal.then(|| "0000000000000008".into());
             let r = run(&p, &l);
             assert_eq!(r.reason_code, reason);
         }
@@ -607,6 +705,7 @@ pub mod tests {
     #[test]
     fn archive_hook_blocks_without_adopting() {
         let p = db("archive-block");
+        seed_durable(&p);
         let r = reconcile_startup(
             &p,
             "run",
@@ -623,6 +722,7 @@ pub mod tests {
     #[test]
     fn external_ahead_blocks() {
         let p = db("external");
+        seed_durable(&p);
         let w = open_writer(&p, "fixture", 2, 0).unwrap();
         w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('archive','archive','cfg','epoch',1)",[]).unwrap();
         drop(w);

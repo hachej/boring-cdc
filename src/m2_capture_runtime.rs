@@ -827,6 +827,16 @@ fn encode_row(row: &RowChange, origin: Option<&(u64, String)>) -> Result<Vec<u8>
     .map_err(|_| RuntimeError::Protocol("event_encoding"))
 }
 fn parse_lsn(value: &str) -> Result<u64, RuntimeError> {
+    if let Some((high, low)) = value.split_once('/') {
+        let high = u64::from_str_radix(high, 16)
+            .map_err(|_| RuntimeError::Protocol("invalid_durable_lsn"))?;
+        let low = u64::from_str_radix(low, 16)
+            .map_err(|_| RuntimeError::Protocol("invalid_durable_lsn"))?;
+        return high
+            .checked_shl(32)
+            .and_then(|prefix| prefix.checked_add(low))
+            .ok_or(RuntimeError::Protocol("invalid_durable_lsn"));
+    }
     u64::from_str_radix(value, 16).map_err(|_| RuntimeError::Protocol("invalid_durable_lsn"))
 }
 
@@ -1390,11 +1400,26 @@ impl Drop for ProductionControlLane {
     }
 }
 
-fn observe_live_source(
+pub fn observe_live_source(
     dsn: &str,
-    publication_fingerprint: &str,
 ) -> Result<crate::m2_reconcile::LiveSourceObservation, CaptureFailure> {
-    let mut connection = PgReplicationConnection::connect(dsn).map_err(|_| {
+    use crate::m1_control_fixtures::PublicationSpec;
+    use std::collections::BTreeSet;
+
+    let has_replication_parameter = dsn.split_once('?').is_some_and(|(_, query)| {
+        query.split('&').any(|item| {
+            item.split_once('=')
+                .is_some_and(|(key, _)| key == "replication")
+        })
+    });
+    let observation_dsn = if has_replication_parameter {
+        dsn.to_owned()
+    } else if dsn.contains('?') {
+        format!("{dsn}&replication=database")
+    } else {
+        format!("{dsn}?replication=database")
+    };
+    let mut connection = PgReplicationConnection::connect(&observation_dsn).map_err(|_| {
         CaptureFailure::at("reconciliation", "M2_SOURCE_OBSERVATION_CONNECT_FAILED")
     })?;
     let identity = connection
@@ -1407,10 +1432,50 @@ fn observe_live_source(
     };
     let source_system_id = value(0)?;
     let timeline_id = value(1)?;
-    let database_id = identity
-        .get_value(0, 3)
-        .unwrap_or_else(|| "unknown_database".into());
-    let slot = connection.exec(&format!("SELECT plugin,coalesce(confirmed_flush_lsn::text,''),coalesce(restart_lsn::text,''),coalesce(wal_status,''),coalesce(invalidation_reason,'') FROM pg_replication_slots WHERE slot_name='{}'", SLOT))
+    // The database OID, unlike a database name or IDENTIFY_SYSTEM's xlog position, is the
+    // immutable database identity bound by the source contract. pg_database is readable by the
+    // runtime role without granting administrative mutation privileges.
+    let database = connection
+        .exec("SELECT oid::text FROM pg_database WHERE datname=current_database()")
+        .map_err(|_| CaptureFailure::at("reconciliation", "M2_DATABASE_IDENTITY_QUERY_FAILED"))?;
+    let database_id = database
+        .get_value(0, 0)
+        .ok_or_else(|| CaptureFailure::at("reconciliation", "M2_DATABASE_IDENTITY_QUERY_FAILED"))?;
+
+    // Fingerprint the observed catalog definition, not the configured expectation. The two
+    // catalog reads use stable order and the same typed canonical representation as init.
+    let publication = connection.exec(&format!(
+        "SELECT p.pubname,pg_get_userbyid(p.pubowner),concat_ws(',',CASE WHEN p.pubdelete THEN 'delete' END,CASE WHEN p.pubinsert THEN 'insert' END,CASE WHEN p.pubtruncate THEN 'truncate' END,CASE WHEN p.pubupdate THEN 'update' END) FROM pg_publication p WHERE p.pubname='{PUBLICATION}'"
+    )).map_err(|_| CaptureFailure::at("reconciliation", "M2_PUBLICATION_OBSERVATION_FAILED"))?;
+    let publication_value = |column| {
+        publication.get_value(0, column).ok_or_else(|| {
+            CaptureFailure::at("reconciliation", "M2_PUBLICATION_OBSERVATION_FAILED")
+        })
+    };
+    let publication_name = publication_value(0)?;
+    let owner_role = publication_value(1)?;
+    let operations = publication_value(2)?;
+    let relations = connection.exec(&format!(
+        "SELECT coalesce(string_agg(schemaname||'.'||tablename,chr(31) ORDER BY schemaname,tablename),'') FROM pg_publication_tables WHERE pubname='{PUBLICATION}'"
+    )).map_err(|_| CaptureFailure::at("reconciliation", "M2_PUBLICATION_OBSERVATION_FAILED"))?
+        .get_value(0, 0)
+        .ok_or_else(|| CaptureFailure::at("reconciliation", "M2_PUBLICATION_OBSERVATION_FAILED"))?;
+    let observed_publication = PublicationSpec {
+        name: publication_name,
+        owner_role,
+        relations: relations
+            .split('\u{1f}')
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>(),
+        operations: operations
+            .split(',')
+            .filter(|value| !value.is_empty())
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>(),
+    };
+
+    let slot = connection.exec(&format!("SELECT plugin,coalesce(confirmed_flush_lsn::text,''),coalesce(restart_lsn::text,''),coalesce(wal_status,''),coalesce(invalidation_reason,'') FROM pg_replication_slots WHERE slot_name='{SLOT}'"))
         .map_err(|_| CaptureFailure::at("reconciliation", "M2_SLOT_OBSERVATION_FAILED"))?;
     let plugin = slot.get_value(0, 0);
     let position = |column| {
@@ -1419,24 +1484,30 @@ fn observe_live_source(
             .and_then(|v| parse_lsn(&v).ok())
             .map(|v| format!("{v:016X}"))
     };
-    let wal_status = slot.get_value(0, 3).unwrap_or_default();
-    let invalidation = slot.get_value(0, 4).unwrap_or_default();
+    let wal_status = slot.get_value(0, 3).filter(|value| !value.is_empty());
+    let invalidation_reason = slot.get_value(0, 4).filter(|value| !value.is_empty());
     let restart_lsn = position(2);
-    let slot_healthy = plugin.as_deref() == Some("pgoutput")
-        && matches!(wal_status.as_str(), "reserved" | "extended")
-        && invalidation.is_empty()
-        && restart_lsn.is_some();
+    let slot_exists = plugin.is_some();
+    let slot_valid =
+        slot_exists && plugin.as_deref() == Some("pgoutput") && invalidation_reason.is_none();
+    let resume_wal_available = slot_valid
+        && restart_lsn.is_some()
+        && wal_status
+            .as_deref()
+            .is_some_and(|value| matches!(value, "reserved" | "extended"));
     Ok(crate::m2_reconcile::LiveSourceObservation {
         source_system_id,
         timeline_id,
         database_id,
         slot_name: SLOT.into(),
-        plugin: plugin.clone().unwrap_or_else(|| "pgoutput".into()),
-        publication_fingerprint: publication_fingerprint.into(),
+        plugin: plugin.clone().unwrap_or_default(),
+        publication_fingerprint: observed_publication.fingerprint(),
         protocol_fingerprint: "pgoutput-v1".into(),
-        slot_exists: plugin.is_some(),
-        slot_valid: slot_healthy,
-        resume_wal_available: slot_healthy,
+        slot_exists,
+        slot_valid,
+        invalidation_reason,
+        wal_status,
+        resume_wal_available,
         confirmed_flush_lsn: position(1),
         restart_lsn,
     })
@@ -1493,12 +1564,31 @@ pub async fn run_loaded_config(
         .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?;
     let now = elapsed.as_millis() as i64;
     let startup_run_id = format!("production-startup-{}", elapsed.as_nanos());
-    let live_source = observe_live_source(&dsn, config.fingerprints().source.as_str())?;
-    if !journal_path.exists() {
-        let initial = open_writer(&journal_path, &startup_run_id, 1, now)
+    let live_source = observe_live_source(&dsn)?;
+    // Initialization is keyed by durable schema/source state, never by path existence. A crash
+    // after migrations but before this transaction leaves no partial identity receipt; retrying
+    // observes zero rows and atomically writes the full live identity.
+    {
+        let mut initial = open_writer(&journal_path, &startup_run_id, 1, now)
             .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_OPEN_FAILED"))?;
-        initial.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,?1,?2,?3,?4,?5,?6,?7,?8)",rusqlite::params![config.fingerprints().runtime,live_source.source_system_id,live_source.timeline_id,live_source.database_id,live_source.slot_name,live_source.plugin,live_source.publication_fingerprint,live_source.protocol_fingerprint]).map_err(|_|CaptureFailure::at("journal","M2_SOURCE_STATE_INIT_FAILED"))?;
-        drop(initial);
+        let source_rows: i64 = initial
+            .connection()
+            .query_row("SELECT count(*) FROM source_state", [], |row| row.get(0))
+            .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_READ_FAILED"))?;
+        if source_rows == 0 {
+            let tx = initial
+                .connection_mut()
+                .transaction()
+                .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_INIT_FAILED"))?;
+            tx.execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,?1,?2,?3,?4,?5,?6,?7,?8)",rusqlite::params![config.fingerprints().runtime,live_source.source_system_id,live_source.timeline_id,live_source.database_id,live_source.slot_name,live_source.plugin,live_source.publication_fingerprint,live_source.protocol_fingerprint]).map_err(|_|CaptureFailure::at("journal","M2_SOURCE_STATE_INIT_FAILED"))?;
+            tx.commit()
+                .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_INIT_FAILED"))?;
+        } else if source_rows != 1 {
+            return Err(CaptureFailure::at(
+                "journal",
+                "M2_SOURCE_STATE_CARDINALITY_INVALID",
+            ));
+        }
     }
     let receipt = crate::m2_reconcile::reconcile_startup(
         &journal_path,
@@ -1596,7 +1686,7 @@ pub async fn run_loaded_config(
             timeline_id: live_source.timeline_id,
             database_id: live_source.database_id,
             slot_name: SLOT.into(),
-            publication_fingerprint: config.fingerprints().source.clone(),
+            publication_fingerprint: live_source.publication_fingerprint.clone(),
             protocol_fingerprint: "pgoutput-v1".into(),
         },
         CommitLimits {
@@ -1729,6 +1819,13 @@ pub mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::Duration;
     static NEXT: AtomicU64 = AtomicU64::new(1);
+
+    #[test]
+    fn postgresql_and_canonical_lsn_text_parse_identically() {
+        assert_eq!(parse_lsn("0/193A370").unwrap(), 0x193A370);
+        assert_eq!(parse_lsn("000000000193A370").unwrap(), 0x193A370);
+        assert!(parse_lsn("0/not-hex").is_err());
+    }
 
     #[derive(Default)]
     struct MemorySpools;

@@ -19,11 +19,23 @@ CREATE PUBLICATION article1_publication FOR TABLE customers,order_items,orders,p
 SELECT * FROM pg_create_logical_replication_slot('article1_slot','pgoutput');
 SQL
 cargo build --quiet --locked --bin boring-cdc
-mkdir -p "$work/run/state/spool"; chmod 700 "$work/run/state" "$work/run/state/spool"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
+mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run/state" "$work/run/state/spool"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 sed -i 's/publication = "boring_publication"/publication = "article1_publication"/; s/slot = "boring_slot"/slot = "article1_slot"/; s#sqlite_path = "state/boring.db"#sqlite_path = "state/journal.sqlite"#' "$work/run/boring-cdc.toml"
 dsn="postgresql://boring_cdc@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_RUNTIME="$dsn" PG_CONTROL="${dsn}&application_name=control" PG_ADMIN="${dsn}&application_name=admin"
 export CH_RUNTIME='https://runtime:runtime-only@127.0.0.1:8443' CH_MAINT='https://maint:maint-only@127.0.0.1:8443'
+# A fresh journal may observe the already-created fixture slot, but cannot adopt it until the
+# fixture durably binds its creation floor to a bootstrap intent.
+if (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run) >"$work/unproven.out" 2>"$work/unproven.err"; then
+  echo E_UNPROVEN_SLOT_ADMITTED >&2; exit 1
+fi
+grep -q M2_STARTUP_BLOCKED "$work/unproven.err" || { cat "$work/unproven.err" >&2; exit 1; }
+python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+c=sqlite3.connect(sys.argv[1]); row=c.execute('select capture_epoch,source_system_id,database_id,slot_name,observed_confirmed_flush_lsn from source_state').fetchone(); assert row[4]
+c.execute("insert into bootstrap_intents(intent_id,capture_epoch,source_system_id,database_id,slot_name,creation_floor_lsn,state,revision,created_at) values('component-slot',?,?,?,?,?,'slot_created',0,'component')",row)
+c.execute("update source_state set slot_creation_floor_lsn=?,slot_creation_intent_id='component-slot',control_revision=control_revision+1 where singleton=1",(row[4],)); c.commit()
+PY2
 (
   cd "$work/run"
   exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/runtime.out" 2>"$work/runtime.err"
