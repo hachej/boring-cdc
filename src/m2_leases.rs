@@ -24,6 +24,7 @@ pub struct LeaseToken {
     pub identity: LeaseIdentity,
     pub expires_mono_ms: u64,
     pub revision: u64,
+    incarnation: u64,
     external_namespace: String,
 }
 impl LeaseToken {
@@ -76,7 +77,10 @@ fn framed(target: &mut Vec<u8>, value: &[u8]) {
 }
 
 /// Opaque, collision-resistant namespace. No raw source or destination identifier is exposed.
-pub fn derive_external_namespace(identity: &LeaseIdentity) -> Result<String, LeaseError> {
+pub fn derive_external_namespace(
+    identity: &LeaseIdentity,
+    incarnation: u64,
+) -> Result<String, LeaseError> {
     if !nonempty(&identity.destination_id)
         || !nonempty(&identity.capture_epoch)
         || !nonempty(&identity.configuration_fingerprint)
@@ -95,6 +99,7 @@ pub fn derive_external_namespace(identity: &LeaseIdentity) -> Result<String, Lea
         identity.configuration_fingerprint.as_bytes(),
         identity.anchor_id.as_deref().unwrap_or("").as_bytes(),
         identity.run_id.as_bytes(),
+        &incarnation.to_be_bytes(),
     ] {
         framed(&mut encoded, value);
     }
@@ -106,7 +111,7 @@ fn valid_in(
     token: &LeaseToken,
     now: u64,
 ) -> Result<bool, LeaseError> {
-    if derive_external_namespace(&token.identity)? != token.external_namespace {
+    if derive_external_namespace(&token.identity, token.incarnation)? != token.external_namespace {
         return Ok(false);
     }
     let now = as_i64(now)?;
@@ -152,7 +157,6 @@ pub fn acquire(
     if !nonempty(&identity.lease_id) || ttl_ms == 0 {
         return Err(LeaseError::Invalid("lease id and positive TTL required"));
     }
-    let namespace = derive_external_namespace(&identity)?;
     let generation = as_i64(identity.generation)?;
     let now = as_i64(now_mono_ms)?;
     let expires_u64 = now_mono_ms
@@ -217,17 +221,37 @@ pub fn acquire(
             now
         ],
     )?;
+    let prior_revision: Option<i64> = transaction
+        .query_row(
+            "SELECT revision FROM destination_generation_leases
+         WHERE destination_id=?1 AND capture_epoch=?2 AND generation=?3
+           AND state IN ('fenced','expired','released')",
+            params![identity.destination_id, identity.capture_epoch, generation],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let incarnation = match prior_revision {
+        Some(value) => value
+            .checked_add(1)
+            .ok_or(LeaseError::Invalid("lease incarnation overflow"))?,
+        None => 0,
+    };
     transaction.execute(
         "DELETE FROM destination_generation_leases
          WHERE destination_id=?1 AND capture_epoch=?2 AND generation=?3
            AND state IN ('fenced','expired','released')",
         params![identity.destination_id, identity.capture_epoch, generation],
     )?;
+    let namespace = derive_external_namespace(
+        &identity,
+        u64::try_from(incarnation)
+            .map_err(|_| LeaseError::Invalid("negative lease incarnation"))?,
+    )?;
     let inserted = transaction.execute(
         "INSERT OR IGNORE INTO destination_generation_leases
          (lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state,revision)
-         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,'held',0)",
-        params![identity.lease_id, identity.destination_id, identity.capture_epoch, identity.anchor_id, generation, identity.configuration_fingerprint, identity.run_id, expires],
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,'held',?9)",
+        params![identity.lease_id, identity.destination_id, identity.capture_epoch, identity.anchor_id, generation, identity.configuration_fingerprint, identity.run_id, expires, incarnation],
     )?;
     if inserted != 1 {
         return Err(LeaseError::Conflict);
@@ -236,7 +260,10 @@ pub fn acquire(
     Ok(LeaseToken {
         identity,
         expires_mono_ms: expires_u64,
-        revision: 0,
+        revision: u64::try_from(incarnation)
+            .map_err(|_| LeaseError::Invalid("negative lease incarnation"))?,
+        incarnation: u64::try_from(incarnation)
+            .map_err(|_| LeaseError::Invalid("negative lease incarnation"))?,
         external_namespace: namespace,
     })
 }
@@ -276,6 +303,7 @@ pub fn renew(
         identity: token.identity.clone(),
         expires_mono_ms: expires_u64,
         revision: token.revision + 1,
+        incarnation: token.incarnation,
         external_namespace: token.external_namespace().to_owned(),
     })
 }
@@ -331,7 +359,7 @@ where
         return Err(LeaseError::Stale);
     }
     before.commit()?;
-    let namespace = derive_external_namespace(&token.identity)?;
+    let namespace = derive_external_namespace(&token.identity, token.incarnation)?;
     let artifact = adapter
         .apply_candidate(&namespace)
         .map_err(LeaseError::External)?;
@@ -510,7 +538,12 @@ pub(crate) mod tests {
         let current = acquire(&mut writer, successor, 12, 100).unwrap();
         assert_ne!(old.external_namespace(), current.external_namespace());
         assert_eq!(renew(&mut writer, &old, 13, 100), Err(LeaseError::Stale));
-        assert!(renew(&mut writer, &current, 13, 100).is_ok());
+        let current = renew(&mut writer, &current, 13, 100).unwrap();
+        release(&mut writer, &current, 14).unwrap();
+        let recycled_identity = identity(1);
+        let recycled = acquire(&mut writer, recycled_identity, 15, 100).unwrap();
+        assert_ne!(old.external_namespace(), recycled.external_namespace());
+        assert_eq!(renew(&mut writer, &old, 16, 100), Err(LeaseError::Stale));
         cleanup(path);
     }
 
@@ -692,7 +725,7 @@ pub(crate) mod tests {
         let mut invalid = identity(0);
         invalid.destination_id.clear();
         assert!(matches!(
-            derive_external_namespace(&invalid),
+            derive_external_namespace(&invalid, 0),
             Err(LeaseError::Invalid(_))
         ));
         assert!(matches!(
@@ -714,7 +747,7 @@ pub(crate) mod tests {
     #[test]
     fn namespaces_are_epoch_generation_anchor_and_config_scoped() {
         let base = identity(1);
-        let first = derive_external_namespace(&base).unwrap();
+        let first = derive_external_namespace(&base, 0).unwrap();
         for changed in [
             LeaseIdentity {
                 capture_epoch: "epoch-b".into(),
@@ -733,7 +766,7 @@ pub(crate) mod tests {
                 ..base.clone()
             },
         ] {
-            assert_ne!(first, derive_external_namespace(&changed).unwrap());
+            assert_ne!(first, derive_external_namespace(&changed, 0).unwrap());
         }
         assert!(!first.contains("dest-a"));
     }
