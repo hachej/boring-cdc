@@ -1163,6 +1163,10 @@ pub async fn run_loaded_config(
         .runtime_dsn()
         .ok_or_else(|| CaptureFailure::at("configuration", "M2_RUNTIME_DSN_UNAVAILABLE"))?
         .to_owned();
+    let heartbeat_dsn = config
+        .control_writer_dsn()
+        .ok_or_else(|| CaptureFailure::at("configuration", "M2_CONTROL_DSN_UNAVAILABLE"))?
+        .to_owned();
     let journal_path = PathBuf::from(&public.storage.sqlite_path);
     let spool_path = PathBuf::from(&public.storage.spool_path);
     if let Some(parent) = journal_path.parent() {
@@ -1175,6 +1179,18 @@ pub async fn run_loaded_config(
         .duration_since(UNIX_EPOCH)
         .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?
         .as_millis() as i64;
+    let cadence_ms = public.source.heartbeat_cadence_ms.0;
+    let initial_retry_ms = (cadence_ms / 10).max(1);
+    let heartbeat_lane = crate::m2_heartbeat::PublishedHeartbeatLane::start(
+        heartbeat_dsn,
+        crate::m2_heartbeat::HeartbeatPolicy {
+            cadence_ms,
+            initial_retry_ms,
+            max_retry_ms: (cadence_ms / 2).max(initial_retry_ms),
+        },
+        now as u64,
+    )
+    .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?;
     let writer = open_writer(&journal_path, "production-run", 1, now)
         .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_OPEN_FAILED"))?;
     let durable = writer
@@ -1350,6 +1366,7 @@ pub async fn run_loaded_config(
     if result.is_err() {
         let _ = ownership.unexpected_transport_loss();
     }
+    drop(heartbeat_lane);
     result
 }
 

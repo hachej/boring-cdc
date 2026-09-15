@@ -79,7 +79,7 @@ impl HeartbeatWriter {
             || policy.initial_retry_ms == 0
             || policy.initial_retry_ms > policy.max_retry_ms
             || policy.max_retry_ms > policy.cadence_ms
-            || persisted_nonce == u64::MAX
+            || persisted_nonce >= i64::MAX as u64
         {
             return Err(HeartbeatError::Invalid("invalid heartbeat policy or nonce"));
         }
@@ -131,6 +131,7 @@ impl HeartbeatWriter {
         self.next_nonce = self
             .next_nonce
             .checked_add(1)
+            .filter(|nonce| *nonce <= i64::MAX as u64)
             .ok_or(HeartbeatError::Invalid("heartbeat nonce exhausted"))?;
         self.attempt = 0;
         self.next_attempt_ms = now_ms.saturating_add(self.policy.cadence_ms);
@@ -167,6 +168,104 @@ impl HeartbeatWriter {
 
     pub fn status(&self) -> HeartbeatStatus {
         self.status
+    }
+}
+
+/// Executes one heartbeat through the same pure-Rust PostgreSQL client used by the binary.
+/// The generated integer is the only interpolated value; relation, key and columns are fixed.
+pub fn publish_once(dsn: &str, nonce: u64) -> Result<(u64, u64), HeartbeatError> {
+    if nonce > i64::MAX as u64 {
+        return Err(HeartbeatError::Invalid(
+            "heartbeat nonce exceeds PostgreSQL bigint",
+        ));
+    }
+    let mut connection = pg_walstream::PgReplicationConnection::connect(dsn)
+        .map_err(|_| HeartbeatError::SourceUnavailable)?;
+    let update = connection
+        .exec(&format!(
+            "WITH changed AS (UPDATE boring_cdc_control.heartbeat SET nonce = {nonce}, updated_at = clock_timestamp() WHERE id = 'singleton' RETURNING id) SELECT id FROM changed"
+        ))
+        .map_err(|_| HeartbeatError::SourceUnavailable)?;
+    let selected = connection
+        .exec(HEARTBEAT_KEY_CHECK_SQL)
+        .map_err(|_| HeartbeatError::SourceUnavailable)?;
+    let affected = u64::try_from(update.ntuples())
+        .map_err(|_| HeartbeatError::Invalid("heartbeat update cardinality"))?;
+    let selected_keys = u64::try_from(selected.ntuples())
+        .map_err(|_| HeartbeatError::Invalid("heartbeat key cardinality"))?;
+    if affected != 1 || selected_keys != 1 {
+        return Err(HeartbeatError::Invalid("heartbeat control row cardinality"));
+    }
+    Ok((affected, selected_keys))
+}
+
+/// Long-lived production scheduler. Source outages degrade this lane and retry with bounded
+/// backoff; they never synthesize feedback or terminate the capture stream.
+pub struct PublishedHeartbeatLane {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    status: std::sync::Arc<std::sync::Mutex<HeartbeatStatus>>,
+    worker: Option<std::thread::JoinHandle<()>>,
+}
+impl PublishedHeartbeatLane {
+    pub fn start(
+        dsn: String,
+        policy: HeartbeatPolicy,
+        now_ms: u64,
+    ) -> Result<Self, HeartbeatError> {
+        let writer = HeartbeatWriter::new(policy, now_ms, now_ms.saturating_sub(1))?;
+        let status = std::sync::Arc::new(std::sync::Mutex::new(writer.status()));
+        let lane_status = status.clone();
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let lane_stop = stop.clone();
+        let worker = std::thread::Builder::new()
+            .name("published-heartbeat".into())
+            .spawn(move || {
+                let mut writer = writer;
+                while !lane_stop.load(std::sync::atomic::Ordering::Acquire) {
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_or(0, |value| value.as_millis() as u64);
+                    if let Some(command) = writer.due(now) {
+                        let next = match publish_once(&dsn, command.nonce) {
+                            Ok((affected, selected)) => writer
+                                .record_success(now, command, affected, selected)
+                                .unwrap_or_else(|_| writer.record_outage(now, 0)),
+                            Err(_) => writer.record_outage(now, 0),
+                        };
+                        if let Ok(mut current) = lane_status.lock() {
+                            *current = next;
+                        }
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+            })
+            .map_err(|_| HeartbeatError::SourceUnavailable)?;
+        Ok(Self {
+            stop,
+            status,
+            worker: Some(worker),
+        })
+    }
+    pub fn status(&self) -> HeartbeatStatus {
+        self.status.lock().map_or(
+            HeartbeatStatus {
+                condition: HeartbeatCondition::Degraded,
+                attempt: u32::MAX,
+                next_attempt_ms: 0,
+                failure_fingerprint: Some("HEARTBEAT_STATUS_UNAVAILABLE"),
+                wal_headroom_bytes: 0,
+                feedback_advanced: false,
+            },
+            |status| *status,
+        )
+    }
+}
+impl Drop for PublishedHeartbeatLane {
+    fn drop(&mut self) {
+        self.stop.store(true, std::sync::atomic::Ordering::Release);
+        if let Some(worker) = self.worker.take() {
+            let _ = worker.join();
+        }
     }
 }
 

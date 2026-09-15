@@ -567,7 +567,7 @@ pub fn read_complete_range(
             break;
         }
         let measure: Option<(i64, i64, Option<i64>, Option<i64>)> = reader.query_one_bounded_params(
-            "SELECT count(*),coalesce(sum(length(payload)+length(CAST(transaction_id AS BLOB))+length(CAST(event_id AS BLOB))+length(CAST(payload_hash AS BLOB))+coalesce(length(CAST(relation_schema_fingerprint AS BLOB)),0)+coalesce((SELECT length(CAST(rs.relation_id AS BLOB)) FROM relation_schemas rs WHERE rs.schema_fingerprint=journal_events.relation_schema_fingerprint),0)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id=?1",
+            "SELECT count(*),coalesce(sum(length(payload)+length(CAST(transaction_id AS BLOB))+length(CAST(event_id AS BLOB))+length(CAST(payload_hash AS BLOB))+coalesce(length(CAST(relation_schema_fingerprint AS BLOB)),0)+coalesce(length(CAST(control_kind AS BLOB)),0)+coalesce((SELECT length(CAST(rs.relation_id AS BLOB)) FROM relation_schemas rs WHERE rs.schema_fingerprint=journal_events.relation_schema_fingerprint),0)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id=?1",
             [txid.as_str()],
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )?;
