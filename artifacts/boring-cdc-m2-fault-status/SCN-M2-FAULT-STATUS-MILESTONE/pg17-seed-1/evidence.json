@@ -1,0 +1,99 @@
+{
+  "schema_version": "evidence/v1",
+  "owner_bead": "boring-cdc-m2-fault-status",
+  "scenario_id": "SCN-M2-FAULT-STATUS-MILESTONE",
+  "evidence_profile": "runtime",
+  "evidence_tier": "milestone",
+  "seed": "pg17-seed-1",
+  "git_commit": "ec612456b6c6116beec555886decefd4921bae62",
+  "commands": [
+    {
+      "argv": "cargo clippy --locked --all-targets",
+      "version": "m2-fault-status/v1",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stdout",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stderr",
+      "stderr_sha256": "949aa2e594932026ac5f88bb4376c672b5dc5c0e5ee3b4cc6be2bd01156fe4a1"
+    },
+    {
+      "argv": "cargo test --locked --workspace --all-targets",
+      "version": "m2-fault-status/v1",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stdout",
+      "stdout_sha256": "f9afdfb177e7b2bd1cb5b2076bae68d65d0295527572f17e7f2ab3f7c79e3e7d",
+      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stderr",
+      "stderr_sha256": "eefe100c714c41131d498f9a41ca9fe62339e727a99c5c1cc072a1c5a883634d"
+    },
+    {
+      "argv": "cargo test --locked m2_fault_status::tests",
+      "version": "m2-fault-status/v1",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stdout",
+      "stdout_sha256": "e242ad47f48a13b3e6fec8984d3219d36186c1168095221824fc1e3881925a9a",
+      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stderr",
+      "stderr_sha256": "70c14adfe3d1bce5e7d1e936240d0644ba7a90179caedf9704d89b202a853444"
+    },
+    {
+      "argv": "scripts/e2e/m2_fault_status.sh",
+      "version": "m2-fault-status/v1",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stdout",
+      "stdout_sha256": "2621186a88727c197c102348410e9b455abd637871a7908ea9b1744fec6079b4",
+      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stderr",
+      "stderr_sha256": "e2c54412f9a698741c93a276605791872f4a1c05f8d4305a1cebc1f7c3a4f16b"
+    },
+    {
+      "argv": "scripts/faults/m2_fault_status.sh",
+      "version": "m2-fault-status/v1",
+      "exit_code": 0,
+      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stdout",
+      "stdout_sha256": "91e7474b541f5bf4dbdc5e82db12c2689b84168c1f44e46a918dedd74584c4f9",
+      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stderr",
+      "stderr_sha256": "1067d3b6de7203045a27ef04b08560b3f062e581589701f4ef774e6d80494450"
+    }
+  ],
+  "source_preservation": {
+    "before_sha256": "684f02c41ba5a2a9ac6047faf053fc1a179818e0cfa16ba7a6c03871f979866f",
+    "after_sha256": "684f02c41ba5a2a9ac6047faf053fc1a179818e0cfa16ba7a6c03871f979866f",
+    "preserved": true
+  },
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "tier_proof": {
+    "targeted_checks": true,
+    "boundary_e2e": true,
+    "fault_suite": true,
+    "deterministic_rerun": true,
+    "consumed_contract_vectors": true,
+    "workspace_tests": true,
+    "integration": true,
+    "clean_environment": true,
+    "exit_assertions": true,
+    "endurance": false,
+    "full_failure_matrix": false,
+    "clean_clone": false
+  },
+  "result": {
+    "status": "pass",
+    "digest": "af5d3cf4c8f8783caa42a8714f184e282f45bc537c154b1ba7c896abc189b662",
+    "artifacts": [
+      "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/manifest.json",
+      "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/logs/boring-cdc.jsonl",
+      "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault-timeline.json",
+      "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/state/after.json"
+    ],
+    "attempts": [
+      "e2e-pg17-run-1",
+      "fault-wrapper-pg17-run-2"
+    ],
+    "product_faults": "exact-PID SIGKILL before source receipt; missing, unreserved, and lost/wal_removed PostgreSQL slot states",
+    "runtime_observed": true
+  }
+}

@@ -1,0 +1,19 @@
+{"postgres":"17.6","database_oid_observed":true,"live_publication_fingerprint":true,"fresh_slot_ambiguous":true,"migration_receipt_retry":true,"slot_reasons":["SLOT_MISSING","RESUME_WAL_STATUS_UNAVAILABLE","SLOT_INVALID_WAL_REMOVED"],"abrupt_process_restart":true,"cli_json_text_matrix":true}
+{"schema_version": "validation-result/v1", "status": "pass", "owner_bead": "boring-cdc-m2-fault-status", "validator_version": "m2-fault-status/v1", "findings": []}
+M2_FAULT_STATUS_E2E_OK postgres=17.6 crash=exact-pid status=stable redaction=pass
+
+running 3 tests
+...
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 0.17s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+M2_FAULT_STATUS_FAULTS_OK rerun=true hooks=16

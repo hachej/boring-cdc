@@ -1,0 +1,18 @@
+
+running 3 tests
+test m2_fault_status::tests::inventories_are_exact ... ok
+test m2_fault_status::tests::failure_and_reseed_are_concurrent ... ok
+test m2_fault_status::tests::stable_restart_projection_redacts ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 317 filtered out; finished in 0.14s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
