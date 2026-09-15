@@ -77,7 +77,11 @@ for leaf in leaves:
  if not leaf.get('feature_ids'): fail(f'{owner}: missing canonical feature IDs')
  if not leaf.get('contract_ids'): fail(f'{owner}: missing contract IDs')
  if not leaf.get('unit_target'): fail(f'{owner}: missing unit target')
- if not leaf.get('component_and_fault_scripts'): fail(f'{owner}: missing component/fault/validator scripts')
+ scripts=leaf.get('component_and_fault_scripts',[])
+ if not scripts: fail(f'{owner}: missing component/fault/validator scripts')
+ if not any('/e2e/' in script for script in scripts): fail(f'{owner}: missing e2e script')
+ if not any('/faults/' in script for script in scripts): fail(f'{owner}: missing fault script')
+ if not any('/validate/' in script for script in scripts): fail(f'{owner}: missing validator script')
  events=leaf.get('structured_log_event_codes',[])
  if not events: fail(f'{owner}: missing structured log event codes')
  else:
