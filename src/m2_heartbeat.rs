@@ -211,7 +211,11 @@ impl PublishedHeartbeatLane {
         dsn: String,
         policy: HeartbeatPolicy,
         now_ms: u64,
+        maximum_operation: std::time::Duration,
     ) -> Result<Self, HeartbeatError> {
+        if maximum_operation.is_zero() {
+            return Err(HeartbeatError::Invalid("zero heartbeat operation deadline"));
+        }
         let writer = HeartbeatWriter::new(policy, now_ms, now_ms.saturating_sub(1))?;
         let status = std::sync::Arc::new(std::sync::Mutex::new(writer.status()));
         let lane_status = status.clone();
@@ -226,7 +230,22 @@ impl PublishedHeartbeatLane {
                         .duration_since(std::time::UNIX_EPOCH)
                         .map_or(0, |value| value.as_millis() as u64);
                     if let Some(command) = writer.due(now) {
-                        let next = match publish_once(&dsn, command.nonce) {
+                        let (send, receive) = std::sync::mpsc::sync_channel(1);
+                        let attempt_dsn = dsn.clone();
+                        let spawned = std::thread::Builder::new()
+                            .name("published-heartbeat-attempt".into())
+                            .spawn(move || {
+                                let _ = send.send(publish_once(&attempt_dsn, command.nonce));
+                            });
+                        let (result, operation_timed_out) = if spawned.is_err() {
+                            (Err(HeartbeatError::SourceUnavailable), false)
+                        } else {
+                            match receive.recv_timeout(maximum_operation) {
+                                Ok(result) => (result, false),
+                                Err(_) => (Err(HeartbeatError::SourceUnavailable), true),
+                            }
+                        };
+                        let next = match result {
                             Ok((affected, selected)) => writer
                                 .record_success(now, command, affected, selected)
                                 .unwrap_or_else(|_| writer.record_outage(now, 0)),
@@ -234,6 +253,18 @@ impl PublishedHeartbeatLane {
                         };
                         if let Ok(mut current) = lane_status.lock() {
                             *current = next;
+                        }
+                        if next.condition == HeartbeatCondition::Degraded {
+                            eprintln!(
+                                "{{\"schema_version\":\"heartbeat-health/v1\",\"component\":\"heartbeat\",\"outcome\":\"degraded\",\"attempt\":{},\"failure_fingerprint\":\"HEARTBEAT_WRITE_UNAVAILABLE\",\"wal_headroom_bytes\":{},\"feedback_advanced\":false}}",
+                                next.attempt, next.wal_headroom_bytes
+                            );
+                        }
+                        // A timed-out synchronous driver may still own one detached attempt.
+                        // Fence this lane instead of leaking one thread per retry; supervision
+                        // can replace the process after the degraded health event is observed.
+                        if operation_timed_out {
+                            break;
                         }
                     }
                     std::thread::sleep(std::time::Duration::from_millis(50));

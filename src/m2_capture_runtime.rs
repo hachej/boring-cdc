@@ -1258,6 +1258,7 @@ pub async fn run_loaded_config(
             max_retry_ms: (cadence_ms / 2).max(initial_retry_ms),
         },
         now as u64,
+        Duration::from_millis(public.source.maximum_operation_ms.0),
     )
     .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?;
     let writer = open_writer(&journal_path, "production-run", 1, now)

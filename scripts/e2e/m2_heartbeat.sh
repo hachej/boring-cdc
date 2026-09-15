@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
+cargo test --locked --workspace --all-targets
 for attempt in 1 2; do
   cargo test --locked m2_heartbeat::tests -- --nocapture >"/var/tmp/m2-heartbeat-tests-${attempt}-$$.out"
   grep -q 'real_journal_preserves_control_route_and_persisted_feedback_boundary ... ok' "/var/tmp/m2-heartbeat-tests-${attempt}-$$.out"

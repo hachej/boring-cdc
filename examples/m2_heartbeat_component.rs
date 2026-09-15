@@ -12,11 +12,15 @@ fn main() {
                 max_retry_ms: 25,
             },
             0,
+            std::time::Duration::from_millis(100),
         )
         .expect("bounded lane");
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
         while lane.status().condition != HeartbeatCondition::Degraded {
-            assert!(std::time::Instant::now() < deadline, "outage status deadline");
+            assert!(
+                std::time::Instant::now() < deadline,
+                "outage status deadline"
+            );
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         let status = lane.status();
