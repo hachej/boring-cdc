@@ -12,40 +12,15 @@
                 "const": "boring-cdc-m1-decoder"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "bidirectional CopyData accepted",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-COPYBOTH-FRAMES\"}=1",
+                  "state": "streaming",
+                  "status_code": "pg_copyboth_frames"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-COPYBOTH-FRAMES"
@@ -88,20 +63,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -126,40 +98,15 @@
                 "const": "boring-cdc-m1-decoder"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-ORIGIN-ORDINAL\"}=1",
+                  "state": "streaming",
+                  "status_code": "pg_origin_ordinal"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-ORIGIN-ORDINAL"
@@ -200,20 +147,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -238,40 +182,15 @@
                 "const": "boring-cdc-m2-capture-runtime"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "one status packet",
+                  "feedback": "last_durable_boundary",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-KEEPALIVE-REPLY\"}=1",
+                  "state": "streaming",
+                  "status_code": "pg_keepalive_reply"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-KEEPALIVE-REPLY"
@@ -312,20 +231,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -350,40 +266,15 @@
                 "const": "boring-cdc-m1-decoder"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-RESTART-MAX\"}=1",
+                  "state": "streaming",
+                  "status_code": "pg_restart_max"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-RESTART-MAX"
@@ -419,20 +310,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -457,40 +345,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CREATION-FLOOR-NULL\"}=1",
+                  "state": "imports_pending",
+                  "status_code": "pg_creation_floor_null"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-CREATION-FLOOR-NULL"
@@ -528,20 +391,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -566,40 +426,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CREATION-FLOOR-EQUAL\"}=1",
+                  "state": "imports_pending",
+                  "status_code": "pg_creation_floor_equal"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-CREATION-FLOOR-EQUAL"
@@ -637,20 +472,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -675,40 +507,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 78,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CREATION-FLOOR-INVALID-SLOT\"}=1",
+                  "state": "requires_reseed",
+                  "status_code": "pg_creation_floor_invalid_slot"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-CREATION-FLOOR-INVALID-SLOT"
@@ -746,20 +553,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -784,40 +588,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 78,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CREATION-FLOOR-WAL-UNAVAILABLE\"}=1",
+                  "state": "requires_reseed",
+                  "status_code": "pg_creation_floor_wal_unavailable"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-CREATION-FLOOR-WAL-UNAVAILABLE"
@@ -855,20 +634,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -893,40 +669,15 @@
                 "const": "boring-cdc-m3-restart"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 75,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-AMBIGUOUS-SLOT\"}=1",
+                  "state": "bootstrap_ambiguous_requires_restart",
+                  "status_code": "pg_ambiguous_slot"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-AMBIGUOUS-SLOT"
@@ -961,20 +712,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -999,40 +747,15 @@
                 "const": "boring-cdc-m2-capture-runtime"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-SAFE-STOP-CLOSE\"}=1",
+                  "state": "capture_safe_stopped",
+                  "status_code": "pg_safe_stop_close"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-SAFE-STOP-CLOSE"
@@ -1067,20 +790,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -1105,40 +825,15 @@
                 "const": "boring-cdc-m2-capture-runtime"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 75,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-UNEXPECTED-COPYBOTH-LOSS\"}=1",
+                  "state": "ownership_lost",
+                  "status_code": "pg_unexpected_copyboth_loss"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-UNEXPECTED-COPYBOTH-LOSS"
@@ -1173,20 +868,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -1211,40 +903,15 @@
                 "const": "boring-cdc-m2-capture-runtime"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "requested reply packet",
+                  "feedback": "prior_durable_boundary",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-SLOW-COMMIT-REQUESTED-REPLY\"}=1",
+                  "state": "streaming",
+                  "status_code": "pg_slow_commit_requested_reply"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-SLOW-COMMIT-REQUESTED-REPLY"
@@ -1279,20 +946,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -1317,40 +981,15 @@
                 "const": "boring-cdc-m1-control-fixtures"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 78,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-PUBLICATION-DRIFT\"}=1",
+                  "state": "publication_drift_requires_reseed",
+                  "status_code": "pg_publication_drift"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-PUBLICATION-DRIFT"
@@ -1388,20 +1027,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -1426,40 +1062,15 @@
                 "const": "boring-cdc-m1-control-fixtures"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 78,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CONTROL-CARDINALITY\"}=1",
+                  "state": "capture_safe_stopped",
+                  "status_code": "pg_control_cardinality"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-CONTROL-CARDINALITY"
@@ -1500,20 +1111,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -1538,40 +1146,15 @@
                 "const": "boring-cdc-m1-preflight"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 78,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CONTROL-PRIVILEGES\"}=1",
+                  "state": "preflight_blocked",
+                  "status_code": "pg_control_privileges"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-CONTROL-PRIVILEGES"
@@ -1618,20 +1201,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -1656,40 +1236,15 @@
                 "const": "boring-cdc-m1-ddl-fixtures"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-DDL-CONFLICT-MATRIX\"}=1",
+                  "state": "guard_held",
+                  "status_code": "pg_ddl_conflict_matrix"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-DDL-CONFLICT-MATRIX"
@@ -1729,20 +1284,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -1767,40 +1319,15 @@
                 "const": "boring-cdc-m1-ddl-fixtures"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 78,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-DDL-IDLE-POLL\"}=1",
+                  "state": "schema_requires_reseed",
+                  "status_code": "pg_ddl_idle_poll"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-DDL-IDLE-POLL"
@@ -1838,20 +1365,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -1876,40 +1400,15 @@
                 "const": "boring-cdc-m1-ddl-fixtures"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-DDL-IMMEDIATE-DML\"}=1",
+                  "state": "capture_paused_for_schema",
+                  "status_code": "pg_ddl_immediate_dml"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-DDL-IMMEDIATE-DML"
@@ -1947,20 +1446,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -1985,40 +1481,15 @@
                 "const": "boring-cdc-m3-schema-guard"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-DDL-WAITER-INVALIDATE\"}=1",
+                  "state": "snapshot_unusable",
+                  "status_code": "pg_ddl_waiter_invalidate"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-DDL-WAITER-INVALIDATE"
@@ -2057,20 +1528,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -2095,40 +1563,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-BOOTSTRAP-IMPORTS\"}=1",
+                  "state": "anchor_pending_fence",
+                  "status_code": "pg_bootstrap_imports"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-BOOTSTRAP-IMPORTS"
@@ -2171,20 +1614,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -2209,40 +1649,15 @@
                 "const": "boring-cdc-m3-faults"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-BOOTSTRAP-EXPORTER-LOSS\"}=1",
+                  "state": "snapshot_unusable",
+                  "status_code": "pg_bootstrap_exporter_loss"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-BOOTSTRAP-EXPORTER-LOSS"
@@ -2286,20 +1701,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -2324,40 +1736,15 @@
                 "const": "boring-cdc-m3-restart"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-EXISTING-SLOT-STITCH\"}=1",
+                  "state": "copying_snapshot",
+                  "status_code": "pg_existing_slot_stitch"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-EXISTING-SLOT-STITCH"
@@ -2400,20 +1787,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -2438,40 +1822,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "advanced_to_fence_transaction",
+                  "exit_code": 0,
+                  "external_effect": "durable anchor proof",
+                  "feedback": "eligible_durable_boundary",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CAPTURE-FENCE\"}=1",
+                  "state": "anchor_complete",
+                  "status_code": "pg_capture_fence"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-CAPTURE-FENCE"
@@ -2507,20 +1866,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -2545,40 +1901,15 @@
                 "const": "boring-cdc-m3-restart"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-RETAINED-SLOT-RECOVERY\"}=1",
+                  "state": "existing_slot_generation_required",
+                  "status_code": "pg_retained_slot_recovery"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-RETAINED-SLOT-RECOVERY"
@@ -2613,20 +1944,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -2651,40 +1979,15 @@
                 "const": "boring-cdc-m2-pressure"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-WAL-HEADROOM\"}=1",
+                  "state": "wal_headroom_action",
+                  "status_code": "pg_wal_headroom"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-WAL-HEADROOM"
@@ -2728,20 +2031,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -2766,40 +2066,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-BEFORE-SLOT-CREATE\"}=1",
+                  "state": "prepared",
+                  "status_code": "pg_before_slot_create"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-BEFORE-SLOT-CREATE"
@@ -2832,20 +2107,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -2870,40 +2142,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-TOKEN-PERSIST\"}=1",
+                  "state": "snapshot_exported",
+                  "status_code": "pg_token_persist"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-TOKEN-PERSIST"
@@ -2938,20 +2185,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -2976,40 +2220,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-EXPORTER-RELEASE-BEFORE\"}=1",
+                  "state": "exporter_release_permitted",
+                  "status_code": "pg_exporter_release_before"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-EXPORTER-RELEASE-BEFORE"
@@ -3050,20 +2269,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -3088,40 +2304,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-EXPORTER-RELEASE-AFTER\"}=1",
+                  "state": "exporter_released",
+                  "status_code": "pg_exporter_release_after"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-EXPORTER-RELEASE-AFTER"
@@ -3157,20 +2348,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -3195,40 +2383,15 @@
                 "const": "boring-cdc-m1-decoder"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-START-REPLICATION\"}=1",
+                  "state": "streaming",
+                  "status_code": "pg_start_replication"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-START-REPLICATION"
@@ -3243,17 +2406,19 @@
                   "creation_floor_lsn": "0/16B6C00",
                   "durable_transaction_end_lsn": "0/16B6D00",
                   "expected_close_token": "close-run-fixture-0001-gen-3",
+                  "exporter_backend_pid": 4101,
                   "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
                   "fault_action": "crash_before_start_replication",
                   "fault_phase": "before_start_replication",
                   "fence_nonce_hex": "00112233445566778899aabbccddeeff",
                   "generation": 11,
+                  "guard_backend_pid": 4102,
                   "journal_checkpoint_seq": 101,
                   "last_feedback_lsn": "0/16B6C50",
                   "operation_deadline_ms": 1000,
                   "ownership_deadline_remaining_ms": 9000,
                   "phase": "before_start_replication",
-                  "pre_state": "exporter_released_replication_not_started",
+                  "pre_state": "snapshot_exported_replication_not_started",
                   "publication_name": "boring_cdc",
                   "run_id": "run-fixture-0001",
                   "slot_name": "boring_cdc_slot",
@@ -3261,20 +2426,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -3299,40 +2461,15 @@
                 "const": "boring-cdc-m2-capture-runtime"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "creation_floor_repeat",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-FIRST-FEEDBACK\"}=1",
+                  "state": "streaming",
+                  "status_code": "pg_first_feedback"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-FIRST-FEEDBACK"
@@ -3347,11 +2484,19 @@
                   "creation_floor_lsn": "0/16B6C00",
                   "durable_transaction_end_lsn": "0/16B6D00",
                   "expected_close_token": "close-run-fixture-0001-gen-3",
+                  "exporter_backend_pid": 4101,
                   "failure_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
                   "fault_action": "request_first_feedback_while_importer_gate_active",
                   "fault_phase": "before_first_feedback",
                   "fence_nonce_hex": "00112233445566778899aabbccddeeff",
                   "generation": 11,
+                  "guard_backend_pid": 4102,
+                  "importer_acknowledged": 0,
+                  "importer_backend_pids": [
+                    4103,
+                    4104
+                  ],
+                  "importer_expected": 2,
                   "journal_checkpoint_seq": 101,
                   "last_feedback_lsn": "0/16B6C50",
                   "operation_deadline_ms": 1000,
@@ -3365,20 +2510,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -3403,40 +2545,15 @@
                 "const": "boring-cdc-m2-spool"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "advanced_to_fence_transaction",
+                  "exit_code": 75,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-COMMIT-FEEDBACK-CRASH\"}=1",
+                  "state": "streaming",
+                  "status_code": "pg_commit_feedback_crash"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-COMMIT-FEEDBACK-CRASH"
@@ -3469,20 +2586,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -3507,40 +2621,15 @@
                 "const": "boring-cdc-m2-capture-runtime"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-SAFE-STOP-PERSIST-BEFORE\"}=1",
+                  "state": "capture_block_pending",
+                  "status_code": "pg_safe_stop_persist_before"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-SAFE-STOP-PERSIST-BEFORE"
@@ -3573,20 +2662,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -3611,40 +2697,15 @@
                 "const": "boring-cdc-m2-ownership"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-EXPECTED-CLOSE-TOKEN\"}=1",
+                  "state": "capture_safe_stopped",
+                  "status_code": "pg_expected_close_token"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-EXPECTED-CLOSE-TOKEN"
@@ -3677,20 +2738,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -3715,40 +2773,15 @@
                 "const": "boring-cdc-m2-ownership"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 75,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-ADVISORY-PROBE-LATE\"}=1",
+                  "state": "ownership_lost",
+                  "status_code": "pg_advisory_probe_late"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-ADVISORY-PROBE-LATE"
@@ -3781,20 +2814,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -3819,40 +2849,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-SNAPSHOT-EXPORT-AFTER-GUARD\"}=1",
+                  "state": "guard_held",
+                  "status_code": "pg_snapshot_export_after_guard"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-SNAPSHOT-EXPORT-AFTER-GUARD"
@@ -3886,20 +2891,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -3924,40 +2926,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-CHUNK-COMMIT\"}=1",
+                  "state": "copying_snapshot",
+                  "status_code": "pg_chunk_commit"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-CHUNK-COMMIT"
@@ -3998,20 +2975,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -4036,40 +3010,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-FENCE-UPDATE-BEFORE\"}=1",
+                  "state": "fence_intent_persisted",
+                  "status_code": "pg_fence_update_before"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-FENCE-UPDATE-BEFORE"
@@ -4103,20 +3052,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -4141,40 +3087,15 @@
                 "const": "boring-cdc-m3-bootstrap"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-FENCE-UPDATE-AFTER\"}=1",
+                  "state": "anchor_pending_fence",
+                  "status_code": "pg_fence_update_after"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-FENCE-UPDATE-AFTER"
@@ -4208,20 +3129,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"
@@ -4246,40 +3164,15 @@
                 "const": "boring-cdc-m3-schema-guard"
               },
               "expected": {
-                "additionalProperties": false,
-                "properties": {
-                  "checkpoint": {
-                    "type": "string"
-                  },
-                  "exit_code": {
-                    "type": "integer"
-                  },
-                  "external_effect": {
-                    "type": "string"
-                  },
-                  "feedback": {
-                    "type": "string"
-                  },
-                  "metric": {
-                    "type": "string"
-                  },
-                  "state": {
-                    "type": "string"
-                  },
-                  "status_code": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "state",
-                  "exit_code",
-                  "checkpoint",
-                  "feedback",
-                  "external_effect",
-                  "status_code",
-                  "metric"
-                ],
-                "type": "object"
+                "const": {
+                  "checkpoint": "unchanged",
+                  "exit_code": 0,
+                  "external_effect": "none",
+                  "feedback": "unchanged",
+                  "metric": "boring_cdc_fixture_outcome{fixture_id=\"SCN-M0-PG-GUARD-LOSS\"}=1",
+                  "state": "snapshot_unusable",
+                  "status_code": "pg_guard_loss"
+                }
               },
               "fixture_id": {
                 "const": "SCN-M0-PG-GUARD-LOSS"
@@ -4315,20 +3208,17 @@
                 }
               },
               "preconditions": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 1,
-                "type": "array"
+                "const": [
+                  "exclusive local and source ownership unless fixture asserts loss",
+                  "contract fingerprint matches"
+                ]
               },
               "redaction": {
-                "items": {
-                  "minLength": 1,
-                  "type": "string"
-                },
-                "minItems": 3,
-                "type": "array"
+                "const": [
+                  "dsn absent",
+                  "password absent",
+                  "absolute paths absent"
+                ]
               },
               "seed": {
                 "const": "0x50474344434d305631"

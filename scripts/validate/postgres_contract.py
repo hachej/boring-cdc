@@ -184,7 +184,11 @@ LIFECYCLE_EXPECTATIONS = {'SCN-M0-PG-ADVISORY-PROBE-LATE': {'fault_action': 'del
                               'fault_phase': 'before_first_feedback',
                               'phase': 'before_first_feedback',
                               'pre_state': 'replication_started_feedback_gated',
-                              'process': {}},
+                              'process': {'exporter_backend_pid': 4101,
+                                          'guard_backend_pid': 4102,
+                                          'importer_acknowledged': 0,
+                                          'importer_backend_pids': [4103, 4104],
+                                          'importer_expected': 2}},
  'SCN-M0-PG-GUARD-LOSS': {'fault_action': 'disconnect_guard_before_durable_fence',
                           'fault_phase': 'guard_connection_loss',
                           'phase': 'guard_connection_loss',
@@ -238,8 +242,8 @@ LIFECYCLE_EXPECTATIONS = {'SCN-M0-PG-ADVISORY-PROBE-LATE': {'fault_action': 'del
  'SCN-M0-PG-START-REPLICATION': {'fault_action': 'crash_before_start_replication',
                                  'fault_phase': 'before_start_replication',
                                  'phase': 'before_start_replication',
-                                 'pre_state': 'exporter_released_replication_not_started',
-                                 'process': {}},
+                                 'pre_state': 'snapshot_exported_replication_not_started',
+                                 'process': {'exporter_backend_pid': 4101, 'guard_backend_pid': 4102}},
  'SCN-M0-PG-TOKEN-PERSIST': {'fault_action': 'crash_after_snapshot_token_journal_commit',
                              'fault_phase': 'after_snapshot_token_persist',
                              'phase': 'after_snapshot_token_persist',
@@ -281,7 +285,7 @@ FIXTURE_INPUT_SHA256 = {'SCN-M0-PG-ADVISORY-PROBE-LATE': 'cc6e5c4b63ca974fd0acf4
  'SCN-M0-PG-EXPORTER-RELEASE-BEFORE': '4a22cf61cdde1e3534a72ca49fc516e3c0088b379c6d099fe3974da3ee00237f',
  'SCN-M0-PG-FENCE-UPDATE-AFTER': '8a1382be58c83f1e931c8fd2752503847f20c37d498a10a5f399ca393e9c8972',
  'SCN-M0-PG-FENCE-UPDATE-BEFORE': '06fdeb9154e7e8cf375ed808a08f5375182e644955edc82d6643a096356c975f',
- 'SCN-M0-PG-FIRST-FEEDBACK': '00318b49adf1617e7066924112c0559cc56bd886ec26e5161e00633d70a15b7f',
+ 'SCN-M0-PG-FIRST-FEEDBACK': '478b5e175631afe6ce434747e6ea9c877df5ef44f56b99d7e2eaf1baaff33b2d',
  'SCN-M0-PG-GUARD-LOSS': 'd5734ea37c8502f648d9166a68abff63008391907ea97bff5d4fc3058a8955a3',
  'SCN-M0-PG-KEEPALIVE-REPLY': 'd50f69b76d4f164e057fbe1f7fcd48e04f44aab860a1e1cf9ef744114d4e40a7',
  'SCN-M0-PG-ORIGIN-ORDINAL': 'fd763458daa1e992cfa93ea62c90f5e6122ad24c401ce1214fe5b773f8e13847',
@@ -292,10 +296,51 @@ FIXTURE_INPUT_SHA256 = {'SCN-M0-PG-ADVISORY-PROBE-LATE': 'cc6e5c4b63ca974fd0acf4
  'SCN-M0-PG-SAFE-STOP-PERSIST-BEFORE': '730cf13390059172447b2102a982adbb573fc480338b5876b3b3147c5db5c02d',
  'SCN-M0-PG-SLOW-COMMIT-REQUESTED-REPLY': '8fc7471fcc782f2cc5429c71a08b02c5025c777e21e2e7abddd35a051b2c96ad',
  'SCN-M0-PG-SNAPSHOT-EXPORT-AFTER-GUARD': '270202d20884b30f86c08073753963fa3e6ea98c8b362fb14c69dc1ce2f42f9b',
- 'SCN-M0-PG-START-REPLICATION': 'f5aa6c3c84a84cafba9b6ec1d28a8b97b3ef33f2725c6c50024f04f9fb6e54f6',
+ 'SCN-M0-PG-START-REPLICATION': '89072fbf16e2cc7737c414f06c1dbdc6674c6d48531877da00eaccb0f74c7ec7',
  'SCN-M0-PG-TOKEN-PERSIST': 'fbc17dbda596d360083bd08ee64427edd9b992d9444e9350ddc7807de5606e0d',
  'SCN-M0-PG-UNEXPECTED-COPYBOTH-LOSS': '25bb7bcdc79379a514ca301defb88e355ab6e77d499e9f7937cb62a82ae9b842',
  'SCN-M0-PG-WAL-HEADROOM': '905de8830979cca6e1e4ec9ac5067113196934b1564e4211f1e579395e231801'}
+
+FIXTURE_CASE_SHA256 = {'SCN-M0-PG-ADVISORY-PROBE-LATE': '88c46d63e5ab7614bfea9f43ad19bece4b0f5087018d51b81767f1f6a1346ecd',
+ 'SCN-M0-PG-AMBIGUOUS-SLOT': '1ded8eec66e700be5435f054063d95d13d6af2e07a6171b1efd786cb59579e68',
+ 'SCN-M0-PG-BEFORE-SLOT-CREATE': '3b6c74a0e4646f1bccff8f959d80f1047e810560fe0e49ab1e32c5964fee7f78',
+ 'SCN-M0-PG-BOOTSTRAP-EXPORTER-LOSS': '49b450e2a0d8f6f7c2957f8afc0e2bf59a4e04e2cd46499abc0cdd59dac35ebc',
+ 'SCN-M0-PG-BOOTSTRAP-IMPORTS': 'ed75cf7a490b551e9eee68f0ba2e13aa9dc0a418026adc78aad0be6a4da826c8',
+ 'SCN-M0-PG-CAPTURE-FENCE': 'd9c00e42b92fdadd6944c0c3242f10d5a5d5a9d507695746c5b2b73358713d85',
+ 'SCN-M0-PG-CHUNK-COMMIT': '495d50b973cdf734deccc77db9e4e3010e1b7e691a012fd62a9199c450530cb2',
+ 'SCN-M0-PG-COMMIT-FEEDBACK-CRASH': 'c84ba62a719587b66981d418fa260c6772aa782fc9cf3f83ec9c17de190f2168',
+ 'SCN-M0-PG-CONTROL-CARDINALITY': '21df9b3e5cf29bec7032c5d7c7e05fc581cb90d515803940f662a7013b366587',
+ 'SCN-M0-PG-CONTROL-PRIVILEGES': 'ef861da4f063d19c2ff7239fb2870072128498352f87f9026605b8b904b9c784',
+ 'SCN-M0-PG-COPYBOTH-FRAMES': '62fe1e0782dc064468213ae36662a57174ecf6e0515b0f0930b58a7e9b5fc304',
+ 'SCN-M0-PG-CREATION-FLOOR-EQUAL': '5fd37cb022f1883ed0d2875bd8e22a5ede1512aaa3eafa64880093e43492b816',
+ 'SCN-M0-PG-CREATION-FLOOR-INVALID-SLOT': '6fb1e8926cd74c59c9c3d0158353395f290df349c9492532d6c6dcc4a3b9bbce',
+ 'SCN-M0-PG-CREATION-FLOOR-NULL': '08701e73b48301c5c9f67eb8350c84fe2b2328d3c108ba4e4b3c3b79dbad072d',
+ 'SCN-M0-PG-CREATION-FLOOR-WAL-UNAVAILABLE': 'db3e037dc09f54712c8e5758acf8e42d6df96e642766aeb323bdacb3749c30cb',
+ 'SCN-M0-PG-DDL-CONFLICT-MATRIX': '3561175c9a3ad42ee5d124632e816144b3a2d5884df64b10bd209c182e87a560',
+ 'SCN-M0-PG-DDL-IDLE-POLL': '297cb6bd16e6dbd4a68c65a60e6c1c0ff1053e9d1a54866105659f40dbc8156a',
+ 'SCN-M0-PG-DDL-IMMEDIATE-DML': 'b034fd5ea21662ce860d032b7d72293aeb2f3c1de181bf0c3a00938209976a10',
+ 'SCN-M0-PG-DDL-WAITER-INVALIDATE': '3f3cd4ac63b447f66b751e76c0deb9c6cf810af3133d935c0eabb1e370a05b3a',
+ 'SCN-M0-PG-EXISTING-SLOT-STITCH': '6d9fd4d19961d1f77a8b0139ed6bc01bff731b653e591097da6949239d55ae76',
+ 'SCN-M0-PG-EXPECTED-CLOSE-TOKEN': '38f9a6c4b8c1401f69fc992b5e01a6dec3bee8009ef9f7acac6862ed91c14a6f',
+ 'SCN-M0-PG-EXPORTER-RELEASE-AFTER': 'fcd57891ab746a1b4bc4c5a7eea5b8bd7eb6fa7bcfc9d6278bcba3e7d115e56c',
+ 'SCN-M0-PG-EXPORTER-RELEASE-BEFORE': '98283f41b6cec78b9e5afb314ba039e3ad4e2120d7d8b72e141b53c7dbd298cf',
+ 'SCN-M0-PG-FENCE-UPDATE-AFTER': 'af60de1289c397fec768076370d2b33115a18f63d18ff6117cca0b202fcd23b3',
+ 'SCN-M0-PG-FENCE-UPDATE-BEFORE': '9723804f63b71274735f73d110b06b9c5751e5247c25cbcf21ef5454e37f1422',
+ 'SCN-M0-PG-FIRST-FEEDBACK': '457b29b5544d810be87be6eddfa456f65059dc59290dfca60d32a0cdc3805884',
+ 'SCN-M0-PG-GUARD-LOSS': '86afa11cce2a5402514917b21a2ccbe5044a417b6dcd12d12e132f26b579f491',
+ 'SCN-M0-PG-KEEPALIVE-REPLY': '4759e804ce85f0d7b08f596d418d0c4e7302fbb83353e4fbdb9fafd52ce7dc6b',
+ 'SCN-M0-PG-ORIGIN-ORDINAL': '2ad8a854d8ce6f4f356e1c3270414458ccd84a5b11dcc3e133d212b0901ef5bf',
+ 'SCN-M0-PG-PUBLICATION-DRIFT': '1d453d3aeefc38a6fcf62ecc54038a682d062ab692977abaf54a1d5e2354f629',
+ 'SCN-M0-PG-RESTART-MAX': '6b8faf6cbbb30886f4ce36568cdee8b518ad2851c9298b21d57121f2e709d457',
+ 'SCN-M0-PG-RETAINED-SLOT-RECOVERY': 'b3343c7f60da63e7d28109ac2451fc0efc2c5ac3f9d83fd978d921c3fb1cffa5',
+ 'SCN-M0-PG-SAFE-STOP-CLOSE': '4d091c322b620747b2da2075d56d61a5698bb8068fa3dc006f383767669a688c',
+ 'SCN-M0-PG-SAFE-STOP-PERSIST-BEFORE': 'fde0c702efd106beb37d8280c9b7d0cc51450922279b6dc96d7df06986d59954',
+ 'SCN-M0-PG-SLOW-COMMIT-REQUESTED-REPLY': '8da8faf7c3a2c1d2c21e61ac4756af59bd0d7f57d6c20808db264c16669d95ea',
+ 'SCN-M0-PG-SNAPSHOT-EXPORT-AFTER-GUARD': 'bdbc17180fd582ec97da4c099deb85f50eeefe0c291cb4075fb51f5c79113ded',
+ 'SCN-M0-PG-START-REPLICATION': '4b2a3200c83f9082841b47b8cdfc1a3906c34cc93d2892abf9f9869bf470f8d3',
+ 'SCN-M0-PG-TOKEN-PERSIST': '533f5c98313072bd58aa3ea72d0b3380c6cc454ab384c656c31292e17bea8599',
+ 'SCN-M0-PG-UNEXPECTED-COPYBOTH-LOSS': '4fa1d6f723d830e45133020084903c4b0571fa8da808fa59545980dc8974d36a',
+ 'SCN-M0-PG-WAL-HEADROOM': '5cc8bdb1f1f5cc4cd5a8f4203f7dae60196b24122ea6c13ce55111e03ae447f1'}
 
 def validate_fixture_semantics(cases, findings):
     """Reject phase-impossible process state and nominal lifecycle placeholders."""
@@ -309,6 +354,10 @@ def validate_fixture_semantics(cases, findings):
         encoded_inputs = json.dumps(inputs, sort_keys=True, separators=(",", ":")).encode()
         if hashlib.sha256(encoded_inputs).hexdigest() != FIXTURE_INPUT_SHA256[fixture_id]:
             finding(findings, "E_FIXTURE_INPUT_DIGEST", fixture_id, "exact branch input vector changed")
+        case_semantics = {key: case.get(key) for key in ("executor_id", "seed", "inputs", "preconditions", "hook", "expected", "redaction")}
+        encoded_case = json.dumps(case_semantics, sort_keys=True, separators=(",", ":")).encode()
+        if hashlib.sha256(encoded_case).hexdigest() != FIXTURE_CASE_SHA256[fixture_id]:
+            finding(findings, "E_FIXTURE_CASE_DIGEST", fixture_id, "exact prerequisites/outcome/redaction vector changed")
         for field in ("pre_state", "phase", "fault_phase", "fault_action"):
             if inputs.get(field) != expected[field]:
                 finding(findings, "E_FIXTURE_LIFECYCLE", fixture_id, f"{field} must be {expected[field]!r}")
@@ -488,14 +537,17 @@ def validate():
 def main():
     findings, inputs = validate()
     prior = load(EVIDENCE) if EVIDENCE.exists() else {}
-    source_parent = prior.get("source_parent_git_commit") or subprocess.check_output(
+    validator_sha256 = hashlib.sha256(VALIDATOR.read_bytes()).hexdigest()
+    prior_matches_inputs = prior.get("inputs") == inputs and prior.get("validator_sha256") == validator_sha256
+    source_parent = prior.get("source_parent_git_commit") if prior_matches_inputs else None
+    source_parent = source_parent or subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
     ).strip()
     tree_material = b"".join((path + "\0" + digest + "\n").encode() for path, digest in sorted(inputs.items()))
     evidence = {
         "schema_version": "m0-postgres-contract-evidence/v1", "owner_bead": OWNER,
         "status": "pass" if not findings else "fail", "validator": "scripts/validate/postgres_contract.py",
-        "validator_sha256": hashlib.sha256(VALIDATOR.read_bytes()).hexdigest(),
+        "validator_sha256": validator_sha256,
         "source_parent_git_commit": source_parent,
         "input_tree_sha256": hashlib.sha256(tree_material).hexdigest(),
         "inputs": inputs, "fixture_count": len(load(FIXTURES)["cases"]), "findings": findings,

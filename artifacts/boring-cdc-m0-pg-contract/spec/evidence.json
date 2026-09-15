@@ -1,21 +1,21 @@
 {
   "findings": [],
   "fixture_count": 40,
-  "input_tree_sha256": "0bd2f0eb7147c172628b941827d62105d74be9f7e1839974691df8a7d3254f99",
+  "input_tree_sha256": "46d73298129f04e1bb089b6a885fc8d25a7aecd3b8ad3090687737660409df80",
   "inputs": {
-    "contracts/postgres/capture-backfill-fixtures.schema.json": "d4d8451b385a534de5a5046021b8e215ec5e44b9cfdf8638a45aded297112ecd",
+    "contracts/postgres/capture-backfill-fixtures.schema.json": "5bb6b1d9a37245dfd43e13266a0bd29c47a68771f5b57675cdde85843926f6d5",
     "contracts/postgres/capture-backfill.json": "dbc36feb8faa0e2e89258a3f2918f1c91739f9c1a99849f8b790533bdae3cf07",
     "contracts/postgres/capture-backfill.schema.json": "81f8e94bc0e3dbf121bd0abdd672e412ae6d675c77839ae5ad37f83142a70ff8",
     "contracts/postgres/postgres-contract-evidence.schema.json": "c05e3e2d247ab5a8de8081dfaa147ba715e592055a1e31b23f01c95367650e8a",
     "contracts/postgres/roles-grants.sql": "f8f4de681c52540741b5c2c1a1287d284c65cfb9f5c843341e23c83fa9127875",
-    "fixtures/m0/postgres/capture-backfill.json": "75714a37bc69d1af13f4ccb2d6d4fce95183e79c9177e2fef73ad8daec63ea85"
+    "fixtures/m0/postgres/capture-backfill.json": "038137fda734811812aac01b76e80f724a088cbd44bf2f5383872c374dcb0425"
   },
   "owner_bead": "boring-cdc-m0-pg-contract",
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-postgres-contract-evidence/v1",
-  "source_parent_git_commit": "162ce32d042b81d48b8f38d13188ca4f11851a9d",
+  "source_parent_git_commit": "f2d4fbdf5495b0ef4f6f9193033f86038e7d418d",
   "status": "pass",
   "validator": "scripts/validate/postgres_contract.py",
-  "validator_sha256": "7dbf993b48031eea101645c71d7691806a476c6a47acff66476c871cef0a1242"
+  "validator_sha256": "ca2a7e667ef05489925e3b675446fba7c7191ceb03ebba75771691dd6126bc97"
 }

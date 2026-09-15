@@ -49,9 +49,18 @@ class PostgresContractTests(unittest.TestCase):
         findings = []
         postgres_contract.validate_fixture_semantics(cases, findings)
         self.assertEqual(
-            {"E_FIXTURE_INPUT_DIGEST", "E_FIXTURE_LIFECYCLE", "E_FIXTURE_PROCESS_STATE"},
+            {"E_FIXTURE_CASE_DIGEST", "E_FIXTURE_INPUT_DIGEST", "E_FIXTURE_LIFECYCLE", "E_FIXTURE_PROCESS_STATE"},
             {item["code"] for item in findings},
         )
+
+    def test_expected_outcomes_and_preconditions_are_exact(self):
+        cases = copy.deepcopy(self.fixtures["cases"])
+        guard_loss = next(case for case in cases if case["fixture_id"] == "SCN-M0-PG-GUARD-LOSS")
+        guard_loss["expected"]["state"] = "anchor_complete"
+        guard_loss["preconditions"] = ["anything"]
+        findings = []
+        postgres_contract.validate_fixture_semantics(cases, findings)
+        self.assertIn("E_FIXTURE_CASE_DIGEST", {item["code"] for item in findings})
 
     def test_fixture_schema_is_discriminated_by_fixture_id(self):
         fixtures = copy.deepcopy(self.fixtures)
