@@ -1,14 +1,14 @@
- Network m2-reconcile-31320-77633_default  Creating
- Network m2-reconcile-31320-77633_default  Created
- Volume "m2-reconcile-31320-77633_pgdata"  Creating
- Volume "m2-reconcile-31320-77633_pgdata"  Created
- Container m2-reconcile-31320-77633-postgres-1  Creating
- Container m2-reconcile-31320-77633-postgres-1  Created
- Container m2-reconcile-31320-77633-postgres-1  Starting
- Container m2-reconcile-31320-77633-postgres-1  Started
- Container m2-reconcile-31320-77633-postgres-1  Waiting
- Container m2-reconcile-31320-77633-postgres-1  Healthy
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+ Network m2-reconcile-5419-142470_default  Creating
+ Network m2-reconcile-5419-142470_default  Created
+ Volume "m2-reconcile-5419-142470_pgdata"  Creating
+ Volume "m2-reconcile-5419-142470_pgdata"  Created
+ Container m2-reconcile-5419-142470-postgres-1  Creating
+ Container m2-reconcile-5419-142470-postgres-1  Created
+ Container m2-reconcile-5419-142470-postgres-1  Starting
+ Container m2-reconcile-5419-142470-postgres-1  Started
+ Container m2-reconcile-5419-142470-postgres-1  Waiting
+ Container m2-reconcile-5419-142470-postgres-1  Healthy
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
      Running unittests src/lib.rs (target/debug/deps/boring_cdc-215a04c5a0e6b11d)
      Running unittests src/main.rs (target/debug/deps/boring_cdc-175d1f19bac9dae3)
      Running tests/compile_fail.rs (target/debug/deps/compile_fail-8b561352160a8d94)

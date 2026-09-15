@@ -1,3 +1,4 @@
+    Checking boring-cdc v0.1.0 (/home/ubuntu/projects/boring-cdc/.worktrees/epic-boring-cdc-m2)
 warning: file opened with `create`, but `truncate` behavior not defined
   --> src/m2_init_recovery.rs:70:10
    |
@@ -172,6 +173,7 @@ warning: this function has too many arguments (12/7)
      |
      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
 
+warning: `boring-cdc` (lib) generated 13 warnings (run `cargo clippy --fix --lib -p boring-cdc` to apply 4 suggestions)
 warning: useless use of `vec!`
     --> src/m2_spool.rs:1407:22
      |
@@ -189,6 +191,5 @@ warning: useless use of `vec!`
      |
      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_vec
 
-warning: `boring-cdc` (lib) generated 13 warnings (run `cargo clippy --fix --lib -p boring-cdc` to apply 4 suggestions)
 warning: `boring-cdc` (lib test) generated 15 warnings (13 duplicates) (run `cargo clippy --fix --lib -p boring-cdc --tests` to apply 2 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.27s
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.39s
