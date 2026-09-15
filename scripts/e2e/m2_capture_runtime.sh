@@ -46,9 +46,8 @@ assert tx[0]==1 and ev==2 and tx[1] is not None
 print('{"journal_transactions":1,"journal_events":2,"feedback_bounded":true,"server_feedback_positions":"%s"}'%sys.argv[2])
 PY2
 version=$(psqlc -Atqc 'show server_version'); [[ "$version" == 17.6* ]]
-printf '{"command":"CMD-RUN","exit":0,"postgres":"%s","server_feedback_positions":"%s"}
-' "$version" "$feedback" >"$work/runtime.out"
-export M2_RUNTIME_OUTPUT="$work/runtime.out" M2_POSTGRES_VERSION="$version"
+printf '{"command":"CMD-RUN","exit":0,"postgres":"%s","journal_transactions":1,"journal_events":2,"durable_before_feedback":true,"server_feedback_positions":"%s"}\n' "$version" "$feedback" >"$work/observation.json"
+export M2_RUNTIME_OUTPUT="$work/runtime.out" M2_RUNTIME_OBSERVATION="$work/observation.json" M2_POSTGRES_VERSION="$version"
 python3 scripts/lib/m2_capture_runtime_evidence.py e2e
 scripts/validate/evidence.sh artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-E2E/capture-runtime-production-v1/evidence.json
 echo "M2_CAPTURE_RUNTIME_E2E_OK postgres=$version durable_before_feedback=true"
