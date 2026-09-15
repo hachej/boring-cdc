@@ -2,57 +2,57 @@
   "schema_version": "m2-fault-status-manifest/v1",
   "bead_id": "boring-cdc-m2-fault-status",
   "scenario_id": "SCN-M2-FAULT-STATUS-MILESTONE",
-  "git_commit": "41a0fcbc1c6a639f10c535f7329a456cb032189d",
-  "source_tree": "c212b3f62aae534851eba185f6af1e28be807c70",
-  "binary_sha256": "bf06ae9035a5f4b19d35d4177b9004d33128a702e0fc9fc2988dc567b918cf5a",
+  "git_commit": "3fc741d43059b3cadd2e556370f25fa2c007064d",
+  "source_tree": "411fe1b7711f01ebf59685c104903e067b5df9fe",
+  "binary_sha256": "4eb5fdd5322d4709445b7a9bebf54f7f608d1b9cb99315cb56487be37b809c94",
   "postgres_image": "docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
   "seed": "pg17-seed-1",
   "profile": "clean-compose",
   "commands": [
     {
       "argv": "cargo clippy --locked --all-targets",
-      "version": "m2-fault-status/v2",
+      "version": "m2-fault-status/v3",
       "exit_code": 0,
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stdout",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stderr",
-      "stderr_sha256": "4316b3a201d6dc9237dbe96f868a23a36b33f8c82eeaf305519e9d8853852717"
+      "stderr_sha256": "e68401d0597e1d46e0cc58d51092b3e2aa228f1de64ffd5014f5bb5f28c879ca"
     },
     {
       "argv": "cargo test --locked --workspace --all-targets",
-      "version": "m2-fault-status/v2",
+      "version": "m2-fault-status/v3",
       "exit_code": 0,
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stdout",
-      "stdout_sha256": "83dad9ff178670938891db188f5a0cfcb6a9c9da7d04c497bf0485eb1ddd17b8",
+      "stdout_sha256": "abd71f26d19376b435b26edb1cd402f1943d5dde85e679bd9d87305160398d44",
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stderr",
-      "stderr_sha256": "bd3def5df8a1bd5d44760a2f3f5a88e08ffa27f5f54986c118d409c6ecfada89"
+      "stderr_sha256": "1d3fc95b58d8d003fc9c87122144ae9bdc2cf575b2d94628cec4df1feb30f272"
     },
     {
       "argv": "cargo test --locked m2_fault_status::tests",
-      "version": "m2-fault-status/v2",
+      "version": "m2-fault-status/v3",
       "exit_code": 0,
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stdout",
-      "stdout_sha256": "70061931ccb79573a68b7a262295083b4ed07e474bc8dd2885bcb8321d72ffa4",
+      "stdout_sha256": "e1b2061bbf3b6a7c5b83521821d077b040356f48a5cbabf3d45e0b3825e307c9",
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stderr",
-      "stderr_sha256": "91d0f20d151e8742e709ee25a76c932cc09ed4507898217f7c655b722935da0c"
+      "stderr_sha256": "d442e9a0036c74c870651f3529c008517b1610a7ee7203af2507d87489594905"
     },
     {
       "argv": "scripts/e2e/m2_fault_status.sh",
-      "version": "m2-fault-status/v2",
+      "version": "m2-fault-status/v3",
       "exit_code": 0,
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stdout",
       "stdout_sha256": "2621186a88727c197c102348410e9b455abd637871a7908ea9b1744fec6079b4",
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stderr",
-      "stderr_sha256": "c5c6f9a522ff1300d896a6f967ac065e08dcb371ed79f2eb5238483e081d67e8"
+      "stderr_sha256": "7044783855ef09e3efa0fa243de5ca66e7bfad33e42b4b4c9f607476e7fd8bdf"
     },
     {
       "argv": "scripts/faults/m2_fault_status.sh",
-      "version": "m2-fault-status/v2",
+      "version": "m2-fault-status/v3",
       "exit_code": 0,
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stdout",
-      "stdout_sha256": "e050484378d6f33a0051af572b3332b891f5d330d23d7674d49b2d7d16654736",
+      "stdout_sha256": "f3374f122eb5ab5c7c0fd55bef76643fe41996f771bf0a23d02059952193d587",
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stderr",
-      "stderr_sha256": "d9cafbcbdebda868db830d66f75319dba42d2139a301911accc8057bd4992e08"
+      "stderr_sha256": "50d967e2a05e44d01a884ad779775769b3b961b891fabff95474f7afa1ec047e"
     }
   ],
   "config_fingerprint": "sha256:b79606fb3afea5bd1609ed40b622142f1c98125abcfe89a76a661b0e8e343910",

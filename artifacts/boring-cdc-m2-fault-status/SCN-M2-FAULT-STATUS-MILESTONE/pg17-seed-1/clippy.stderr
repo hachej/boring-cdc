@@ -1,3 +1,16 @@
+warning: this boolean expression can be simplified
+   --> src/m1_config.rs:613:12
+    |
+613 |           if name.starts_with("BORING_CDC_")
+    |  ____________^
+614 | |             && !APPROVED_OVERRIDES.contains(&name.as_str())
+615 | |             && !(cfg!(debug_assertions) && name == "BORING_CDC_M2_FAULT_HOOK")
+616 | |             && !secret_names.iter().any(|secret| secret.as_str() == name)
+    | |_________________________________________________________________________^ help: try: `!(!name.starts_with("BORING_CDC_") || APPROVED_OVERRIDES.contains(&name.as_str()) || secret_names.iter().any(|secret| secret.as_str() == name) || cfg!(debug_assertions) && name == "BORING_CDC_M2_FAULT_HOOK")`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#nonminimal_bool
+    = note: `#[warn(clippy::nonminimal_bool)]` on by default
+
 warning: file opened with `create`, but `truncate` behavior not defined
   --> src/m2_init_recovery.rs:70:10
    |
@@ -189,6 +202,6 @@ warning: useless use of `vec!`
      |
      = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_vec
 
-warning: `boring-cdc` (lib) generated 13 warnings (run `cargo clippy --fix --lib -p boring-cdc` to apply 4 suggestions)
-warning: `boring-cdc` (lib test) generated 15 warnings (13 duplicates) (run `cargo clippy --fix --lib -p boring-cdc --tests` to apply 2 suggestions)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.28s
+warning: `boring-cdc` (lib) generated 14 warnings (run `cargo clippy --fix --lib -p boring-cdc` to apply 4 suggestions)
+warning: `boring-cdc` (lib test) generated 16 warnings (14 duplicates) (run `cargo clippy --fix --lib -p boring-cdc --tests` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.17s
