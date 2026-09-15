@@ -197,7 +197,7 @@ def validate():
         if expected["archive_state"].startswith("blocked") and expected["checkpoint"] != "unchanged":
             finding(out, "E_CHECKPOINT_SKIP", f"fixtures/cases/{index}", "blocked fixture advances checkpoint")
     if digest(C) != EXPECTED_CONTRACT_SHA256:
-        finding(out, "E_CONTRACT_DIGEST", "contracts/archive/archive-model.json", "entire approved contract changed without validator reconciliation")
+        finding(out, "E_CONTRACT_DIGEST", "contracts/archive/archive-model.json", "entire archive contract changed without validator reconciliation")
     if digest(F) != EXPECTED_FIXTURES_SHA256:
         finding(out, "E_FIXTURE_DIGEST", "fixtures/m0/archive/scenarios.json", "entire executable fixture corpus changed without validator reconciliation")
     try:

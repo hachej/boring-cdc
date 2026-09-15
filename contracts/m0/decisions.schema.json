@@ -72,6 +72,28 @@
           ]
         }
       },
+      "oneOf": [
+        {
+          "properties": {
+            "provisional_markers": { "type": "null" },
+            "status": { "const": "approved" }
+          },
+          "required": ["approval"]
+        },
+        {
+          "properties": {
+            "approval": { "type": "null" },
+            "status": { "const": "open" }
+          }
+        },
+        {
+          "properties": {
+            "approval": { "type": "null" },
+            "provisional_markers": { "type": "null" },
+            "status": { "const": "rejected" }
+          }
+        }
+      ],
       "required": [
         "id",
         "owner_bead",

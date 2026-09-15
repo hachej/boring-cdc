@@ -59,15 +59,23 @@ class Core(unittest.TestCase):
             row["provisional_markers"] = [marker]
             path.write_text(json.dumps(document))
             self.assertEqual(run("decisions", path).returncode, 0)
-            for mutation, code in (
-                (lambda value: value.update(status="approved"), "E_PROVISIONAL_STATE"),
-                (lambda value: value.update(provisional_markers=[marker + "/forged"]), "E_PROVISIONAL_MARKER"),
-                (lambda value: value.update(provisional_markers=[marker, marker]), "E_PROVISIONAL_MARKER"),
+            schema = ROOT / "contracts/m0/decisions.schema.json"
+            self.assertEqual(run("schema", path, "--schema", schema).returncode, 0)
+            for mutation, code, schema_code in (
+                (lambda value: value.update(status="approved"), "E_PROVISIONAL_STATE", "E_SCHEMA_ONE_OF"),
+                (lambda value: value.update(provisional_markers=[marker + "/forged"]), "E_PROVISIONAL_MARKER", "E_SCHEMA_PATTERN"),
+                (lambda value: value.update(provisional_markers=[marker, marker]), "E_PROVISIONAL_MARKER", "E_SCHEMA_UNIQUE_ITEMS"),
             ):
                 hostile = json.loads(json.dumps(document))
                 mutation(hostile["decisions"][0])
                 path.write_text(json.dumps(hostile))
                 self.assertCode(run("decisions", path), code)
+                self.assertCode(run("schema", path, "--schema", schema), schema_code)
+            approved_without_approval = json.loads(json.dumps(document))
+            approved_without_approval["decisions"][0].update(status="approved")
+            approved_without_approval["decisions"][0].pop("provisional_markers")
+            path.write_text(json.dumps(approved_without_approval))
+            self.assertCode(run("schema", path, "--schema", schema), "E_SCHEMA_ONE_OF")
 
     def test_empty_skeletons_valid_but_not_complete(self):
         with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:

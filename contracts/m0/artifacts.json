@@ -81,7 +81,7 @@
       "id": "ART-M0-ARCHIVE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "scripts/validate/archive_contract.py",
-      "sha256": "7bf09a22bf7b6b0dd1daedd92f22292430096649a49fff2b103dba22a68c3a93",
+      "sha256": "fae2d88199b265e6d05056b3903db0e41c86d9e2692442c74e68fb25c99c5cb6",
       "status": "complete"
     },
     {
