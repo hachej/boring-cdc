@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 7;
+pub const SCHEMA_VERSION: i64 = 8;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -359,6 +359,23 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_7_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v8: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=8)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v8 {
+            connection.execute_batch(MIGRATION_8)?;
+            connection.execute("INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(8,'journal-retention-clock',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[MIGRATION_8_CHECKSUM])?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=8",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_8_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -693,6 +710,19 @@ CREATE TABLE terminal_metadata_retention(
 CREATE TABLE orphan_diagnostics(
  diagnostic_id TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('active','resolved')),
  created_at_unix_ms INTEGER NOT NULL, resolved_at_unix_ms INTEGER);
+"#;
+
+const MIGRATION_8_CHECKSUM: &str =
+    "sha256:24a2fbf89f3ed0724851926faee98cb6e32b1644e2ae1715c212edc7056f21ca";
+const MIGRATION_8: &str = r#"
+CREATE TABLE journal_retention_clock(
+ transaction_id TEXT PRIMARY KEY REFERENCES source_transactions(transaction_id) ON DELETE CASCADE,
+ committed_at_unix_ms INTEGER NOT NULL);
+CREATE TRIGGER journal_retention_clock_insert AFTER INSERT ON source_transactions
+ WHEN NEW.state='committed' BEGIN
+ INSERT INTO journal_retention_clock(transaction_id,committed_at_unix_ms)
+ VALUES(NEW.transaction_id,CAST(unixepoch('subsec')*1000 AS INTEGER));
+ END;
 "#;
 
 #[cfg(test)]

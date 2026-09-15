@@ -10,7 +10,7 @@ def main():
  mode=sys.argv[1]; scenario='SCN-M2-PRESSURE-COMPONENT' if mode=='e2e' else 'SCN-M2-PRESSURE-READER-CONTENTION'; out=R/'artifacts/boring-cdc-m2-pressure'/scenario/SEED
  shutil.rmtree(out,ignore_errors=True); out.mkdir(parents=True)
  test=run(['cargo','test','--locked','m2_pressure::tests','--','--nocapture']); assert test.returncode==0,test.stderr
- impl=sha(b''.join((R/p).read_bytes() for p in ['src/m2_pressure.rs','src/m2_schema.rs','contracts/m2/pressure-cases.json']))
+ impl=sha(b''.join((R/p).read_bytes() for p in ['src/m2_pressure.rs','src/m2_schema.rs','src/m2_journal.rs','src/m2_capture_runtime.rs','contracts/m2/pressure-cases.json']))
  state={'pressure_order':['normal','warning','action','critical','hard'],'gc_transaction_aligned':True,'paused_destination_pin_visible':True,'expired_pin_requires_reconciliation':True,'checkpoint_mode':'RESTART','checkpoint_progress_visible':True,'incremental_vacuum_max_pages':1000,'automatic_full_vacuum':False,'wal_reseed_risk_visible':True,'reader_release_policy':'bounded progress-handler cancellation'}
  timeline=['threshold-evaluated','backfill-throttled','automatic-pin-safe-gc-audited','archive-backfill-stopped','materializers-draining','capture-safe-stopped']
  if mode=='fault': timeline=['reader-stalled','reader-cancelled-at-deadline','restart-checkpoint-progress-visible','wal-recycled-with-logical-pin-preserved']

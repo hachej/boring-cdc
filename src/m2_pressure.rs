@@ -210,6 +210,7 @@ pub struct PressureObservation<'a> {
     pub free_bytes: u64,
     pub capture_epoch: &'a str,
     pub replay_from_seq: u64,
+    pub replay_cutoff_unix_ms: Option<i64>,
     pub now_unix_ms: i64,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -226,11 +227,16 @@ pub fn service_pressure_tick(
     observation: PressureObservation<'_>,
 ) -> Result<PressureServiceResult, PressureError> {
     let decision = decide_pressure(observation.free_bytes, thresholds)?;
+    let replay_from_seq = if let Some(cutoff) = observation.replay_cutoff_unix_ms {
+        replay_floor_for_cutoff(writer, observation.capture_epoch, cutoff)?
+    } else {
+        observation.replay_from_seq
+    };
     let gc = if decision.actions.automatic_gc {
         Some(automatic_gc(
             writer,
             observation.capture_epoch,
-            observation.replay_from_seq,
+            replay_from_seq,
             observation.now_unix_ms,
             GC_MAX_TRANSACTIONS,
             GC_MAX_HOLD,
@@ -251,6 +257,23 @@ pub fn service_pressure_tick(
         gc,
         checkpoint,
     })
+}
+
+pub fn replay_floor_for_cutoff(
+    writer: &WriterConnection,
+    epoch: &str,
+    cutoff_unix_ms: i64,
+) -> Result<u64, PressureError> {
+    let missing:bool=writer.connection().query_row("SELECT EXISTS(SELECT 1 FROM source_transactions t LEFT JOIN journal_retention_clock c USING(transaction_id) WHERE t.capture_epoch=?1 AND t.state='committed' AND c.transaction_id IS NULL)",[epoch],|r|r.get(0))?;
+    if missing {
+        return Ok(1);
+    }
+    let floor:Option<i64>=writer.connection().query_row("SELECT min(t.first_seq) FROM source_transactions t JOIN journal_retention_clock c USING(transaction_id) WHERE t.capture_epoch=?1 AND t.state='committed' AND c.committed_at_unix_ms>=?2",params![epoch,cutoff_unix_ms],|r|r.get(0))?;
+    if let Some(v) = floor {
+        return Ok(v as u64);
+    }
+    let newest:i64=writer.connection().query_row("SELECT coalesce(max(last_seq),0)+1 FROM source_transactions WHERE capture_epoch=?1 AND state='committed'",[epoch],|r|r.get(0))?;
+    Ok(newest.max(1) as u64)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -753,6 +776,7 @@ pub(crate) mod tests {
                 free_bytes: 80,
                 capture_epoch: "epoch",
                 replay_from_seq: 6,
+                replay_cutoff_unix_ms: None,
                 now_unix_ms: 1,
             },
         )

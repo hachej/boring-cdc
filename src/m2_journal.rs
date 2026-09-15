@@ -1017,6 +1017,13 @@ impl JournalWriterService {
             scheduler: CapturePriorityScheduler::new(queue_caps, capture_burst)?,
         })
     }
+    pub(crate) fn pressure_tick_reserved(
+        &mut self,
+        thresholds: crate::m2_pressure::PressureThresholds,
+        observation: crate::m2_pressure::PressureObservation<'_>,
+    ) -> Result<crate::m2_pressure::PressureServiceResult, crate::m2_pressure::PressureError> {
+        crate::m2_pressure::service_pressure_tick(&mut self.store.writer, thresholds, observation)
+    }
     pub fn enqueue_capture(
         &mut self,
         commit: SourceCommit,
