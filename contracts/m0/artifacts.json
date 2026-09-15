@@ -4,7 +4,7 @@
       "id": "ART-M0-ARCHIVE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "artifacts/boring-cdc-m0-archive-model/spec/evidence.json",
-      "sha256": "4429c823029e65ec5c16d03daa657f4953719aca8ec3cebc12a4eafc96ef9feb",
+      "sha256": "a2cccbe0ef8f604184c6abffc31cfe3fae681c8a3f2eb36117530d118193f1b0",
       "status": "complete"
     },
     {
@@ -81,7 +81,7 @@
       "id": "ART-M0-ARCHIVE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "scripts/validate/archive_contract.py",
-      "sha256": "a60c66743f971672fa8556228d849be2e32d5752eaeffc7e04a2a0e9524d6bcb",
+      "sha256": "f267548290162dd796e262744a369a10eaa8aaf940e5e26d5821fa2853707080",
       "status": "complete"
     },
     {

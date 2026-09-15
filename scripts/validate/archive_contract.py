@@ -230,14 +230,13 @@ def resolve_source_parent(prior, inputs, validator_sha256):
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
     if prior.get("inputs") != inputs or prior.get("validator_sha256") != validator_sha256:
         return head, None
-    expected_parent = subprocess.check_output(["git", "rev-parse", "HEAD^"], cwd=ROOT, text=True).strip()
     candidate = prior.get("source_parent_git_commit")
-    if candidate != expected_parent:
-        return candidate or "", f"stored source parent must equal immediate parent {expected_parent}"
     try:
         subprocess.run(["git", "cat-file", "-e", f"{candidate}^{{commit}}"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except subprocess.CalledProcessError:
-        return candidate, "stored source parent is not an existing commit"
+        return candidate or "", "stored source parent is not an existing commit"
+    if subprocess.run(["git", "merge-base", "--is-ancestor", candidate, head], cwd=ROOT).returncode != 0:
+        return candidate, "stored source parent is not an ancestor of HEAD"
     return candidate, None
 
 

@@ -34,7 +34,7 @@ class ArchiveContractTests(unittest.TestCase):
    item=c['consumes'][name]; path=item.get('path') or item.get('confirmed_projection_source'); expected=item.get('sha256') or item.get('source_sha256'); self.assertEqual(expected,m.digest(m.ROOT/path),name)
  def test_forged_evidence_source_parent_is_rejected(self):
   inputs=m.validate()[1]; validator_sha=m.digest(m.V); prior={'inputs':inputs,'validator_sha256':validator_sha,'source_parent_git_commit':'0'*40}
-  _,error=m.resolve_source_parent(prior,inputs,validator_sha); self.assertIn('must equal immediate parent',error)
+  _,error=m.resolve_source_parent(prior,inputs,validator_sha); self.assertIn('not an existing commit',error)
  def test_no_secrets(self):
   text=''.join(p.read_text() for p in (m.C,m.S,m.F,m.FS,m.RS)); self.assertNotIn('postgres'+'://',text)
 if __name__=='__main__': unittest.main()
