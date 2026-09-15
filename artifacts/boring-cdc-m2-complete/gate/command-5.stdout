@@ -29,10 +29,11 @@
     "boring-cdc-m2-capture-runtime",
     "boring-cdc-m2.1"
   ],
+  "completion_policy": "factory-handoff/v1",
   "contract_owner_count": 11,
   "feature_owner_count": 49,
   "findings": [],
-  "immutable_handoff_count": 24,
+  "immutable_handoff_count": 27,
   "pinned_manifest_count": 19,
   "prior_terminal_proof": {
     "bead": "boring-cdc-m1-raw-demo",
@@ -51,6 +52,23 @@
     "boring-cdc-m2-spool",
     "boring-cdc-m2-capture-runtime",
     "boring-cdc-m2.1"
+  ],
+  "review_cap_residual_handoffs": [
+    {
+      "handoff_bead": "boring-cdc-m2-init-recovery",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "target_sha": "b37fb30e2e5fdc8a367e03ec06a5062624216ab0"
+    },
+    {
+      "handoff_bead": "boring-cdc-m2-pressure.3",
+      "owner_bead": "boring-cdc-m2-pressure",
+      "target_sha": "0cf677630e634d320231d776c9635b205622e8e6"
+    },
+    {
+      "handoff_bead": "boring-cdc-m2-capture-runtime.1",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "target_sha": "51998f09e38aa4d7ba474bd0c6788d25848b363e"
+    }
   ],
   "schema_version": "m2-completion-summary/v1",
   "status": "pass",

@@ -5,27 +5,63 @@
   },
   "commands": [
     {
-      "argv": "scripts/acceptance/m2_complete.sh --probe",
+      "argv": "cargo fmt --check",
       "exit_code": 0,
-      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/run-1.stderr",
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/run-1.log",
-      "stdout_sha256": "3adc4ff79df4a993c6f89dcc70632088de66afb414038505d9afe870442afb59",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-1.stdout",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "m2-complete/v2"
+    },
+    {
+      "argv": "cargo clippy --locked --workspace --all-targets --all-features",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-2.stderr",
+      "stderr_sha256": "e418d74436c30307421bc8d424bd623ae2f3ea757ac39e6d507b6f8f290dad75",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-2.stdout",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "m2-complete/v2"
+    },
+    {
+      "argv": "cargo test --locked --workspace --all-targets",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-3.stderr",
+      "stderr_sha256": "72cced5a2a67dbd0839da1243ec72843dfda4f0c7b69829e68ee33a336489eb7",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-3.stdout",
+      "stdout_sha256": "e2097ddff38f1a5ba9667a92a47f9a192fa31541bd638a8969d4b7a2aa5d5e44",
+      "version": "m2-complete/v2"
+    },
+    {
+      "argv": "scripts/validate/plan_coverage.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-4.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-4.stdout",
+      "stdout_sha256": "9d356f84480b989ab966dfda367bf58eba6773908de50a44a2362031830fb293",
       "version": "m2-complete/v2"
     },
     {
       "argv": "scripts/acceptance/m2_complete.sh --probe",
       "exit_code": 0,
-      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/run-2.stderr",
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-5.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/run-2.log",
-      "stdout_sha256": "3adc4ff79df4a993c6f89dcc70632088de66afb414038505d9afe870442afb59",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-5.stdout",
+      "stdout_sha256": "3b9e953210dd6b5682369972ca476564db339962dc926adaf762a9483d2636df",
+      "version": "m2-complete/v2"
+    },
+    {
+      "argv": "scripts/acceptance/m2_complete.sh --probe",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-6.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-6.stdout",
+      "stdout_sha256": "3b9e953210dd6b5682369972ca476564db339962dc926adaf762a9483d2636df",
       "version": "m2-complete/v2"
     }
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "milestone",
-  "git_commit": "c24db459be20ae2d005d70c1487003bda88fcd1a",
+  "git_commit": "a118f35e30d0ddef908895eeb4597f8c2849c41f",
   "owner_bead": "boring-cdc-m2-complete",
   "redaction": {
     "checked": true,
@@ -38,11 +74,11 @@
       "artifacts/boring-cdc-m2-complete/gate/completion-summary.json"
     ],
     "attempts": [
-      "attempt-1:16971899075c494aaf9b5e29fbbc3be625e8c84e60e225f65be3c5fc064025c7",
-      "attempt-2:7c7929279f27641ee64bce124a65912d8ccb162a79acc9b89ce644617a4b0e41"
+      "attempt-5:f807dc608559dadfa998f24446a4a3203f312e182ab5f32ce1b4cacaa155ce03",
+      "attempt-6:52beb557105e641a43fe971c41e5fcf8f7b7833897e1b6455d1e4d3e0b7cca84"
     ],
-    "digest": "c9c58662cc13b339099c7c6af46b8b2f9757e20a3b98e219392a0c67927bc68b",
-    "product_faults": "immutable leaf handoffs retain PostgreSQL 17.6 Compose crash/fault proof; downstream terminal proof remains excluded",
+    "digest": "89cc8245555ab9f1fd88cd27df7031b837a0910324a316824f5f2bacb9d10078",
+    "product_faults": "factory completion consumes pinned PostgreSQL 17.6 Compose crash/fault proof; three review-cap residual handoffs remain explicit for owner disposition; downstream terminal proof remains excluded",
     "runtime_observed": true,
     "status": "pass"
   },
@@ -50,20 +86,20 @@
   "schema_version": "evidence/v1",
   "seed": "m2-complete-v2",
   "source_preservation": {
-    "after_sha256": "519a807d7e43364c66c0656ddc279ad2243dd8d8c2092ecaee1aca5c5e162b0f",
-    "before_sha256": "519a807d7e43364c66c0656ddc279ad2243dd8d8c2092ecaee1aca5c5e162b0f",
+    "after_sha256": "84e2980df89db68dceadd8c87ac308af8b60b25c28fa30f12b9082736127d17f",
+    "before_sha256": "84e2980df89db68dceadd8c87ac308af8b60b25c28fa30f12b9082736127d17f",
     "preserved": true
   },
   "tier_proof": {
     "boundary_e2e": true,
-    "clean_clone": true,
+    "clean_clone": false,
     "clean_environment": true,
     "consumed_contract_vectors": true,
     "deterministic_rerun": true,
     "endurance": false,
     "exit_assertions": true,
     "fault_suite": true,
-    "full_failure_matrix": true,
+    "full_failure_matrix": false,
     "integration": true,
     "targeted_checks": true,
     "workspace_tests": true
