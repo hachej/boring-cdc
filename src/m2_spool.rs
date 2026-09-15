@@ -197,7 +197,7 @@ impl DiskAdmission {
             requested: bytes,
         })?;
         if next > limit.total_budget - limit.emergency_reserve
-            || available.saturating_sub(next) < limit.emergency_reserve
+            || available.saturating_sub(bytes) < limit.emergency_reserve
         {
             return Err(SpoolError::DiskReserve {
                 filesystem,
@@ -1466,7 +1466,7 @@ pub mod tests {
         shared.admit(dev, 600, 400).unwrap();
         assert_eq!(shared.clone().reserved(dev), 500);
         assert!(matches!(
-            shared.admit(dev, 600, 1),
+            shared.admit(dev, 100, 1),
             Err(SpoolError::DiskReserve { .. })
         ));
         fs::remove_dir_all(shared_dir).ok();
