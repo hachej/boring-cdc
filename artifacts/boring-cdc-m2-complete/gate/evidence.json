@@ -1,0 +1,71 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/acceptance/m2_complete.sh --probe",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/run-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/run-1.log",
+      "stdout_sha256": "3adc4ff79df4a993c6f89dcc70632088de66afb414038505d9afe870442afb59",
+      "version": "m2-complete/v2"
+    },
+    {
+      "argv": "scripts/acceptance/m2_complete.sh --probe",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/run-2.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/run-2.log",
+      "stdout_sha256": "3adc4ff79df4a993c6f89dcc70632088de66afb414038505d9afe870442afb59",
+      "version": "m2-complete/v2"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "milestone",
+  "git_commit": "c24db459be20ae2d005d70c1487003bda88fcd1a",
+  "owner_bead": "boring-cdc-m2-complete",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "contracts/coverage/m2.json",
+      ".beads/issues.jsonl",
+      "artifacts/boring-cdc-m2-complete/gate/completion-summary.json"
+    ],
+    "attempts": [
+      "attempt-1:16971899075c494aaf9b5e29fbbc3be625e8c84e60e225f65be3c5fc064025c7",
+      "attempt-2:7c7929279f27641ee64bce124a65912d8ccb162a79acc9b89ce644617a4b0e41"
+    ],
+    "digest": "c9c58662cc13b339099c7c6af46b8b2f9757e20a3b98e219392a0c67927bc68b",
+    "product_faults": "immutable leaf handoffs retain PostgreSQL 17.6 Compose crash/fault proof; downstream terminal proof remains excluded",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M2-COMPLETION-BARRIER",
+  "schema_version": "evidence/v1",
+  "seed": "m2-complete-v2",
+  "source_preservation": {
+    "after_sha256": "519a807d7e43364c66c0656ddc279ad2243dd8d8c2092ecaee1aca5c5e162b0f",
+    "before_sha256": "519a807d7e43364c66c0656ddc279ad2243dd8d8c2092ecaee1aca5c5e162b0f",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": true,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": true,
+    "integration": true,
+    "targeted_checks": true,
+    "workspace_tests": true
+  }
+}

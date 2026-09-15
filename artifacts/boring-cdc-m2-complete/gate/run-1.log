@@ -1,0 +1,58 @@
+{
+  "blocking_edges": [
+    "boring-cdc-m1-raw-demo",
+    "boring-cdc-m2-capture-runtime",
+    "boring-cdc-m2-heartbeat",
+    "boring-cdc-m2-init-recovery",
+    "boring-cdc-m2-journal",
+    "boring-cdc-m2-jsonl",
+    "boring-cdc-m2-leases",
+    "boring-cdc-m2-ownership",
+    "boring-cdc-m2-pressure",
+    "boring-cdc-m2-reconcile",
+    "boring-cdc-m2-schema",
+    "boring-cdc-m2-spool",
+    "boring-cdc-m2.1"
+  ],
+  "blocking_graph_acyclic": true,
+  "completed_by_immutable_handoff": [
+    "boring-cdc-m2-heartbeat",
+    "boring-cdc-m2-init-recovery",
+    "boring-cdc-m2-journal",
+    "boring-cdc-m2-jsonl",
+    "boring-cdc-m2-leases",
+    "boring-cdc-m2-ownership",
+    "boring-cdc-m2-pressure",
+    "boring-cdc-m2-reconcile",
+    "boring-cdc-m2-schema",
+    "boring-cdc-m2-spool",
+    "boring-cdc-m2-capture-runtime",
+    "boring-cdc-m2.1"
+  ],
+  "contract_owner_count": 11,
+  "feature_owner_count": 49,
+  "findings": [],
+  "immutable_handoff_count": 24,
+  "pinned_manifest_count": 19,
+  "prior_terminal_proof": {
+    "bead": "boring-cdc-m1-raw-demo",
+    "closed": true
+  },
+  "required_leaves": [
+    "boring-cdc-m2-heartbeat",
+    "boring-cdc-m2-init-recovery",
+    "boring-cdc-m2-journal",
+    "boring-cdc-m2-jsonl",
+    "boring-cdc-m2-leases",
+    "boring-cdc-m2-ownership",
+    "boring-cdc-m2-pressure",
+    "boring-cdc-m2-reconcile",
+    "boring-cdc-m2-schema",
+    "boring-cdc-m2-spool",
+    "boring-cdc-m2-capture-runtime",
+    "boring-cdc-m2.1"
+  ],
+  "schema_version": "m2-completion-summary/v1",
+  "status": "pass",
+  "terminal_proof_downstream": true
+}
