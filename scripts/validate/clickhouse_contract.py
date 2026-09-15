@@ -62,7 +62,9 @@ def validate():
   if name=='confirmation':continue
   p=item.get('path') or item.get('confirmed_projection_source'); h=item.get('sha256') or item.get('source_sha256')
   if not p or not h or digest(ROOT/p)!=h:add(out,'E_CONSUMED_DIGEST','consumes/'+name,'consumed input digest mismatch')
- if (c['pins']['server'],c['pins']['platform'])!=('25.8.2.29','linux/amd64') or '78b6f08' not in c['pins']['image']:add(out,'E_PIN','pins','server/platform/image pin changed')
+ expected_index='docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f'
+ expected_platform='sha256:78b6f0863688458b229b597f6a1bbf891855a01cf59c3f3dbe66428571c518c9'
+ if (c['pins']['server'],c['pins']['platform'],c['pins']['image'],c['pins']['image_platform_digest'])!=('25.8.2.29','linux/amd64',expected_index,expected_platform):add(out,'E_PIN','pins','canonical Compose index/platform image identity changed')
  fp=c['consumes']['failure_policy']
  if (fp['version'],fp['base_delay_ms'],fp['cap_delay_ms'],fp['maximum_attempts'])!=(1,250,30000,10):add(out,'E_FAILURE_POLICY','consumes/failure_policy','confirmed retry literals changed')
  ddl=DDL.read_text(); query=Q.read_text(); retire=R.read_text()

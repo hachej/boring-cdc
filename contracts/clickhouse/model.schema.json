@@ -133,6 +133,22 @@
     "consumes": {
       "additionalProperties": false,
       "properties": {
+        "compose": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "type": "object"
+        },
         "confirmation": {
           "additionalProperties": false,
           "properties": {
@@ -233,7 +249,8 @@
         "confirmation",
         "event_contract",
         "failure_policy",
-        "promotion"
+        "promotion",
+        "compose"
       ],
       "type": "object"
     },
@@ -620,6 +637,9 @@
         "image": {
           "type": "string"
         },
+        "image_platform_digest": {
+          "type": "string"
+        },
         "platform": {
           "type": "string"
         },
@@ -639,7 +659,8 @@
         "platform",
         "rust_client_crate",
         "server",
-        "topology"
+        "topology",
+        "image_platform_digest"
       ],
       "type": "object"
     },

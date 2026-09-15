@@ -44,6 +44,10 @@
     "status": "provisional engineering artifact using card-recommended values; does not close decision Beads"
   },
   "consumes": {
+    "compose": {
+      "path": "contracts/m0/compose.json",
+      "sha256": "8a78b0a63d36a039eabae79768a35d66707f46d8c4c635508059d1a065cf8017"
+    },
     "confirmation": {
       "cards": [
         "5a994cfd",
@@ -290,7 +294,8 @@
   "owner_bead": "boring-cdc-m0-ch-model",
   "pins": {
     "client_protocol": "native",
-    "image": "clickhouse/clickhouse-server@sha256:78b6f08a2520267329a21893b70d7a43f90eaab2c5573b513e5afb7084e33c21",
+    "image": "docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f",
+    "image_platform_digest": "sha256:78b6f0863688458b229b597f6a1bbf891855a01cf59c3f3dbe66428571c518c9",
     "platform": "linux/amd64",
     "rust_client_crate": "clickhouse 0.13.3",
     "server": "25.8.2.29",

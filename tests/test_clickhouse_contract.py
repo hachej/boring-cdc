@@ -26,4 +26,8 @@ class ClickHouseContractTests(unittest.TestCase):
  def test_capture_epoch_is_direct_u64(self):
   self.assertEqual(3,m.DDL.read_text().count('capture_epoch UInt64'))
   self.assertNotIn('capture_epoch FixedString',m.DDL.read_text())
+ def test_image_identity_matches_compose_index_and_platform(self):
+  pins=m.load(m.C)['pins']; compose=m.load(m.ROOT/'contracts/m0/compose.json')['images']['clickhouse']
+  self.assertEqual(f"{compose['repository']}:{compose['tag']}@{compose['index_digest']}",pins['image'])
+  self.assertEqual(compose['platform_digest'],pins['image_platform_digest'])
 if __name__=='__main__':unittest.main()

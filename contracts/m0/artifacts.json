@@ -102,14 +102,14 @@
       "id": "ART-M0-CLICKHOUSE-DOC",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "docs/CLICKHOUSE_MODEL.md",
-      "sha256": "73ec93cd23de90b8bab12b31886e71a8716e4e50062ebb745b0f3a37cfe22ff7",
+      "sha256": "47528c341d172bd0b797eff7d9a0ebd6c3081730f1984d34c6c3eedd7044fc28",
       "status": "complete"
     },
     {
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "5116b84707d1d1ca8e62893e2b89fcf34546e1b1aa5938ba6efcc32c75384909",
+      "sha256": "68a5d00a43db31ab80192d3feccecdc8d0404527b36cdfcc9c65ca2dc1d4fadc",
       "status": "complete"
     },
     {
@@ -130,14 +130,14 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "2fb181171ff568338440babb0156c53405c56592133178583d2a53cb5495c11d",
+      "sha256": "8597fda59182e21a73776a5f3f90231c32b4fe79b16324e585c45d4b8679d320",
       "status": "complete"
     },
     {
       "id": "ART-M0-CLICKHOUSE-MODEL-SCHEMA",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.schema.json",
-      "sha256": "9e1ff4dd1dd429c90c9f31d7c082e7abb92c643636a4a30d5adec554e93bc43c",
+      "sha256": "4ec898368ada9d0e64f77a05340e1155836b3320163e270a0462252a4e64de71",
       "status": "complete"
     },
     {
@@ -158,7 +158,7 @@
       "id": "ART-M0-CLICKHOUSE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "scripts/validate/clickhouse_contract.py",
-      "sha256": "7af62efe8ee6eff8193c42bcada93fbbad3c9bf78c094ef52f8833d8f4a9d745",
+      "sha256": "dd7bdc0c303b5eb91311b7972bad6c4b6db5b7e68b80a8325077f048f23665ca",
       "status": "complete"
     },
     {
