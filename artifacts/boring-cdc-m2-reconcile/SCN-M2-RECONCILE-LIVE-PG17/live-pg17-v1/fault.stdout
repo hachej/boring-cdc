@@ -1,9 +1,9 @@
-{"postgres":"17.6","database_oid_observed":true,"live_publication_fingerprint":true,"fresh_slot_ambiguous":true,"migration_receipt_retry":true,"slot_reason":"SLOT_MISSING","cli_json_text_matrix":true}
+{"postgres":"17.6","database_oid_observed":true,"live_publication_fingerprint":true,"fresh_slot_ambiguous":true,"migration_receipt_retry":true,"slot_reasons":["SLOT_MISSING","RESUME_WAL_STATUS_UNAVAILABLE","SLOT_INVALID_WAL_REMOVED"],"abrupt_process_restart":true,"cli_json_text_matrix":true}
 
 running 1 test
 test m2_reconcile::tests::creation_floor_compound_safety_precedes_floor_resume ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 315 filtered out; finished in 0.24s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 315 filtered out; finished in 0.23s
 
 
 running 0 tests
@@ -35,7 +35,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; fini
 running 1 test
 test m2_reconcile::tests::invalid_slot_and_missing_wal_require_reseed ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 315 filtered out; finished in 0.26s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 315 filtered out; finished in 0.22s
 
 
 running 0 tests
