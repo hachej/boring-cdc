@@ -1,16 +1,17 @@
 
-running 9 tests
+running 10 tests
 test m2_leases::tests::namespaces_are_epoch_generation_anchor_and_config_scoped ... ok
 test m2_leases::tests::reseed_generation_and_configuration_fence_old_workers ... ok
-test m2_leases::tests::pause_and_detach_prevent_dispatch_and_checkpoint ... ok
-test m2_leases::tests::expiry_during_effect_or_completion_is_stale_and_rolls_back ... ok
-test m2_leases::tests::tampered_namespace_ownership_loss_and_external_error_fail_closed ... ok
 test m2_leases::tests::invalid_identities_ttls_and_overflows_are_rejected ... ok
-test m2_leases::tests::two_runtime_race_keeps_stale_artifact_out_of_live_state ... ok
+test m2_leases::tests::expiry_during_effect_or_completion_is_stale_and_rolls_back ... ok
 test m2_leases::tests::acquire_renew_expire_and_stale_cas_are_exact ... ok
+test m2_leases::tests::released_generation_can_be_reacquired_by_successor_runtime ... ok
+test m2_leases::tests::pause_and_detach_prevent_dispatch_and_checkpoint ... ok
 test m2_leases::tests::promotion_intent_allocates_increasing_fence_and_stale_token_cannot_prepare ... ok
+test m2_leases::tests::tampered_namespace_ownership_loss_and_external_error_fail_closed ... ok
+test m2_leases::tests::two_runtime_race_keeps_stale_artifact_out_of_live_state ... ok
 
-test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 282 filtered out; finished in 0.50s
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 288 filtered out; finished in 0.71s
 
 
 running 0 tests
