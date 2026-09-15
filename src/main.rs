@@ -1,12 +1,15 @@
 use boring_cdc::article1_capture::{CaptureConfig, CaptureFailure, capture_jsonl};
 use boring_cdc::m1_cli_contract::{
-    ExitCode, command_help, error_envelope, parse, root_help, unavailable,
+    CLI_SCHEMA_VERSION, CliEnvelope, ExitCode, command_help, error_envelope, parse, root_help,
+    unavailable,
 };
 use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
 use boring_cdc::m1_preflight::{
     CheckStatus, PreflightObservation, envelope, evaluate_untrusted, input_failure,
 };
 use boring_cdc::m2_capture_runtime::{acquire_production_ownership, run_loaded_config};
+use boring_cdc::m2_journal::journal_inspect_event;
+use boring_cdc::m2_reconcile::{journal_report, recover_report};
 use pg_walstream::CancellationToken;
 use serde::Deserialize;
 use std::io::{self, Read, Write};
@@ -281,6 +284,85 @@ fn write_stdout(bytes: &[u8]) -> Result<(), ()> {
         .and_then(|_| out.flush())
         .map_err(|_| ())
 }
+fn read_only_journal_command(
+    parsed: &boring_cdc::m1_cli_contract::ParsedCommand,
+) -> Result<CliEnvelope, ReaderFailure> {
+    let text = std::fs::read_to_string("boring-cdc.toml").map_err(|_| {
+        ReaderFailure::unavailable(
+            "JOURNAL_CONFIG_UNAVAILABLE",
+            "journal configuration is unavailable",
+        )
+    })?;
+    let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Status).map_err(|_| {
+        ReaderFailure::unavailable("JOURNAL_CONFIG_INVALID", "journal configuration is invalid")
+    })?;
+    let path = std::path::Path::new(&config.public().storage.sqlite_path);
+    let data = match parsed.spec.id {
+        "CMD-JOURNAL-VERIFY" => {
+            serde_json::to_value(journal_report(path).map_err(|_| ReaderFailure {
+                code: "JOURNAL_INTEGRITY_FAILED",
+                message: "journal integrity verification failed",
+                exit: ExitCode::Integrity,
+            })?)
+            .expect("serializable journal report")
+        }
+        "CMD-RECOVER-INSPECT" => {
+            serde_json::to_value(recover_report(path).map_err(|_| ReaderFailure {
+                code: "RECOVERY_STATE_UNAVAILABLE",
+                message: "recovery state is unavailable",
+                exit: ExitCode::Integrity,
+            })?)
+            .expect("serializable recovery report")
+        }
+        "CMD-JOURNAL-INSPECT" => {
+            let event_id = parsed
+                .argv
+                .windows(2)
+                .find(|w| w[0] == "--event-id")
+                .map(|w| w[1].as_str());
+            if let Some(event_id) = event_id {
+                match journal_inspect_event(path, event_id, Duration::from_secs(30)).map_err(
+                    |_| ReaderFailure {
+                        code: "JOURNAL_INSPECTION_FAILED",
+                        message: "journal inspection failed",
+                        exit: ExitCode::Integrity,
+                    },
+                )? {
+                    Some(item) => {
+                        serde_json::json!({"event_id":item.event_id,"transaction_id":item.transaction_id,"journal_seq":item.journal_seq,"transaction_boundary":{"first_seq":item.transaction_boundary.0,"last_seq":item.transaction_boundary.1},"payload_hash":item.payload_hash,"durable_end_lsn":item.durable_end_lsn})
+                    }
+                    None => serde_json::Value::Null,
+                }
+            } else {
+                serde_json::to_value(journal_report(path).map_err(|_| ReaderFailure {
+                    code: "JOURNAL_INTEGRITY_FAILED",
+                    message: "journal integrity verification failed",
+                    exit: ExitCode::Integrity,
+                })?)
+                .expect("serializable journal report")
+            }
+        }
+        _ => unreachable!("read-only journal handler called for unrelated command"),
+    };
+    Ok(CliEnvelope {
+        schema_version: CLI_SCHEMA_VERSION,
+        command: parsed.spec.id.into(),
+        outcome: "success".into(),
+        code: "OK".into(),
+        message: "read-only journal state inspected".into(),
+        request_id: None,
+        run_id: None,
+        capture_epoch: None,
+        condition: None,
+        runbook_id: None,
+        data,
+        warnings: vec![],
+        next_commands: vec![],
+        plan_digest: None,
+        postcondition_evidence_digest: None,
+        mutation_trace: None,
+    })
+}
 fn main() {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     match argv.as_slice() {
@@ -302,6 +384,36 @@ fn main() {
             let _ = write_stdout(command_help(parsed.spec).as_bytes());
         }
         Ok(parsed) => {
+            if matches!(
+                parsed.spec.id,
+                "CMD-JOURNAL-INSPECT" | "CMD-JOURNAL-VERIFY" | "CMD-RECOVER-INSPECT"
+            ) {
+                match read_only_journal_command(&parsed) {
+                    Ok(result) => {
+                        if parsed.json {
+                            let mut bytes = serde_json::to_vec(&result).expect("envelope");
+                            bytes.push(b'\n');
+                            if write_stdout(&bytes).is_err() {
+                                std::process::exit(0);
+                            }
+                        } else {
+                            let mut text = format!("{}: {}\n", result.code, result.message);
+                            text.push_str(
+                                &serde_json::to_string_pretty(&result.data).expect("report"),
+                            );
+                            text.push('\n');
+                            if write_stdout(text.as_bytes()).is_err() {
+                                std::process::exit(0);
+                            }
+                        }
+                        return;
+                    }
+                    Err(error) => {
+                        eprintln!("{}: {}", error.code, error.message);
+                        std::process::exit(error.exit as i32);
+                    }
+                }
+            }
             if parsed.spec.id == "CMD-RUN" {
                 let result = if std::path::Path::new("boring-cdc.toml").exists() {
                     run_m2()

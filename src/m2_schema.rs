@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -302,6 +302,26 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_4_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v5: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=5)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v5 {
+            connection.execute_batch(MIGRATION_5)?;
+            connection.execute(
+                "INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(5,'startup-reconciliation-receipts',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",
+                [MIGRATION_5_CHECKSUM],
+            )?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=5",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_5_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -593,6 +613,18 @@ WHEN (NEW.destination_id IS NOT OLD.destination_id
 BEGIN SELECT RAISE(ABORT,'audit coverage must be invalidated before round identity changes'); END;
 "#;
 
+const MIGRATION_5_CHECKSUM: &str =
+    "sha256:b48ca78c92fca7159a6623f4c0cba08485a0854437e1b1d44dfebcdbef34c1b2";
+const MIGRATION_5: &str = r#"
+CREATE TABLE startup_reconciliations(
+ reconciliation_id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT NOT NULL UNIQUE,
+ capture_epoch TEXT NOT NULL, outcome TEXT NOT NULL CHECK(outcome IN ('ready','duplicate_replay_expected','creation_floor_only','bootstrap_ambiguous_requires_restart','requires_reseed','blocked')),
+ reason_code TEXT NOT NULL, requested_lsn TEXT, effective_restart_lsn TEXT,
+ durable_transaction_end_lsn TEXT, creation_floor_lsn TEXT, created_at TEXT NOT NULL,
+ CHECK(requested_lsn IS NULL OR (length(requested_lsn)=16 AND requested_lsn NOT GLOB '*[^0-9A-F]*')),
+ CHECK(effective_restart_lsn IS NULL OR (length(effective_restart_lsn)=16 AND effective_restart_lsn NOT GLOB '*[^0-9A-F]*')));
+"#;
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -664,6 +696,7 @@ pub mod tests {
             "condition_hysteresis",
             "alerts",
             "schema_migrations",
+            "startup_reconciliations",
         ] {
             assert!(names.contains(&n.to_string()), "missing {n}");
         }
@@ -914,7 +947,7 @@ pub mod tests {
             c.query_row("SELECT count(*) FROM schema_migrations", [], |r| r
                 .get::<_, i64>(0))
                 .unwrap(),
-            4
+            SCHEMA_VERSION
         );
         assert_eq!(
             c.query_row(
