@@ -1,0 +1,33 @@
+{
+  "schema_version": "owner-reconciliation-report/v1",
+  "reporting_bead": "boring-cdc-m2-spool.1",
+  "status": "unresolved",
+  "approved_authorities": [
+    {
+      "path": "src/m2_schema.rs",
+      "sha256": "6117246c6f1bc729d89485ed580c875ce4c763317738069b6f3c8f8b393066b9",
+      "finding": "processing_failures has no XID, configured limit, observed byte, or observed event columns",
+      "disposition": "typed spool outcome retains those values; no approved schema field was invented"
+    },
+    {
+      "path": "contracts/storage/sqlite-schema.sql",
+      "sha256": "4a3c95f4fade5068ace3e481315e25098d4ac55434398ed1e19f385476fce13d",
+      "finding": "the older approved storage contract also has no XID, configured limit, observed byte, or observed event columns",
+      "disposition": "reported only; no schema mutation"
+    },
+    {
+      "path": "contracts/coverage/plan-to-beads.json",
+      "sha256": "d3a910b4ba65b03772d885ede2320f14dd84b2154e7eaa393d5638db5f3ea6c0",
+      "finding": "zero assignments name boring-cdc-m2-spool or boring-cdc-m2-spool.1",
+      "disposition": "reported only; no approved assignment or owner was changed"
+    }
+  ],
+  "owner_action_required": [
+    "The schema owner must decide whether raw XID/limit/observed values belong in processing_failures or remain in typed domain evidence.",
+    "The plan-coverage owner must assign existing canonical IDs to the approved executing owner or explicitly supersede the zero-assignment closure clause."
+  ],
+  "mutations_to_approved_schema_or_coverage": [],
+  "provisional_inventory": [
+    "M0-PROVISIONAL: boring-cdc-m2-spool.1 recommends spool format version 1 pending M0 owner approval"
+  ]
+}

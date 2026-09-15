@@ -108,6 +108,30 @@ fn main() {
             b.finish().unwrap();
             json!({"outcome":"commit_ready","observed_bytes":observed.0,"observed_events":observed.1,"iterator_events":iterator_events,"spill_delta":spill_delta,"stream_delta":stream_delta,"feedback_permitted":false,"high_water":high})
         }
+        "filesystem-isolation" => {
+            let first_fs = 41;
+            let second_fs = 42;
+            let shared = FilesystemAdmissionController::new(DiskAdmission::default());
+            for filesystem in [first_fs, second_fs] {
+                shared
+                    .configure(
+                        filesystem,
+                        FilesystemLimit {
+                            total_budget: 1_000,
+                            emergency_reserve: 100,
+                        },
+                    )
+                    .unwrap();
+            }
+            shared.account_existing(first_fs, 100).unwrap();
+            let first_transaction = shared.clone();
+            let second_transaction = shared.clone();
+            first_transaction.admit(first_fs, 1_000, 400).unwrap();
+            let same_filesystem_blocked = second_transaction.admit(first_fs, 1_000, 401).is_err();
+            second_transaction.admit(second_fs, 1_000, 800).unwrap();
+            first_transaction.release(first_fs, 400).unwrap();
+            json!({"outcome":"isolated","same_filesystem_blocked":same_filesystem_blocked,"first_filesystem_reserved":shared.reserved(first_fs),"second_filesystem_reserved":shared.reserved(second_fs)})
+        }
         "oversized" => {
             let mut b = buffer(&root, "xid-large", 8, 4096, 4, 2);
             push(&mut b, b"1234").unwrap();
@@ -126,6 +150,74 @@ fn main() {
                 &mut context,
             );
             json!({"outcome":out,"error":format!("{error:?}"),"policy_action":format!("{action:?}"),"prepared_persistence":prepared.is_some()})
+        }
+        "policy-vectors" => {
+            let b = buffer(&root, "xid-policy", 8, 4096, 4, 2);
+            let error = SpoolError::TransactionBytesLimit {
+                limit: 4,
+                observed: 5,
+            };
+            let clock = VirtualClock::new(1_000);
+            let mut random = ZeroRandom;
+            let mut context = TransitionContext {
+                clock: &clock,
+                randomness: &mut random,
+            };
+            let (_, initial, _) = b.apply_failure_policy(
+                &error,
+                Some("0000000000000042"),
+                "limit-a",
+                None,
+                &mut context,
+            );
+            let boring_cdc::failure_policy::PolicyAction::Persist(record) = initial else {
+                panic!("initial policy action")
+            };
+            let (_, suppressed, suppressed_write) = b.apply_failure_policy(
+                &error,
+                Some("0000000000000042"),
+                "limit-a",
+                Some(&record),
+                &mut context,
+            );
+            let later = VirtualClock::new(2_000);
+            let mut random = ZeroRandom;
+            let mut context = TransitionContext {
+                clock: &later,
+                randomness: &mut random,
+            };
+            let (unchanged, unchanged_action, _) = b.rearm_failure_policy(
+                &error,
+                Some("0000000000000042"),
+                "limit-a",
+                "limit-a",
+                &record,
+                true,
+                "same-limit",
+                &mut context,
+            );
+            let (wal_missing, wal_missing_action, _) = b.rearm_failure_policy(
+                &error,
+                Some("0000000000000042"),
+                "limit-a",
+                "limit-b",
+                &record,
+                false,
+                "wal-missing",
+                &mut context,
+            );
+            let (changed, changed_action, changed_write) = b.rearm_failure_policy(
+                &error,
+                Some("0000000000000042"),
+                "limit-a",
+                "limit-b",
+                &record,
+                true,
+                "changed-limit",
+                &mut context,
+            );
+            b.finish().unwrap();
+            json!({"outcome":"policy_vectors_proved","same_fingerprint":format!("{suppressed:?}"),"same_fingerprint_write":suppressed_write.is_some(),"unchanged_limit":unchanged,"unchanged_action":format!("{unchanged_action:?}"),"wal_missing":wal_missing,"wal_missing_action":format!("{wal_missing_action:?}"),"changed_limit":changed,"changed_action":format!("{changed_action:?}"),"changed_write":changed_write.is_some()})
         }
         "enospc" => {
             let mut b = buffer(&root, "xid-enospc", 0, 4096, 32, 2);

@@ -14,4 +14,4 @@ cp -a artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-COMPONENT "$scratch/expected"
 python3 scripts/lib/m2_spool_component.py e2e
 diff -ru "$scratch/expected" artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-COMPONENT
 python3 scripts/validate/m2_spool.py e2e
-scripts/validate/evidence.sh artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-COMPONENT
+scripts/validate/evidence.sh artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-COMPONENT/spool-component-v1/evidence.json

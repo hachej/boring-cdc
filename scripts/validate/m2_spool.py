@@ -3,7 +3,7 @@ import hashlib,json,re,subprocess,sys
 from pathlib import Path
 root=Path(__file__).resolve().parents[2];src=(root/'src/m2_spool.rs').read_text();contract=json.loads((root/'contracts/m2/spool-cases.json').read_text());errors=[]
 def digest():
- names=['src/m2_spool.rs','src/lib.rs','examples/m2_spool_component.rs','contracts/m2/spool-cases.json','scripts/lib/m2_spool_component.py','scripts/validate/m2_spool.py','scripts/e2e/m2_spool.sh','scripts/faults/m2_spool.sh'];h=hashlib.sha256()
+ names=['src/m2_spool.rs','src/m2_ownership.rs','src/lib.rs','examples/m2_spool_component.rs','contracts/m2/spool-cases.json','scripts/lib/m2_spool_component.py','scripts/validate/m2_spool.py','scripts/e2e/m2_spool.sh','scripts/faults/m2_spool.sh'];h=hashlib.sha256()
  for name in names:
   raw=(root/name).read_bytes();h.update(len(name).to_bytes(8,'big'));h.update(name.encode());h.update(len(raw).to_bytes(8,'big'));h.update(raw)
  return h.hexdigest()
@@ -15,7 +15,7 @@ for case in contract['cases']:
  if len(case.get('assertion',''))<50:errors.append('weak assertion '+case['id'])
 for symbol in ('MemoryBudget','DiskAdmission','TxnBuffer','CommitIter','classify_startup_spools','failure_observation'):
  if symbol not in src:errors.append('missing production boundary '+symbol)
-if '// M0-PROVISIONAL: boring-cdc-d-admission' not in src:errors.append('spool format provisional marker missing')
+if '// M0-PROVISIONAL: boring-cdc-m2-spool.1' not in src:errors.append('spool format provisional marker missing')
 reconciliation=json.loads((root/'contracts/m2/m0-provisional-reconciliation.json').read_text())
 if reconciliation['confirmed']['failure_policy']['version']!='failure-policy-v1' or reconciliation['confirmed']['sqlite_writer_busy_timeout_ms']!=5000:errors.append('confirmed M0 inputs changed')
 head=subprocess.run(['git','rev-parse','HEAD'],cwd=root,text=True,capture_output=True).stdout.strip();implementation=digest();selected={'e2e':['SCN-M2-SPOOL-COMPONENT'],'fault':['SCN-M2-SPOOL-FAULTS'],'all':['SCN-M2-SPOOL-COMPONENT','SCN-M2-SPOOL-FAULTS']}.get(sys.argv[1] if len(sys.argv)>1 else 'all',[])
@@ -25,7 +25,7 @@ for scenario in selected:
  manifest=json.loads((packet/'manifest.json').read_text());versions=json.loads((packet/'versions.json').read_text());evidence=manifest['git_commit']
  workspace=[c for c in manifest['commands'] if c.get('argv')=='cargo test --locked --workspace --all-targets']
  if len(workspace)!=1 or b'test result:' not in (packet/'workspace-tests-stdout.txt').read_bytes():errors.append('raw workspace proof missing '+scenario)
- unchanged=subprocess.run(['git','merge-base','--is-ancestor',evidence,head],cwd=root).returncode==0 and subprocess.run(['git','diff','--quiet',evidence+'..'+head,'--','src/m2_spool.rs','src/lib.rs','examples/m2_spool_component.rs','contracts/m2/spool-cases.json','scripts/lib/m2_spool_component.py','scripts/validate/m2_spool.py','scripts/e2e/m2_spool.sh','scripts/faults/m2_spool.sh'],cwd=root).returncode==0
+ unchanged=subprocess.run(['git','merge-base','--is-ancestor',evidence,head],cwd=root).returncode==0 and subprocess.run(['git','diff','--quiet',evidence+'..'+head,'--','src/m2_spool.rs','src/m2_ownership.rs','src/lib.rs','examples/m2_spool_component.rs','contracts/m2/spool-cases.json','scripts/lib/m2_spool_component.py','scripts/validate/m2_spool.py','scripts/e2e/m2_spool.sh','scripts/faults/m2_spool.sh'],cwd=root).returncode==0
  if not unchanged:errors.append('packet not bound to unchanged implementation '+scenario)
  if manifest['source_preservation']['before_sha256']!=implementation or versions.get('implementation_sha256')!=implementation:errors.append('implementation digest mismatch '+scenario)
  binary=root/'target/debug/examples/m2_spool_component'

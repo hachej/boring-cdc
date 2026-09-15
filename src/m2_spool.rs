@@ -6,8 +6,9 @@
 
 use crate::failure_policy::{
     Component, FailedBoundary, FailureClass, FailureObservation, FailureRecord, FingerprintInput,
-    PolicyAction, PolicyEvent, PreparedFailureOperation, SafeContextKey, SafeContextValue,
-    StableErrorCode, build_fingerprint, transition,
+    PolicyAction, PolicyEvent, PreparedFailureOperation, RearmAuthorizationToken, RearmRequest,
+    RelevantConfigurationChange, SafeContextKey, SafeContextValue, StableErrorCode,
+    build_fingerprint, transition,
 };
 use crate::m1_transition_kernel::TransitionContext;
 use serde::{Deserialize, Serialize};
@@ -23,7 +24,7 @@ use std::path::{Path, PathBuf};
 const MAGIC: &[u8; 8] = b"BCDCSP01";
 const HEADER_WORK_BYTES: usize = 8 * 1024;
 const READER_WORK_BYTES: usize = 32 * 1024;
-// M0-PROVISIONAL: boring-cdc-d-admission must approve the spool format version.
+// M0-PROVISIONAL: boring-cdc-m2-spool.1 recommends version 1 pending M0 owner approval.
 pub const SPOOL_FORMAT_VERSION: u32 = 1;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -171,11 +172,15 @@ pub struct FilesystemLimit {
 #[derive(Default)]
 pub struct DiskAdmission {
     limits: HashMap<u64, FilesystemLimit>,
-    reserved: HashMap<u64, u64>,
+    existing: HashMap<u64, u64>,
+    admitted: HashMap<u64, u64>,
 }
 impl DiskAdmission {
     pub fn configure(&mut self, filesystem: u64, limit: FilesystemLimit) -> Result<(), SpoolError> {
-        if limit.total_budget == 0 || limit.emergency_reserve >= limit.total_budget {
+        if limit.total_budget == 0
+            || limit.emergency_reserve >= limit.total_budget
+            || self.reserved(filesystem) > limit.total_budget - limit.emergency_reserve
+        {
             return Err(SpoolError::Invalid("invalid filesystem reserve"));
         }
         self.limits.insert(filesystem, limit);
@@ -186,7 +191,7 @@ impl DiskAdmission {
             .limits
             .get(&filesystem)
             .ok_or(SpoolError::Invalid("filesystem budget missing"))?;
-        let current = *self.reserved.get(&filesystem).unwrap_or(&0);
+        let current = self.reserved(filesystem);
         let next = current.checked_add(bytes).ok_or(SpoolError::DiskReserve {
             filesystem,
             requested: bytes,
@@ -199,7 +204,11 @@ impl DiskAdmission {
                 requested: bytes,
             });
         }
-        self.reserved.insert(filesystem, next);
+        let admitted = self.admitted.entry(filesystem).or_default();
+        *admitted = admitted.checked_add(bytes).ok_or(SpoolError::DiskReserve {
+            filesystem,
+            requested: bytes,
+        })?;
         Ok(())
     }
     /// Accounts bytes already held by SQLite or another approved user on this filesystem.
@@ -208,21 +217,31 @@ impl DiskAdmission {
             .limits
             .get(&filesystem)
             .ok_or(SpoolError::Invalid("filesystem budget missing"))?;
-        if bytes > limit.total_budget.saturating_sub(limit.emergency_reserve) {
+        let admitted = *self.admitted.get(&filesystem).unwrap_or(&0);
+        if bytes.saturating_add(admitted)
+            > limit.total_budget.saturating_sub(limit.emergency_reserve)
+        {
             return Err(SpoolError::DiskReserve {
                 filesystem,
                 requested: bytes,
             });
         }
-        self.reserved.insert(filesystem, bytes);
+        self.existing.insert(filesystem, bytes);
         Ok(())
     }
-    pub fn release(&mut self, filesystem: u64, bytes: u64) {
-        let value = self.reserved.entry(filesystem).or_default();
-        *value = value.saturating_sub(bytes);
+    pub fn release(&mut self, filesystem: u64, bytes: u64) -> Result<(), SpoolError> {
+        let value = self.admitted.entry(filesystem).or_default();
+        *value = value
+            .checked_sub(bytes)
+            .ok_or(SpoolError::Invalid("filesystem reservation underflow"))?;
+        Ok(())
     }
     pub fn reserved(&self, filesystem: u64) -> u64 {
-        *self.reserved.get(&filesystem).unwrap_or(&0)
+        self.existing
+            .get(&filesystem)
+            .copied()
+            .unwrap_or(0)
+            .saturating_add(self.admitted.get(&filesystem).copied().unwrap_or(0))
     }
 }
 
@@ -231,6 +250,22 @@ pub struct FilesystemAdmissionController(std::rc::Rc<RefCell<DiskAdmission>>);
 impl FilesystemAdmissionController {
     pub fn new(admission: DiskAdmission) -> Self {
         Self(std::rc::Rc::new(RefCell::new(admission)))
+    }
+    /// Adds or replaces the shared limit for one physical filesystem.
+    pub fn configure(&self, filesystem: u64, limit: FilesystemLimit) -> Result<(), SpoolError> {
+        self.0.borrow_mut().configure(filesystem, limit)
+    }
+    /// Admits a transaction allocation against all users of the same filesystem.
+    pub fn admit(&self, filesystem: u64, available: u64, bytes: u64) -> Result<(), SpoolError> {
+        self.0.borrow_mut().admit(filesystem, available, bytes)
+    }
+    /// Accounts durable bytes already used by SQLite or another approved subsystem.
+    pub fn account_existing(&self, filesystem: u64, bytes: u64) -> Result<(), SpoolError> {
+        self.0.borrow_mut().account_existing(filesystem, bytes)
+    }
+    /// Releases a completed or rolled-back admission on exactly one filesystem.
+    pub fn release(&self, filesystem: u64, bytes: u64) -> Result<(), SpoolError> {
+        self.0.borrow_mut().release(filesystem, bytes)
     }
     pub fn reserved(&self, filesystem: u64) -> u64 {
         self.0.borrow().reserved(filesystem)
@@ -584,7 +619,7 @@ impl TxnBuffer {
                 requested: u64::MAX,
             })?;
         let available = self.space.available_bytes(&self.directory)?;
-        self.disk.0.borrow_mut().admit(dev, available, bytes)?;
+        self.disk.admit(dev, available, bytes)?;
         let result = (|| {
             self.allocator.allocate(file, offset, bytes)?;
             file.seek(SeekFrom::Start(offset))?;
@@ -595,7 +630,7 @@ impl TxnBuffer {
         })();
         if let Err(error) = result {
             if file.set_len(offset).is_ok() {
-                self.disk.0.borrow_mut().release(dev, bytes);
+                self.disk.release(dev, bytes)?;
             }
             return Err(error.into());
         }
@@ -661,7 +696,7 @@ impl TxnBuffer {
             drop(file);
             fs::remove_file(path)?;
             sync_dir(&self.directory)?;
-            self.disk.0.borrow_mut().release(dev, len);
+            self.disk.release(dev, len)?;
         }
         Ok(())
     }
@@ -681,6 +716,53 @@ impl TxnBuffer {
     ) {
         let (observation, outcome) = self.failure_observation(error, end_lsn, config_fingerprint);
         let action = transition(current, PolicyEvent::Observe(observation), context);
+        let prepared = PreparedFailureOperation::from_policy_action(action.clone(), None);
+        (outcome, action, prepared)
+    }
+
+    /// Requests the shared policy core to re-arm a limit failure. The spool domain does not
+    /// clear or rewrite persisted policy state: changed relevant limits and retained WAL are
+    /// both mandatory, otherwise the only safe outcome is re-seed.
+    pub fn rearm_failure_policy(
+        &self,
+        error: &SpoolError,
+        end_lsn: Option<&str>,
+        previous_config_fingerprint: &str,
+        replacement_config_fingerprint: &str,
+        current: &FailureRecord,
+        retained_wal_proven: bool,
+        authorization_token_id: &str,
+        context: &mut TransitionContext<'_>,
+    ) -> (
+        SpoolRecoveryOutcome,
+        PolicyAction,
+        Option<PreparedFailureOperation>,
+    ) {
+        let (previous, _) = self.failure_observation(error, end_lsn, previous_config_fingerprint);
+        let (replacement, _) =
+            self.failure_observation(error, end_lsn, replacement_config_fingerprint);
+        let request = RearmRequest {
+            expected_failure_id: current.failure_id.clone(),
+            expected_fingerprint: current.fingerprint.clone(),
+            authorization_token: RearmAuthorizationToken {
+                token_id: authorization_token_id.into(),
+                expected_last_rearm_token_digest: current.last_rearm_token_digest.clone(),
+            },
+            relevant_configuration_change: Some(RelevantConfigurationChange {
+                previous: previous.fingerprint,
+                replacement: replacement.fingerprint,
+            }),
+            retained_wal_proven,
+            integrity_recovery_proven: false,
+            continuity_recovery_proven: false,
+            explicit_operator_authorization: false,
+        };
+        let action = transition(Some(current), PolicyEvent::Rearm(request), context);
+        let outcome = if matches!(action, PolicyAction::Rearmed { .. }) {
+            SpoolRecoveryOutcome::RetainedWalRearmed
+        } else {
+            SpoolRecoveryOutcome::RequireReseed
+        };
         let prepared = PreparedFailureOperation::from_policy_action(action.clone(), None);
         (outcome, action, prepared)
     }
@@ -832,6 +914,13 @@ pub enum CaptureAdmissionOutcome {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SpoolRecoveryOutcome {
+    RetainedWalRearmed,
+    RequireReseed,
+}
+
 fn spool_name(h: &Header) -> String {
     let raw = serde_json::to_vec(h).expect("header");
     format!("txn-{:x}.spool", Sha256::digest(raw))
@@ -932,104 +1021,105 @@ pub fn classify_startup_spools(
         .checked_mul(std::mem::size_of::<StartupAction>() + 4096)
         .ok_or(SpoolError::MemoryLimit(MemoryClass::Staging))?;
     startup_memory.reserve(MemoryClass::Staging, action_reservation)?;
-    let quarantine = directory.join("quarantine");
-    if let Err(error) = fs::create_dir_all(&quarantine) {
-        startup_memory.release(MemoryClass::Staging, action_reservation);
-        return Err(error.into());
-    }
-    let mut actions = Vec::with_capacity(max_spools);
-    for entry in fs::read_dir(directory)? {
-        let path = entry?.path();
-        if path.as_os_str().as_encoded_bytes().len() > 4096 {
-            startup_memory.release(MemoryClass::Staging, action_reservation);
-            return Err(SpoolError::Invalid("spool path too long"));
+    // Keep all fallible startup work inside one scope so every read_dir/entry/remove/
+    // quarantine/sync error releases the action-vector reservation before returning.
+    let result = (|| {
+        let quarantine = directory.join("quarantine");
+        fs::create_dir_all(&quarantine)?;
+        let mut actions = Vec::with_capacity(max_spools);
+        for entry in fs::read_dir(directory)? {
+            let path = entry?.path();
+            if path.as_os_str().as_encoded_bytes().len() > 4096 {
+                return Err(SpoolError::Invalid("spool path too long"));
+            }
+            if path.extension().and_then(|x| x.to_str()) != Some("spool") {
+                continue;
+            }
+            if actions.len() == max_spools {
+                return Err(SpoolError::StartupBlocked);
+            }
+            startup_memory.reserve(MemoryClass::Decoder, READER_WORK_BYTES)?;
+            // read_record allocates one event Vec. Admit that allocation independently from
+            // BufReader/parser work and release both reservations on every parse result.
+            if let Err(error) = startup_memory.reserve(MemoryClass::Staging, max_event_bytes) {
+                startup_memory.release(MemoryClass::Decoder, READER_WORK_BYTES);
+                return Err(error);
+            }
+            let parsed = (|| {
+                let mut r = BufReader::new(File::open(&path)?);
+                let h = read_header(&mut r)?;
+                if path.file_name().and_then(|v| v.to_str()) != Some(spool_name(&h).as_str()) {
+                    return Err(SpoolError::Checksum);
+                }
+                let mut bytes = 0_u64;
+                let mut events = 0_u64;
+                loop {
+                    let mut peek = [0; 1];
+                    match r.read(&mut peek)? {
+                        0 => break,
+                        1 => {
+                            r.seek_relative(-1)?;
+                            if events >= max_transaction_events {
+                                return Err(SpoolError::TransactionEventsLimit {
+                                    limit: max_transaction_events,
+                                    observed: events + 1,
+                                });
+                            }
+                            let remaining = max_transaction_bytes.saturating_sub(bytes);
+                            let allocation_limit = max_event_bytes
+                                .min(usize::try_from(remaining).unwrap_or(usize::MAX));
+                            let event = read_record(&mut r, allocation_limit)?;
+                            bytes = bytes.checked_add(event.len() as u64).ok_or(
+                                SpoolError::TransactionBytesLimit {
+                                    limit: max_transaction_bytes,
+                                    observed: u64::MAX,
+                                },
+                            )?;
+                            events += 1;
+                            if bytes > max_transaction_bytes {
+                                return Err(SpoolError::TransactionBytesLimit {
+                                    limit: max_transaction_bytes,
+                                    observed: bytes,
+                                });
+                            }
+                        }
+                        _ => unreachable!(),
+                    }
+                }
+                Ok::<_, SpoolError>(h)
+            })();
+            startup_memory.release(MemoryClass::Staging, max_event_bytes);
+            startup_memory.release(MemoryClass::Decoder, READER_WORK_BYTES);
+            let action = match parsed {
+                Ok(h) if h.capture_epoch == current_epoch && h.creation_run != current_run => {
+                    match existing(&h.capture_epoch, &h.xid) {
+                        ExistingTransaction::CommittedSame => {
+                            fs::remove_file(&path)?;
+                            StartupAction::RemovedCommitted(path.clone())
+                        }
+                        ExistingTransaction::Uncommitted => {
+                            fs::remove_file(&path)?;
+                            StartupAction::RemovedUncommitted(path.clone())
+                        }
+                        ExistingTransaction::Contradictory => quarantine_file(&path, &quarantine)?,
+                    }
+                }
+                _ => quarantine_file(&path, &quarantine)?,
+            };
+            actions.push(action);
         }
-        if path.extension().and_then(|x| x.to_str()) != Some("spool") {
-            continue;
-        }
-        if actions.len() == max_spools {
-            startup_memory.release(MemoryClass::Staging, action_reservation);
+        sync_dir(directory)?;
+        sync_dir(&quarantine)?;
+        if actions
+            .iter()
+            .any(|a| matches!(a, StartupAction::Quarantined(_)))
+        {
             return Err(SpoolError::StartupBlocked);
         }
-        startup_memory.reserve(MemoryClass::Decoder, READER_WORK_BYTES)?;
-        let parsed = (|| {
-            let mut r = BufReader::new(File::open(&path)?);
-            let h = read_header(&mut r)?;
-            if path.file_name().and_then(|v| v.to_str()) != Some(spool_name(&h).as_str()) {
-                return Err(SpoolError::Checksum);
-            }
-            let mut bytes = 0_u64;
-            let mut events = 0_u64;
-            loop {
-                let mut peek = [0; 1];
-                match r.read(&mut peek)? {
-                    0 => break,
-                    1 => {
-                        r.seek_relative(-1)?;
-                        if events >= max_transaction_events {
-                            return Err(SpoolError::TransactionEventsLimit {
-                                limit: max_transaction_events,
-                                observed: events + 1,
-                            });
-                        }
-                        let remaining = max_transaction_bytes.saturating_sub(bytes);
-                        let allocation_limit =
-                            max_event_bytes.min(usize::try_from(remaining).unwrap_or(usize::MAX));
-                        let event = read_record(&mut r, allocation_limit)?;
-                        bytes = bytes.checked_add(event.len() as u64).ok_or(
-                            SpoolError::TransactionBytesLimit {
-                                limit: max_transaction_bytes,
-                                observed: u64::MAX,
-                            },
-                        )?;
-                        events += 1;
-                        if bytes > max_transaction_bytes {
-                            return Err(SpoolError::TransactionBytesLimit {
-                                limit: max_transaction_bytes,
-                                observed: bytes,
-                            });
-                        }
-                        if events > max_transaction_events {
-                            return Err(SpoolError::TransactionEventsLimit {
-                                limit: max_transaction_events,
-                                observed: events,
-                            });
-                        }
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            Ok::<_, SpoolError>(h)
-        })();
-        startup_memory.release(MemoryClass::Decoder, READER_WORK_BYTES);
-        let action = match parsed {
-            Ok(h) if h.capture_epoch == current_epoch && h.creation_run != current_run => {
-                match existing(&h.capture_epoch, &h.xid) {
-                    ExistingTransaction::CommittedSame => {
-                        fs::remove_file(&path)?;
-                        StartupAction::RemovedCommitted(path.clone())
-                    }
-                    ExistingTransaction::Uncommitted => {
-                        fs::remove_file(&path)?;
-                        StartupAction::RemovedUncommitted(path.clone())
-                    }
-                    ExistingTransaction::Contradictory => quarantine_file(&path, &quarantine)?,
-                }
-            }
-            _ => quarantine_file(&path, &quarantine)?,
-        };
-        actions.push(action);
-    }
-    sync_dir(directory)?;
-    sync_dir(&quarantine)?;
-    let blocked = actions
-        .iter()
-        .any(|a| matches!(a, StartupAction::Quarantined(_)));
+        Ok(actions)
+    })();
     startup_memory.release(MemoryClass::Staging, action_reservation);
-    if blocked {
-        return Err(SpoolError::StartupBlocked);
-    }
-    Ok(actions)
+    result
 }
 fn quarantine_file(path: &Path, dir: &Path) -> Result<StartupAction, SpoolError> {
     let name = path
@@ -1239,15 +1329,139 @@ pub mod tests {
                 },
             )
             .unwrap();
-        admission.account_existing(dev, 100).unwrap();
         let shared = FilesystemAdmissionController::new(admission);
-        shared.0.borrow_mut().admit(dev, 600, 400).unwrap();
+        shared.account_existing(dev, 100).unwrap();
+        shared.admit(dev, 600, 400).unwrap();
         assert_eq!(shared.clone().reserved(dev), 500);
         assert!(matches!(
-            shared.0.borrow_mut().admit(dev, 600, 1),
+            shared.admit(dev, 600, 1),
             Err(SpoolError::DiskReserve { .. })
         ));
         fs::remove_dir_all(shared_dir).ok();
+    }
+    #[test]
+    fn shared_filesystem_controller_isolates_transactions_and_filesystems() {
+        let first_fs = 41;
+        let second_fs = 42;
+        let shared = FilesystemAdmissionController::new(DiskAdmission::default());
+        for filesystem in [first_fs, second_fs] {
+            shared
+                .configure(
+                    filesystem,
+                    FilesystemLimit {
+                        total_budget: 1_000,
+                        emergency_reserve: 100,
+                    },
+                )
+                .unwrap();
+        }
+        shared.account_existing(first_fs, 100).unwrap();
+        let first_transaction = shared.clone();
+        let second_transaction = shared.clone();
+        first_transaction.admit(first_fs, 1_000, 400).unwrap();
+        assert_eq!(second_transaction.reserved(first_fs), 500);
+        shared.account_existing(first_fs, 200).unwrap();
+        assert_eq!(shared.reserved(first_fs), 600);
+        shared.account_existing(first_fs, 100).unwrap();
+        assert_eq!(second_transaction.reserved(first_fs), 500);
+        assert!(matches!(
+            second_transaction.admit(first_fs, 1_000, 401),
+            Err(SpoolError::DiskReserve {
+                filesystem: 41,
+                requested: 401
+            })
+        ));
+        second_transaction.admit(second_fs, 1_000, 800).unwrap();
+        assert_eq!(shared.reserved(first_fs), 500);
+        assert_eq!(shared.reserved(second_fs), 800);
+        first_transaction.release(first_fs, 400).unwrap();
+        assert_eq!(shared.reserved(first_fs), 100);
+        assert_eq!(shared.reserved(second_fs), 800);
+    }
+    #[test]
+    fn same_fingerprint_is_suppressed_and_limit_rearm_requires_retained_wal() {
+        let b = setup("policy-vectors", 512, 4096);
+        let error = SpoolError::TransactionBytesLimit {
+            limit: 1,
+            observed: 2,
+        };
+        let clock = VirtualClock::new(1_000);
+        let mut random = ZeroRandom;
+        let mut context = TransitionContext {
+            clock: &clock,
+            randomness: &mut random,
+        };
+        let (_, initial, _) = b.apply_failure_policy(
+            &error,
+            Some("0000000000000010"),
+            "limit-a",
+            None,
+            &mut context,
+        );
+        let PolicyAction::Persist(record) = initial else {
+            panic!("initial limit failure must persist")
+        };
+        let (_, repeated, prepared) = b.apply_failure_policy(
+            &error,
+            Some("0000000000000010"),
+            "limit-a",
+            Some(&record),
+            &mut context,
+        );
+        assert_eq!(repeated, PolicyAction::Suppressed);
+        assert!(prepared.is_none());
+
+        let later = VirtualClock::new(2_000);
+        let mut random = ZeroRandom;
+        let mut context = TransitionContext {
+            clock: &later,
+            randomness: &mut random,
+        };
+        let (same_limit, same_action, same_prepared) = b.rearm_failure_policy(
+            &error,
+            Some("0000000000000010"),
+            "limit-a",
+            "limit-a",
+            &record,
+            true,
+            "rearm-same-limit",
+            &mut context,
+        );
+        assert_eq!(same_limit, SpoolRecoveryOutcome::RequireReseed);
+        assert_eq!(same_action, PolicyAction::RejectedRearm);
+        assert!(same_prepared.is_none());
+
+        let (wal_missing, wal_action, wal_prepared) = b.rearm_failure_policy(
+            &error,
+            Some("0000000000000010"),
+            "limit-a",
+            "limit-b",
+            &record,
+            false,
+            "rearm-without-wal",
+            &mut context,
+        );
+        assert_eq!(wal_missing, SpoolRecoveryOutcome::RequireReseed);
+        assert_eq!(wal_action, PolicyAction::RejectedRearm);
+        assert!(wal_prepared.is_none());
+
+        let (rearmed, action, prepared) = b.rearm_failure_policy(
+            &error,
+            Some("0000000000000010"),
+            "limit-a",
+            "limit-b",
+            &record,
+            true,
+            "rearm-changed-limit",
+            &mut context,
+        );
+        assert_eq!(rearmed, SpoolRecoveryOutcome::RetainedWalRearmed);
+        assert!(matches!(action, PolicyAction::Rearmed { .. }));
+        assert!(matches!(
+            prepared,
+            Some(PreparedFailureOperation::Rearm { .. })
+        ));
+        b.finish().unwrap();
     }
     #[test]
     fn checksum_failure_is_detected_by_commit_iterator() {
@@ -1367,6 +1581,45 @@ pub mod tests {
                 .count(),
             0
         );
+        assert_eq!(scan_memory.used(MemoryClass::Decoder), 0);
+        assert_eq!(scan_memory.used(MemoryClass::Staging), 0);
+        drop(lock);
+        fs::remove_dir_all(store_dir).ok();
+    }
+    #[test]
+    fn startup_releases_action_reader_and_event_reservations_on_error() {
+        let store_dir = dir("startup-accounting");
+        let store = store_dir.join("state.sqlite");
+        let lock = StateLock::acquire(&store, "owner", "nonce").unwrap();
+        fs::write(store_dir.join("malformed.spool"), b"bad").unwrap();
+        let mut budget = MemoryBudget::new(MemoryLimits {
+            process_limit: 1_048_576,
+            runtime_fixed: 1,
+            receive: 1,
+            decoder: READER_WORK_BYTES,
+            // Enough for the action vector, deliberately not enough for its independent event.
+            staging: std::mem::size_of::<StartupAction>() + 4096 + 1,
+        })
+        .unwrap();
+        let result = classify_startup_spools(
+            &lock,
+            &store,
+            &store_dir,
+            "epoch",
+            "owner",
+            512,
+            1024,
+            4,
+            1,
+            &mut budget,
+            |_, _| ExistingTransaction::Uncommitted,
+        );
+        assert!(matches!(
+            result,
+            Err(SpoolError::MemoryLimit(MemoryClass::Staging))
+        ));
+        assert_eq!(budget.used(MemoryClass::Decoder), 0);
+        assert_eq!(budget.used(MemoryClass::Staging), 0);
         drop(lock);
         fs::remove_dir_all(store_dir).ok();
     }

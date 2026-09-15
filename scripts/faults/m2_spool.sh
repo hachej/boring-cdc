@@ -16,4 +16,4 @@ cp -a artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-FAULTS "$scratch/expected"
 python3 scripts/lib/m2_spool_component.py fault
 diff -ru "$scratch/expected" artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-FAULTS
 python3 scripts/validate/m2_spool.py fault
-scripts/validate/evidence.sh artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-FAULTS
+scripts/validate/evidence.sh artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-FAULTS/spool-component-v1/evidence.json
