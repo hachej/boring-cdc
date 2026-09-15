@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Boring CDC M0 Completion · Gate 2 packet</title><style>
+:root{--bg:#08121a;--panel:#10212d;--ink:#edf6f4;--muted:#9bb2ba;--line:#29414c;--ok:#65d79a;--warn:#f4bd62;--bad:#ff7b72;--blue:#73bdf2}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 85% 0,#15384b 0,transparent 34%),var(--bg);color:var(--ink);font:15px/1.55 system-ui,-apple-system,sans-serif}.wrap{max-width:1080px;margin:auto;padding:38px 20px 64px}header{display:grid;grid-template-columns:1.6fr 1fr;gap:20px;border-bottom:1px solid var(--line);padding-bottom:24px}.eyebrow{color:var(--blue);font:700 12px ui-monospace,monospace;letter-spacing:.13em;text-transform:uppercase}h1{font-size:clamp(34px,6vw,64px);line-height:1;margin:10px 0 14px;letter-spacing:-.04em}h2{margin:0 0 14px}.lede,.muted{color:var(--muted)}.stamp,.card{background:rgba(16,33,45,.9);border:1px solid var(--line);border-radius:14px;padding:18px}.pill{display:inline-block;border-radius:999px;padding:5px 10px;background:#382713;color:#ffd28a;font-weight:750}.sha{font:12px ui-monospace,monospace;overflow-wrap:anywhere;color:var(--muted)}section{margin-top:24px}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card b{color:var(--ok)}pre{white-space:pre-wrap;background:#071019;border:1px solid var(--line);border-radius:12px;padding:16px;overflow:auto;color:#cce4ea;font:13px/1.45 ui-monospace,monospace}.mermaid{color:#d8edf2}.walk details{border:1px solid var(--line);border-radius:10px;padding:12px 15px;margin:9px 0;background:#0d1b25}.walk summary{cursor:pointer;font-weight:750}.walk code{color:var(--blue)}table{width:100%;border-collapse:collapse;background:#0d1b25;border:1px solid var(--line)}th,td{text-align:left;vertical-align:top;padding:11px;border-bottom:1px solid var(--line)}th{color:var(--blue)}.low{color:var(--ok)}.high{color:var(--bad)}.callout{border-left:4px solid var(--warn);background:#2a2114;padding:15px 17px;border-radius:8px;color:#ffe0a7}.checks li{margin:7px 0}@media(max-width:760px){header,.grid{grid-template-columns:1fr}.wrap{padding-top:24px}table{font-size:13px}}
+</style></head><body><main class="wrap"><header><div><div class="eyebrow">Boring CDC M0 Completion · Gate 2 packet</div><h1>Contracts complete. Closure still guarded.</h1><p class="lede">The relaunched M0 slice hardens six contract surfaces, runs every decision-domain validator, and records the terminal graph result without converting recommendations into approvals.</p></div><div class="stamp"><span class="pill">BLOCKED · owner decisions open</span><p><b>CI / proof:</b> green at reviewed implementation</p><div class="sha">c4e68e84e123c5558882c965500c0ad812d882ff</div><p class="muted">Bead: boring-cdc-boring-cdc-m0-v2-86qv.10<br>Risk: medium · merge is not yet authorized</p></div></header>
+<section><h2>Changed-component map</h2><pre class="mermaid">flowchart LR
+  PG[PostgreSQL contract]:::changed --> EV[Event ABI]:::changed
+  EV --> ST[SQLite contract]:::changed --> AR[Archive contract]:::changed --> CH[ClickHouse contract]:::changed
+  EV --> TV[Process-local teaching view]:::changed
+  C[M0 completeness · 20 checks]:::changed --> G[Terminal close guard]:::changed
+  D[7 open owner decisions]:::context --> C
+  G --> B[Blocked · 30 open legacy-root nodes]
+  classDef changed fill:#164936,stroke:#65d79a,color:#edf6f4
+  classDef context fill:#17252e,stroke:#526a75,color:#9bb2ba</pre></section>
+<section><h2>Shipped flow</h2><pre class="mermaid">sequenceDiagram
+  participant PG as PostgreSQL
+  participant E as Event ABI
+  participant V as Teaching view
+  participant S as Storage/archive specs
+  participant C as ClickHouse (Article 4)
+  participant G as Aggregate gate
+  PG->>E: raw pgoutput
+  E->>V: same-stream current state
+  Note over V: process-local and non-durable
+  E->>S: canonical events and boundaries
+  S->>C: convergence specification
+  Note over C: runtime proof deferred to Article 4
+  G->>G: 6 artifacts + 9 decision validators
+  G-->>G: retain 7 provisional open states</pre></section>
+<section><h2>What changed</h2><pre> repository/
++├── contracts/m0/              exact inventories and schemas
++├── fixtures/m0/               deterministic hostile vectors
++├── scripts/validate/          artifact, decision, provenance gates
++├── scripts/acceptance/        20-check M0 completion
++├── artifacts/boring-cdc-m0-*/ immutable bound receipts
++└── artifacts/boring-cdc-m0-gate/gate/close-guard.json
++                               exact exit-1 result; 30 open nodes</pre><div class="walk">
+<details open><summary><code>contracts/</code> + <code>fixtures/</code> — executable contract surface</summary><p>Six primary artifacts cover PostgreSQL capture, storage, event ABI, archive, ClickHouse, and scaffold. Exact artifact and owner inventories prevent coordinated omission.</p></details>
+<details><summary><code>scripts/validate/m0_completeness.py</code> — aggregate gate</summary><p>Runs all six artifact checks and all nine decision-domain validators exactly once, checks source/validator/input provenance, and preserves seven explicit provisional decisions.</p></details>
+<details><summary><code>docs/SERIES_EXECUTION.md</code> + Article 1 code — evidence boundary</summary><p>Article 1 remains raw pgoutput plus a same-stream, process-local, non-durable teaching projection. ClickHouse, durability, checkpoints, and exactly-once remain Article 4.</p></details>
+<details><summary><code>artifacts/boring-cdc-m0-gate/gate/close-guard.json</code> — honest terminal receipt</summary><p>The committed ledger deterministically yields exit 1, status <code>fail</code>, and 30 open reachable nodes. This is a closure block, not a failing implementation test and not authority to close decisions.</p></details></div></section>
+<section><h2>Risks</h2><table><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr><tr><td>Provisional literals mistaken for approved policy</td><td class="low">Low</td><td class="high">High</td><td>Seven exact <code>// M0-PROVISIONAL:</code> markers and open states; aggregate rejects forged approval.</td></tr><tr><td>Gate packet mistaken for merge readiness</td><td>Medium</td><td class="high">High</td><td>Blocked status above fold; close-guard failure and owner action are explicit.</td></tr><tr><td>Live PostgreSQL behavior differs</td><td>Medium</td><td>Medium</td><td>Five pinned PostgreSQL 17.6 tests remain fixture-gated and disclosed.</td></tr><tr><td>Rollback</td><td class="low">Low</td><td>Low</td><td>Revert commits in the M0-v2 range; no migration or M2 change shipped.</td></tr></table></section>
+<section><h2>Test coverage</h2><table><tr><th>Area</th><th>Automated proof</th><th>Manual check</th><th>Gap</th></tr><tr><td>Rust/scaffold</td><td>Locked Clippy; 178 lib + 3 bin + compile-fail</td><td>None</td><td>5 live-PG tests ignored</td></tr><tr><td>M0 aggregate</td><td>20 checks; 22 focused Python tests</td><td>Inspect completion summary</td><td>None known</td></tr><tr><td>Terminal graph</td><td>Exact-SHA byte comparison</td><td>Run close guard; expect exit 1</td><td>Owner closure remains</td></tr><tr><td>Ledger</td><td>182 rows; duplicate IDs = 0</td><td>None</td><td>None known</td></tr></table></section>
+<section><h2>Reviewer checklist</h2><ol class="checks"><li>Are all seven provisional decisions still visibly open and marker-bound?</li><li>Does Article 1 avoid claiming durable or ClickHouse evidence?</li><li>Does the aggregate invoke all nine decision-domain validators exactly once?</li><li>Is the close-guard failure presented as a merge blocker rather than suppressed?</li><li>Is any closure/merge action deferred to the owner and Orchestrator?</li></ol></section>
+<section><h2>Proof and next action</h2><div class="callout"><b>Do not merge yet.</b> From <span class="sha">c4e68e8</span>, run <code>TMPDIR=/var/tmp scripts/acceptance/m0_complete.sh --verify</code>, then run <code>scripts/validate/close_guard.sh boring-cdc-m0</code>. The first passes; the second must exit 1 and match the stored JSON. The Orchestrator must resolve owner authority and legacy closure before raising merge approval.</div><p class="muted">Actual source range: <span class="sha">d1eb211e369551fc23f7cda2fa4d65be7af15330..c4e68e84e123c5558882c965500c0ad812d882ff</span><br>Evidence: artifacts/boring-cdc-m0-complete/gate/completion-summary.json · artifacts/boring-cdc-m0-gate/gate/close-guard.json</p></section>
+</main></body></html>
