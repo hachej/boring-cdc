@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 9;
+pub const SCHEMA_VERSION: i64 = 10;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -393,6 +393,23 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_9_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v10: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=10)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v10 {
+            connection.execute_batch(MIGRATION_10)?;
+            connection.execute("INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(10,'bounded-logical-pin-owner-lookup',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[MIGRATION_10_CHECKSUM])?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=10",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_10_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -750,6 +767,13 @@ const MIGRATION_9: &str = r#"
 INSERT OR IGNORE INTO journal_retention_clock(transaction_id,committed_at_unix_ms)
 SELECT transaction_id,CAST(unixepoch('subsec')*1000 AS INTEGER)
 FROM source_transactions WHERE state='committed';
+"#;
+
+const MIGRATION_10_CHECKSUM: &str =
+    "sha256:3f2922071f599fa575fbc9a7aa5b9cfb7a4ea0039edb66ab0cf409d4bc84d195";
+const MIGRATION_10: &str = r#"
+CREATE INDEX logical_range_pins_owner_state
+ON logical_range_pins(owner_kind,owner_id,state,pin_id);
 "#;
 
 #[cfg(test)]

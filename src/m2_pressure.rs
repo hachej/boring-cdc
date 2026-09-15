@@ -606,20 +606,47 @@ pub fn bounded_metadata_gc(
             .collect::<Result<Vec<_>, _>>()?
     };
     let mut audits = 0;
+    let mut remaining_pin_rows = limits.batch_max;
     for audit_id in audit_ids {
-        // The terminal owner row and all of its logical pins are coordinated by this one
-        // IMMEDIATE transaction. Advancing active pins through release_pending preserves the
-        // lifecycle trigger, while also reconciling a release already requested by another turn.
-        tx.execute(
-            "UPDATE logical_range_pins SET state='release_pending',revision=revision+1
-             WHERE owner_kind='audit' AND owner_id=?1 AND state='active'",
+        // The owner index and shared row budget keep reconciliation bounded even when corrupt or
+        // legacy state contains many pins for one audit. The audit remains until a later tick has
+        // released every pin, and each tick is one IMMEDIATE transaction.
+        let pin_ids = {
+            let mut statement = tx.prepare(
+                "SELECT pin_id FROM logical_range_pins
+                 WHERE owner_kind='audit' AND owner_id=?1 AND state!='released'
+                 ORDER BY pin_id LIMIT ?2",
+            )?;
+            statement
+                .query_map(params![audit_id, remaining_pin_rows as i64], |row| {
+                    row.get::<_, String>(0)
+                })?
+                .collect::<Result<Vec<_>, _>>()?
+        };
+        remaining_pin_rows -= pin_ids.len();
+        for pin_id in pin_ids {
+            // Advancing active pins through release_pending preserves the lifecycle trigger and
+            // also reconciles a release already requested by another maintenance turn.
+            tx.execute(
+                "UPDATE logical_range_pins SET state='release_pending',revision=revision+1
+                 WHERE pin_id=?1 AND state='active'",
+                [&pin_id],
+            )?;
+            tx.execute(
+                "UPDATE logical_range_pins SET state='released',revision=revision+1
+                 WHERE pin_id=?1 AND state='release_pending'",
+                [&pin_id],
+            )?;
+        }
+        let has_unreleased = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM logical_range_pins
+             WHERE owner_kind='audit' AND owner_id=?1 AND state!='released')",
             [&audit_id],
+            |row| row.get::<_, bool>(0),
         )?;
-        tx.execute(
-            "UPDATE logical_range_pins SET state='released',revision=revision+1
-             WHERE owner_kind='audit' AND owner_id=?1 AND state='release_pending'",
-            [&audit_id],
-        )?;
+        if has_unreleased {
+            continue;
+        }
         let deleted = tx.execute(
             "DELETE FROM destination_audits WHERE audit_id=?1
              AND journal_cursor_seq>=round_target_seq AND self_cursor_seq>=round_target_seq",
@@ -1063,6 +1090,71 @@ pub(crate) mod tests {
                 .query_row("SELECT count(*) FROM terminal_metadata_retention WHERE category='destination_audit'", [], |r| r.get::<_, i64>(0))
                 .unwrap(),
             1
+        );
+        drop(w);
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
+    fn audit_pin_reconciliation_bounds_many_owner_pins_per_tick() {
+        let (mut w, p) = writer();
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','clickhouse','cfg','epoch',1)",[]).unwrap();
+        for (audit_id, terminal_at) in [("many", 1_i64), ("keeper", 2)] {
+            w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,budget_bytes_used,budget_events_used,budget_ms_used,freshness_window_started_at,freshness_expires_at,contract_digest) VALUES(?1,'d','cfg','epoch',1,10,'round',10,10,0,0,0,'2026','2027','contract')",[audit_id]).unwrap();
+            w.connection().execute("INSERT INTO terminal_metadata_retention(category,object_id,terminal_at_unix_ms) VALUES('destination_audit',?1,?2)",params![audit_id,terminal_at]).unwrap();
+        }
+        for pin_id in ["pin-1", "pin-2", "pin-3"] {
+            create_pin(
+                &mut w,
+                PinSpec {
+                    pin_id,
+                    owner_kind: "audit",
+                    owner_id: "many",
+                    capture_epoch: "epoch",
+                    start_seq: 1,
+                    end_seq: Some(10),
+                    expires_at_unix_ms: None,
+                },
+            )
+            .unwrap();
+        }
+        let limits = MetadataRetention {
+            alerts_rows: 1,
+            audit_rows: 1,
+            completed_command_cutoff: "2025",
+            invalid_generation_cutoff_ms: 1,
+            retired_generation_cutoff_ms: 1,
+            orphan_cutoff_ms: 1,
+            batch_max: 1,
+        };
+        for released in 1..=2 {
+            assert_eq!(
+                bounded_metadata_gc(&mut w, limits.clone()).unwrap().audits,
+                0
+            );
+            assert_eq!(
+                w.connection()
+                    .query_row("SELECT count(*) FROM logical_range_pins WHERE owner_id='many' AND state='released'", [], |r| r.get::<_, i64>(0))
+                    .unwrap(),
+                released
+            );
+        }
+        assert_eq!(bounded_metadata_gc(&mut w, limits).unwrap().audits, 1);
+        assert_eq!(
+            w.connection()
+                .query_row("SELECT count(*) FROM logical_range_pins WHERE owner_id='many' AND state='released'", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            3
+        );
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT count(*) FROM destination_audits WHERE audit_id='many'",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
         );
         drop(w);
         let _ = std::fs::remove_file(p);
