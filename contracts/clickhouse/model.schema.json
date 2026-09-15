@@ -116,13 +116,17 @@
         },
         "requirements": {
           "type": "string"
+        },
+        "status": {
+          "type": "string"
         }
       },
       "required": [
         "architecture",
         "owner_cards",
         "owner_confirmation_date",
-        "requirements"
+        "requirements",
+        "status"
       ],
       "type": "object"
     },
@@ -242,6 +246,9 @@
           },
           "type": "array"
         },
+        "capture_epoch_encoding": {
+          "type": "string"
+        },
         "cross_epoch_comparison": {
           "type": "string"
         },
@@ -285,7 +292,8 @@
         "key_change",
         "source_order",
         "stored_payload_hash_inputs",
-        "toast"
+        "toast",
+        "capture_epoch_encoding"
       ],
       "type": "object"
     },
@@ -374,6 +382,9 @@
         "retirement"
       ],
       "type": "object"
+    },
+    "fixture_fault_abi": {
+      "type": "string"
     },
     "fixture_ids": {
       "items": {
@@ -482,7 +493,7 @@
             "fsync_after_insert": {
               "type": "integer"
             },
-            "fsync_directories": {
+            "fsync_part_directory": {
               "type": "integer"
             },
             "insert_deduplicate": {
@@ -498,7 +509,7 @@
           "required": [
             "async_insert",
             "fsync_after_insert",
-            "fsync_directories",
+            "fsync_part_directory",
             "insert_deduplicate",
             "insert_quorum",
             "wait_for_async_insert"
@@ -671,6 +682,12 @@
       ],
       "type": "object"
     },
+    "provisional_markers": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
     "result_schema": {
       "type": "string"
     },
@@ -727,7 +744,9 @@
     "promotion",
     "result_schema",
     "schema_evolution",
-    "schema_version"
+    "schema_version",
+    "fixture_fault_abi",
+    "provisional_markers"
   ],
   "type": "object"
 }

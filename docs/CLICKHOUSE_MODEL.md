@@ -1,6 +1,15 @@
 # ClickHouse model v1
 
-**Canonical artifact:** `contracts/clickhouse/model.json` (`ART-M0-CLICKHOUSE-MODEL`). Owner confirmation on 2026-09-10 accepted every recommended value in cards `5a994cfd` and `765bd3b2`. This document is explanatory; JSON, SQL, schemas, fixtures, and their registered hashes are executable authority.
+**Canonical artifact:** `contracts/clickhouse/model.json` (`ART-M0-CLICKHOUSE-MODEL`). The artifact retains the recommended values under unresolved owner card `59a63169`; it does not close or materialize decision Beads. This document is explanatory; JSON, SQL, schemas, fixtures, and their registered hashes are executable authority.
+
+The directly consumed recommendations remain visibly provisional:
+
+- `// M0-PROVISIONAL: boring-cdc-d-compose` — pinned `linux/amd64` ClickHouse profile;
+- `// M0-PROVISIONAL: boring-cdc-d-keys` — canonical key types, encoding, component count, and decoded-byte cap;
+- `// M0-PROVISIONAL: boring-cdc-d-values` — admitted value encodings and scalar/row/event limits;
+- `// M0-PROVISIONAL: boring-cdc-d-values.1` — shortest round-tripping float spelling and ties.
+
+`boring-cdc-d-wal-cap`, `boring-cdc-d-sqlite`, and `boring-cdc-d-archive-durability` are not ClickHouse-owned literals here. `boring-cdc-d-pg-protocol` and its `ARTICLE1-PROVISIONAL` candidates remain open and untouched.
 
 ## Boundary and objects
 
@@ -8,7 +17,7 @@ The destination is one pinned ClickHouse `25.8.2.29` server on `linux/amd64`; it
 
 ## Dimensions, identity, order, and deduplication
 
-Rows retain `capture_epoch`, `generation`, `logical_table_id`, `relation_schema_fingerprint`, and the complete canonical key. Event identity is `(connector_event_id, payload_hash)`. Identical repetitions converge logically; one event ID with multiple payload hashes is an integrity failure, not “last wins.” Source comparison uses exact `(lsn_u64, origin_rank, transaction_ordinal, mutation_ordinal, connector_event_id)` and never compares capture epochs. `journal_seq` is delivery/audit position, not source order.
+Rows retain `capture_epoch`, `generation`, `logical_table_id`, `relation_schema_fingerprint`, and the complete canonical key. The event ABI's `u64 capture_epoch` maps directly to ClickHouse `UInt64`; no text, hash, or width conversion is permitted. Event identity is `(connector_event_id, payload_hash)`. Identical repetitions converge logically; one event ID with multiple payload hashes is an integrity failure, not “last wins.” Source comparison uses exact `(lsn_u64, origin_rank, transaction_ordinal, mutation_ordinal, connector_event_id)` and never compares capture epochs. `journal_seq` is delivery/audit position, not source order.
 
 `contracts/clickhouse/canonical-query.sql` resolves the unique greatest promotion fence, rejects selector and event-ID conflicts before serving, selects the latest operation per key, and reconstructs each column from its latest explicit value/null. `unchanged_toast` carries the nearest earlier explicit state; no source lookup is permitted. `absent_for_schema` projects null for the sole compatible nullable/no-default addition. A missing predecessor blocks. A latest delete hides the row while preserving its tombstone and predecessors. A key change is `operation=update, mutation_kind=delete` for the old key plus `operation=update, mutation_kind=upsert` for the new key; canonical visibility checks mutation kind as well as operation; unchanged TOAST anywhere in such a change blocks.
 
@@ -18,7 +27,7 @@ Normal queries use the canonical view/query without `FINAL`. Correctness is inva
 
 For an exact complete-transaction journal range, the worker persists an immutable SQLite intent, inserts history with synchronous settings, drives the Rust insert body/future through successful end-of-stream finalization, and reads back exact count, identity/payload digest, and zero conflicts. Only then does it insert and read back an identical batch marker and atomically advance the ClickHouse checkpoint/finalized intent in SQLite. No marker replays the same intent; a valid marker is adopted; conflicting history/marker blocks. Checkpoints never skip a failed transaction.
 
-The fixed settings are `async_insert=0`, `wait_for_async_insert=1`, `insert_quorum=1`, `fsync_after_insert=1`, `fsync_directories=1`, and `insert_deduplicate=0`. They and every correctness-bearing object/query form the object fingerprint. Drift blocks only ClickHouse.
+The fixed settings are `async_insert=0`, `wait_for_async_insert=1`, `insert_quorum=1`, `fsync_after_insert=1`, `fsync_part_directory=1`, and `insert_deduplicate=0`. They and every correctness-bearing object/query form the object fingerprint. Drift blocks only ClickHouse.
 
 ## Promotion and schema evolution
 
@@ -38,4 +47,4 @@ History warns at 64 GiB and blocks ClickHouse before a new insert at 80 GiB or b
 
 ClickHouse references the shared persisted `FailurePolicy` (v1, 250 ms base, 30,000 ms cap, 10 attempts); it does not duplicate scheduling. Transient due times survive restart. Deterministic, contract, configuration, integrity, and exhausted failures block without hot-loop or checkpoint skip. Resume revalidates the corrected cause and unchanged boundary. Capture and archive continue within their own limits.
 
-`fixtures/m0/clickhouse/scenarios.json` specifies deterministic merge/TOAST/delete/order/dedup, durability, audit, corruption, promotion, quota, retirement, schema, retry, and recovery cases. `boring-cdc-m4-ddl`, `boring-cdc-m4-durability`, and `boring-cdc-m4-promotion` execute them later. M0 claims specification validation only, never runtime ClickHouse results.
+`fixtures/m0/clickhouse/scenarios.json` specifies deterministic merge/TOAST/delete/order/dedup, durability, audit, corruption, promotion, quota, retirement, schema, retry, and recovery cases. Every history row contains the direct DDL dimensions and delivery identity, and every fault operation names a resolvable fixture-root JSON pointer rather than a `field=none` placeholder. `boring-cdc-m4-ddl`, `boring-cdc-m4-durability`, and `boring-cdc-m4-promotion` execute them later. M0 claims specification validation only, never runtime ClickHouse results.

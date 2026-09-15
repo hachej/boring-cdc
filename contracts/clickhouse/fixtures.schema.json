@@ -28,30 +28,16 @@
               "fault": {
                 "additionalProperties": false,
                 "properties": {
-                  "mutation": {
+                  "arguments": {
                     "additionalProperties": false,
                     "properties": {
-                      "field": {
+                      "setup_pointer": {
                         "type": "string"
                       },
-                      "kind": {
-                        "type": "string"
-                      },
-                      "replacement": {
-                        "type": [
-                          "string",
-                          "null"
-                        ]
-                      },
-                      "row_index": {
-                        "type": "integer"
-                      }
+                      "value": {}
                     },
                     "required": [
-                      "field",
-                      "kind",
-                      "replacement",
-                      "row_index"
+                      "setup_pointer"
                     ],
                     "type": "object"
                   },
@@ -67,10 +53,10 @@
                   }
                 },
                 "required": [
-                  "mutation",
                   "operation",
                   "preserve",
-                  "target"
+                  "target",
+                  "arguments"
                 ],
                 "type": "object"
               },
@@ -233,8 +219,14 @@
                     "items": {
                       "additionalProperties": false,
                       "properties": {
+                        "batch_id": {
+                          "type": "string"
+                        },
                         "before_key": {
                           "type": "string"
+                        },
+                        "capture_epoch": {
+                          "type": "integer"
                         },
                         "cells": {
                           "items": {
@@ -250,16 +242,25 @@
                           },
                           "type": "array"
                         },
+                        "generation": {
+                          "type": "integer"
+                        },
                         "hash": {
                           "type": "string"
                         },
                         "id": {
                           "type": "string"
                         },
+                        "journal_seq": {
+                          "type": "integer"
+                        },
                         "key": {
                           "type": "string"
                         },
                         "key_hash": {
+                          "type": "string"
+                        },
+                        "logical_table_id": {
                           "type": "string"
                         },
                         "mutation_kind": {
@@ -293,7 +294,12 @@
                         "mutation_kind",
                         "op",
                         "relation_schema_fingerprint",
-                        "version"
+                        "version",
+                        "capture_epoch",
+                        "generation",
+                        "logical_table_id",
+                        "journal_seq",
+                        "batch_id"
                       ],
                       "type": "object"
                     },
@@ -357,7 +363,7 @@
                         "additionalProperties": false,
                         "properties": {
                           "capture_epoch": {
-                            "type": "string"
+                            "type": "integer"
                           },
                           "first_journal_seq": {
                             "type": "integer"
@@ -403,7 +409,7 @@
                           "type": "string"
                         },
                         "capture_epoch": {
-                          "type": "string"
+                          "type": "integer"
                         },
                         "compatible_anchor_id": {
                           "type": "string"
@@ -515,7 +521,7 @@
             "additionalProperties": false,
             "properties": {
               "capture_epoch": {
-                "type": "string"
+                "type": "integer"
               },
               "checkpoint_journal_seq": {
                 "type": "integer"
@@ -581,8 +587,14 @@
           "items": {
             "additionalProperties": false,
             "properties": {
+              "batch_id": {
+                "type": "string"
+              },
               "before_key": {
                 "type": "string"
+              },
+              "capture_epoch": {
+                "type": "integer"
               },
               "cells": {
                 "items": {
@@ -598,16 +610,25 @@
                 },
                 "type": "array"
               },
+              "generation": {
+                "type": "integer"
+              },
               "hash": {
                 "type": "string"
               },
               "id": {
                 "type": "string"
               },
+              "journal_seq": {
+                "type": "integer"
+              },
               "key": {
                 "type": "string"
               },
               "key_hash": {
+                "type": "string"
+              },
+              "logical_table_id": {
                 "type": "string"
               },
               "mutation_kind": {
@@ -641,7 +662,12 @@
               "mutation_kind",
               "op",
               "relation_schema_fingerprint",
-              "version"
+              "version",
+              "capture_epoch",
+              "generation",
+              "logical_table_id",
+              "journal_seq",
+              "batch_id"
             ],
             "type": "object"
           },

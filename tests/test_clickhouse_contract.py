@@ -9,9 +9,21 @@ class ClickHouseContractTests(unittest.TestCase):
   es=copy.deepcopy(m.load(m.F)['golden_vectors']['events']); es.append({**es[0],'hash':'f'*64})
   with self.assertRaisesRegex(ValueError,'event conflict'): m.simulate(es)
  def test_missing_toast_predecessor_blocks(self):
-  es=[{'id':'1'*64,'hash':'a'*64,'key':'k','op':'update','mutation_kind':'upsert','version':[1,1,0,0,0,0,0],'cells':[[1,'unchanged_toast',25,-1,'']]}]
+  es=[{'capture_epoch':1,'generation':7,'logical_table_id':'8'*64,'journal_seq':100,'batch_id':'7'*64,'id':'1'*64,'hash':'a'*64,'key':'k','op':'update','mutation_kind':'upsert','version':[1,1,0,0,'1'*64],'cells':[[1,'unchanged_toast',25,-1,'']]}]
   with self.assertRaisesRegex(ValueError,'missing predecessor'): m.simulate(es)
+ def test_absent_for_schema_projects_explicit_null(self):
+  event={'capture_epoch':1,'generation':7,'logical_table_id':'8'*64,'journal_seq':100,'batch_id':'7'*64,'id':'1'*64,'hash':'a'*64,'key':'k','op':'insert','mutation_kind':'upsert','version':[1,1,0,0,'1'*64],'cells':[[3,'absent_for_schema',25,-1,'']]}
+  self.assertEqual('explicit_null',m.simulate([event])[0]['columns'][0]['state'])
+ def test_fixture_rows_are_ddl_complete_and_fault_pointers_resolve(self):
+  f=m.load(m.F); required={'capture_epoch','generation','logical_table_id','journal_seq','batch_id','before_key','cells','hash','id','key','key_hash','mutation_kind','op','relation_schema_fingerprint','version'}
+  for case in f['cases']:
+   self.assertTrue(all(set(row)==required for row in case['execution']['setup']['history_events']))
+   m.resolve_pointer(case,case['execution']['fault']['arguments']['setup_pointer'])
  def test_fixture_scope(self):
   c=m.load(m.C); f=m.load(m.F); self.assertEqual(41,len(f['cases'])); self.assertEqual(c['fixture_ids'],[x['fixture_id'] for x in f['cases']])
- def test_no_provisional(self): self.assertNotIn('M0-'+'PROVISIONAL',''.join(p.read_text() for p in [m.C,m.S,m.F,m.FS,m.RS,m.DDL,m.Q,m.R,m.D]))
+ def test_exact_provisional_inventory(self):
+  self.assertEqual(['// M0-PROVISIONAL: boring-cdc-d-compose','// M0-PROVISIONAL: boring-cdc-d-keys','// M0-PROVISIONAL: boring-cdc-d-values','// M0-PROVISIONAL: boring-cdc-d-values.1'],m.load(m.C)['provisional_markers'])
+ def test_capture_epoch_is_direct_u64(self):
+  self.assertEqual(3,m.DDL.read_text().count('capture_epoch UInt64'))
+  self.assertNotIn('capture_epoch FixedString',m.DDL.read_text())
 if __name__=='__main__':unittest.main()

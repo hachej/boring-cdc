@@ -1,24 +1,24 @@
 {
   "findings": [],
   "fixture_count": 41,
-  "input_tree_sha256": "26c76b96c31a81cccd8367ef331cbd68eb402e1bbcbe1d71eb9de9b638350db1",
+  "input_tree_sha256": "d1a2c7670d90f81cd29753c94a31b5bb4d2f41fbc8b20f58e76b378ddb5fec9a",
   "inputs": {
-    "contracts/clickhouse/canonical-query.sql": "95c8b6e8f49f94cdd1cb47360a5e5b777d8d8b9f2b8639dd46fdaf322f72f375",
-    "contracts/clickhouse/ddl.sql": "c147e8498231b61a8aa422bfae69844072078cd95e696edf272f98866431a386",
-    "contracts/clickhouse/fixtures.schema.json": "6d5e9fb2ff2cc9c1459a20450fce3ffb2f3d4a7a2652ced48a7c75bf9c1c4147",
-    "contracts/clickhouse/model.json": "3b4088b922b0b8ed46c0153147126d64c6225fe42eaea6bf2346fb4e3a205bf9",
-    "contracts/clickhouse/model.schema.json": "31e3930372389c411c8266cef0ecb13aafe84f72163dc7411753e210ae643327",
+    "contracts/clickhouse/canonical-query.sql": "0c1a0008e94cc1104e2b6964d39cc9aae26cddb76ba1f38372dc7c5d5442c8df",
+    "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
+    "contracts/clickhouse/fixtures.schema.json": "c344ce2607d548e154f0f6434463da9816e1db66200e28dd46f7bd58fb59bdf7",
+    "contracts/clickhouse/model.json": "2fb181171ff568338440babb0156c53405c56592133178583d2a53cb5495c11d",
+    "contracts/clickhouse/model.schema.json": "9e1ff4dd1dd429c90c9f31d7c082e7abb92c643636a4a30d5adec554e93bc43c",
     "contracts/clickhouse/result.schema.json": "80ad19fb794e6b6caba1dd45bbcfe63f75c83f6ae7c2d0b81b16da404b8ace8e",
     "contracts/clickhouse/retire-generation.sql": "12becfbfd61eba750e3df9b635bbb8cce61c78575efda675a61f27f433b0df01",
-    "docs/CLICKHOUSE_MODEL.md": "6ad74b91f87b228c0ce233266402ea33749b10838203b883ccce800d2d299b37",
-    "fixtures/m0/clickhouse/scenarios.json": "f7807310a8cc081092ab849edea98d454606f8541221a4ec351548c6eb9433b4"
+    "docs/CLICKHOUSE_MODEL.md": "73ec93cd23de90b8bab12b31886e71a8716e4e50062ebb745b0f3a37cfe22ff7",
+    "fixtures/m0/clickhouse/scenarios.json": "7a74a89b5fc22bec360c5926234f4ae26d676606900edc3812a41de987bcb6a6"
   },
   "owner_bead": "boring-cdc-m0-ch-model",
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-clickhouse-contract-evidence/v1",
-  "source_parent_git_commit": "fcf45734ce55c9baceddfa921f68033fd15dc740",
+  "source_parent_git_commit": "83c2b9ad3cb193a0e0b172391ff8c5a6ae173e90",
   "status": "pass",
   "validator": "scripts/validate/clickhouse_contract.py",
-  "validator_sha256": "2b94c0da3f49b8273a060fd5bd8904945fa2e97cd00cd34c772bfb6fa8809825"
+  "validator_sha256": "7af62efe8ee6eff8193c42bcada93fbbad3c9bf78c094ef52f8833d8f4a9d745"
 }
