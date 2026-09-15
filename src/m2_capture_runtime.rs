@@ -517,13 +517,19 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
             })?;
             return Ok(());
         }
-        let frame = connection
-            .get_copy_data_async(cancellation)
-            .await
-            .map_err(|_| {
+        let frame = match connection.get_copy_data_async(cancellation).await {
+            Ok(frame) => frame,
+            Err(_) if cancellation.is_cancelled() => {
+                runtime.graceful_shutdown().map_err(|_| {
+                    CaptureFailure::at("runtime", "M2_SHUTDOWN_RECONCILIATION_REQUIRED")
+                })?;
+                return Ok(());
+            }
+            Err(_) => {
                 runtime.unexpected_eof();
-                CaptureFailure::at("runtime", "M2_COPYBOTH_UNEXPECTED_LOSS")
-            })?;
+                return Err(CaptureFailure::at("runtime", "M2_COPYBOTH_UNEXPECTED_LOSS"));
+            }
+        };
         if runtime.receive(&frame).is_err() && runtime.state() != RuntimeState::CaptureSafeStopped {
             return Err(CaptureFailure::at("runtime", "M2_CAPTURE_FAILED"));
         }
@@ -798,7 +804,7 @@ pub async fn run_loaded_config(
     };
     let mut runtime =
         CaptureRuntime::new(store, factory, NoSnapshotGate, Default::default(), durable);
-    capture_copyboth_until_with_probe(
+    let result = capture_copyboth_until_with_probe(
         &CaptureConfig::article1(dsn, 1)?,
         cancellation,
         &mut runtime,
@@ -811,7 +817,11 @@ pub async fn run_loaded_config(
                 .is_ok()
         },
     )
-    .await
+    .await;
+    if result.is_err() {
+        let _ = ownership.unexpected_transport_loss();
+    }
+    result
 }
 
 #[cfg(test)]
