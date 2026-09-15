@@ -478,7 +478,13 @@ pub fn transaction_checksum(events: &[JournalEvent]) -> String {
 pub struct CopiedEvent {
     pub journal_seq: u64,
     pub transaction_id: String,
+    /// Zero-based complete-transaction ordinal within this copied range.
+    pub transaction_ordinal: u64,
+    /// Original mutation ordinal persisted by capture.
+    pub mutation_ordinal: u32,
     pub event_id: String,
+    pub relation_schema_fingerprint: Option<String>,
+    pub source_relation_id: Option<String>,
     pub payload: Vec<u8>,
     pub payload_hash: String,
 }
@@ -524,7 +530,7 @@ pub fn read_complete_range(
             "result vector capacity exceeds byte bound",
         ));
     }
-    let mut events = Vec::with_capacity(max_events);
+    let mut events: Vec<CopiedEvent> = Vec::with_capacity(max_events);
     let mut copied = events
         .capacity()
         .checked_mul(std::mem::size_of::<CopiedEvent>())
@@ -587,16 +593,25 @@ pub fn read_complete_range(
             }
             break;
         }
+        let transaction_ordinal = events
+            .iter()
+            .map(|e| e.transaction_ordinal)
+            .max()
+            .map_or(0, |v| v + 1);
         let row_count = reader.for_each_bounded_params(
-            "SELECT journal_seq,transaction_id,event_id,payload,payload_hash FROM journal_events WHERE transaction_id=?1 ORDER BY journal_seq",
+            "SELECT e.journal_seq,e.transaction_id,e.transaction_ordinal,e.event_id,e.relation_schema_fingerprint,rs.relation_id,e.payload,e.payload_hash FROM journal_events e LEFT JOIN relation_schemas rs ON rs.schema_fingerprint=e.relation_schema_fingerprint WHERE e.transaction_id=?1 ORDER BY e.journal_seq",
             [txid.as_str()],
             |r| {
                 events.push(CopiedEvent {
                     journal_seq: r.get::<_, i64>(0)? as u64,
                     transaction_id: r.get(1)?,
-                    event_id: r.get(2)?,
-                    payload: r.get(3)?,
-                    payload_hash: r.get(4)?,
+                    transaction_ordinal,
+                    mutation_ordinal: r.get::<_,i64>(2)? as u32,
+                    event_id: r.get(3)?,
+                    relation_schema_fingerprint: r.get(4)?,
+                    source_relation_id: r.get(5)?,
+                    payload: r.get(6)?,
+                    payload_hash: r.get(7)?,
                 });
                 Ok(())
             },
