@@ -1,0 +1,24 @@
+{
+  "assertions": [
+    "one deny-unknown-fields TOML loader is shared by check/status/run and mutually exclusive maintenance purposes",
+    "defaults < TOML < closed approved environment overrides",
+    "all secret references validate independent of purpose; resolved values remain operation-scoped and absent from serialization, Debug, diagnostics and fingerprints",
+    "canonical source/table-set/destination/archive/promotion/backfill/runtime fingerprints are deterministic and independently scoped",
+    "132 embedded configuration fields each have a unique stable accepted/rejected case, type, constraint, error/status/log metadata and executable target",
+    "malformed, truncated, overflow, zero, unsafe path/socket, protocol-option, TLS/listener and durability combinations fail closed"
+  ],
+  "contract_digests": {
+    "contracts/m1/config-cases.json": "c63bae4cbaf95b8f256be030342acf171ff7d94efe5b4f5ecf89d1bf2ff33308"
+  },
+  "git_commit": "7bf763bbd99a4601cdc193ba4a6485b8672c596d",
+  "outcome": "pass",
+  "owner_bead": "boring-cdc-m1-config",
+  "provisional_constants": [
+    "boring-cdc-d-security: loopback 127.0.0.1:8787/8788; 0700/0600 operator endpoint; 65536-byte request/response; 5s timeout; 24h result retention; 5m confirmation expiry",
+    "boring-cdc-d-pg-protocol: postgres-replication-copyboth-v1; origin any; proto_version=1; streaming/two_phase/binary=false",
+    "boring-cdc-d-ch-accept: server 25.8.2.29; client 0.2.0; clickhouse-v1; greatest-valid-fence; end-and-wait",
+    "boring-cdc-d-archive-durability: parquet 57.0.0; zstd:3; ext4/XFS; opaque/no-follow policy"
+  ],
+  "scenario_id": "SCN-M1-CONFIG-BOUNDARY",
+  "schema_version": "boring-cdc/m1-config-proof/v1"
+}

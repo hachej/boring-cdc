@@ -1,0 +1,335 @@
+{
+  "cases": [
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_OBSERVATION_SCHEMA_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SCHEMA",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_OBSERVATION_PROVENANCE_MISMATCH",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-PROVENANCE",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_POSTGRES_VERSION_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-PG-VERSION",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_WAL_LEVEL_NOT_LOGICAL",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-WAL",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_COPYBOTH_UNAVAILABLE",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-COPYBOTH",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_PUBLICATION_FINGERPRINT_MISMATCH",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-PUBLICATION",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_PUBLICATION_PRIVILEGE_UNSAFE",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-PUBLICATION-OWNERSHIP",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_REPLICATION_PRIVILEGE_MISSING",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-REPLICATION-ROLE",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_SLOT_BINDING_MISMATCH",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SLOT",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_SLOT_INTENT_NOT_BOUND",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SLOT-INTENT",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_SLOT_STATE_UNSAFE",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SLOT-STATE",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_PUBLICATION_SHAPE_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-PUBLICATION-SHAPE",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_SOURCE_POLICY_MISMATCH",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SOURCE-POLICY",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_TABLE_CONTRACT_MISMATCH",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-TABLES",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_DDL_POLICY_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-DDL",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_KEY_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-KEYS",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_TYPE_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-TYPES",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_PARTITION_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-PARTITIONS",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_REPLICA_IDENTITY_INCOMPLETE",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-REPLICA-IDENTITY",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_CONTROL_ROW_CARDINALITY",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-CONTROL-CARDINALITY",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_CONTROL_PRIVILEGE_EXCESS",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-CONTROL-PRIVILEGES",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_REQUIRED_GRANT_MISSING",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-GRANTS",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_PROTOCOL_FINGERPRINT_MISMATCH",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-PROTOCOL-FINGERPRINT",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_MEMORY_BUDGET_INSUFFICIENT",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-MEMORY",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_SPILL_COUNTERS_UNAVAILABLE",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SPILL-COUNTERS",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_TIMEOUT_KEEPALIVE_INCOMPATIBLE",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-TIMEOUTS",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_OWNERSHIP_RECOVERY_UNSAFE",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-OWNERSHIP",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_STATE_MUTATED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-NO-MUTATION",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_SQLITE_PRAGMA_MISMATCH",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SQLITE-PRAGMAS",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_WRITER_SYNCHRONOUS_UNVERIFIED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-WRITER-ATTESTATION",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_FILESYSTEM_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-FILESYSTEM",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_UNIT_BUDGET_INVALID",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-BUDGETS",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_CLICKHOUSE_MAPPING_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-CLICKHOUSE-MAPPING",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_ARCHIVE_MAPPING_UNSUPPORTED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-ARCHIVE-MAPPING",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_DESTINATION_TLS_UNVERIFIED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-DESTINATION-TLS",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_OPERATOR_SOCKET_UNSAFE",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SOCKET",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_MUTATING_OBSERVABILITY_ROUTE",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-READONLY-ROUTES",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_LISTENER_POLICY_MISMATCH",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-LISTENERS",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_REDACTION_POLICY_FAILED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-REDACTION",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_SOURCE_FREE_DISK_UNKNOWN",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-SOURCE-FREE-DISK",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    },
+    {
+      "blocked_or_unknown_reason": "PREFLIGHT_LIVE_COLLECTION_UNVERIFIED",
+      "checkpoint_assertion": "not_applicable_read_only",
+      "id": "SCN-M1-PREFLIGHT-LIVE-COLLECTOR",
+      "log_assertion": "stable_reason_only",
+      "state_assertion": "before_state_sha256 == after_state_sha256",
+      "unit_target": "m1_preflight::tests"
+    }
+  ],
+  "evidence_tier": "component",
+  "owner_bead": "boring-cdc-m1-preflight",
+  "schema_version": "m1-preflight-cases/v1"
+}

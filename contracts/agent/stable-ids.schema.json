@@ -1,0 +1,101 @@
+{
+  "$id": "https://boring-cdc.dev/contracts/agent/stable-ids.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "entries": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence_status": {
+            "const": "pending"
+          },
+          "id": {
+            "pattern": "^(REQ|INV|DEC|CMD|COND|TRANS|SCN|REL|RISK|RUNBOOK|CLAIM|FINDING)-[A-Z0-9-]+$",
+            "type": "string"
+          },
+          "namespace": {
+            "enum": [
+              "REQ",
+              "INV",
+              "DEC",
+              "CMD",
+              "COND",
+              "TRANS",
+              "SCN",
+              "REL",
+              "RISK",
+              "RUNBOOK",
+              "CLAIM",
+              "FINDING"
+            ]
+          },
+          "owner_bead": {
+            "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+            "type": "string"
+          },
+          "source": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_anchor": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "source_excerpt": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_locator": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "summary": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "namespace",
+          "owner_bead",
+          "source",
+          "source_locator",
+          "source_digest",
+          "evidence_status",
+          "summary",
+          "source_excerpt",
+          "source_anchor"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "inventory_digest": {
+      "const": "45f66c59261e3489c38d211400cab66218e14060e524ae746bdb31b94793bc2c"
+    },
+    "schema_version": {
+      "const": "stable-registry/v1"
+    },
+    "source_files": {
+      "additionalProperties": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "minProperties": 1,
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "source_files",
+    "entries",
+    "inventory_digest"
+  ],
+  "title": "Canonical stable ID registry",
+  "type": "object"
+}

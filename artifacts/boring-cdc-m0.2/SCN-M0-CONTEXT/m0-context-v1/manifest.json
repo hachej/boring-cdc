@@ -1,0 +1,106 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/validate/test_context.sh m0-context-v1 > artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-1.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-context/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-1.log",
+      "stdout_sha256": "09e9abf19fb5d77a57a95c4d33ac16384ff92a24f8f91668e12c742e0671647a",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    },
+    {
+      "argv": "scripts/e2e/m0_context.sh m0-context-v1 > artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-2.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-context/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-2.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    },
+    {
+      "argv": "scripts/faults/m0_context.sh m0-context-v1 > artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-3.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-context/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-3.log",
+      "stdout_sha256": "6e07ceffa59a3df78425c833fa373cee6041884567824ceb924daf194274f403",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    },
+    {
+      "argv": "scripts/validate/test_context.sh m0-context-v1 > artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-4.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-context/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-4.log",
+      "stdout_sha256": "09e9abf19fb5d77a57a95c4d33ac16384ff92a24f8f91668e12c742e0671647a",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    },
+    {
+      "argv": "scripts/e2e/m0_context.sh m0-context-v1 > artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-5.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-context/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-5.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    },
+    {
+      "argv": "scripts/faults/m0_context.sh m0-context-v1 > artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-6.log 2>&1",
+      "exit_code": 0,
+      "stderr_path": "tests/fixtures/m0-context/empty.txt",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-6.log",
+      "stdout_sha256": "6e07ceffa59a3df78425c833fa373cee6041884567824ceb924daf194274f403",
+      "version": "python=Python 3.13.3; br=br 0.2.16"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "component",
+  "git_commit": "585b06aed79541634857d5c471baf8ef9e915f5f",
+  "owner_bead": "boring-cdc-m0.2",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-1.log",
+      "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-2.log",
+      "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-3.log",
+      "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-4.log",
+      "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-5.log",
+      "artifacts/boring-cdc-m0.2/SCN-M0-CONTEXT/m0-context-v1/command-6.log"
+    ],
+    "digest": "957565ec66443432c5863632b1ab7203b17c4b12d4de985fe531fe32b8cf6fbe",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M0-CONTEXT",
+  "schema_version": "evidence/v1",
+  "seed": "m0-context-v1",
+  "source_preservation": {
+    "after_sha256": "a63904ee889e5cef5ae3610de7dac01d217918fcb9710e58de1f5d96557f3297",
+    "before_sha256": "a63904ee889e5cef5ae3610de7dac01d217918fcb9710e58de1f5d96557f3297",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": true,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

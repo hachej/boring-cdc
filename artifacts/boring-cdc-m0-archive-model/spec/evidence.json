@@ -1,0 +1,22 @@
+{
+  "findings": [],
+  "fixture_count": 41,
+  "input_tree_sha256": "885bd3313f659c3fbe8ff689c66b915ab57c1fad44e4e8e120d2f062b72f196e",
+  "inputs": {
+    "contracts/archive/archive-fixtures.schema.json": "d30612ef3a4fddcc2e99aff383814610802c3966af49b1dbc413cc011f5e99a6",
+    "contracts/archive/archive-model.json": "0acaa38c019856d93de33037bc5344ee34ecf53a8c703fce2d6efa5dc2d5ad67",
+    "contracts/archive/archive-model.schema.json": "4d9f9ac3f9beacb23fd4515c6bbb51eeaeceeca390b7a662b3ccac0e55378506",
+    "contracts/archive/archive-result.schema.json": "9760edf105c164adf49fee4b126c2d0a741630cf4a05ff7c966bfd678e881d71",
+    "contracts/archive/generation-manifest.schema.json": "d17bfac2e0d3feb40958ed63e0f3d3b03eb04039995694c541d98cf821741a8c",
+    "contracts/archive/segment-manifest.schema.json": "047aceed0b73ef36a1cfeb5f6746316caba917c7f16db020ded32e02af442dd0",
+    "fixtures/m0/archive/scenarios.json": "8b1f4f0561d9d06037f9985327064ec63c1c90afa1ab08705d3d6224bc0b8e69"
+  },
+  "owner_bead": "boring-cdc-m0-archive-model",
+  "product_faults": "fault_not_applicable",
+  "runtime_observed": false,
+  "schema_version": "m0-archive-contract-evidence/v1",
+  "source_parent_git_commit": "a5841171081d00546c221e2b5c4d9eefc3818382",
+  "status": "pass",
+  "validator": "scripts/validate/archive_contract.py",
+  "validator_sha256": "fae2d88199b265e6d05056b3903db0e41c86d9e2692442c74e68fb25c99c5cb6"
+}

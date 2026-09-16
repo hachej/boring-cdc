@@ -1,0 +1,22 @@
+{
+  "schema_version": "boring-cdc/transition-fixture/v1",
+  "scenario_id": "SCN-M1-INJECTED-VIOLATION",
+  "synthetic": true,
+  "seed": {
+    "schema_version": "boring-cdc/schedule-seed/v1",
+    "algorithm": "splitmix64-v1",
+    "seed": 17,
+    "fair_scheduler_assumed": false,
+    "restored_resources_assumed": false
+  },
+  "budget": {
+    "max_steps": 32,
+    "max_trace_entries": 32,
+    "max_minimizer_runs": 64,
+    "max_redacted_bytes": 128,
+    "max_state_bytes": 1024,
+    "max_scheduled_payload_bytes": 1024
+  },
+  "steps": [{"kind": "event", "fixture_ref": "break"}],
+  "expected_violation": "synthetic-invariant-v1"
+}

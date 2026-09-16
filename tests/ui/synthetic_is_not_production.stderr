@@ -1,0 +1,15 @@
+error[E0308]: mismatched types
+ --> tests/ui/synthetic_is_not_production.rs:5:48
+  |
+5 |     let _ = DurableSourceBoundary::from_commit(evidence);
+  |             ---------------------------------- ^^^^^^^^ expected `ValidatedCommit<Production>`, found `ValidatedCommit<Synthetic>`
+  |             |
+  |             arguments to this function are incorrect
+  |
+  = note: expected struct `ValidatedCommit<Production>`
+             found struct `ValidatedCommit<Synthetic>`
+note: associated function defined here
+ --> src/m1_transition_kernel.rs
+  |
+  |     pub fn from_commit(evidence: ValidatedCommit<evidence_kind::Production>) -> Self {
+  |            ^^^^^^^^^^^

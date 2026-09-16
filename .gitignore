@@ -19,3 +19,7 @@ results/raw/
 
 # bv (beads viewer) local config and caches
 .bv/
+
+# Local Compose credentials and generated component evidence
+.secrets/
+artifacts/boring-cdc-m0-scaffold/

@@ -1,0 +1,5 @@
+#!/usr/bin/env python3
+"""Explain finish operations without performing claim, commit, push, or close."""
+import json,sys
+bead=sys.argv[1] if len(sys.argv)>1 else None
+print(json.dumps({"schema_version":"agent-finish/v1","bead_id":bead,"read_only":True,"performed":False,"required_explicit_operations":["run scripts/agent/verify and its displayed commands","emit and validate scripts/agent/handoff output","review git diff","commit and push under operator authority"],"forbidden":["automatic claim","automatic product mutation","automatic commit","automatic push","automatic close"]},sort_keys=True))

@@ -1,0 +1,113 @@
+{
+  "files": [
+    {
+      "path": "tests/fixtures/m0-context/empty.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tests/fixtures/m0-core/invalid/artifact-traversal.json",
+      "sha256": "f4c8435694ce4493e85a2b505ad5bb006540f95b35e3c35781b09d964828ca57"
+    },
+    {
+      "path": "tests/fixtures/m0-core/invalid/decisions-duplicate.json",
+      "sha256": "c47ab2134ac61cf3cf5a749276272c31ea61efa05f11656b43fd36705eb65afc"
+    },
+    {
+      "path": "tests/fixtures/m0-core/invalid/duplicate-key.json",
+      "sha256": "c2d7a002245670adbbf4a9569d1424418d00976195b79f31de45c30b33ae6e43"
+    },
+    {
+      "path": "tests/fixtures/m0-core/invalid/graph-cycle.jsonl",
+      "sha256": "64f7da2c7838d7a722f06a9c22d232d160d2194c1bbc121d5490dc926de70b1b"
+    },
+    {
+      "path": "tests/fixtures/m0-core/invalid/graph-stale.jsonl",
+      "sha256": "0ea19c0ce091dae16f4e3af7a4d9b0063fb5bfeb6504aaad2402131d763084e2"
+    },
+    {
+      "path": "tests/fixtures/m0-core/invalid/runbook-gap.json",
+      "sha256": "595d2fe029558cf799e79675e478c674d89b81271f4ccdbffb367b02cfcd56eb"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/artifacts.json",
+      "sha256": "1c8a4c6e418032de77c44e9826cb1351538ed8b84cb46bce80dec533a58cae60"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/decisions.json",
+      "sha256": "68bffd1a8a46a44f634aa57013946915e9a5704414a0accd26d6f385617ed795"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/empty.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/executors.json",
+      "sha256": "7e59b2f6c3c11c60dfc3ec69d9b894a10b86194a7426a5bcb46ef2652ad41dc3"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/expected-artifacts.json",
+      "sha256": "8572b616a78b7f52125fc25b856070e14f7d5070f31908f071e52b6153f3b981"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/expected-decisions.json",
+      "sha256": "d05ca9c1401ffdaba4a3654736a9b3b937c640edbb9ac6358397459886c7596f"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/fixture-spec.json",
+      "sha256": "a9ca4f87ad1f616cfd6af0275f3c7baff98a89e10a103d80c81ea1abea7f775a"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/fixtures.json",
+      "sha256": "510df6d1132d0f4ef08bbff19b840b87d4f5e8b65b260b66ca50b869bd64646c"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/graph.jsonl",
+      "sha256": "9fc7d1f04328a4465e12f341d5317490d99ca3d2d2430bd9bd5345eb14222e80"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/owners.json",
+      "sha256": "8219b969be6641a20d2e93359fc60c33de8087a4e159e59f219abe2852334d90"
+    },
+    {
+      "path": "tests/fixtures/m0-core/valid/runbooks.json",
+      "sha256": "7e38acafa9155df004e4d5f9c35ada3fc9e5adc6d7b0c4d87b6ad0f779c914d3"
+    },
+    {
+      "path": "tests/fixtures/m0-knowledge/valid/actual-compatible.json",
+      "sha256": "285f94a3a3306ae16e9cd28318086749fce297d41596dabc65a6ed327b0d9c8b"
+    },
+    {
+      "path": "tests/fixtures/m0-knowledge/valid/actual-exact.json",
+      "sha256": "a8a7d0180b7ca3e96df06cea9249abdef0044558ff124f16897a1bb8596d564c"
+    },
+    {
+      "path": "tests/fixtures/m0-knowledge/valid/claim-index-baseline.json",
+      "sha256": "405c13dc3cbcd022ff0e0eca7eca7de86ab6e28ac57a34d50f21069de2c8c5a1"
+    },
+    {
+      "path": "tests/fixtures/m0-knowledge/valid/claim-index.json",
+      "sha256": "54e1a5f526c48341ab40ab6b352ce70d68c99360efddc8bf440227af94e1f3f5"
+    },
+    {
+      "path": "tests/fixtures/m0-knowledge/valid/claims.json",
+      "sha256": "85bf4ecc6aabbf923c47ceba72389ba23835000a97b02b871f566b673a02f90f"
+    },
+    {
+      "path": "tests/fixtures/m0-knowledge/valid/compatibility.json",
+      "sha256": "161968c7d338a88d0f171274b9a7deda7b55d037de78fcc3c087f973d4815097"
+    },
+    {
+      "path": "tests/fixtures/m0-knowledge/valid/findings.jsonl",
+      "sha256": "b742b48cf9cbfff08a9aa354223d9b661498074d2ff31b20fce1fd18804cf859"
+    },
+    {
+      "path": "tests/fixtures/m0-knowledge/valid/handoff.json",
+      "sha256": "a7e34bb93501d7810cbfff912059d7a135af9a9c602d4de941a54e54b2268c9f"
+    },
+    {
+      "path": "tests/fixtures/m0-knowledge/valid/owners.json",
+      "sha256": "e02646ab5f86d1651b250bbde1f0f01f90efbeb5cf7ad7d272646f106faed825"
+    }
+  ],
+  "schema_version": "fixture-digests/v1"
+}

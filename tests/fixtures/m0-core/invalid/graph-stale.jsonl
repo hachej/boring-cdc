@@ -1,0 +1,2 @@
+{"id":"synthetic-root","status":"closed","dependencies":[{"issue_id":"synthetic-root","depends_on_id":"synthetic-leaf","type":"blocks"}]}
+{"id":"synthetic-extra","status":"open","dependencies":[]}

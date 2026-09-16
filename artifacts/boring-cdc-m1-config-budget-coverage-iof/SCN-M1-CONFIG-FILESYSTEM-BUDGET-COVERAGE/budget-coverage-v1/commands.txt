@@ -1,0 +1,7 @@
+cargo fmt --check
+cargo test --locked m1_config::tests
+cargo clippy --locked --all-targets -- -D warnings
+python3 -m json.tool contracts/m1/config-cases.json
+scripts/validate/plan_coverage.sh
+br lint
+python3 -c 'import json,collections; ids=[json.loads(x)["id"] for x in open(".beads/issues.jsonl") if x.strip()]; d=[k for k,v in collections.Counter(ids).items() if v>1]; print(f"duplicate_ids={len(d)}"); assert not d'

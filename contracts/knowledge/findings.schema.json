@@ -1,0 +1,88 @@
+{
+  "$comment": "Each JSONL line validates against this schema.",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "affected_ids": {
+      "items": {
+        "pattern": "^[A-Z]+-[A-Z0-9-]+$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "environment_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "failed_approach": {
+      "type": "string"
+    },
+    "finding_id": {
+      "pattern": "^FINDING-[A-Z0-9-]+$",
+      "type": "string"
+    },
+    "hypothesis": {
+      "type": "string"
+    },
+    "input_digest": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "invalidation_trigger": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "kind": {
+      "enum": [
+        "verified_observation",
+        "hypothesis"
+      ]
+    },
+    "observation": {
+      "type": "string"
+    },
+    "owner_bead": {
+      "pattern": "^boring-cdc-[A-Za-z0-9.-]+$",
+      "type": "string"
+    },
+    "resolution": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "finding/v1"
+    },
+    "status": {
+      "enum": [
+        "open",
+        "resolved",
+        "invalidated"
+      ]
+    },
+    "supersedes": {
+      "items": {
+        "pattern": "^FINDING-[A-Z0-9-]+$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "schema_version",
+    "finding_id",
+    "kind",
+    "observation",
+    "hypothesis",
+    "affected_ids",
+    "environment_digest",
+    "input_digest",
+    "failed_approach",
+    "owner_bead",
+    "status",
+    "resolution",
+    "invalidation_trigger",
+    "supersedes"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,21 @@
+{
+  "findings": [],
+  "fixture_count": 40,
+  "input_tree_sha256": "5f56235d69894565c037ac1b0512556e5740fc9da7e88943f3ba5f3dce87f5bc",
+  "inputs": {
+    "contracts/postgres/capture-backfill-fixtures.schema.json": "88a55e0227c6217cbf926469cf81bbabaa67c110a4c78d3e1078237dd74d6db1",
+    "contracts/postgres/capture-backfill.json": "dbc36feb8faa0e2e89258a3f2918f1c91739f9c1a99849f8b790533bdae3cf07",
+    "contracts/postgres/capture-backfill.schema.json": "81f8e94bc0e3dbf121bd0abdd672e412ae6d675c77839ae5ad37f83142a70ff8",
+    "contracts/postgres/postgres-contract-evidence.schema.json": "c05e3e2d247ab5a8de8081dfaa147ba715e592055a1e31b23f01c95367650e8a",
+    "contracts/postgres/roles-grants.sql": "f8f4de681c52540741b5c2c1a1287d284c65cfb9f5c843341e23c83fa9127875",
+    "fixtures/m0/postgres/capture-backfill.json": "26d57176d4ea0f1161a80e039807a1b8a10b17b670ef08c42e36e8039b44d1e8"
+  },
+  "owner_bead": "boring-cdc-m0-pg-contract",
+  "product_faults": "fault_not_applicable",
+  "runtime_observed": false,
+  "schema_version": "m0-postgres-contract-evidence/v1",
+  "source_parent_git_commit": "7612b4abcddc1d0cb3326a1a09a1c236745e9647",
+  "status": "pass",
+  "validator": "scripts/validate/postgres_contract.py",
+  "validator_sha256": "9c583fe3cf481efc542d96dcb4af71f4b906df25ae94ec9d4816b1e036a2d605"
+}

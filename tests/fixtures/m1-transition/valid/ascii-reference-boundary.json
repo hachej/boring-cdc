@@ -1,0 +1,27 @@
+{
+  "schema_version": "boring-cdc/transition-fixture/v1",
+  "scenario_id": "SCN-M1-UNICODE-BOUNDARY",
+  "synthetic": true,
+  "seed": {
+    "schema_version": "boring-cdc/schedule-seed/v1",
+    "algorithm": "splitmix64-v1",
+    "seed": 1,
+    "fair_scheduler_assumed": false,
+    "restored_resources_assumed": false
+  },
+  "budget": {
+    "max_steps": 1,
+    "max_trace_entries": 1,
+    "max_minimizer_runs": 1,
+    "max_redacted_bytes": 128,
+    "max_state_bytes": 1024,
+    "max_scheduled_payload_bytes": 1024
+  },
+  "steps": [
+    {
+      "kind": "expiry",
+      "fixture_ref": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "expected_violation": null
+}

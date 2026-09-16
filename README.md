@@ -31,13 +31,21 @@ The intended guarantee is **at-least-once capture with idempotent destination co
 
 Start with [`AGENTS.md`](AGENTS.md), then inspect the current Git/Beads state and claim one ready Bead. Routine work should begin from the complete claimed Bead and a bounded set of owned contracts—not by loading the entire plan or tracker snapshot. Generated context, impact, evidence, and handoff views are projections with source digests; they never become independent authority.
 
-Until the planned `scripts/agent/` interface exists, the first commands are:
+The repository-local helper interface is available and remains transparent and non-mutating:
 
 ```bash
-git status --short --branch
-br sync --status && br doctor
-br ready
+scripts/agent/doctor
+scripts/agent/next
+scripts/agent/context <bead-id>
+scripts/agent/impact <bead-id>
+scripts/agent/verify <bead-id>
 ```
+
+Each helper emits source provenance and its underlying commands. `handoff`, `recover`, and `finish` emit bounded projections or explicit operation plans; they never claim, mutate product state, commit, push, or close work.
+
+## Article 1 reader
+
+The Article 1 live reader prints raw `pgoutput` events beside `article1_row_view` results derived from the same in-process decoded objects. **`article1_row_view` is a TEACHING VIEW: NOT ClickHouse, NOT durable, NOT exactly-once, NOT checkpointed, NOT a materializer, NOT production state, and NOT M4.** ClickHouse and destination guarantees are deferred to Article 4/M4. See [`evidence/article1/README.md`](evidence/article1/README.md).
 
 ## Status
 
@@ -55,3 +63,7 @@ Planning and M0 contract work. No production-ready connector exists yet. `br rea
 ## Comparisons
 
 The accompanying experiment compares externally visible behavior with Estuary as a managed reference implementation. Debezium may be used to explain capture and offset design. This repository is not a vendor leaderboard.
+
+## License
+
+Licensed under the [Apache License, Version 2.0](LICENSE) (`Apache-2.0`).

@@ -1,0 +1,4 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.05s
+     Running unittests src/lib.rs (target/debug/deps/boring_cdc-b604efced9ff1882)
+     Running unittests src/main.rs (target/debug/deps/boring_cdc-a5120d6777913092)
+     Running tests/compile_fail.rs (target/debug/deps/compile_fail-643486a7c948e1a6)

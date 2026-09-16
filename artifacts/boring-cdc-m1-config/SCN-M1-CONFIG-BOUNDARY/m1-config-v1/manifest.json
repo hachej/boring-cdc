@@ -1,0 +1,120 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo fmt --check",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-1.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo test --locked m1_config::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-2.stderr",
+      "stderr_sha256": "64ae24d8d24c8306401c004d33afc6e4b341989b639948601c214e6ff39593d3",
+      "stdout_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-2.log",
+      "stdout_sha256": "7ac613edc2ff1c0e1a8a79fa8947cfbf3a99c7f81c394920ad027f6919cd9631",
+      "version": "cargo 1.95.0"
+    },
+    {
+      "argv": "cargo clippy --locked --all-targets -- -D warnings",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-3.stderr",
+      "stderr_sha256": "2b34696728dc82b03cbf6311d7e3a6a41658bbde097834c3010a78bc82842c1a",
+      "stdout_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-3.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "cargo/clippy 1.95.0"
+    },
+    {
+      "argv": "python3 -m json.tool contracts/m1/config-cases.json",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-4.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-4.log",
+      "stdout_sha256": "e1ea4be0350eeb4d0be358baf1aa75a815790eee5e41be7187e732693e9a039e",
+      "version": "python 3"
+    },
+    {
+      "argv": "scripts/validate/plan_coverage.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-5.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-5.log",
+      "stdout_sha256": "4bd57b453201667aa720bf9885705388093e8ef96610f923d69aa9ead05064d3",
+      "version": "plan-coverage/v1"
+    },
+    {
+      "argv": "br lint",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-6.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-6.log",
+      "stdout_sha256": "aec2265655820ef7d982a4347ea6787daa446602af84c59247c4a8704da2c224",
+      "version": "br 0.2.16"
+    },
+    {
+      "argv": "test duplicate Bead IDs = 0",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-7.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-7.log",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "jq/coreutils"
+    },
+    {
+      "argv": "scripts/validate/evidence.sh artifacts/boring-cdc-m1-config",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-8.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/command-8.log",
+      "stdout_sha256": "9a8095460ae841aaf937390202341bb91b33fbf7313941459c4cd6316ac1a82d",
+      "version": "core-validators/1.0.0"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "leaf",
+  "git_commit": "7bf763bbd99a4601cdc193ba4a6485b8672c596d",
+  "owner_bead": "boring-cdc-m1-config",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/proof-summary.json",
+      "artifacts/boring-cdc-m1-config/SCN-M1-CONFIG-BOUNDARY/m1-config-v1/versions.json"
+    ],
+    "digest": "9aa293a453fbaf0175cc0ddda387d13462c7bd614365f9727cc782f3dc6396df",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M1-CONFIG-BOUNDARY",
+  "schema_version": "evidence/v1",
+  "seed": "m1-config-v1",
+  "source_preservation": {
+    "after_sha256": "31ba3519b025458bb20b78840b113dbb40642ddd759ae087d947c7b110bbda7f",
+    "before_sha256": "31ba3519b025458bb20b78840b113dbb40642ddd759ae087d947c7b110bbda7f",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": false,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": false,
+    "deterministic_rerun": false,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": false,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}

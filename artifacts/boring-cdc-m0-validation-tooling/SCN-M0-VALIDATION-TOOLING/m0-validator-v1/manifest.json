@@ -1,0 +1,118 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/validate/test_validators.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.stderr",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.log",
+      "stdout_sha256": "625cce12ff515774f928c2157b7721e959d1b4d1c9d2f865c36881b52e5d3d65",
+      "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
+    },
+    {
+      "argv": "scripts/e2e/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.stderr",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log",
+      "stdout_sha256": "2bff8bfa64180135eb7f404a4fa1c097feca3922118634ac47a57ded8d054c50",
+      "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
+    },
+    {
+      "argv": "scripts/faults/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.stderr",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.log",
+      "stdout_sha256": "67da97dd6a153e279764b0609601479b3746b9fcfbe85c6f7de7998355105eed",
+      "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
+    },
+    {
+      "argv": "scripts/validate/test_validators.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.stderr",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.log",
+      "stdout_sha256": "625cce12ff515774f928c2157b7721e959d1b4d1c9d2f865c36881b52e5d3d65",
+      "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
+    },
+    {
+      "argv": "scripts/e2e/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.stderr",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log",
+      "stdout_sha256": "2bff8bfa64180135eb7f404a4fa1c097feca3922118634ac47a57ded8d054c50",
+      "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
+    },
+    {
+      "argv": "scripts/faults/m0_validation_tooling.sh m0-validator-v1 > artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log 2> artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.stderr",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log",
+      "stdout_sha256": "67da97dd6a153e279764b0609601479b3746b9fcfbe85c6f7de7998355105eed",
+      "version": "python=Python 3.13.3; br=br 0.2.16; m0-validation-tooling/1.0.0"
+    }
+  ],
+  "evidence_profile": "documentation",
+  "evidence_tier": "component",
+  "git_commit": "ecbb08fc028566a0d68d57e95b791f06d28bb4b8",
+  "owner_bead": "boring-cdc-m0.9",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/before-after-tree.json",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-1.stderr",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-2.stderr",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-3.stderr",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-4.stderr",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-5.stderr",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.log",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/command-6.stderr",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/fixture-digests.json",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/scenario-inventory.json",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/sha256-inventory.json",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/structured-log.jsonl",
+      "artifacts/boring-cdc-m0-validation-tooling/SCN-M0-VALIDATION-TOOLING/m0-validator-v1/versions.json"
+    ],
+    "digest": "29d2149b77ae0505b1fb52f692e43b6f005e2a32660ca718d8f4a2d540694c86",
+    "product_faults": "fault_not_applicable",
+    "runtime_observed": false,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M0-VALIDATION-TOOLING",
+  "schema_version": "evidence/v1",
+  "seed": "m0-validator-v1",
+  "source_preservation": {
+    "after_sha256": "79cb3d9554d0ee20f42de426fefeb71eeeb29dc03152e2b47c71556078d55591",
+    "before_sha256": "79cb3d9554d0ee20f42de426fefeb71eeeb29dc03152e2b47c71556078d55591",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": false,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": false,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": false
+  }
+}
