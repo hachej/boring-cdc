@@ -818,11 +818,11 @@
             "checkpoint_cadence_ms": {
               "type": "integer"
             },
-            "checkpoint_max_wal_pages_per_attempt": {
-              "type": "integer"
-            },
             "checkpoint_mode": {
               "type": "string"
+            },
+            "checkpoint_request_wal_pages": {
+              "type": "integer"
             },
             "incremental_vacuum_cadence_ms": {
               "type": "integer"
@@ -844,8 +844,8 @@
             "automatic_full_vacuum",
             "checkpoint_busy_timeout_ms",
             "checkpoint_cadence_ms",
-            "checkpoint_max_wal_pages_per_attempt",
             "checkpoint_mode",
+            "checkpoint_request_wal_pages",
             "incremental_vacuum_cadence_ms",
             "incremental_vacuum_max_pages",
             "offline_full_vacuum",
