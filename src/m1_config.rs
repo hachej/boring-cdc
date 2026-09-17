@@ -296,6 +296,16 @@ impl SecretString {
         &self.0
     }
 }
+impl Drop for SecretString {
+    fn drop(&mut self) {
+        // String owns this allocation exclusively; volatile stores prevent dead-store removal.
+        unsafe {
+            for byte in self.0.as_mut_vec() {
+                std::ptr::write_volatile(byte, 0);
+            }
+        }
+    }
+}
 
 struct Secrets {
     runtime: Option<SecretString>,
@@ -493,7 +503,10 @@ impl Environment for ProcessEnvironment {
         std::env::var(name).ok()
     }
     fn names(&self) -> Vec<String> {
-        std::env::vars().map(|(k, _)| k).collect()
+        // Enumerate keys without materializing unrelated environment values (which may be secrets).
+        std::env::vars_os()
+            .filter_map(|(k, _)| k.into_string().ok())
+            .collect()
     }
 }
 
@@ -597,15 +610,22 @@ fn reject_unapproved_overrides(
     secret_names: [&String; 5],
 ) -> Result<(), ConfigError> {
     for name in env.names() {
-        if name.starts_with("BORING_CDC_")
-            && !APPROVED_OVERRIDES.contains(&name.as_str())
-            && !secret_names.iter().any(|secret| secret.as_str() == name)
-        {
-            return Err(ConfigError {
-                code: "CONFIG_UNAPPROVED_ENV_OVERRIDE",
-                field: "environment",
-            });
+        if !name.starts_with("BORING_CDC_") {
+            continue;
         }
+        if APPROVED_OVERRIDES.contains(&name.as_str()) {
+            continue;
+        }
+        if cfg!(debug_assertions) && name == "BORING_CDC_M2_FAULT_HOOK" {
+            continue;
+        }
+        if secret_names.iter().any(|secret| secret.as_str() == name) {
+            continue;
+        }
+        return Err(ConfigError {
+            code: "CONFIG_UNAPPROVED_ENV_OVERRIDE",
+            field: "environment",
+        });
     }
     Ok(())
 }
@@ -800,7 +820,8 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
     }
     if !(raw.conditions.warning < raw.conditions.action
         && raw.conditions.action < raw.conditions.critical
-        && raw.conditions.critical < raw.conditions.hard)
+        && raw.conditions.critical < raw.conditions.hard
+        && raw.conditions.hard <= 100)
     {
         return err("CONFIG_INVALID_THRESHOLDS", "conditions");
     }
@@ -1048,7 +1069,7 @@ fn safe_path(value: &str, field: &'static str) -> Result<(), ConfigError> {
     Ok(())
 }
 
-fn filesystem_budget_for_path(
+pub(crate) fn filesystem_budget_for_path(
     budgets: &[FilesystemBudget],
     path: &Path,
 ) -> Result<usize, ConfigError> {
@@ -1750,6 +1771,7 @@ archive_segment_bytes = 0
                 "CONFIG_ZERO_BOUND",
             ),
             ("warning = 60", "warning = 99", "CONFIG_INVALID_THRESHOLDS"),
+            ("hard = 100", "hard = 101", "CONFIG_INVALID_THRESHOLDS"),
             (
                 "concurrency = 2",
                 "concurrency = 0",

@@ -1,1 +1,132 @@
-{"schema_version":"runbooks-index/v1","stage":"declared","runbooks":[]}
+{
+  "schema_version": "runbooks-index/v1",
+  "stage": "declared",
+  "runbooks": [
+    {
+      "id": "RUNBOOK-HEALTHY-V1",
+      "condition_id": "COND-HEALTHY",
+      "action_id": "CMD-STATUS",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m2-fault-status",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-DEGRADED-V1",
+      "condition_id": "COND-DEGRADED",
+      "action_id": "CMD-CHECK",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m1-preflight",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-DESTINATION-BLOCKED-V1",
+      "condition_id": "COND-DESTINATION-BLOCKED",
+      "action_id": "CMD-DESTINATION-LIST",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m5-ops-cli",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-SCHEMA-BLOCKED-V1",
+      "condition_id": "COND-SCHEMA-BLOCKED",
+      "action_id": "CMD-JOURNAL-INSPECT",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m2-reconcile",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-CAPTURE-SAFE-STOPPED-V1",
+      "condition_id": "COND-CAPTURE-SAFE-STOPPED",
+      "action_id": "CMD-JOURNAL-VERIFY",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m2-reconcile",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-SLOT-INVALID-REQUIRES-RESEED-V1",
+      "condition_id": "COND-SLOT-INVALID-REQUIRES-RESEED",
+      "action_id": "CMD-RECOVER-RESEED",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m2-init-recovery",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-JOURNAL-CORRUPT-REQUIRES-RESEED-V1",
+      "condition_id": "COND-JOURNAL-CORRUPT-REQUIRES-RESEED",
+      "action_id": "CMD-JOURNAL-GC",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m5-gc",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-PUBLICATION-DRIFT-REQUIRES-RESEED-V1",
+      "condition_id": "COND-PUBLICATION-DRIFT-REQUIRES-RESEED",
+      "action_id": "CMD-INIT",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m2-init-recovery",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-BOOTSTRAP-AMBIGUOUS-REQUIRES-RESTART-V1",
+      "condition_id": "COND-BOOTSTRAP-AMBIGUOUS-REQUIRES-RESTART",
+      "action_id": "CMD-RECOVER-INSPECT",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m2-init-recovery",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-HEARTBEAT-DEGRADED-V1",
+      "condition_id": "COND-HEARTBEAT-DEGRADED",
+      "action_id": "CMD-RUN",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m2-capture-runtime",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-PROMOTION-RECOVERY-REQUIRED-V1",
+      "condition_id": "COND-PROMOTION-RECOVERY-REQUIRED",
+      "action_id": "CMD-RECOVER-PROMOTION",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m5-ops-cli",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-SOURCE-IDENTITY-BLOCKED-V1",
+      "condition_id": "COND-SOURCE-IDENTITY-BLOCKED",
+      "action_id": "CMD-ARCHIVE-VERIFY",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m5-segment-set",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-OWNERSHIP-LOST-V1",
+      "condition_id": "COND-OWNERSHIP-LOST",
+      "action_id": "CMD-RUN-BOOTSTRAP",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m1-bootstrap-sm",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    },
+    {
+      "id": "RUNBOOK-UNSAFE-DURABILITY-V1",
+      "condition_id": "COND-UNSAFE-DURABILITY",
+      "action_id": "CMD-ARCHIVE-RECONSTRUCT",
+      "condition_owner": "boring-cdc-m2-fault-status",
+      "action_owner": "boring-cdc-m5-segment-set",
+      "procedure_owner": "boring-cdc-m6-runbooks",
+      "procedure": null
+    }
+  ]
+}

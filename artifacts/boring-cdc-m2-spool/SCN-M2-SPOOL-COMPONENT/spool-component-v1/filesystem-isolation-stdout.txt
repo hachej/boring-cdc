@@ -1,0 +1,1 @@
+{"first_filesystem_reserved":100,"outcome":"isolated","same_filesystem_blocked":true,"second_filesystem_reserved":800}

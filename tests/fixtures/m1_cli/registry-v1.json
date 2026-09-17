@@ -37,7 +37,7 @@
       "init"
     ],
     "operation_variant": "base",
-    "owner_bead": "boring-cdc-m2-schema",
+    "owner_bead": "boring-cdc-m2-init-recovery",
     "class": "mutation",
     "ownership": "maintenance",
     "confirmation": "dry_run_then_confirm",

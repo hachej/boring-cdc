@@ -1,0 +1,1 @@
+cargo test --locked m2_pressure::tests -- --nocapture

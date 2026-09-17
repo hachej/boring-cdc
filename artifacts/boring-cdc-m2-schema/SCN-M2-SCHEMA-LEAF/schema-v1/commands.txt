@@ -1,0 +1,8 @@
+cargo fmt --all -- --check
+cargo test --locked m2_schema::tests
+python3 scripts/validate/m2_schema.py
+scripts/e2e/m2_schema.sh
+scripts/faults/m2_schema.sh
+scripts/validate/plan_coverage.sh
+br lint
+python3 duplicate-id-scan

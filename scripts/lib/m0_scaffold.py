@@ -28,6 +28,18 @@ def canonical(obj:object)->bytes:return (json.dumps(obj,sort_keys=True,separator
 def write_json(path:Path,obj:object)->None:path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(canonical(obj))
 
 PROVISIONAL_AUTHORITIES = {
+# M2 lane surfaces: provisional markers owned by M2 beads, authorized here so the
+# M0 scaffold contract stays the single registry after the M0 epic merged forward.
+"src/m2_capture_runtime.rs":{"boring-cdc-m2-capture-runtime.1"},
+"src/m2_pressure.rs":{"boring-cdc-m2-pressure"},
+"src/m2_schema.rs":{"boring-cdc-m2-schema"},
+"src/m2_spool.rs":{"boring-cdc-d-admission"},
+"scripts/validate/m2_schema.py":{"boring-cdc-m2-schema"},
+"scripts/validate/m2_spool.py":{"boring-cdc-d-admission"},
+"scripts/validate/m2_ownership.py":{"boring-cdc-d-security"},
+"scripts/validate/failure_policy.py":{"boring-cdc-m2.1"},
+"contracts/m2/spool-cases.json":{"boring-cdc-d-admission"},
+"contracts/m2/m0-provisional-reconciliation.json":{"boring-cdc-m2-capture-runtime.1","boring-cdc-m2-pressure","boring-cdc-m2-schema","boring-cdc-d-admission"},
  "contracts/m0/compose.json":{"boring-cdc-d-compose"},
  "contracts/m0/decisions.json":{"boring-cdc-d-compose","boring-cdc-d-sqlite","boring-cdc-d-wal-cap"},
  "fixtures/m0/decisions/boring-cdc-d-compose.json":{"boring-cdc-d-compose"},

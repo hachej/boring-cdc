@@ -1,0 +1,121 @@
+{
+  "answered_cards": [
+    {
+      "question_id": "5a994cfd-e4e2-46a7-b512-5dae280acae0",
+      "submitted_at": "2026-09-10T14:03:30.910Z",
+      "values_sha256": "91da63153fb6eea5c3aee7e2697324217113b3104c5a7d37ad1aabc543fa4eef"
+    },
+    {
+      "question_id": "765bd3b2-4b68-4102-a9ec-43ca93357390",
+      "submitted_at": "2026-09-10T14:03:30.949Z",
+      "values_sha256": "05005015cb43d00a2248c0089285af1276d7820572cc6d9d37b69f7b0ec6cbcb"
+    },
+    {
+      "accepted_decisions": [
+        "boring-cdc-d-archive-durability",
+        "boring-cdc-d-compose",
+        "boring-cdc-d-keys",
+        "boring-cdc-d-sqlite",
+        "boring-cdc-d-values",
+        "boring-cdc-d-values.1",
+        "boring-cdc-d-wal-cap"
+      ],
+      "question_id": "59a63169",
+      "submitted_at": "2026-09-17"
+    }
+  ],
+  "answered_sections_without_marked_constants_on_this_branch": [
+    "supported_values",
+    "wal_cap",
+    "compose"
+  ],
+  "confirmed": {
+    "canonical_key_components_max": 8,
+    "failure_policy": {
+      "base_delay_ms": 250,
+      "classes": [
+        "transient_io",
+        "transient_source",
+        "transient_destination",
+        "rate_limited",
+        "integrity",
+        "unsupported",
+        "ownership_lost",
+        "configuration"
+      ],
+      "expected_close_identity": [
+        "run_id",
+        "capture_generation"
+      ],
+      "jitter": "full [0,delay]",
+      "jitter_rng": "ChaCha20 tests; OS CSPRNG production",
+      "max_attempts": 10,
+      "max_delay_ms": 30000,
+      "multiplier": 2,
+      "stable_code_shape": "BCDC_<DOMAIN>_<CAUSE>",
+      "test_seed": "0x424344435f52455452595f563031",
+      "version": "failure-policy-v1"
+    },
+    "owner_card_59a63169": "all seven prefilled recommended literal sets accepted exactly",
+    "security": {
+      "prometheus_listen_addr": "127.0.0.1:8788",
+      "read_timeout_seconds": 10,
+      "request_bytes_max": 1048576,
+      "response_bytes_max": 4194304,
+      "socket_directory_mode": "0700",
+      "socket_mode": "0600",
+      "status_listen_addr": "127.0.0.1:8787",
+      "write_timeout_seconds": 30
+    },
+    "sqlite_writer_busy_timeout_ms": 5000
+  },
+  "mismatches_corrected": [
+    "security request bytes 65536 -> 1048576",
+    "security response bytes 65536 -> 4194304",
+    "security command timeout 5s -> read 10s and write 30s",
+    "canonical key arity 32 -> 8",
+    "failure base delay 1000ms -> 250ms",
+    "failure delay cap 300000ms -> 30000ms",
+    "failure attempts 8 -> 10",
+    "failure symmetric +/-20% jitter -> full [0,delay] jitter",
+    "failure seed failure-policy-v1/SplitMix literal -> approved ChaCha20 test seed",
+    "failure seven-class provisional taxonomy -> approved eight-class taxonomy",
+    "failure lowercase codes -> BCDC_<DOMAIN>_<CAUSE> codes",
+    "expected-close generation-only binding -> run_id plus capture generation"
+  ],
+  "owner_bead": "boring-cdc-7fz",
+  "schema_version": "m2-m0-provisional-reconciliation/v1",
+  "untouched_provisional_markers": [
+    {
+      "marker": "// M0-PROVISIONAL: boring-cdc-m2-capture-runtime.1 (writer queue caps and capture burst).",
+      "path": "src/m2_capture_runtime.rs"
+    },
+    {
+      "marker": "// M0-PROVISIONAL: boring-cdc-m2-pressure -- frozen storage contract literal.",
+      "path": "src/m2_pressure.rs"
+    },
+    {
+      "marker": "// M0-PROVISIONAL: boring-cdc-m2-schema",
+      "path": "src/m2_schema.rs"
+    },
+    {
+      "marker": "// M0-PROVISIONAL: boring-cdc-m2-schema",
+      "path": "src/m2_schema.rs"
+    },
+    {
+      "marker": "// M0-PROVISIONAL: boring-cdc-d-admission must approve the recommended spool format version.",
+      "path": "src/m2_spool.rs"
+    }
+  ],
+  "untouched_provisional_owners": [
+    "boring-cdc-d-backfill",
+    "boring-cdc-d-ch-accept",
+    "boring-cdc-d-ddl",
+    "boring-cdc-d-event-id",
+    "boring-cdc-d-pg-protocol",
+    "boring-cdc-d-publication",
+    "boring-cdc-m1.6",
+    "boring-cdc-m2-schema:READER_MAX_AGE",
+    "boring-cdc-m2-schema:READER_MAX_ROWS"
+  ]
+}
