@@ -25,7 +25,7 @@
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "milestone",
-  "git_commit": "129f8fbe30bed3722090d3d766367f60e03bc870",
+  "git_commit": "67d2754316dc680073d59bd0f3ceb3f85f01fb36",
   "owner_bead": "boring-cdc-m0-complete",
   "redaction": {
     "checked": true,

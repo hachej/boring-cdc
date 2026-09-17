@@ -116,8 +116,13 @@ markers=('boring-cdc-d-security','boring-cdc-d-values','boring-cdc-d-keys','bori
 sys.path.insert(0,str(root/'scripts/lib'))
 from m0_scaffold import provisional_marker_errors
 marker_paths=[]
-for base in ('src','scripts','fixtures','contracts','config','tests','examples','.github'):
- marker_paths.extend(path for path in (root/base).rglob('*') if path.is_file() and 'target' not in path.parts and '__pycache__' not in path.parts)
+# Scan generated artifacts too. The sole exclusion is an immutable M2 historical
+# reconciliation report whose JSON data quotes the legacy marker as inventory;
+# it is evidence about the marker, not a product marker, and is content-bound by
+# the already certified M2 spool packet.
+marker_inventory_evidence={root/'artifacts/boring-cdc-m2-spool/owner-reconciliation.json'}
+for base in ('src','scripts','fixtures','contracts','config','tests','examples','.github','artifacts'):
+ marker_paths.extend(path for path in (root/base).rglob('*') if path.is_file() and path not in marker_inventory_evidence and 'target' not in path.parts and '__pycache__' not in path.parts)
 marker_paths.extend(path for path in (root/'.env.example',root/'rust-toolchain.toml',root/'.dockerignore',root/'Cargo.toml',root/'Dockerfile',root/'compose.yaml') if path.is_file())
 for error in provisional_marker_errors(marker_paths): fail(error)
 for path in marker_paths:
