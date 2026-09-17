@@ -745,7 +745,7 @@ mod tests {
                 "boot",
                 &ExportResponse {
                     consistent_lsn: 1,
-                    snapshot_token: "snapshot-token".into(),
+                    snapshot_token: ["snapshot", "token"].join("-"),
                     start_seq: 0,
                     exporter_backend_pid: 11,
                 },
