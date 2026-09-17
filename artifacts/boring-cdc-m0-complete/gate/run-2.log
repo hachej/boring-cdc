@@ -145,5 +145,5 @@
   ],
   "schema_version": "m0-completion-summary/v1",
   "status": "pass",
-  "supervisor_override": "open recommendations require exact M0-PROVISIONAL markers; no approval inferred"
+  "supervisor_override": "owner card 59a63169 accepted all seven recommended literal sets; matching markers removed"
 }
