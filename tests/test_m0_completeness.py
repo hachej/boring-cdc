@@ -87,9 +87,11 @@ class M0CompletenessTests(unittest.TestCase):
 
     def test_every_decision_domain_validator_is_fail_closed(self):
         expected = {
+            "boring-cdc-d-archive-durability": ("scripts/validate/archive_durability.sh",),
             "boring-cdc-d-archive-scope": ("scripts/validate/archive_scope.sh",),
             "boring-cdc-d-compose": ("scripts/validate/compose_spec.sh",),
             "boring-cdc-d-failure-policy": ("scripts/validate/failure_policy.sh",),
+            "boring-cdc-d-keys": ("scripts/validate/supported_keys.sh",),
             "boring-cdc-d-license": ("scripts/validate/license.sh",),
             "boring-cdc-d-owner": ("scripts/fixtures/validate_m0_repository_identity.py",),
             "boring-cdc-d-security": ("scripts/validate/security_exposure.sh",),

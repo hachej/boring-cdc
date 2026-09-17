@@ -19,7 +19,7 @@ EVIDENCE = ROOT / "artifacts/boring-cdc-m0-complete/gate/evidence.json"
 SUMMARY = EVIDENCE.with_name("completion-summary.json")
 
 # primary manifest ID -> (artifact registry ID, canonical owner)
-EXPECTED_ARTIFACTS_SHA256 = "3f61bcd6a4913b7c50bd6633fcf25f9543daad776d22b1dd9a63889b7134b051"
+EXPECTED_ARTIFACTS_SHA256 = "19dbb98a243f15838dcdd011a4469ec8862dd31dbca1f497571a4854239b3bf1"
 
 PRIMARY_ARTIFACTS = {
     "ART-M0-ARCHIVE-MODEL": ("ART-M0-ARCHIVE-MODEL", "boring-cdc-m0-archive-model"),
@@ -30,9 +30,11 @@ PRIMARY_ARTIFACTS = {
     "ART-M0-STORAGE-MODEL": ("ART-M0-STORAGE-MODEL", "boring-cdc-m0-storage-model"),
 }
 DECISION_OWNERS = {
+    "boring-cdc-d-archive-durability",
     "boring-cdc-d-archive-scope",
     "boring-cdc-d-compose",
     "boring-cdc-d-failure-policy",
+    "boring-cdc-d-keys",
     "boring-cdc-d-license",
     "boring-cdc-d-owner",
     "boring-cdc-d-security",
@@ -59,7 +61,8 @@ SPEC_INPUTS = {
         "contracts/archive/archive-fixtures.schema.json", "contracts/archive/archive-model.json",
         "contracts/archive/archive-model.schema.json", "contracts/archive/archive-result.schema.json",
         "contracts/archive/generation-manifest.schema.json", "contracts/archive/segment-manifest.schema.json",
-        "fixtures/m0/archive/scenarios.json",
+        "contracts/m0/failure-policy.json", "fixtures/m0/archive/scenarios.json",
+        "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
     },
     "boring-cdc-m0-ch-model": {
         "contracts/clickhouse/canonical-query.sql", "contracts/clickhouse/ddl.sql",
@@ -70,22 +73,14 @@ SPEC_INPUTS = {
     },
 }
 
-PROVISIONAL = {
-    "boring-cdc-d-archive-durability",
-    "boring-cdc-d-keys",
-    "boring-cdc-d-sqlite",
-    "boring-cdc-d-wal-cap",
-}
+PROVISIONAL = set()
 def provisional_marker(owner: str) -> str:
     # Split the sentinel so the repository scanner does not mistake validator
     # source for a consumer of an owner-controlled recommendation.
     return "// M0-" + "PROVISIONAL: " + owner
 
 
-OPEN_DECISIONS = {
-    "boring-cdc-d-sqlite": {provisional_marker("boring-cdc-d-sqlite")},
-    "boring-cdc-d-wal-cap": {provisional_marker("boring-cdc-d-wal-cap")},
-}
+OPEN_DECISIONS = {}
 REQUIRED_M0_OWNERS = {
     "boring-cdc-d-additive", "boring-cdc-d-admission", "boring-cdc-d-anchor",
     "boring-cdc-d-archive-durability", "boring-cdc-d-archive-scope",
@@ -103,9 +98,11 @@ REQUIRED_M0_OWNERS = {
     "boring-cdc-m0.1", "boring-cdc-m0.2", "boring-cdc-m0.3",
 }
 DECISION_DOMAIN_COMMANDS = {
+    "boring-cdc-d-archive-durability": ("scripts/validate/archive_durability.sh",),
     "boring-cdc-d-archive-scope": ("scripts/validate/archive_scope.sh",),
     "boring-cdc-d-compose": ("scripts/validate/compose_spec.sh",),
     "boring-cdc-d-failure-policy": ("scripts/validate/failure_policy.sh",),
+    "boring-cdc-d-keys": ("scripts/validate/supported_keys.sh",),
     "boring-cdc-d-license": ("scripts/validate/license.sh",),
     "boring-cdc-d-owner": ("scripts/fixtures/validate_m0_repository_identity.py",),
     "boring-cdc-d-security": ("scripts/validate/security_exposure.sh",),
