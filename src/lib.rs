@@ -31,5 +31,6 @@ pub mod m2_spool;
 
 pub mod m3_bootstrap;
 pub mod m3_planner;
+pub mod m4_clickhouse_schema;
 
 pub mod failure_policy;
