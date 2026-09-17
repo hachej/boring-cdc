@@ -234,6 +234,52 @@ class KickoffContracts(unittest.TestCase):
             "available; otherwise clearly label unavailable visibility. Debezium explanation only |",
         )
 
+    def test_series_preparation_record_has_per_article_boundaries(self):
+        for article in range(1, 6):
+            rows = [line for line in self.series.splitlines()
+                    if line.startswith(f"| {article} | `boring-cdc-")]
+            self.assertEqual(len(rows), 1, article)
+            for phrase in ("Reader demo", "Agent-story artifact boundary",
+                           "External comparison and publication boundary"):
+                self.assertIn(phrase, self.series)
+        self.assertIn("scripts/acceptance/article1.sh", self.series)
+        self.assertIn("python3 scripts/validate/article1_transcript.py", self.series)
+        self.assertIn("actually executed", self.series)
+        self.assertIn("no article-ready", self.series)
+        self.assertIn("M7 consumes only measurements", self.series)
+
+    def test_series_separates_baseline_event_delivery_and_convergence(self):
+        for phrase in ("Source baseline/current state", "Ledger delivery",
+                       "Independently observed business-event delivery",
+                       "Final-state convergence", "business-only loss",
+                       "event delivery as **unavailable**"):
+            self.assertIn(phrase, self.series)
+        self.assertIn("Never downgrade the local oracle", self.series)
+
+    def test_series_retains_redacted_story_without_reconstruction(self):
+        for artifact in ("originating-prompt.redacted", "first-output.redacted",
+                         "failures.jsonl", "human-corrections.jsonl",
+                         "interventions.jsonl"):
+            self.assertIn(artifact, self.series)
+        self.assertIn("record it as unavailable—do not reconstruct", self.series)
+        self.assertIn("no secrets", self.series.lower())
+
+    def test_series_access_and_editorial_states_fail_closed(self):
+        self.assertIn("1c99e72d-3878-4f3b-9cdc-663f97657b3e", self.series)
+        for phrase in ("every field is **unverified**", "`verified`, `manual`, or `unavailable`",
+                       "None is currently publication-ready", "no approval is automatic",
+                       "no predetermined winner"):
+            self.assertIn(phrase, self.series)
+        self.assertIn("No managed resource", self.series)
+
+    def test_series_records_unsafe_content_checkout_blocker(self):
+        self.assertIn("335ada9", self.series)
+        self.assertIn("62c02e13110820d3289fc36932c80dc42ced774c721ce237a868df1b3d872ff4",
+                      self.series)
+        self.assertIn("checkout was therefore unsafe and was left untouched", self.series)
+        self.assertIn("keeps `boring-cdc-v01.5` open", self.series)
+        self.assertIn("no comparison may be commissioned", self.series)
+
     def test_document_bead_links_resolve(self):
         for name in ["docs/PLAN.md", "docs/AGENT_SYSTEM.md", "docs/SERIES_EXECUTION.md"]:
             text = (ROOT / name).read_text()

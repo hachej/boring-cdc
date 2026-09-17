@@ -29,6 +29,55 @@ In particular, M1 does not provide a production destination, M2 JSONL candidate 
 
 For every row the owner supplies the **actually executed** command/argv, code commit and binary/image/configuration/profile/seed digests, scenario IDs, raw redacted results, correctness verdicts and operator steps. This planning document deliberately does not claim that future CLI or scripts already exist. Reproduction commands come from their canonical command owners and measured evidence, never guessed article snippets.
 
+## Preparation record (2026-09-17)
+
+This is a provenance snapshot, not a readiness checklist or runtime pass. `br` remains authoritative for current state. Status terms are exact: **verified** means linked immutable evidence was inspected; **manual** means a named human operation must be recorded; **unavailable** means no qualifying result or access exists; **unverified** means the accountable owner has not supplied the fact. No unavailable or unverified state is a pass.
+
+The reader-demo and command-capture boundary for each article is:
+
+| Article | Code/evidence checkpoint and scenario boundary | Reader demo and reproduction-command capture | Agent-story artifact boundary | External comparison and publication boundary |
+|---|---|---|---|---|
+| 1 | `boring-cdc-m1-raw-demo`; actual fixture owner `boring-cdc-pci.6`; verified `evidence/article1/manifest.json` (`article1-reader-evidence/v2`) and its SHA-256 inventory | **verified local demo:** `TMPDIR=/var/tmp ARTICLE1_PG_PORT=55696 ARTICLE1_PROJECT=article1-owner-evidence scripts/acceptance/article1.sh`, followed by `python3 scripts/validate/article1_transcript.py`. The manifest retains the actual reader argv; do not replace it with an article paraphrase | Retain the prompt/output/failure/correction bundle keyed to the M1 scenario IDs; the already captured transcript is product evidence, not a substitute for the story bundle | `boring-cdc-m7-estuary` owns any measured external decode/visibility result. Current managed result: **unavailable**. Disclosure and Julien's publication approval: **unverified** |
+| 2 | `boring-cdc-m2-fault-status`; crash boundaries must consume completed M3 anchor and M4 destination evidence before the article can claim live recovery | **unavailable:** no article-ready, actually executed composite reader demo/argv is captured. Command owner must retain the exact successful M2/M3/M4 invocations and digests; names in Bead prose are not execution evidence | Retain the bundle for each durable-commit, feedback, destination-write and checkpoint failure scenario, including unsuccessful attempts | `boring-cdc-m7-estuary` owns matching outage/recovery results. Access/result **unavailable**; disclosure and publication approval **unverified** |
+| 3 | `boring-cdc-m3-faults` + `boring-cdc-m3-oracle`; M4/M5 destination owners supply each destination actually claimed | **unavailable:** no article-ready backfill/control demo or executed argv is captured. The M3 owners capture exact commands only when run against the frozen workload/oracle | Retain bundles for initial/restarted snapshot, concurrent mutation, naive control, correlation failures and human corrections | `boring-cdc-m7-estuary` owns matching-profile backfill/control results. Access/result **unavailable**; disclosure and publication approval **unverified** |
+| 4 | `boring-cdc-m4-bench`, plus `boring-cdc-m5-table-add` for the full expanded-table claim | **unavailable:** no article-ready ClickHouse demo or executed argv is captured. M4/M5 owners retain actual view/readback, merge, `FINAL`, audit and table-add commands when executed | Retain bundles for update/delete/DDL, replay, merge/promotion and stale-row failures and corrections | `boring-cdc-m7-estuary` owns common-observable ClickHouse results. Access/result **unavailable**; disclosure and publication approval **unverified** |
+| 5 | `boring-cdc-m5-faults`; archive verifier/readback commands are consumed from their canonical M5 owners | **unavailable:** no article-ready dual-destination/archive demo or executed argv is captured. M5 owners retain the actual reconstruct/verify, selector, outage, catch-up and expiry commands when executed | Retain bundles for independent outage/replay, late add, retention expiry, selector/promotion and source-load scenarios | `boring-cdc-m7-estuary` owns matching fan-out/recovery results. Access/result **unavailable**; disclosure and publication approval **unverified** |
+
+An article row advances only when its command owner links the immutable manifest and raw redacted output containing the **actually executed** argv. A file name mentioned in a Bead, an unexecuted proposed command, local implementation completion, or this record cannot advance it. M7 consumes only measurements with matching workload/profile/reset/interval inputs and cannot reinterpret preparation as provider runtime proof.
+
+### Source baseline versus event delivery
+
+Every local or managed result must publish these as separate verdicts:
+
+| Claim | Required observation | What does not prove it |
+|---|---|---|
+| Source baseline/current state | Typed keyed row set and counts/checksums at a declared snapshot or final read, with source workload/profile/reset interval | A matching baseline does not prove that historical intermediate business events were delivered |
+| Ledger delivery | Expected mutation-ledger entries, including the ledger-only negative fixture | Final-state convergence or provider-internal offsets alone |
+| Independently observed business-event delivery | Actual insert/update/delete/key-change observations correlated by the approved oracle, including business-only loss, repeated same-key operations and transaction grouping | Ledger equality, final-state equality, snapshot rows, provider LSN equality, or inferred intermediate events |
+| Final-state convergence | Typed destination rows/counts/checksums after the declared settling boundary | Convergence does not recover overwritten or deleted intermediate events |
+
+If Estuary cannot expose independent intermediate updates/deletes, record event delivery as **unavailable** while still reporting ledger and final-state results separately. Never downgrade the local oracle or local correctness checks to make a managed comparison look complete.
+
+### Immutable, redacted implementation story
+
+Each command-owning Bead stores, under its existing scenario evidence root, an `agent-story/` bundle containing `originating-prompt.redacted`, `first-output.redacted`, append-only `failures.jsonl`, append-only `human-corrections.jsonl`, and `interventions.jsonl`. The owning manifest binds every file by SHA-256 to Bead ID, code commit, scenario ID and run ID. Corrections add records; they never overwrite the first output or a failure. If a prompt or first output was not retained contemporaneously, record it as unavailable—do not reconstruct it from final code.
+
+Redaction removes credentials, tenant identifiers, private agent context, production/client payloads, DSNs, secret names/values, absolute private paths and unrelated client material. Public material uses synthetic workload data. Raw unredacted material is neither linked nor copied into the repository. `boring-cdc-m7-docs` may publish only validator-approved redacted artifacts and their digests.
+
+### Access, disclosure and publication readiness
+
+Consolidated owner question `1c99e72d-3878-4f3b-9cdc-663f97657b3e` is the single request for the following fields; no duplicate request is opened. As of this snapshot every field is **unverified**: Estuary tenant/region and observable version/configuration; secure credential handoff method (never the credential); source and destination connectivity; independent intermediate-event/delete visibility; budget; permitted disruptive/outage/recovery operations; sponsor approval and date; one-sentence sponsorship disclosure; and client review window. No managed resource, provider-account action, cost-bearing run or disruptive operation is authorized by this document.
+
+Access evidence must classify each operation/result as `verified`, `manual`, or `unavailable`, include sanitized provenance and timestamp, and contain no secrets. Unsupported managed crash hooks stay unavailable; they are not simulated into provider proof. Cost, credits, hardware assumptions and operator effort are reported separately. Negative and unfavorable results remain publishable and must not be dropped. Estuary is the sole external comparison; Debezium is a design reference only. There is no leaderboard and no predetermined winner.
+
+Every article requires Julien's explicit editorial approval, sponsor approval/date, the approved one-sentence disclosure, completed client review window, its local evidence boundary, and either a measured matching external result or a prominently labeled unavailable result. None is currently publication-ready, no date is inferred, and no approval is automatic.
+
+### Source-note reconciliation blocker
+
+Read-only inspection on 2026-09-17 found the separate `boring-content` checkout on `main` at `335ada9`, one commit ahead of `origin/main`, with modified `research/ideas.md` and unrelated untracked `.boring/`, image, client-output and draft-output paths. The source note `research/clients/estuary/boring-cdc-series.md` had SHA-256 `62c02e13110820d3289fc36932c80dc42ced774c721ce237a868df1b3d872ff4` and still contains conflicting Debezium-only and optional-extra-vendor directions. The checkout was therefore unsafe and was left untouched: no source-note edit, stage, commit or push occurred.
+
+This exact blocker keeps `boring-cdc-v01.5` open. Reconciliation requires an explicitly authorized, clean, isolated content branch/worktree that changes only the source note to Estuary-only external comparison and Debezium design-reference policy. Until a narrow content commit and its resulting note digest are recorded, no comparison may be commissioned and no article may be published. The canonical CDC requirements remain unambiguous and unchanged.
+
 ## Preserve the implementation story
 
 At each capability boundary retain redacted originating prompts, the first relevant implementation output/commit, failed attempts and fault evidence, subsequent corrections, and explicit human interventions. Bind them to the Bead/code/scenario snapshot under the existing evidence root. Never rewrite an earlier failure into success, silently reconstruct prompts after the fact, or publish private agent context, credentials, production payloads or unrelated client material. Public examples use synthetic workload data only.
