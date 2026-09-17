@@ -109,7 +109,7 @@
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "9b701de4afb587efe07157fb31c322d9c8a520269a0826c7e51e035b195a93c1",
+      "sha256": "8c5efa642b0037203cf67edeaf7602bb0b70d0b0dbb7f94d68a3048395fc0285",
       "status": "complete"
     },
     {

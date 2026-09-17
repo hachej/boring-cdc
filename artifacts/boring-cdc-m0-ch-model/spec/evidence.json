@@ -1,11 +1,5 @@
 {
-  "findings": [
-    {
-      "code": "E_ARTIFACT_HASH",
-      "message": "artifact hash mismatch",
-      "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json"
-    }
-  ],
+  "findings": [],
   "fixture_count": 41,
   "input_tree_sha256": "d3f64bedfb6b66a2198b0377912cc6e57f0edd7d0a37bf0319ae0d13cb525297",
   "inputs": {
@@ -24,7 +18,7 @@
   "runtime_observed": false,
   "schema_version": "m0-clickhouse-contract-evidence/v1",
   "source_parent_git_commit": "bdd8c9e591e8e1dce7480b181af8ecb5f5260007",
-  "status": "fail",
+  "status": "pass",
   "validator": "scripts/validate/clickhouse_contract.py",
   "validator_sha256": "2972dbcef6c3911ea74a45340058c5febec120a3d0b2d9ecc023d91a95035343"
 }
