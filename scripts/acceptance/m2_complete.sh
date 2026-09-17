@@ -240,8 +240,10 @@ else:
   if len(observed)==2 and (observed[0]!=observed[1] or observed[0]!=(encoded.encode(),b'')): fail('stored probes are not byte-identical to the fresh summary')
   commit=evidence.get('git_commit','')
   ancestor=re.fullmatch(r'[0-9a-f]{40}',str(commit)) and git_ok('cat-file','-e',str(commit)+'^{commit}') and git_ok('merge-base','--is-ancestor',str(commit),'HEAD')
-  freshness_paths=['src','examples','Cargo.toml','Cargo.lock','rust-toolchain.toml','build.rs','config','compose.yaml','Dockerfile','fixtures','contracts','scripts','tests']
-  if not ancestor or subprocess.run(['git','diff','--quiet',str(commit)+'..HEAD','--',*freshness_paths]).returncode: fail('gate git_commit is missing, non-ancestor, or stale')
+  if not ancestor: fail('gate git_commit is missing or non-ancestor')
+  # scripts/validate/evidence.sh below is the single freshness authority. It
+  # keeps shared/same-milestone inputs binding without reintroducing the broad
+  # cross-milestone invalidation cycle repaired by core_validator.py.
   expected_artifacts=[coverage_path,root/'artifacts/boring-cdc-m2-complete/gate/completion-summary.json']
   recorded=[root/path for path in evidence.get('result',{}).get('artifacts',[])]
   if recorded!=expected_artifacts or not all(path.is_file() for path in recorded) or sha_bytes(b''.join(path.read_bytes() for path in recorded))!=evidence.get('result',{}).get('digest'): fail('gate result artifact digest mismatch')
