@@ -128,6 +128,23 @@
     },
     {
       "approval": {
+        "approved_at": "2026-09-16T06:05:55.752Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "04b4a49b25a121d7e7d1e01a721e0d3716a5914ae1e979bfcb4dd894ef44b29a"
+      },
+      "executor_beads": [
+        "boring-cdc-m1-ordering",
+        "boring-cdc-m3-planner"
+      ],
+      "fixture_sha256": "270201578a48f216e9b480aac6c3c819e5442906bae13e65cdbc35a835525d96",
+      "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-keys.json",
+      "id": "DEC-SUPPORTED-KEYS",
+      "owner_bead": "boring-cdc-d-keys",
+      "proposed_value": "Canonical source keys use 1..8 non-null effective-replica-identity components in index order from int2, int4, int8, numeric(precision <=100, scale -18..18), uuid, date, timestamp, timestamptz, C-collated text/varchar/bpchar, or bytea <=1 KiB; encoding v1 and PostgreSQL ascending B-tree order are fixed by answered owner card 59a63169.",
+      "status": "approved"
+    },
+    {
+      "approval": {
         "approved_at": "2026-09-16T00:00:00Z",
         "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
         "value_digest": "5b72e01797c88dc68dc5dbf21bc1b41b45284e12d75dd0746a1984516feb7cef"

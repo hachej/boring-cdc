@@ -107,7 +107,7 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "87118dc77f012eec73f118e4bb547d1a08405a6a2bd0ff3228d2d2bf3a4bdf9a",
+      "sha256": "9dcfe845dcd8f70505620d3967208c87ef0a3c1cf39c397813a398e5fe188d8d",
       "status": "complete"
     },
     {
@@ -135,7 +135,7 @@
       "id": "ART-M0-EVENT-FORMAT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",
-      "sha256": "72dd2b42b79341aa584587d997413b5c05a48c813213bca453069242b1b5cfcb",
+      "sha256": "9eca4905a8760b6ae940bb32941a69daa60cc09c6bc7076439e8936ac17e448d",
       "status": "complete"
     },
     {

@@ -102,7 +102,7 @@
       "id": "ART-M0-CLICKHOUSE-DOC",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "docs/CLICKHOUSE_MODEL.md",
-      "sha256": "98041f56be1803cdac4888fac1d8603baab604b556bd63b9fd45536e68ba100d",
+      "sha256": "be22bc2ae22f61275cb74f0e0c5f25fa3ec455533a01d85d653683e872758171",
       "status": "complete"
     },
     {
@@ -130,7 +130,7 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "87118dc77f012eec73f118e4bb547d1a08405a6a2bd0ff3228d2d2bf3a4bdf9a",
+      "sha256": "9dcfe845dcd8f70505620d3967208c87ef0a3c1cf39c397813a398e5fe188d8d",
       "status": "complete"
     },
     {
@@ -158,7 +158,7 @@
       "id": "ART-M0-CLICKHOUSE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "scripts/validate/clickhouse_contract.py",
-      "sha256": "0d6605598cc27b29ac9decb855d7176f5a34d3d86d224fbf9dd522e010e5a595",
+      "sha256": "2972dbcef6c3911ea74a45340058c5febec120a3d0b2d9ecc023d91a95035343",
       "status": "complete"
     },
     {
@@ -214,14 +214,14 @@
       "id": "ART-M0-EVENT-FORMAT-CONTRACT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",
-      "sha256": "72dd2b42b79341aa584587d997413b5c05a48c813213bca453069242b1b5cfcb",
+      "sha256": "9eca4905a8760b6ae940bb32941a69daa60cc09c6bc7076439e8936ac17e448d",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-DOC",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "docs/EVENT_FORMAT.md",
-      "sha256": "ee65fecd3c915c8c95967ae100cf0af1126ba903202c3fdcf8ce657136528d09",
+      "sha256": "628480c5a7661ed0c413b88a381618917167466948d0cc8f098b8f99aa8a04ad",
       "status": "complete"
     },
     {
@@ -235,21 +235,21 @@
       "id": "ART-M0-EVENT-FORMAT-SCHEMA",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event.schema.json",
-      "sha256": "bef8393066708831ee19352466f862dd7151fa049f6d57f3e1a93791e9d11ede",
+      "sha256": "4396068f2385da5f6ebe0486c2cae70c356200ad75409eefbfdb13fcbc569c8b",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-VALIDATOR",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "scripts/validate/event_format.py",
-      "sha256": "6162b5b5a1c20e0eb126a213c51452ba4ad35970e11f78990b2601fc1d7df9d1",
+      "sha256": "5d41c6d8170ea112bd053661b7cd0b5070c854ebf9dc0764001c31ac988b6253",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-VECTORS",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "fixtures/m0/event-format/golden-vectors.json",
-      "sha256": "98ed0c59f6e4735463484648e981b258a0077e4fc2facd458bce46b1cfaeed93",
+      "sha256": "bde306cec5b72c150d68ef59073a5b7f7310042d0b6a3d476f4535f91c2debff",
       "status": "complete"
     },
     {
@@ -502,6 +502,20 @@
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "scripts/validate/storage_contract.py",
       "sha256": "891f23997caf77eb18f6bd304bb9c0f72924ecd79155d8ee2c38b4adec53e996",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-SUPPORTED-KEYS-FIXTURE",
+      "owner_bead": "boring-cdc-d-keys",
+      "path": "fixtures/m0/decisions/boring-cdc-d-keys.json",
+      "sha256": "270201578a48f216e9b480aac6c3c819e5442906bae13e65cdbc35a835525d96",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-SUPPORTED-KEYS-PROBE",
+      "owner_bead": "boring-cdc-d-keys",
+      "path": "artifacts/m0/decisions/boring-cdc-d-keys/fixture-run.jsonl",
+      "sha256": "c68416e914e51772182377d2a2c46854f8e4294b329d3570ceab44d1205b8670",
       "status": "complete"
     },
     {
