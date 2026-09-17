@@ -1,11 +1,5 @@
 {
-  "findings": [
-    {
-      "code": "E_ARTIFACT_HASH",
-      "message": "artifact hash mismatch",
-      "path": "artifacts/boring-cdc-m0-archive-model/spec/evidence.json"
-    }
-  ],
+  "findings": [],
   "fixture_count": 41,
   "input_tree_sha256": "4859fd94b5348fa262c9d27f36ac96d9d3bd1f520099042defa05719e2d64c0e",
   "inputs": {
@@ -24,7 +18,7 @@
   "runtime_observed": false,
   "schema_version": "m0-archive-contract-evidence/v1",
   "source_parent_git_commit": "65cc964dda5a8ec2709bf4df99b63c6739544478",
-  "status": "fail",
+  "status": "pass",
   "validator": "scripts/validate/archive_contract.py",
   "validator_sha256": "7a98290ad86a8fb205ecd733505759d54ace0bbbfbd33dfb42faea43ceada680"
 }

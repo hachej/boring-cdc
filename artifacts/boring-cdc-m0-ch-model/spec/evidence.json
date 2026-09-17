@@ -1,24 +1,24 @@
 {
   "findings": [],
   "fixture_count": 41,
-  "input_tree_sha256": "d3f64bedfb6b66a2198b0377912cc6e57f0edd7d0a37bf0319ae0d13cb525297",
+  "input_tree_sha256": "38f7a50cb90fdd65848c0fdd783711364917efdc6bc60e9a335cef6ebe6eb6cf",
   "inputs": {
     "contracts/clickhouse/canonical-query.sql": "0c1a0008e94cc1104e2b6964d39cc9aae26cddb76ba1f38372dc7c5d5442c8df",
     "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
     "contracts/clickhouse/fixtures.schema.json": "894bed006fdc7b5b162024b68aed22e8d7e7b691b57a509bb33c2179b71bec81",
-    "contracts/clickhouse/model.json": "83bc5438ef2e0fb1a8a799985e7f17ddbb2200e1853633f082e61a832197d5d4",
+    "contracts/clickhouse/model.json": "093e8b55b0ea30b485de3c4e3f7428f287639626540c17f7b14186e5feb3166a",
     "contracts/clickhouse/model.schema.json": "4ec898368ada9d0e64f77a05340e1155836b3320163e270a0462252a4e64de71",
     "contracts/clickhouse/result.schema.json": "80ad19fb794e6b6caba1dd45bbcfe63f75c83f6ae7c2d0b81b16da404b8ace8e",
     "contracts/clickhouse/retire-generation.sql": "0f18d6679a6b6bbf58fde38f6c35b09c3c8dca3e2b99a75f8623b0176fb9ae06",
-    "docs/CLICKHOUSE_MODEL.md": "be22bc2ae22f61275cb74f0e0c5f25fa3ec455533a01d85d653683e872758171",
+    "docs/CLICKHOUSE_MODEL.md": "a42b361438fd557dd35ff333b8c2f4efeabe84eb4f6582f55de02efbb1bedee5",
     "fixtures/m0/clickhouse/scenarios.json": "d1eb388ece27906b91f97707e32745c01a34e51b62634bbd6159d473c6b9cbf8"
   },
   "owner_bead": "boring-cdc-m0-ch-model",
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-clickhouse-contract-evidence/v1",
-  "source_parent_git_commit": "bdd8c9e591e8e1dce7480b181af8ecb5f5260007",
+  "source_parent_git_commit": "563b0b1ce2ff2a6d7431816cfb67538ddab0d1bb",
   "status": "pass",
   "validator": "scripts/validate/clickhouse_contract.py",
-  "validator_sha256": "2972dbcef6c3911ea74a45340058c5febec120a3d0b2d9ecc023d91a95035343"
+  "validator_sha256": "9c2af4e24bb71ffeda0c4f1b6b6d33286b748e4799af0476483c959485ab4d84"
 }

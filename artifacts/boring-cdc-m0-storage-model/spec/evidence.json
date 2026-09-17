@@ -2,12 +2,12 @@
   "actual_connection_attestation": true,
   "findings": [],
   "fixture_count": 36,
-  "input_tree_sha256": "0e3544de52f1f7daf5068d3ffdb54bb87cd4dc49952c571495a5e95b594757f0",
+  "input_tree_sha256": "2bfbe967aad139153d77f9b19c8c7891bf82bb173f62a661834d471194738394",
   "inputs": {
     "contracts/storage/sqlite-schema.sql": "0c3c0141ebe5a1d90e617014434164cf95f710997241248d7a9116999ab5fa90",
     "contracts/storage/storage-fixtures.schema.json": "0b170d1fc49e80ac6b2e142b45af6fa0ee3505699a9b2f729b1fed10b1f8542f",
-    "contracts/storage/storage-model.json": "9b6f48a65557ac3a70fb5ab8eb2cadb4b1f3dd7457f7306bda31197325d24a7f",
-    "contracts/storage/storage-model.schema.json": "d0e0b58da4852688b48acb62f73b1e7a28c541ae6d7413465d80bad5affcc48b",
+    "contracts/storage/storage-model.json": "c27dae8e706f2f454665c5dcc98b85ea85a1f7bca0179affc97b8951b2cc5ef3",
+    "contracts/storage/storage-model.schema.json": "42d695f8b12169c4724f7a65d9bfcbfd1029fa687004967d11b5168d11241cf7",
     "contracts/storage/storage-result.schema.json": "844ff4da1b54ffc653ab79e489ba7eeb41814a05f434a0b3bb5688d3db43b266",
     "fixtures/m0/storage/scenarios.json": "1cd91668950293580ab810814f948501b4dcbe90e40951bfcb99617ee9ef3e8b"
   },
@@ -15,8 +15,8 @@
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-storage-contract-evidence/v1",
-  "source_parent_git_commit": "2937a0b3ac7735b4f02a1849e21569236381e7aa",
+  "source_parent_git_commit": "e5818a9d32e5b7bee5234dcaaabafec3d15bbccb",
   "status": "pass",
   "validator": "scripts/validate/storage_contract.py",
-  "validator_sha256": "5df1ddcf3ef02540ec5456169cee79b80a7132964ad4158a263f9a490768b57b"
+  "validator_sha256": "18f8ab10d382a7508b52b8f7e27ea4a23356e26cc787e63981825cb7f51e5d9f"
 }
