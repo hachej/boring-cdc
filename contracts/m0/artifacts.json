@@ -109,7 +109,7 @@
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "e24b6ccb68f9b9ded491350254e82d6b5417b636ea7e1349ca1bece41aa850f8",
+      "sha256": "1d0203ba644d797574d4e5caffadd685d033ac10e65458f6130766cd49df3f38",
       "status": "complete"
     },
     {
@@ -228,7 +228,7 @@
       "id": "ART-M0-EVENT-FORMAT-EVIDENCE",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "artifacts/boring-cdc-m0-event-format/spec/evidence.json",
-      "sha256": "8f2ae1544e7a1890086e4c50bd0d6e178f428c90a88ea2325b679b642fda70e3",
+      "sha256": "f637c3ad31af796e7ee76bb887080dbb05cba77d2ea6e28a2eff2409e97cd9d5",
       "status": "complete"
     },
     {
@@ -508,21 +508,21 @@
       "id": "ART-M0-SUPPORTED-VALUES-FIXTURE",
       "owner_bead": "boring-cdc-d-values",
       "path": "fixtures/m0/decisions/boring-cdc-d-values.json",
-      "sha256": "caffe1f7f01bd65500682a9c7f30dcc76c13453211e07c8571fc2524f8d6fcb3",
+      "sha256": "eb4c3e4825a9dba19a0c1aa4c33ba82a300ef782507178914bf3661bf1c06a4b",
       "status": "complete"
     },
     {
       "id": "ART-M0-SUPPORTED-VALUES-PROBE",
       "owner_bead": "boring-cdc-d-values",
       "path": "artifacts/m0/decisions/boring-cdc-d-values/fixture-run.jsonl",
-      "sha256": "1665539a48e4a103c1d7b11abd6e8a7daa13b9edc96aa286caceae640523951c",
+      "sha256": "721a416e99281ae0bdd2dab1cdef5dff3554a46898a81feb6a88d359ccc3a4c9",
       "status": "complete"
     },
     {
       "id": "ART-M0-SUPPORTED-VALUES-VALIDATION",
       "owner_bead": "boring-cdc-d-values",
       "path": "artifacts/m0/decisions/boring-cdc-d-values/evidence.json",
-      "sha256": "1fe18e32998dc4752a0c5f8b60d64ff0f4adc6fa24aae90a09bff1c950b0df12",
+      "sha256": "9601b57628c7924375d74c8c71b76a664c132640be092b57deb65742c042bdcc",
       "status": "complete"
     },
     {
