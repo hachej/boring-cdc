@@ -17,14 +17,16 @@ psqlc(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" ex
 admin_credential='admin-local-only'; runtime_credential='runtime-local-only'; control_credential='control-local-only'; application_credential='application-local-only'
 psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_credential" -v "control_password=$control_credential" -v "application_password=$application_credential" \
   < scripts/setup/durable_simple_prerequisites.sql >/dev/null
+psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_credential" -v "control_password=$control_credential" -v "application_password=$application_credential" \
+  < scripts/setup/durable_simple_prerequisites.sql >/dev/null
 cargo build --quiet --locked --bin boring-cdc
-mkdir -p "$work/run/state/spool"; chmod 700 "$work/run/state" "$work/run/state/spool"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
+mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 admin_dsn=postgresql:"//boring_cdc_admin:${admin_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_ADMIN="$admin_dsn" CH_MAINT='https://unused.invalid'; unset PG_RUNTIME PG_CONTROL CH_RUNTIME || true
 binary="$PWD/target/debug/boring-cdc"
 init_dry_run(){ (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PG_ADMIN -u CH_MAINT "$binary" init --dry-run --json); }
 confirm_token(){ python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["confirm_token"])' "$1"; }
-reset_local_state(){ rm -rf "$work/run/state"; mkdir -p "$work/run/state/spool"; chmod 700 "$work/run/state" "$work/run/state/spool"; }
+reset_local_state(){ rm -rf "$work/run/state"; mkdir -p "$work/run/state/spool" "$work/run/state/tmp"; chmod 700 "$work/run/state" "$work/run/state/spool"; }
 expect_init_failure(){
   local expected=$1 label=$2
   reset_local_state
@@ -76,6 +78,26 @@ done
 psqlc -qc "ALTER PUBLICATION boring_publication SET (publish='insert,update,delete,truncate')"
 psqlc -qc 'GRANT SELECT ON boring_cdc_control.heartbeat TO boring_cdc_control_writer'
 expect_init_failure M2_INIT_CONTROL_PRIVILEGE_EXCESS privilege
+psqlc -qc 'REVOKE SELECT ON boring_cdc_control.heartbeat FROM boring_cdc_control_writer; GRANT boring_cdc_runtime TO boring_cdc_control_writer'
+expect_init_failure M2_INIT_CONTROL_ROLE_MEMBERSHIP_EXCESS membership
+psqlc -qc 'REVOKE boring_cdc_runtime FROM boring_cdc_control_writer'
 
-[[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot'")" == 0 ]]
-echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 empty_database=true documented_sql=true idempotent=true replay=blocked relation_set=diagnosed owner=diagnosed publish_flags=diagnosed privilege=diagnosed no_slot=true'
+# Re-initialize clean local state, then exercise the documented capture-only bootstrap handoff.
+reset_local_state
+init_dry_run >"$work/final-dry.json"; final_token=$(confirm_token "$work/final-dry.json")
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" init --confirm --confirm-token "$final_token" --json) >"$work/final.json"
+unset PG_ADMIN CH_MAINT
+export PG_RUNTIME=postgresql:"//boring_cdc_runtime:${runtime_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
+export PG_CONTROL=postgresql:"//boring_cdc_control_writer:${control_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
+export CH_RUNTIME='https://unused.invalid'
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run --bootstrap) & bootstrap_pid=$!
+slot_ready=false
+for _ in $(seq 1 100); do
+  if [[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot' and plugin='pgoutput'")" == 1 ]]; then slot_ready=true; break; fi
+  kill -0 "$bootstrap_pid" 2>/dev/null || { wait "$bootstrap_pid"; exit 1; }
+  sleep 0.1
+done
+[[ "$slot_ready" == true ]]; sleep 1; kill -INT "$bootstrap_pid"; wait "$bootstrap_pid"
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE timeout --preserve-status --signal=INT 5 "$binary" run)
+
+echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 empty_database=true documented_sql=true init_bootstrap_run=true idempotent=true replay=blocked relation_set=diagnosed owner=diagnosed publish_flags=diagnosed privilege=diagnosed membership=diagnosed slot=pgoutput'
