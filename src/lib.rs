@@ -29,4 +29,6 @@ pub mod m2_reconcile;
 pub mod m2_schema;
 pub mod m2_spool;
 
+pub mod m4_clickhouse_schema;
+
 pub mod failure_policy;
