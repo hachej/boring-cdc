@@ -15,7 +15,13 @@ def outcome(cid,i,a):
  if cid=='identity_change_restart': return 'pass_restart_round' if i['new_generation']!=i['generation'] and i['new_selector_sha256']!=i['selector_sha256'] and i['partial_cursor']['byte_offset']>0 else 'invalid'
  if cid=='freshness_expired': return 'archive_partial_unknown' if i['last_complete_age_seconds']>i['freshness_seconds'] else 'pass'
  if cid=='inadequate_service_three_misses': return 'archive_blocked_inadequate_service' if i['missed_cadences']>=a['inadequate_service_after_consecutive_missed_cadences'] and i['missed_cadences']*i['cadence_seconds']>=i['freshness_seconds'] else 'pass'
- return {'transient_read':'retry_wait','rate_limited_reader':'retry_wait','invalid_configuration':'archive_blocked_configuration','manifest_mismatch':'archive_blocked_integrity','continuity_gap':'archive_blocked_continuity','unsupported_filesystem':'archive_blocked_unsupported'}[cid]
+ if cid=='transient_read': return 'retry_wait' if i.get('failure_class')=='transient_io' and 1 <= i.get('attempt_after_failure',0) < 10 else 'invalid'
+ if cid=='rate_limited_reader': return 'retry_wait' if i.get('failure_class')=='rate_limited' and 1 <= i.get('attempt_after_failure',0) < 10 else 'invalid'
+ if cid=='invalid_configuration': return 'archive_blocked_configuration' if i.get('failure_class')=='configuration' else 'invalid'
+ if cid=='manifest_mismatch': return 'archive_blocked_integrity' if i.get('failure_class')=='integrity' and i.get('expected_sha256')!=i.get('actual_sha256') else 'invalid'
+ if cid=='continuity_gap': return 'archive_blocked_continuity' if i.get('failure_class')=='integrity' and i.get('next_start')!=i.get('verified_end',-1)+1 else 'invalid'
+ if cid=='unsupported_filesystem': return 'archive_blocked_unsupported' if i.get('failure_class')=='unsupported' and i.get('filesystem') in {'nfs','smb_cifs','fuse','tmpfs','overlayfs','remote_or_network_filesystem'} else 'invalid'
+ return 'invalid'
 try:
  f=json.loads((r/'fixtures/m0/decisions/boring-cdc-d-archive-durability.json').read_text()); a=f['confirmed_boundary']['audit']; m=f['confirmed_boundary']['failure_mapping']; ds=json.loads((r/'contracts/m0/decisions.json').read_text()); ar=json.loads((r/'contracts/m0/artifacts.json').read_text()); c=json.loads((r/'contracts/archive/archive-model.json').read_text()); st=json.loads((r/'contracts/storage/storage-model.json').read_text()); policy=json.loads((r/'contracts/m0/failure-policy.json').read_text())
  approval=f['approval']; boundary_sha=hashlib.sha256(json.dumps(f['confirmed_boundary'],sort_keys=True,separators=(',',':')).encode()).hexdigest()

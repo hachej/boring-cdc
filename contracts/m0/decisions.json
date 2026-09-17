@@ -11,7 +11,7 @@
         "boring-cdc-m5-loops",
         "boring-cdc-m5-faults"
       ],
-      "fixture_sha256": "a9b387f549da61b42bd32ac31ea7a8a7d2e9f69bf99a000d5cb3e026065ba9e6",
+      "fixture_sha256": "e4076e0f7c78c44018f1e8ec440d5cb6097e8ad3f7b62adb7677b528d51e5a57",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
       "id": "DEC-ARCHIVE-DURABILITY-CONTINUITY",
       "owner_bead": "boring-cdc-d-archive-durability",
