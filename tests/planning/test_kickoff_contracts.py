@@ -235,17 +235,29 @@ class KickoffContracts(unittest.TestCase):
         )
 
     def test_series_preparation_record_has_per_article_boundaries(self):
-        for article in range(1, 6):
+        checkpoints = {
+            1: ("boring-cdc-m1-raw-demo", "boring-cdc-pci.6", "verified local demo",
+                "scripts/acceptance/article1.sh", "evidence/article1/manifest.json"),
+            2: ("boring-cdc-m2-fault-status", "M2/M3/M4", "**unavailable:**",
+                "no article-ready", "actually executed"),
+            3: ("boring-cdc-m3-faults", "boring-cdc-m3-oracle", "**unavailable:**",
+                "no article-ready", "frozen workload/oracle"),
+            4: ("boring-cdc-m4-bench", "boring-cdc-m5-table-add", "**unavailable:**",
+                "no article-ready", "table-add commands"),
+            5: ("boring-cdc-m5-faults", "canonical M5 owners", "**unavailable:**",
+                "no article-ready", "reconstruct/verify"),
+        }
+        for article, required in checkpoints.items():
             rows = [line for line in self.series.splitlines()
                     if line.startswith(f"| {article} | `boring-cdc-")]
             self.assertEqual(len(rows), 1, article)
-            for phrase in ("Reader demo", "Agent-story artifact boundary",
-                           "External comparison and publication boundary"):
-                self.assertIn(phrase, self.series)
-        self.assertIn("scripts/acceptance/article1.sh", self.series)
+            row = rows[0]
+            self.assertEqual(len(row.split("|")), 7, article)
+            for phrase in required + ("Retain", "boring-cdc-m7-estuary", "**unavailable**"):
+                self.assertIn(phrase, row, (article, phrase))
+            for phrase in ("disclosure", "publication approval"):
+                self.assertIn(phrase, row.lower(), (article, phrase))
         self.assertIn("python3 scripts/validate/article1_transcript.py", self.series)
-        self.assertIn("actually executed", self.series)
-        self.assertIn("no article-ready", self.series)
         self.assertIn("M7 consumes only measurements", self.series)
 
     def test_series_separates_baseline_event_delivery_and_convergence(self):
