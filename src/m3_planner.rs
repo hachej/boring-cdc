@@ -948,6 +948,32 @@ fn add_receive_peak(peak: usize, receive: usize) -> Result<usize, PlannerError> 
         .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))
 }
 
+// The threaded native driver owns a clone of the SQL while the caller's String remains live.
+// During send, its framed query BytesMut is also live beside the fixed receive backing; the driver
+// explicitly drops that frame before reading results.
+fn bounded_query_peak(
+    result_and_receive_peak: usize,
+    receive: usize,
+    sql: &String,
+) -> Result<usize, PlannerError> {
+    let retained_sql = sql
+        .capacity()
+        .checked_add(sql.len())
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let result_peak = result_and_receive_peak
+        .checked_add(retained_sql)
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let query_frame = sql
+        .len()
+        .checked_add(6)
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let send_peak = receive
+        .checked_add(retained_sql)
+        .and_then(|value| value.checked_add(query_frame))
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    Ok(result_peak.max(send_peak))
+}
+
 fn postgres_copy_peaks(
     expected: &Vec<CanonicalKey>,
     prepared_rows: &Vec<SnapshotRow>,
@@ -1167,6 +1193,13 @@ impl BoundedRangeSource for PostgresRangeSource {
         if schema.len() != self.key_columns.len() {
             return Err(PlannerError::Conflict("M3_KEY_SCHEMA_COLUMNS"));
         }
+        // The imported connection already owns an 8 KiB native receive backing. Refuse before
+        // rendering SQL or issuing any command when the configured source-impact bound cannot
+        // even cover that persistent allocation.
+        if budget.max_source_impact_bytes < NATIVE_RECEIVE_FLOOR {
+            self.required_source_impact_bytes = Some(NATIVE_RECEIVE_FLOOR);
+            return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
+        }
         fn literal(part: KeyPart) -> Result<String, PlannerError> {
             match part {
                 KeyPart::I64(v) => Ok(v.to_string()),
@@ -1208,9 +1241,7 @@ impl BoundedRangeSource for PostgresRangeSource {
             format!(" WHERE {}", predicates.join(" AND "))
         };
         let timeout = budget.max_duration.as_millis().max(1);
-        self.connection
-            .exec(&format!("SET LOCAL statement_timeout={timeout}"))
-            .map_err(|_| PlannerError::Conflict("M3_SOURCE_TIMEOUT_SETUP"))?;
+        let set_timeout_sql = format!("SET LOCAL statement_timeout={timeout}");
         let keys = self.key_columns.join(",");
         let meta_sql = format!(
             "SELECT {keys},octet_length(convert_to(to_jsonb(t)::text,'UTF8')) AS payload_bytes FROM {} t{where_clause} ORDER BY {keys} LIMIT {}",
@@ -1224,10 +1255,23 @@ impl BoundedRangeSource for PostgresRangeSource {
             budget.max_bytes,
             key_column_name_bytes,
         )?;
-        self.required_source_impact_bytes = Some(metadata_preflight);
-        if metadata_preflight > budget.max_source_impact_bytes {
+        let metadata_preflight =
+            bounded_query_peak(metadata_preflight, metadata_receive_capacity, &meta_sql)?;
+        let timeout_peak =
+            bounded_query_peak(NATIVE_RECEIVE_FLOOR, NATIVE_RECEIVE_FLOOR, &set_timeout_sql)?;
+        let preflight = metadata_preflight.max(timeout_peak);
+        self.required_source_impact_bytes = Some(preflight);
+        if preflight > budget.max_source_impact_bytes {
             return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
         }
+        self.connection
+            .exec_bounded(&set_timeout_sql, NATIVE_RECEIVE_FLOOR)
+            .map_err(|error| match error {
+                pg_walstream::ReplicationError::Buffer(_) => {
+                    PlannerError::Limit("M3_SOURCE_IMPACT")
+                }
+                _ => PlannerError::Conflict("M3_SOURCE_TIMEOUT_SETUP"),
+            })?;
         let started = Instant::now();
         let (meta, metadata_receive_stats) = self
             .connection
@@ -1338,17 +1382,28 @@ impl BoundedRangeSource for PostgresRangeSource {
                 key_column_name_bytes,
             },
         )?;
-        let metadata_peak =
-            add_receive_peak(peaks.metadata, metadata_receive_stats.allocated_bytes)?;
+        let metadata_peak = bounded_query_peak(
+            add_receive_peak(peaks.metadata, metadata_receive_stats.allocated_bytes)?,
+            metadata_receive_stats.allocated_bytes,
+            &meta_sql,
+        )?;
         let payload_receive_capacity =
             receive_capacity(schema.len() + 1, max_data_row_value_bytes)?;
-        let payload_peak = add_receive_peak(peaks.payload, payload_receive_capacity)?;
+        let data_sql = format!(
+            "SELECT {keys},encode(convert_to(to_jsonb(t)::text,'UTF8'),'hex') AS payload_hex FROM {} t{where_clause} ORDER BY {keys} LIMIT {}",
+            self.table, budget.max_rows
+        );
+        let payload_peak = bounded_query_peak(
+            add_receive_peak(peaks.payload, payload_receive_capacity)?,
+            payload_receive_capacity,
+            &data_sql,
+        )?;
         let peaks = CopyPeaks {
             metadata: metadata_peak,
             payload: payload_peak,
         };
         self.last_copy_peaks = Some(peaks);
-        let required = metadata_preflight.max(metadata_peak).max(payload_peak);
+        let required = preflight.max(metadata_peak).max(payload_peak);
         self.required_source_impact_bytes = Some(required);
         if required > budget.max_source_impact_bytes {
             // Payload is never fetched unless both the application allocations and the fixed
@@ -1360,10 +1415,6 @@ impl BoundedRangeSource for PostgresRangeSource {
         }
         drop(meta);
         drop(payload_lengths);
-        let data_sql = format!(
-            "SELECT {keys},encode(convert_to(to_jsonb(t)::text,'UTF8'),'hex') AS payload_hex FROM {} t{where_clause} ORDER BY {keys} LIMIT {}",
-            self.table, budget.max_rows
-        );
         self.payload_queries = self
             .payload_queries
             .checked_add(1)

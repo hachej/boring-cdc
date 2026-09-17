@@ -10,11 +10,23 @@ synthetic_line_sha256 = {
  ('scripts/validate/failure_policy.py','cdf586d916094a050143f668573a622d0ef7b37b114dc7e4d72377c7546f7541'),
  ('src/failure_policy.rs','265977cf786da300c32cbd0fb0db99c25b2390f0dd24a2a75137ac37ab917df8'),
  ('src/m2_ownership.rs','7a7210fa8294ef38edf962dca6fc617ae3a3c17e1cc939becdb65348c4482940'),
+ ('vendor/pg_walstream/src/lib.rs','3ff4e303a30ae16c6e07ebc2db31714edbd94ae946e92eceb4f656cf280ed324'),
+}
+reviewed_vendor_paths = {
+ 'vendor/pg_walstream/Cargo.toml',
+ 'vendor/pg_walstream/src/lib.rs',
+ 'vendor/pg_walstream/src/connection/mod.rs',
+ 'vendor/pg_walstream/src/connection/native/mod.rs',
+ 'vendor/pg_walstream/src/connection/native/connection.rs',
+ 'vendor/pg_walstream/src/connection/native/query.rs',
 }
 hits=[]
 for name in paths:
  p=pathlib.Path(name)
- if not p.is_file() or name.startswith(('.beads/','artifacts/','vendor/')): continue
+ if not p.is_file() or name.startswith(('.beads/','artifacts/')): continue
+ # Published dependency baseline contains synthetic credential fixtures; scan every locally
+ # modified vendor surface instead of silently excluding the whole vendor tree.
+ if name.startswith('vendor/') and name not in reviewed_vendor_paths: continue
  try:text=p.read_text()
  except UnicodeDecodeError:continue
  for n,line in enumerate(text.splitlines(),1):
@@ -27,5 +39,5 @@ for name in paths:
   if synthetic or approved_file_reference:continue
   hits.append(f'{name}:{n}')
 assert not hits,hits
-print('{"status":"pass","scope":"all tracked non-evidence files","secrets_found":0}')
+print('{"status":"pass","scope":"project files and locally modified vendor surfaces","secrets_found":0}')
 PY

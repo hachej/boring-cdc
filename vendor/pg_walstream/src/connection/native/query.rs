@@ -78,6 +78,9 @@ pub async fn bounded_simple_query<S: AsyncRead + AsyncWrite + Unpin>(
     let query_msg = wire::build_query_message(sql);
     wire::write_all(stream, &query_msg).await?;
     wire::flush(stream).await?;
+    // The command frame is not part of the receive/result peak. Callers still account the
+    // simultaneous send peak (receive backing + command strings + this frame) before admission.
+    drop(query_msg);
     let mut result = NativePgResult::new();
 
     loop {
