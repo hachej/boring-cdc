@@ -564,7 +564,7 @@
       "id": "ART-M0-WAL-CAP-VALIDATION",
       "owner_bead": "boring-cdc-d-wal-cap",
       "path": "artifacts/m0/decisions/boring-cdc-d-wal-cap/evidence.json",
-      "sha256": "f61e1a15dcd3428d8f8675e04ae3d00b34a596fa4acb67ac9fd881a4a9f0d7c1",
+      "sha256": "b150c6902622c05431c5eb4574387c5847233b20064d91ba5dfa9338a3f8635c",
       "status": "complete"
     }
   ],
