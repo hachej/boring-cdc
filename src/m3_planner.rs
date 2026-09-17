@@ -385,7 +385,7 @@ impl PlannerStore {
             params![import_id,input.bootstrap_intent_id,input.destination_id],
         )?;
         let importing = tx.execute(
-            "UPDATE bootstrap_imports SET state='importing',revision=revision+1 WHERE import_id=?1 AND state='prepared' AND EXISTS(SELECT 1 FROM destinations d WHERE d.destination_id=?3 AND d.capture_epoch=?5 AND d.generation=?4) AND EXISTS(SELECT 1 FROM m3_feedback_gates f WHERE f.intent_id=?2 AND f.generation=?4 AND f.state='open') AND NOT EXISTS(SELECT 1 FROM m3_bootstrap_importers i WHERE i.intent_id=?2 AND i.state!='acknowledged')",
+            "UPDATE bootstrap_imports SET state='importing',revision=revision+1 WHERE import_id=?1 AND state='prepared' AND EXISTS(SELECT 1 FROM destinations d JOIN m3_bootstrap_runtime r ON r.intent_id=?2 WHERE d.destination_id=?3 AND d.capture_epoch=?5 AND d.generation=?4 AND d.configuration_fingerprint=r.configuration_fingerprint) AND EXISTS(SELECT 1 FROM m3_feedback_gates f WHERE f.intent_id=?2 AND f.generation=?4 AND f.state='open') AND NOT EXISTS(SELECT 1 FROM m3_bootstrap_importers i WHERE i.intent_id=?2 AND i.state!='acknowledged')",
             params![import_id,input.bootstrap_intent_id,input.destination_id,input.generation,input.capture_epoch],
         )?;
         let acknowledged = tx.execute(
@@ -1573,7 +1573,7 @@ mod tests {
         let p = Temp::new();
         let w = open_writer(&p.0, "run", 1, 0).unwrap();
         w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('dest','archive','cfg','epoch',1)",[]).unwrap();
-        w.connection().execute_batch("CREATE TABLE m3_bootstrap_runtime(intent_id TEXT PRIMARY KEY,generation INTEGER, start_seq INTEGER,snapshot_promotable INTEGER,guard_liveness TEXT,state TEXT); CREATE TABLE m3_bootstrap_importers(intent_id TEXT,importer_id TEXT,assigned_ranges_digest TEXT,snapshot_schema_fingerprint TEXT,state TEXT,PRIMARY KEY(intent_id,importer_id)); CREATE TABLE m3_feedback_gates(intent_id TEXT PRIMARY KEY,generation INTEGER,state TEXT);").unwrap();
+        w.connection().execute_batch("CREATE TABLE m3_bootstrap_runtime(intent_id TEXT PRIMARY KEY,generation INTEGER, start_seq INTEGER,snapshot_promotable INTEGER,guard_liveness TEXT,state TEXT,configuration_fingerprint TEXT); CREATE TABLE m3_bootstrap_importers(intent_id TEXT,importer_id TEXT,assigned_ranges_digest TEXT,snapshot_schema_fingerprint TEXT,state TEXT,PRIMARY KEY(intent_id,importer_id)); CREATE TABLE m3_feedback_gates(intent_id TEXT PRIMARY KEY,generation INTEGER,state TEXT);").unwrap();
         let s = PlannerStore::open(w, limits()).unwrap();
         (p, s)
     }
@@ -1596,7 +1596,7 @@ mod tests {
         }
         let digest = crate::m3_bootstrap::digest_assignment(&assigned);
         s.writer.connection().execute("INSERT INTO bootstrap_intents(intent_id,capture_epoch,source_system_id,database_id,slot_name,creation_floor_lsn,state,revision,created_at) VALUES('intent','epoch','sys','db','slot','0000000000000001','slot_created',0,'now')",[]).unwrap();
-        s.writer.connection().execute("INSERT INTO m3_bootstrap_runtime VALUES('intent',1,10,1,'held','exporter_released')",[]).unwrap();
+        s.writer.connection().execute("INSERT INTO m3_bootstrap_runtime VALUES('intent',1,10,1,'held','exporter_released','cfg')",[]).unwrap();
         s.writer.connection().execute("INSERT INTO m3_bootstrap_importers VALUES('intent','worker',?1,'schema-fp','acknowledged')",[&digest]).unwrap();
         s.writer
             .connection()

@@ -768,25 +768,41 @@ mod tests {
             source_impact_bytes: 1024,
             max_rows_per_second: 100,
         };
-        let mut planner =
-            PlannerStore::open(open_writer(&database, "planner", 2, 2).unwrap(), limits).unwrap();
-        planner
-            .persist_plan(&PlanInput {
-                run_id: "run".into(),
-                generation_id: "gen".into(),
-                destination_id: "destination".into(),
-                capture_epoch: "1".into(),
-                generation: 1,
-                bootstrap_intent_id: "boot".into(),
-                importer_id: "worker".into(),
-                snapshot_schema_fingerprint: "schema-fp".into(),
-                key_schema: vec![KeyPartType::I64],
-                boundaries: vec![],
-                estimated_rows: 0,
-                start_seq: 0,
-                started_mono_ms: 1,
-            })
-            .unwrap();
+        let mut mismatched_writer = open_writer(&database, "planner-mismatch", 2, 2).unwrap();
+        mismatched_writer.connection_mut().execute(
+            "UPDATE destinations SET configuration_fingerprint='other',revision=revision+1 WHERE destination_id='destination'",
+            [],
+        ).unwrap();
+        let mut mismatched_planner = PlannerStore::open(mismatched_writer, limits).unwrap();
+        let plan_input = || PlanInput {
+            run_id: "run".into(),
+            generation_id: "gen".into(),
+            destination_id: "destination".into(),
+            capture_epoch: "1".into(),
+            generation: 1,
+            bootstrap_intent_id: "boot".into(),
+            importer_id: "worker".into(),
+            snapshot_schema_fingerprint: "schema-fp".into(),
+            key_schema: vec![KeyPartType::I64],
+            boundaries: vec![],
+            estimated_rows: 0,
+            start_seq: 0,
+            started_mono_ms: 1,
+        };
+        assert!(matches!(
+            mismatched_planner.persist_plan(&plan_input()),
+            Err(crate::m3_planner::PlannerError::Conflict(
+                "M3_CANONICAL_IMPORT_PROOF_MISSING"
+            ))
+        ));
+        drop(mismatched_planner);
+        let mut matching_writer = open_writer(&database, "planner", 3, 3).unwrap();
+        matching_writer.connection_mut().execute(
+            "UPDATE destinations SET configuration_fingerprint='cfg',revision=revision+1 WHERE destination_id='destination'",
+            [],
+        ).unwrap();
+        let mut planner = PlannerStore::open(matching_writer, limits).unwrap();
+        planner.persist_plan(&plan_input()).unwrap();
         let claim = planner
             .claim_next("gen", "worker", 2, std::time::Duration::from_secs(1))
             .unwrap()
@@ -797,7 +813,7 @@ mod tests {
         planner.finish_copy("gen").unwrap();
         drop(planner);
 
-        let mut fence = FenceStore::open(open_writer(&database, "fence", 3, 3).unwrap()).unwrap();
+        let mut fence = FenceStore::open(open_writer(&database, "fence", 4, 4).unwrap()).unwrap();
         assert_eq!(
             fence
                 .writer
