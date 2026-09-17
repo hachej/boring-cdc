@@ -1,12 +1,12 @@
 
 running 5 tests
 test m2_fault_status::tests::inventories_are_exact ... ok
+test m2_fault_status::tests::stable_restart_projection_redacts ... ok
 test m2_fault_status::tests::failure_and_reseed_are_concurrent ... ok
 test m2_fault_status::tests::freshness_expires_and_causal_records_exclude_payloads ... ok
-test m2_fault_status::tests::stable_restart_projection_redacts ... ok
 test m2_fault_status::tests::domain_alerts_project_declared_conditions_and_revisions ... ok
 
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 319 filtered out; finished in 0.29s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 319 filtered out; finished in 0.28s
 
 
 running 0 tests

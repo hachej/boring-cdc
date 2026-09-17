@@ -23,43 +23,43 @@
     },
     {
       "argv": "scripts/validate/archive_scope.sh",
-      "exit_code": 0
+      "exit_code": 1
     },
     {
       "argv": "scripts/validate/compose_spec.sh",
-      "exit_code": 0
+      "exit_code": 1
     },
     {
       "argv": "scripts/validate/failure_policy.sh",
-      "exit_code": 0
+      "exit_code": 1
     },
     {
       "argv": "scripts/validate/license.sh",
-      "exit_code": 0
+      "exit_code": 1
     },
     {
       "argv": "scripts/fixtures/validate_m0_repository_identity.py",
-      "exit_code": 0
+      "exit_code": 1
     },
     {
       "argv": "scripts/validate/security_exposure.sh",
-      "exit_code": 0
+      "exit_code": 1
     },
     {
       "argv": "scripts/validate/sqlite_durability.sh",
-      "exit_code": 0
+      "exit_code": 1
     },
     {
       "argv": "scripts/validate/supported_values.sh",
-      "exit_code": 0
+      "exit_code": 1
     },
     {
       "argv": "scripts/validate/wal_cap.sh",
-      "exit_code": 0
+      "exit_code": 1
     },
     {
       "argv": "scripts/validate/m0_artifact.sh contracts/m0/artifacts.json --complete --expected-artifacts contracts/m0/expected-artifacts.json",
-      "exit_code": 0
+      "exit_code": 1
     },
     {
       "argv": "scripts/validate/m0_decisions.sh contracts/m0/decisions.json",
@@ -94,7 +94,34 @@
     "boring-cdc-d-wal-cap"
   ],
   "duplicate_bead_ids": 0,
-  "findings": [],
+  "findings": [
+    "artifact registry expected ID set mismatch",
+    "artifact row 12: incomplete, missing, or digest mismatch",
+    "artifact row 2: incomplete, missing, or digest mismatch",
+    "artifact row 33: incomplete, missing, or digest mismatch",
+    "artifact row 43: incomplete, missing, or digest mismatch",
+    "artifact row 47: incomplete, missing, or digest mismatch",
+    "artifact row 60: incomplete, missing, or digest mismatch",
+    "artifact row 64: incomplete, missing, or digest mismatch",
+    "artifact row 67: incomplete, missing, or digest mismatch",
+    "artifact row 78: incomplete, missing, or digest mismatch",
+    "artifact row 81: incomplete, missing, or digest mismatch",
+    "artifact row 84: incomplete, missing, or digest mismatch",
+    "boring-cdc-d-sqlite: provisional decision state/marker mismatch",
+    "boring-cdc-d-wal-cap: provisional decision state/marker mismatch",
+    "boring-cdc-m0-archive-model: evidence input provenance mismatch",
+    "command failed (scripts/fixtures/validate_m0_repository_identity.py): {\"code\":\"PUBLIC_OWNER_FIXTURE_INVALID\",\"outcome\":\"fail\",\"phase\":\"validate_spec\"}",
+    "command failed (scripts/validate/archive_scope.sh): {\"code\":\"ARCHIVE_SCOPE_FIXTURE_INVALID\",\"outcome\":\"fail\",\"phase\":\"validate_spec\"}",
+    "command failed (scripts/validate/compose_spec.sh): {\"code\":\"COMPOSE_FIXTURE_INVALID\",\"outcome\":\"fail\",\"phase\":\"validate_spec\"}",
+    "command failed (scripts/validate/failure_policy.sh): {\"code\":\"FAILURE_POLICY_FIXTURE_INVALID\",\"outcome\":\"fail\",\"phase\":\"validate_spec\"}",
+    "command failed (scripts/validate/license.sh): {\"code\":\"LICENSE_FIXTURE_INVALID\",\"outcome\":\"fail\",\"phase\":\"validate_spec\"}",
+    "command failed (scripts/validate/m0_artifact.sh contracts/m0/artifacts.json --complete --expected-artifacts contracts/m0/expected-artifacts.json): {\"findings\":[{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/12/sha256\"},{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/2/sha256\"},{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/33/sha256\"},{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/43/sha256\"},{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/47/sha256\"},{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/60/sha256\"},{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/64/sha256\"},{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/67/sha256\"},{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/78/sha256\"},{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/81/sha256\"},{\"code\":\"E_HASH_MISMATCH\",\"message\":\"artifact content hash mismatch\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/84/sha256\"},{\"code\":\"E_ARTIFACT_EXTRA\",\"message\":\"artifact is absent from expected inventory\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/ART-M0-ARCHIVE-DURABILITY-FIXTURE\"},{\"code\":\"E_ARTIFACT_EXTRA\",\"message\":\"artifact is absent from expected inventory\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/ART-M0-ARCHIVE-DURABILITY-PROBE\"},{\"code\":\"E_ARTIFACT_EXTRA\",\"message\":\"artifact is absent from expected inventory\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/ART-M0-ARCHIVE-DURABILITY-VALIDATION\"},{\"code\":\"E_ARTIFACT_EXTRA\",\"message\":\"artifact is absent from expected inventory\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/ART-M0-COMPOSE-MANIFEST-VALIDATOR\"},{\"code\":\"E_ARTIFACT_EXTRA\",\"message\":\"artifact is absent from expected inventory\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/ART-M0-SUPPORTED-KEYS-FIXTURE\"},{\"code\":\"E_ARTIFACT_EXTRA\",\"message\":\"artifact is absent from expected inventory\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/ART-M0-SUPPORTED-KEYS-PROBE\"},{\"code\":\"E_ARTIFACT_EXTRA\",\"message\":\"artifact is absent from expected inventory\",\"owner_bead\":\"boring-cdc-m0.1\",\"pointer\":\"/artifacts/ART-M0-SUPPORTED-KEYS-VALIDATION\"}],\"git_commit\":\"368ff1a2e7ad76053f41f60fe2ec58bc2b1eb7d4\",\"input_sha256\":\"8ec6e6a9e2da6055cb33c34b1fc47716bb6a98611f3a319d8d3596695ec18f5e\",\"owner_bead\":\"boring-cdc-m0.1\",\"schema_version\":\"validation-result/v1\",\"status\":\"fail\",\"validator_version\":\"core-validators/1.0.0\"}",
+    "command failed (scripts/validate/security_exposure.sh): {\"code\":\"SECURITY_EXPOSURE_FIXTURE_INVALID\",\"outcome\":\"fail\",\"phase\":\"validate_spec\"}",
+    "command failed (scripts/validate/sqlite_durability.sh): {\"code\":\"SQLITE_DURABILITY_FIXTURE_INVALID\",\"outcome\":\"fail\",\"phase\":\"validate_spec\"}",
+    "command failed (scripts/validate/supported_values.sh): {\"code\":\"SUPPORTED_VALUES_FIXTURE_INVALID\",\"outcome\":\"fail\",\"phase\":\"validate_spec\"}",
+    "command failed (scripts/validate/wal_cap.sh): {\"code\":\"WAL_CAP_FIXTURE_INVALID\",\"outcome\":\"fail\",\"phase\":\"validate_spec\"}",
+    "decision manifest owner set mismatch"
+  ],
   "primary_artifact_owners": [
     "boring-cdc-m0-archive-model",
     "boring-cdc-m0-ch-model",
@@ -103,7 +130,12 @@
     "boring-cdc-m0-scaffold",
     "boring-cdc-m0-storage-model"
   ],
-  "provisional_decisions": [],
+  "provisional_decisions": [
+    "boring-cdc-d-archive-durability",
+    "boring-cdc-d-keys",
+    "boring-cdc-d-sqlite",
+    "boring-cdc-d-wal-cap"
+  ],
   "required_m0_owners": [
     "boring-cdc-d-additive",
     "boring-cdc-d-admission",
@@ -144,6 +176,6 @@
     "boring-cdc-m0.3"
   ],
   "schema_version": "m0-completion-summary/v1",
-  "status": "pass",
-  "supervisor_override": "owner card 59a63169 accepted all seven recommended literal sets; matching markers removed"
+  "status": "fail",
+  "supervisor_override": "open recommendations require exact M0-PROVISIONAL markers; no approval inferred"
 }

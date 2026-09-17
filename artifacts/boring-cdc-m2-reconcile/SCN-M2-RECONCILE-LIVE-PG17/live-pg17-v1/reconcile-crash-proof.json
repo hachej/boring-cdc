@@ -1,0 +1,1 @@
+{"schema_version":"m2-reconcile-crash-proof/v1","postgres":"17.6","crash_pid":2441246,"executable":"boring-cdc","boundary_marker":"before-source-state-receipt","sigkill_reaped":true,"process_absent_after_wait":true,"source_receipt_absent_before_restart":true,"slot_reasons":["SLOT_MISSING","RESUME_WAL_STATUS_UNAVAILABLE","SLOT_INVALID_WAL_REMOVED"]}

@@ -6,26 +6,26 @@
   "commands": [
     {
       "argv": "scripts/acceptance/m0_complete.sh --probe",
-      "exit_code": 0,
+      "exit_code": 1,
       "stderr_path": "artifacts/boring-cdc-m0-complete/gate/run-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-complete/gate/run-1.log",
-      "stdout_sha256": "8db7210927f7c97daa60f479c280f149c18bc399e6cb13ea31bad50429e69864",
-      "version": "m0-complete/v1"
+      "stdout_sha256": "07b4d455835fecd85e1645f2b9ca2870775e81b629c5292c0b475936f28cfcb6",
+      "version": "m0-complete/v2-current-master"
     },
     {
       "argv": "scripts/acceptance/m0_complete.sh --probe",
-      "exit_code": 0,
+      "exit_code": 1,
       "stderr_path": "artifacts/boring-cdc-m0-complete/gate/run-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-complete/gate/run-2.log",
-      "stdout_sha256": "8db7210927f7c97daa60f479c280f149c18bc399e6cb13ea31bad50429e69864",
-      "version": "m0-complete/v1"
+      "stdout_sha256": "07b4d455835fecd85e1645f2b9ca2870775e81b629c5292c0b475936f28cfcb6",
+      "version": "m0-complete/v2-current-master"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "milestone",
-  "git_commit": "82ce5de23601d02648ba167ebb6fcba408dddd62",
+  "git_commit": "368ff1a2e7ad76053f41f60fe2ec58bc2b1eb7d4",
   "owner_bead": "boring-cdc-m0-complete",
   "redaction": {
     "checked": true,
@@ -38,17 +38,21 @@
       "contracts/m0/decisions.json",
       "artifacts/boring-cdc-m0-complete/gate/completion-summary.json"
     ],
-    "digest": "79879d113abfb0b07b2ee4082526c5e46c742797f6160991392238cd4d14e512",
+    "attempts": [
+      "current-master-probe-1",
+      "current-master-probe-2"
+    ],
+    "digest": "45305da3b423811e23c01bd738509ecd30716f7326ae02e7011ca7257c5ca1df",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
-    "status": "pass"
+    "status": "fail"
   },
   "scenario_id": "SCN-M0-COMPLETION-BARRIER",
   "schema_version": "evidence/v1",
-  "seed": "m0-complete-v1",
+  "seed": "m0-complete-current-master-v2",
   "source_preservation": {
-    "after_sha256": "dacf9bfd41582697ec2060b4038cfc171e7cf6eeb88fef0a2ed6745268612c17",
-    "before_sha256": "dacf9bfd41582697ec2060b4038cfc171e7cf6eeb88fef0a2ed6745268612c17",
+    "after_sha256": "8ca6423f50100577874ea34e0e8d5aed20c8eb69c0475a45ad4e1ef9a77f5c29",
+    "before_sha256": "8ca6423f50100577874ea34e0e8d5aed20c8eb69c0475a45ad4e1ef9a77f5c29",
     "preserved": true
   },
   "tier_proof": {

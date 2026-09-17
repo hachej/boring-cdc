@@ -1,88 +1,64 @@
 {
-  "schema_version": "evidence/v1",
-  "owner_bead": "boring-cdc-m2-fault-status",
-  "scenario_id": "SCN-M2-FAULT-STATUS-MILESTONE",
-  "evidence_profile": "runtime",
-  "evidence_tier": "milestone",
-  "seed": "pg17-seed-1",
-  "git_commit": "d705eac351e07220ceec430967e54a587d0fdc9d",
-  "commands": [
-    {
-      "argv": "cargo clippy --locked --all-targets",
-      "version": "m2-fault-status/v4",
-      "exit_code": 0,
-      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stdout",
-      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stderr",
-      "stderr_sha256": "e68401d0597e1d46e0cc58d51092b3e2aa228f1de64ffd5014f5bb5f28c879ca"
-    },
-    {
-      "argv": "cargo test --locked --workspace --all-targets",
-      "version": "m2-fault-status/v4",
-      "exit_code": 0,
-      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stdout",
-      "stdout_sha256": "95e025f8d267fbb16f8873959e11bdc5109eddfaa2595f320ea49b842524f4e6",
-      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stderr",
-      "stderr_sha256": "ab52d30121f7f525a0d99ff6d18ab3c9a1c6575eb6f063c796af5c8902d91a86"
-    },
-    {
-      "argv": "cargo test --locked m2_fault_status::tests",
-      "version": "m2-fault-status/v4",
-      "exit_code": 0,
-      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stdout",
-      "stdout_sha256": "f3a1f6a5fd61692ef4055278e0bac3d5941d9b5a7fca92a29ace37fe86a18b77",
-      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stderr",
-      "stderr_sha256": "5fd8dbdbd1aab7a073807811e91f1e295de671c7cab947b9a9266341f7b80690"
-    },
-    {
-      "argv": "scripts/e2e/m2_fault_status.sh",
-      "version": "m2-fault-status/v4",
-      "exit_code": 0,
-      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stdout",
-      "stdout_sha256": "2621186a88727c197c102348410e9b455abd637871a7908ea9b1744fec6079b4",
-      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stderr",
-      "stderr_sha256": "1893c26d840c07425c8a74b80436db4678f367db1892e8bbedf91d18c07cc37f"
-    },
-    {
-      "argv": "scripts/faults/m2_fault_status.sh",
-      "version": "m2-fault-status/v4",
-      "exit_code": 0,
-      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stdout",
-      "stdout_sha256": "42846824ff3c68d9462e5d192c334731436417e76d6f6d7d04d0f6c407abcbe7",
-      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stderr",
-      "stderr_sha256": "71a4630b556d32d860264525d6a8cfd5a0a3c159404391c3e87ba1c2f9e5f254"
-    }
-  ],
-  "source_preservation": {
-    "before_sha256": "1ba0b6c479ec180b558d8c0a5e0f1271970fc91f96d83e936ef7bb0f010b28a1",
-    "after_sha256": "1ba0b6c479ec180b558d8c0a5e0f1271970fc91f96d83e936ef7bb0f010b28a1",
-    "preserved": true
-  },
   "cleanup": {
     "complete": true,
     "remaining_paths": []
   },
+  "commands": [
+    {
+      "argv": "cargo clippy --locked --all-targets",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stderr",
+      "stderr_sha256": "2461b00c8697c4189b2de92ca6fb05b5d72273c78a0a47b1ce4e83ccca077b70",
+      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stdout",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "m2-fault-status/v5"
+    },
+    {
+      "argv": "cargo test --locked --workspace --all-targets",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stderr",
+      "stderr_sha256": "07ccb4af8d9479a68db4b7e6a5bb217adfcfecde1d119d98bf617ed7197c1353",
+      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stdout",
+      "stdout_sha256": "4ed68bb5a9185d76a73f8f33bb8a5208f4f381d663be5b0fd324ddaf3e5a9b32",
+      "version": "m2-fault-status/v5"
+    },
+    {
+      "argv": "cargo test --locked m2_fault_status::tests",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stderr",
+      "stderr_sha256": "83ed90e8c31c79563450f19aa46f74032b81844d46700acd0234af3bda9b52a8",
+      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stdout",
+      "stdout_sha256": "e2927e9198321927e621f9c8e196a9b50fe9c1aaca673af64782a6c3cf137357",
+      "version": "m2-fault-status/v5"
+    },
+    {
+      "argv": "scripts/e2e/m2_fault_status.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stderr",
+      "stderr_sha256": "cab7c797c81fd4143bdbed6921e7afba82b6109f8241c82927e0dce28eb5f998",
+      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stdout",
+      "stdout_sha256": "2621186a88727c197c102348410e9b455abd637871a7908ea9b1744fec6079b4",
+      "version": "m2-fault-status/v5"
+    },
+    {
+      "argv": "scripts/faults/m2_fault_status.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stderr",
+      "stderr_sha256": "3e98bf340d26127fd0527f3850f8e1ad4d19d4821ed8973a63ff84c73fa5d17e",
+      "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stdout",
+      "stdout_sha256": "866137a9170ed549611f624936dce23ed13d14627dbf715ad39ddf547c880367",
+      "version": "m2-fault-status/v5"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "milestone",
+  "git_commit": "368ff1a2e7ad76053f41f60fe2ec58bc2b1eb7d4",
+  "owner_bead": "boring-cdc-m2-fault-status",
   "redaction": {
     "checked": true,
     "secrets_found": 0
   },
-  "tier_proof": {
-    "targeted_checks": true,
-    "boundary_e2e": true,
-    "fault_suite": true,
-    "deterministic_rerun": true,
-    "consumed_contract_vectors": true,
-    "workspace_tests": true,
-    "integration": true,
-    "clean_environment": true,
-    "exit_assertions": true,
-    "endurance": false,
-    "full_failure_matrix": false,
-    "clean_clone": false
-  },
   "result": {
-    "status": "pass",
-    "digest": "627c5c69a5086ac0e5385616dacc57e5e2a5998c9f076e3ce71ec8993cc480db",
     "artifacts": [
       "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/manifest.json",
       "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/logs/boring-cdc.jsonl",
@@ -95,7 +71,31 @@
       "e2e-pg17-run-1",
       "fault-wrapper-pg17-run-2"
     ],
-    "product_faults": "16 wired product boundaries aborted including live PG17 before/after feedback; exact-PID startup SIGKILL; missing, unreserved, lost/wal_removed slot states",
-    "runtime_observed": true
+    "digest": "93c1336c30b607c3fc64d6aff9003d152c64ebcabdbdbacf3fbdbca1c0ed9f50",
+    "product_faults": "16 wired product boundaries aborted; exact-PID PostgreSQL 17.6 recovery and slot-state separation",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M2-FAULT-STATUS-MILESTONE",
+  "schema_version": "evidence/v1",
+  "seed": "pg17-seed-1",
+  "source_preservation": {
+    "after_sha256": "0ec863ea08082341407cebbc4e1aaa3cc3bad369993f0d1aa842c29300b57c01",
+    "before_sha256": "0ec863ea08082341407cebbc4e1aaa3cc3bad369993f0d1aa842c29300b57c01",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": true,
+    "targeted_checks": true,
+    "workspace_tests": true
   }
 }
