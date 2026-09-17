@@ -452,7 +452,7 @@
       "id": "ART-M0-STORAGE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "artifacts/boring-cdc-m0-storage-model/spec/evidence.json",
-      "sha256": "9e51e21ac02e9e67a1ef66365b5b9efebe9bb7046256d5be364358d814b20e8d",
+      "sha256": "864f76164c293e6d29b5f38882c4b0cf994a454e55ed8aaeb59a3205f052819d",
       "status": "complete"
     },
     {
