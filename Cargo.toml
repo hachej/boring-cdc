@@ -25,7 +25,9 @@ name = "boring-cdc"
 path = "src/main.rs"
 
 [dependencies]
+# ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pg_walstream = { version = "=0.8.1", default-features = false, features = ["rustls-tls"] }
+# ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 tokio = { version = "=1.53.1", features = ["rt-multi-thread"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"

@@ -474,10 +474,6 @@
             "crate": {
               "type": "string"
             },
-            "crate_sha256": {
-              "pattern": "^[0-9a-f]{64}$",
-              "type": "string"
-            },
             "feature": {
               "type": "string"
             },
@@ -485,9 +481,6 @@
               "type": "string"
             },
             "required_capability": {
-              "type": "string"
-            },
-            "source": {
               "type": "string"
             },
             "stock_high_level_worker": {
@@ -504,9 +497,7 @@
             "implementation_boundary",
             "required_capability",
             "stock_high_level_worker",
-            "version",
-            "source",
-            "crate_sha256"
+            "version"
           ],
           "type": "object"
         },
