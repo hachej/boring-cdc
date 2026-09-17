@@ -15,6 +15,21 @@ cleanup() {
   rm -rf "$work"
 }
 trap cleanup EXIT INT TERM
+stop_bounded() {
+  local child=$1 signal=$2 label=$3 deadline
+  kill -"$signal" "$child"
+  deadline=$((SECONDS+10))
+  while kill -0 "$child" 2>/dev/null; do
+    if (( SECONDS >= deadline )); then
+      kill -KILL "$child" >/dev/null 2>&1 || true
+      wait "$child" 2>/dev/null || true
+      echo "E_PROCESS_SHUTDOWN_TIMEOUT $label" >&2
+      return 1
+    fi
+    sleep .1
+  done
+  wait "$child"
+}
 
 printf 'durable-simple-postgres-%s\n' "$project" >"$work/postgres_password"
 chmod 600 "$work/postgres_password"
@@ -64,8 +79,7 @@ until [[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_na
   sleep .1
 done
 sleep 1
-kill -INT "$bootstrap_pid"
-wait "$bootstrap_pid"
+stop_bounded "$bootstrap_pid" INT bootstrap
 bootstrap_pid=
 
 journal="$work/run/state/boring.db"
@@ -189,8 +203,7 @@ with open(result_path,'w') as f: json.dump(result,f,indent=2,sort_keys=True); f.
 print(json.dumps(result,sort_keys=True))
 PY
 
-kill -TERM "$runtime_pid"
-wait "$runtime_pid"
+stop_bounded "$runtime_pid" TERM runtime-restart
 runtime_pid=
 [[ ! -s "$work/runtime-restart.err" ]]
 echo "DURABLE_SIMPLE_CASE_OK postgres=$version transactions=6 crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"
