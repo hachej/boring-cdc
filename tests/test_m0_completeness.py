@@ -74,17 +74,16 @@ class M0CompletenessTests(unittest.TestCase):
         evidence.write_text(json.dumps(value, sort_keys=True) + "\n")
         self.assertIn("boring-cdc-m0-event-format: evidence input provenance mismatch", m0.aggregate_findings(target))
 
-    def test_provisional_manifest_rows_cannot_claim_approval(self):
+    def test_approved_manifest_rows_cannot_retain_provisional_markers(self):
         temporary, target = self.fixture_root()
         self.addCleanup(temporary.cleanup)
         decisions = target / "contracts/m0/decisions.json"
         value = json.loads(decisions.read_text())
         row = next(row for row in value["decisions"] if row["owner_bead"] == "boring-cdc-d-compose")
-        row["status"] = "approved"
-        row["approval"] = {"approved_by": "forged", "approved_at": "now", "value_digest": "0" * 64}
+        row["provisional_markers"] = ["// M0-PROVISIONAL: boring-cdc-d-compose"]
         decisions.write_text(json.dumps(value, sort_keys=True) + "\n")
         findings = m0.aggregate_findings(target)
-        self.assertIn("boring-cdc-d-compose: provisional decision state/marker mismatch", findings)
+        self.assertIn("boring-cdc-d-compose: approved decision retains provisional marker", findings)
 
     def test_every_decision_domain_validator_is_fail_closed(self):
         expected = {

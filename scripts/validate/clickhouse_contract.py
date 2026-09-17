@@ -78,9 +78,9 @@ def validate():
  text='\n'.join(p.read_text(errors='replace') for p in paths)
  if c['objects']['materialized_views']!=[] or not c['objects']['materialized_view_policy'].startswith('none:'):add(out,'E_MATERIALIZED_VIEW','objects','materialized-view policy changed')
  if c['lookup_behavior']['external_dictionaries']!='forbidden for correctness and TOAST reconstruction' or c['lookup_behavior']['postgres_joins']!='forbidden':add(out,'E_LOOKUP','lookup_behavior','dictionary/source join would weaken reconstruction')
- provisional=['// M0-PROVISIONAL: boring-cdc-d-compose']
+ provisional=[]
  if c.get('provisional_markers')!=provisional:add(out,'E_PROVISIONAL','provisional_markers','owner-card provisional inventory changed')
- if c.get('authority',{}).get('owner_cards')!=['59a63169'] or not c.get('authority',{}).get('status','').startswith('engineering artifact with accepted d-values, canonical-float, and d-keys literals'):add(out,'E_AUTHORITY','authority','owner card 59a63169 must remain the literal decision authority')
+ if c.get('authority',{}).get('owner_cards')!=['59a63169'] or not c.get('authority',{}).get('status','').startswith('engineering artifact with accepted d-values, canonical-float, d-keys, and d-compose literals'):add(out,'E_AUTHORITY','authority','owner card 59a63169 must remain the literal decision authority')
  for marker in provisional:
   if marker not in text:add(out,'E_PROVISIONAL','inputs','missing '+marker)
  for token in ('postgres'+ '://','password'+'=','BEGIN PRIVATE'+' KEY','AK'+'IA'):

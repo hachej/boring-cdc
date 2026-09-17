@@ -1132,15 +1132,8 @@
       "type": "object"
     },
     "provisional_markers": {
-      "items": {
-        "enum": [
-          "// M0-PROVISIONAL: boring-cdc-d-compose"
-        ]
-      },
-      "maxItems": 1,
-      "minItems": 1,
-      "type": "array",
-      "uniqueItems": true
+      "maxItems": 0,
+      "type": "array"
     },
     "reconciliation": {
       "additionalProperties": false,
@@ -1238,9 +1231,6 @@
         },
         "platform": {
           "type": "string"
-        },
-        "provisional": {
-          "const": "// M0-PROVISIONAL: boring-cdc-d-compose"
         },
         "retry_scope": {
           "type": "string"

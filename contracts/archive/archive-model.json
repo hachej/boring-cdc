@@ -42,7 +42,7 @@
     ],
     "owner_confirmation_date": "2026-09-10",
     "requirements": "docs/REQUIREMENTS.md \u00a77",
-    "status": "engineering artifact with accepted d-archive-durability literals; Compose recommendations remain provisional"
+    "status": "engineering artifact with accepted d-archive-durability and d-compose literals"
   },
   "commit_protocol": {
     "checkpoint_rule": "never beyond a complete transaction or before durable ready segment; selector promotion is separate and monotonic",
@@ -109,14 +109,14 @@
         "765bd3b2"
       ],
       "date": "2026-09-10",
-      "scope": "archive artifact design accepted; blocked durability and Compose recommendations remain provisional under owner card 59a63169"
+      "scope": "archive artifact design plus d-archive-durability and d-compose literals accepted under owner card 59a63169"
     },
     "durability": {
       "approval_card": "59a63169",
       "confirmed_projection_source": "contracts/storage/storage-model.json",
       "decision_id": "boring-cdc-d-archive-durability",
       "projection": "ext4/xfs local allowlist; descriptor-relative no-follow lifecycle; parent directory sync; owner-only modes",
-      "source_sha256": "9b6f48a65557ac3a70fb5ab8eb2cadb4b1f3dd7457f7306bda31197325d24a7f"
+      "source_sha256": "c27dae8e706f2f454665c5dcc98b85ea85a1f7bca0179affc97b8951b2cc5ef3"
     },
     "event_contract": {
       "path": "contracts/event/event-format.json",
@@ -135,7 +135,7 @@
       "confirmed_projection_source": "contracts/storage/storage-model.json",
       "decision_id": "boring-cdc-d-promotion",
       "projection": "strictly increasing destination fence; lower no-op; same-fence conflict; external-ahead maintenance adoption",
-      "source_sha256": "9b6f48a65557ac3a70fb5ab8eb2cadb4b1f3dd7457f7306bda31197325d24a7f"
+      "source_sha256": "c27dae8e706f2f454665c5dcc98b85ea85a1f7bca0179affc97b8951b2cc5ef3"
     }
   },
   "executors": [
@@ -454,9 +454,7 @@
     "same_fence_same_state": "idempotent",
     "selector_resolution": "parse valid immutable generation selectors for epoch; unique greatest promotion_fence selects one complete GENERATION_READY generation"
   },
-  "provisional_markers": [
-    "// M0-PROVISIONAL: boring-cdc-d-compose"
-  ],
+  "provisional_markers": [],
   "reconciliation": {
     "final_without_ready": "validate intent, path, manifest and every file; resync and create marker, else quarantine and block",
     "orphan_without_intent": "quarantine; never adopt or delete automatically",
@@ -510,7 +508,6 @@
     "parquet_format_version": "2.6",
     "parquet_writer_crate": "parquet 57.0.0",
     "platform": "linux/amd64",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-compose",
     "retry_scope": "byte-identical only under exact platform, versions, event/config fingerprints and profile",
     "row_group_max_rows": 65536,
     "row_order": "journal_seq,event_index",

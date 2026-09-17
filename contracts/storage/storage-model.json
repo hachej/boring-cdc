@@ -70,7 +70,7 @@
       "59a63169"
     ],
     "requirements": "docs/REQUIREMENTS.md",
-    "status": "engineering artifact with accepted d-values, d-keys, d-wal-cap, and d-sqlite literals; remaining decision recommendations stay provisional"
+    "status": "engineering artifact with accepted d-values, d-keys, d-wal-cap, d-sqlite, and d-compose literals; remaining decision recommendations stay provisional"
   },
   "executors": [
     "boring-cdc-m1-preflight",
@@ -191,7 +191,6 @@
     "loss": "fence all dispatch and exit; no in-process reacquire or CopyBoth reopen",
     "ownership_deadline_ms": 15000,
     "probe_interval_ms": 5000,
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-compose",
     "source_lock": "dedicated non-pooled advisory backend PID + random nonce",
     "state_lock": "exclusive nonblocking lock on state root",
     "takeover_wait_ms": 90000
@@ -220,8 +219,7 @@
     }
   },
   "provisional_markers": [
-    "// M0-PROVISIONAL: boring-cdc-d-admission",
-    "// M0-PROVISIONAL: boring-cdc-d-compose"
+    "// M0-PROVISIONAL: boring-cdc-d-admission"
   ],
   "result_schema": "contracts/storage/storage-result.schema.json",
   "safe_stop": {

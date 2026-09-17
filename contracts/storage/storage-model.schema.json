@@ -418,9 +418,6 @@
         "probe_interval_ms": {
           "type": "integer"
         },
-        "provisional": {
-          "type": "string"
-        },
         "source_lock": {
           "type": "string"
         },
@@ -436,7 +433,6 @@
         "loss",
         "ownership_deadline_ms",
         "probe_interval_ms",
-        "provisional",
         "source_lock",
         "state_lock",
         "takeover_wait_ms"

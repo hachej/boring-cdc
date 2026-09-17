@@ -36,20 +36,22 @@
       "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-16T06:05:55.752Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "4ace0733df1a791af2bbc65b5c958d2368f7a8224208dc07782ca0d342eba28b"
+      },
       "executor_beads": [
         "boring-cdc-m0-scaffold",
         "boring-cdc-m6-failure-matrix",
         "boring-cdc-m7-artifacts"
       ],
-      "fixture_sha256": "6a006e66448934224f60083677f3b8a6ab0de09550b2a1757144d3fc033e3c0b",
+      "fixture_sha256": "325cfbd390c2093e82910ed62a73280a457a6d61b376da48bad74fd1b27d46df",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-compose.json",
       "id": "DEC-COMPOSE-IMAGES-RUNTIME-RECOVERY",
       "owner_bead": "boring-cdc-d-compose",
-      "proposed_value": "linux/amd64 only; PostgreSQL 17.6, ClickHouse 25.8.2.29, Rust 1.89.0 Bookworm builder, and Debian bookworm-20250811-slim runtime are pinned by recommended OCI index and amd64 digests; Docker Engine 28.3.3, Compose 2.39.2, BuildKit 0.24.0, and Dockerfile frontend 1.12.0; cargo build --locked --release; project boring-cdc with postgres, clickhouse, connector and pgdata, chdata, cdcdata; connector restart unless-stopped with unlimited supervisor attempts while the provisional persisted FailurePolicy remains retry authority; PostgreSQL keepalive 30/10/3 and client check 10 seconds, measured reap <=70 seconds, takeover at 90 seconds; health 5/3/12 with 30-second start period and 120-second readiness; patch/minor changes rerun clean-pull with rollback-compatible state, major PostgreSQL/ClickHouse changes require migration plan and reseed.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-compose"
-      ],
-      "status": "open"
+      "proposed_value": "linux/amd64 only; PostgreSQL docker.io/library/postgres:17.6 index sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929 and amd64 sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409; ClickHouse docker.io/clickhouse/clickhouse-server:25.8.2.29 index sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f and amd64 sha256:78b6f0863688458b229b597f6a1bbf891855a01cf59c3f3dbe66428571c518c9; builder rust:1.89.0-bookworm index sha256:948f9b08a66e7fe01b03a98ef1c7568292e07ec2e4fe90d88c07bb14563c84ff and amd64 sha256:c9ac3fa8945b61dede1e4500d25028aa8fd8a8fe46365fcf9c0422f8d999b9b0; runtime debian:bookworm-20250811-slim index sha256:b1a741487078b369e78119849663d7f1a5341ef2768798f7b7406c4240f86aef and amd64 sha256:cea2634840f5a87503d8210e4df97b9f23a2acd67ff860a76c133d963032f866; Docker Engine 28.3.3, Compose 2.39.2, BuildKit 0.24.0, Dockerfile frontend 1.12.0; cargo build --locked --release; project boring-cdc with postgres, clickhouse, connector and pgdata, chdata, cdcdata; restart unless-stopped with persisted FailurePolicy retry authority; PostgreSQL keepalive 30/10/3 and client check 10 seconds, reap <=70 seconds, takeover 90 seconds; health 5/3/12 with 30-second start and 120-second readiness; patch/minor clean-pull with rollback-compatible store; PostgreSQL/ClickHouse major migration plan and reseed.",
+      "status": "approved"
     },
     {
       "approval": {
