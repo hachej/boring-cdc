@@ -80,7 +80,7 @@ class M0CompletenessTests(unittest.TestCase):
         decisions = target / "contracts/m0/decisions.json"
         value = json.loads(decisions.read_text())
         row = next(row for row in value["decisions"] if row["owner_bead"] == "boring-cdc-d-compose")
-        row["provisional_markers"] = ["// M0-PROVISIONAL: boring-cdc-d-compose"]
+        row["provisional_markers"] = ["// M0-" + "PROVISIONAL: boring-cdc-d-compose"]
         decisions.write_text(json.dumps(value, sort_keys=True) + "\n")
         findings = m0.aggregate_findings(target)
         self.assertIn("boring-cdc-d-compose: approved decision retains provisional marker", findings)

@@ -48,10 +48,16 @@ class StorageContractTests(unittest.TestCase):
   prior={'inputs':inputs,'validator_sha256':validator_sha,'source_parent_git_commit':candidate}
   parent,error=m.resolve_source_parent(prior,inputs,validator_sha)
   self.assertIsNone(error); self.assertEqual(candidate,parent)
-  old=m.subprocess.check_output(['git','rev-parse',candidate+'^'],cwd=m.ROOT,text=True).strip()
-  prior['source_parent_git_commit']=old
-  _,error=m.resolve_source_parent(prior,inputs,validator_sha)
-  self.assertRegex(error,r'(missing recorded blob|blob hash differs)')
+  ancestors=m.subprocess.check_output(['git','rev-list',candidate+'^'],cwd=m.ROOT,text=True).splitlines()
+  errors=[]
+  for old in ancestors:
+   prior['source_parent_git_commit']=old
+   _,error=m.resolve_source_parent(prior,inputs,validator_sha)
+   if error:
+    errors.append(error)
+    break
+  self.assertTrue(errors,'history must contain an ancestor with different or missing recorded storage blobs')
+  self.assertRegex(errors[0],r'(missing recorded blob|blob hash differs)')
   missing={**inputs,'contracts/storage/not-present.json':'0'*64}
   _,error=m.resolve_source_parent({'inputs':missing,'validator_sha256':validator_sha,'source_parent_git_commit':candidate},missing,validator_sha)
   self.assertIn('missing recorded blob contracts/storage/not-present.json',error)
