@@ -18,7 +18,7 @@
       "id": "ART-M0-ARCHIVE-DURABILITY-VALIDATION",
       "owner_bead": "boring-cdc-d-archive-durability",
       "path": "artifacts/m0/decisions/boring-cdc-d-archive-durability/evidence.json",
-      "sha256": "97a79b3c0b9a4454ec2f96b4ffbf7aba837160238d1d6748cfc812874f81c940",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     },
     {
@@ -88,7 +88,7 @@
       "id": "ART-M0-ARCHIVE-SCOPE-VALIDATION",
       "owner_bead": "boring-cdc-d-archive-scope",
       "path": "artifacts/m0/decisions/boring-cdc-d-archive-scope/evidence.json",
-      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     },
     {
@@ -235,7 +235,7 @@
       "id": "ART-M0-COMPOSE-VALIDATION",
       "owner_bead": "boring-cdc-d-compose",
       "path": "artifacts/m0/decisions/boring-cdc-d-compose/evidence.json",
-      "sha256": "cd304db3749369ebbd98a6985f9e8c6f3a6c65676dbcf4335b5edc2b20da10d7",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     },
     {
@@ -305,7 +305,7 @@
       "id": "ART-M0-FAILURE-POLICY-VALIDATION",
       "owner_bead": "boring-cdc-d-failure-policy",
       "path": "artifacts/m0/decisions/boring-cdc-d-failure-policy/evidence.json",
-      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     },
     {
@@ -333,7 +333,7 @@
       "id": "ART-M0-LICENSE-VALIDATION",
       "owner_bead": "boring-cdc-d-license",
       "path": "artifacts/m0/decisions/boring-cdc-d-license/evidence.json",
-      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     },
     {
@@ -424,7 +424,7 @@
       "id": "ART-M0-PUBLIC-OWNER-VALIDATION",
       "owner_bead": "boring-cdc-d-owner",
       "path": "artifacts/m0/decisions/boring-cdc-d-owner/evidence.json",
-      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     },
     {
@@ -452,7 +452,7 @@
       "id": "ART-M0-SECURITY-EXPOSURE-VALIDATION",
       "owner_bead": "boring-cdc-d-security",
       "path": "artifacts/m0/decisions/boring-cdc-d-security/evidence.json",
-      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     },
     {
@@ -473,7 +473,7 @@
       "id": "ART-M0-SQLITE-DURABILITY-VALIDATION",
       "owner_bead": "boring-cdc-d-sqlite",
       "path": "artifacts/m0/decisions/boring-cdc-d-sqlite/evidence.json",
-      "sha256": "9059f740c625a9b04459533ba1f1e5341b2904a99df12fdc637c3c4bb2f5c657",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     },
     {
@@ -550,7 +550,7 @@
       "id": "ART-M0-SUPPORTED-KEYS-VALIDATION",
       "owner_bead": "boring-cdc-d-keys",
       "path": "artifacts/m0/decisions/boring-cdc-d-keys/evidence.json",
-      "sha256": "a5ab51df34aec11d208d57b9fac0a48da1649e788fc50943dbbc379c8442a5f4",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     },
     {
@@ -571,7 +571,7 @@
       "id": "ART-M0-SUPPORTED-VALUES-VALIDATION",
       "owner_bead": "boring-cdc-d-values",
       "path": "artifacts/m0/decisions/boring-cdc-d-values/evidence.json",
-      "sha256": "fd391e1c6154360aa8002e6ae5a89988d82e323c72339d7cdbffd70802e41d65",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     },
     {
@@ -592,7 +592,7 @@
       "id": "ART-M0-WAL-CAP-VALIDATION",
       "owner_bead": "boring-cdc-d-wal-cap",
       "path": "artifacts/m0/decisions/boring-cdc-d-wal-cap/evidence.json",
-      "sha256": "b150c6902622c05431c5eb4574387c5847233b20064d91ba5dfa9338a3f8635c",
+      "sha256": "d4d5eb2ae2a4f9a52f46c723695aaa6bd2cfe334b2772701ae7ea686c8e9d1e2",
       "status": "complete"
     }
   ],

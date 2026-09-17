@@ -61,7 +61,8 @@ SPEC_INPUTS = {
         "contracts/archive/archive-fixtures.schema.json", "contracts/archive/archive-model.json",
         "contracts/archive/archive-model.schema.json", "contracts/archive/archive-result.schema.json",
         "contracts/archive/generation-manifest.schema.json", "contracts/archive/segment-manifest.schema.json",
-        "fixtures/m0/archive/scenarios.json",
+        "contracts/m0/failure-policy.json", "fixtures/m0/archive/scenarios.json",
+        "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
     },
     "boring-cdc-m0-ch-model": {
         "contracts/clickhouse/canonical-query.sql", "contracts/clickhouse/ddl.sql",
