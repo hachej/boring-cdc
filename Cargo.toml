@@ -7,6 +7,14 @@ license = "Apache-2.0"
 repository = "https://github.com/hachej/boring-cdc"
 description = "A bounded Postgres CDC experiment"
 publish = false
+include = [
+    "/src/**",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/rust-toolchain.toml",
+    "/README.md",
+    "/LICENSE",
+]
 
 [lib]
 name = "boring_cdc"

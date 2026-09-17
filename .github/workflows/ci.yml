@@ -8,16 +8,19 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@1.89.0
-        with: {components: "clippy,rustfmt"}
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update
       - name: Format
         run: cargo fmt --all -- --check
       - name: Lint
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Test
         run: cargo test --locked --workspace --all-targets
+      - name: Package boundary
+        run: scripts/validate/scaffold_package.sh
       - name: Scaffold contract
         run: scripts/validate/m0_scaffold.sh
       - name: License metadata
@@ -26,5 +29,5 @@ jobs:
         run: scripts/validate/scaffold_secrets.sh
       - name: Dependency audit
         run: |
-          cargo install cargo-audit --locked
+          cargo install cargo-audit --version 0.22.2 --locked
           cargo audit --deny warnings

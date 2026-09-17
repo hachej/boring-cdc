@@ -27,7 +27,8 @@
     "segment_manifest",
     "generation_manifest",
     "fixture_schemas",
-    "golden_vectors"
+    "golden_vectors",
+    "provisional_markers"
   ],
   "properties": {
     "schema_version": {
@@ -46,7 +47,8 @@
         "owner_confirmation_date",
         "owner_cards",
         "requirements",
-        "architecture"
+        "architecture",
+        "status"
       ],
       "properties": {
         "owner_confirmation_date": {
@@ -62,6 +64,9 @@
           "type": "string"
         },
         "architecture": {
+          "type": "string"
+        },
+        "status": {
           "type": "string"
         }
       }
@@ -181,7 +186,8 @@
             "decision_id",
             "confirmed_projection_source",
             "source_sha256",
-            "projection"
+            "projection",
+            "provisional"
           ],
           "properties": {
             "decision_id": {
@@ -195,6 +201,9 @@
             },
             "projection": {
               "type": "string"
+            },
+            "provisional": {
+              "const": "// M0-PROVISIONAL: boring-cdc-d-archive-durability"
             }
           }
         },
@@ -294,7 +303,8 @@
         "row_order",
         "created_by",
         "timestamps_and_host_metadata",
-        "retry_scope"
+        "retry_scope",
+        "provisional"
       ],
       "properties": {
         "id": {
@@ -356,6 +366,9 @@
         },
         "retry_scope": {
           "type": "string"
+        },
+        "provisional": {
+          "const": "// M0-PROVISIONAL: boring-cdc-d-compose"
         }
       }
     },
@@ -374,7 +387,8 @@
         "selector",
         "path_rules",
         "generation_manifest",
-        "generation_ready"
+        "generation_ready",
+        "provisional"
       ],
       "properties": {
         "root_mode": {
@@ -450,6 +464,9 @@
         },
         "generation_ready": {
           "type": "string"
+        },
+        "provisional": {
+          "const": "// M0-PROVISIONAL: boring-cdc-d-archive-durability"
         }
       }
     },
@@ -1302,6 +1319,18 @@
     },
     "golden_vectors": {
       "type": "string"
+    },
+    "provisional_markers": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "// M0-PROVISIONAL: boring-cdc-d-archive-durability",
+          "// M0-PROVISIONAL: boring-cdc-d-compose"
+        ]
+      }
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

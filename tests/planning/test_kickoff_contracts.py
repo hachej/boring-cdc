@@ -217,6 +217,23 @@ class KickoffContracts(unittest.TestCase):
         self.assertIn("originating prompts", self.series)
         self.assertIn("no publication or m0-completion date", self.series.lower())
 
+    def test_article_one_uses_shipped_teaching_view_without_article_four_evidence(self):
+        rows = [line for line in self.series.splitlines()
+                if line.startswith("| 1. How Postgres CDC Works |")]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(
+            rows[0],
+            "| 1. How Postgres CDC Works | `boring-cdc-m1-raw-demo`: protocol, "
+            "workload, decode and fail-closed fixtures | Shipped PR #3 evidence: "
+            "[real raw `pgoutput` events](../evidence/article1/README.md) plus the "
+            "same-stream, process-local, non-durable `article1_row_view` **TEACHING VIEW** "
+            "showing insert/current row, update/overwrite and delete/removal; explain the tested "
+            "topology, keys, source-risk, replica-identity and oracle limits. This is not "
+            "destination evidence: ClickHouse, durability, checkpoints and exactly-once are "
+            "deferred to Article 4/M4 | Relevant M7 external decode/observation evidence where "
+            "available; otherwise clearly label unavailable visibility. Debezium explanation only |",
+        )
+
     def test_document_bead_links_resolve(self):
         for name in ["docs/PLAN.md", "docs/AGENT_SYSTEM.md", "docs/SERIES_EXECUTION.md"]:
             text = (ROOT / name).read_text()

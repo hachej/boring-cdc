@@ -29,7 +29,7 @@
           "properties": {
             "bytes": {
               "maxLength": 1398102,
-              "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-]{2}|[A-Za-z0-9_-]{3})?$",
+              "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$",
               "type": "string"
             },
             "column_id": {
@@ -262,16 +262,41 @@
                 "type": "integer"
               },
               "type_oid": {
-                "enum": [
-                  17,
-                  2950
-                ],
+                "const": 17,
                 "type": "integer"
               },
               "value": {
                 "maxLength": 1366,
                 "minLength": 2,
-                "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-]{2}|[A-Za-z0-9_-]{3})?$",
+                "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "type_oid",
+              "type_modifier",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "bytes"
+              },
+              "type_modifier": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "type_oid": {
+                "const": 2950,
+                "type": "integer"
+              },
+              "value": {
+                "pattern": "^(?:[A-Za-z0-9_-]{4}){5}[A-Za-z0-9_-][AQgw]$",
                 "type": "string"
               }
             },

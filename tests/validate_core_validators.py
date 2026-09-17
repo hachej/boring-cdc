@@ -47,6 +47,73 @@ class Core(unittest.TestCase):
                 cp = run(*case); self.assertEqual(cp.returncode, 0, cp.stdout + cp.stderr); self.assertEqual(json.loads(cp.stdout)["status"], "pass")
         finally: (valid/"normalized.tmp.json").unlink(missing_ok=True)
 
+    def test_provisional_decisions_require_exact_markers_and_open_state(self):
+        valid = F / "valid"
+        marker = "// M0-" + "PROVISIONAL: boring-cdc-d-synthetic"
+        with tempfile.TemporaryDirectory(dir=ROOT / "tests") as td:
+            path = Path(td) / "decision.json"
+            document = json.loads((valid / "decisions.json").read_text())
+            row = document["decisions"][0]
+            row.pop("approval")
+            row["status"] = "open"
+            row["provisional_markers"] = [marker]
+            path.write_text(json.dumps(document))
+            self.assertEqual(run("decisions", path).returncode, 0)
+            schema = ROOT / "contracts/m0/decisions.schema.json"
+            self.assertEqual(run("schema", path, "--schema", schema).returncode, 0)
+            for mutation, code, schema_code in (
+                (lambda value: value.update(status="approved"), "E_PROVISIONAL_STATE", "E_SCHEMA_ONE_OF"),
+                (lambda value: value.update(provisional_markers=[marker + "/forged"]), "E_PROVISIONAL_MARKER", "E_SCHEMA_PATTERN"),
+                (lambda value: value.update(provisional_markers=[marker, marker]), "E_PROVISIONAL_MARKER", "E_SCHEMA_UNIQUE_ITEMS"),
+            ):
+                hostile = json.loads(json.dumps(document))
+                mutation(hostile["decisions"][0])
+                path.write_text(json.dumps(hostile))
+                self.assertCode(run("decisions", path), code)
+                self.assertCode(run("schema", path, "--schema", schema), schema_code)
+            approved_without_approval = json.loads(json.dumps(document))
+            approved_without_approval["decisions"][0].update(status="approved")
+            approved_without_approval["decisions"][0].pop("provisional_markers")
+            path.write_text(json.dumps(approved_without_approval))
+            self.assertCode(run("schema", path, "--schema", schema), "E_SCHEMA_ONE_OF")
+
+    def test_decision_schema_isolates_state_contradictions(self):
+        valid = F / "valid"
+        schema = ROOT / "contracts/m0/decisions.schema.json"
+        approved = json.loads((valid / "decisions.json").read_text())
+        open_decision = json.loads(json.dumps(approved))
+        open_decision["decisions"][0]["status"] = "open"
+        open_decision["decisions"][0].pop("approval")
+
+        with tempfile.TemporaryDirectory(dir=ROOT / "tests") as td:
+            path = Path(td) / "decision.json"
+            for control in (approved, open_decision):
+                path.write_text(json.dumps(control))
+                self.assertEqual(run("schema", path, "--schema", schema).returncode, 0)
+
+            open_with_approval = json.loads(json.dumps(open_decision))
+            open_with_approval["decisions"][0]["approval"] = approved["decisions"][0]["approval"]
+            approved_with_marker = json.loads(json.dumps(approved))
+            approved_with_marker["decisions"][0]["provisional_markers"] = ["// M0-" + "PROVISIONAL: boring-cdc-d-synthetic"]
+            approved_without_approval = json.loads(json.dumps(approved))
+            approved_without_approval["decisions"][0].pop("approval")
+
+            for name, hostile in (
+                ("open_with_approval", open_with_approval),
+                ("approved_with_provisional_marker", approved_with_marker),
+                ("approved_without_approval", approved_without_approval),
+            ):
+                with self.subTest(name=name):
+                    path.write_text(json.dumps(hostile))
+                    cp = run("schema", path, "--schema", schema)
+                    self.assertNotEqual(cp.returncode, 0, cp.stdout + cp.stderr)
+                    self.assertFalse(cp.stderr)
+                    findings = json.loads(cp.stdout)["findings"]
+                    self.assertEqual(
+                        [(item["code"], item["pointer"]) for item in findings],
+                        [("E_SCHEMA_ONE_OF", "/decisions/0")],
+                    )
+
     def test_empty_skeletons_valid_but_not_complete(self):
         with tempfile.TemporaryDirectory(dir=ROOT/"tests") as td:
             root = Path(td)

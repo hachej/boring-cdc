@@ -116,19 +116,39 @@
         },
         "requirements": {
           "type": "string"
+        },
+        "status": {
+          "type": "string"
         }
       },
       "required": [
         "architecture",
         "owner_cards",
         "owner_confirmation_date",
-        "requirements"
+        "requirements",
+        "status"
       ],
       "type": "object"
     },
     "consumes": {
       "additionalProperties": false,
       "properties": {
+        "compose": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "sha256": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "type": "object"
+        },
         "confirmation": {
           "additionalProperties": false,
           "properties": {
@@ -229,7 +249,8 @@
         "confirmation",
         "event_contract",
         "failure_policy",
-        "promotion"
+        "promotion",
+        "compose"
       ],
       "type": "object"
     },
@@ -241,6 +262,9 @@
             "type": "string"
           },
           "type": "array"
+        },
+        "capture_epoch_encoding": {
+          "type": "string"
         },
         "cross_epoch_comparison": {
           "type": "string"
@@ -285,7 +309,8 @@
         "key_change",
         "source_order",
         "stored_payload_hash_inputs",
-        "toast"
+        "toast",
+        "capture_epoch_encoding"
       ],
       "type": "object"
     },
@@ -374,6 +399,9 @@
         "retirement"
       ],
       "type": "object"
+    },
+    "fixture_fault_abi": {
+      "type": "string"
     },
     "fixture_ids": {
       "items": {
@@ -482,7 +510,7 @@
             "fsync_after_insert": {
               "type": "integer"
             },
-            "fsync_directories": {
+            "fsync_part_directory": {
               "type": "integer"
             },
             "insert_deduplicate": {
@@ -498,7 +526,7 @@
           "required": [
             "async_insert",
             "fsync_after_insert",
-            "fsync_directories",
+            "fsync_part_directory",
             "insert_deduplicate",
             "insert_quorum",
             "wait_for_async_insert"
@@ -609,6 +637,9 @@
         "image": {
           "type": "string"
         },
+        "image_platform_digest": {
+          "type": "string"
+        },
         "platform": {
           "type": "string"
         },
@@ -628,7 +659,8 @@
         "platform",
         "rust_client_crate",
         "server",
-        "topology"
+        "topology",
+        "image_platform_digest"
       ],
       "type": "object"
     },
@@ -670,6 +702,12 @@
         "selector"
       ],
       "type": "object"
+    },
+    "provisional_markers": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
     },
     "result_schema": {
       "type": "string"
@@ -727,7 +765,9 @@
     "promotion",
     "result_schema",
     "schema_evolution",
-    "schema_version"
+    "schema_version",
+    "fixture_fault_abi",
+    "provisional_markers"
   ],
   "type": "object"
 }

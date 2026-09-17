@@ -13,7 +13,11 @@ for name in paths:
  for n,line in enumerate(text.splitlines(),1):
   if not pat.search(line):continue
   synthetic = ((name == 'tests/test_context.py' and 'postgres://user:supersecret@example.invalid/db' in line) or (name == 'tests/validate_knowledge.py' and 'postgresql://user:pw@host/db' in line) or (name == 'src/m2_ownership.rs' and 'postgres://admin:seeded-secret@host/db' in line) or (name in ('scripts/lib/core_validator.py','scripts/lib/knowledge_validator.py','scripts/validate/scaffold_secrets.sh') and ('SECRET = re.compile' in line or 'pat=re.compile' in line)) or (name in ('src/failure_policy.rs','scripts/validate/failure_policy.py') and 'rearm-token=' in line))
-  if synthetic or (name in ('compose.yaml','.env.example') and 'POSTGRES_PASSWORD_FILE' in line):continue
+  approved_file_reference = (name,line.strip()) in {
+   ('compose.yaml','POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password'),
+   ('.env.example','BORING_CDC_POSTGRES_PASSWORD_FILE=.secrets/postgres_password'),
+  }
+  if synthetic or approved_file_reference:continue
   hits.append(f'{name}:{n}')
 assert not hits,hits
 print('{"status":"pass","scope":"all tracked non-evidence files","secrets_found":0}')

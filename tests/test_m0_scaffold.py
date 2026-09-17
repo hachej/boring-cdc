@@ -65,6 +65,77 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIsNone(m0_scaffold.evidence_path(evidence_root, "/etc/passwd"))
         self.assertIsNone(m0_scaffold.evidence_path(evidence_root, "Cargo.lock"))
 
+    def test_scaffold_rejects_unauthorized_provisional_marker(self):
+        marker = ROOT / "config" / ".test-provisional-marker"
+        marker.write_text("// M0-" + "PROVISIONAL: boring-cdc-d-values\n")
+        try:
+            result = subprocess.run(
+                ["scripts/validate/m0_scaffold.sh"], cwd=ROOT, text=True, capture_output=True
+            )
+        finally:
+            marker.unlink(missing_ok=True)
+        self.assertNotEqual(result.returncode, 0)
+        findings = json.loads(result.stdout)["findings"]
+        self.assertIn(
+            "provisional-marker-unauthorized:config/.test-provisional-marker:boring-cdc-d-values",
+            findings,
+        )
+
+    def test_scaffold_rejects_malformed_marker_in_authorized_path(self):
+        marker = ROOT / "config" / ".test-authorized-marker"
+        relative = str(marker.relative_to(ROOT))
+        m0_scaffold.PROVISIONAL_AUTHORITIES[relative] = {"boring-cdc-d-values"}
+        try:
+            for value in (
+                "// M0-" + "PROVISIONAL\n",
+                "M0-" + "PROVISIONAL: boring-cdc-d-values\n",
+                "# M0-" + "PROVISIONAL: boring-cdc-d-values\n",
+                "// M0-" + "PROVISIONAL: boring-cdc-d-values/forged\n",
+            ):
+                marker.write_text(value)
+                self.assertEqual(
+                    [f"provisional-marker-malformed:{relative}"],
+                    m0_scaffold.provisional_marker_errors([marker]),
+                )
+        finally:
+            marker.unlink(missing_ok=True)
+            m0_scaffold.PROVISIONAL_AUTHORITIES.pop(relative, None)
+
+    def test_scaffold_rejects_forged_template_suffix(self):
+        marker = ROOT / "config" / ".test-template-marker"
+        relative = str(marker.relative_to(ROOT))
+        m0_scaffold.PROVISIONAL_AUTHORITIES[relative] = {"boring-cdc-d-values"}
+        m0_scaffold.PROVISIONAL_TEMPLATE_PATHS.add(relative)
+        try:
+            marker.write_text("// M0-" + "PROVISIONAL: {decision}/forged\n")
+            self.assertEqual(
+                [f"provisional-marker-malformed:{relative}"],
+                m0_scaffold.provisional_marker_errors([marker]),
+            )
+        finally:
+            marker.unlink(missing_ok=True)
+            m0_scaffold.PROVISIONAL_AUTHORITIES.pop(relative, None)
+            m0_scaffold.PROVISIONAL_TEMPLATE_PATHS.discard(relative)
+
+    def test_secret_scan_does_not_exempt_mixed_password_file_line(self):
+        path = ROOT / "compose.yaml"
+        original = path.read_bytes()
+        hostile = b"\n# POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password " + b"pass" + b"word='creden" + b"tial'\n"
+        path.write_bytes(original + hostile)
+        try:
+            result = subprocess.run(
+                ["scripts/validate/scaffold_secrets.sh"], cwd=ROOT, text=True, capture_output=True
+            )
+        finally:
+            path.write_bytes(original)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("compose.yaml", result.stderr)
+
+    def test_package_excludes_internal_metadata_and_evidence(self):
+        out = json.loads(run("scripts/validate/scaffold_package.sh").stdout)
+        self.assertEqual(out["status"], "pass")
+        self.assertFalse(out["sensitive_repository_metadata"])
+
     def test_m1_completion_rejects_reintroduced_provisional_marker(self):
         marker = ROOT / "config" / ".test-provisional-marker"
         marker.write_text("M0-" + "PROVISIONAL")

@@ -37,24 +37,28 @@
   "authority": {
     "architecture": "docs/PLAN.md \u00a7\u00a79.3/16/19",
     "owner_cards": [
-      "5a994cfd",
-      "765bd3b2"
+      "59a63169"
     ],
     "owner_confirmation_date": "2026-09-10",
-    "requirements": "docs/REQUIREMENTS.md \u00a76"
+    "requirements": "docs/REQUIREMENTS.md \u00a76",
+    "status": "provisional engineering artifact using card-recommended values; does not close decision Beads"
   },
   "consumes": {
+    "compose": {
+      "path": "contracts/m0/compose.json",
+      "sha256": "2ee8964ab1d5c065f7df9020d5511e74a8df273845c23a302e2b95639829cfd4"
+    },
     "confirmation": {
       "cards": [
         "5a994cfd",
         "765bd3b2"
       ],
       "date": "2026-09-10",
-      "scope": "every pre-filled RECOMMENDED default accepted exactly"
+      "scope": "ClickHouse artifact design accepted; value/key/Compose recommendations remain provisional under owner card 59a63169"
     },
     "event_contract": {
       "path": "contracts/event/event-format.json",
-      "sha256": "ec09bf8ab2df2fd9fc035ee6021297a0b5c31551cc183c2d26e4d91f0a918547"
+      "sha256": "ab44eb632693bb2eeef84b8a030452f730d5e00a1d08d56bc86c221a213eaf1f"
     },
     "failure_policy": {
       "base_delay_ms": 250,
@@ -68,7 +72,7 @@
     "promotion": {
       "confirmed_projection_source": "contracts/storage/storage-model.json",
       "decision_id": "boring-cdc-d-promotion",
-      "source_sha256": "45dc34e9b1e90fe60a626bbbde8707487c67a804c285c03ad5e2128878f1713a"
+      "source_sha256": "8f09ff584867f45a7bb122f1142eab9afd17fc0384a0e711e665985d0b29e1ff"
     }
   },
   "event_projection": {
@@ -79,6 +83,7 @@
       "relation_schema_fingerprint",
       "canonical_key"
     ],
+    "capture_epoch_encoding": "u64 event ABI maps directly to ClickHouse UInt64; no textual or hash conversion",
     "cross_epoch_comparison": "forbidden",
     "dedup": "same connector_event_id and payload_hash collapses logically; same ID with multiple hashes blocks",
     "delete": "latest event delete hides row but tombstone remains in history",
@@ -159,6 +164,7 @@
     "ddl": "contracts/clickhouse/ddl.sql",
     "retirement": "contracts/clickhouse/retire-generation.sql"
   },
+  "fixture_fault_abi": "Each fault operation is an executor command over the JSON value at arguments.setup_pointer; replacement commands also carry value. JSON pointers are fixture-root absolute, must resolve, and unknown operations or targets fail closed.",
   "fixture_ids": [
     "SCN-M0-CH-DUPLICATE-IDENTICAL",
     "SCN-M0-CH-DUPLICATE-CONFLICT",
@@ -252,7 +258,7 @@
     "settings": {
       "async_insert": 0,
       "fsync_after_insert": 1,
-      "fsync_directories": 1,
+      "fsync_part_directory": 1,
       "insert_deduplicate": 0,
       "insert_quorum": 1,
       "wait_for_async_insert": 1
@@ -288,7 +294,8 @@
   "owner_bead": "boring-cdc-m0-ch-model",
   "pins": {
     "client_protocol": "native",
-    "image": "clickhouse/clickhouse-server@sha256:78b6f08a2520267329a21893b70d7a43f90eaab2c5573b513e5afb7084e33c21",
+    "image": "docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f",
+    "image_platform_digest": "sha256:78b6f0863688458b229b597f6a1bbf891855a01cf59c3f3dbe66428571c518c9",
     "platform": "linux/amd64",
     "rust_client_crate": "clickhouse 0.13.3",
     "server": "25.8.2.29",
@@ -310,6 +317,12 @@
     "same_fence_same_candidate": "idempotent",
     "selector": "append-only generation_selectors_v1; canonical queries resolve unique greatest promotion_fence"
   },
+  "provisional_markers": [
+    "// M0-PROVISIONAL: boring-cdc-d-compose",
+    "// M0-PROVISIONAL: boring-cdc-d-keys",
+    "// M0-PROVISIONAL: boring-cdc-d-values",
+    "// M0-PROVISIONAL: boring-cdc-d-values.1"
+  ],
   "result_schema": "contracts/clickhouse/result.schema.json",
   "schema_evolution": {
     "active_backfill": "invalidate candidate and require fresh generation",
