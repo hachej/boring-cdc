@@ -221,7 +221,7 @@
       "id": "ART-M0-EVENT-FORMAT-DOC",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "docs/EVENT_FORMAT.md",
-      "sha256": "628480c5a7661ed0c413b88a381618917167466948d0cc8f098b8f99aa8a04ad",
+      "sha256": "53e7f1a0ef46287039371775ee34b8569a740da6173fd1c81b7aaff33d0ba5da",
       "status": "complete"
     },
     {
@@ -508,14 +508,14 @@
       "id": "ART-M0-SUPPORTED-KEYS-FIXTURE",
       "owner_bead": "boring-cdc-d-keys",
       "path": "fixtures/m0/decisions/boring-cdc-d-keys.json",
-      "sha256": "0bd930b25db7ef87c9902ed596cd2d45f6d42b73dfcf098c2e1e0b25a0468df3",
+      "sha256": "069bea2025a389c35aa79a49e41a2d5e52b0bb652339a504f892197da914eaa2",
       "status": "complete"
     },
     {
       "id": "ART-M0-SUPPORTED-KEYS-PROBE",
       "owner_bead": "boring-cdc-d-keys",
       "path": "artifacts/m0/decisions/boring-cdc-d-keys/fixture-run.jsonl",
-      "sha256": "9b58057ef4bbfd6d38ae5c23f8ff1b9d85ebbb5f664202d8b68cfd070dd27b22",
+      "sha256": "4702036c6ad29a406eb25fd705dbfad8d95cbc3aa17ac1f58d0cfad5efe6a762",
       "status": "complete"
     },
     {

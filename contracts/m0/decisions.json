@@ -136,7 +136,7 @@
         "boring-cdc-m1-ordering",
         "boring-cdc-m3-planner"
       ],
-      "fixture_sha256": "0bd930b25db7ef87c9902ed596cd2d45f6d42b73dfcf098c2e1e0b25a0468df3",
+      "fixture_sha256": "069bea2025a389c35aa79a49e41a2d5e52b0bb652339a504f892197da914eaa2",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-keys.json",
       "id": "DEC-SUPPORTED-KEYS",
       "owner_bead": "boring-cdc-d-keys",

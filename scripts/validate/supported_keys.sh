@@ -42,6 +42,7 @@ ORDER_GROUPS=[
  {'case_id':'timestamptz-order','ordered_components':[('timestamptz','-infinity'),('timestamptz','1999-12-31T23:59:59.999999Z'),('timestamptz','2000-01-01T00:00:00.000001Z'),('timestamptz','infinity')]},
  {'case_id':'c-text-byte-order','ordered_components':[('text',''),('text','A'),('text','a'),('text','á')]},
  {'case_id':'bpchar-order','ordered_components':[('bpchar',''),('bpchar','A'),('bpchar','a')]},
+ {'case_id':'bpchar-trailing-space-equivalence','equivalent_components':[('bpchar','x'),('bpchar','x  ')]},
  {'case_id':'bytea-order','ordered_components':[('bytea',''),('bytea','00'),('bytea','ff')]},
  {'case_id':'composite-prefix-order','ordered_tuples':[[('int4',1),('text','z')],[('int4',2),('text','a')]]}]
 FAILURES=[
@@ -110,7 +111,11 @@ try:
  if [(x['case_id'],x['input'],x['expected_code']) for x in spec['failure_vectors']]!=FAILURES: fail()
  expected_golden=[{'case_id':case,'components':[{'type':n,'value':v} for n,v in items],'encoded_hex':encoded_tuple(items).hex(),'sha256':hashlib.sha256(encoded_tuple(items)).hexdigest()} for case,items in GOLDEN_INPUTS]
  if spec['golden_vectors']!=expected_golden: fail()
- expected_order=[{'case_id':x['case_id'],'ordered_components':[{'type':n,'value':v} for n,v in x['ordered_components']]} if 'ordered_components' in x else {'case_id':x['case_id'],'ordered_tuples':[[{'type':n,'value':v} for n,v in row] for row in x['ordered_tuples']]} for x in ORDER_GROUPS]
+ expected_order=[]
+ for x in ORDER_GROUPS:
+  if 'ordered_components' in x: expected_order.append({'case_id':x['case_id'],'ordered_components':[{'type':n,'value':v} for n,v in x['ordered_components']]})
+  elif 'equivalent_components' in x: expected_order.append({'case_id':x['case_id'],'equivalent_components':[{'type':n,'value':v} for n,v in x['equivalent_components']]})
+  else: expected_order.append({'case_id':x['case_id'],'ordered_tuples':[[{'type':n,'value':v} for n,v in row] for row in x['ordered_tuples']]})
  if spec['order_vectors']!=expected_order: fail()
  from decimal import Decimal
  from datetime import date,datetime
@@ -125,13 +130,16 @@ try:
    if value=='infinity': return (1<<127)-1
    delta=datetime.fromisoformat(value.removesuffix('Z'))-datetime(2000,1,1)
    return (delta.days*86400+delta.seconds)*1_000_000+delta.microseconds
-  if name in ('text','varchar','bpchar'): return value.encode()
+  if name in ('text','varchar'): return value.encode()
+  if name=='bpchar': return value.encode().rstrip(b' ')
   if name=='bytea': return bytes.fromhex(value)
   raise ValueError('missing comparator')
  for group in ORDER_GROUPS:
-  rows=group.get('ordered_components') or group.get('ordered_tuples')
+  rows=group.get('ordered_components') or group.get('equivalent_components') or group.get('ordered_tuples')
   observed=[order_value(row) if isinstance(row,tuple) else tuple(order_value(item) for item in row) for row in rows]
-  if any(left>=right for left,right in zip(observed,observed[1:])): fail()
+  if 'equivalent_components' in group:
+   if len(set(observed))!=1: fail()
+  elif any(left>=right for left,right in zip(observed,observed[1:])): fail()
  enc=spec['canonical_encoding']
  if enc!={'arity':{'maximum':8,'minimum':1,'order':'effective replica identity index order','width':'u8'},'component_frame':['PostgreSQL OID as u32 big-endian','canonical payload length as u32 big-endian','canonical payload bytes'],'numeric_payload':['ASCII sign (+ or -)','signed i16 big-endian power-of-ten exponent applied to digit integer','u8 ASCII digit count','minimal ASCII digits; no leading or trailing zero except canonical zero +, exponent 0, digit 0'],'temporal_epoch':'2000-01-01T00:00:00; date uses signed i32 days and timestamps use signed i64 microseconds; PostgreSQL -infinity/+infinity use the minimum/maximum signed payload','tuple_frame':['encoding version as u8','arity as u8','components in index order'],'version':1}: fail()
  if spec['ordering']!={'collation':'PostgreSQL C for text, varchar, and bpchar','direction':'ascending','nulls':'forbidden','rule':'lexicographic PostgreSQL B-tree order over typed components; compare component values using their admitted PostgreSQL ascending operator class, then the next component'}: fail()
