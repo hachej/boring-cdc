@@ -1296,10 +1296,13 @@ impl BoundedRangeSource for PostgresRangeSource {
         let timeout = budget.max_duration.as_millis().max(1);
         let set_timeout_sql = format!("SET LOCAL statement_timeout={timeout}");
         let keys = self.key_columns.join(",");
+        let metadata_limit = budget
+            .max_rows
+            .checked_add(1)
+            .ok_or(PlannerError::Limit("M3_CHUNK_ROWS"))?;
         let meta_sql = format!(
-            "SELECT {keys},octet_length(convert_to(to_jsonb(t)::text,'UTF8')) AS payload_bytes FROM {} t{where_clause} ORDER BY {keys} LIMIT {}",
-            self.table,
-            budget.max_rows + 1
+            "SELECT {keys},octet_length(convert_to(to_jsonb(t)::text,'UTF8')) AS payload_bytes FROM {} t{where_clause} ORDER BY {keys} LIMIT {metadata_limit}",
+            self.table
         );
         let key_column_name_bytes = self.key_columns.iter().map(String::len).sum();
         let (metadata_preflight, metadata_receive_capacity) = metadata_preflight_peak(
