@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS m3_planner_runs(
  max_concurrency INTEGER NOT NULL CHECK(max_concurrency>0), revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0));
 CREATE TABLE IF NOT EXISTS m3_canonical_import_proofs(
  import_id TEXT PRIMARY KEY REFERENCES bootstrap_imports(import_id) ON DELETE CASCADE,
- configuration_fingerprint TEXT NOT NULL);
+ destination_id TEXT NOT NULL REFERENCES destinations(destination_id), capture_epoch TEXT NOT NULL,
+ generation INTEGER NOT NULL CHECK(generation>0), configuration_fingerprint TEXT NOT NULL);
 CREATE TRIGGER IF NOT EXISTS m3_import_proof_update_immutable BEFORE UPDATE ON m3_canonical_import_proofs
  WHEN EXISTS(SELECT 1 FROM bootstrap_imports i JOIN bootstrap_anchors a ON a.bootstrap_intent_id=i.intent_id WHERE i.import_id=OLD.import_id AND a.state='complete')
  BEGIN SELECT RAISE(ABORT,'anchor destination binding is immutable'); END;
@@ -408,7 +409,7 @@ impl PlannerStore {
             return Err(PlannerError::Conflict("M3_CANONICAL_IMPORT_PROOF_MISSING"));
         }
         let bound = tx.execute(
-            "INSERT INTO m3_canonical_import_proofs(import_id,configuration_fingerprint) SELECT ?1,r.configuration_fingerprint FROM m3_bootstrap_runtime r JOIN destinations d ON d.destination_id=?3 AND d.capture_epoch=?4 AND d.generation=?5 AND d.configuration_fingerprint=r.configuration_fingerprint WHERE r.intent_id=?2",
+            "INSERT INTO m3_canonical_import_proofs(import_id,destination_id,capture_epoch,generation,configuration_fingerprint) SELECT ?1,d.destination_id,d.capture_epoch,d.generation,r.configuration_fingerprint FROM m3_bootstrap_runtime r JOIN destinations d ON d.destination_id=?3 AND d.capture_epoch=?4 AND d.generation=?5 AND d.configuration_fingerprint=r.configuration_fingerprint WHERE r.intent_id=?2",
             params![import_id,input.bootstrap_intent_id,input.destination_id,input.capture_epoch,input.generation],
         )?;
         if bound != 1 {
