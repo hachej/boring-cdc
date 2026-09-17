@@ -1,1 +1,1 @@
-{"atomic_chunk_event_commit":true,"bounded_reader_released":true,"generation_state":"invalidated","keyset_only":false,"limits_respected":true,"stale_completion_rejected":true}
+{"atomic_chunk_event_commit":true,"bounded_reader_released":true,"generation_state":"invalidated","keyset_only":false,"remaining_claims":0,"snapshot_events":1,"stale_completion_rejected":true}
