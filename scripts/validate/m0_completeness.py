@@ -19,7 +19,7 @@ EVIDENCE = ROOT / "artifacts/boring-cdc-m0-complete/gate/evidence.json"
 SUMMARY = EVIDENCE.with_name("completion-summary.json")
 
 # primary manifest ID -> (artifact registry ID, canonical owner)
-EXPECTED_ARTIFACTS_SHA256 = "a05434d21deb1982df64d36c9fd0633d173d6503eecd6043c3fb0f91911dc9f2"
+EXPECTED_ARTIFACTS_SHA256 = "19dbb98a243f15838dcdd011a4469ec8862dd31dbca1f497571a4854239b3bf1"
 
 PRIMARY_ARTIFACTS = {
     "ART-M0-ARCHIVE-MODEL": ("ART-M0-ARCHIVE-MODEL", "boring-cdc-m0-archive-model"),
@@ -37,7 +37,6 @@ DECISION_OWNERS = {
     "boring-cdc-d-keys",
     "boring-cdc-d-license",
     "boring-cdc-d-owner",
-    "boring-cdc-d-pg-protocol",
     "boring-cdc-d-security",
     "boring-cdc-d-sqlite",
     "boring-cdc-d-values",
@@ -106,7 +105,6 @@ DECISION_DOMAIN_COMMANDS = {
     "boring-cdc-d-keys": ("scripts/validate/supported_keys.sh",),
     "boring-cdc-d-license": ("scripts/validate/license.sh",),
     "boring-cdc-d-owner": ("scripts/fixtures/validate_m0_repository_identity.py",),
-    "boring-cdc-d-pg-protocol": ("scripts/validate/postgres_protocol.sh",),
     "boring-cdc-d-security": ("scripts/validate/security_exposure.sh",),
     "boring-cdc-d-sqlite": ("scripts/validate/sqlite_durability.sh",),
     "boring-cdc-d-values": ("scripts/validate/supported_values.sh",),

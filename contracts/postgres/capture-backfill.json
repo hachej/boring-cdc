@@ -337,13 +337,15 @@
     ],
     "streaming": false,
     "transport": {
-      "adapter": "boring-cdc-pgwire-v1",
-      "crate": "pgwire-replication",
-      "feature": "tls-rustls,scram",
-      "implementation_boundary": "use pinned crate CopyBoth framing/auth/TLS and public status encoder; owned adapter encodes exact START_REPLICATION query and always passes false for outgoing reply_requested",
+      "adapter": "boring-cdc-pg-walstream-v1",
+      "crate": "pg_walstream",
+      "crate_sha256": "4cb204bf29c07ccaedb26f3c6c87fd02fc7cb99021bf7b40f339ddb3aae7fcc2",
+      "feature": "rustls-tls",
+      "implementation_boundary": "use pinned PgReplicationConnection CopyBoth read/status primitives; owned scheduler encodes exact START_REPLICATION query and always passes false for outgoing reply_requested",
       "required_capability": "incremental bidirectional logical-replication CopyBoth with standby-status writes; no complete-stream collection",
-      "stock_high_level_worker": "forbidden: cannot encode frozen streaming/two_phase/origin options and replies to requested keepalive with outgoing reply_requested=true",
-      "version": "0.4.0"
+      "source": "registry+https://github.com/rust-lang/crates.io-index",
+      "stock_high_level_worker": "forbidden: scheduler and durable feedback boundary remain owned by boring-cdc; use connection primitives directly",
+      "version": "0.8.1"
     },
     "tuple_mode": "text",
     "two_phase": false,

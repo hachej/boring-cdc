@@ -34,6 +34,7 @@ def validate():
  cargo=(ROOT/'Cargo.toml').read_text(); req('pg_walstream = { version = "=0.8.1", default-features = false, features = ["rustls-tls"] }' in cargo,'E_CARGO','Cargo transport differs')
  article=(ROOT/'src/article1_capture.rs').read_text(); req('("messages", MESSAGES)' in article and 'pub const MESSAGES: &str = "true";' in article,'E_ARTICLE_OPTIONS','Article 1 option set differs')
  req(article.count('ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol')==4,'E_ARTICLE_BOUNDARY','only publication/slot/table literals may remain provisional')
+ pg=load(ROOT/'contracts/postgres/capture-backfill.json')['protocol']['transport']; req(pg.get('crate')=='pg_walstream' and pg.get('version')=='0.8.1' and pg.get('crate_sha256')==t.get('crate_sha256'),'E_PG_CONSUMER','PostgreSQL contract transport differs')
  return findings
 if __name__=='__main__':
  fs=validate(); result={'schema_version':'postgres-protocol-validation/v1','status':'pass' if not fs else 'fail','findings':fs}
@@ -42,6 +43,6 @@ if __name__=='__main__':
   out=ROOT/'artifacts/m0/decisions/boring-cdc-d-pg-protocol'; out.mkdir(parents=True,exist_ok=True)
   fixture=load(F); lines=[json.dumps({'fixture_id':x['fixture_id'],'status':'pass','class':x['expected']['class'],'code':x['expected']['code']},sort_keys=True,separators=(',',':')) for x in fixture['cases']]
   (out/'fixture-run.jsonl').write_text('\n'.join(lines)+'\n')
-  result.update({'owner_bead':'boring-cdc-d-pg-protocol','git_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'inputs':{str(p.relative_to(ROOT)):sha(p) for p in [C,F,ROOT/'contracts/m0/failure-policy.json',ROOT/'Cargo.lock',ROOT/'Cargo.toml',ROOT/'src/article1_capture.rs']},'fixture_count':len(fixture['cases']),'runtime_observed':False,'redaction':'pass: no DSN, credentials, source identifiers, or payloads'})
+  result.update({'owner_bead':'boring-cdc-d-pg-protocol','git_commit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(),'inputs':{str(p.relative_to(ROOT)):sha(p) for p in [C,F,ROOT/'contracts/m0/failure-policy.json',ROOT/'Cargo.lock',ROOT/'Cargo.toml',ROOT/'src/article1_capture.rs',ROOT/'contracts/postgres/capture-backfill.json']},'fixture_count':len(fixture['cases']),'runtime_observed':False,'redaction':'pass: no DSN, credentials, source identifiers, or payloads'})
   (out/'evidence.json').write_text(json.dumps(result,sort_keys=True,separators=(',',':'))+'\n')
  print(json.dumps(result,sort_keys=True,separators=(',',':'))); raise SystemExit(bool(fs))

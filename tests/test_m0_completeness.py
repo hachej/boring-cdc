@@ -94,7 +94,6 @@ class M0CompletenessTests(unittest.TestCase):
             "boring-cdc-d-keys": ("scripts/validate/supported_keys.sh",),
             "boring-cdc-d-license": ("scripts/validate/license.sh",),
             "boring-cdc-d-owner": ("scripts/fixtures/validate_m0_repository_identity.py",),
-            "boring-cdc-d-pg-protocol": ("scripts/validate/postgres_protocol.sh",),
             "boring-cdc-d-security": ("scripts/validate/security_exposure.sh",),
             "boring-cdc-d-sqlite": ("scripts/validate/sqlite_durability.sh",),
             "boring-cdc-d-values": ("scripts/validate/supported_values.sh",),

@@ -398,8 +398,10 @@ def validate():
     if protocol["option_order"] != required_options or any(value is not False for value in (protocol["binary"], protocol["streaming"], protocol["two_phase"])) or protocol["origin"] != "any":
         finding(findings, "E_PROTOCOL_OPTIONS", "protocol", "logical-replication options changed")
     transport = protocol["transport"]
-    if (transport["crate"], transport["version"], transport["feature"], transport.get("adapter")) != ("pgwire-replication", "0.4.0", "tls-rustls,scram", "boring-cdc-pgwire-v1"):
+    if (transport["crate"], transport["version"], transport["feature"], transport.get("adapter"), transport.get("crate_sha256")) != ("pg_walstream", "0.8.1", "rustls-tls", "boring-cdc-pg-walstream-v1", "4cb204bf29c07ccaedb26f3c6c87fd02fc7cb99021bf7b40f339ddb3aae7fcc2"):
         finding(findings, "E_TRANSPORT", "protocol/transport", "CopyBoth transport/adapter pin changed")
+    if transport.get("source") != "registry+https://github.com/rust-lang/crates.io-index":
+        finding(findings, "E_TRANSPORT_SOURCE", "protocol/transport", "transport source identity changed")
     if not transport.get("stock_high_level_worker", "").startswith("forbidden:") or "always passes false" not in transport.get("implementation_boundary", ""):
         finding(findings, "E_TRANSPORT_ADAPTER", "protocol/transport", "stock-worker incompatibility or safe status adapter requirement absent")
     if "START_REPLICATION SLOT" not in protocol["start_replication_template"] or "origin 'any'" not in protocol["start_replication_template"]:
