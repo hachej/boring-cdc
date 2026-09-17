@@ -1,5 +1,5 @@
 {
-  "git_commit": "533926a784e52c56a84318310c88e6caf558ec3c",
+  "git_commit": "c968eb2792d298288f67fe6bd5325be832cdbb62",
   "postgres_image": "docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
   "rustc": "rustc 1.89.0 (29483883e 2025-08-04)"
 }
