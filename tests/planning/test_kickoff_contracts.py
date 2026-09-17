@@ -98,38 +98,24 @@ class KickoffContracts(unittest.TestCase):
                 self.assertEqual(len(counts), 1, barrier)
             for count in counts:
                 self.assertEqual(int(count), len(declared), barrier)
-            blockers = self.blockers(barrier)
-            if terminal in blockers:
-                # Relaunched execution graphs may make the historical terminal
-                # direct proof for completion instead of a successor gate.
-                expected = declared | {terminal}
-            else:
-                expected = declared | ({TERMINALS[milestone - 1]} if milestone else set())
-                self.assertIn(barrier, self.blockers(terminal))
-            self.assertEqual(blockers, expected, barrier)
-            self.assertNotIn(barrier, self.closure(barrier))
-            # Imported execution epics retain parent edges for provenance but
-            # do not retroactively change the canonical planning barrier set.
+            expected = declared | ({TERMINALS[milestone - 1]} if milestone else set())
+            self.assertEqual(self.blockers(barrier), expected, barrier)
+            self.assertIn(barrier, self.blockers(terminal))
+            self.assertNotIn(terminal, self.closure(barrier))
             actual_leaves = {
                 row["id"] for row in self.rows
                 if row["issue_type"] != "epic"
                 and row["id"] not in {barrier, terminal}
-                and not str(row.get("source_repo", "")).startswith("epic-")
                 and any(dep["type"] == "parent-child"
                         and dep["depends_on_id"] == f"boring-cdc-m{milestone}"
                         for dep in row.get("dependencies", []))
             }
-            # Blocking edges and the frozen declaration above are authoritative;
-            # parent-child provenance may be removed by later execution imports.
-            self.assertTrue(actual_leaves <= declared, barrier)
+            self.assertEqual(declared, actual_leaves, barrier)
 
     def test_release_covers_every_open_executing_task(self):
         covered = self.closure(TERMINALS[-1]) | {TERMINALS[-1]}
         for row in self.rows:
-            # The shared ledger imports execution-epic worktrees with their own
-            # release graphs. This planning assertion governs the canonical root.
-            if (row["status"] != "closed" and row["issue_type"] != "epic"
-                    and row["id"] != REPAIR and row.get("source_repo") == "boring-cdc"):
+            if row["status"] != "closed" and row["issue_type"] != "epic" and row["id"] != REPAIR:
                 self.assertIn(row["id"], covered, row["id"])
         self.assertIn(SERIES, covered)
 
