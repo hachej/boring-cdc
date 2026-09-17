@@ -14,7 +14,7 @@ synthetic_line_sha256 = {
 hits=[]
 for name in paths:
  p=pathlib.Path(name)
- if not p.is_file() or name.startswith('.beads/') or name.startswith('artifacts/'): continue
+ if not p.is_file() or name.startswith(('.beads/','artifacts/','vendor/')): continue
  try:text=p.read_text()
  except UnicodeDecodeError:continue
  for n,line in enumerate(text.splitlines(),1):
