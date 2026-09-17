@@ -1,0 +1,13 @@
+{
+  "schema_version": "boring-cdc/m3-bootstrap-cases/v1",
+  "owner_bead": "boring-cdc-m3-bootstrap",
+  "cases": [
+    {"scenario_id":"SCN-M3-BOOTSTRAP-INTENT-BEFORE-SLOT","unit_test":"intent_is_durable_before_export_and_floor_is_separate","expected":"prepared intent precedes floor/token transaction"},
+    {"scenario_id":"SCN-M3-BOOTSTRAP-IMPORT-GATE","unit_test":"importer_acknowledgements_gate_exporter_release","expected":"all exact-snapshot imports durable before release"},
+    {"scenario_id":"SCN-M3-BOOTSTRAP-FEEDBACK-HOLD","unit_test":"pending_imports_hold_feedback","expected":"later durable WAL is not feedback eligible"},
+    {"scenario_id":"SCN-M3-BOOTSTRAP-INVALIDATE","unit_test":"invalidation_atomically_releases_feedback_gate","expected":"snapshot non-promotable and durable WAL gate open atomically"},
+    {"scenario_id":"SCN-M3-BOOTSTRAP-LOST-TOKEN","unit_test":"lost_response_never_recreates_or_drops_slot","expected":"ambiguous then proof-based retained-slot path"},
+    {"scenario_id":"SCN-M3-BOOTSTRAP-CONTINUITY-AMBIGUOUS","unit_test":"ambiguous_continuity_requires_full_reseed","expected":"explicit new-epoch full reseed required"},
+    {"scenario_id":"SCN-M3-BOOTSTRAP-LIVE-SESSIONS","unit_test":"exported_snapshot_uses_distinct_command_idle_sessions","expected":"guard before export; distinct exporter/capture/importer PIDs; first-statement import"}
+  ]
+}
