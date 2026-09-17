@@ -177,35 +177,6 @@ def validate_artifacts(obj, findings, args):
         for i,r in enumerate(rows):
             if isinstance(r,dict) and r.get("status") != "complete": add(findings,"E_ARTIFACT_INCOMPLETE",f"/artifacts/{i}/status","aggregate completeness requires every artifact complete")
 
-def evidence_milestone(owner: object) -> str | None:
-    """Return the milestone owned by an evidence record, when encoded in its Bead id."""
-    match = re.match(r"^boring-cdc-m([0-9]+)(?:[.-]|$)", str(owner))
-    return match.group(1) if match else None
-
-
-def freshness_path_applies(owner: object, path: str) -> bool:
-    """Keep freshness strict while isolating explicitly milestone-owned paths.
-
-    A later milestone must not invalidate an already certified earlier milestone
-    merely because both live below the broad contracts/scripts/tests roots.
-    Untagged shared paths remain globally binding and same-milestone paths always
-    bind, so this is isolation rather than a freshness waiver.
-    """
-    # The validator is applied live to every record; changing its implementation
-    # must not invalidate the bytes it is currently validating.
-    if path in {"scripts/lib/core_validator.py", "tests/test_m2_completion_freshness.py"}:
-        return False
-    # Completion-barrier machinery certifies leaf evidence but does not produce it.
-    # Keep it binding for the barrier itself, not every leaf in that milestone.
-    if path in {"contracts/coverage/m2.json", "scripts/acceptance/m2_complete.sh", "scripts/lib/freeze_m2_completion_inputs.py"}:
-        return str(owner) == "boring-cdc-m2-complete"
-    milestone = evidence_milestone(owner)
-    if milestone is None:
-        return True
-    tags = set(re.findall(r"(?:^|[/_-])m([0-9]+)(?=[/_.-]|$)", path))
-    return not tags or milestone in tags
-
-
 def validate_evidence(obj, findings, args):
     fields=["schema_version","owner_bead","scenario_id","evidence_profile","evidence_tier","seed","git_commit","commands","source_preservation","cleanup","redaction","tier_proof","result"]
     if not req_obj(obj,fields,findings): return
@@ -223,13 +194,8 @@ def validate_evidence(obj, findings, args):
             bound_paths = ["contracts", "scripts", "tests"]
             if obj.get("owner_bead") == "boring-cdc-m2-journal":
                 bound_paths += ["src", "examples"]
-            changed = subprocess.run(
-                ["git", "diff", "--name-only", commit+"..HEAD", "--", *bound_paths],
-                cwd=ROOT, text=True, capture_output=True, check=True,
-            ).stdout.splitlines()
-            relevant = [path for path in changed if freshness_path_applies(obj.get("owner_bead"), path)]
-            if relevant:
-                add(findings,"E_EVIDENCE_STALE","/git_commit","owned implementation, contract, fixture, src, or example paths changed after the evidence commit: "+", ".join(relevant[:8]))
+            if subprocess.run(["git","diff","--quiet",commit+"..HEAD","--",*bound_paths],cwd=ROOT).returncode != 0:
+                add(findings,"E_EVIDENCE_STALE","/git_commit","owned implementation, contract, fixture, src, or example paths changed after the evidence commit")
     cmds=obj.get("commands")
     if not isinstance(cmds,list) or not cmds: add(findings,"E_COMMANDS_REQUIRED","/commands","at least one command record is required")
     else:
