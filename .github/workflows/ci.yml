@@ -31,3 +31,14 @@ jobs:
         run: |
           cargo install cargo-audit --version 0.22.2 --locked
           cargo audit --deny warnings
+      # Guards the documented operator path. A green unit suite is not evidence the
+      # connector can start: the capture runtime once refused every publication but
+      # the demo fixture's, and init failed closed against a role model nothing
+      # provisioned, while the M2 suite stayed green because its harness faked the
+      # slot-creation floor. This drives the real path end to end and proves
+      # exactly-once against PostgreSQL's own transaction ids after a kill -9.
+      - name: Durable simple case
+        timeout-minutes: 20
+        env:
+          TMPDIR: /var/tmp
+        run: scripts/acceptance/durable_simple_case.sh
