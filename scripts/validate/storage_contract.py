@@ -3,7 +3,7 @@ import hashlib, importlib.util, json, re, sqlite3, subprocess, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; OWNER='boring-cdc-m0-storage-model'
 C=ROOT/'contracts/storage/storage-model.json'; S=ROOT/'contracts/storage/storage-model.schema.json'; Q=ROOT/'contracts/storage/sqlite-schema.sql'; F=ROOT/'fixtures/m0/storage/scenarios.json'; FS=ROOT/'contracts/storage/storage-fixtures.schema.json'; R=ROOT/'contracts/storage/storage-result.schema.json'; E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence.json'; V=Path(__file__); M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
-EXPECTED_CONTRACT_SHA256='fc70dd8474688c9625260b8dc4f1939cb3ea7c05b4d7a1f98f7f26bc2790616f'
+EXPECTED_CONTRACT_SHA256='81185e4b3d81c7344880c797e60d61169a0a77d852d4d0442486f73efea6c9d5'
 EXPECTED_FIXTURES_SHA256='1cd91668950293580ab810814f948501b4dcbe90e40951bfcb99617ee9ef3e8b'
 core_spec=importlib.util.spec_from_file_location('core_validator',ROOT/'scripts/lib/core_validator.py'); core=importlib.util.module_from_spec(core_spec); core_spec.loader.exec_module(core)
 def load(p):
@@ -24,24 +24,23 @@ def validate():
  sf=[]; core.validate_schema_instance(f,fschema,sf,base=FS.parent,root=fschema)
  for x in sf:add(fs,'E_FIXTURE_SCHEMA',x['pointer'],x['message'])
  marker=lambda decision:f'// M0-PROVISIONAL: {decision}'
- markers={marker(x) for x in ('boring-cdc-d-sqlite','boring-cdc-d-admission','boring-cdc-d-archive-durability','boring-cdc-d-compose')}
+ markers={marker(x) for x in ('boring-cdc-d-admission','boring-cdc-d-archive-durability','boring-cdc-d-compose')}
  if set(c['provisional_markers'])!=markers:add(fs,'E_PROVISIONAL','provisional_markers','exact provisional dependency inventory changed')
  expected_nested={
   'admission':{marker(x) for x in ('boring-cdc-d-admission',)},
-  'filesystem':{marker(x) for x in ('boring-cdc-d-sqlite','boring-cdc-d-archive-durability')},
+  'filesystem':{marker(x) for x in ('boring-cdc-d-archive-durability',)},
  }
  if set(c['admission']['provisional'])!=expected_nested['admission']:add(fs,'E_PROVISIONAL','admission/provisional','admission recommendations must retain exact decision markers')
  if set(c['filesystem']['provisional'])!=expected_nested['filesystem']:add(fs,'E_PROVISIONAL','filesystem/provisional','filesystem recommendations must retain exact decision markers')
- if c['sqlite']['provisional']!=marker('boring-cdc-d-sqlite'):add(fs,'E_PROVISIONAL','sqlite/provisional','SQLite recommendation must retain its exact decision marker')
  if c['writer_service']['provisional']!=marker('boring-cdc-d-admission'):add(fs,'E_PROVISIONAL','writer_service/provisional','writer recommendation must retain its exact decision marker')
  if c['ownership_commands']['provisional']!=marker('boring-cdc-d-compose'):add(fs,'E_PROVISIONAL','ownership_commands/provisional','ownership timing recommendations must retain the Compose decision marker')
- if marker('boring-cdc-d-sqlite') not in Q.read_text():add(fs,'E_PROVISIONAL','sqlite-schema.sql','SQLite recommendation must remain provisional')
- if c['authority']['owner_cards']!=['59a63169'] or not c['authority']['status'].startswith('engineering artifact with accepted d-values, d-keys, and d-wal-cap literals'):add(fs,'E_PROVISIONAL','authority','accepted storage literals must remain bound to owner card 59a63169')
+ if marker('boring-cdc-d-sqlite') in Q.read_text() or 'provisional' in c['sqlite']:add(fs,'E_PROVISIONAL','sqlite','approved SQLite literals must not retain their decision marker')
+ if c['authority']['owner_cards']!=['59a63169'] or not c['authority']['status'].startswith('engineering artifact with accepted d-values, d-keys, d-wal-cap, and d-sqlite literals'):add(fs,'E_PROVISIONAL','authority','accepted storage literals must remain bound to owner card 59a63169')
  p=c['sqlite']; expected=('3.45.3',4096,5000,0,16,5000,4096,10000)
  got=(p['version'],p['page_size_bytes'],p['connection_pragmas']['busy_timeout_ms'],p['connection_pragmas']['wal_autocheckpoint_pages'],p['connections']['max_readers'],p['connections']['max_reader_age_ms'],p['connections']['max_reader_pages'],p['actual_connection_attestation']['freshness_ms'])
  if got!=expected:add(fs,'E_SQLITE_LITERALS','sqlite','recommended SQLite literals changed')
  if p['connection_pragmas']['synchronous']!='FULL' or p['persistent_pragmas']['journal_mode']!='WAL' or p['persistent_pragmas']['auto_vacuum']!='INCREMENTAL':add(fs,'E_PRAGMA','sqlite','durability PRAGMAs weakened')
- if p['maintenance']!={'owner':'single run-owned maintenance scheduler','wal_autocheckpoint_pages':0,'checkpoint_mode':'RESTART','checkpoint_cadence_ms':1000,'checkpoint_max_wal_pages_per_attempt':4096,'checkpoint_busy_timeout_ms':50,'incremental_vacuum_max_pages':1024,'incremental_vacuum_cadence_ms':1000,'automatic_full_vacuum':'forbidden','offline_full_vacuum':'stopped and backed-up store only'}:add(fs,'E_MAINTENANCE','sqlite/maintenance','checkpoint/vacuum ownership or bound changed')
+ if p['maintenance']!={'owner':'single run-owned maintenance scheduler','wal_autocheckpoint_pages':0,'checkpoint_mode':'PASSIVE','checkpoint_cadence_ms':30000,'checkpoint_max_wal_pages_per_attempt':1000,'checkpoint_busy_timeout_ms':50,'incremental_vacuum_max_pages':1000,'incremental_vacuum_cadence_ms':1000,'automatic_full_vacuum':'forbidden','offline_full_vacuum':'stopped and backed-up store only'}:add(fs,'E_MAINTENANCE','sqlite/maintenance','checkpoint/vacuum ownership or bound changed')
  allow=[x['type'] for x in c['filesystem']['allowlist']]
  if allow!=['ext4','xfs'] or c['filesystem']['modes']!={'roots':'0700','database_and_sidecars':'0600','spool_intents_manifests':'0600','command_socket':'0600'}:add(fs,'E_FILESYSTEM','filesystem','allowlist or strict modes changed')
  a=c['admission']; lim=a['limits']; mem=a['runtime_memory']

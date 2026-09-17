@@ -109,6 +109,11 @@
       "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-16T06:05:55.752Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "3022fb1386cca155899fb4c3af8f000acd380f384cfe35b99760ed9518b7df23"
+      },
       "executor_beads": [
         "boring-cdc-m1-preflight",
         "boring-cdc-m2-schema",
@@ -116,15 +121,12 @@
         "boring-cdc-m2-pressure",
         "boring-cdc-m2-reconcile"
       ],
-      "fixture_sha256": "5abe431e27f4a0b5193e32038cbe4e3e9fd686b25f7a8594c6befe795927e76b",
+      "fixture_sha256": "1276a522d52539fa8ca5f450055592175450100301157e9aede3de2e3b2754eb",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-sqlite.json",
       "id": "DEC-SQLITE-PHYSICAL-JOURNAL-DURABILITY",
       "owner_bead": "boring-cdc-d-sqlite",
-      "proposed_value": "SQLite 3.45.3; one physical database with logically append-only journal_events; WAL; synchronous=FULL on every admitted durability connection; journal_size_limit=256 MiB; page_size=4096; temp_store=FILE; foreign_keys=ON; secure_delete=FAST; pre-schema auto_vacuum=INCREMENTAL; wal_autocheckpoint=0; busy_timeout=5000 ms; mmap_size=0; at most 16 readers; local ext4/XFS non-network block devices only; PASSIVE checkpoint at 1,000 WAL pages or 30 seconds, RESTART only when pins permit, TRUNCATE maintenance-only; incremental vacuum at most 1,000 pages per cycle; attestation valid 24 hours and invalid on mount/device change; FULL sync of database/WAL and required directory lifecycle; quick_check at startup and daily, integrity_check maintenance-only; SHA-256 exported evidence/backups; no automatic full VACUUM.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-sqlite"
-      ],
-      "status": "open"
+      "proposed_value": "SQLite 3.45.3; one physical database with logically append-only journal_events; WAL; synchronous=FULL on every admitted durability connection; journal_size_limit=256 MiB; page_size=4096; temp_store=FILE; foreign_keys=ON; secure_delete=FAST; pre-schema auto_vacuum=INCREMENTAL; wal_autocheckpoint=0; busy_timeout=5000 ms; mmap_size=0; at most 16 readers, each transaction at most 5,000 ms and 4,096 pages; local ext4/XFS non-network block devices only; PASSIVE checkpoint at 1,000 WAL pages or 30 seconds, RESTART only when pins permit, TRUNCATE maintenance-only; incremental vacuum at most 1,000 pages per cycle; attestation valid 24 hours and invalid on mount/device change; FULL sync of database/WAL and required directory lifecycle; quick_check at startup and daily, integrity_check maintenance-only; SHA-256 transaction checksums and exported evidence/backups; no automatic full VACUUM.",
+      "status": "approved"
     },
     {
       "approval": {

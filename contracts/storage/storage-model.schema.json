@@ -914,9 +914,6 @@
           ],
           "type": "object"
         },
-        "provisional": {
-          "type": "string"
-        },
         "schema_path": {
           "type": "string"
         },
@@ -939,7 +936,6 @@
         "page_size_bytes",
         "payload_log_file",
         "persistent_pragmas",
-        "provisional",
         "schema_path",
         "single_database",
         "version"
