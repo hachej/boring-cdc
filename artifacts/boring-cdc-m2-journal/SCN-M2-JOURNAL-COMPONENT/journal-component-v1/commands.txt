@@ -1,0 +1,6 @@
+cargo test --locked --workspace --all-targets
+target/debug/examples/m2_journal_component terminate-before $TMPDIR/isolated-journal.sqlite
+target/debug/examples/m2_journal_component normal $TMPDIR/isolated-journal.sqlite
+target/debug/examples/m2_journal_component slow-commit $TMPDIR/isolated-journal.sqlite
+target/debug/examples/m2_journal_component commands $TMPDIR/isolated-journal.sqlite
+target/debug/examples/m2_journal_component saturated-service $TMPDIR/isolated-journal.sqlite

@@ -1,0 +1,106 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "cargo fmt --check",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-1.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-1.stdout",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "m2-complete/v2"
+    },
+    {
+      "argv": "cargo clippy --locked --workspace --all-targets --all-features",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-2.stderr",
+      "stderr_sha256": "95c5ba263804fb8ac848353ff345726fe477cd1a72465aa4c4039149174efc59",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-2.stdout",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "m2-complete/v2"
+    },
+    {
+      "argv": "cargo test --locked --workspace --all-targets",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-3.stderr",
+      "stderr_sha256": "1dd98d93e1cd071fd569c44706c234109e391e56946cdb216705573e8eef6741",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-3.stdout",
+      "stdout_sha256": "3c9c652f410c72c8b1554828aa3e75c348c16fc53b8ce11cb129e23f00dea614",
+      "version": "m2-complete/v2"
+    },
+    {
+      "argv": "scripts/validate/plan_coverage.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-4.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-4.stdout",
+      "stdout_sha256": "6fb9ffaddc3a3e7bfe9d6562bae4060ac4e1018c0b44ea520da3cc4d8684086d",
+      "version": "m2-complete/v2"
+    },
+    {
+      "argv": "scripts/acceptance/m2_complete.sh --probe",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-5.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-5.stdout",
+      "stdout_sha256": "3b9e953210dd6b5682369972ca476564db339962dc926adaf762a9483d2636df",
+      "version": "m2-complete/v2"
+    },
+    {
+      "argv": "scripts/acceptance/m2_complete.sh --probe",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-6.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-6.stdout",
+      "stdout_sha256": "3b9e953210dd6b5682369972ca476564db339962dc926adaf762a9483d2636df",
+      "version": "m2-complete/v2"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "milestone",
+  "git_commit": "7d36e0b53a0d6231f1a142da78141bf32c8bbd89",
+  "owner_bead": "boring-cdc-m2-complete",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "contracts/coverage/m2.json",
+      "artifacts/boring-cdc-m2-complete/gate/completion-summary.json"
+    ],
+    "attempts": [
+      "attempt-5:f807dc608559dadfa998f24446a4a3203f312e182ab5f32ce1b4cacaa155ce03",
+      "attempt-6:52beb557105e641a43fe971c41e5fcf8f7b7833897e1b6455d1e4d3e0b7cca84"
+    ],
+    "digest": "252e474aad783442b9357e2428208c6e9e85b841fceed3d66e71d7315082fc53",
+    "product_faults": "factory completion consumes pinned PostgreSQL 17.6 Compose crash/fault proof; three review-cap residual handoffs remain explicit for owner disposition; downstream terminal proof remains excluded",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M2-COMPLETION-BARRIER",
+  "schema_version": "evidence/v1",
+  "seed": "m2-complete-v2",
+  "source_preservation": {
+    "after_sha256": "84e2980df89db68dceadd8c87ac308af8b60b25c28fa30f12b9082736127d17f",
+    "before_sha256": "84e2980df89db68dceadd8c87ac308af8b60b25c28fa30f12b9082736127d17f",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": true,
+    "targeted_checks": true,
+    "workspace_tests": true
+  }
+}

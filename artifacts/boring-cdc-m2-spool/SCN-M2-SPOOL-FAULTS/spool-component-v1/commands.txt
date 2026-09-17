@@ -1,0 +1,3 @@
+cargo test --locked --workspace --all-targets
+target/debug/examples/m2_spool_component enospc $TMPDIR/isolated-spool
+target/debug/examples/m2_spool_component startup $TMPDIR/isolated-spool

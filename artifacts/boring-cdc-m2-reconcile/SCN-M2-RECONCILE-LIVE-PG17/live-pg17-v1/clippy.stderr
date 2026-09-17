@@ -1,0 +1,195 @@
+    Checking boring-cdc v0.1.0 (/home/ubuntu/projects/boring-cdc/.worktrees/epic-boring-cdc-m2)
+warning: file opened with `create`, but `truncate` behavior not defined
+  --> src/m2_init_recovery.rs:70:10
+   |
+70 |         .create(true)
+   |          ^^^^^^^^^^^^- help: add: `.truncate(true)`
+   |
+   = help: if you intend to overwrite an existing file entirely, call `.truncate(true)`
+   = help: if you instead know that you may want to keep some parts of the old file, call `.truncate(false)`
+   = help: alternatively, use `.append(true)` to append to the file instead of overwriting it
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#suspicious_open_options
+   = note: `#[warn(clippy::suspicious_open_options)]` on by default
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> src/m2_journal.rs:292:20
+    |
+292 |         let state: Option<(String,String,String,String,String,String,String,Option<String>)> = transaction.query_row(
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+    = note: `#[warn(clippy::type_complexity)]` on by default
+
+warning: this function has too many arguments (8/7)
+   --> src/m2_journal.rs:425:1
+    |
+425 | / fn verify_duplicate(
+426 | |     tx: &rusqlite::Transaction<'_>,
+427 | |     commit: &SourceCommit,
+428 | |     txid: &str,
+...   |
+433 | |     checksum: &str,
+434 | | ) -> Result<(), JournalError> {
+    | |_____________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+    = note: `#[warn(clippy::too_many_arguments)]` on by default
+
+warning: this `if` statement can be collapsed
+   --> src/m2_journal.rs:759:17
+    |
+759 | / ...   if let Some((_,old_first,old_last,old_count,old_checksum,hasher))=active.take() {
+760 | | ...       if old_last-old_first+1!=old_count || format!("{:x}",hasher.finalize())!=old_checksum { return Err(rusqlite::Error::InvalidQuer...
+761 | | ...   }
+    | |_______^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if
+    = note: `#[warn(clippy::collapsible_if)]` on by default
+help: collapse nested if block
+    |
+759 ~                 if let Some((_,old_first,old_last,old_count,old_checksum,hasher))=active.take()
+760 ~                     && (old_last-old_first+1!=old_count || format!("{:x}",hasher.finalize())!=old_checksum) { return Err(rusqlite::Error::InvalidQuery); }
+    |
+
+warning: this `if` statement can be collapsed
+   --> src/m2_journal.rs:770:5
+    |
+770 | /     if let Some((_, first, last, count, checksum, hasher)) = active.take() {
+771 | |         if last - first + 1 != count || format!("{:x}", hasher.finalize()) != checksum {
+772 | |             return Err(JournalError::Conflict("transaction checksum mismatch"));
+773 | |         }
+774 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#collapsible_if
+help: collapse nested if block
+    |
+770 ~     if let Some((_, first, last, count, checksum, hasher)) = active.take()
+771 ~         && (last - first + 1 != count || format!("{:x}", hasher.finalize()) != checksum) {
+772 |             return Err(JournalError::Conflict("transaction checksum mismatch"));
+773 ~         }
+    |
+
+warning: method `next` can be confused for the standard trait method `std::iter::Iterator::next`
+   --> src/m2_journal.rs:875:5
+    |
+875 | /     pub fn next(&mut self) -> Option<(WorkClass, T, u64)> {
+876 | |         self.tick += 1;
+877 | |         let service_pending = self.service.iter().any(|q| !q.is_empty());
+878 | |         if !self.capture.is_empty()
+...   |
+906 | |             .map(|x| (WorkClass::Capture, x, self.tick))
+907 | |     }
+    | |_____^
+    |
+    = help: consider implementing the trait `std::iter::Iterator` or choosing a less ambiguous method name
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#should_implement_trait
+    = note: `#[warn(clippy::should_implement_trait)]` on by default
+
+warning: this function has too many arguments (9/7)
+   --> src/m2_jsonl.rs:737:5
+    |
+737 | /     pub fn prepare_failure(
+738 | |         current: Option<&crate::failure_policy::FailureRecord>,
+739 | |         outcome: DestinationOutcome,
+740 | |         destination_id: &str,
+...   |
+746 | |         context: &mut crate::m1_transition_kernel::TransitionContext<'_>,
+747 | |     ) -> crate::failure_policy::PolicyAction {
+    | |____________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+
+warning: casting to the same type is unnecessary (`u64` -> `u64`)
+   --> src/m2_spool.rs:288:12
+    |
+288 |         Ok((stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64))
+    |            ^^^^^^^^^^^^^^^^^^^^^^ help: try: `stat.f_bavail`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_cast
+    = note: `#[warn(clippy::unnecessary_cast)]` on by default
+
+warning: casting to the same type is unnecessary (`u64` -> `u64`)
+   --> src/m2_spool.rs:288:50
+    |
+288 |         Ok((stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64))
+    |                                                  ^^^^^^^^^^^^^^^^^^^^ help: try: `stat.f_frsize`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_cast
+
+warning: this function has too many arguments (9/7)
+   --> src/m2_spool.rs:367:5
+    |
+367 | /     pub fn new(
+368 | |         directory: PathBuf,
+369 | |         capture_epoch: String,
+370 | |         xid: String,
+...   |
+376 | |         allocator: Box<dyn PhysicalAllocation>,
+377 | |     ) -> Result<Self, SpoolError> {
+    | |_________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+
+warning: this function has too many arguments (9/7)
+   --> src/m2_spool.rs:771:5
+    |
+771 | /     pub fn rearm_failure_policy(
+772 | |         &self,
+773 | |         error: &SpoolError,
+774 | |         end_lsn: Option<&str>,
+...   |
+784 | |         Option<PreparedFailureOperation>,
+785 | |     ) {
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+
+warning: this function has too many arguments (11/7)
+    --> src/m2_spool.rs:1081:1
+     |
+1081 | / pub fn classify_startup_spools(
+1082 | |     lock: &crate::m2_ownership::StateLock,
+1083 | |     store: &Path,
+1084 | |     directory: &Path,
+...    |
+1092 | |     existing: impl FnMut(&str, &str) -> ExistingTransaction,
+1093 | | ) -> Result<Vec<StartupAction>, SpoolError> {
+     | |___________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+
+warning: this function has too many arguments (12/7)
+    --> src/m2_spool.rs:1110:1
+     |
+1110 | / fn classify_startup_spools_with(
+1111 | |     filesystem: &impl StartupFilesystem,
+1112 | |     lock: &crate::m2_ownership::StateLock,
+1113 | |     store: &Path,
+...    |
+1122 | |     mut existing: impl FnMut(&str, &str) -> ExistingTransaction,
+1123 | | ) -> Result<Vec<StartupAction>, SpoolError> {
+     | |___________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_arguments
+
+warning: `boring-cdc` (lib) generated 13 warnings (run `cargo clippy --fix --lib -p boring-cdc` to apply 4 suggestions)
+warning: useless use of `vec!`
+    --> src/m2_spool.rs:1407:22
+     |
+1407 |         push(&mut b, &vec![1; 100]).unwrap();
+     |                      ^^^^^^^^^^^^^ help: you can use a slice directly: `&[1; 100]`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_vec
+     = note: `#[warn(clippy::useless_vec)]` on by default
+
+warning: useless use of `vec!`
+    --> src/m2_spool.rs:1511:30
+     |
+1511 |         let e = push(&mut b, &vec![1; 32]).unwrap_err();
+     |                              ^^^^^^^^^^^^ help: you can use a slice directly: `&[1; 32]`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_vec
+
+warning: `boring-cdc` (lib test) generated 15 warnings (13 duplicates) (run `cargo clippy --fix --lib -p boring-cdc --tests` to apply 2 suggestions)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.39s

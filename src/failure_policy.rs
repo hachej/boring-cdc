@@ -1,0 +1,2435 @@
+//! Shared, pure failure classification, scheduling, fingerprint, and persistence preparation.
+//!
+//! Domain runtimes provide clocks, lifecycle fencing, recovery proofs, and the sole SQLite
+//! writer. This module does not sleep, reconnect, advance boundaries, or open a database.
+
+use crate::m1_transition_kernel::TransitionContext;
+use rusqlite::{Connection, OptionalExtension, Transaction, params};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
+
+pub const POLICY_VERSION: &str = "failure-policy-v1";
+pub const JITTER_TEST_SEED: &str = "0x424344435f52455452595f563031";
+// The generic transition harness still needs a scheduling seed; policy jitter uses the
+// independently approved ChaCha20 seed below rather than this scheduler-only value.
+#[cfg(test)]
+const SCHEDULE_HARNESS_SEED_U64: u64 = 0x6661_696c_7572_652d;
+pub const BASE_DELAY_MS: u64 = 250;
+pub const MAX_DELAY_MS: u64 = 30_000;
+pub const MAX_ATTEMPTS: u32 = 10;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FailureClass {
+    TransientIo,
+    TransientSource,
+    TransientDestination,
+    RateLimited,
+    Integrity,
+    Unsupported,
+    OwnershipLost,
+    Configuration,
+}
+
+impl FailureClass {
+    pub const ALL: [Self; 8] = [
+        Self::TransientIo,
+        Self::TransientSource,
+        Self::TransientDestination,
+        Self::RateLimited,
+        Self::Integrity,
+        Self::Unsupported,
+        Self::OwnershipLost,
+        Self::Configuration,
+    ];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::TransientIo => "transient_io",
+            Self::TransientSource => "transient_source",
+            Self::TransientDestination => "transient_destination",
+            Self::RateLimited => "rate_limited",
+            Self::Integrity => "integrity",
+            Self::Unsupported => "unsupported",
+            Self::OwnershipLost => "ownership_lost",
+            Self::Configuration => "configuration",
+        }
+    }
+
+    const fn persisted_retry_class(self) -> &'static str {
+        match self {
+            Self::TransientIo
+            | Self::TransientSource
+            | Self::TransientDestination
+            | Self::RateLimited => "transient",
+            Self::Integrity | Self::OwnershipLost => "integrity_mismatch",
+            Self::Unsupported | Self::Configuration => "deterministic",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StableErrorCode {
+    #[serde(rename = "BCDC_SHARED_TRANSPORT_UNAVAILABLE")]
+    TransportUnavailable,
+    #[serde(rename = "BCDC_SHARED_DEADLINE_EXCEEDED")]
+    DeadlineExceeded,
+    #[serde(rename = "BCDC_SHARED_INVALID_RECORD")]
+    InvalidRecord,
+    #[serde(rename = "BCDC_SHARED_CHECKSUM_MISMATCH")]
+    ChecksumMismatch,
+    #[serde(rename = "BCDC_SHARED_HISTORY_UNAVAILABLE")]
+    HistoryUnavailable,
+    #[serde(rename = "BCDC_SHARED_UNSUPPORTED_CONFIGURATION")]
+    UnsupportedConfiguration,
+    #[serde(rename = "BCDC_SHARED_RESOURCE_LIMIT")]
+    ResourceLimit,
+    #[serde(rename = "BCDC_SHARED_OPERATOR_PAUSE")]
+    OperatorPause,
+}
+
+impl StableErrorCode {
+    pub const ALL: [Self; 8] = [
+        Self::TransportUnavailable,
+        Self::DeadlineExceeded,
+        Self::InvalidRecord,
+        Self::ChecksumMismatch,
+        Self::HistoryUnavailable,
+        Self::UnsupportedConfiguration,
+        Self::ResourceLimit,
+        Self::OperatorPause,
+    ];
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::TransportUnavailable => "BCDC_SHARED_TRANSPORT_UNAVAILABLE",
+            Self::DeadlineExceeded => "BCDC_SHARED_DEADLINE_EXCEEDED",
+            Self::InvalidRecord => "BCDC_SHARED_INVALID_RECORD",
+            Self::ChecksumMismatch => "BCDC_SHARED_CHECKSUM_MISMATCH",
+            Self::HistoryUnavailable => "BCDC_SHARED_HISTORY_UNAVAILABLE",
+            Self::UnsupportedConfiguration => "BCDC_SHARED_UNSUPPORTED_CONFIGURATION",
+            Self::ResourceLimit => "BCDC_SHARED_RESOURCE_LIMIT",
+            Self::OperatorPause => "BCDC_SHARED_OPERATOR_PAUSE",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Component {
+    Capture,
+    ClickHouse,
+    Archive,
+    Journal,
+    Ownership,
+}
+
+impl Component {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Capture => "capture",
+            Self::ClickHouse => "clickhouse",
+            Self::Archive => "archive",
+            Self::Journal => "journal",
+            Self::Ownership => "ownership",
+        }
+    }
+}
+
+/// Closed allow-list: callers cannot add keys or values containing payloads, DSNs, keys,
+/// source identifiers, driver strings, or credentials.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SafeContextKey {
+    Operation,
+    ProtocolPhase,
+    DestinationKind,
+    LimitKind,
+}
+
+impl SafeContextKey {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Operation => "operation",
+            Self::ProtocolPhase => "protocol_phase",
+            Self::DestinationKind => "destination_kind",
+            Self::LimitKind => "limit_kind",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SafeContextValue {
+    Capture,
+    Decode,
+    Publish,
+    Verify,
+    Reconcile,
+    CopyBoth,
+    Pgoutput,
+    ClickHouse,
+    Archive,
+    JournalBytes,
+    MemoryBytes,
+}
+
+impl SafeContextValue {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Capture => "capture",
+            Self::Decode => "decode",
+            Self::Publish => "publish",
+            Self::Verify => "verify",
+            Self::Reconcile => "reconcile",
+            Self::CopyBoth => "copy_both",
+            Self::Pgoutput => "pgoutput",
+            Self::ClickHouse => "clickhouse",
+            Self::Archive => "archive",
+            Self::JournalBytes => "journal_bytes",
+            Self::MemoryBytes => "memory_bytes",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FailedBoundary {
+    Capture {
+        capture_epoch: String,
+        end_lsn: String,
+    },
+    Destination {
+        capture_epoch: String,
+        generation: u64,
+        first_seq: u64,
+        last_seq: u64,
+    },
+    Control {
+        capture_epoch: String,
+        generation: u64,
+    },
+}
+
+impl FailedBoundary {
+    /// Canonical binary framing is injective for arbitrary stored TEXT. Variant and field
+    /// boundaries are explicit; no delimiter can make two logical boundaries collide.
+    fn canonical(&self) -> Vec<u8> {
+        let mut encoded = Vec::new();
+        match self {
+            Self::Capture {
+                capture_epoch,
+                end_lsn,
+            } => {
+                push_framed(&mut encoded, b"capture");
+                push_framed(&mut encoded, capture_epoch.as_bytes());
+                push_framed(&mut encoded, end_lsn.as_bytes());
+            }
+            Self::Destination {
+                capture_epoch,
+                generation,
+                first_seq,
+                last_seq,
+            } => {
+                push_framed(&mut encoded, b"destination");
+                push_framed(&mut encoded, capture_epoch.as_bytes());
+                push_framed(&mut encoded, &generation.to_be_bytes());
+                push_framed(&mut encoded, &first_seq.to_be_bytes());
+                push_framed(&mut encoded, &last_seq.to_be_bytes());
+            }
+            Self::Control {
+                capture_epoch,
+                generation,
+            } => {
+                push_framed(&mut encoded, b"control");
+                push_framed(&mut encoded, capture_epoch.as_bytes());
+                push_framed(&mut encoded, &generation.to_be_bytes());
+            }
+        }
+        encoded
+    }
+
+    fn seq_range(&self) -> (Option<u64>, Option<u64>) {
+        match self {
+            Self::Destination {
+                first_seq,
+                last_seq,
+                ..
+            } => (Some(*first_seq), Some(*last_seq)),
+            Self::Capture { .. } | Self::Control { .. } => (None, None),
+        }
+    }
+
+    pub(crate) fn capture_epoch(&self) -> &str {
+        match self {
+            Self::Capture { capture_epoch, .. }
+            | Self::Destination { capture_epoch, .. }
+            | Self::Control { capture_epoch, .. } => capture_epoch,
+        }
+    }
+
+    pub(crate) fn generation(&self) -> Option<u64> {
+        match self {
+            Self::Destination { generation, .. } | Self::Control { generation, .. } => {
+                Some(*generation)
+            }
+            Self::Capture { .. } => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FingerprintInput {
+    pub component: Component,
+    pub class: FailureClass,
+    pub code: StableErrorCode,
+    pub boundary: FailedBoundary,
+    pub relevant_configuration_fingerprint: String,
+    pub context: BTreeMap<SafeContextKey, SafeContextValue>,
+}
+
+pub fn build_fingerprint(input: &FingerprintInput) -> String {
+    let mut hasher = Sha256::new();
+    for value in [
+        POLICY_VERSION,
+        input.component.as_str(),
+        input.class.as_str(),
+        input.code.as_str(),
+    ] {
+        hash_framed(&mut hasher, value);
+    }
+    hash_framed_bytes(&mut hasher, &input.boundary.canonical());
+    hash_framed(&mut hasher, &input.relevant_configuration_fingerprint);
+    for (key, value) in &input.context {
+        hash_framed(&mut hasher, key.as_str());
+        hash_framed(&mut hasher, value.as_str());
+    }
+    format!("sha256:{:x}", hasher.finalize())
+}
+
+fn hash_framed(hasher: &mut Sha256, value: &str) {
+    hash_framed_bytes(hasher, value.as_bytes());
+}
+
+fn hash_framed_bytes(hasher: &mut Sha256, value: &[u8]) {
+    hasher.update((value.len() as u64).to_be_bytes());
+    hasher.update(value);
+}
+
+fn push_framed(output: &mut Vec<u8>, value: &[u8]) {
+    output.extend_from_slice(&(value.len() as u64).to_be_bytes());
+    output.extend_from_slice(value);
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FailureRecord {
+    pub failure_id: String,
+    pub destination_id: Option<String>,
+    pub component: String,
+    pub class: FailureClass,
+    pub fingerprint: String,
+    pub boundary: FailedBoundary,
+    pub attempt: u32,
+    pub next_retry_at_ms: Option<u64>,
+    pub armed: bool,
+    pub first_failed_at_ms: u64,
+    pub last_failed_at_ms: u64,
+    /// Digest of the most recently consumed explicit re-arm authorization. It is encoded
+    /// durably in `last_failed_at` without changing the schema owned by m2-schema.
+    pub last_rearm_token_digest: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FailureObservation {
+    pub fingerprint: FingerprintInput,
+    pub destination_id: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompletionToken {
+    pub failure_id: String,
+    pub fingerprint: String,
+    pub capture_epoch: String,
+    pub generation: Option<u64>,
+    pub attempt: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PolicyEvent {
+    Observe(FailureObservation),
+    RetryDue,
+    Completed(CompletionToken),
+    ProcessRestarted,
+    Rearm(RearmRequest),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RelevantConfigurationChange {
+    pub previous: FingerprintInput,
+    pub replacement: FingerprintInput,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RearmAuthorizationToken {
+    /// Opaque command identity. Callers must not put secrets or payloads here.
+    pub token_id: String,
+    /// State-bound predecessor makes replay fail permanently after any later token is consumed.
+    pub expected_last_rearm_token_digest: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RearmRequest {
+    pub expected_failure_id: String,
+    pub expected_fingerprint: String,
+    pub authorization_token: RearmAuthorizationToken,
+    pub relevant_configuration_change: Option<RelevantConfigurationChange>,
+    pub retained_wal_proven: bool,
+    pub integrity_recovery_proven: bool,
+    pub continuity_recovery_proven: bool,
+    pub explicit_operator_authorization: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PolicyAction {
+    Persist(FailureRecord),
+    RetryNow(FailureRecord),
+    Suppressed,
+    Clear {
+        failure_id: String,
+        fingerprint: String,
+        attempt: u32,
+        destination_id: Option<String>,
+        capture_epoch: String,
+        generation: Option<u64>,
+    },
+    StaleCompletion,
+    RejectedRearm,
+    Rearmed {
+        record: FailureRecord,
+        expected_last_failed_at_ms: u64,
+        expected_last_rearm_token_digest: Option<String>,
+    },
+    Noop,
+}
+
+pub fn transition(
+    current: Option<&FailureRecord>,
+    event: PolicyEvent,
+    context: &mut TransitionContext<'_>,
+) -> PolicyAction {
+    match event {
+        PolicyEvent::Observe(observation) => observe(current, observation, context),
+        PolicyEvent::RetryDue => match current {
+            Some(record)
+                if record.armed
+                    && record
+                        .next_retry_at_ms
+                        .is_some_and(|next_retry| context.clock.now() >= next_retry) =>
+            {
+                PolicyAction::RetryNow(record.clone())
+            }
+            _ => PolicyAction::Noop,
+        },
+        PolicyEvent::Completed(token) => match current {
+            Some(record)
+                if token.failure_id == record.failure_id
+                    && token.fingerprint == record.fingerprint
+                    && token.capture_epoch == record.boundary.capture_epoch()
+                    && token.generation == record.boundary.generation()
+                    && token.attempt == record.attempt =>
+            {
+                PolicyAction::Clear {
+                    failure_id: record.failure_id.clone(),
+                    fingerprint: record.fingerprint.clone(),
+                    attempt: record.attempt,
+                    destination_id: record.destination_id.clone(),
+                    capture_epoch: record.boundary.capture_epoch().into(),
+                    generation: record.boundary.generation(),
+                }
+            }
+            _ => PolicyAction::StaleCompletion,
+        },
+        PolicyEvent::ProcessRestarted => current
+            .cloned()
+            .map(PolicyAction::Persist)
+            .unwrap_or(PolicyAction::Noop),
+        PolicyEvent::Rearm(request) => rearm(current, request, context),
+    }
+}
+
+fn observe(
+    current: Option<&FailureRecord>,
+    observation: FailureObservation,
+    context: &mut TransitionContext<'_>,
+) -> PolicyAction {
+    let fingerprint = build_fingerprint(&observation.fingerprint);
+    if let Some(record) = current
+        && record.armed
+        && record.fingerprint == fingerprint
+        && !is_automatic_retry(record.class)
+    {
+        return PolicyAction::Suppressed;
+    }
+    let same = current.filter(|record| record.fingerprint == fingerprint);
+    let attempt = same.map_or(1, |record| record.attempt.saturating_add(1));
+    let now_ms = context.clock.now();
+    let first_failed_at_ms = same.map_or(now_ms, |record| record.first_failed_at_ms);
+    let effective_now = same.map_or(now_ms, |record| now_ms.max(record.last_failed_at_ms));
+    let class = observation.fingerprint.class;
+    let exhausted = is_automatic_retry(class) && attempt > MAX_ATTEMPTS;
+    let next_retry_at_ms = if is_automatic_retry(class) && !exhausted {
+        Some(effective_now.saturating_add(retry_delay_ms(context.randomness.next_u64(), attempt)))
+    } else {
+        None
+    };
+    let failure_id = same.map_or_else(
+        || {
+            let boundary_digest = Sha256::digest(observation.fingerprint.boundary.canonical());
+            format!("failure-{boundary_digest:x}-{}", &fingerprint[7..])
+        },
+        |record| record.failure_id.clone(),
+    );
+    PolicyAction::Persist(FailureRecord {
+        failure_id,
+        destination_id: observation.destination_id,
+        component: observation.fingerprint.component.as_str().into(),
+        class,
+        fingerprint,
+        boundary: observation.fingerprint.boundary,
+        attempt,
+        next_retry_at_ms,
+        armed: true,
+        first_failed_at_ms,
+        last_failed_at_ms: effective_now,
+        last_rearm_token_digest: same.and_then(|record| record.last_rearm_token_digest.clone()),
+    })
+}
+
+const fn is_automatic_retry(class: FailureClass) -> bool {
+    matches!(
+        class,
+        FailureClass::TransientIo
+            | FailureClass::TransientSource
+            | FailureClass::TransientDestination
+            | FailureClass::RateLimited
+    )
+}
+
+fn retry_delay_ms(sample: u64, attempt: u32) -> u64 {
+    let exponent = attempt.saturating_sub(1).min(62);
+    let nominal = BASE_DELAY_MS
+        .saturating_mul(1_u64 << exponent)
+        .min(MAX_DELAY_MS);
+    sample % nominal.saturating_add(1)
+}
+
+fn rearm(
+    current: Option<&FailureRecord>,
+    request: RearmRequest,
+    context: &mut TransitionContext<'_>,
+) -> PolicyAction {
+    let Some(record) = current else {
+        return PolicyAction::RejectedRearm;
+    };
+    if request.expected_failure_id != record.failure_id
+        || request.expected_fingerprint != record.fingerprint
+        || request.authorization_token.token_id.is_empty()
+        || request.authorization_token.expected_last_rearm_token_digest
+            != record.last_rearm_token_digest
+    {
+        return PolicyAction::RejectedRearm;
+    }
+    let token_digest = rearm_token_digest(record, &request.authorization_token);
+    if record.last_rearm_token_digest.as_deref() == Some(&token_digest) {
+        return PolicyAction::RejectedRearm;
+    }
+    let allowed = match record.class {
+        FailureClass::TransientIo
+        | FailureClass::TransientSource
+        | FailureClass::TransientDestination
+        | FailureClass::RateLimited => false,
+        FailureClass::Unsupported => request.explicit_operator_authorization,
+        FailureClass::Integrity => request.integrity_recovery_proven,
+        FailureClass::OwnershipLost => {
+            request.continuity_recovery_proven && request.retained_wal_proven
+        }
+        FailureClass::Configuration => {
+            request.retained_wal_proven
+                && request
+                    .relevant_configuration_change
+                    .as_ref()
+                    .is_some_and(|proof| valid_configuration_change(record, proof))
+        }
+    };
+    if !allowed || context.clock.now() <= record.last_failed_at_ms {
+        return PolicyAction::RejectedRearm;
+    }
+    let mut rearmed = record.clone();
+    rearmed.attempt = record.attempt;
+    rearmed.armed = true;
+    rearmed.last_failed_at_ms = context.clock.now().max(record.last_failed_at_ms);
+    rearmed.next_retry_at_ms = None;
+    rearmed.last_rearm_token_digest = Some(token_digest);
+    PolicyAction::Rearmed {
+        record: rearmed,
+        expected_last_failed_at_ms: record.last_failed_at_ms,
+        expected_last_rearm_token_digest: record.last_rearm_token_digest.clone(),
+    }
+}
+
+fn rearm_token_digest(
+    record: &FailureRecord,
+    authorization_token: &RearmAuthorizationToken,
+) -> String {
+    let mut hasher = Sha256::new();
+    for value in [
+        "failure-rearm-token-v1",
+        &record.failure_id,
+        &record.fingerprint,
+        &authorization_token.token_id,
+        authorization_token
+            .expected_last_rearm_token_digest
+            .as_deref()
+            .unwrap_or("none"),
+    ] {
+        hash_framed(&mut hasher, value);
+    }
+    hash_framed_bytes(&mut hasher, &record.boundary.canonical());
+    format!("sha256:{:x}", hasher.finalize())
+}
+
+fn valid_configuration_change(record: &FailureRecord, proof: &RelevantConfigurationChange) -> bool {
+    build_fingerprint(&proof.previous) == record.fingerprint
+        && proof.previous.component == proof.replacement.component
+        && proof.previous.class == proof.replacement.class
+        && proof.previous.code == proof.replacement.code
+        && proof.previous.boundary == proof.replacement.boundary
+        && proof.previous.context == proof.replacement.context
+        && proof.previous.relevant_configuration_fingerprint
+            != proof.replacement.relevant_configuration_fingerprint
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CaptureOutcome {
+    SafeStopped,
+    RetryEligible,
+    IntegrityRecoveryRequired,
+    ContinuityRecoveryRequired,
+    ExpectedClose,
+    UnexpectedClose,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DestinationOutcome {
+    Blocked,
+    RetryEligible,
+    IntegrityRecoveryRequired,
+    ContinuityRecoveryRequired,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DomainHookInput {
+    Capture {
+        outcome: CaptureOutcome,
+        run_id: String,
+        expected_close_run_id: Option<String>,
+        capture_epoch: String,
+        connection_generation: u64,
+        expected_close_generation: Option<u64>,
+    },
+    ClickHouse {
+        outcome: DestinationOutcome,
+        capture_epoch: String,
+        generation: u64,
+    },
+    Archive {
+        outcome: DestinationOutcome,
+        capture_epoch: String,
+        generation: u64,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DomainProjection {
+    SafeStopped,
+    Blocked,
+    RetryEligible,
+    RecoveryRequired,
+    ExpectedClose,
+    OwnershipLost,
+}
+
+pub trait DomainRecoveryHook {
+    fn project(&self, input: &DomainHookInput) -> DomainProjection;
+}
+
+/// Synthetic shared projection; real transport and destination hooks remain downstream.
+pub struct StrictDomainHook;
+
+impl DomainRecoveryHook for StrictDomainHook {
+    fn project(&self, input: &DomainHookInput) -> DomainProjection {
+        match input {
+            DomainHookInput::Capture {
+                outcome: CaptureOutcome::SafeStopped,
+                ..
+            } => DomainProjection::SafeStopped,
+            DomainHookInput::Capture {
+                outcome: CaptureOutcome::RetryEligible,
+                ..
+            }
+            | DomainHookInput::ClickHouse {
+                outcome: DestinationOutcome::RetryEligible,
+                ..
+            }
+            | DomainHookInput::Archive {
+                outcome: DestinationOutcome::RetryEligible,
+                ..
+            } => DomainProjection::RetryEligible,
+            DomainHookInput::ClickHouse {
+                outcome: DestinationOutcome::Blocked,
+                ..
+            }
+            | DomainHookInput::Archive {
+                outcome: DestinationOutcome::Blocked,
+                ..
+            } => DomainProjection::Blocked,
+            DomainHookInput::Capture {
+                outcome:
+                    CaptureOutcome::IntegrityRecoveryRequired
+                    | CaptureOutcome::ContinuityRecoveryRequired,
+                ..
+            }
+            | DomainHookInput::ClickHouse {
+                outcome:
+                    DestinationOutcome::IntegrityRecoveryRequired
+                    | DestinationOutcome::ContinuityRecoveryRequired,
+                ..
+            }
+            | DomainHookInput::Archive {
+                outcome:
+                    DestinationOutcome::IntegrityRecoveryRequired
+                    | DestinationOutcome::ContinuityRecoveryRequired,
+                ..
+            } => DomainProjection::RecoveryRequired,
+            DomainHookInput::Capture {
+                outcome: CaptureOutcome::ExpectedClose,
+                run_id,
+                expected_close_run_id: Some(expected_run_id),
+                connection_generation,
+                expected_close_generation: Some(expected_generation),
+                ..
+            } if run_id == expected_run_id && connection_generation == expected_generation => {
+                DomainProjection::ExpectedClose
+            }
+            DomainHookInput::Capture {
+                outcome: CaptureOutcome::ExpectedClose | CaptureOutcome::UnexpectedClose,
+                ..
+            } => DomainProjection::OwnershipLost,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PreparedFailureOperation {
+    StoreAndArm {
+        record: FailureRecord,
+        expected_current_failure_id: Option<String>,
+    },
+    Rearm {
+        record: FailureRecord,
+        expected_last_failed_at_ms: u64,
+        expected_last_rearm_token_digest: Option<String>,
+    },
+    Clear {
+        failure_id: String,
+        fingerprint: String,
+        attempt: u32,
+        destination_id: Option<String>,
+        capture_epoch: String,
+        generation: Option<u64>,
+    },
+}
+
+impl PreparedFailureOperation {
+    /// Project a pure policy action into a sole-writer operation without dropping any CAS fence.
+    pub fn from_policy_action(
+        action: PolicyAction,
+        expected_current_failure_id: Option<String>,
+    ) -> Option<Self> {
+        match action {
+            PolicyAction::Persist(record) => Some(Self::StoreAndArm {
+                record,
+                expected_current_failure_id,
+            }),
+            PolicyAction::Rearmed {
+                record,
+                expected_last_failed_at_ms,
+                expected_last_rearm_token_digest,
+            } => Some(Self::Rearm {
+                record,
+                expected_last_failed_at_ms,
+                expected_last_rearm_token_digest,
+            }),
+            PolicyAction::Clear {
+                failure_id,
+                fingerprint,
+                attempt,
+                destination_id,
+                capture_epoch,
+                generation,
+            } => Some(Self::Clear {
+                failure_id,
+                fingerprint,
+                attempt,
+                destination_id,
+                capture_epoch,
+                generation,
+            }),
+            PolicyAction::RetryNow(_)
+            | PolicyAction::Suppressed
+            | PolicyAction::StaleCompletion
+            | PolicyAction::RejectedRearm
+            | PolicyAction::Noop => None,
+        }
+    }
+
+    /// Execute only inside the transaction supplied by the capture-priority sole writer.
+    pub fn execute(&self, transaction: &Transaction<'_>) -> rusqlite::Result<()> {
+        match self {
+            Self::StoreAndArm {
+                record,
+                expected_current_failure_id,
+            } => {
+                let (start, end) = record.boundary.seq_range();
+                let retry_class =
+                    if is_automatic_retry(record.class) && record.attempt > MAX_ATTEMPTS {
+                        "exhausted"
+                    } else {
+                        record.class.persisted_retry_class()
+                    };
+                transaction.execute(
+                    "INSERT INTO processing_failures(failure_id,destination_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13) ON CONFLICT(failure_id) DO UPDATE SET retry_class=excluded.retry_class,attempt=excluded.attempt,next_retry_at=excluded.next_retry_at,armed=excluded.armed,last_failed_at=excluded.last_failed_at WHERE processing_failures.fingerprint=excluded.fingerprint AND (processing_failures.attempt+1=excluded.attempt OR (processing_failures.attempt=excluded.attempt AND processing_failures.armed=excluded.armed AND processing_failures.next_retry_at IS excluded.next_retry_at AND processing_failures.last_failed_at=excluded.last_failed_at))",
+                    params![record.failure_id,record.destination_id,record.component,record.class.as_str(),record.fingerprint,start,end,retry_class,record.attempt,record.next_retry_at_ms.map(timestamp),i64::from(record.armed),timestamp(record.first_failed_at_ms),persisted_last_failed_at(record.last_failed_at_ms, record.last_rearm_token_digest.as_deref())],
+                )?;
+                if transaction.changes() != 1 {
+                    return Err(rusqlite::Error::InvalidQuery);
+                }
+                if let Some(destination_id) = &record.destination_id {
+                    let FailedBoundary::Destination {
+                        capture_epoch,
+                        generation,
+                        ..
+                    } = &record.boundary
+                    else {
+                        return Err(rusqlite::Error::InvalidQuery);
+                    };
+                    transaction.execute(
+                        "UPDATE destinations SET current_failure_id=?1,revision=revision+1 WHERE destination_id=?2 AND capture_epoch=?3 AND generation=?4 AND current_failure_id IS ?5",
+                        params![record.failure_id, destination_id, capture_epoch, generation, expected_current_failure_id],
+                    )?;
+                    if transaction.changes() != 1 {
+                        return Err(rusqlite::Error::QueryReturnedNoRows);
+                    }
+                }
+            }
+            Self::Rearm {
+                record,
+                expected_last_failed_at_ms,
+                expected_last_rearm_token_digest,
+            } => {
+                let Some(consumed_token) = record.last_rearm_token_digest.as_deref() else {
+                    return Err(rusqlite::Error::InvalidQuery);
+                };
+                if let Some(destination_id) = &record.destination_id {
+                    let FailedBoundary::Destination {
+                        capture_epoch,
+                        generation,
+                        ..
+                    } = &record.boundary
+                    else {
+                        return Err(rusqlite::Error::InvalidQuery);
+                    };
+                    // Compare the exact destination fence first. The supplied sole-writer
+                    // transaction prevents drift before the failure-row swap and this read-only
+                    // phase leaves no revision churn if that later swap rejects.
+                    let destination_matches = transaction
+                        .query_row(
+                            "SELECT 1 FROM destinations WHERE destination_id=?1 AND current_failure_id=?2 AND capture_epoch=?3 AND generation=?4",
+                            params![destination_id, record.failure_id, capture_epoch, generation],
+                            |_| Ok(()),
+                        )
+                        .optional()?;
+                    if destination_matches.is_none() {
+                        return Err(rusqlite::Error::QueryReturnedNoRows);
+                    }
+                }
+                transaction.execute(
+                    "UPDATE processing_failures SET last_failed_at=?1 WHERE failure_id=?2 AND fingerprint=?3 AND attempt=?4 AND armed=1 AND last_failed_at=?5",
+                    params![persisted_last_failed_at(record.last_failed_at_ms, Some(consumed_token)), record.failure_id, record.fingerprint, record.attempt, persisted_last_failed_at(*expected_last_failed_at_ms, expected_last_rearm_token_digest.as_deref())],
+                )?;
+                if transaction.changes() != 1 {
+                    return Err(rusqlite::Error::QueryReturnedNoRows);
+                }
+            }
+            Self::Clear {
+                failure_id,
+                fingerprint,
+                attempt,
+                destination_id,
+                capture_epoch,
+                generation,
+            } => {
+                if let Some(destination_id) = destination_id {
+                    let Some(generation) = generation else {
+                        return Err(rusqlite::Error::InvalidQuery);
+                    };
+                    // Compare the exact destination boundary before disarming or unlinking.
+                    let destination_matches = transaction
+                        .query_row(
+                            "SELECT 1 FROM destinations WHERE destination_id=?1 AND current_failure_id=?2 AND capture_epoch=?3 AND generation=?4",
+                            params![destination_id, failure_id, capture_epoch, generation],
+                            |_| Ok(()),
+                        )
+                        .optional()?;
+                    if destination_matches.is_none() {
+                        return Err(rusqlite::Error::QueryReturnedNoRows);
+                    }
+                }
+                transaction.execute(
+                    "UPDATE processing_failures SET armed=0,retry_class=CASE WHEN retry_class='transient' THEN 'exhausted' ELSE retry_class END,next_retry_at=NULL WHERE failure_id=?1 AND fingerprint=?2 AND attempt=?3 AND armed=1",
+                    params![failure_id, fingerprint, attempt],
+                )?;
+                if transaction.changes() != 1 {
+                    return Err(rusqlite::Error::QueryReturnedNoRows);
+                }
+                if let Some(destination_id) = destination_id {
+                    transaction.execute(
+                        "UPDATE destinations SET current_failure_id=NULL,revision=revision+1 WHERE destination_id=?1 AND current_failure_id=?2 AND capture_epoch=?3 AND generation=?4",
+                        params![destination_id, failure_id, capture_epoch, generation],
+                    )?;
+                    if transaction.changes() != 1 {
+                        return Err(rusqlite::Error::QueryReturnedNoRows);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+pub fn load_failure(
+    connection: &Connection,
+    failure_id: &str,
+    boundary: FailedBoundary,
+) -> rusqlite::Result<Option<FailureRecord>> {
+    let row = connection
+        .query_row(
+            "SELECT destination_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,attempt,next_retry_at,armed,first_failed_at,last_failed_at FROM processing_failures WHERE failure_id=?1",
+            [failure_id],
+            |row| {
+                Ok((
+                    row.get::<_, Option<String>>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, Option<u64>>(4)?,
+                    row.get::<_, Option<u64>>(5)?,
+                    row.get::<_, u32>(6)?,
+                    row.get::<_, Option<String>>(7)?,
+                    row.get::<_, i64>(8)?,
+                    row.get::<_, String>(9)?,
+                    row.get::<_, String>(10)?,
+                ))
+            },
+        )
+        .optional()?;
+    let Some((
+        destination_id,
+        component,
+        class,
+        fingerprint,
+        start,
+        end,
+        attempt,
+        next,
+        armed,
+        first,
+        last,
+    )) = row
+    else {
+        return Ok(None);
+    };
+    let boundary_digest = format!("{:x}", Sha256::digest(boundary.canonical()));
+    let expected_failure_id = format!("failure-{boundary_digest}-{}", &fingerprint[7..]);
+    if boundary.seq_range() != (start, end) || failure_id != expected_failure_id {
+        return Err(rusqlite::Error::InvalidQuery);
+    }
+    Ok(Some(FailureRecord {
+        failure_id: failure_id.into(),
+        destination_id,
+        component,
+        class: parse_class(&class)?,
+        fingerprint,
+        boundary,
+        attempt,
+        next_retry_at_ms: next.map(|value| parse_timestamp(&value)).transpose()?,
+        armed: armed == 1,
+        first_failed_at_ms: parse_timestamp(&first)?,
+        last_failed_at_ms: parse_timestamp(&last)?,
+        last_rearm_token_digest: parse_rearm_token(&last)?,
+    }))
+}
+
+fn parse_class(value: &str) -> rusqlite::Result<FailureClass> {
+    match value {
+        "transient_io" => Ok(FailureClass::TransientIo),
+        "transient_source" => Ok(FailureClass::TransientSource),
+        "transient_destination" => Ok(FailureClass::TransientDestination),
+        "rate_limited" => Ok(FailureClass::RateLimited),
+        "integrity" => Ok(FailureClass::Integrity),
+        "unsupported" => Ok(FailureClass::Unsupported),
+        "ownership_lost" => Ok(FailureClass::OwnershipLost),
+        "configuration" => Ok(FailureClass::Configuration),
+        _ => Err(rusqlite::Error::InvalidQuery),
+    }
+}
+
+fn parse_timestamp(value: &str) -> rusqlite::Result<u64> {
+    value
+        .split_once(";rearm-token=")
+        .map_or(value, |(timestamp, _)| timestamp)
+        .strip_prefix("unix-ms:")
+        .and_then(|value| value.parse().ok())
+        .ok_or(rusqlite::Error::InvalidQuery)
+}
+
+fn parse_rearm_token(value: &str) -> rusqlite::Result<Option<String>> {
+    let Some((_, token)) = value.split_once(";rearm-token=") else {
+        return Ok(None);
+    };
+    if token.len() == 71
+        && token.starts_with("sha256:")
+        && token[7..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        Ok(Some(token.into()))
+    } else {
+        Err(rusqlite::Error::InvalidQuery)
+    }
+}
+
+fn persisted_last_failed_at(ms: u64, rearm_token: Option<&str>) -> String {
+    match rearm_token {
+        Some(token) => format!("{};rearm-token={token}", timestamp(ms)),
+        None => timestamp(ms),
+    }
+}
+
+fn timestamp(ms: u64) -> String {
+    format!("unix-ms:{ms:020}")
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+    use crate::m1_transition_kernel::{
+        Harness, HarnessBudget, Randomness, ScheduleSeed, ScheduledAction, ScheduledStep,
+        TransitionSystem, VirtualClock,
+    };
+    use crate::m2_schema::{WriterConnection, open_writer};
+    use rand_chacha::ChaCha20Rng;
+    use rand_core::{RngCore, SeedableRng};
+    use std::cell::RefCell;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct ApprovedTestRandomness(ChaCha20Rng);
+
+    impl ApprovedTestRandomness {
+        fn seeded() -> Self {
+            Self(ChaCha20Rng::from_seed(approved_test_seed()))
+        }
+    }
+
+    fn approved_test_seed() -> [u8; 32] {
+        let decoded = hex_seed_bytes(JITTER_TEST_SEED);
+        let mut seed = [0_u8; 32];
+        seed[..decoded.len()].copy_from_slice(&decoded);
+        seed
+    }
+
+    impl Default for ApprovedTestRandomness {
+        fn default() -> Self {
+            Self::seeded()
+        }
+    }
+
+    impl Randomness for ApprovedTestRandomness {
+        fn next_u64(&mut self) -> u64 {
+            self.0.next_u64()
+        }
+    }
+
+    fn hex_seed_bytes(value: &str) -> Vec<u8> {
+        let hex = value.strip_prefix("0x").expect("hex seed prefix");
+        assert!(hex.len().is_multiple_of(2));
+        hex.as_bytes()
+            .chunks_exact(2)
+            .map(|pair| {
+                u8::from_str_radix(std::str::from_utf8(pair).expect("ASCII seed"), 16)
+                    .expect("hex seed")
+            })
+            .collect()
+    }
+
+    fn boundary() -> FailedBoundary {
+        FailedBoundary::Destination {
+            capture_epoch: "epoch-a".into(),
+            generation: 7,
+            first_seq: 10,
+            last_seq: 20,
+        }
+    }
+
+    fn observation(class: FailureClass, _at: u64) -> FailureObservation {
+        FailureObservation {
+            destination_id: Some("destination-a".into()),
+            fingerprint: FingerprintInput {
+                component: Component::Archive,
+                class,
+                code: StableErrorCode::TransportUnavailable,
+                boundary: boundary(),
+                relevant_configuration_fingerprint: "config-a".into(),
+                context: BTreeMap::from([(SafeContextKey::Operation, SafeContextValue::Publish)]),
+            },
+        }
+    }
+
+    fn rearm_authorization(record: &FailureRecord, token_id: &str) -> RearmAuthorizationToken {
+        RearmAuthorizationToken {
+            token_id: token_id.into(),
+            expected_last_rearm_token_digest: record.last_rearm_token_digest.clone(),
+        }
+    }
+
+    fn run_transition(current: Option<&FailureRecord>, event: PolicyEvent) -> PolicyAction {
+        run_transition_at(current, event, 10_000)
+    }
+
+    fn run_transition_at(
+        current: Option<&FailureRecord>,
+        event: PolicyEvent,
+        now_ms: u64,
+    ) -> PolicyAction {
+        let clock = VirtualClock::new(now_ms);
+        let mut randomness = ApprovedTestRandomness::seeded();
+        let mut context = TransitionContext {
+            clock: &clock,
+            randomness: &mut randomness,
+        };
+        transition(current, event, &mut context)
+    }
+
+    #[derive(Default)]
+    struct PolicyHarnessDomain {
+        effects: RefCell<Vec<PolicyAction>>,
+        lifecycle: RefCell<Vec<&'static str>>,
+        randomness: RefCell<ApprovedTestRandomness>,
+    }
+
+    impl PolicyHarnessDomain {
+        fn last_effect(&self) -> PolicyAction {
+            self.effects
+                .borrow()
+                .last()
+                .cloned()
+                .expect("policy effect")
+        }
+    }
+
+    impl TransitionSystem for PolicyHarnessDomain {
+        type Facts = Option<FailureRecord>;
+        type Event = PolicyEvent;
+        type Effect = PolicyAction;
+        type Completion = CompletionToken;
+
+        fn on_event(
+            &self,
+            facts: &mut Self::Facts,
+            event: Self::Event,
+            context: &mut TransitionContext<'_>,
+        ) -> Vec<Self::Effect> {
+            let mut randomness = self.randomness.borrow_mut();
+            let mut policy_context = TransitionContext {
+                clock: context.clock,
+                randomness: &mut *randomness,
+            };
+            let action = transition(facts.as_ref(), event, &mut policy_context);
+            self.effects.borrow_mut().push(action.clone());
+            match &action {
+                PolicyAction::Persist(record)
+                | PolicyAction::RetryNow(record)
+                | PolicyAction::Rearmed { record, .. } => *facts = Some(record.clone()),
+                PolicyAction::Clear { .. } => *facts = None,
+                PolicyAction::Suppressed
+                | PolicyAction::StaleCompletion
+                | PolicyAction::RejectedRearm
+                | PolicyAction::Noop => {}
+            }
+            vec![action]
+        }
+
+        fn on_completion(
+            &self,
+            facts: &mut Self::Facts,
+            completion: Self::Completion,
+            context: &mut TransitionContext<'_>,
+        ) -> Vec<Self::Effect> {
+            self.on_event(facts, PolicyEvent::Completed(completion), context)
+        }
+
+        fn on_expiry(&self, _facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {
+            self.lifecycle.borrow_mut().push("expiry");
+        }
+        fn on_cancel(&self, _facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {
+            self.lifecycle.borrow_mut().push("cancel");
+        }
+        fn on_crash_restart(&self, facts: &mut Self::Facts, context: &mut TransitionContext<'_>) {
+            self.lifecycle.borrow_mut().push("restart");
+            let _ = self.on_event(facts, PolicyEvent::ProcessRestarted, context);
+        }
+        fn invariant_violation(&self, _facts: &Self::Facts) -> Option<String> {
+            None
+        }
+        fn redacted_state(&self, facts: &Self::Facts) -> String {
+            facts.as_ref().map_or_else(
+                || "clear".into(),
+                |record| format!("armed={};attempt={}", record.armed, record.attempt),
+            )
+        }
+        fn facts_size_bytes(&self, facts: &Self::Facts) -> usize {
+            facts
+                .as_ref()
+                .map_or(0, |_| std::mem::size_of::<FailureRecord>())
+        }
+        fn event_size_bytes(&self, _event: &Self::Event) -> usize {
+            std::mem::size_of::<PolicyEvent>()
+        }
+        fn completion_size_bytes(&self, _completion: &Self::Completion) -> usize {
+            std::mem::size_of::<CompletionToken>()
+        }
+    }
+
+    struct PolicyPersistenceHarnessDomain {
+        writer: RefCell<WriterConnection>,
+        effects: RefCell<Vec<PolicyAction>>,
+        sql_error: RefCell<Option<String>>,
+        randomness: RefCell<ApprovedTestRandomness>,
+    }
+
+    impl PolicyPersistenceHarnessDomain {
+        fn new(writer: WriterConnection) -> Self {
+            Self {
+                writer: RefCell::new(writer),
+                effects: RefCell::new(Vec::new()),
+                sql_error: RefCell::new(None),
+                randomness: RefCell::new(ApprovedTestRandomness::seeded()),
+            }
+        }
+
+        fn apply(
+            &self,
+            facts: &mut Option<FailureRecord>,
+            action: PolicyAction,
+        ) -> Vec<PolicyAction> {
+            let expected_current = facts.as_ref().and_then(|record| {
+                record
+                    .destination_id
+                    .as_ref()
+                    .map(|_| record.failure_id.clone())
+            });
+            if let Some(operation) =
+                PreparedFailureOperation::from_policy_action(action.clone(), expected_current)
+            {
+                let mut writer = self.writer.borrow_mut();
+                let result = (|| {
+                    let transaction = writer.connection_mut().transaction()?;
+                    operation.execute(&transaction)?;
+                    transaction.commit()
+                })();
+                if let Err(error) = result {
+                    *self.sql_error.borrow_mut() = Some(format!("persistence-cas:{error}"));
+                    return vec![action];
+                }
+            }
+            match &action {
+                PolicyAction::Persist(record)
+                | PolicyAction::RetryNow(record)
+                | PolicyAction::Rearmed { record, .. } => *facts = Some(record.clone()),
+                PolicyAction::Clear { .. } => *facts = None,
+                PolicyAction::Suppressed
+                | PolicyAction::StaleCompletion
+                | PolicyAction::RejectedRearm
+                | PolicyAction::Noop => {}
+            }
+            self.effects.borrow_mut().push(action.clone());
+            vec![action]
+        }
+    }
+
+    impl TransitionSystem for PolicyPersistenceHarnessDomain {
+        type Facts = Option<FailureRecord>;
+        type Event = PolicyEvent;
+        type Effect = PolicyAction;
+        type Completion = CompletionToken;
+
+        fn on_event(
+            &self,
+            facts: &mut Self::Facts,
+            event: Self::Event,
+            context: &mut TransitionContext<'_>,
+        ) -> Vec<Self::Effect> {
+            let mut randomness = self.randomness.borrow_mut();
+            let mut policy_context = TransitionContext {
+                clock: context.clock,
+                randomness: &mut *randomness,
+            };
+            self.apply(
+                facts,
+                transition(facts.as_ref(), event, &mut policy_context),
+            )
+        }
+
+        fn on_completion(
+            &self,
+            facts: &mut Self::Facts,
+            completion: Self::Completion,
+            context: &mut TransitionContext<'_>,
+        ) -> Vec<Self::Effect> {
+            self.on_event(facts, PolicyEvent::Completed(completion), context)
+        }
+
+        fn on_expiry(&self, _facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {}
+        fn on_cancel(&self, _facts: &mut Self::Facts, _context: &mut TransitionContext<'_>) {}
+        fn on_crash_restart(&self, facts: &mut Self::Facts, context: &mut TransitionContext<'_>) {
+            let _ = self.on_event(facts, PolicyEvent::ProcessRestarted, context);
+        }
+        fn invariant_violation(&self, _facts: &Self::Facts) -> Option<String> {
+            self.sql_error.borrow().clone()
+        }
+        fn redacted_state(&self, facts: &Self::Facts) -> String {
+            facts.as_ref().map_or_else(
+                || "clear".into(),
+                |record| format!("armed={};attempt={}", record.armed, record.attempt),
+            )
+        }
+        fn facts_size_bytes(&self, facts: &Self::Facts) -> usize {
+            facts
+                .as_ref()
+                .map_or(0, |_| std::mem::size_of::<FailureRecord>())
+        }
+        fn event_size_bytes(&self, _event: &Self::Event) -> usize {
+            std::mem::size_of::<PolicyEvent>()
+        }
+        fn completion_size_bytes(&self, _completion: &Self::Completion) -> usize {
+            std::mem::size_of::<CompletionToken>()
+        }
+    }
+
+    fn persisted(action: PolicyAction) -> FailureRecord {
+        match action {
+            PolicyAction::Persist(record) => record,
+            other => panic!("expected persisted action, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn shared_bounded_harness_replays_policy_vectors_deterministically() {
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 0)),
+        ));
+        let completion = CompletionToken {
+            failure_id: record.failure_id.clone(),
+            fingerprint: record.fingerprint.clone(),
+            capture_epoch: "epoch-a".into(),
+            generation: Some(7),
+            attempt: record.attempt,
+        };
+        let steps = vec![
+            ScheduledStep::new("restart", ScheduledAction::CrashRestart),
+            ScheduledStep::new("advance", ScheduledAction::AdvanceClock(20_000)),
+            ScheduledStep::new("due", ScheduledAction::Event(PolicyEvent::RetryDue)),
+            ScheduledStep::new("complete", ScheduledAction::Completion(completion)),
+        ];
+        let harness = Harness::new(HarnessBudget {
+            max_steps: 8,
+            max_trace_entries: 8,
+            max_minimizer_runs: 8,
+            max_redacted_bytes: 256,
+            max_state_bytes: 4_096,
+            max_scheduled_payload_bytes: 4_096,
+        })
+        .unwrap();
+        let seed = ScheduleSeed::splitmix64(SCHEDULE_HARNESS_SEED_U64);
+        let one = harness
+            .execute(
+                &PolicyHarnessDomain::default(),
+                Some(record.clone()),
+                &steps,
+                seed.clone(),
+            )
+            .unwrap();
+        let two = harness
+            .execute(&PolicyHarnessDomain::default(), Some(record), &steps, seed)
+            .unwrap();
+        assert_eq!(
+            serde_json::to_vec(&one).unwrap(),
+            serde_json::to_vec(&two).unwrap()
+        );
+        assert_eq!(one.entries.len(), 4);
+        assert!(one.violation.is_none());
+    }
+
+    #[test]
+    fn complete_policy_vector_inventory_uses_bounded_harness_schedules() {
+        let harness = Harness::new(HarnessBudget {
+            max_steps: 16,
+            max_trace_entries: 16,
+            max_minimizer_runs: 8,
+            max_redacted_bytes: 256,
+            max_state_bytes: 4_096,
+            max_scheduled_payload_bytes: 8_192,
+        })
+        .unwrap();
+        let seed = ScheduleSeed::splitmix64(SCHEDULE_HARNESS_SEED_U64);
+
+        let observe_domain = PolicyHarnessDomain::default();
+        harness
+            .execute(
+                &observe_domain,
+                None,
+                &[ScheduledStep::new(
+                    "observe",
+                    ScheduledAction::Event(PolicyEvent::Observe(observation(
+                        FailureClass::Configuration,
+                        0,
+                    ))),
+                )],
+                seed.clone(),
+            )
+            .unwrap();
+        let record = match observe_domain.last_effect() {
+            PolicyAction::Persist(record) => record,
+            other => panic!("observe did not persist: {other:?}"),
+        };
+
+        let automatic = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 0)),
+        ));
+        let automatic_domain = PolicyHarnessDomain::default();
+        harness
+            .execute(
+                &automatic_domain,
+                Some(automatic.clone()),
+                &[ScheduledStep::new(
+                    "automatic-rearm-rejected",
+                    ScheduledAction::Event(PolicyEvent::Rearm(RearmRequest {
+                        expected_failure_id: automatic.failure_id.clone(),
+                        expected_fingerprint: automatic.fingerprint.clone(),
+                        authorization_token: rearm_authorization(&automatic, "automatic-token"),
+                        relevant_configuration_change: None,
+                        retained_wal_proven: true,
+                        integrity_recovery_proven: true,
+                        continuity_recovery_proven: true,
+                        explicit_operator_authorization: true,
+                    })),
+                )],
+                seed.clone(),
+            )
+            .unwrap();
+        assert_eq!(automatic_domain.last_effect(), PolicyAction::RejectedRearm);
+
+        let mut replacement = observation(FailureClass::Configuration, 0).fingerprint;
+        replacement.relevant_configuration_fingerprint = "config-b".into();
+        let config_domain = PolicyHarnessDomain::default();
+        let config_steps = [
+            ScheduledStep::new("advance-for-rearm", ScheduledAction::AdvanceClock(20_000)),
+            ScheduledStep::new(
+                "configuration-proof",
+                ScheduledAction::Event(PolicyEvent::Rearm(RearmRequest {
+                    expected_failure_id: record.failure_id.clone(),
+                    expected_fingerprint: record.fingerprint.clone(),
+                    authorization_token: rearm_authorization(&record, "configuration-token"),
+                    relevant_configuration_change: Some(RelevantConfigurationChange {
+                        previous: observation(FailureClass::Configuration, 0).fingerprint,
+                        replacement,
+                    }),
+                    retained_wal_proven: true,
+                    integrity_recovery_proven: false,
+                    continuity_recovery_proven: false,
+                    explicit_operator_authorization: false,
+                })),
+            ),
+        ];
+        harness
+            .execute(
+                &config_domain,
+                Some(record.clone()),
+                &config_steps,
+                seed.clone(),
+            )
+            .unwrap();
+        assert!(matches!(
+            config_domain.last_effect(),
+            PolicyAction::Rearmed { .. }
+        ));
+
+        let stale_domain = PolicyHarnessDomain::default();
+        harness
+            .execute(
+                &stale_domain,
+                Some(record.clone()),
+                &[ScheduledStep::new(
+                    "stale-completion",
+                    ScheduledAction::Completion(CompletionToken {
+                        failure_id: record.failure_id.clone(),
+                        fingerprint: record.fingerprint.clone(),
+                        capture_epoch: "stale-epoch".into(),
+                        generation: Some(7),
+                        attempt: record.attempt,
+                    }),
+                )],
+                seed.clone(),
+            )
+            .unwrap();
+        assert_eq!(stale_domain.last_effect(), PolicyAction::StaleCompletion);
+
+        let due_record = persisted(run_transition_at(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 0)),
+            0,
+        ));
+        let due_domain = PolicyHarnessDomain::default();
+        let due_steps = [
+            ScheduledStep::new("advance-to-due", ScheduledAction::AdvanceClock(20_000)),
+            ScheduledStep::new("retry-due", ScheduledAction::Event(PolicyEvent::RetryDue)),
+        ];
+        harness
+            .execute(
+                &due_domain,
+                Some(due_record.clone()),
+                &due_steps,
+                seed.clone(),
+            )
+            .unwrap();
+        assert!(matches!(
+            due_domain.last_effect(),
+            PolicyAction::RetryNow(_)
+        ));
+
+        let completion_domain = PolicyHarnessDomain::default();
+        harness
+            .execute(
+                &completion_domain,
+                Some(due_record.clone()),
+                &[ScheduledStep::new(
+                    "valid-completion",
+                    ScheduledAction::Completion(CompletionToken {
+                        failure_id: due_record.failure_id.clone(),
+                        fingerprint: due_record.fingerprint.clone(),
+                        capture_epoch: "epoch-a".into(),
+                        generation: Some(7),
+                        attempt: due_record.attempt,
+                    }),
+                )],
+                seed.clone(),
+            )
+            .unwrap();
+        let clear = completion_domain.last_effect();
+        assert!(matches!(clear, PolicyAction::Clear { .. }));
+        assert!(matches!(
+            PreparedFailureOperation::from_policy_action(clear, None),
+            Some(PreparedFailureOperation::Clear { .. })
+        ));
+
+        let mut cleared = due_record;
+        cleared.armed = false;
+        cleared.next_retry_at_ms = None;
+        let recurrence_domain = PolicyHarnessDomain::default();
+        harness
+            .execute(
+                &recurrence_domain,
+                Some(cleared),
+                &[ScheduledStep::new(
+                    "cleared-recurrence",
+                    ScheduledAction::Event(PolicyEvent::Observe(observation(
+                        FailureClass::TransientIo,
+                        0,
+                    ))),
+                )],
+                seed.clone(),
+            )
+            .unwrap();
+        assert!(matches!(
+            recurrence_domain.last_effect(),
+            PolicyAction::Persist(_)
+        ));
+
+        let ordering_domain = PolicyHarnessDomain::default();
+        let ordering = [
+            ScheduledStep::new("restart", ScheduledAction::CrashRestart),
+            ScheduledStep::new("expiry", ScheduledAction::Expire),
+            ScheduledStep::new("cancel", ScheduledAction::Cancel),
+        ];
+        let trace = harness
+            .execute(&ordering_domain, Some(record), &ordering, seed)
+            .unwrap();
+        assert_eq!(trace.entries.len(), 3);
+        let lifecycle = ordering_domain.lifecycle.borrow();
+        assert_eq!(lifecycle.len(), 3);
+        assert!(lifecycle.contains(&"restart"));
+        assert!(lifecycle.contains(&"expiry"));
+        assert!(lifecycle.contains(&"cancel"));
+    }
+
+    #[test]
+    fn persistence_cas_projections_execute_inside_bounded_harness() {
+        let path = temp_path();
+        let writer = open_writer(&path, "harness-run", 1, 0).unwrap();
+        writer.connection().execute(
+            "INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','archive','config-a','epoch-a',7)",
+            [],
+        ).unwrap();
+        let domain = PolicyPersistenceHarnessDomain::new(writer);
+        let harness = Harness::new(HarnessBudget {
+            max_steps: 4,
+            max_trace_entries: 4,
+            max_minimizer_runs: 4,
+            max_redacted_bytes: 256,
+            max_state_bytes: 4_096,
+            max_scheduled_payload_bytes: 4_096,
+        })
+        .unwrap();
+        let seed = ScheduleSeed::splitmix64(SCHEDULE_HARNESS_SEED_U64);
+        let observed = harness
+            .execute(
+                &domain,
+                None,
+                &[ScheduledStep::new(
+                    "persist-observe",
+                    ScheduledAction::Event(PolicyEvent::Observe(observation(
+                        FailureClass::Integrity,
+                        0,
+                    ))),
+                )],
+                seed.clone(),
+            )
+            .unwrap();
+        assert!(observed.violation.is_none());
+        let record = match domain.effects.borrow().last().cloned().unwrap() {
+            PolicyAction::Persist(record) => record,
+            other => panic!("expected persisted harness effect, got {other:?}"),
+        };
+        assert!(
+            load_failure(
+                domain.writer.borrow().connection(),
+                &record.failure_id,
+                boundary(),
+            )
+            .unwrap()
+            .is_some()
+        );
+
+        let rearm_steps = [
+            ScheduledStep::new("advance", ScheduledAction::AdvanceClock(20_000)),
+            ScheduledStep::new(
+                "rearm-cas",
+                ScheduledAction::Event(PolicyEvent::Rearm(RearmRequest {
+                    expected_failure_id: record.failure_id.clone(),
+                    expected_fingerprint: record.fingerprint.clone(),
+                    authorization_token: rearm_authorization(&record, "harness-rearm"),
+                    relevant_configuration_change: None,
+                    retained_wal_proven: false,
+                    integrity_recovery_proven: true,
+                    continuity_recovery_proven: false,
+                    explicit_operator_authorization: false,
+                })),
+            ),
+        ];
+        let rearmed_trace = harness
+            .execute(&domain, Some(record.clone()), &rearm_steps, seed.clone())
+            .unwrap();
+        assert!(rearmed_trace.violation.is_none());
+        let rearmed = load_failure(
+            domain.writer.borrow().connection(),
+            &record.failure_id,
+            boundary(),
+        )
+        .unwrap()
+        .unwrap();
+        assert!(rearmed.last_rearm_token_digest.is_some());
+
+        let completion = CompletionToken {
+            failure_id: rearmed.failure_id.clone(),
+            fingerprint: rearmed.fingerprint.clone(),
+            capture_epoch: "epoch-a".into(),
+            generation: Some(7),
+            attempt: rearmed.attempt,
+        };
+        let cleared = harness
+            .execute(
+                &domain,
+                Some(rearmed),
+                &[ScheduledStep::new(
+                    "clear-cas",
+                    ScheduledAction::Completion(completion),
+                )],
+                seed,
+            )
+            .unwrap();
+        assert!(cleared.violation.is_none());
+        let stored: (i64, Option<String>) = domain.writer.borrow().connection().query_row(
+            "SELECT f.armed,d.current_failure_id FROM processing_failures f JOIN destinations d ON d.destination_id=f.destination_id WHERE f.failure_id=?1",
+            [&record.failure_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        ).unwrap();
+        assert_eq!(stored, (0, None));
+        drop(domain);
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(path.with_extension("sqlite-wal"));
+        let _ = fs::remove_file(path.with_extension("sqlite-shm"));
+    }
+
+    #[test]
+    fn exhaustive_classes_have_closed_stable_serialization() {
+        let names: Vec<_> = FailureClass::ALL.iter().map(|c| c.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                "transient_io",
+                "transient_source",
+                "transient_destination",
+                "rate_limited",
+                "integrity",
+                "unsupported",
+                "ownership_lost",
+                "configuration"
+            ]
+        );
+        for class in FailureClass::ALL {
+            assert_eq!(
+                serde_json::from_str::<FailureClass>(&serde_json::to_string(&class).unwrap())
+                    .unwrap(),
+                class
+            );
+        }
+        for code in StableErrorCode::ALL {
+            let serialized = serde_json::to_string(&code).unwrap();
+            assert_eq!(serialized, format!(r#""{}""#, code.as_str()));
+            assert_eq!(
+                serde_json::from_str::<StableErrorCode>(&serialized).unwrap(),
+                code
+            );
+        }
+        assert!(serde_json::from_str::<StableErrorCode>("\"transport_unavailable\"").is_err());
+        for class in [
+            FailureClass::TransientIo,
+            FailureClass::TransientSource,
+            FailureClass::TransientDestination,
+            FailureClass::RateLimited,
+        ] {
+            assert!(is_automatic_retry(class));
+        }
+        for class in [
+            FailureClass::Integrity,
+            FailureClass::Unsupported,
+            FailureClass::OwnershipLost,
+            FailureClass::Configuration,
+        ] {
+            assert!(!is_automatic_retry(class));
+        }
+    }
+
+    #[test]
+    fn approved_chacha20_seed_expansion_and_draw_order_match_golden_vectors() {
+        assert_eq!(hex_seed_bytes(JITTER_TEST_SEED), b"BCDC_RETRY_V01");
+        let expanded = approved_test_seed();
+        assert_eq!(
+            expanded,
+            [
+                0x42, 0x43, 0x44, 0x43, 0x5f, 0x52, 0x45, 0x54, 0x52, 0x59, 0x5f, 0x56, 0x30, 0x31,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ]
+        );
+
+        // Draw exactly once per ascending attempt. `next_u64` assembly, stream position,
+        // zero padding, exponential capping, or modulo drift changes this complete vector.
+        let expected = [
+            (1, 2_469_525_849_052_024_087, 250, 132),
+            (2, 14_682_752_550_997_020_102, 500, 273),
+            (3, 6_383_775_579_002_771_793, 1_000, 844),
+            (4, 18_292_979_100_849_785_532, 2_000, 204),
+            (5, 12_610_900_134_770_089_858, 4_000, 3_694),
+            (6, 12_413_990_053_327_801_956, 8_000, 7_521),
+            (7, 13_472_926_905_698_362_994, 16_000, 8_489),
+            (8, 6_063_425_432_550_872_070, 30_000, 11_847),
+            (9, 15_583_386_212_084_045_179, 30_000, 12_137),
+            (10, 5_276_732_411_777_251_899, 30_000, 29_910),
+        ];
+        let mut randomness = ApprovedTestRandomness::seeded();
+        for (attempt, expected_sample, nominal, expected_delay) in expected {
+            let sample = randomness.next_u64();
+            assert_eq!(
+                sample, expected_sample,
+                "ChaCha20 draw for attempt {attempt}"
+            );
+            assert_eq!(retry_delay_ms(sample, attempt), expected_delay);
+            assert_eq!(
+                BASE_DELAY_MS
+                    .saturating_mul(1_u64 << attempt.saturating_sub(1))
+                    .min(MAX_DELAY_MS),
+                nominal
+            );
+        }
+    }
+
+    #[test]
+    fn deterministic_schedule_caps_jitters_and_ignores_clock_rollback() {
+        let first = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 10_000)),
+        ));
+        assert!((first.next_retry_at_ms.unwrap() - 10_000) <= 250);
+        let replay = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 10_000)),
+        ));
+        assert_eq!(first, replay);
+        let second = persisted(run_transition_at(
+            Some(&first),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 1)),
+            1,
+        ));
+        assert_eq!(second.last_failed_at_ms, 10_000);
+        assert!((second.next_retry_at_ms.unwrap() - 10_000) <= 500);
+        let mut current = second;
+        for _ in 2..MAX_ATTEMPTS {
+            current = persisted(run_transition(
+                Some(&current),
+                PolicyEvent::Observe(observation(FailureClass::TransientIo, 10_000)),
+            ));
+        }
+        assert!(current.next_retry_at_ms.unwrap() - 10_000 <= MAX_DELAY_MS);
+        let exhausted = persisted(run_transition(
+            Some(&current),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 10_000)),
+        ));
+        assert_eq!(exhausted.attempt, MAX_ATTEMPTS + 1);
+        assert_eq!(exhausted.next_retry_at_ms, None);
+    }
+
+    #[test]
+    fn restart_preserves_attempt_and_same_deterministic_failure_is_suppressed() {
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::Unsupported, 50)),
+        ));
+        assert_eq!(
+            run_transition(Some(&record), PolicyEvent::ProcessRestarted),
+            PolicyAction::Persist(record.clone())
+        );
+        assert_eq!(
+            run_transition(
+                Some(&record),
+                PolicyEvent::Observe(observation(FailureClass::Unsupported, 60))
+            ),
+            PolicyAction::Suppressed
+        );
+    }
+
+    #[test]
+    fn fingerprint_changes_only_for_allowed_canonical_inputs_and_contains_no_raw_data() {
+        let input = observation(FailureClass::Integrity, 0).fingerprint;
+        let one = build_fingerprint(&input);
+        let mut changed = input.clone();
+        changed
+            .context
+            .insert(SafeContextKey::LimitKind, SafeContextValue::JournalBytes);
+        let two = build_fingerprint(&changed);
+        assert_ne!(one, two);
+        assert_eq!(one.len(), 71);
+        assert!(!one.contains("publish"));
+        assert!(!one.contains("epoch-a"));
+
+        let collision_left = FailedBoundary::Capture {
+            capture_epoch: "a|b".into(),
+            end_lsn: "c".into(),
+        };
+        let collision_right = FailedBoundary::Capture {
+            capture_epoch: "a".into(),
+            end_lsn: "b|c".into(),
+        };
+        assert_ne!(collision_left.canonical(), collision_right.canonical());
+        let mut left = input.clone();
+        left.boundary = collision_left;
+        let mut right = input;
+        right.boundary = collision_right;
+        assert_ne!(build_fingerprint(&left), build_fingerprint(&right));
+    }
+
+    #[test]
+    fn rearm_requires_class_specific_proofs_and_rejects_unrelated_change() {
+        for class in [
+            FailureClass::Integrity,
+            FailureClass::OwnershipLost,
+            FailureClass::Configuration,
+            FailureClass::Unsupported,
+        ] {
+            let record = persisted(run_transition(
+                None,
+                PolicyEvent::Observe(observation(class, 100)),
+            ));
+            let base = RearmRequest {
+                expected_failure_id: record.failure_id.clone(),
+                expected_fingerprint: record.fingerprint.clone(),
+                authorization_token: rearm_authorization(&record, &format!("rearm-{class:?}")),
+                relevant_configuration_change: None,
+                retained_wal_proven: false,
+                integrity_recovery_proven: false,
+                continuity_recovery_proven: false,
+                explicit_operator_authorization: false,
+            };
+            assert_eq!(
+                run_transition(Some(&record), PolicyEvent::Rearm(base.clone())),
+                PolicyAction::RejectedRearm
+            );
+            let mut allowed = base;
+            match class {
+                FailureClass::Integrity => allowed.integrity_recovery_proven = true,
+                FailureClass::OwnershipLost => {
+                    allowed.continuity_recovery_proven = true;
+                    allowed.retained_wal_proven = true;
+                }
+                FailureClass::Configuration => {
+                    allowed.retained_wal_proven = true;
+                    let previous = observation(FailureClass::Configuration, 0).fingerprint;
+                    let mut replacement = previous.clone();
+                    replacement.relevant_configuration_fingerprint = "config-b".into();
+                    allowed.relevant_configuration_change = Some(RelevantConfigurationChange {
+                        previous,
+                        replacement,
+                    });
+                }
+                FailureClass::Unsupported => allowed.explicit_operator_authorization = true,
+                _ => unreachable!(),
+            }
+            assert!(matches!(
+                run_transition_at(Some(&record), PolicyEvent::Rearm(allowed), 20_000),
+                PolicyAction::Rearmed { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn stale_epoch_generation_attempt_and_fingerprint_completions_cannot_clear() {
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 0)),
+        ));
+        let valid = CompletionToken {
+            failure_id: record.failure_id.clone(),
+            fingerprint: record.fingerprint.clone(),
+            capture_epoch: "epoch-a".into(),
+            generation: Some(7),
+            attempt: 1,
+        };
+        assert_eq!(
+            run_transition(Some(&record), PolicyEvent::Completed(valid.clone())),
+            PolicyAction::Clear {
+                failure_id: record.failure_id.clone(),
+                fingerprint: record.fingerprint.clone(),
+                attempt: record.attempt,
+                destination_id: record.destination_id.clone(),
+                capture_epoch: "epoch-a".into(),
+                generation: Some(7),
+            }
+        );
+        for stale in [
+            CompletionToken {
+                attempt: 2,
+                ..valid.clone()
+            },
+            CompletionToken {
+                generation: Some(8),
+                ..valid.clone()
+            },
+            CompletionToken {
+                capture_epoch: "epoch-b".into(),
+                ..valid.clone()
+            },
+            CompletionToken {
+                fingerprint: "sha256:stale".into(),
+                ..valid
+            },
+        ] {
+            assert_eq!(
+                run_transition(Some(&record), PolicyEvent::Completed(stale)),
+                PolicyAction::StaleCompletion
+            );
+        }
+    }
+
+    #[test]
+    fn retry_due_boundaries_and_cleared_recurrence_fail_closed() {
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 0)),
+        ));
+        let due = record.next_retry_at_ms.unwrap();
+        assert_eq!(
+            run_transition_at(Some(&record), PolicyEvent::RetryDue, due - 1),
+            PolicyAction::Noop
+        );
+        assert_eq!(
+            run_transition_at(Some(&record), PolicyEvent::RetryDue, due),
+            PolicyAction::RetryNow(record.clone())
+        );
+        let mut cleared = record;
+        cleared.armed = false;
+        cleared.next_retry_at_ms = None;
+        let recurrence = persisted(run_transition(
+            Some(&cleared),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, due + 1)),
+        ));
+        assert!(recurrence.armed);
+        assert_eq!(recurrence.attempt, cleared.attempt + 1);
+        let automatic_rearm = RearmRequest {
+            expected_failure_id: recurrence.failure_id.clone(),
+            expected_fingerprint: recurrence.fingerprint.clone(),
+            authorization_token: rearm_authorization(&recurrence, "automatic-rearm"),
+            relevant_configuration_change: None,
+            retained_wal_proven: true,
+            integrity_recovery_proven: true,
+            continuity_recovery_proven: true,
+            explicit_operator_authorization: true,
+        };
+        assert_eq!(
+            run_transition_at(
+                Some(&recurrence),
+                PolicyEvent::Rearm(automatic_rearm),
+                due + 2
+            ),
+            PolicyAction::RejectedRearm
+        );
+    }
+
+    #[test]
+    fn non_transient_rearm_is_persistable_and_stale_operations_are_rejected() {
+        let path = temp_path();
+        let mut writer = open_writer(&path, "run", 1, 0).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','archive','config-a','epoch-a',7)", []).unwrap();
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::Integrity, 0)),
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: record.clone(),
+            expected_current_failure_id: None,
+        }
+        .execute(&tx)
+        .unwrap();
+        tx.commit().unwrap();
+        let request = RearmRequest {
+            expected_failure_id: record.failure_id.clone(),
+            expected_fingerprint: record.fingerprint.clone(),
+            authorization_token: rearm_authorization(&record, "integrity-rearm-1"),
+            relevant_configuration_change: None,
+            retained_wal_proven: false,
+            integrity_recovery_proven: true,
+            continuity_recovery_proven: false,
+            explicit_operator_authorization: false,
+        };
+        let (rearmed, expected_last_failed_at_ms, expected_last_rearm_token_digest) =
+            match run_transition_at(Some(&record), PolicyEvent::Rearm(request.clone()), 20_000) {
+                PolicyAction::Rearmed {
+                    record,
+                    expected_last_failed_at_ms,
+                    expected_last_rearm_token_digest,
+                } => (
+                    record,
+                    expected_last_failed_at_ms,
+                    expected_last_rearm_token_digest,
+                ),
+                other => panic!("expected rearm, got {other:?}"),
+            };
+        assert_eq!(rearmed.next_retry_at_ms, None);
+        assert!(rearmed.last_failed_at_ms > expected_last_failed_at_ms);
+        let tx = writer.connection_mut().transaction().unwrap();
+        let prepared_rearm = PreparedFailureOperation::Rearm {
+            record: rearmed.clone(),
+            expected_last_failed_at_ms,
+            expected_last_rearm_token_digest,
+        };
+        prepared_rearm.execute(&tx).unwrap();
+        tx.commit().unwrap();
+
+        drop(writer);
+        let mut writer = open_writer(&path, "run-reopened", 2, 21_000).unwrap();
+        let reopened = load_failure(writer.connection(), &record.failure_id, boundary())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            reopened.last_rearm_token_digest,
+            rearmed.last_rearm_token_digest
+        );
+        let revision_before_replay: u64 = writer
+            .connection()
+            .query_row(
+                "SELECT revision FROM destinations WHERE destination_id='destination-a'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        assert!(
+            prepared_rearm.execute(&tx).is_err(),
+            "one durable token may be consumed only once"
+        );
+        tx.commit().unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT revision FROM destinations WHERE destination_id='destination-a'",
+                    [],
+                    |row| row.get::<_, u64>(0)
+                )
+                .unwrap(),
+            revision_before_replay
+        );
+        assert_eq!(
+            load_failure(writer.connection(), &record.failure_id, boundary())
+                .unwrap()
+                .unwrap()
+                .last_rearm_token_digest,
+            rearmed.last_rearm_token_digest
+        );
+
+        let second_request = RearmRequest {
+            expected_failure_id: reopened.failure_id.clone(),
+            expected_fingerprint: reopened.fingerprint.clone(),
+            authorization_token: rearm_authorization(&reopened, "integrity-rearm-2"),
+            relevant_configuration_change: None,
+            retained_wal_proven: false,
+            integrity_recovery_proven: true,
+            continuity_recovery_proven: false,
+            explicit_operator_authorization: false,
+        };
+        let stale_destination_rearm =
+            match run_transition_at(Some(&reopened), PolicyEvent::Rearm(second_request), 22_000) {
+                PolicyAction::Rearmed {
+                    record,
+                    expected_last_failed_at_ms,
+                    expected_last_rearm_token_digest,
+                } => PreparedFailureOperation::Rearm {
+                    record,
+                    expected_last_failed_at_ms,
+                    expected_last_rearm_token_digest,
+                },
+                other => panic!("expected second prepared rearm, got {other:?}"),
+            };
+        writer
+            .connection()
+            .execute(
+                "UPDATE destinations SET generation=8,revision=revision+1 WHERE destination_id='destination-a'",
+                [],
+            )
+            .unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        assert!(stale_destination_rearm.execute(&tx).is_err());
+        tx.rollback().unwrap();
+        writer
+            .connection()
+            .execute(
+                "UPDATE destinations SET generation=7,revision=revision+1 WHERE destination_id='destination-a'",
+                [],
+            )
+            .unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        stale_destination_rearm.execute(&tx).unwrap();
+        tx.commit().unwrap();
+        let twice_rearmed = load_failure(writer.connection(), &record.failure_id, boundary())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            run_transition_at(Some(&twice_rearmed), PolicyEvent::Rearm(request), 23_000,),
+            PolicyAction::RejectedRearm,
+            "token A remains consumed after token B is consumed"
+        );
+
+        let newer = persisted(run_transition(
+            Some(&record),
+            PolicyEvent::Observe(FailureObservation {
+                fingerprint: FingerprintInput {
+                    class: FailureClass::TransientIo,
+                    ..observation(FailureClass::TransientIo, 0).fingerprint
+                },
+                destination_id: Some("destination-a".into()),
+            }),
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        // A different fingerprint receives a different immutable failure id.
+        PreparedFailureOperation::StoreAndArm {
+            record: newer,
+            expected_current_failure_id: Some(record.failure_id.clone()),
+        }
+        .execute(&tx)
+        .unwrap();
+        tx.commit().unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        let stale_store = PreparedFailureOperation::StoreAndArm {
+            record: record.clone(),
+            expected_current_failure_id: None,
+        };
+        assert!(stale_store.execute(&tx).is_err());
+        tx.rollback().unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        let stale_clear = PreparedFailureOperation::Clear {
+            failure_id: record.failure_id.clone(),
+            fingerprint: record.fingerprint.clone(),
+            attempt: record.attempt + 1,
+            destination_id: record.destination_id.clone(),
+            capture_epoch: "epoch-a".into(),
+            generation: Some(7),
+        };
+        assert!(stale_clear.execute(&tx).is_err());
+        tx.rollback().unwrap();
+        drop(writer);
+        let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn synthetic_hooks_fail_closed_on_close_run_and_generation_mismatch() {
+        let hook = StrictDomainHook;
+        let capture = DomainHookInput::Capture {
+            outcome: CaptureOutcome::ExpectedClose,
+            run_id: "run-1".into(),
+            expected_close_run_id: Some("run-1".into()),
+            capture_epoch: "epoch".into(),
+            connection_generation: 4,
+            expected_close_generation: Some(3),
+        };
+        assert_eq!(hook.project(&capture), DomainProjection::OwnershipLost);
+        assert_eq!(
+            hook.project(&DomainHookInput::Capture {
+                outcome: CaptureOutcome::ExpectedClose,
+                run_id: "run-1".into(),
+                expected_close_run_id: Some("run-1".into()),
+                capture_epoch: "epoch".into(),
+                connection_generation: 4,
+                expected_close_generation: Some(4),
+            }),
+            DomainProjection::ExpectedClose
+        );
+        assert_eq!(
+            hook.project(&DomainHookInput::Capture {
+                outcome: CaptureOutcome::ExpectedClose,
+                run_id: "run-2".into(),
+                expected_close_run_id: Some("run-1".into()),
+                capture_epoch: "epoch".into(),
+                connection_generation: 4,
+                expected_close_generation: Some(4),
+            }),
+            DomainProjection::OwnershipLost
+        );
+        assert_eq!(
+            hook.project(&DomainHookInput::ClickHouse {
+                outcome: DestinationOutcome::IntegrityRecoveryRequired,
+                capture_epoch: "epoch".into(),
+                generation: 7,
+            }),
+            DomainProjection::RecoveryRequired
+        );
+        assert_eq!(
+            hook.project(&DomainHookInput::Archive {
+                outcome: DestinationOutcome::Blocked,
+                capture_epoch: "epoch".into(),
+                generation: 7,
+            }),
+            DomainProjection::Blocked
+        );
+    }
+
+    fn temp_path() -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "boring-cdc-failure-policy-{}-{nonce}.sqlite",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn prepared_adapter_persists_reopens_and_clears_via_supplied_transaction() {
+        let path = temp_path();
+        let mut writer = open_writer(&path, "run", 1, 0).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','archive','config-a','epoch-a',7)", []).unwrap();
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 1_000)),
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: record.clone(),
+            expected_current_failure_id: None,
+        }
+        .execute(&tx)
+        .unwrap();
+        tx.commit().unwrap();
+        drop(writer);
+        let mut writer = open_writer(&path, "run-2", 2, 2_000).unwrap();
+        let loaded: (u32, i64, String) = writer.connection().query_row("SELECT f.attempt,f.armed,d.current_failure_id FROM processing_failures f JOIN destinations d ON d.destination_id=f.destination_id WHERE f.failure_id=?1", [&record.failure_id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).unwrap();
+        assert_eq!(loaded, (1, 1, record.failure_id.clone()));
+        assert_eq!(
+            load_failure(writer.connection(), &record.failure_id, boundary()).unwrap(),
+            Some(record.clone())
+        );
+        writer.connection().execute(
+            "UPDATE processing_failures SET fingerprint='sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' WHERE failure_id=?1",
+            [&record.failure_id],
+        ).unwrap();
+        assert!(load_failure(writer.connection(), &record.failure_id, boundary()).is_err());
+        writer
+            .connection()
+            .execute(
+                "UPDATE processing_failures SET fingerprint=?1 WHERE failure_id=?2",
+                params![record.fingerprint, record.failure_id],
+            )
+            .unwrap();
+        assert!(
+            load_failure(
+                writer.connection(),
+                &record.failure_id,
+                FailedBoundary::Destination {
+                    capture_epoch: "epoch-a".into(),
+                    generation: 7,
+                    first_seq: 11,
+                    last_seq: 20,
+                }
+            )
+            .is_err()
+        );
+        let retry = persisted(run_transition(
+            Some(&record),
+            PolicyEvent::Observe(observation(FailureClass::TransientIo, 2_000)),
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: retry.clone(),
+            expected_current_failure_id: Some(record.failure_id.clone()),
+        }
+        .execute(&tx)
+        .unwrap();
+        tx.commit().unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        assert!(
+            PreparedFailureOperation::StoreAndArm {
+                record: record.clone(),
+                expected_current_failure_id: None
+            }
+            .execute(&tx)
+            .is_err()
+        );
+        tx.rollback().unwrap();
+        writer
+            .connection()
+            .execute(
+                "UPDATE destinations SET generation=8,revision=revision+1 WHERE destination_id='destination-a'",
+                [],
+            )
+            .unwrap();
+        let revision_before_stale_clear: u64 = writer
+            .connection()
+            .query_row(
+                "SELECT revision FROM destinations WHERE destination_id='destination-a'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        assert!(
+            PreparedFailureOperation::Clear {
+                failure_id: retry.failure_id.clone(),
+                fingerprint: retry.fingerprint.clone(),
+                attempt: retry.attempt,
+                destination_id: retry.destination_id.clone(),
+                capture_epoch: "epoch-a".into(),
+                generation: Some(7),
+            }
+            .execute(&tx)
+            .is_err()
+        );
+        tx.commit().unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT revision FROM destinations WHERE destination_id='destination-a'",
+                    [],
+                    |row| row.get::<_, u64>(0)
+                )
+                .unwrap(),
+            revision_before_stale_clear
+        );
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT armed FROM processing_failures WHERE failure_id=?1",
+                    [&retry.failure_id],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            1
+        );
+        writer
+            .connection()
+            .execute(
+                "UPDATE destinations SET generation=7,revision=revision+1 WHERE destination_id='destination-a'",
+                [],
+            )
+            .unwrap();
+
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::Clear {
+            failure_id: retry.failure_id.clone(),
+            fingerprint: retry.fingerprint.clone(),
+            attempt: retry.attempt,
+            destination_id: retry.destination_id.clone(),
+            capture_epoch: "epoch-a".into(),
+            generation: Some(7),
+        }
+        .execute(&tx)
+        .unwrap();
+        tx.commit().unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT armed FROM processing_failures WHERE failure_id=?1",
+                    [&record.failure_id],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
+        drop(writer);
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(path.with_extension("sqlite-wal"));
+        let _ = fs::remove_file(path.with_extension("sqlite-shm"));
+    }
+}

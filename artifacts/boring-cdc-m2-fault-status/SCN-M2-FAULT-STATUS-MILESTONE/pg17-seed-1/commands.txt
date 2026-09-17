@@ -1,0 +1,5 @@
+TMPDIR=/var/tmp cargo clippy --locked --all-targets
+TMPDIR=/var/tmp cargo test --locked --workspace --all-targets
+TMPDIR=/var/tmp cargo test --locked m2_fault_status::tests
+TMPDIR=/var/tmp scripts/e2e/m2_fault_status.sh
+TMPDIR=/var/tmp scripts/faults/m2_fault_status.sh

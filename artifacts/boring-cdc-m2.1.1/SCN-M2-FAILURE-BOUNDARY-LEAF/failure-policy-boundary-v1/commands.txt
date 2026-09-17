@@ -1,0 +1,8 @@
+cargo fmt --all -- --check
+cargo check --locked --workspace --all-targets
+cargo test --locked failure_policy::tests
+python3 scripts/validate/failure_policy.py
+scripts/e2e/failure_policy.sh
+scripts/faults/failure_policy.sh
+scripts/validate/plan_coverage.sh
+br lint

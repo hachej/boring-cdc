@@ -1,0 +1,4 @@
+error: test failed, to rerun pass `--lib`
+
+Caused by:
+  process didn't exit successfully: `/home/ubuntu/projects/boring-cdc/.worktrees/epic-boring-cdc-m2/target/debug/deps/boring_cdc-215a04c5a0e6b11d 'm2_jsonl::tests::process_crash_and_recovery_probe' --exact --nocapture --quiet` (signal: 6, SIGABRT: process abort signal)

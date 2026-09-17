@@ -1,0 +1,5 @@
+cargo test --locked --workspace --all-targets
+target/debug/examples/m2_spool_component near-limit $TMPDIR/isolated-spool
+target/debug/examples/m2_spool_component filesystem-isolation $TMPDIR/isolated-spool
+target/debug/examples/m2_spool_component oversized $TMPDIR/isolated-spool
+target/debug/examples/m2_spool_component policy-vectors $TMPDIR/isolated-spool

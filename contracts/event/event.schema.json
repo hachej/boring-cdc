@@ -161,35 +161,6 @@
             "additionalProperties": false,
             "properties": {
               "kind": {
-                "const": "bool"
-              },
-              "type_modifier": {
-                "maximum": 2147483647,
-                "minimum": -2147483648,
-                "type": "integer"
-              },
-              "type_oid": {
-                "enum": [
-                  16
-                ],
-                "type": "integer"
-              },
-              "value": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "kind",
-              "type_oid",
-              "type_modifier",
-              "value"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "properties": {
-              "kind": {
                 "const": "int64"
               },
               "type_modifier": {
@@ -223,37 +194,6 @@
             "additionalProperties": false,
             "properties": {
               "kind": {
-                "const": "uint64"
-              },
-              "type_modifier": {
-                "maximum": 2147483647,
-                "minimum": -2147483648,
-                "type": "integer"
-              },
-              "type_oid": {
-                "enum": [
-                  26
-                ],
-                "type": "integer"
-              },
-              "value": {
-                "maximum": 18446744073709551615,
-                "minimum": 0,
-                "type": "integer"
-              }
-            },
-            "required": [
-              "kind",
-              "type_oid",
-              "type_modifier",
-              "value"
-            ],
-            "type": "object"
-          },
-          {
-            "additionalProperties": false,
-            "properties": {
-              "kind": {
                 "const": "bytes"
               },
               "type_modifier": {
@@ -267,7 +207,7 @@
               },
               "value": {
                 "maxLength": 1366,
-                "minLength": 2,
+                "minLength": 0,
                 "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$",
                 "type": "string"
               }
@@ -312,6 +252,41 @@
             "additionalProperties": false,
             "properties": {
               "kind": {
+                "const": "bytes"
+              },
+              "type_modifier": {
+                "maximum": 2147483647,
+                "minimum": -2147483648,
+                "type": "integer"
+              },
+              "type_oid": {
+                "enum": [
+                  1700,
+                  1082,
+                  1114,
+                  1184
+                ],
+                "type": "integer"
+              },
+              "value": {
+                "maxLength": 1366,
+                "minLength": 2,
+                "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "type_oid",
+              "type_modifier",
+              "value"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
                 "const": "text"
               },
               "type_modifier": {
@@ -323,14 +298,13 @@
                 "enum": [
                   25,
                   1043,
-                  1042,
-                  19
+                  1042
                 ],
                 "type": "integer"
               },
               "value": {
                 "maxLength": 1024,
-                "minLength": 1,
+                "minLength": 0,
                 "type": "string"
               }
             },
@@ -344,7 +318,7 @@
           }
         ]
       },
-      "maxItems": 32,
+      "maxItems": 8,
       "minItems": 1,
       "type": "array"
     },

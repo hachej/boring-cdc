@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-import hashlib, importlib.util, json, sqlite3, subprocess, tempfile
+import hashlib, importlib.util, json, re, sqlite3, subprocess, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; OWNER='boring-cdc-m0-storage-model'
 C=ROOT/'contracts/storage/storage-model.json'; S=ROOT/'contracts/storage/storage-model.schema.json'; Q=ROOT/'contracts/storage/sqlite-schema.sql'; F=ROOT/'fixtures/m0/storage/scenarios.json'; FS=ROOT/'contracts/storage/storage-fixtures.schema.json'; R=ROOT/'contracts/storage/storage-result.schema.json'; E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence.json'; V=Path(__file__); M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
-EXPECTED_CONTRACT_SHA256='8f09ff584867f45a7bb122f1142eab9afd17fc0384a0e711e665985d0b29e1ff'
+EXPECTED_CONTRACT_SHA256='c27dae8e706f2f454665c5dcc98b85ea85a1f7bca0179affc97b8951b2cc5ef3'
 EXPECTED_FIXTURES_SHA256='1cd91668950293580ab810814f948501b4dcbe90e40951bfcb99617ee9ef3e8b'
 core_spec=importlib.util.spec_from_file_location('core_validator',ROOT/'scripts/lib/core_validator.py'); core=importlib.util.module_from_spec(core_spec); core_spec.loader.exec_module(core)
 def load(p):
@@ -24,24 +24,27 @@ def validate():
  sf=[]; core.validate_schema_instance(f,fschema,sf,base=FS.parent,root=fschema)
  for x in sf:add(fs,'E_FIXTURE_SCHEMA',x['pointer'],x['message'])
  marker=lambda decision:f'// M0-PROVISIONAL: {decision}'
- markers={marker(x) for x in ('boring-cdc-d-sqlite','boring-cdc-d-admission','boring-cdc-d-archive-durability','boring-cdc-d-values','boring-cdc-d-wal-cap','boring-cdc-d-compose')}
+ markers={marker('boring-cdc-d-admission')}
  if set(c['provisional_markers'])!=markers:add(fs,'E_PROVISIONAL','provisional_markers','exact provisional dependency inventory changed')
  expected_nested={
-  'admission':{marker(x) for x in ('boring-cdc-d-admission','boring-cdc-d-values','boring-cdc-d-wal-cap')},
-  'filesystem':{marker(x) for x in ('boring-cdc-d-sqlite','boring-cdc-d-archive-durability')},
+  'admission':{marker(x) for x in ('boring-cdc-d-admission',)},
+  'filesystem':set(),
  }
  if set(c['admission']['provisional'])!=expected_nested['admission']:add(fs,'E_PROVISIONAL','admission/provisional','admission recommendations must retain exact decision markers')
  if set(c['filesystem']['provisional'])!=expected_nested['filesystem']:add(fs,'E_PROVISIONAL','filesystem/provisional','filesystem recommendations must retain exact decision markers')
- if c['sqlite']['provisional']!=marker('boring-cdc-d-sqlite'):add(fs,'E_PROVISIONAL','sqlite/provisional','SQLite recommendation must retain its exact decision marker')
  if c['writer_service']['provisional']!=marker('boring-cdc-d-admission'):add(fs,'E_PROVISIONAL','writer_service/provisional','writer recommendation must retain its exact decision marker')
- if c['ownership_commands']['provisional']!=marker('boring-cdc-d-compose'):add(fs,'E_PROVISIONAL','ownership_commands/provisional','ownership timing recommendations must retain the Compose decision marker')
- if marker('boring-cdc-d-sqlite') not in Q.read_text():add(fs,'E_PROVISIONAL','sqlite-schema.sql','SQLite recommendation must remain provisional')
- if c['authority']['owner_cards']!=['59a63169'] or not c['authority']['status'].startswith('provisional engineering artifact'):add(fs,'E_PROVISIONAL','authority','storage recommendations must remain bound to owner card 59a63169 without decision closure')
+ if 'provisional' in c['ownership_commands']:add(fs,'E_PROVISIONAL','ownership_commands/provisional','approved Compose literals must not retain their decision marker')
+ if marker('boring-cdc-d-sqlite') in Q.read_text() or 'provisional' in c['sqlite']:add(fs,'E_PROVISIONAL','sqlite','approved SQLite literals must not retain their decision marker')
+ if c['authority']['owner_cards']!=['59a63169'] or not c['authority']['status'].startswith('engineering artifact with accepted d-values, d-keys, d-wal-cap, d-sqlite, and d-compose literals'):add(fs,'E_PROVISIONAL','authority','accepted storage literals must remain bound to owner card 59a63169')
  p=c['sqlite']; expected=('3.45.3',4096,5000,0,16,5000,4096,10000)
  got=(p['version'],p['page_size_bytes'],p['connection_pragmas']['busy_timeout_ms'],p['connection_pragmas']['wal_autocheckpoint_pages'],p['connections']['max_readers'],p['connections']['max_reader_age_ms'],p['connections']['max_reader_pages'],p['actual_connection_attestation']['freshness_ms'])
  if got!=expected:add(fs,'E_SQLITE_LITERALS','sqlite','recommended SQLite literals changed')
+ if p['connection_pragmas']!={'busy_timeout_ms':5000,'foreign_keys':'ON','journal_size_limit_bytes':268435456,'mmap_size_bytes':0,'secure_delete':'FAST','synchronous':'FULL','temp_store':'FILE','trusted_schema':'OFF','wal_autocheckpoint_pages':0}:add(fs,'E_SQLITE_LITERALS','sqlite/connection_pragmas','accepted connection-local PRAGMAs changed')
+ if p['filesystem_attestation']!={'invalidate_on':['mount_change','device_change'],'validity_seconds':86400}:add(fs,'E_SQLITE_LITERALS','sqlite/filesystem_attestation','accepted filesystem attestation boundary changed')
+ expected_readback={'auto_vacuum':2,'foreign_keys':1,'journal_mode':'wal','journal_size_limit':268435456,'mmap_size':0,'secure_delete':2,'synchronous':2,'temp_store':1,'trusted_schema':0,'wal_autocheckpoint':0}
+ if p['actual_connection_attestation']['required_observed_values']!=expected_readback or set(p['actual_connection_attestation']['writer_applies_and_reads_back'])!=set(expected_readback):add(fs,'E_SQLITE_LITERALS','sqlite/actual_connection_attestation','accepted writer PRAGMA readback set changed')
  if p['connection_pragmas']['synchronous']!='FULL' or p['persistent_pragmas']['journal_mode']!='WAL' or p['persistent_pragmas']['auto_vacuum']!='INCREMENTAL':add(fs,'E_PRAGMA','sqlite','durability PRAGMAs weakened')
- if p['maintenance']!={'owner':'single run-owned maintenance scheduler','wal_autocheckpoint_pages':0,'checkpoint_mode':'RESTART','checkpoint_cadence_ms':1000,'checkpoint_max_wal_pages_per_attempt':4096,'checkpoint_busy_timeout_ms':50,'incremental_vacuum_max_pages':1024,'incremental_vacuum_cadence_ms':1000,'automatic_full_vacuum':'forbidden','offline_full_vacuum':'stopped and backed-up store only'}:add(fs,'E_MAINTENANCE','sqlite/maintenance','checkpoint/vacuum ownership or bound changed')
+ if p['maintenance']!={'owner':'single run-owned maintenance scheduler','wal_autocheckpoint_pages':0,'checkpoint_mode':'PASSIVE','checkpoint_cadence_ms':30000,'checkpoint_request_wal_pages':1000,'checkpoint_busy_timeout_ms':50,'incremental_vacuum_max_pages':1000,'incremental_vacuum_cadence_ms':1000,'automatic_full_vacuum':'forbidden','offline_full_vacuum':'stopped and backed-up store only'}:add(fs,'E_MAINTENANCE','sqlite/maintenance','checkpoint/vacuum ownership or bound changed')
  allow=[x['type'] for x in c['filesystem']['allowlist']]
  if allow!=['ext4','xfs'] or c['filesystem']['modes']!={'roots':'0700','database_and_sidecars':'0600','spool_intents_manifests':'0600','command_socket':'0600'}:add(fs,'E_FILESYSTEM','filesystem','allowlist or strict modes changed')
  a=c['admission']; lim=a['limits']; mem=a['runtime_memory']
@@ -80,10 +83,10 @@ def validate():
  try:
   with tempfile.TemporaryDirectory() as td:
    db=Path(td)/'journal.sqlite'; con=sqlite3.connect(db)
-   con.execute('PRAGMA page_size=4096'); con.execute('PRAGMA auto_vacuum=INCREMENTAL'); con.execute('PRAGMA journal_mode=WAL'); con.execute('PRAGMA synchronous=FULL'); con.execute('PRAGMA foreign_keys=ON'); con.execute('PRAGMA trusted_schema=OFF'); con.execute('PRAGMA wal_autocheckpoint=0'); con.execute('PRAGMA busy_timeout=5000'); con.execute('PRAGMA temp_store=FILE')
+   con.execute('PRAGMA page_size=4096'); con.execute('PRAGMA auto_vacuum=INCREMENTAL'); con.execute('PRAGMA journal_mode=WAL'); con.execute('PRAGMA synchronous=FULL'); con.execute('PRAGMA foreign_keys=ON'); con.execute('PRAGMA trusted_schema=OFF'); con.execute('PRAGMA wal_autocheckpoint=0'); con.execute('PRAGMA busy_timeout=5000'); con.execute('PRAGMA temp_store=FILE'); con.execute('PRAGMA journal_size_limit=268435456'); con.execute('PRAGMA mmap_size=0'); con.execute('PRAGMA secure_delete=FAST')
    con.executescript(Q.read_text())
-   observed=(con.execute('PRAGMA journal_mode').fetchone()[0],con.execute('PRAGMA synchronous').fetchone()[0],con.execute('PRAGMA auto_vacuum').fetchone()[0],con.execute('PRAGMA foreign_keys').fetchone()[0],con.execute('PRAGMA trusted_schema').fetchone()[0],con.execute('PRAGMA wal_autocheckpoint').fetchone()[0],con.execute('PRAGMA temp_store').fetchone()[0])
-   if observed!=('wal',2,2,1,0,0,1):add(fs,'E_ACTUAL_ATTESTATION','sqlite-schema.sql',repr(observed))
+   observed=(con.execute('PRAGMA journal_mode').fetchone()[0],con.execute('PRAGMA synchronous').fetchone()[0],con.execute('PRAGMA auto_vacuum').fetchone()[0],con.execute('PRAGMA foreign_keys').fetchone()[0],con.execute('PRAGMA trusted_schema').fetchone()[0],con.execute('PRAGMA wal_autocheckpoint').fetchone()[0],con.execute('PRAGMA temp_store').fetchone()[0],con.execute('PRAGMA journal_size_limit').fetchone()[0],con.execute('PRAGMA mmap_size').fetchone()[0],con.execute('PRAGMA secure_delete').fetchone()[0])
+   if observed!=('wal',2,2,1,0,0,1,268435456,0,2):add(fs,'E_ACTUAL_ATTESTATION','sqlite-schema.sql',repr(observed))
    tables={x[0] for x in con.execute("SELECT name FROM sqlite_schema WHERE type='table'")}; required_tables={'journal_events','source_transactions','source_state','runtime_ownership','writer_attestations','operator_command_requests','relation_schemas','destinations','destination_checkpoints','backfill_runs','backfill_generations','backfill_chunks','bootstrap_intents','bootstrap_imports','durable_capture_fences','bootstrap_anchors','reseed_intents','destination_generation_leases','destination_promotion_intents','clickhouse_batch_intents','archive_generations','archive_segment_intents','archive_segments','archive_generation_markers','processing_failures','destination_audits','logical_range_pins','condition_hysteresis','alerts','schema_migrations'}
    if not required_tables<=tables:add(fs,'E_SQL_SCHEMA','sqlite-schema.sql',','.join(sorted(required_tables-tables)))
    con.close()
@@ -105,8 +108,25 @@ def validate():
   if secret in text:add(fs,'E_SECRET','inputs',f'forbidden token {secret}')
  inputs={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in (C,S,Q,F,FS,R)}
  return fs,inputs
+def resolve_source_parent(prior,inputs,validator_sha256):
+ head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+ changed=prior.get('inputs')!=inputs or prior.get('validator_sha256')!=validator_sha256
+ candidate=head if changed else prior.get('source_parent_git_commit')
+ if not isinstance(candidate,str) or re.fullmatch(r'[0-9a-f]{40}',candidate) is None:return candidate or '', 'stored source parent must be a canonical full lowercase commit OID'
+ try: resolved=subprocess.check_output(['git','rev-parse',candidate+'^{commit}'],cwd=ROOT,text=True,stderr=subprocess.DEVNULL).strip()
+ except subprocess.CalledProcessError:return candidate,'stored source parent is not an existing commit'
+ if resolved!=candidate:return candidate,'stored source parent does not resolve canonically'
+ if subprocess.run(['git','merge-base','--is-ancestor',candidate,head],cwd=ROOT).returncode:return candidate,'stored source parent is not an ancestor of HEAD'
+ recorded={**inputs,str(V.relative_to(ROOT)):validator_sha256}
+ for path,expected in recorded.items():
+  try: blob=subprocess.check_output(['git','show',f'{candidate}:{path}'],cwd=ROOT,stderr=subprocess.DEVNULL)
+  except subprocess.CalledProcessError:return candidate,f'stored source parent is missing recorded blob {path}'
+  if hashlib.sha256(blob).hexdigest()!=expected:return candidate,f'stored source parent blob hash differs for {path}'
+ return candidate,None
 def main():
- fs,inputs=validate(); prior=load(E) if E.exists() else {}; parent=prior.get('source_parent_git_commit') or subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(); material=''.join(k+'\0'+v+'\n' for k,v in sorted(inputs.items())).encode()
- ev={'schema_version':'m0-storage-contract-evidence/v1','owner_bead':OWNER,'status':'pass' if not fs else 'fail','validator':'scripts/validate/storage_contract.py','validator_sha256':hashlib.sha256(V.read_bytes()).hexdigest(),'source_parent_git_commit':parent,'input_tree_sha256':hashlib.sha256(material).hexdigest(),'inputs':inputs,'fixture_count':len(load(F)['cases']),'actual_connection_attestation':True,'runtime_observed':False,'product_faults':'fault_not_applicable','findings':fs}
+ fs,inputs=validate(); prior=load(E) if E.exists() else {}; validator_sha256=hashlib.sha256(V.read_bytes()).hexdigest(); parent,error=resolve_source_parent(prior,inputs,validator_sha256)
+ if error:add(fs,'E_EVIDENCE_PROVENANCE','evidence/source_parent_git_commit',error)
+ material=''.join(k+'\0'+v+'\n' for k,v in sorted(inputs.items())).encode()
+ ev={'schema_version':'m0-storage-contract-evidence/v1','owner_bead':OWNER,'status':'pass' if not fs else 'fail','validator':'scripts/validate/storage_contract.py','validator_sha256':validator_sha256,'source_parent_git_commit':parent,'input_tree_sha256':hashlib.sha256(material).hexdigest(),'inputs':inputs,'fixture_count':len(load(F)['cases']),'actual_connection_attestation':True,'runtime_observed':False,'product_faults':'fault_not_applicable','findings':fs}
  E.parent.mkdir(parents=True,exist_ok=True); E.write_text(json.dumps(ev,indent=2,sort_keys=True)+'\n'); print(json.dumps(ev,sort_keys=True,separators=(',',':'))); return 0 if not fs else 1
 if __name__=='__main__': raise SystemExit(main())

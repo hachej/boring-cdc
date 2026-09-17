@@ -72,11 +72,8 @@ SPEC_INPUTS = {
 
 PROVISIONAL = {
     "boring-cdc-d-archive-durability",
-    "boring-cdc-d-compose",
     "boring-cdc-d-keys",
     "boring-cdc-d-sqlite",
-    "boring-cdc-d-values",
-    "boring-cdc-d-values.1",
     "boring-cdc-d-wal-cap",
 }
 def provisional_marker(owner: str) -> str:
@@ -86,12 +83,7 @@ def provisional_marker(owner: str) -> str:
 
 
 OPEN_DECISIONS = {
-    "boring-cdc-d-compose": {provisional_marker("boring-cdc-d-compose")},
     "boring-cdc-d-sqlite": {provisional_marker("boring-cdc-d-sqlite")},
-    "boring-cdc-d-values": {
-        provisional_marker("boring-cdc-d-values"),
-        provisional_marker("boring-cdc-d-values.1"),
-    },
     "boring-cdc-d-wal-cap": {provisional_marker("boring-cdc-d-wal-cap")},
 }
 REQUIRED_M0_OWNERS = {
@@ -231,6 +223,8 @@ def aggregate_findings(root: Path = ROOT) -> list[str]:
         if owner in OPEN_DECISIONS:
             if row.get("status") != "open" or set(row.get("provisional_markers", [])) != OPEN_DECISIONS[owner] or "approval" in row:
                 findings.append(f"{owner}: provisional decision state/marker mismatch")
+        elif row.get("provisional_markers"):
+            findings.append(f"{owner}: approved decision retains provisional marker")
         elif row.get("status") != "approved" or not isinstance(row.get("approval"), dict):
             findings.append(f"{owner}: approved decision lost approval authority")
         for executor in row.get("executor_beads", []):

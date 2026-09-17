@@ -2,6 +2,24 @@
   "decisions": [
     {
       "approval": {
+        "approved_at": "2026-09-16T06:05:55.752Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "ac120fdef10b8141596e957e678ce5df1112d1e98ca5418c1b6f6bc771c7750b"
+      },
+      "executor_beads": [
+        "boring-cdc-m5-segment-set",
+        "boring-cdc-m5-loops",
+        "boring-cdc-m5-faults"
+      ],
+      "fixture_sha256": "a9b387f549da61b42bd32ac31ea7a8a7d2e9f69bf99a000d5cb3e026065ba9e6",
+      "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
+      "id": "DEC-ARCHIVE-DURABILITY-CONTINUITY",
+      "owner_bead": "boring-cdc-d-archive-durability",
+      "proposed_value": "Archive audit is read-only with separate journal/self-consistency ranges; each pass is bounded to 67,108,864 bytes, 100,000 events, and 5,000 ms; cadence is 300 seconds and freshness is 900 seconds, so three consecutive missed cadences are inadequate service; oversized units resume in bounded chunks; identity changes restart a finite round; gaps/expiry remain partial or unknown; integrity/continuity/configuration/unsupported failures block only archive under the shared FailurePolicy with stable archive codes and unchanged capture feedback.",
+      "status": "approved"
+    },
+    {
+      "approval": {
         "approved_at": "2026-09-09T08:58:19Z",
         "approved_by": "Julien Hurault (repository owner), intention d3e8abc3-d2f4-4bc0-8aec-d6ffd7bf2e36",
         "value_digest": "36e94526528793c4f9b72508a334ffbc9af72e545faa5bb7d326b23efda69ae3"
@@ -18,20 +36,22 @@
       "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-16T06:05:55.752Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "4ace0733df1a791af2bbc65b5c958d2368f7a8224208dc07782ca0d342eba28b"
+      },
       "executor_beads": [
         "boring-cdc-m0-scaffold",
         "boring-cdc-m6-failure-matrix",
         "boring-cdc-m7-artifacts"
       ],
-      "fixture_sha256": "6a006e66448934224f60083677f3b8a6ab0de09550b2a1757144d3fc033e3c0b",
+      "fixture_sha256": "325cfbd390c2093e82910ed62a73280a457a6d61b376da48bad74fd1b27d46df",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-compose.json",
       "id": "DEC-COMPOSE-IMAGES-RUNTIME-RECOVERY",
       "owner_bead": "boring-cdc-d-compose",
-      "proposed_value": "linux/amd64 only; PostgreSQL 17.6, ClickHouse 25.8.2.29, Rust 1.89.0 Bookworm builder, and Debian bookworm-20250811-slim runtime are pinned by recommended OCI index and amd64 digests; Docker Engine 28.3.3, Compose 2.39.2, BuildKit 0.24.0, and Dockerfile frontend 1.12.0; cargo build --locked --release; project boring-cdc with postgres, clickhouse, connector and pgdata, chdata, cdcdata; connector restart unless-stopped with unlimited supervisor attempts while the provisional persisted FailurePolicy remains retry authority; PostgreSQL keepalive 30/10/3 and client check 10 seconds, measured reap <=70 seconds, takeover at 90 seconds; health 5/3/12 with 30-second start period and 120-second readiness; patch/minor changes rerun clean-pull with rollback-compatible state, major PostgreSQL/ClickHouse changes require migration plan and reseed.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-compose"
-      ],
-      "status": "open"
+      "proposed_value": "linux/amd64 only; PostgreSQL docker.io/library/postgres:17.6 index sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929 and amd64 sha256:b86568d3e0fe1dfaeff52714f9da36f206a30e4c49131b82bf96982d78627409; ClickHouse docker.io/clickhouse/clickhouse-server:25.8.2.29 index sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f and amd64 sha256:78b6f0863688458b229b597f6a1bbf891855a01cf59c3f3dbe66428571c518c9; builder rust:1.89.0-bookworm index sha256:948f9b08a66e7fe01b03a98ef1c7568292e07ec2e4fe90d88c07bb14563c84ff and amd64 sha256:c9ac3fa8945b61dede1e4500d25028aa8fd8a8fe46365fcf9c0422f8d999b9b0; runtime debian:bookworm-20250811-slim index sha256:b1a741487078b369e78119849663d7f1a5341ef2768798f7b7406c4240f86aef and amd64 sha256:cea2634840f5a87503d8210e4df97b9f23a2acd67ff860a76c133d963032f866; Docker Engine 28.3.3, Compose 2.39.2, BuildKit 0.24.0, Dockerfile frontend 1.12.0; cargo build --locked --release; project boring-cdc with postgres, clickhouse, connector and pgdata, chdata, cdcdata; restart unless-stopped with persisted FailurePolicy retry authority; PostgreSQL keepalive 30/10/3 and client check 10 seconds, reap <=70 seconds, takeover 90 seconds; health 5/3/12 with 30-second start and 120-second readiness; patch/minor clean-pull with rollback-compatible store; PostgreSQL/ClickHouse major migration plan and reseed.",
+      "status": "approved"
     },
     {
       "approval": {
@@ -109,6 +129,11 @@
       "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-16T06:05:55.752Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "3022fb1386cca155899fb4c3af8f000acd380f384cfe35b99760ed9518b7df23"
+      },
       "executor_beads": [
         "boring-cdc-m1-preflight",
         "boring-cdc-m2-schema",
@@ -116,47 +141,64 @@
         "boring-cdc-m2-pressure",
         "boring-cdc-m2-reconcile"
       ],
-      "fixture_sha256": "5abe431e27f4a0b5193e32038cbe4e3e9fd686b25f7a8594c6befe795927e76b",
+      "fixture_sha256": "1276a522d52539fa8ca5f450055592175450100301157e9aede3de2e3b2754eb",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-sqlite.json",
       "id": "DEC-SQLITE-PHYSICAL-JOURNAL-DURABILITY",
       "owner_bead": "boring-cdc-d-sqlite",
-      "proposed_value": "SQLite 3.45.3; one physical database with logically append-only journal_events; WAL; synchronous=FULL on every admitted durability connection; journal_size_limit=256 MiB; page_size=4096; temp_store=FILE; foreign_keys=ON; secure_delete=FAST; pre-schema auto_vacuum=INCREMENTAL; wal_autocheckpoint=0; busy_timeout=5000 ms; mmap_size=0; at most 16 readers; local ext4/XFS non-network block devices only; PASSIVE checkpoint at 1,000 WAL pages or 30 seconds, RESTART only when pins permit, TRUNCATE maintenance-only; incremental vacuum at most 1,000 pages per cycle; attestation valid 24 hours and invalid on mount/device change; FULL sync of database/WAL and required directory lifecycle; quick_check at startup and daily, integrity_check maintenance-only; SHA-256 exported evidence/backups; no automatic full VACUUM.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-sqlite"
-      ],
-      "status": "open"
+      "proposed_value": "SQLite 3.45.3; one physical database with logically append-only journal_events; WAL; synchronous=FULL on every admitted durability connection; journal_size_limit=256 MiB; page_size=4096; temp_store=FILE; foreign_keys=ON; secure_delete=FAST; pre-schema auto_vacuum=INCREMENTAL; wal_autocheckpoint=0; busy_timeout=5000 ms; mmap_size=0; at most 16 readers, each transaction at most 5,000 ms and 4,096 pages; local ext4/XFS non-network block devices only; PASSIVE checkpoint at 1,000 WAL pages or 30 seconds, RESTART only when pins permit, TRUNCATE maintenance-only; incremental vacuum at most 1,000 pages per cycle; attestation valid 24 hours and invalid on mount/device change; FULL sync of database/WAL and required directory lifecycle; quick_check at startup and daily, integrity_check maintenance-only; SHA-256 transaction checksums and exported evidence/backups; no automatic full VACUUM.",
+      "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-16T06:05:55.752Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "04b4a49b25a121d7e7d1e01a721e0d3716a5914ae1e979bfcb4dd894ef44b29a"
+      },
+      "executor_beads": [
+        "boring-cdc-m1-ordering",
+        "boring-cdc-m3-planner"
+      ],
+      "fixture_sha256": "069bea2025a389c35aa79a49e41a2d5e52b0bb652339a504f892197da914eaa2",
+      "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-keys.json",
+      "id": "DEC-SUPPORTED-KEYS",
+      "owner_bead": "boring-cdc-d-keys",
+      "proposed_value": "Canonical source keys use 1..8 non-null effective-replica-identity components in index order from int2, int4, int8, numeric(precision <=100, scale -18..18), uuid, date, timestamp, timestamptz, C-collated text/varchar/bpchar, or bytea <=1 KiB; encoding v1 and PostgreSQL ascending B-tree order are fixed by answered owner card 59a63169.",
+      "status": "approved"
+    },
+    {
+      "approval": {
+        "approved_at": "2026-09-16T00:00:00Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "5b72e01797c88dc68dc5dbf21bc1b41b45284e12d75dd0746a1984516feb7cef"
+      },
       "executor_beads": [
         "boring-cdc-m1-decoder",
         "boring-cdc-m0-event-format"
       ],
-      "fixture_sha256": "491c789ebc5802aca0b2086e5cf0d50f31426de2d273b96c22621436003b504a",
+      "fixture_sha256": "057219e927dc55a27837c73faddf17c16859b5a357200576e87bab11df417e71",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-values.json",
       "id": "DEC-SUPPORTED-VALUES",
       "owner_bead": "boring-cdc-d-values",
-      "proposed_value": "Envelope v1 uses type tags and distinct null, absent, and unchanged states for the recommended bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; canonical bodies, destination mappings, and limits are retained as a provisional owner-card recommendation.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-values",
-        "// M0-PROVISIONAL: boring-cdc-d-values.1"
-      ],
-      "status": "open"
+      "proposed_value": "Owner-card accepted envelope v1 type tags; distinct null, absent, and unchanged states; bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; canonical bodies including corrected globally shortest round-trip float spelling; destination mappings; and limits.",
+      "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-16T06:05:55.752Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "10ad7685fea445c94f416d8c673ba9b0dfdb6e41e836386376ad9c462b1e2f2f"
+      },
       "executor_beads": [
         "boring-cdc-m2-pressure",
         "boring-cdc-m6-safety-sm",
         "boring-cdc-m6-metrics"
       ],
-      "fixture_sha256": "ede1aacfd1f4678f262874bc3a00ed2e8230b6e31be1f59389ef061fc18a57ea",
+      "fixture_sha256": "3ed9a28af5607eab15cadff25a8dec19ee4f241ec38dc0e34fdf5142657c80e0",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-wal-cap.json",
       "id": "DEC-WAL-CAP",
       "owner_bead": "boring-cdc-d-wal-cap",
       "proposed_value": "max_slot_wal_keep_size=64 GiB (68,719,476,736 bytes); raw headroom=max(0,min(cap-retained_slot_bytes,source_free_bytes-16 GiB)); WAL rate=nearest-rank p95 (rank 15 after ascending sort) over exactly 15 complete 1-minute byte/s buckets, stale after 3 minutes; fresh zero rate gives infinite horizon only with positive headroom; raw horizon=floor(raw_headroom/rate), safety horizon=max(0,raw_horizon-30-second monitor delay-120-second reaction reserve); warning <=60 minutes, action_required <=30 minutes, critical <=10 minutes on safety horizon with equality more severe; missing/unsupported/stale inputs produce unknown, block new bootstrap/backfill, and preserve healthy capture; local-only --unsafe-unbounded-slot-wal expires at 24 hours, requires confirmation UNBOUNDED_WAL_LOCAL_ONLY and actor/time/config-digest audit, and is forbidden remotely; invalidated slots require explicit reseed.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-wal-cap"
-      ],
-      "status": "open"
+      "status": "approved"
     }
   ],
   "schema_version": "m0-decisions/v1"

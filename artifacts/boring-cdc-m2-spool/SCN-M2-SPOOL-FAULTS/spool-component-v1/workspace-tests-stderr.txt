@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.17s
+     Running unittests src/lib.rs (target/debug/deps/boring_cdc-215a04c5a0e6b11d)
+     Running unittests src/main.rs (target/debug/deps/boring_cdc-175d1f19bac9dae3)
+     Running tests/compile_fail.rs (target/debug/deps/compile_fail-8b561352160a8d94)
+    Checking boring-cdc-tests v0.0.0 (/home/ubuntu/projects/boring-cdc/.worktrees/epic-boring-cdc-m2/target/tests/trybuild/boring-cdc)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.27s
+
+
+test [0m[1mtests/ui/creation_floor_is_not_received.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/cursor_is_not_lsn.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/durable_boundary_is_not_deserializable.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/received_is_not_durable.rs[0m ... [0m[32mok
+[0mtest [0m[1mtests/ui/synthetic_is_not_production.rs[0m ... [0m[32mok
+[0m
+
+     Running unittests examples/m1_cli_contract.rs (target/debug/examples/m1_cli_contract-e4cef303ac00c797)
+     Running unittests examples/m1_control_probe.rs (target/debug/examples/m1_control_probe-dfcb03dff7a2a74d)
+     Running unittests examples/m2_journal_component.rs (target/debug/examples/m2_journal_component-fca7c4eb654ac8c3)
+     Running unittests examples/m2_ownership_component.rs (target/debug/examples/m2_ownership_component-09abcac61d70dc80)
+     Running unittests examples/m2_spool_component.rs (target/debug/examples/m2_spool_component-892a5fce9a74076e)

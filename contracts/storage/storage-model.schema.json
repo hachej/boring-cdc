@@ -418,9 +418,6 @@
         "probe_interval_ms": {
           "type": "integer"
         },
-        "provisional": {
-          "type": "string"
-        },
         "source_lock": {
           "type": "string"
         },
@@ -436,7 +433,6 @@
         "loss",
         "ownership_deadline_ms",
         "probe_interval_ms",
-        "provisional",
         "source_lock",
         "state_lock",
         "takeover_wait_ms"
@@ -641,6 +637,15 @@
                 },
                 "wal_autocheckpoint": {
                   "type": "integer"
+                },
+                "journal_size_limit": {
+                  "type": "integer"
+                },
+                "mmap_size": {
+                  "type": "integer"
+                },
+                "secure_delete": {
+                  "type": "integer"
                 }
               },
               "required": [
@@ -650,7 +655,10 @@
                 "foreign_keys",
                 "trusted_schema",
                 "wal_autocheckpoint",
-                "temp_store"
+                "temp_store",
+                "journal_size_limit",
+                "mmap_size",
+                "secure_delete"
               ],
               "type": "object"
             },
@@ -694,6 +702,15 @@
             },
             "wal_autocheckpoint_pages": {
               "type": "integer"
+            },
+            "journal_size_limit_bytes": {
+              "type": "integer"
+            },
+            "mmap_size_bytes": {
+              "type": "integer"
+            },
+            "secure_delete": {
+              "type": "string"
             }
           },
           "required": [
@@ -702,7 +719,10 @@
             "synchronous",
             "temp_store",
             "trusted_schema",
-            "wal_autocheckpoint_pages"
+            "wal_autocheckpoint_pages",
+            "journal_size_limit_bytes",
+            "mmap_size_bytes",
+            "secure_delete"
           ],
           "type": "object"
         },
@@ -818,11 +838,11 @@
             "checkpoint_cadence_ms": {
               "type": "integer"
             },
-            "checkpoint_max_wal_pages_per_attempt": {
-              "type": "integer"
-            },
             "checkpoint_mode": {
               "type": "string"
+            },
+            "checkpoint_request_wal_pages": {
+              "type": "integer"
             },
             "incremental_vacuum_cadence_ms": {
               "type": "integer"
@@ -844,8 +864,8 @@
             "automatic_full_vacuum",
             "checkpoint_busy_timeout_ms",
             "checkpoint_cadence_ms",
-            "checkpoint_max_wal_pages_per_attempt",
             "checkpoint_mode",
+            "checkpoint_request_wal_pages",
             "incremental_vacuum_cadence_ms",
             "incremental_vacuum_max_pages",
             "offline_full_vacuum",
@@ -914,9 +934,6 @@
           ],
           "type": "object"
         },
-        "provisional": {
-          "type": "string"
-        },
         "schema_path": {
           "type": "string"
         },
@@ -925,6 +942,25 @@
         },
         "version": {
           "type": "string"
+        },
+        "filesystem_attestation": {
+          "additionalProperties": false,
+          "properties": {
+            "invalidate_on": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "validity_seconds": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "invalidate_on",
+            "validity_seconds"
+          ],
+          "type": "object"
         }
       },
       "required": [
@@ -939,10 +975,10 @@
         "page_size_bytes",
         "payload_log_file",
         "persistent_pragmas",
-        "provisional",
         "schema_path",
         "single_database",
-        "version"
+        "version",
+        "filesystem_attestation"
       ],
       "type": "object"
     },

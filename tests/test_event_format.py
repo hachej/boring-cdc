@@ -106,6 +106,33 @@ class EventFormatContractTests(unittest.TestCase):
         self.assertNotEqual(event_format.key_hash(left), event_format.key_hash(right))
         self.assertNotEqual(event_format.key_hash([{"kind":"int64","type_oid":20,"type_modifier":-1,"value":1}]), event_format.key_hash([{"kind":"text","type_oid":25,"type_modifier":-1,"value":"1"}]))
 
+    def test_numeric_key_payload_rejects_noncanonical_spellings(self):
+        invalid = [b"+\x00\x00\x0201", b"+\x00\x00\x01x", b"-\x00\x00\x010", b"+\x00\x00\x0200", b"+\x00\x13\x011"]
+        for raw in invalid:
+            component = {
+                "kind": "bytes",
+                "type_oid": 1700,
+                "type_modifier": -1,
+                "value": event_format.base64.urlsafe_b64encode(raw).decode().rstrip("="),
+            }
+            with self.assertRaises(ValueError):
+                event_format.key_component_bytes(component)
+
+    def test_empty_text_and_bytea_keys_are_representable(self):
+        schema = json.loads(event_format.SCHEMA.read_text())
+        emitted = json.loads(json.dumps(self.vectors["vectors"][0]["event"]))
+        for component in (
+            {"kind": "text", "type_oid": 25, "type_modifier": -1, "value": ""},
+            {"kind": "bytes", "type_oid": 17, "type_modifier": -1, "value": ""},
+        ):
+            event = json.loads(json.dumps(emitted))
+            event["canonical_key"] = [component]
+            event["key_hash"] = event_format.key_hash(event["canonical_key"])
+            event["payload_hash"] = event_format.payload_hash(event)
+            findings = []
+            event_format.CORE.validate_schema_instance(event, schema, findings, base=event_format.SCHEMA.parent, root=schema)
+            self.assertEqual([], findings)
+
     def test_key_canonicalization_rejects_hostile_boundaries(self):
         emitted = json.loads(json.dumps(self.vectors["vectors"][0]["event"]))
         hostile = []

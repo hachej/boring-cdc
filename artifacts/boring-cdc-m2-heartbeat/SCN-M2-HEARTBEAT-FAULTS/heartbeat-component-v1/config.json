@@ -1,0 +1,1 @@
+{"cadence_ms":1000,"initial_retry_ms":100,"max_retry_ms":400,"profile":"deterministic-fault-fixture","seed":"heartbeat-component-v1"}

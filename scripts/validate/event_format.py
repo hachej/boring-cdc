@@ -128,35 +128,44 @@ def decode_b64url(value: str) -> bytes:
 
 
 def key_component_bytes(component: dict) -> bytes:
-    kind, value = component["kind"], component["value"]
+    kind, value, oid = component["kind"], component["value"], component["type_oid"]
+    if kind == "int64":
+        widths = {21: 2, 23: 4, 20: 8}
+        width = widths[oid]
+        raw = signed(int(value), width)
+        return bytes([raw[0] ^ 0x80]) + raw[1:]
     if kind == "bytes":
         decoded = decode_b64url(value)
-        if component["type_oid"] == 2950 and len(decoded) != 16:
-            raise ValueError("UUID key must contain exactly 16 bytes")
+        expected_widths = {2950: 16, 1082: 4, 1114: 8, 1184: 8}
+        if oid in expected_widths and len(decoded) != expected_widths[oid]:
+            raise ValueError(f"OID {oid} key payload must contain exactly {expected_widths[oid]} bytes")
+        if oid == 1700:
+            if len(decoded) < 5 or decoded[:1] not in (b"+", b"-") or decoded[3] != len(decoded[4:]):
+                raise ValueError("numeric key payload is not canonical sign/exponent/digits")
+            exponent = int.from_bytes(decoded[1:3], "big", signed=True)
+            digits = decoded[4:]
+            if not 1 <= len(digits) <= 100 or not all(48 <= byte <= 57 for byte in digits):
+                raise ValueError("numeric key digits are invalid")
+            if digits == b"0":
+                if decoded[:1] != b"+" or exponent != 0:
+                    raise ValueError("numeric zero must be canonical +/0/0")
+            elif digits[:1] == b"0" or digits[-1:] == b"0" or not -18 <= exponent <= 18:
+                raise ValueError("numeric key precision/scale or zero trimming is invalid")
         return decoded
     if kind == "text":
         return value.encode()
-    return b""
+    raise ValueError(f"unsupported key representation {kind}")
 
 
 def encode_key(key: list[dict]) -> bytes:
-    encoded = bytearray(u(len(key), 4))
-    tags = {"bool": 1, "int64": 2, "uint64": 3, "bytes": 4, "text": 5}
+    if not 1 <= len(key) <= 8:
+        raise ValueError("canonical key arity must be 1..8")
+    encoded = bytearray([1, len(key)])
     for component in key:
-        kind, value = component["kind"], component["value"]
-        encoded.append(tags[kind])
+        raw = key_component_bytes(component)
         encoded.extend(u(component["type_oid"], 4))
-        encoded.extend(signed(component["type_modifier"], 4))
-        if kind == "bool":
-            encoded.append(1 if value else 0)
-        elif kind == "int64":
-            encoded.extend(signed(int(value), 8))
-        elif kind == "uint64":
-            encoded.extend(u(int(value), 8))
-        else:
-            raw = decode_b64url(value) if kind == "bytes" else value.encode()
-            encoded.extend(u(len(raw), 8))
-            encoded.extend(raw)
+        encoded.extend(u(len(raw), 4))
+        encoded.extend(raw)
     return bytes(encoded)
 
 
@@ -334,15 +343,8 @@ def validate() -> tuple[list[dict], dict]:
     for title in required_sections:
         if f"## {title}" not in document:
             fail(findings, "E_DOC_SECTION", "docs/EVENT_FORMAT.md", title)
-    provisional_markers = {
-        "// M0-PROVISIONAL: boring-cdc-d-values",
-        "// M0-PROVISIONAL: boring-cdc-d-values.1",
-        "// M0-PROVISIONAL: boring-cdc-d-keys",
-    }
-    if set(contract.get("provisional_markers", [])) != provisional_markers or any(
-        marker not in document for marker in provisional_markers
-    ):
-        fail(findings, "E_PROVISIONAL", "contract", "owner-pending recommendation markers changed or are missing")
+    if contract.get("provisional_markers") or "// M0-PROVISIONAL: boring-cdc-d-keys" in document:
+        fail(findings, "E_PROVISIONAL", "contract", "accepted d-keys provisional marker remains")
 
     primitives = vectors["identity_primitives"]
     observed_slot = source_slot_identity(primitives["source_slot"]["input"])
@@ -479,8 +481,12 @@ def validate() -> tuple[list[dict], dict]:
     if set(contract["fixture_ids"]) != ids:
         fail(findings, "E_FIXTURE_INVENTORY", "contract/fixture_ids", "contract and vector IDs differ")
     limits = contract["limits"]
-    if (limits["canonical_key_components"], limits["key_component_bytes"], limits["scalar_bytes"], limits["row_bytes"], limits["event_bytes"]) != (32, 1024, 1048576, 4194304, 8388608):
-        fail(findings, "E_LIMIT_LITERAL", "contract/limits", "recommended limits changed")
+    if (limits["canonical_key_components"], limits["key_component_bytes"], limits["scalar_bytes"], limits["row_bytes"], limits["event_bytes"]) != (8, 1024, 1048576, 4194304, 8388608):
+        fail(findings, "E_LIMIT_LITERAL", "contract/limits", "accepted limits changed")
+    if contract["key_types"] != ["int2", "int4", "int8", "numeric", "uuid", "date", "timestamp", "timestamptz", "text", "varchar", "bpchar", "bytea"]:
+        fail(findings, "E_KEY_TYPES", "contract/key_types", "accepted d-keys matrix changed")
+    if not contract["identity_encodings"]["canonical_key"].startswith("u8 encoding version 1; u8 component count"):
+        fail(findings, "E_KEY_ENCODING", "contract/identity_encodings/canonical_key", "accepted d-keys framing changed")
     if contract["hashing"]["algorithm"] != "SHA-256" or contract["hashing"]["field_framing"] != "u64-be byte length followed by bytes":
         fail(findings, "E_HASH_LITERAL", "contract/hashing", "hash ABI changed")
     relation_terms = ("attnum", "logical ordinal", "dropped", "collation", "default-expression", "generated-expression", "identity-expression", "replica mode", "replica-index", "partition", "publication membership", "column-projection")

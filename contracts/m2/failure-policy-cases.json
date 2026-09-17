@@ -1,0 +1,189 @@
+{
+  "schema_version": "m2-failure-policy-cases/v1",
+  "owner_bead": "boring-cdc-m2.1",
+  "policy_version": "failure-policy-v1",
+  "fixed_seed": "0x424344435f52455452595f563031",
+  "evidence_tier": "leaf",
+  "test_doubles": [
+    "StrictDomainHook"
+  ],
+  "downstream_real_adapter_owners": [
+    "boring-cdc-m2-capture-runtime",
+    "boring-cdc-m2-jsonl",
+    "boring-cdc-m4-durability",
+    "boring-cdc-m5-loops"
+  ],
+  "cases": [
+    {
+      "id": "SCN-M2-FAILURE-ENUM",
+      "test": "exhaustive_classes_have_closed_stable_serialization",
+      "assertion": "all eight confirmed failure classes and all eight public stable error codes serialize and round-trip through their exact closed representations; only the four transient/rate classes auto-retry"
+    },
+    {
+      "id": "SCN-M2-FAILURE-SCHEDULE",
+      "test": "deterministic_schedule_caps_jitters_and_ignores_clock_rollback",
+      "assertion": "approved zero-padded ChaCha20 seed expansion and one next_u64 draw per ascending attempt match exact multi-attempt full-jitter golden vectors, with exponential cap and monotonic clock rollback handling"
+    },
+    {
+      "id": "SCN-M2-FAILURE-JITTER-GOLDEN",
+      "test": "approved_chacha20_seed_expansion_and_draw_order_match_golden_vectors",
+      "assertion": "the 14 decoded seed bytes occupy the leading bytes of the 32-byte ChaCha20 seed with 18 trailing zero bytes, then exactly one next_u64 draw is consumed for each ascending attempt"
+    },
+    {
+      "id": "SCN-M2-FAILURE-RESTART-SUPPRESS",
+      "test": "restart_preserves_attempt_and_same_deterministic_failure_is_suppressed",
+      "assertion": "restart preserves persisted attempts and same deterministic fingerprint cannot hot-loop"
+    },
+    {
+      "id": "SCN-M2-FAILURE-FINGERPRINT",
+      "test": "fingerprint_changes_only_for_allowed_canonical_inputs_and_contains_no_raw_data",
+      "assertion": "length-framed SHA-256 fingerprint consumes only closed nonsecret context and emits no raw context or epoch"
+    },
+    {
+      "id": "SCN-M2-FAILURE-REARM",
+      "test": "rearm_requires_class_specific_proofs_and_rejects_unrelated_change",
+      "assertion": "integrity, ownership_lost, configuration, and unsupported classes require their typed stronger proof"
+    },
+    {
+      "id": "SCN-M2-FAILURE-STALE",
+      "test": "stale_epoch_generation_attempt_and_fingerprint_completions_cannot_clear",
+      "assertion": "stale completion identity cannot clear a current failure"
+    },
+    {
+      "id": "SCN-M2-FAILURE-HOOKS",
+      "test": "synthetic_hooks_fail_closed_on_close_run_and_generation_mismatch",
+      "assertion": "synthetic typed domain hook accepts expected close only for matching run_id and connection generation"
+    },
+    {
+      "id": "SCN-M2-FAILURE-PERSISTENCE",
+      "test": "prepared_adapter_persists_reopens_and_clears_via_supplied_transaction",
+      "assertion": "prepared operations execute only through a supplied transaction, survive reopen, validate exact boundary-plus-fingerprint identity, and preserve destination current_failure_id"
+    },
+    {
+      "id": "SCN-M2-FAILURE-DUE-RECURRENCE",
+      "test": "retry_due_boundaries_and_cleared_recurrence_fail_closed",
+      "assertion": "retry fires exactly at its persisted boundary and a cleared same-fingerprint recurrence re-arms with a higher attempt"
+    },
+    {
+      "id": "SCN-M2-FAILURE-PERSISTENCE-CAS",
+      "test": "non_transient_rearm_is_persistable_and_stale_operations_are_rejected",
+      "assertion": "delayed non-transient re-arm is revision-CAS persisted; automatic re-arm and stale store/link/clear operations fail closed"
+    },
+    {
+      "id": "SCN-M2-FAILURE-BOUNDED-HARNESS",
+      "test": "shared_bounded_harness_replays_policy_vectors_deterministically",
+      "assertion": "the shared m1.1 bounded TransitionSystem harness replays production transitions byte-identically under the fixed seed"
+    },
+    {
+      "id": "SCN-M2-FAILURE-COMPLETE-HARNESS-INVENTORY",
+      "test": "complete_policy_vector_inventory_uses_bounded_harness_schedules",
+      "assertion": "observe, explicit and automatic re-arm, configuration proof, stale completion, restart, expiry, cancel, and persistence-CAS projections use production transitions under bounded deterministic harness schedules"
+    },
+    {
+      "id": "SCN-M2-FAILURE-HARNESS-PERSISTENCE-CAS",
+      "test": "persistence_cas_projections_execute_inside_bounded_harness",
+      "assertion": "bounded Harness schedules execute production observe, re-arm, clear, and supplied-transaction SQLite CAS projections"
+    }
+  ],
+  "confirmed_literals": {
+    "base_delay_ms": 250,
+    "max_delay_ms": 30000,
+    "max_attempts": 10,
+    "taxonomy": [
+      "transient_io",
+      "transient_source",
+      "transient_destination",
+      "rate_limited",
+      "integrity",
+      "unsupported",
+      "ownership_lost",
+      "configuration"
+    ],
+    "stable_error_codes": [
+      "BCDC_SHARED_TRANSPORT_UNAVAILABLE",
+      "BCDC_SHARED_DEADLINE_EXCEEDED",
+      "BCDC_SHARED_INVALID_RECORD",
+      "BCDC_SHARED_CHECKSUM_MISMATCH",
+      "BCDC_SHARED_HISTORY_UNAVAILABLE",
+      "BCDC_SHARED_UNSUPPORTED_CONFIGURATION",
+      "BCDC_SHARED_RESOURCE_LIMIT",
+      "BCDC_SHARED_OPERATOR_PAUSE"
+    ],
+    "typed_hook_shapes": [
+      "capture",
+      "clickhouse",
+      "archive"
+    ],
+    "jitter": "full [0,delay]",
+    "jitter_rng": "ChaCha20 in tests; OS CSPRNG in production",
+    "jitter_seed_expansion": {
+      "decoded_ascii": "BCDC_RETRY_V01",
+      "decoded_hex": "424344435f52455452595f563031",
+      "expanded_32_bytes_hex": "424344435f52455452595f563031000000000000000000000000000000000000",
+      "rule": "decoded bytes copied at offset 0; remaining trailing bytes zero-filled"
+    },
+    "jitter_draw_order": "one ChaCha20Rng::next_u64 draw per attempt in ascending attempt order before inclusive modulo",
+    "jitter_golden_vectors": [
+      {
+        "attempt": 1,
+        "sample_u64": 2469525849052024087,
+        "nominal_delay_ms": 250,
+        "delay_ms": 132
+      },
+      {
+        "attempt": 2,
+        "sample_u64": 14682752550997020102,
+        "nominal_delay_ms": 500,
+        "delay_ms": 273
+      },
+      {
+        "attempt": 3,
+        "sample_u64": 6383775579002771793,
+        "nominal_delay_ms": 1000,
+        "delay_ms": 844
+      },
+      {
+        "attempt": 4,
+        "sample_u64": 18292979100849785532,
+        "nominal_delay_ms": 2000,
+        "delay_ms": 204
+      },
+      {
+        "attempt": 5,
+        "sample_u64": 12610900134770089858,
+        "nominal_delay_ms": 4000,
+        "delay_ms": 3694
+      },
+      {
+        "attempt": 6,
+        "sample_u64": 12413990053327801956,
+        "nominal_delay_ms": 8000,
+        "delay_ms": 7521
+      },
+      {
+        "attempt": 7,
+        "sample_u64": 13472926905698362994,
+        "nominal_delay_ms": 16000,
+        "delay_ms": 8489
+      },
+      {
+        "attempt": 8,
+        "sample_u64": 6063425432550872070,
+        "nominal_delay_ms": 30000,
+        "delay_ms": 11847
+      },
+      {
+        "attempt": 9,
+        "sample_u64": 15583386212084045179,
+        "nominal_delay_ms": 30000,
+        "delay_ms": 12137
+      },
+      {
+        "attempt": 10,
+        "sample_u64": 5276732411777251899,
+        "nominal_delay_ms": 30000,
+        "delay_ms": 29910
+      }
+    ]
+  }
+}
