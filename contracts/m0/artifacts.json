@@ -109,7 +109,7 @@
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "1d0203ba644d797574d4e5caffadd685d033ac10e65458f6130766cd49df3f38",
+      "sha256": "cbc07f296b0df59f03916c47e5f748e68dcb2de74ec30f88d8546413794d4b51",
       "status": "complete"
     },
     {
@@ -228,7 +228,7 @@
       "id": "ART-M0-EVENT-FORMAT-EVIDENCE",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "artifacts/boring-cdc-m0-event-format/spec/evidence.json",
-      "sha256": "f637c3ad31af796e7ee76bb887080dbb05cba77d2ea6e28a2eff2409e97cd9d5",
+      "sha256": "fcc4d462756b798b76f4ac9e7a5751cb21499f6d66bf61cf5049af7b8ff35600",
       "status": "complete"
     },
     {
@@ -516,6 +516,13 @@
       "owner_bead": "boring-cdc-d-keys",
       "path": "artifacts/m0/decisions/boring-cdc-d-keys/fixture-run.jsonl",
       "sha256": "c68416e914e51772182377d2a2c46854f8e4294b329d3570ceab44d1205b8670",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-SUPPORTED-KEYS-VALIDATION",
+      "owner_bead": "boring-cdc-d-keys",
+      "path": "artifacts/m0/decisions/boring-cdc-d-keys/evidence.json",
+      "sha256": "b8f6dc94aa2e56f92d281c2c7d3d15f823ea1601836fb24a0feafc0e068e3612",
       "status": "complete"
     },
     {
