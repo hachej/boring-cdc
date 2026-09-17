@@ -442,10 +442,10 @@ pub fn execute_confirmed(
         r#"BEGIN;
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='{ADMIN_ROLE}') THEN CREATE ROLE {ADMIN_ROLE} NOLOGIN; END IF; IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='{CONTROL_ROLE}') THEN CREATE ROLE {CONTROL_ROLE} LOGIN; END IF; END $$;
 CREATE SCHEMA IF NOT EXISTS boring_cdc_control AUTHORIZATION {ADMIN_ROLE};
-CREATE TABLE IF NOT EXISTS boring_cdc_control.heartbeat(id text PRIMARY KEY CHECK(id='singleton'),nonce bigint NOT NULL,updated_at timestamptz NOT NULL);
-CREATE TABLE IF NOT EXISTS boring_cdc_control.capture_fences(id text PRIMARY KEY CHECK(id='singleton'),capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint text NOT NULL,unique_nonce bigint NOT NULL);
-INSERT INTO boring_cdc_control.heartbeat VALUES('singleton',0,clock_timestamp()) ON CONFLICT(id) DO NOTHING;
-INSERT INTO boring_cdc_control.capture_fences VALUES('singleton',0,0,repeat('0',64),0) ON CONFLICT(id) DO NOTHING;
+CREATE TABLE IF NOT EXISTS boring_cdc_control.heartbeat(id smallint PRIMARY KEY CHECK(id=1),nonce bigint NOT NULL,updated_at timestamptz NOT NULL);
+CREATE TABLE IF NOT EXISTS boring_cdc_control.capture_fences(id smallint PRIMARY KEY CHECK(id=1),capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint bytea NOT NULL CHECK(octet_length(table_set_fingerprint)=32),unique_nonce bytea NOT NULL CHECK(octet_length(unique_nonce)=16));
+INSERT INTO boring_cdc_control.heartbeat VALUES(1,0,'-infinity') ON CONFLICT(id) DO NOTHING;
+INSERT INTO boring_cdc_control.capture_fences VALUES(1,0,0,decode(repeat('00',32),'hex'),decode(repeat('00',16),'hex')) ON CONFLICT(id) DO NOTHING;
 GRANT USAGE ON SCHEMA boring_cdc_control TO {CONTROL_ROLE};
 GRANT SELECT(id),UPDATE(nonce,updated_at) ON boring_cdc_control.heartbeat TO {CONTROL_ROLE};
 GRANT SELECT(id),UPDATE(capture_epoch,generation,table_set_fingerprint,unique_nonce) ON boring_cdc_control.capture_fences TO {CONTROL_ROLE};
@@ -515,21 +515,21 @@ fn verify(
     for (table, expected_shape) in [
         (
             HEARTBEAT,
-            "id:text:NO,nonce:bigint:NO,updated_at:timestamp with time zone:NO",
+            "id:smallint:NO,nonce:bigint:NO,updated_at:timestamp with time zone:NO",
         ),
         (
             FENCE,
-            "id:text:NO,capture_epoch:bigint:NO,generation:bigint:NO,table_set_fingerprint:text:NO,unique_nonce:bigint:NO",
+            "id:smallint:NO,capture_epoch:bigint:NO,generation:bigint:NO,table_set_fingerprint:bytea:NO,unique_nonce:bytea:NO",
         ),
     ] {
         let value = scalar(
             c,
             &format!(
-                "SELECT count(*)::text||':'||coalesce(min(id),'')||':'||coalesce(max(id),'') FROM {table}"
+                "SELECT count(*)::text||':'||coalesce(min(id)::text,'')||':'||coalesce(max(id)::text,'') FROM {table}"
             ),
             "control_cardinality",
         )?;
-        if value != "1:singleton:singleton" {
+        if value != "1:1:1" {
             return Err(InitFailure::at(
                 "control_cardinality",
                 "M2_INIT_CONTROL_CARDINALITY_INVALID",
@@ -551,7 +551,7 @@ fn verify(
         let constraints = scalar(
             c,
             &format!(
-                "SELECT ((SELECT array_agg(a.attname::text ORDER BY a.attname::text)=ARRAY['id'] FROM pg_index i JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=ANY(i.indkey) WHERE i.indrelid='{table}'::regclass AND i.indisprimary) AND (SELECT count(*)=1 AND bool_and(pg_get_expr(conbin,conrelid)='(id = ''singleton''::text)') FROM pg_constraint WHERE conrelid='{table}'::regclass AND contype='c'))::int::text"
+                "SELECT ((SELECT array_agg(a.attname::text ORDER BY a.attname::text)=ARRAY['id'] FROM pg_index i JOIN pg_attribute a ON a.attrelid=i.indrelid AND a.attnum=ANY(i.indkey) WHERE i.indrelid='{table}'::regclass AND i.indisprimary) AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='{table}'::regclass AND contype='c' AND pg_get_expr(conbin,conrelid)='(id = 1)'))::int::text"
             ),
             "control_shape",
         )?;

@@ -66,8 +66,8 @@ pub struct FenceIntentInput {
     pub bootstrap_intent_id: String,
     pub capture_epoch: i64,
     pub generation: i64,
-    pub nonce: i64,
-    pub table_set_fingerprint: String,
+    pub nonce: [u8; 16],
+    pub table_set_fingerprint: [u8; 32],
     pub anchor_id: String,
     pub expires_at: String,
 }
@@ -76,9 +76,9 @@ pub struct FenceDispatch {
     pub sql: String,
     pub capture_epoch: i64,
     pub generation: i64,
-    pub table_set_fingerprint: String,
+    pub table_set_fingerprint: [u8; 32],
     /// Kept out of logs and status; the dispatcher binds it as a query parameter.
-    pub nonce: i64,
+    pub nonce: [u8; 16],
 }
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct AnchorProof {
@@ -325,20 +325,47 @@ impl FenceStore {
         if state != "fencing"
             || generation != input.generation
             || epoch != input.capture_epoch.to_string()
-            || tables != input.table_set_fingerprint
+            || tables != hex(&input.table_set_fingerprint)
             || incomplete != 0
             || pending_imports != 0
             || gate != "open"
         {
             return Err(FenceError::Conflict("M3_FENCE_PREREQUISITE_MISMATCH"));
         }
-        let changed=tx.execute("UPDATE backfill_generations SET intended_fence_nonce=?2 WHERE generation_id=?1 AND intended_fence_nonce IS NULL AND state='fencing'",params![input.generation_id,input.nonce])?;
+        let nonce = hex(&input.nonce);
+        let table_set_fingerprint = hex(&input.table_set_fingerprint);
+        let changed=tx.execute("UPDATE backfill_generations SET intended_fence_nonce=?2 WHERE generation_id=?1 AND intended_fence_nonce IS NULL AND state='fencing'",params![input.generation_id,nonce])?;
         if changed != 1 {
             return Err(FenceError::Conflict("M3_FENCE_NONCE_ALREADY_INTENDED"));
         }
-        tx.execute("INSERT INTO m3_fence_intents(intent_id,generation_id,bootstrap_intent_id,capture_epoch,generation,nonce,table_set_fingerprint,anchor_id,expires_at,state) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,'intended')",params![input.intent_id,input.generation_id,input.bootstrap_intent_id,input.capture_epoch,input.generation,input.nonce,input.table_set_fingerprint,input.anchor_id,input.expires_at])?;
+        tx.execute("INSERT INTO m3_fence_intents(intent_id,generation_id,bootstrap_intent_id,capture_epoch,generation,nonce,table_set_fingerprint,anchor_id,expires_at,state) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,'intended')",params![input.intent_id,input.generation_id,input.bootstrap_intent_id,input.capture_epoch,input.generation,nonce,table_set_fingerprint,input.anchor_id,input.expires_at])?;
         tx.commit()?;
-        Ok(FenceDispatch { sql:"UPDATE boring_cdc_control.capture_fences SET capture_epoch=$1,generation=$2,table_set_fingerprint=$3,unique_nonce=$4 WHERE id='singleton'".into(), capture_epoch:input.capture_epoch, generation:input.generation, table_set_fingerprint:input.table_set_fingerprint.clone(), nonce:input.nonce })
+        Ok(dispatch(
+            input.capture_epoch,
+            input.generation,
+            input.table_set_fingerprint,
+            input.nonce,
+        ))
+    }
+
+    /// Reloads the immutable dispatch after a crash before or after the source UPDATE.
+    pub fn load_dispatch(&self, intent_id: &str) -> Result<FenceDispatch, FenceError> {
+        let row:Option<(String,i64,String,String)>=self.writer.connection().query_row(
+            "SELECT capture_epoch,generation,table_set_fingerprint,nonce FROM m3_fence_intents WHERE intent_id=?1 AND state IN ('intended','dispatched')",
+            [intent_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+        ).optional()?;
+        let Some((epoch, generation, tables, nonce)) = row else {
+            return Err(FenceError::Conflict("M3_FENCE_DISPATCH_STALE"));
+        };
+        let epoch = epoch
+            .parse::<i64>()
+            .map_err(|_| FenceError::Conflict("M3_FENCE_STORED_IDENTITY_INVALID"))?;
+        Ok(dispatch(
+            epoch,
+            generation,
+            decode_fixed(&tables)?,
+            decode_fixed(&nonce)?,
+        ))
     }
 
     /// Records that the runtime credential's fixed-row UPDATE affected exactly one row.
@@ -349,6 +376,14 @@ impl FenceStore {
     ) -> Result<(), FenceError> {
         if affected_rows != 1 {
             return Err(FenceError::Conflict("M3_FENCE_CONTROL_CARDINALITY"));
+        }
+        let state: String = self.writer.connection().query_row(
+            "SELECT state FROM m3_fence_intents WHERE intent_id=?1",
+            [intent_id],
+            |r| r.get(0),
+        )?;
+        if state == "dispatched" {
+            return Ok(());
         }
         let changed=self.writer.connection().execute("UPDATE m3_fence_intents SET state='dispatched',revision=revision+1 WHERE intent_id=?1 AND state='intended'",[intent_id])?;
         if changed != 1 {
@@ -380,7 +415,7 @@ impl FenceStore {
             String,
         );
         let intent:Intent=tx.query_row("SELECT generation_id,bootstrap_intent_id,capture_epoch,generation,nonce,table_set_fingerprint,anchor_id,expires_at,state FROM m3_fence_intents WHERE intent_id=?1",[intent_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?)))?;
-        if !matches!(intent.8.as_str(), "dispatched" | "complete") {
+        if !matches!(intent.8.as_str(), "intended" | "dispatched" | "complete") {
             return Err(FenceError::Conflict("M3_FENCE_OBSERVATION_STALE"));
         }
         let durable:Option<(String,i64,Vec<u8>)>=tx.query_row("SELECT t.end_lsn,t.last_seq,e.payload FROM source_transactions t JOIN journal_events e ON e.transaction_id=t.transaction_id AND e.journal_seq=t.last_seq WHERE t.transaction_id=?1 AND t.capture_epoch=?2 AND t.state='committed' AND t.event_count=1 AND t.first_seq=t.last_seq AND e.control_kind='capture_fence'",params![transaction_id,intent.2],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
@@ -411,14 +446,17 @@ impl FenceStore {
         let observed_generation = text[2]
             .parse::<u64>()
             .map_err(|_| FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))?;
+        let observed_tables = text[3]
+            .strip_prefix("\\x")
+            .ok_or(FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))?;
         let observed_nonce = text[4]
-            .parse::<u64>()
-            .map_err(|_| FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))?;
-        if text[0] != "singleton"
+            .strip_prefix("\\x")
+            .ok_or(FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))?;
+        if text[0] != "1"
             || intent.2.parse::<u64>().ok() != Some(observed_epoch)
             || observed_generation != intent.3 as u64
-            || intent.4.parse::<u64>().ok() != Some(observed_nonce)
-            || text[3] != intent.5
+            || observed_nonce != intent.4
+            || observed_tables != intent.5
         {
             return Err(FenceError::Conflict("M3_FENCE_IDENTITY_MISMATCH"));
         }
@@ -438,11 +476,11 @@ impl FenceStore {
         )?;
         if first {
             tx.execute("INSERT INTO durable_capture_fences(fence_id,capture_epoch,generation,nonce,transaction_id,post_copy_fence_lsn,post_copy_fence_seq,first_proof) VALUES(?1,?2,?3,?4,?5,?6,?7,1)",params![format!("fence:{}",intent_id),intent.2,intent.3,intent.4,transaction_id,lsn,seq])?;
-            let snapshot:(String,i64,String,String)=tx.query_row("SELECT x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint,json_group_array(DISTINCT i.snapshot_schema_fingerprint) FROM m3_bootstrap_runtime x JOIN m3_planner_runs p ON p.bootstrap_intent_id=x.intent_id AND p.generation_id=?2 JOIN m3_bootstrap_importers i ON i.intent_id=x.intent_id WHERE x.intent_id=?1 GROUP BY x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint",params![intent.1,intent.0],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)))?;
+            let snapshot:(String,i64,String,String,i64)=tx.query_row("SELECT x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint,json_group_array(DISTINCT i.snapshot_schema_fingerprint),x.start_seq FROM m3_bootstrap_runtime x JOIN m3_planner_runs p ON p.bootstrap_intent_id=x.intent_id AND p.generation_id=?2 JOIN m3_bootstrap_importers i ON i.intent_id=x.intent_id WHERE x.intent_id=?1 GROUP BY x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint",params![intent.1,intent.0],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)))?;
             tx.execute("UPDATE backfill_generations SET state='complete' WHERE generation_id=?1 AND state='fencing'",[&intent.0])?;
             tx.execute("UPDATE backfill_runs SET state='complete',revision=revision+1 WHERE run_id=(SELECT run_id FROM backfill_generations WHERE generation_id=?1) AND state='running'",[&intent.0])?;
-            tx.execute("INSERT INTO bootstrap_anchors(anchor_id,capture_epoch,generation,lower_stitch_lsn,start_seq,snapshot_boundary_lsn,snapshot_complete_seq,post_copy_fence_nonce,post_copy_fence_lsn,post_copy_fence_seq,table_set_fingerprint,snapshot_schema_fingerprints,state,expires_at,generation_id,bootstrap_intent_id) VALUES(?1,?2,?3,NULL,0,?4,?5,?6,?7,?8,?9,?10,'complete',?11,?12,?13)",params![intent.6,intent.2,intent.3,snapshot.0,snapshot.1,intent.4,lsn,seq,snapshot.2,snapshot.3,intent.7,intent.0,intent.1])?;
-            tx.execute("UPDATE m3_fence_intents SET state='complete',revision=revision+1 WHERE intent_id=?1 AND state='dispatched'",[intent_id])?;
+            tx.execute("INSERT INTO bootstrap_anchors(anchor_id,capture_epoch,generation,lower_stitch_lsn,start_seq,snapshot_boundary_lsn,snapshot_complete_seq,post_copy_fence_nonce,post_copy_fence_lsn,post_copy_fence_seq,table_set_fingerprint,snapshot_schema_fingerprints,state,expires_at,generation_id,bootstrap_intent_id) VALUES(?1,?2,?3,NULL,?14,?4,?5,?6,?7,?8,?9,?10,'complete',?11,?12,?13)",params![intent.6,intent.2,intent.3,snapshot.0,snapshot.1,intent.4,lsn,seq,snapshot.2,snapshot.3,intent.7,intent.0,intent.1,snapshot.4])?;
+            tx.execute("UPDATE m3_fence_intents SET state='complete',revision=revision+1 WHERE intent_id=?1 AND state IN ('intended','dispatched')",[intent_id])?;
         } else if existing
             .as_ref()
             .is_some_and(|v| v.0 == transaction_id && v.1 == lsn && v.2 == seq)
@@ -461,17 +499,43 @@ impl FenceStore {
     }
 }
 
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|v| format!("{v:02x}")).collect()
+}
+fn decode_fixed<const N: usize>(value: &str) -> Result<[u8; N], FenceError> {
+    if value.len() != N * 2 {
+        return Err(FenceError::Conflict("M3_FENCE_STORED_IDENTITY_INVALID"));
+    }
+    let mut out = [0u8; N];
+    for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+        let digit = |v: u8| match v {
+            b'0'..=b'9' => Ok(v - b'0'),
+            b'a'..=b'f' => Ok(v - b'a' + 10),
+            _ => Err(FenceError::Conflict("M3_FENCE_STORED_IDENTITY_INVALID")),
+        };
+        out[index] = (digit(pair[0])? << 4) | digit(pair[1])?;
+    }
+    Ok(out)
+}
+fn dispatch(
+    capture_epoch: i64,
+    generation: i64,
+    table_set_fingerprint: [u8; 32],
+    nonce: [u8; 16],
+) -> FenceDispatch {
+    FenceDispatch{sql:"UPDATE boring_cdc_control.capture_fences SET capture_epoch=$1,generation=$2,table_set_fingerprint=$3,unique_nonce=$4 WHERE id=1".into(),capture_epoch,generation,table_set_fingerprint,nonce}
+}
 pub fn fence_payload(
-    capture_epoch: &str,
-    generation: u64,
-    table_set_fingerprint: &str,
-    nonce: u64,
+    capture_epoch: i64,
+    generation: i64,
+    table_set_fingerprint: [u8; 32],
+    nonce: [u8; 16],
 ) -> Vec<u8> {
     let text = |value: &str| serde_json::json!({"state":"text","bytes":value.as_bytes()});
     serde_json::to_vec(&serde_json::json!({
         "kind":"update","relation_id":42,"ordinal":0,"old_kind":"key",
-        "old":[text("singleton")],
-        "new":[text("singleton"),text(capture_epoch),text(&generation.to_string()),text(table_set_fingerprint),text(&nonce.to_string())],
+        "old":[text("1")],
+        "new":[text("1"),text(&capture_epoch.to_string()),text(&generation.to_string()),text(&format!("\\x{}",hex(&table_set_fingerprint))),text(&format!("\\x{}",hex(&nonce)))],
         "origin_lsn":null,"origin_name":null
     })).expect("typed M2 encoded fence row")
 }
@@ -480,18 +544,13 @@ fn valid(v: &str) -> bool {
 }
 fn validate_input(v: &FenceIntentInput) -> Result<(), FenceError> {
     if v.generation <= 0
-        || v.nonce <= 0
+        || v.nonce.iter().all(|v| *v == 0)
         || v.capture_epoch <= 0
-        || v.table_set_fingerprint.len() != 64
-        || !v
-            .table_set_fingerprint
-            .bytes()
-            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        || v.table_set_fingerprint.iter().all(|v| *v == 0)
         || ![
             &v.intent_id,
             &v.generation_id,
             &v.bootstrap_intent_id,
-            &v.table_set_fingerprint,
             &v.anchor_id,
             &v.expires_at,
         ]
@@ -502,8 +561,8 @@ fn validate_input(v: &FenceIntentInput) -> Result<(), FenceError> {
     }
     Ok(())
 }
-pub fn nonce_hash(nonce: i64) -> String {
-    format!("{:x}", Sha256::digest(nonce.to_be_bytes()))
+pub fn nonce_hash(nonce: [u8; 16]) -> String {
+    format!("{:x}", Sha256::digest(nonce))
 }
 
 #[cfg(test)]
@@ -535,6 +594,9 @@ mod tests {
         w.connection().execute_batch("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','1',1); INSERT INTO bootstrap_intents VALUES('boot','1','sys','db','slot','0000000000000001','slot_created',0,'now'); INSERT INTO m3_bootstrap_runtime VALUES('boot',1,0,'0000000000000001','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','exporter_released','released','held',1,1,0); INSERT INTO m3_bootstrap_importers VALUES('boot','worker','acknowledged',0,'schema'); INSERT INTO m3_feedback_gates VALUES('boot',1,'open',NULL,0); INSERT INTO bootstrap_imports VALUES('import','boot','d','acknowledged',0); INSERT INTO backfill_runs VALUES('run','d','1','running',0); INSERT INTO backfill_generations VALUES('gen','run',1,NULL,'fencing'); INSERT INTO backfill_chunks VALUES('chunk','gen',X'',X'','complete',5,'sum'); INSERT INTO m3_planner_runs VALUES('gen','boot',5); INSERT INTO relation_schemas VALUES('schema','1','rel',X'00','sum',1);").unwrap();
         FenceStore::open(w).unwrap()
     }
+    fn nonce() -> [u8; 16] {
+        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+    }
     fn input() -> FenceIntentInput {
         FenceIntentInput {
             intent_id: "intent".into(),
@@ -542,9 +604,8 @@ mod tests {
             bootstrap_intent_id: "boot".into(),
             capture_epoch: 1,
             generation: 1,
-            nonce: 700000000000000007,
-            table_set_fingerprint:
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
+            nonce: nonce(),
+            table_set_fingerprint: [0xaa; 32],
             anchor_id: "anchor".into(),
             expires_at: "later".into(),
         }
@@ -560,18 +621,8 @@ mod tests {
             )
             .unwrap();
     }
-    fn journal(s: &mut FenceStore, txid: &str, lsn: &str, nonce: u64) {
-        journal_payload(
-            s,
-            txid,
-            lsn,
-            fence_payload(
-                "1",
-                1,
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                nonce,
-            ),
-        );
+    fn journal(s: &mut FenceStore, txid: &str, lsn: &str, nonce: [u8; 16]) {
+        journal_payload(s, txid, lsn, fence_payload(1, 1, [0xaa; 32], nonce));
     }
     fn decode_hex(value: &str) -> Vec<u8> {
         value
@@ -600,16 +651,35 @@ mod tests {
         s.writer
             .connection()
             .execute(
+                "UPDATE m3_bootstrap_runtime SET start_seq=5 WHERE intent_id='boot'",
+                [],
+            )
+            .unwrap();
+        s.writer.connection().execute("INSERT INTO source_transactions VALUES('lower','1','sys','db','slot','6','000000000000000F',5,5,0,'lower-sum','committed')",[]).unwrap();
+        s.writer
+            .connection()
+            .execute(
                 "INSERT INTO m3_planner_runs VALUES('other-generation','boot',999)",
                 [],
             )
             .unwrap();
-        journal(&mut s, "tx", "0000000000000010", 700000000000000007);
+        journal(&mut s, "tx", "0000000000000010", nonce());
         let p = s.observe_durable("intent", "tx").unwrap();
         assert!(p.first_proof);
         let again = s.observe_durable("intent", "tx").unwrap();
         assert!(!again.first_proof);
         assert_eq!(again.post_copy_fence_lsn, "0000000000000010");
+        assert_eq!(
+            s.writer
+                .connection()
+                .query_row(
+                    "SELECT start_seq FROM bootstrap_anchors WHERE anchor_id='anchor'",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
+                .unwrap(),
+            5
+        );
         assert_eq!(
             s.writer
                 .connection()
@@ -656,8 +726,7 @@ mod tests {
     #[test]
     fn restart_reconciles_persisted_intent_without_inventing_a_proof() {
         let mut s = setup("restart");
-        s.prepare_after_copy(&input()).unwrap();
-        s.mark_dispatched("intent", 1).unwrap();
+        let expected = s.prepare_after_copy(&input()).unwrap();
         let database_path: String = s
             .writer
             .connection()
@@ -672,28 +741,24 @@ mod tests {
             open_writer(std::path::Path::new(&database_path), "restart", 2, 2).unwrap(),
         )
         .unwrap();
+        assert_eq!(s.load_dispatch("intent").unwrap(), expected);
         assert!(matches!(
             s.observe_durable("intent", "missing"),
             Err(FenceError::Conflict("M3_FENCE_DURABLE_PAIR_MISSING"))
         ));
+        journal(&mut s, "tx", "0000000000000010", nonce());
+        let proof = s.observe_durable("intent", "tx").unwrap();
+        assert!(proof.first_proof);
         assert_eq!(
             s.writer
                 .connection()
                 .query_row(
                     "SELECT state FROM m3_fence_intents WHERE intent_id='intent'",
                     [],
-                    |r| r.get::<_, String>(0),
+                    |r| r.get::<_, String>(0)
                 )
                 .unwrap(),
-            "dispatched"
-        );
-        assert_eq!(
-            s.writer
-                .connection()
-                .query_row("SELECT count(*) FROM bootstrap_anchors", [], |r| r
-                    .get::<_, i64>(0))
-                .unwrap(),
-            0
+            "complete"
         );
     }
     #[test]
@@ -701,7 +766,7 @@ mod tests {
         let mut s = setup("mismatch");
         s.prepare_after_copy(&input()).unwrap();
         s.mark_dispatched("intent", 1).unwrap();
-        journal(&mut s, "tx", "0000000000000010", 8);
+        journal(&mut s, "tx", "0000000000000010", [0xbb; 16]);
         assert!(matches!(
             s.observe_durable("intent", "tx"),
             Err(FenceError::Conflict("M3_FENCE_IDENTITY_MISMATCH"))
@@ -720,14 +785,9 @@ mod tests {
         let mut s = setup("audit");
         s.prepare_after_copy(&input()).unwrap();
         s.mark_dispatched("intent", 1).unwrap();
-        journal(&mut s, "tx", "0000000000000010", 700000000000000007);
+        journal(&mut s, "tx", "0000000000000010", nonce());
         let first = s.observe_durable("intent", "tx").unwrap();
-        let payload = fence_payload(
-            "1",
-            1,
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            700000000000000007,
-        );
+        let payload = fence_payload(1, 1, [0xaa; 32], nonce());
         let hash = crate::m2_journal::sha256(&payload);
         s.writer.connection().execute("INSERT INTO source_transactions VALUES('tx2','1','sys','db','slot','8','0000000000000020',7,7,1,'sum2','committed')", []).unwrap();
         s.writer.connection().execute("INSERT INTO journal_events VALUES(7,'event-tx2','tx2',0,'1',NULL,'capture_fence',?1,?2)", params![payload,hash]).unwrap();
@@ -750,7 +810,12 @@ mod tests {
     #[test]
     fn fixed_row_dispatch_requires_exactly_one_row() {
         let mut s = setup("cardinality");
-        s.prepare_after_copy(&input()).unwrap();
+        let dispatch = s.prepare_after_copy(&input()).unwrap();
+        assert_eq!(dispatch.capture_epoch, 1);
+        assert_eq!(dispatch.generation, 1);
+        assert_eq!(dispatch.table_set_fingerprint, [0xaa; 32]);
+        assert_eq!(dispatch.nonce, nonce());
+        assert!(dispatch.sql.ends_with("WHERE id=1"));
         assert!(s.mark_dispatched("intent", 0).is_err());
         assert!(s.mark_dispatched("intent", 2).is_err());
         s.mark_dispatched("intent", 1).unwrap();
@@ -811,7 +876,7 @@ mod tests {
                         relation,
                         key_columns: vec![0],
                         control: Some(ControlContract {
-                            immutable_key: vec![b"singleton".to_vec()],
+                            immutable_key: vec![b"1".to_vec()],
                             mutable_columns: vec![1, 2, 3, 4],
                         }),
                     })

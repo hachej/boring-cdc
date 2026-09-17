@@ -7,7 +7,7 @@ shutil.rmtree(out,ignore_errors=True);(out/'logs').mkdir(parents=True);(out/'sta
 def canon(v):return (json.dumps(v,sort_keys=True,separators=(',',':'))+'\n').encode()
 def sha(v):return hashlib.sha256(v).hexdigest()
 def wr(p,v):p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(v if isinstance(v,bytes) else v.encode())
-files=['src/m3_fence.rs','src/m3_bootstrap.rs','src/lib.rs','contracts/m3/fence-cases.json','scripts/e2e/m3_fence.sh','scripts/faults/m3_fence.sh','scripts/lib/m3_fence_evidence.py']
+files=['src/m3_fence.rs','src/m3_bootstrap.rs','src/m2_capture_runtime.rs','src/m2_init_recovery.rs','src/m2_heartbeat.rs','src/lib.rs','contracts/m3/fence-cases.json','contracts/postgres/roles-grants.sql','contracts/postgres/capture-backfill.json','scripts/e2e/m3_fence.sh','scripts/faults/m3_fence.sh','scripts/lib/m3_fence_evidence.py','scripts/validate/m2_heartbeat.py']
 h=hashlib.sha256()
 for n in files:h.update(n.encode()+(R/n).read_bytes())
 impl=h.hexdigest();git=os.popen(f'git -C {R} rev-parse HEAD').read().strip()

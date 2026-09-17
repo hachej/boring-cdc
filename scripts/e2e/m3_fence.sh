@@ -31,13 +31,13 @@ for attempt in 1 2; do
 DROP SCHEMA IF EXISTS boring_cdc_control CASCADE;
 CREATE SCHEMA boring_cdc_control;
 CREATE TABLE boring_cdc_control.capture_fences(
- id text PRIMARY KEY CHECK(id='singleton'), capture_epoch bigint NOT NULL,
- generation bigint NOT NULL, table_set_fingerprint text NOT NULL, unique_nonce bigint NOT NULL);
-INSERT INTO boring_cdc_control.capture_fences VALUES('singleton',0,0,repeat('0',64),0);
+ id smallint PRIMARY KEY CHECK(id=1), capture_epoch bigint NOT NULL,
+ generation bigint NOT NULL, table_set_fingerprint bytea NOT NULL CHECK(octet_length(table_set_fingerprint)=32), unique_nonce bytea NOT NULL CHECK(octet_length(unique_nonce)=16));
+INSERT INTO boring_cdc_control.capture_fences VALUES(1,0,0,decode(repeat('00',32),'hex'),decode(repeat('00',16),'hex'));
 CREATE PUBLICATION ${pub} FOR TABLE boring_cdc_control.capture_fences WITH (publish='update');
 SELECT * FROM pg_create_logical_replication_slot('${slot}','pgoutput');
 SQL
-  update_result=$("${psql_cmd[@]}" -c "UPDATE boring_cdc_control.capture_fences SET capture_epoch=1,generation=1,table_set_fingerprint=repeat('a',64),unique_nonce=700000000000000007 WHERE id='singleton'")
+  update_result=$("${psql_cmd[@]}" -c "UPDATE boring_cdc_control.capture_fences SET capture_epoch=1,generation=1,table_set_fingerprint=decode(repeat('aa',32),'hex'),unique_nonce=decode('0102030405060708090a0b0c0d0e0f10','hex') WHERE id=1")
   [[ "$update_result" == "UPDATE 1" ]]
   "${psql_cmd[@]}" -F '|' -c "SELECT lsn::text,xid,encode(data,'hex') FROM pg_logical_slot_peek_binary_changes('${slot}',NULL,NULL,'proto_version','1','publication_names','${pub}')" >"$work/pgoutput-$attempt.txt"
   python3 - "$work/pgoutput-$attempt.txt" "$work/observation-$attempt.json" <<'PY'
@@ -46,7 +46,7 @@ rows=[]
 for line in pathlib.Path(sys.argv[1]).read_text().splitlines():
     lsn,xid,raw=line.split('|',2);data=bytes.fromhex(raw);rows.append((lsn,xid,data))
 commits=[data for _,_,data in rows if data[:1]==b'C']
-assert commits and any(b'700000000000000007' in data for _,_,data in rows)
+assert commits and any(b'\\x0102030405060708090a0b0c0d0e0f10' in data for _,_,data in rows)
 commit=commits[-1]
 assert len(commit)>=26
 end_lsn=int.from_bytes(commit[10:18],'big')

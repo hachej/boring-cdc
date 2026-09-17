@@ -12,7 +12,7 @@ for case in cases.get('cases',[]):
  # Milestone registries may retain a later aggregate owner; this leaf binds and executes the
  # embedded Bead contract without rewriting the read-only generated coverage projection.
 if len(ids)!=len(set(ids)): errors.append('duplicate case id')
-for literal in ["UPDATE boring_cdc_control.heartbeat SET nonce = $1, updated_at = clock_timestamp() WHERE id = 'singleton'","SELECT id FROM boring_cdc_control.heartbeat WHERE id = 'singleton'","HEARTBEAT_WRITE_UNAVAILABLE"]:
+for literal in ["UPDATE boring_cdc_control.heartbeat SET nonce = $1, updated_at = clock_timestamp() WHERE id = 1","SELECT id FROM boring_cdc_control.heartbeat WHERE id = 1","HEARTBEAT_WRITE_UNAVAILABLE"]:
  if literal not in source: errors.append('missing literal '+literal)
 if errors:
  print('\n'.join(errors),file=sys.stderr);sys.exit(1)
