@@ -234,6 +234,21 @@ def probe(name:str,path:str|None)->int:
 
 
 CLEAN_ENVIRONMENT_KEYS = {"DOCKER_CONFIG", "HOME", "LC_ALL", "PATH", "SOURCE_DATE_EPOCH", "TZ"}
+OUTER_LAUNCH_ENVIRONMENT_KEYS = {"DOCKER_CONFIG", "HOME", "LC_ALL", "PATH", "TZ"}
+TRUSTED_DOCKER_PATHS = (Path("/usr/bin/docker"), Path("/usr/local/bin/docker"))
+
+def trusted_docker_executable()->str:
+ for candidate in TRUSTED_DOCKER_PATHS:
+  if candidate.is_file() and os.access(candidate,os.X_OK):return str(candidate)
+ raise RuntimeError("docker is required at an approved absolute path")
+
+def outer_launcher_environment(docker_config:Path, home:Path, ambient:dict[str,str]|None=None)->dict[str,str]:
+ # The actual host-side launcher allowlist ignores ambient Docker, Compose, proxy,
+ # Cargo, Rustup, and PATH settings before the isolated clean environment exists.
+ del ambient
+ result={"DOCKER_CONFIG":str(docker_config),"HOME":str(home),"LC_ALL":"C","PATH":"/usr/bin:/bin","TZ":"UTC"}
+ if set(result)!=OUTER_LAUNCH_ENVIRONMENT_KEYS:raise RuntimeError("outer launcher environment inventory changed")
+ return result
 
 def isolated_clean_environment(docker_config:Path, home:Path, source_date_epoch:str, ambient:dict[str,str]|None=None)->dict[str,str]:
  # ambient is accepted only so hostile tests can prove it is ignored wholesale.
@@ -245,31 +260,26 @@ def isolated_clean_environment(docker_config:Path, home:Path, source_date_epoch:
 def execute(out:Path)->None:
  errors=validate()
  if errors:raise RuntimeError(";".join(errors))
- if shutil.which("docker") is None:raise RuntimeError("docker is required")
+ docker=trusted_docker_executable()
  source_digest=source_snapshot();head=git("rev-parse","HEAD");author_timestamp=git("show","-s","--format=%at",head);suffix=head[:12];project=f"boring-cdc-m0-scaffold-{suffix}";builder=f"m0-scaffold-{suffix}";image=f"boring-cdc-connector:{suffix}"
- # Host environment is used only to launch the isolated daemon/CLI containers.
- # No ambient Docker/Compose/proxy/Rust build setting reaches clean-pull commands.
- outer=os.environ.copy();outer.pop("DOCKER_HOST",None)
- for key in ("COMPOSE_FILE","COMPOSE_PROFILES","DOCKER_CONTEXT","DOCKER_DEFAULT_PLATFORM","HTTP_PROXY","HTTPS_PROXY","NO_PROXY","RUSTFLAGS"):
-  outer.pop(key,None)
  attempts=[];semantic_attempts=[];attempt_records=[];versions={}
- with tempfile.TemporaryDirectory(prefix="m0-scaffold-",dir=os.environ.get("TMPDIR","/var/tmp")) as td:
-  proof_root=Path(td);run_dir=proof_root/"run";run_dir.mkdir(mode=0o777);dind=f"m0-scaffold-dind-{suffix}";cli_container=f"m0-scaffold-cli-{suffix}";cli_config=proof_root/"docker-config";plugins=cli_config/"cli-plugins";plugins.mkdir(parents=True)
-  subprocess.run(["docker","rm","-f",dind],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-  subprocess.check_call(["docker","run","-d","--privileged","--network","host","--name",dind,"-e","DOCKER_TLS_CERTDIR=","-v",f"{run_dir}:/var/run","-v",f"{proof_root}:{proof_root}",f"docker@{PINS['docker_dind']}","--host=unix:///var/run/docker.sock",f"--group={os.getgid()}"],env=outer,stdout=subprocess.DEVNULL)
+ with tempfile.TemporaryDirectory(prefix="m0-scaffold-",dir="/var/tmp") as td:
+  proof_root=Path(td);run_dir=proof_root/"run";run_dir.mkdir(mode=0o777);dind=f"m0-scaffold-dind-{suffix}";cli_container=f"m0-scaffold-cli-{suffix}";cli_config=proof_root/"docker-config";plugins=cli_config/"cli-plugins";plugins.mkdir(parents=True);launcher_home=proof_root/"launcher-home";launcher_home.mkdir();outer=outer_launcher_environment(cli_config,launcher_home,os.environ)
+  subprocess.run([docker,"rm","-f",dind],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+  subprocess.check_call([docker,"run","-d","--privileged","--network","host","--name",dind,"-e","DOCKER_TLS_CERTDIR=","-v",f"{run_dir}:/var/run","-v",f"{proof_root}:{proof_root}",f"docker@{PINS['docker_dind']}","--host=unix:///var/run/docker.sock",f"--group={os.getgid()}"],env=outer,stdout=subprocess.DEVNULL)
   try:
    socket=run_dir/"docker.sock"
    for _ in range(60):
     if socket.exists():
-     test=subprocess.run(["docker","version","--format","{{.Server.Version}}"],env={**outer,"DOCKER_HOST":f"unix://{socket}"},stdout=subprocess.PIPE)
+     test=subprocess.run([docker,"version","--format","{{.Server.Version}}"],env={**outer,"DOCKER_HOST":f"unix://{socket}"},stdout=subprocess.PIPE)
      if test.returncode==0:break
     import time;time.sleep(1)
    else:raise RuntimeError("pinned Docker Engine did not become ready")
-   subprocess.run(["docker","rm","-f",cli_container],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
-   subprocess.check_call(["docker","create","--name",cli_container,f"docker@{PINS['docker_cli']}"],env=outer,stdout=subprocess.DEVNULL)
+   subprocess.run([docker,"rm","-f",cli_container],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+   subprocess.check_call([docker,"create","--name",cli_container,f"docker@{PINS['docker_cli']}"],env=outer,stdout=subprocess.DEVNULL)
    for plugin in ("docker-compose","docker-buildx"):
-    subprocess.check_call(["docker","cp",f"{cli_container}:/usr/local/libexec/docker/cli-plugins/{plugin}",str(plugins/plugin)],env=outer)
-   subprocess.check_call(["docker","rm",cli_container],env=outer,stdout=subprocess.DEVNULL)
+    subprocess.check_call([docker,"cp",f"{cli_container}:/usr/local/libexec/docker/cli-plugins/{plugin}",str(plugins/plugin)],env=outer)
+   subprocess.check_call([docker,"rm",cli_container],env=outer,stdout=subprocess.DEVNULL)
    clean_env=isolated_clean_environment(cli_config,proof_root,author_timestamp,os.environ)
    # Runtime-only values are generated by this executor, never inherited. The manifest
    # verifier receives exactly clean_env, so forbidden ambient variables cannot alter
@@ -320,11 +330,11 @@ def execute(out:Path)->None:
    if len(attempts)!=2 or attempts[0]!=attempts[1]:raise RuntimeError(f"nondeterministic rerun: {attempts}\n{json.dumps(semantic_attempts,indent=2,sort_keys=True)}")
    if source_snapshot()!=source_digest:raise RuntimeError("source tree changed during evidence run")
   finally:
-   outer_cleanup=[subprocess.run(["docker","rm","-f",cli_container],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL),subprocess.run(["docker","rm","-f",dind],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)]
-   socket_cleanup=subprocess.run(["docker","run","--rm","-v",f"{proof_root}:/cleanup",f"docker@{PINS['docker_cli']}","sh","-c","rm -rf /cleanup/run/*"],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+   outer_cleanup=[subprocess.run([docker,"rm","-f",cli_container],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL),subprocess.run([docker,"rm","-f",dind],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)]
+   socket_cleanup=subprocess.run([docker,"run","--rm","-v",f"{proof_root}:/cleanup",f"docker@{PINS['docker_cli']}","sh","-c","rm -rf /cleanup/run/*"],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
   if socket_cleanup.returncode: raise RuntimeError("outer socket cleanup failed")
   for outer_name in (dind,cli_container):
-   if subprocess.run(["docker","inspect",outer_name],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode==0: raise RuntimeError(f"outer cleanup left container: {outer_name}")
+   if subprocess.run([docker,"inspect",outer_name],env=outer,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL).returncode==0: raise RuntimeError(f"outer cleanup left container: {outer_name}")
   if source_snapshot()!=source_digest:raise RuntimeError("source tree changed before evidence emission")
   emit_evidence(out,attempt_records,source_digest,versions,attempts,binary_digest)
  if source_snapshot()!=source_digest:raise RuntimeError("source tree changed after cleanup")

@@ -167,6 +167,29 @@ class ScaffoldTests(unittest.TestCase):
         self.assertIn('clean_env=isolated_clean_environment(cli_config,proof_root,author_timestamp,os.environ)', source)
         self.assertIn('"--build-arg",f"SOURCE_DATE_EPOCH={author_timestamp}"', source)
 
+    def test_outer_launcher_environment_ignores_hostile_ambient_values(self):
+        hostile = {
+            "DOCKER_CONFIG": "/attacker/docker", "DOCKER_HOST": "tcp://attacker",
+            "DOCKER_TLS_VERIFY": "1", "DOCKER_CERT_PATH": "/attacker/certs",
+            "BUILDKIT_HOST": "tcp://attacker", "COMPOSE_FILE": "attacker.yml",
+            "COMPOSE_PROFILES": "attacker", "DOCKER_CONTEXT": "attacker",
+            "DOCKER_DEFAULT_PLATFORM": "linux/arm64", "HTTP_PROXY": "http://attacker",
+            "HTTPS_PROXY": "http://attacker", "NO_PROXY": "", "ALL_PROXY": "http://attacker",
+            "CARGO_HOME": "/attacker/cargo", "RUSTUP_HOME": "/attacker/rustup",
+            "RUSTFLAGS": "-C target-cpu=native", "PATH": "/attacker/bin",
+        }
+        outer = m0_scaffold.outer_launcher_environment(
+            Path("/isolated/docker"), Path("/isolated/home"), hostile
+        )
+        self.assertEqual(m0_scaffold.OUTER_LAUNCH_ENVIRONMENT_KEYS, set(outer))
+        self.assertEqual("/isolated/docker", outer["DOCKER_CONFIG"])
+        self.assertEqual("/isolated/home", outer["HOME"])
+        self.assertEqual("/usr/bin:/bin", outer["PATH"])
+        self.assertFalse(set(hostile) - {"DOCKER_CONFIG", "PATH"} & set(outer))
+        source = (ROOT / "scripts/lib/m0_scaffold.py").read_text()
+        self.assertIn("outer=outer_launcher_environment(cli_config,launcher_home,os.environ)", source)
+        self.assertIn("docker=trusted_docker_executable()", source)
+
     def test_clean_environment_ignores_all_ambient_values(self):
         hostile = {
             "DOCKER_HOST": "tcp://attacker", "COMPOSE_FILE": "attacker.yml",
