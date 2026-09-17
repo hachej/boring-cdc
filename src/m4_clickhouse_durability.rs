@@ -510,6 +510,16 @@ pub fn persist_failure(
     code: StableErrorCode,
     transition_context: &mut TransitionContext<'_>,
 ) -> Result<FailureRecord, DurabilityError> {
+    if batch.destination_id != context.destination_id
+        || batch.capture_epoch_text != context.capture_epoch
+        || batch.marker.generation != context.generation
+        || batch.configuration_fingerprint != context.configuration_fingerprint
+        || batch.lease_id != context.lease_id
+        || batch.run_id != context.run_id
+    {
+        return Err(DurabilityError::Conflict("failure batch context mismatch"));
+    }
+    validate_prepared_batch(transaction, batch)?;
     let boundary = FailedBoundary::Destination {
         capture_epoch: context.capture_epoch.clone(),
         generation: context.generation,
