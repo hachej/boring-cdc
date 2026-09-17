@@ -8,7 +8,7 @@ python3 - <<'PY'
 p='src/m2_init_recovery.rs'; s=open(p).read()
 for forbidden in ['pg_create_logical_replication_slot(', 'pg_drop_replication_slot(', 'CREATE_REPLICATION_SLOT']:
  assert forbidden not in s
-for required in ['M2_INIT_OWNERSHIP_CONFLICT','M2_INIT_CONTROL_CARDINALITY_INVALID','M2_INIT_CONTROL_PRIVILEGE_EXCESS','M2_INIT_PUBLICATION_DRIFT','M2_INIT_PERMANENT_SLOT_EXISTS']:
+for required in ['M2_INIT_OWNERSHIP_CONFLICT','M2_INIT_CONTROL_CARDINALITY_INVALID','M2_INIT_CONTROL_PRIVILEGE_EXCESS','M2_INIT_PUBLICATION_DRIFT','M2_INIT_PERMANENT_SLOT_EXISTS','M2_INIT_CONTROL_LENGTH_CONSTRAINT_INVALID']:
  assert required in s
-print('M2_INIT_RECOVERY_FAULTS_OK ambiguous=blocked cardinality=blocked privilege=blocked slot=never-created')
+print('M2_INIT_RECOVERY_FAULTS_OK ambiguous=blocked cardinality=blocked privilege=blocked fence_lengths=exact slot=never-created')
 PY

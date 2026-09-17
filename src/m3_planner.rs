@@ -373,6 +373,28 @@ impl PlannerStore {
         {
             return Err(PlannerError::Conflict("M3_BOOTSTRAP_PROOF_MISMATCH"));
         }
+        // Materialize the canonical M2 import proof from this exact acknowledged M3 importer set
+        // and destination.  The anchor trigger consumes this row; no fixture or parallel import
+        // state machine may manufacture it independently.
+        let import_id = format!(
+            "m3-import:{}",
+            sha256(format!("{}\0{}", input.bootstrap_intent_id, input.destination_id).as_bytes())
+        );
+        tx.execute(
+            "INSERT INTO bootstrap_imports(import_id,intent_id,destination_id,state,revision) VALUES(?1,?2,?3,'prepared',0)",
+            params![import_id,input.bootstrap_intent_id,input.destination_id],
+        )?;
+        let importing = tx.execute(
+            "UPDATE bootstrap_imports SET state='importing',revision=revision+1 WHERE import_id=?1 AND state='prepared' AND EXISTS(SELECT 1 FROM destinations d WHERE d.destination_id=?3 AND d.capture_epoch=?5 AND d.generation=?4) AND EXISTS(SELECT 1 FROM m3_feedback_gates f WHERE f.intent_id=?2 AND f.generation=?4 AND f.state='open') AND NOT EXISTS(SELECT 1 FROM m3_bootstrap_importers i WHERE i.intent_id=?2 AND i.state!='acknowledged')",
+            params![import_id,input.bootstrap_intent_id,input.destination_id,input.generation,input.capture_epoch],
+        )?;
+        let acknowledged = tx.execute(
+            "UPDATE bootstrap_imports SET state='acknowledged',revision=revision+1 WHERE import_id=?1 AND state='importing'",
+            [&import_id],
+        )?;
+        if importing != 1 || acknowledged != 1 {
+            return Err(PlannerError::Conflict("M3_CANONICAL_IMPORT_PROOF_MISSING"));
+        }
         tx.execute("INSERT INTO backfill_runs(run_id,destination_id,capture_epoch,state,revision) VALUES(?1,?2,?3,'running',0)", params![input.run_id,input.destination_id,input.capture_epoch])?;
         tx.execute("INSERT INTO backfill_generations(generation_id,run_id,generation,state) VALUES(?1,?2,?3,'copying')", params![input.generation_id,input.run_id,input.generation])?;
         tx.execute("INSERT INTO m3_planner_runs(run_id,generation_id,bootstrap_intent_id,importer_id,snapshot_schema_fingerprint,key_schema,key_schema_digest,estimated_rows,started_mono_ms,next_snapshot_seq,max_concurrency) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)", params![input.run_id,input.generation_id,input.bootstrap_intent_id,input.importer_id,input.snapshot_schema_fingerprint,schema,schema_digest,input.estimated_rows,input.started_mono_ms,input.start_seq,self.limits.concurrency])?;
@@ -1551,7 +1573,7 @@ mod tests {
         let p = Temp::new();
         let w = open_writer(&p.0, "run", 1, 0).unwrap();
         w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('dest','archive','cfg','epoch',1)",[]).unwrap();
-        w.connection().execute_batch("CREATE TABLE m3_bootstrap_runtime(intent_id TEXT PRIMARY KEY,generation INTEGER, start_seq INTEGER,snapshot_promotable INTEGER,guard_liveness TEXT,state TEXT); CREATE TABLE m3_bootstrap_importers(intent_id TEXT,importer_id TEXT,assigned_ranges_digest TEXT,snapshot_schema_fingerprint TEXT,state TEXT,PRIMARY KEY(intent_id,importer_id));").unwrap();
+        w.connection().execute_batch("CREATE TABLE m3_bootstrap_runtime(intent_id TEXT PRIMARY KEY,generation INTEGER, start_seq INTEGER,snapshot_promotable INTEGER,guard_liveness TEXT,state TEXT); CREATE TABLE m3_bootstrap_importers(intent_id TEXT,importer_id TEXT,assigned_ranges_digest TEXT,snapshot_schema_fingerprint TEXT,state TEXT,PRIMARY KEY(intent_id,importer_id)); CREATE TABLE m3_feedback_gates(intent_id TEXT PRIMARY KEY,generation INTEGER,state TEXT);").unwrap();
         let s = PlannerStore::open(w, limits()).unwrap();
         (p, s)
     }
@@ -1576,6 +1598,13 @@ mod tests {
         s.writer.connection().execute("INSERT INTO bootstrap_intents(intent_id,capture_epoch,source_system_id,database_id,slot_name,creation_floor_lsn,state,revision,created_at) VALUES('intent','epoch','sys','db','slot','0000000000000001','slot_created',0,'now')",[]).unwrap();
         s.writer.connection().execute("INSERT INTO m3_bootstrap_runtime VALUES('intent',1,10,1,'held','exporter_released')",[]).unwrap();
         s.writer.connection().execute("INSERT INTO m3_bootstrap_importers VALUES('intent','worker',?1,'schema-fp','acknowledged')",[&digest]).unwrap();
+        s.writer
+            .connection()
+            .execute(
+                "INSERT INTO m3_feedback_gates VALUES('intent',1,'open')",
+                [],
+            )
+            .unwrap();
         s.persist_plan(&PlanInput {
             run_id: "run".into(),
             generation_id: "gen".into(),

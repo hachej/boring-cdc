@@ -27,6 +27,7 @@ token2=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]
 [[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot'")" == 0 ]]
 [[ "$(psqlc -Atqc 'select count(*) from boring_cdc_control.heartbeat')" == 1 ]]
 [[ "$(psqlc -Atqc 'select count(*) from boring_cdc_control.capture_fences')" == 1 ]]
+[[ "$(psqlc -Atqc "SELECT count(*) FROM pg_constraint WHERE conrelid='boring_cdc_control.capture_fences'::regclass AND pg_get_expr(conbin,conrelid) IN ('(octet_length(table_set_fingerprint) = 32)','(octet_length(unique_nonce) = 16)')")" == 2 ]]
 [[ "$(psqlc -Atqc "select count(*) from pg_publication_tables where pubname='boring_publication'")" == 3 ]]
 [[ "$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from source_state").fetchone()[0])' "$work/run/state/boring.db")" == 1 ]]
 python3 - "$work/first.json" "$work/second.json" <<'PY'
@@ -41,5 +42,11 @@ psqlc -qc 'GRANT SELECT ON boring_cdc_control.heartbeat TO boring_cdc_control_wr
 token3=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["confirm_token"])' "$work/dry3.json")
 if (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token3" --json) >"$work/drift.out" 2>"$work/drift.err"; then echo E_PRIVILEGE_DRIFT_ACCEPTED >&2; exit 1; fi
 grep -q M2_INIT_CONTROL_PRIVILEGE_EXCESS "$work/drift.err"; ! grep -q 'postgresql://' "$work/drift.err"
+# An existing lookalike table with weak byte-length checks must not pass CREATE IF NOT EXISTS.
+psqlc -qc 'REVOKE SELECT ON boring_cdc_control.heartbeat FROM boring_cdc_control_writer; ALTER TABLE boring_cdc_control.capture_fences DROP CONSTRAINT capture_fences_table_set_fingerprint_check, DROP CONSTRAINT capture_fences_unique_nonce_check; ALTER TABLE boring_cdc_control.capture_fences ADD CHECK(octet_length(table_set_fingerprint)>=16), ADD CHECK(octet_length(unique_nonce)>=8)'
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --dry-run --json) >"$work/dry4.json"
+token4=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["confirm_token"])' "$work/dry4.json")
+if (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token4" --json) >"$work/length-drift.out" 2>"$work/length-drift.err"; then echo E_LENGTH_DRIFT_ACCEPTED >&2; exit 1; fi
+grep -q M2_INIT_CONTROL_LENGTH_CONSTRAINT_INVALID "$work/length-drift.err"; ! grep -q 'postgresql://' "$work/length-drift.err"
 [[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot'")" == 0 ]]
-echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 idempotent=true replay=blocked privilege_drift=blocked no_slot=true'
+echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 idempotent=true replay=blocked privilege_drift=blocked exact_fence_lengths=true no_slot=true'

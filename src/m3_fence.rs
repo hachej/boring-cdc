@@ -573,6 +573,13 @@ mod tests {
     };
     use crate::m2_capture_runtime::{FeedbackGate, encode_row};
     use crate::m2_schema::open_writer;
+    use crate::m3_bootstrap::{
+        BootstrapStore, ExportResponse, ImporterAssignment, PrepareIntent, digest_assignment,
+    };
+    use crate::m3_planner::{
+        BoundedRangeSource, KeyPartType, KeyRange, PlanInput, PlannerLimits, PlannerStore,
+        ReadBudget, SnapshotRow,
+    };
     use std::time::{SystemTime, UNIX_EPOCH};
     fn path(name: &str) -> std::path::PathBuf {
         std::env::temp_dir().join(format!(
@@ -692,6 +699,128 @@ mod tests {
             1
         );
     }
+    #[test]
+    fn acknowledged_bootstrap_planner_and_fence_compose_one_canonical_anchor() {
+        struct EmptyImportedSource;
+        impl BoundedRangeSource for EmptyImportedSource {
+            fn read_range(
+                &mut self,
+                _: &KeyRange,
+                _: &[KeyPartType],
+                _: ReadBudget,
+            ) -> Result<Vec<SnapshotRow>, crate::m3_planner::PlannerError> {
+                Ok(Vec::new())
+            }
+        }
+
+        let database = path("composed-anchor");
+        let writer = open_writer(&database, "bootstrap", 1, 1).unwrap();
+        writer.connection().execute_batch(
+            "INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'1','sys','1','db','slot','pgoutput','publication','protocol');
+             INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination','archive','cfg','1',1);
+             INSERT INTO relation_schemas(schema_fingerprint,capture_epoch,relation_id,canonical_schema,schema_checksum,created_seq) VALUES('schema-fp','1','rel',X'00','sum',1);",
+        ).unwrap();
+        let assignment = digest_assignment(&[0, 0, 0, 0, 0, 0, 0, 0]);
+        let mut bootstrap = BootstrapStore::open(writer).unwrap();
+        bootstrap
+            .prepare(&PrepareIntent {
+                intent_id: "boot".into(),
+                capture_epoch: "1".into(),
+                source_system_id: "sys".into(),
+                database_id: "db".into(),
+                slot_name: "slot".into(),
+                generation: 1,
+                table_set_fingerprint: hex(&[0xaa; 32]),
+                configuration_fingerprint: "cfg".into(),
+                importers: vec![ImporterAssignment {
+                    importer_id: "worker".into(),
+                    assigned_ranges_digest: assignment,
+                }],
+                created_at: "now".into(),
+            })
+            .unwrap();
+        bootstrap.record_guard_acquired("boot", 10).unwrap();
+        bootstrap
+            .persist_export_response(
+                "boot",
+                &ExportResponse {
+                    consistent_lsn: 1,
+                    snapshot_token: "snapshot-token".into(),
+                    start_seq: 0,
+                    exporter_backend_pid: 11,
+                },
+            )
+            .unwrap();
+        bootstrap.snapshot_set_first("boot", "worker", 12).unwrap();
+        bootstrap
+            .bind_importer_contract("boot", "worker", "schema-fp")
+            .unwrap();
+        bootstrap.acknowledge_import("boot", "worker").unwrap();
+        bootstrap.release_exporter("boot").unwrap();
+        drop(bootstrap);
+
+        let limits = PlannerLimits {
+            chunk_rows: 1,
+            chunk_bytes: 1,
+            chunk_duration: std::time::Duration::from_secs(1),
+            writer_hold: std::time::Duration::from_secs(1),
+            concurrency: 1,
+            source_impact_bytes: 1024,
+            max_rows_per_second: 100,
+        };
+        let mut planner =
+            PlannerStore::open(open_writer(&database, "planner", 2, 2).unwrap(), limits).unwrap();
+        planner
+            .persist_plan(&PlanInput {
+                run_id: "run".into(),
+                generation_id: "gen".into(),
+                destination_id: "destination".into(),
+                capture_epoch: "1".into(),
+                generation: 1,
+                bootstrap_intent_id: "boot".into(),
+                importer_id: "worker".into(),
+                snapshot_schema_fingerprint: "schema-fp".into(),
+                key_schema: vec![KeyPartType::I64],
+                boundaries: vec![],
+                estimated_rows: 0,
+                start_seq: 0,
+                started_mono_ms: 1,
+            })
+            .unwrap();
+        let claim = planner
+            .claim_next("gen", "worker", 2, std::time::Duration::from_secs(1))
+            .unwrap()
+            .unwrap();
+        planner
+            .execute_claim(&claim, &mut EmptyImportedSource, 3)
+            .unwrap();
+        planner.finish_copy("gen").unwrap();
+        drop(planner);
+
+        let mut fence = FenceStore::open(open_writer(&database, "fence", 3, 3).unwrap()).unwrap();
+        assert_eq!(
+            fence
+                .writer
+                .connection()
+                .query_row(
+                    "SELECT intent_id||':'||destination_id||':'||state FROM bootstrap_imports",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .unwrap(),
+            "boot:destination:acknowledged"
+        );
+        fence.prepare_after_copy(&input()).unwrap();
+        fence.mark_dispatched("intent", 1).unwrap();
+        journal(&mut fence, "tx", "0000000000000010", nonce());
+        let proof = fence.observe_durable("intent", "tx").unwrap();
+        assert!(proof.first_proof);
+        assert_eq!(fence.writer.connection().query_row(
+            "SELECT bootstrap_intent_id||':'||generation_id||':'||state FROM bootstrap_anchors WHERE anchor_id='anchor'", [],
+            |row| row.get::<_, String>(0),
+        ).unwrap(), "boot:gen:complete");
+    }
+
     #[test]
     fn delayed_copy_cannot_dispatch_or_complete_anchor() {
         let mut s = setup("delayed");

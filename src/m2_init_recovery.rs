@@ -561,6 +561,21 @@ fn verify(
                 "M2_INIT_CONTROL_KEY_NOT_IMMUTABLE",
             ));
         }
+        if table == FENCE {
+            let lengths = scalar(
+                c,
+                &format!(
+                    "SELECT (EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='{FENCE}'::regclass AND contype='c' AND pg_get_expr(conbin,conrelid)='(octet_length(table_set_fingerprint) = 32)') AND EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='{FENCE}'::regclass AND contype='c' AND pg_get_expr(conbin,conrelid)='(octet_length(unique_nonce) = 16)'))::int::text"
+                ),
+                "control_shape",
+            )?;
+            if lengths != "1" {
+                return Err(InitFailure::at(
+                    "control_shape",
+                    "M2_INIT_CONTROL_LENGTH_CONSTRAINT_INVALID",
+                ));
+            }
+        }
     }
     let role_safety = scalar(
         c,
