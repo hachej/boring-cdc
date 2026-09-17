@@ -18,14 +18,14 @@
       "id": "ART-M0-ARCHIVE-DURABILITY-VALIDATION",
       "owner_bead": "boring-cdc-d-archive-durability",
       "path": "artifacts/m0/decisions/boring-cdc-d-archive-durability/evidence.json",
-      "sha256": "35bf069e021090848e4b2fd8bf59635252308abecc34269b0f366d31a0936465",
+      "sha256": "2ef66ed3a0367a3981484203ae37dd209ea4fcfb4fac38121c070ec2548cb9f7",
       "status": "complete"
     },
     {
       "id": "ART-M0-ARCHIVE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "artifacts/boring-cdc-m0-archive-model/spec/evidence.json",
-      "sha256": "e657156f340edf8578592fb1ad6c8d2e75795e12e0604fc0648617093fb9bdea",
+      "sha256": "f6370ad8c7abf58b794c42db6c15ce645516e286659970d03da3060dd65f61d1",
       "status": "complete"
     },
     {
