@@ -171,7 +171,7 @@
         "boring-cdc-m6-safety-sm",
         "boring-cdc-m6-metrics"
       ],
-      "fixture_sha256": "ede1aacfd1f4678f262874bc3a00ed2e8230b6e31be1f59389ef061fc18a57ea",
+      "fixture_sha256": "3ed9a28af5607eab15cadff25a8dec19ee4f241ec38dc0e34fdf5142657c80e0",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-wal-cap.json",
       "id": "DEC-WAL-CAP",
       "owner_bead": "boring-cdc-d-wal-cap",

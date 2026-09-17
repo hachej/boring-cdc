@@ -35,7 +35,8 @@ class StorageContractTests(unittest.TestCase):
  def test_provisional_inventory_is_card_bound(self):
   c=m.load(m.C); marker=lambda decision:f'// M0-PROVISIONAL: {decision}'
   self.assertEqual(c['authority']['owner_cards'],['59a63169'])
-  self.assertEqual(set(c['provisional_markers']),{marker(x) for x in ('boring-cdc-d-sqlite','boring-cdc-d-admission','boring-cdc-d-archive-durability','boring-cdc-d-wal-cap','boring-cdc-d-compose')})
+  self.assertEqual(set(c['provisional_markers']),{marker(x) for x in ('boring-cdc-d-sqlite','boring-cdc-d-admission','boring-cdc-d-archive-durability','boring-cdc-d-compose')})
+  self.assertNotIn(marker('boring-cdc-d-wal-cap'),c['admission']['provisional'])
   self.assertEqual(c['sqlite']['provisional'],marker('boring-cdc-d-sqlite'))
   self.assertEqual(c['ownership_commands']['provisional'],marker('boring-cdc-d-compose'))
   self.assertIn(marker('boring-cdc-d-sqlite'),m.Q.read_text())

@@ -33,8 +33,7 @@
       }
     },
     "provisional": [
-      "// M0-PROVISIONAL: boring-cdc-d-admission",
-      "// M0-PROVISIONAL: boring-cdc-d-wal-cap"
+      "// M0-PROVISIONAL: boring-cdc-d-admission"
     ],
     "reservation_rules": [
       "stat filesystem identity, group roots by device id",
@@ -71,7 +70,7 @@
       "59a63169"
     ],
     "requirements": "docs/REQUIREMENTS.md",
-    "status": "engineering artifact with accepted d-values literals; remaining decision recommendations stay provisional"
+    "status": "engineering artifact with accepted d-values, d-keys, and d-wal-cap literals; remaining decision recommendations stay provisional"
   },
   "executors": [
     "boring-cdc-m1-preflight",
@@ -227,8 +226,7 @@
     "// M0-PROVISIONAL: boring-cdc-d-admission",
     "// M0-PROVISIONAL: boring-cdc-d-archive-durability",
     "// M0-PROVISIONAL: boring-cdc-d-compose",
-    "// M0-PROVISIONAL: boring-cdc-d-sqlite",
-    "// M0-PROVISIONAL: boring-cdc-d-wal-cap"
+    "// M0-PROVISIONAL: boring-cdc-d-sqlite"
   ],
   "result_schema": "contracts/storage/storage-result.schema.json",
   "safe_stop": {
