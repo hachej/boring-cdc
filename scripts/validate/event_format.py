@@ -335,7 +335,6 @@ def validate() -> tuple[list[dict], dict]:
         if f"## {title}" not in document:
             fail(findings, "E_DOC_SECTION", "docs/EVENT_FORMAT.md", title)
     provisional_markers = {
-        "// M0-PROVISIONAL: boring-cdc-d-values",
         "// M0-PROVISIONAL: boring-cdc-d-values.1",
         "// M0-PROVISIONAL: boring-cdc-d-keys",
     }

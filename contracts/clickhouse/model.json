@@ -41,7 +41,7 @@
     ],
     "owner_confirmation_date": "2026-09-10",
     "requirements": "docs/REQUIREMENTS.md \u00a76",
-    "status": "provisional engineering artifact using card-recommended values; does not close decision Beads"
+    "status": "engineering artifact with accepted d-values literals; remaining decision recommendations stay provisional"
   },
   "consumes": {
     "compose": {
@@ -54,11 +54,11 @@
         "765bd3b2"
       ],
       "date": "2026-09-10",
-      "scope": "ClickHouse artifact design accepted; value/key/Compose recommendations remain provisional under owner card 59a63169"
+      "scope": "ClickHouse artifact design and d-values literals accepted; key/Compose and canonical-float recommendations remain provisional under owner card 59a63169"
     },
     "event_contract": {
       "path": "contracts/event/event-format.json",
-      "sha256": "ab44eb632693bb2eeef84b8a030452f730d5e00a1d08d56bc86c221a213eaf1f"
+      "sha256": "2969282e59e61f442befdb888b86a3446535694581c6858a92dda100546786b8"
     },
     "failure_policy": {
       "base_delay_ms": 250,
@@ -72,7 +72,7 @@
     "promotion": {
       "confirmed_projection_source": "contracts/storage/storage-model.json",
       "decision_id": "boring-cdc-d-promotion",
-      "source_sha256": "8f09ff584867f45a7bb122f1142eab9afd17fc0384a0e711e665985d0b29e1ff"
+      "source_sha256": "fabfcdc0606dd5c8e3973eee8707d486003f967b74270eacd3d6634354487d0d"
     }
   },
   "event_projection": {
@@ -320,7 +320,6 @@
   "provisional_markers": [
     "// M0-PROVISIONAL: boring-cdc-d-compose",
     "// M0-PROVISIONAL: boring-cdc-d-keys",
-    "// M0-PROVISIONAL: boring-cdc-d-values",
     "// M0-PROVISIONAL: boring-cdc-d-values.1"
   ],
   "result_schema": "contracts/clickhouse/result.schema.json",

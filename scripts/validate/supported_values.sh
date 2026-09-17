@@ -9,8 +9,8 @@ root=Path(sys.argv[1]); selected_case=sys.argv[2]
 owner='boring-cdc-d-values'; decision_id='DEC-SUPPORTED-VALUES'
 fixture_rel='fixtures/m0/decisions/boring-cdc-d-values.json'
 executors=['boring-cdc-m1-decoder','boring-cdc-m0-event-format']
-markers=['// M0-PROVISIONAL: boring-cdc-d-values', '// M0-PROVISIONAL: boring-cdc-d-values.1']
-proposed='Envelope v1 uses type tags and distinct null, absent, and unchanged states for the recommended bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; canonical bodies, destination mappings, and limits are retained as a provisional owner-card recommendation.'
+markers=['// M0-PROVISIONAL: boring-cdc-d-values.1']
+proposed='Owner-card accepted envelope v1 type tags; distinct null, absent, and unchanged states; bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; non-float canonical bodies; destination mappings; and limits. Canonical shortest-round-trip float spelling remains separately provisional under boring-cdc-d-values.1.'
 SCALARS=[('bool',16,'boolean','Bool','BOOLEAN'),('int2',21,'signed_integer','Int16','INT32'),('int4',23,'signed_integer','Int32','INT32'),('int8',20,'signed_integer','Int64','INT64'),('numeric',1700,'arbitrary_precision_numeric','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('float4',700,'ieee754','Float32','FLOAT'),('float8',701,'ieee754','Float64','DOUBLE'),('date',1082,'date','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('timestamp',1114,'timestamp_without_time_zone','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('timestamptz',1184,'timestamp_with_time_zone','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('uuid',2950,'uuid','UUID','FIXED_LEN_BYTE_ARRAY(16, UUID)'),('text',25,'utf8_text','String','BYTE_ARRAY(UTF8)'),('varchar',1043,'utf8_text','String','BYTE_ARRAY(UTF8)'),('bpchar',1042,'utf8_text','String','BYTE_ARRAY(UTF8)'),('bytea',17,'bytes','String(base64url unpadded)','BYTE_ARRAY')]
 ARRAY_OIDS=[1000,1005,1007,1016,1231,1021,1022,1182,1115,1185,2951,1009,1015,1014,1001]
 EXPECTED_MATRIX=[{'array_oid':a,'canonical_family':f,'clickhouse':ch,'clickhouse_array':'String(tagged canonical array body)','jsonl':'envelope_v1 tagged value','name':n,'oid':o,'parquet':pq+' plus value-state tag metadata','parquet_array':'BYTE_ARRAY(canonical tagged array body) plus value-state tag metadata'} for (n,o,f,ch,pq),a in zip(SCALARS,ARRAY_OIDS)]
@@ -144,7 +144,7 @@ try:
  expected_probe=[{'code':'SUPPORTED_VALUES_FIXTURE_VALID','golden_vectors':len(expected_vectors),'outcome':'pass','phase':'validate_spec','type_oids':30}]
  if probe!=expected_probe or spec['execution_probe']!={'expected_lines':expected_probe,'path':probe_rel,'sha256':sha(root/probe_rel)}: fail()
  decision=next(x for x in decisions['decisions'] if x['id']==decision_id)
- markers=['// M0-PROVISIONAL: boring-cdc-d-values','// M0-PROVISIONAL: boring-cdc-d-values.1']
+ markers=['// M0-PROVISIONAL: boring-cdc-d-values.1']
  if decision!={'executor_beads':executors,'fixture_sha256':sha(root/fixture_rel),'fixture_spec':fixture_rel,'id':decision_id,'owner_bead':owner,'proposed_value':proposed,'status':'open','provisional_markers':markers}: fail()
  needed={'ART-M0-SUPPORTED-VALUES-FIXTURE':fixture_rel,'ART-M0-SUPPORTED-VALUES-PROBE':probe_rel,'ART-M0-SUPPORTED-VALUES-VALIDATION':'artifacts/m0/decisions/boring-cdc-d-values/evidence.json'}
  owned={x['id']:x for x in artifacts['artifacts'] if x.get('owner_bead')==owner}

@@ -121,7 +121,6 @@
   },
   "owner_bead": "boring-cdc-m0-event-format",
   "provisional_markers": [
-    "// M0-PROVISIONAL: boring-cdc-d-values",
     "// M0-PROVISIONAL: boring-cdc-d-values.1",
     "// M0-PROVISIONAL: boring-cdc-d-keys"
   ],

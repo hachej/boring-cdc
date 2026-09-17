@@ -102,7 +102,7 @@
       "id": "ART-M0-CLICKHOUSE-DOC",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "docs/CLICKHOUSE_MODEL.md",
-      "sha256": "47528c341d172bd0b797eff7d9a0ebd6c3081730f1984d34c6c3eedd7044fc28",
+      "sha256": "06fc289d50b06060ea975641d6a77fe375ee43de31cef72ee8d1cd6f5cf8f63c",
       "status": "complete"
     },
     {
@@ -130,7 +130,7 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "35b14707438eb70d1cef5b1fe8d92067094b12e1f37afdbc57d4cae21f1356eb",
+      "sha256": "74962d321fafcb718cbc1d1db3963bbbd3995322c811535849e22fd20690568a",
       "status": "complete"
     },
     {
@@ -158,7 +158,7 @@
       "id": "ART-M0-CLICKHOUSE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "scripts/validate/clickhouse_contract.py",
-      "sha256": "165f50b3acdbf4329c8e12901755baf55c84fa7ca56929977e5a64421df85568",
+      "sha256": "58bf73c5547d8b8787c624e6fbe0f787a71a0ea437cd02a87d187fb642d9d91c",
       "status": "complete"
     },
     {
@@ -214,14 +214,14 @@
       "id": "ART-M0-EVENT-FORMAT-CONTRACT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",
-      "sha256": "ab44eb632693bb2eeef84b8a030452f730d5e00a1d08d56bc86c221a213eaf1f",
+      "sha256": "2969282e59e61f442befdb888b86a3446535694581c6858a92dda100546786b8",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-DOC",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "docs/EVENT_FORMAT.md",
-      "sha256": "af3fc750496ab947f928c23b74dbbab9baf2a90372d34968be0a6df78d54dca5",
+      "sha256": "65252925cc76fccddba444d102ad394ab5f0cebf3a77cd3e3ab2d9bd2531da3a",
       "status": "complete"
     },
     {
@@ -242,7 +242,7 @@
       "id": "ART-M0-EVENT-FORMAT-VALIDATOR",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "scripts/validate/event_format.py",
-      "sha256": "603127eeeeaaf79745c17a4b1743b42e72c02d31fb975b6dfe9932fcd9df89be",
+      "sha256": "ee01e23e59d2127a6f559b0f153bef15c5ac1ca75c4074ee5002aec36c594ae5",
       "status": "complete"
     },
     {
@@ -473,7 +473,7 @@
       "id": "ART-M0-STORAGE-MODEL",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.json",
-      "sha256": "8f09ff584867f45a7bb122f1142eab9afd17fc0384a0e711e665985d0b29e1ff",
+      "sha256": "fabfcdc0606dd5c8e3973eee8707d486003f967b74270eacd3d6634354487d0d",
       "status": "complete"
     },
     {
@@ -501,14 +501,14 @@
       "id": "ART-M0-STORAGE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "scripts/validate/storage_contract.py",
-      "sha256": "b8c08d9ac6fc6d32fc64ae7253dfc59b9b73d93536a58d7637ee18ee79bc02e7",
+      "sha256": "891f23997caf77eb18f6bd304bb9c0f72924ecd79155d8ee2c38b4adec53e996",
       "status": "complete"
     },
     {
       "id": "ART-M0-SUPPORTED-VALUES-FIXTURE",
       "owner_bead": "boring-cdc-d-values",
       "path": "fixtures/m0/decisions/boring-cdc-d-values.json",
-      "sha256": "491c789ebc5802aca0b2086e5cf0d50f31426de2d273b96c22621436003b504a",
+      "sha256": "4a03258299482e7602b7c059766d9c20c66fa5c99ac27fac8a744a63f6e333d7",
       "status": "complete"
     },
     {

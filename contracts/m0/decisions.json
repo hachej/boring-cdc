@@ -131,13 +131,12 @@
         "boring-cdc-m1-decoder",
         "boring-cdc-m0-event-format"
       ],
-      "fixture_sha256": "491c789ebc5802aca0b2086e5cf0d50f31426de2d273b96c22621436003b504a",
+      "fixture_sha256": "4a03258299482e7602b7c059766d9c20c66fa5c99ac27fac8a744a63f6e333d7",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-values.json",
       "id": "DEC-SUPPORTED-VALUES",
       "owner_bead": "boring-cdc-d-values",
-      "proposed_value": "Envelope v1 uses type tags and distinct null, absent, and unchanged states for the recommended bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; canonical bodies, destination mappings, and limits are retained as a provisional owner-card recommendation.",
+      "proposed_value": "Owner-card accepted envelope v1 type tags; distinct null, absent, and unchanged states; bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; non-float canonical bodies; destination mappings; and limits. Canonical shortest-round-trip float spelling remains separately provisional under boring-cdc-d-values.1.",
       "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-values",
         "// M0-PROVISIONAL: boring-cdc-d-values.1"
       ],
       "status": "open"
