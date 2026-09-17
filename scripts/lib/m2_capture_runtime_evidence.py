@@ -30,6 +30,10 @@ for legacy_seed,owner,profile in SEEDS[:-1]:
    command[stream+'_path']=command[stream+'_path'].replace(seed,legacy_seed)
  value['result']['artifacts']=[path.replace(seed,legacy_seed) for path in value['result']['artifacts']]
  legacy_cfg={'profile':profile,'seed':legacy_seed,'credentials':'secret-file-indirect','destination':None}; wr(legacy/'config.json',canon(legacy_cfg))
+ legacy_fp=sha(canon(legacy_cfg)); legacy_log=legacy/'logs/boring-cdc.jsonl'
+ legacy_events=[json.loads(line) for line in legacy_log.read_text().splitlines() if line]
+ for event in legacy_events: event['config_fingerprint']=legacy_fp
+ wr(legacy_log,b''.join(canon(event) for event in legacy_events))
  value['result']['digest']=sha(b''.join((R/path).read_bytes() for path in value['result']['artifacts']))
  wr(legacy/'manifest.json',canon(value));wr(legacy/'evidence.json',canon(value));wr(legacy/'versions.json',canon({'git_commit':git,'implementation_sha256':impl,'postgres':'17.6','python':sys.version.split()[0]}))
  legacy_files=sorted(x for x in legacy.rglob('*') if x.is_file() and x.name!='sha256.txt');wr(legacy/'sha256.txt',''.join(f'{sha(x.read_bytes())}  {x.relative_to(legacy).as_posix()}\n' for x in legacy_files))

@@ -109,7 +109,23 @@ def fault_status() -> None:
     write(out / "evidence.json", canon(evidence)); inventory(out)
 
 
+def run(argv: list[str]) -> None:
+    completed = subprocess.run(argv, cwd=ROOT)
+    if completed.returncode:
+        raise SystemExit(completed.returncode)
+
+
+def reseal() -> None:
+    # One top-level runtime reseal: regenerate the two capture packets from each
+    # real scenario, then package the live reconcile and fault/status scenarios.
+    run(["scripts/e2e/m2_capture_runtime.sh"])
+    run(["scripts/faults/m2_capture_runtime.sh"])
+    reconcile()
+    fault_status()
+
+
 if __name__ == "__main__":
-    if sys.argv[1:] == ["reconcile"]: reconcile()
+    if not sys.argv[1:]: reseal()
+    elif sys.argv[1:] == ["reconcile"]: reconcile()
     elif sys.argv[1:] == ["fault-status"]: fault_status()
-    else: raise SystemExit("usage: reseal_runtime_evidence.py reconcile|fault-status")
+    else: raise SystemExit("usage: reseal_runtime_evidence.py [reconcile|fault-status]")

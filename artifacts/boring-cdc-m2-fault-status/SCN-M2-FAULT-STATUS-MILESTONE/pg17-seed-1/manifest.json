@@ -13,7 +13,7 @@
       "argv": "cargo clippy --locked --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stderr",
-      "stderr_sha256": "2461b00c8697c4189b2de92ca6fb05b5d72273c78a0a47b1ce4e83ccca077b70",
+      "stderr_sha256": "1f5852af1ed7025b5728e842e3c3c2f5d2f720d25557d84c38f1ffda99719c59",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stdout",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "version": "m2-fault-status/v5"
@@ -22,25 +22,25 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stderr",
-      "stderr_sha256": "07ccb4af8d9479a68db4b7e6a5bb217adfcfecde1d119d98bf617ed7197c1353",
+      "stderr_sha256": "6018200332e1d48409b832cc9b836ceb52e955cc1587888de3633141ef33b4e5",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stdout",
-      "stdout_sha256": "4ed68bb5a9185d76a73f8f33bb8a5208f4f381d663be5b0fd324ddaf3e5a9b32",
+      "stdout_sha256": "de82c234663fe7ba5abe81c3aaede7ef9e8eeff115d76b6782161d17cdc96539",
       "version": "m2-fault-status/v5"
     },
     {
       "argv": "cargo test --locked m2_fault_status::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stderr",
-      "stderr_sha256": "83ed90e8c31c79563450f19aa46f74032b81844d46700acd0234af3bda9b52a8",
+      "stderr_sha256": "91d0f20d151e8742e709ee25a76c932cc09ed4507898217f7c655b722935da0c",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stdout",
-      "stdout_sha256": "e2927e9198321927e621f9c8e196a9b50fe9c1aaca673af64782a6c3cf137357",
+      "stdout_sha256": "cd3355e78c9cb30bea7228e436964a1572fb1486190b3476bf78ef3237c8cd5e",
       "version": "m2-fault-status/v5"
     },
     {
       "argv": "scripts/e2e/m2_fault_status.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stderr",
-      "stderr_sha256": "cab7c797c81fd4143bdbed6921e7afba82b6109f8241c82927e0dce28eb5f998",
+      "stderr_sha256": "beb71f6fcf42638e3c67e5a51589a12a45d9f42f6a487d110453ee83403defb3",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stdout",
       "stdout_sha256": "2621186a88727c197c102348410e9b455abd637871a7908ea9b1744fec6079b4",
       "version": "m2-fault-status/v5"
@@ -49,15 +49,15 @@
       "argv": "scripts/faults/m2_fault_status.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stderr",
-      "stderr_sha256": "3e98bf340d26127fd0527f3850f8e1ad4d19d4821ed8973a63ff84c73fa5d17e",
+      "stderr_sha256": "948b09806ac1221322aaa7877f100dfb4d106d4eb6456691d54217fc1aa2045b",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stdout",
-      "stdout_sha256": "866137a9170ed549611f624936dce23ed13d14627dbf715ad39ddf547c880367",
+      "stdout_sha256": "f4eaad28db89241ec2e4a6222316e7763d23b6052c6ff0325ed76a0b4b89e51b",
       "version": "m2-fault-status/v5"
     }
   ],
-  "config_fingerprint": "sha256:0ec863ea08082341407cebbc4e1aaa3cc3bad369993f0d1aa842c29300b57c01",
+  "config_fingerprint": "sha256:050fdb073b2e959ed5cb75512d9b98a5af57390e496a55230799be0c0ad87ea0",
   "failure_fingerprint": null,
-  "git_commit": "368ff1a2e7ad76053f41f60fe2ec58bc2b1eb7d4",
+  "git_commit": "533926a784e52c56a84318310c88e6caf558ec3c",
   "outcome": "pass",
   "postgres_image": "docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
   "profile": "clean-compose",
@@ -66,6 +66,6 @@
   "schema_version": "m2-fault-status-manifest/v1",
   "seed": "pg17-seed-1",
   "source_fingerprint": "redacted-sha256",
-  "source_tree": "0ec863ea08082341407cebbc4e1aaa3cc3bad369993f0d1aa842c29300b57c01",
+  "source_tree": "050fdb073b2e959ed5cb75512d9b98a5af57390e496a55230799be0c0ad87ea0",
   "table_set_fingerprint": "redacted-sha256"
 }
