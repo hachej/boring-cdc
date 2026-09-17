@@ -4,7 +4,7 @@ This is the bounded one-source, one-publication, one-slot, one-binary, one-SQLit
 
 ## 1. Start with an empty operator database
 
-The PostgreSQL server must use `wal_level=logical`, PostgreSQL 17.6, and a finite `max_slot_wal_keep_size`. Create an empty database, then execute the checked-in prerequisite SQL as a superuser (the exercised route). A non-superuser operator must both own the database and have `CREATEROLE`; database ownership alone is not sufficient:
+The PostgreSQL server must use `wal_level=logical`, PostgreSQL 17.6, and a finite `max_slot_wal_keep_size`. Create an empty database, then execute the checked-in prerequisite SQL as a PostgreSQL superuser. This is the only supported and exercised provisioning route; database ownership or `CREATEROLE` alone is not sufficient:
 
 ```sh
 export PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=boring_cdc PGUSER=boring_cdc
