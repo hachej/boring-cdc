@@ -103,15 +103,7 @@
     "boring-cdc-m0-scaffold",
     "boring-cdc-m0-storage-model"
   ],
-  "provisional_decisions": [
-    "boring-cdc-d-archive-durability",
-    "boring-cdc-d-compose",
-    "boring-cdc-d-keys",
-    "boring-cdc-d-sqlite",
-    "boring-cdc-d-values",
-    "boring-cdc-d-values.1",
-    "boring-cdc-d-wal-cap"
-  ],
+  "provisional_decisions": [],
   "required_m0_owners": [
     "boring-cdc-d-additive",
     "boring-cdc-d-admission",

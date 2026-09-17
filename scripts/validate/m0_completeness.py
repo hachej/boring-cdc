@@ -276,7 +276,7 @@ def probe() -> dict:
         "decision_manifest_owners": sorted(DECISION_OWNERS),
         "required_m0_owners": sorted(REQUIRED_M0_OWNERS),
         "provisional_decisions": sorted(PROVISIONAL),
-        "supervisor_override": "open recommendations require exact " + "M0-" + "PROVISIONAL markers; no approval inferred",
+        "supervisor_override": "owner card 59a63169 accepted all seven recommended literal sets; matching markers removed",
         "article1_boundary": "raw pgoutput plus same-stream process-local non-durable teaching view; ClickHouse deferred to Article 4",
         "duplicate_bead_ids": 0 if not any(x.startswith("duplicate Bead IDs") for x in findings) else None,
         "checks": checks,
