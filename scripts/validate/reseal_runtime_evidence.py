@@ -131,8 +131,6 @@ def reseal() -> None:
     run(["python3", "scripts/validate/m2_leases.py"])
     reconcile()
     fault_status()
-    run(["scripts/acceptance/m2_complete.sh", "--write"])
-    run(["scripts/acceptance/m1_complete.sh", "--write"])
 
 
 if __name__ == "__main__":
