@@ -116,7 +116,7 @@
       "confirmed_projection_source": "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
       "decision_id": "DEC-ARCHIVE-DURABILITY-CONTINUITY",
       "projection": "accepted filesystem admission, finite audit budgets/windows, bounded resume, identity restart, failure mapping, stable codes and metrics",
-      "source_sha256": "a9b387f549da61b42bd32ac31ea7a8a7d2e9f69bf99a000d5cb3e026065ba9e6"
+      "source_sha256": "eb06373749e03e65aeb8c3043f63ac6c01b0067eb2cc5d3bfa5ed85e8ba97bc9"
     },
     "event_contract": {
       "path": "contracts/event/event-format.json",

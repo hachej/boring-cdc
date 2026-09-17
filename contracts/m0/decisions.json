@@ -11,7 +11,7 @@
         "boring-cdc-m5-loops",
         "boring-cdc-m5-faults"
       ],
-      "fixture_sha256": "a9b387f549da61b42bd32ac31ea7a8a7d2e9f69bf99a000d5cb3e026065ba9e6",
+      "fixture_sha256": "eb06373749e03e65aeb8c3043f63ac6c01b0067eb2cc5d3bfa5ed85e8ba97bc9",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
       "id": "DEC-ARCHIVE-DURABILITY-CONTINUITY",
       "owner_bead": "boring-cdc-d-archive-durability",
@@ -46,7 +46,7 @@
         "boring-cdc-m6-failure-matrix",
         "boring-cdc-m7-artifacts"
       ],
-      "fixture_sha256": "325cfbd390c2093e82910ed62a73280a457a6d61b376da48bad74fd1b27d46df",
+      "fixture_sha256": "997f59d3657a0b54a41358181173ad92c4bd0ea959a22e35b163482131af6c30",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-compose.json",
       "id": "DEC-COMPOSE-IMAGES-RUNTIME-RECOVERY",
       "owner_bead": "boring-cdc-d-compose",
