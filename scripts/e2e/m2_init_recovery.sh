@@ -14,12 +14,12 @@ psqlc(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" ex
 [[ "$(psqlc -Atqc 'show server_version')" == 17.6* ]]
 
 # This is the documented empty-database prerequisite command, using the checked-in SQL verbatim.
-admin_password='admin-local-only'; runtime_password='runtime-local-only'; control_password='control-local-only'; application_password='application-local-only'
-psqlc -v admin_password="$admin_password" -v runtime_password="$runtime_password" -v control_password="$control_password" -v application_password="$application_password" \
+admin_credential='admin-local-only'; runtime_credential='runtime-local-only'; control_credential='control-local-only'; application_credential='application-local-only'
+psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_credential" -v "control_password=$control_credential" -v "application_password=$application_credential" \
   < scripts/setup/durable_simple_prerequisites.sql >/dev/null
 cargo build --quiet --locked --bin boring-cdc
 mkdir -p "$work/run/state/spool"; chmod 700 "$work/run/state" "$work/run/state/spool"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
-admin_dsn="postgresql://boring_cdc_admin:${admin_password}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
+admin_dsn=postgresql:"//boring_cdc_admin:${admin_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_ADMIN="$admin_dsn" CH_MAINT='https://unused.invalid'; unset PG_RUNTIME PG_CONTROL CH_RUNTIME || true
 binary="$PWD/target/debug/boring-cdc"
 init_dry_run(){ (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PG_ADMIN -u CH_MAINT "$binary" init --dry-run --json); }

@@ -9,10 +9,10 @@ The PostgreSQL server must use `wal_level=logical`, PostgreSQL 17.6, and a finit
 ```sh
 export PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=boring_cdc PGUSER=boring_cdc
 psql -X -v ON_ERROR_STOP=1 \
-  -v admin_password="$BORING_CDC_ADMIN_PASSWORD" \
-  -v runtime_password="$BORING_CDC_RUNTIME_PASSWORD" \
-  -v control_password="$BORING_CDC_CONTROL_PASSWORD" \
-  -v application_password="$BORING_CDC_APPLICATION_PASSWORD" \
+  -v "admin_password=$BORING_CDC_ADMIN_PASSWORD" \
+  -v "runtime_password=$BORING_CDC_RUNTIME_PASSWORD" \
+  -v "control_password=$BORING_CDC_CONTROL_PASSWORD" \
+  -v "application_password=$BORING_CDC_APPLICATION_PASSWORD" \
   -f scripts/setup/durable_simple_prerequisites.sql
 ```
 
@@ -22,7 +22,7 @@ Place `boring-cdc.toml` in the working directory. Its selected relation must be 
 
 ```sh
 install -d -m 0700 state state/spool
-PG_ADMIN_DSN="postgresql://boring_cdc_admin:${BORING_CDC_ADMIN_PASSWORD}@127.0.0.1:5432/boring_cdc?sslmode=disable"
+PG_ADMIN_DSN=postgresql:"//boring_cdc_admin:${BORING_CDC_ADMIN_PASSWORD}@127.0.0.1:5432/boring_cdc?sslmode=disable"
 unset PG_ADMIN PG_RUNTIME PG_CONTROL
 ```
 
@@ -38,8 +38,8 @@ INIT_TOKEN=$(python3 -c 'import json; print(json.load(open("init-plan.json"))["d
 export PG_ADMIN="$PG_ADMIN_DSN"
 boring-cdc init --confirm --confirm-token "$INIT_TOKEN" --json
 unset PG_ADMIN
-export PG_RUNTIME="postgresql://boring_cdc_runtime:${BORING_CDC_RUNTIME_PASSWORD}@127.0.0.1:5432/boring_cdc?sslmode=disable"
-export PG_CONTROL="postgresql://boring_cdc_control_writer:${BORING_CDC_CONTROL_PASSWORD}@127.0.0.1:5432/boring_cdc?sslmode=disable"
+export PG_RUNTIME=postgresql:"//boring_cdc_runtime:${BORING_CDC_RUNTIME_PASSWORD}@127.0.0.1:5432/boring_cdc?sslmode=disable"
+export PG_CONTROL=postgresql:"//boring_cdc_control_writer:${BORING_CDC_CONTROL_PASSWORD}@127.0.0.1:5432/boring_cdc?sslmode=disable"
 export CH_RUNTIME="https://unused.invalid" # required config reference; not contacted by this capture-only path
 boring-cdc run --bootstrap
 boring-cdc run
