@@ -610,16 +610,22 @@ fn reject_unapproved_overrides(
     secret_names: [&String; 5],
 ) -> Result<(), ConfigError> {
     for name in env.names() {
-        if name.starts_with("BORING_CDC_")
-            && !APPROVED_OVERRIDES.contains(&name.as_str())
-            && !(cfg!(debug_assertions) && name == "BORING_CDC_M2_FAULT_HOOK")
-            && !secret_names.iter().any(|secret| secret.as_str() == name)
-        {
-            return Err(ConfigError {
-                code: "CONFIG_UNAPPROVED_ENV_OVERRIDE",
-                field: "environment",
-            });
+        if !name.starts_with("BORING_CDC_") {
+            continue;
         }
+        if APPROVED_OVERRIDES.contains(&name.as_str()) {
+            continue;
+        }
+        if cfg!(debug_assertions) && name == "BORING_CDC_M2_FAULT_HOOK" {
+            continue;
+        }
+        if secret_names.iter().any(|secret| secret.as_str() == name) {
+            continue;
+        }
+        return Err(ConfigError {
+            code: "CONFIG_UNAPPROVED_ENV_OVERRIDE",
+            field: "environment",
+        });
     }
     Ok(())
 }

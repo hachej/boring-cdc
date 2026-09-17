@@ -741,6 +741,7 @@ pub fn load_segment_intent(
 /// The real archive adapter consumes the shared typed hook; it does not define another policy.
 pub struct ArchiveFailureAdapter;
 impl ArchiveFailureAdapter {
+    #[allow(clippy::too_many_arguments)]
     pub fn prepare_failure(
         current: Option<&crate::failure_policy::FailureRecord>,
         outcome: DestinationOutcome,

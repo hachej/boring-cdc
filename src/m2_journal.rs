@@ -7,6 +7,18 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::time::{Duration, Instant};
 
+/// Persisted `source_state` singleton row: identity columns plus the durable commit LSN.
+type SourceStateRow = (
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+    Option<String>,
+);
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceIdentity {
     pub capture_epoch: String,
@@ -289,7 +301,7 @@ impl JournalStore {
                     }
                 })?;
         }
-        let state: Option<(String,String,String,String,String,String,String,Option<String>)> = transaction.query_row(
+        let state: Option<SourceStateRow> = transaction.query_row(
             "SELECT capture_epoch,source_system_id,timeline_id,database_id,slot_name,publication_fingerprint,protocol_fingerprint,durable_transaction_end_lsn FROM source_state WHERE singleton=1", [],
             |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?)),
         ).optional()?;
@@ -426,6 +438,7 @@ fn verify_schemas(
     }
     Ok(())
 }
+#[allow(clippy::too_many_arguments)]
 fn verify_duplicate(
     tx: &rusqlite::Transaction<'_>,
     commit: &SourceCommit,
@@ -760,9 +773,8 @@ pub fn journal_verify(
             let seq:i64=r.get(5)?; let ordinal:i64=r.get(6)?; let payload:Vec<u8>=r.get(7)?; let payload_hash:String=r.get(8)?;
             if seq!=global_seq || seq<first || seq>last || ordinal!=seq-first || sha256(&payload)!=payload_hash { return Err(rusqlite::Error::InvalidQuery); }
             if active.as_ref().is_none_or(|a|a.0!=txid) {
-                if let Some((_,old_first,old_last,old_count,old_checksum,hasher))=active.take() {
-                    if old_last-old_first+1!=old_count || format!("{:x}",hasher.finalize())!=old_checksum { return Err(rusqlite::Error::InvalidQuery); }
-                }
+                if let Some((_,old_first,old_last,old_count,old_checksum,hasher))=active.take()
+                    && (old_last-old_first+1!=old_count || format!("{:x}",hasher.finalize())!=old_checksum) { return Err(rusqlite::Error::InvalidQuery); }
                 if first!=seq || last-first+1!=count { return Err(rusqlite::Error::InvalidQuery); }
                 active=Some((txid.clone(),first,last,count,checksum,Sha256::new())); seen_transactions+=1;
             }
@@ -771,10 +783,10 @@ pub fn journal_verify(
             global_seq+=1; seen_events+=1; Ok(())
         },
     ).map_err(|_| JournalError::Conflict("journal event sequence, boundary, payload hash, or transaction checksum mismatch"))?;
-    if let Some((_, first, last, count, checksum, hasher)) = active.take() {
-        if last - first + 1 != count || format!("{:x}", hasher.finalize()) != checksum {
-            return Err(JournalError::Conflict("transaction checksum mismatch"));
-        }
+    if let Some((_, first, last, count, checksum, hasher)) = active.take()
+        && (last - first + 1 != count || format!("{:x}", hasher.finalize()) != checksum)
+    {
+        return Err(JournalError::Conflict("transaction checksum mismatch"));
     }
     if seen_events != expected_events
         || seen_transactions != transactions
@@ -876,6 +888,8 @@ impl<T> CapturePriorityScheduler<T> {
         queue.push_back(item);
         Ok(())
     }
+    // Not `Iterator::next`: this is a fair-scheduler poll returning the work class and tick.
+    #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<(WorkClass, T, u64)> {
         self.tick += 1;
         let service_pending = self.service.iter().any(|q| !q.is_empty());

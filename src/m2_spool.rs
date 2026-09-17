@@ -285,6 +285,8 @@ impl FreeSpace for StatvfsSpace {
             return Err(io::Error::last_os_error());
         }
         let stat = unsafe { stat.assume_init() };
+        // Widths of `f_bavail`/`f_frsize` are platform-dependent; the casts are deliberate.
+        #[allow(clippy::unnecessary_cast)]
         Ok((stat.f_bavail as u64).saturating_mul(stat.f_frsize as u64))
     }
 }
@@ -364,6 +366,7 @@ pub struct TxnBuffer {
     commit_collection_reserved: usize,
 }
 impl TxnBuffer {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         directory: PathBuf,
         capture_epoch: String,
@@ -770,6 +773,7 @@ impl TxnBuffer {
     /// Requests the shared policy core to re-arm a limit failure. The spool domain does not
     /// clear or rewrite persisted policy state: changed relevant limits and retained WAL are
     /// both mandatory, otherwise the only safe outcome is re-seed.
+    #[allow(clippy::too_many_arguments)]
     pub fn rearm_failure_policy(
         &self,
         error: &SpoolError,
@@ -1080,6 +1084,7 @@ impl StartupFilesystem for RealStartupFilesystem {
 
 /// Requires the caller to hold the repository's exclusive runtime state lock. Unknown entries are
 /// never deleted. Every malformed, unowned, or contradictory spool is quarantined and blocks.
+#[allow(clippy::too_many_arguments)]
 pub fn classify_startup_spools(
     lock: &crate::m2_ownership::StateLock,
     store: &Path,
@@ -1109,6 +1114,7 @@ pub fn classify_startup_spools(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn classify_startup_spools_with(
     filesystem: &impl StartupFilesystem,
     lock: &crate::m2_ownership::StateLock,
@@ -1406,7 +1412,7 @@ pub mod tests {
             .is_err()
         );
         let mut b = setup("memory", 512, 4096);
-        push(&mut b, &vec![1; 100]).unwrap();
+        push(&mut b, &[1; 100]).unwrap();
         let h = b.high_water();
         assert_eq!(
             (h.receive_bytes, h.decoder_bytes, h.staging_bytes),
@@ -1510,7 +1516,7 @@ pub mod tests {
     #[test]
     fn filesystem_reserve_rejects_before_write_and_preserves_emergency_space() {
         let mut b = setup("enospc", 0, 520);
-        let e = push(&mut b, &vec![1; 32]).unwrap_err();
+        let e = push(&mut b, &[1; 32]).unwrap_err();
         assert!(matches!(e, SpoolError::DiskReserve { .. }));
         assert!(b.spool.as_ref().map(|x| x.2).unwrap_or(0) == 0);
         b.finish().unwrap();
