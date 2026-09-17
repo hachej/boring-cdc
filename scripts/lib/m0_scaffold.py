@@ -23,7 +23,9 @@ PINS = {
 }
 def sha(data: bytes)->str:return hashlib.sha256(data).hexdigest()
 def read(path:str)->bytes:return (ROOT/path).read_bytes()
-def git(*args:str)->str:return subprocess.check_output(["git",*args],cwd=ROOT,text=True).strip()
+TRUSTED_GIT = "/usr/bin/git"
+GIT_ENVIRONMENT = {"GIT_CONFIG_GLOBAL":"/dev/null","GIT_CONFIG_NOSYSTEM":"1","HOME":"/nonexistent","LC_ALL":"C","PATH":"/usr/bin:/bin"}
+def git(*args:str)->str:return subprocess.check_output([TRUSTED_GIT,*args],cwd=ROOT,env=GIT_ENVIRONMENT,text=True).strip()
 def canonical(obj:object)->bytes:return (json.dumps(obj,sort_keys=True,separators=(",",":"))+"\n").encode()
 def write_json(path:Path,obj:object)->None:path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(canonical(obj))
 
