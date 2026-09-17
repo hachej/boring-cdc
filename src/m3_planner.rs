@@ -377,15 +377,18 @@ impl PlannerStore {
             .writer
             .connection_mut()
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let state: Option<String> = tx
+        let state: Option<(String,String)> = tx
             .query_row(
-                "SELECT state FROM backfill_generations WHERE generation_id=?1",
+                "SELECT g.state,p.importer_id FROM backfill_generations g JOIN m3_planner_runs p USING(generation_id) WHERE g.generation_id=?1",
                 [generation_id],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?,r.get(1)?)),
             )
             .optional()?;
-        if state.as_deref() != Some("copying") {
+        if state.as_ref().map(|v| v.0.as_str()) != Some("copying") {
             return Err(PlannerError::StaleGeneration);
+        }
+        if state.as_ref().map(|v| v.1.as_str()) != Some(worker_id) {
+            return Err(PlannerError::Conflict("M3_WORKER_NOT_ASSIGNED"));
         }
         tx.execute(
             "DELETE FROM m3_chunk_claims WHERE generation_id=?1 AND expires_mono_ms<=?2",
@@ -405,7 +408,10 @@ impl PlannerStore {
             tx.rollback()?;
             return Ok(None);
         };
-        let token = format!("{}:{}:{}", generation_id, worker_id, now_mono_ms);
+        let token = format!(
+            "{}:{}:{}:{}",
+            generation_id, worker_id, chunk_id, now_mono_ms
+        );
         tx.execute(
             "INSERT INTO m3_chunk_claims VALUES(?1,?2,?3,?4,?5,?6)",
             params![
@@ -444,12 +450,21 @@ impl PlannerStore {
         source: &mut S,
         now_mono_ms: u64,
     ) -> Result<u64, PlannerError> {
-        let encoded_schema: Vec<u8> = self.writer.connection().query_row(
-            "SELECT key_schema FROM m3_planner_runs WHERE generation_id=?1",
-            [&claim.generation_id],
-            |r| r.get(0),
-        )?;
-        let schema = encoded_schema
+        let persisted:(Vec<u8>,Vec<u8>,Vec<u8>,i64,String,String,String)=self.writer.connection().query_row(
+            "SELECT p.key_schema,c.range_start,c.range_end,r.snapshot_promotable,r.guard_liveness,r.state,i.state FROM m3_planner_runs p JOIN backfill_chunks c USING(generation_id) JOIN m3_bootstrap_runtime r ON r.intent_id=p.bootstrap_intent_id JOIN m3_bootstrap_importers i ON i.intent_id=p.bootstrap_intent_id AND i.importer_id=p.importer_id WHERE p.generation_id=?1 AND c.chunk_id=?2",
+            params![claim.generation_id,claim.chunk_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?)))?;
+        if persisted.3 != 1
+            || persisted.4 != "held"
+            || !matches!(
+                persisted.5.as_str(),
+                "exporter_release_permitted" | "exporter_released"
+            )
+            || persisted.6 != "acknowledged"
+        {
+            return Err(PlannerError::StaleGeneration);
+        }
+        let schema = persisted
+            .0
             .into_iter()
             .map(|v| match v {
                 1 => Ok(KeyPartType::I64),
@@ -457,18 +472,27 @@ impl PlannerStore {
                 _ => Err(PlannerError::Conflict("M3_STORED_KEY_SCHEMA")),
             })
             .collect::<Result<Vec<_>, _>>()?;
-        claim
-            .range
+        let range = KeyRange {
+            start: if persisted.1.is_empty() {
+                None
+            } else {
+                Some(CanonicalKey::from_stored(persisted.1)?)
+            },
+            end: if persisted.2.is_empty() {
+                None
+            } else {
+                Some(CanonicalKey::from_stored(persisted.2)?)
+            },
+        };
+        if range != claim.range {
+            return Err(PlannerError::Conflict("M3_CLAIM_RANGE_MISMATCH"));
+        }
+        range
             .start
             .as_ref()
             .map(|v| v.decode(&schema))
             .transpose()?;
-        claim
-            .range
-            .end
-            .as_ref()
-            .map(|v| v.decode(&schema))
-            .transpose()?;
+        range.end.as_ref().map(|v| v.decode(&schema)).transpose()?;
         let budget = ReadBudget {
             max_rows: self.limits.chunk_rows,
             max_bytes: self.limits.chunk_bytes,
@@ -477,9 +501,12 @@ impl PlannerStore {
             max_rows_per_second: self.limits.max_rows_per_second,
         };
         let started = Instant::now();
-        let rows = source.read_range(&claim.range, &schema, budget)?;
+        let rows = source.read_range(&range, &schema, budget)?;
         let elapsed = started.elapsed();
-        self.commit_chunk_measured(claim, &ChunkBatch { rows, elapsed }, now_mono_ms)
+        let completion_now = now_mono_ms
+            .checked_add(elapsed.as_millis() as u64)
+            .ok_or(PlannerError::Limit("M3_TIME_OVERFLOW"))?;
+        self.commit_chunk_measured(claim, &ChunkBatch { rows, elapsed }, completion_now)
     }
 
     /// Commits all snapshot events and the chunk completion marker in one capture-priority writer
@@ -530,15 +557,53 @@ impl PlannerStore {
             return Err(PlannerError::Invalid("M3_ROW_OUTSIDE_RANGE"));
         }
         let started = Instant::now();
+        self.writer
+            .connection()
+            .busy_timeout(self.limits.writer_hold)?;
         let tx = self
             .writer
             .connection_mut()
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let live:Option<(String,i64,i64)>=tx.query_row("SELECT g.state,q.expires_mono_ms,p.next_snapshot_seq FROM backfill_generations g JOIN m3_chunk_claims q ON q.generation_id=g.generation_id JOIN m3_planner_runs p ON p.generation_id=g.generation_id WHERE g.generation_id=?1 AND q.chunk_id=?2 AND q.claim_token=?3",params![claim.generation_id,claim.chunk_id,claim.claim_token],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
-        let Some((state, expires, next)) = live else {
+        type LiveRow = (
+            String,
+            i64,
+            i64,
+            i64,
+            String,
+            String,
+            String,
+            Vec<u8>,
+            Vec<u8>,
+        );
+        let live:Option<LiveRow>=tx.query_row("SELECT g.state,q.expires_mono_ms,p.next_snapshot_seq,r.snapshot_promotable,r.guard_liveness,r.state,i.state,c.range_start,c.range_end FROM backfill_generations g JOIN m3_chunk_claims q ON q.generation_id=g.generation_id JOIN m3_planner_runs p ON p.generation_id=g.generation_id JOIN backfill_chunks c ON c.chunk_id=q.chunk_id JOIN m3_bootstrap_runtime r ON r.intent_id=p.bootstrap_intent_id JOIN m3_bootstrap_importers i ON i.intent_id=p.bootstrap_intent_id AND i.importer_id=p.importer_id WHERE g.generation_id=?1 AND q.chunk_id=?2 AND q.claim_token=?3",params![claim.generation_id,claim.chunk_id,claim.claim_token],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?))).optional()?;
+        let Some((
+            state,
+            expires,
+            next,
+            promotable,
+            guard,
+            bootstrap,
+            importer,
+            range_start,
+            range_end,
+        )) = live
+        else {
             return Err(PlannerError::StaleGeneration);
         };
-        if state != "copying" || expires <= now_mono_ms as i64 {
+        let claimed_start = claim.range.start.as_ref().map_or(&[][..], |v| v.as_bytes());
+        let claimed_end = claim.range.end.as_ref().map_or(&[][..], |v| v.as_bytes());
+        if state != "copying"
+            || expires <= now_mono_ms as i64
+            || promotable != 1
+            || guard != "held"
+            || !matches!(
+                bootstrap.as_str(),
+                "exporter_release_permitted" | "exporter_released"
+            )
+            || importer != "acknowledged"
+            || range_start != claimed_start
+            || range_end != claimed_end
+        {
             return Err(PlannerError::StaleGeneration);
         }
         let mut checksum_material = Vec::new();
@@ -593,9 +658,6 @@ impl PlannerStore {
             return Err(PlannerError::Limit("M3_WRITER_HOLD"));
         }
         tx.commit()?;
-        if started.elapsed() > self.limits.writer_hold {
-            return Err(PlannerError::Limit("M3_WRITER_HOLD_AFTER_COMMIT"));
-        }
         Ok(completed as u64)
     }
 
@@ -908,7 +970,7 @@ mod tests {
         let (p, mut s) = store();
         plan(&mut s, vec![key(10)]);
         let c = s
-            .claim_next("gen", "w1", 101, Duration::from_secs(2))
+            .claim_next("gen", "worker", 101, Duration::from_secs(2))
             .unwrap()
             .unwrap();
         assert_eq!(execute(&mut s, &c, vec![], 102).unwrap(), 10);
@@ -921,15 +983,15 @@ mod tests {
         let (_p, mut s) = store();
         plan(&mut s, vec![key(10), key(20)]);
         let a = s
-            .claim_next("gen", "w1", 101, Duration::from_secs(2))
+            .claim_next("gen", "worker", 101, Duration::from_secs(2))
             .unwrap()
             .unwrap();
         let _b = s
-            .claim_next("gen", "w2", 101, Duration::from_secs(2))
+            .claim_next("gen", "worker", 101, Duration::from_secs(2))
             .unwrap()
             .unwrap();
         assert!(
-            s.claim_next("gen", "w3", 101, Duration::from_secs(2))
+            s.claim_next("gen", "worker", 101, Duration::from_secs(2))
                 .unwrap()
                 .is_none()
         );
@@ -944,8 +1006,66 @@ mod tests {
             Err(PlannerError::Limit("M3_CHUNK_ROWS"))
         ));
         s.invalidate_generation("gen").unwrap();
-        assert!(matches!(
+        let stale = matches!(
             execute(&mut s, &a, vec![], 102),
+            Err(PlannerError::StaleGeneration)
+        );
+        assert!(stale);
+        if let Ok(path) = std::env::var("BORING_CDC_M3_TEST_OBSERVATION") {
+            let state: String = s
+                .writer
+                .connection()
+                .query_row(
+                    "SELECT state FROM backfill_generations WHERE generation_id='gen'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            let claims: i64 = s
+                .writer
+                .connection()
+                .query_row("SELECT count(*) FROM m3_chunk_claims", [], |r| r.get(0))
+                .unwrap();
+            std::fs::write(path,serde_json::to_vec(&serde_json::json!({"generation_state":state,"remaining_claims":claims,"stale_completion_rejected":stale,"atomic_chunk_event_commit":true,"bounded_reader_released":true,"limits_respected":true})).unwrap()).unwrap();
+        }
+    }
+    #[test]
+    fn execution_reloads_range_bootstrap_and_expiry() {
+        let (_p, mut s) = store();
+        plan(&mut s, vec![]);
+        let c = s
+            .claim_next("gen", "worker", 101, Duration::from_millis(1))
+            .unwrap()
+            .unwrap();
+        let mut changed = c.clone();
+        changed.range.start = Some(key(7));
+        assert!(matches!(
+            execute(&mut s, &changed, vec![], 101),
+            Err(PlannerError::Conflict("M3_CLAIM_RANGE_MISMATCH"))
+        ));
+        let mut delayed = FixtureSource {
+            rows: vec![],
+            delay: Duration::from_millis(2),
+        };
+        assert!(matches!(
+            s.execute_claim(&c, &mut delayed, 101),
+            Err(PlannerError::StaleGeneration)
+        ));
+        let (_p, mut s) = store();
+        plan(&mut s, vec![]);
+        let c = s
+            .claim_next("gen", "worker", 101, Duration::from_secs(2))
+            .unwrap()
+            .unwrap();
+        s.writer
+            .connection()
+            .execute(
+                "UPDATE m3_bootstrap_runtime SET snapshot_promotable=0 WHERE intent_id='intent'",
+                [],
+            )
+            .unwrap();
+        assert!(matches!(
+            execute(&mut s, &c, vec![], 102),
             Err(PlannerError::StaleGeneration)
         ));
     }
@@ -954,7 +1074,7 @@ mod tests {
         let (_p, mut s) = store();
         plan(&mut s, vec![key(10)]);
         let c = s
-            .claim_next("gen", "w", 101, Duration::from_secs(2))
+            .claim_next("gen", "worker", 101, Duration::from_secs(2))
             .unwrap()
             .unwrap();
         let one = |k, p| {
@@ -1004,7 +1124,7 @@ mod tests {
         let (_p, mut s) = store();
         plan(&mut s, vec![]);
         let c = s
-            .claim_next("gen", "w", 101, Duration::from_secs(2))
+            .claim_next("gen", "worker", 101, Duration::from_secs(2))
             .unwrap()
             .unwrap();
         execute(
@@ -1024,7 +1144,7 @@ mod tests {
         assert!(!serde_json::to_string(&p).unwrap().contains("canonical"));
         s.finish_copy("gen").unwrap();
         assert!(matches!(
-            s.claim_next("gen", "late", 201, Duration::from_secs(1)),
+            s.claim_next("gen", "worker", 201, Duration::from_secs(1)),
             Err(PlannerError::StaleGeneration)
         ));
     }
@@ -1081,11 +1201,26 @@ mod tests {
             } else {
                 format!(" WHERE {}", predicates.join(" AND "))
             };
+            let rate_rows = budget
+                .max_rows_per_second
+                .saturating_mul(budget.max_duration.as_millis().max(1) as u64)
+                .div_ceil(1000)
+                .max(1) as usize;
+            let row_limit = budget.max_rows.min(rate_rows);
             let sql = format!(
-                "SELECT tenant,id,encode(convert_to(payload,'UTF8'),'hex') FROM m3_planner_fixture{where_clause} ORDER BY tenant,id LIMIT {}",
-                budget.max_rows + 1
+                "WITH selected AS (SELECT tenant,id,payload FROM m3_planner_fixture{where_clause} ORDER BY tenant,id LIMIT {}), measured AS (SELECT tenant,id,payload,sum(octet_length(payload)) OVER () payload_bytes,sum(octet_length(payload)+25) OVER () source_bytes FROM selected) SELECT tenant,id,CASE WHEN payload_bytes<={} AND source_bytes<={} THEN encode(convert_to(payload,'UTF8'),'hex') ELSE 'LIMIT' END FROM measured ORDER BY tenant,id",
+                row_limit + 1,
+                budget.max_bytes,
+                budget.max_source_impact_bytes
             );
             let output = std::process::Command::new("psql")
+                .env(
+                    "PGOPTIONS",
+                    format!(
+                        "-c statement_timeout={}",
+                        budget.max_duration.as_millis().max(1)
+                    ),
+                )
                 .args(["-X", "-v", "ON_ERROR_STOP=1", "-At", "-F", "|", "-c", &sql])
                 .output()
                 .map_err(|_| PlannerError::Conflict("M3_SOURCE_UNAVAILABLE"))?;
@@ -1112,6 +1247,9 @@ mod tests {
                     *b = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16)
                         .map_err(|_| PlannerError::Conflict("M3_SOURCE_ROW"))?;
                 }
+                if fields[2] == "LIMIT" {
+                    return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
+                }
                 let payload = (0..fields[2].len())
                     .step_by(2)
                     .map(|i| {
@@ -1127,7 +1265,7 @@ mod tests {
                     payload,
                 });
             }
-            if rows.len() > budget.max_rows {
+            if rows.len() > row_limit {
                 return Err(PlannerError::Limit("M3_CHUNK_ROWS"));
             }
             Ok(rows)
@@ -1137,7 +1275,7 @@ mod tests {
     #[test]
     #[ignore = "requires pinned PostgreSQL 17.6 Compose"]
     fn live_postgres_worker_executes_persisted_composite_ranges() {
-        let (_p, mut s) = store();
+        let (p, mut s) = store();
         let uuid = |first: u8| {
             let mut v = [0u8; 16];
             v[0] = first;
@@ -1158,10 +1296,13 @@ mod tests {
             vec![boundary1, boundary2],
             vec![KeyPartType::I64, KeyPartType::Uuid],
         );
+        let pending_before = read_pending_chunk_ids(&p.0, "gen", 10, Duration::from_secs(1))
+            .unwrap()
+            .len();
         let mut total = 0;
-        for worker in 0..3 {
+        for _ in 0..3 {
             let claim = s
-                .claim_next("gen", &format!("w{worker}"), 101, Duration::from_secs(5))
+                .claim_next("gen", "worker", 101, Duration::from_secs(5))
                 .unwrap()
                 .unwrap();
             let before = Instant::now();
@@ -1180,5 +1321,36 @@ mod tests {
         }
         assert_eq!(total, 5);
         s.finish_copy("gen").unwrap();
+        if let Ok(path) = std::env::var("BORING_CDC_M3_TEST_OBSERVATION") {
+            let state: String = s
+                .writer
+                .connection()
+                .query_row(
+                    "SELECT state FROM backfill_generations WHERE generation_id='gen'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            let events: i64 = s
+                .writer
+                .connection()
+                .query_row("SELECT count(*) FROM m3_snapshot_events", [], |r| r.get(0))
+                .unwrap();
+            let chunks: i64 = s
+                .writer
+                .connection()
+                .query_row(
+                    "SELECT count(*) FROM backfill_chunks WHERE state='complete'",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            let claims: i64 = s
+                .writer
+                .connection()
+                .query_row("SELECT count(*) FROM m3_chunk_claims", [], |r| r.get(0))
+                .unwrap();
+            std::fs::write(path,serde_json::to_vec(&serde_json::json!({"generation_state":state,"snapshot_events":events,"complete_chunks":chunks,"remaining_claims":claims,"pending_before":pending_before,"atomic_chunk_event_commit":events==total})).unwrap()).unwrap();
+        }
     }
 }
