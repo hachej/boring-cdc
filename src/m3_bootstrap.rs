@@ -580,6 +580,38 @@ pub struct ImporterSession {
     connection: pg_walstream::PgReplicationConnection,
     pub backend_pid: i32,
 }
+
+/// Capability proving that bootstrap imported the exported snapshot, verified the guarded schema,
+/// and durably acknowledged that exact importer. There is deliberately no raw-connection
+/// constructor: only [`BootstrapRuntime`] can mint and transfer this capability.
+pub struct ImportedSnapshotSession {
+    connection: pg_walstream::PgReplicationConnection,
+    importer_id: String,
+    assigned_ranges_digest: String,
+    table_set_fingerprint: String,
+    guarded_relations: Vec<String>,
+}
+impl ImportedSnapshotSession {
+    pub(crate) fn into_planner_connection(
+        self,
+        importer_id: &str,
+        assigned_ranges_digest: &str,
+        schema_fingerprint: &str,
+        relation: &str,
+    ) -> Result<pg_walstream::PgReplicationConnection, BootstrapError> {
+        if self.importer_id != importer_id
+            || self.assigned_ranges_digest != assigned_ranges_digest
+            || self.table_set_fingerprint != schema_fingerprint
+            || !self.guarded_relations.iter().any(|value| value == relation)
+        {
+            return Err(BootstrapError::Conflict(
+                "M3_IMPORTER_CAPABILITY_BINDING_MISMATCH",
+            ));
+        }
+        Ok(self.connection)
+    }
+}
+
 impl ImporterSession {
     /// `SET TRANSACTION SNAPSHOT` is sent in the same simple-query batch as BEGIN and before any
     /// catalog/data statement; callers cannot obtain a session in a pre-import queryable state.
@@ -614,6 +646,22 @@ impl ImporterSession {
                 .map_err(|_| BootstrapError::Conflict("M3_IMPORTED_CONTRACT_FAILED"))?;
         }
         Ok(())
+    }
+
+    fn into_acknowledged(
+        self,
+        importer_id: String,
+        assigned_ranges_digest: String,
+        table_set_fingerprint: String,
+        guarded_relations: Vec<String>,
+    ) -> ImportedSnapshotSession {
+        ImportedSnapshotSession {
+            connection: self.connection,
+            importer_id,
+            assigned_ranges_digest,
+            table_set_fingerprint,
+            guarded_relations,
+        }
     }
 }
 
@@ -671,7 +719,7 @@ pub struct BootstrapRuntime {
     intent_id: String,
     guard: GuardSession,
     _capture: CaptureSession,
-    _importers: Vec<ImporterSession>,
+    importers: Vec<(String, ImportedSnapshotSession)>,
 }
 impl BootstrapRuntime {
     pub fn start(
@@ -726,7 +774,15 @@ impl BootstrapRuntime {
                 &intent.table_set_fingerprint,
             )?;
             store.acknowledge_import(&intent.intent_id, &assignment.importer_id)?;
-            importers.push(importer);
+            importers.push((
+                assignment.importer_id.clone(),
+                importer.into_acknowledged(
+                    assignment.importer_id.clone(),
+                    assignment.assigned_ranges_digest.clone(),
+                    intent.table_set_fingerprint.clone(),
+                    relations.to_vec(),
+                ),
+            ));
         }
         store.release_exporter(&intent.intent_id)?;
         drop(exporter);
@@ -735,8 +791,25 @@ impl BootstrapRuntime {
             intent_id: intent.intent_id,
             guard,
             _capture: capture,
-            _importers: importers,
+            importers,
         })
+    }
+
+    /// Transfers one acknowledged imported session to its assigned planner worker. The runtime
+    /// never exposes a connection before the acknowledgement transaction has committed, and a
+    /// capability can be taken only once.
+    pub fn take_importer(
+        &mut self,
+        importer_id: &str,
+    ) -> Result<ImportedSnapshotSession, BootstrapError> {
+        let position = self
+            .importers
+            .iter()
+            .position(|(id, _)| id == importer_id)
+            .ok_or(BootstrapError::Conflict(
+                "M3_IMPORTER_CAPABILITY_UNAVAILABLE",
+            ))?;
+        Ok(self.importers.swap_remove(position).1)
     }
 
     pub fn keepalive(&mut self) -> Result<(), BootstrapError> {

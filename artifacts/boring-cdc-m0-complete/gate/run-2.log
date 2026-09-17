@@ -22,6 +22,10 @@
       "exit_code": 0
     },
     {
+      "argv": "scripts/validate/archive_durability.sh",
+      "exit_code": 0
+    },
+    {
       "argv": "scripts/validate/archive_scope.sh",
       "exit_code": 0
     },
@@ -31,6 +35,10 @@
     },
     {
       "argv": "scripts/validate/failure_policy.sh",
+      "exit_code": 0
+    },
+    {
+      "argv": "scripts/validate/supported_keys.sh",
       "exit_code": 0
     },
     {
@@ -83,9 +91,11 @@
     }
   ],
   "decision_manifest_owners": [
+    "boring-cdc-d-archive-durability",
     "boring-cdc-d-archive-scope",
     "boring-cdc-d-compose",
     "boring-cdc-d-failure-policy",
+    "boring-cdc-d-keys",
     "boring-cdc-d-license",
     "boring-cdc-d-owner",
     "boring-cdc-d-security",
@@ -145,5 +155,5 @@
   ],
   "schema_version": "m0-completion-summary/v1",
   "status": "pass",
-  "supervisor_override": "owner card 59a63169 accepted all seven recommended literal sets; matching markers removed"
+  "supervisor_override": "answered owner card 59a63169 authorizes the four exact accepted decision literals; unrelated provisional markers remain governed separately"
 }
