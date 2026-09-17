@@ -4,7 +4,7 @@
       "id": "ART-M0-ARCHIVE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "artifacts/boring-cdc-m0-archive-model/spec/evidence.json",
-      "sha256": "05fee746246c01331670816287dd303907ecaa2f7eebcd957f40b716403bf906",
+      "sha256": "6991cc2ff136f8de7572784188d3214731d4b8e98cd4936918fc482d3433a2cc",
       "status": "complete"
     },
     {
@@ -109,7 +109,7 @@
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "bdcee02564767a1dd6038256e2a55d7ac8428c7b9dbad4f73095f86a0d5fd424",
+      "sha256": "a6a5aed700643b1518f7e1bf0d9b714b1fd9d861ad17dad5ad62386e4edd3821",
       "status": "complete"
     },
     {
@@ -228,7 +228,7 @@
       "id": "ART-M0-EVENT-FORMAT-EVIDENCE",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "artifacts/boring-cdc-m0-event-format/spec/evidence.json",
-      "sha256": "d873a4a699015271183562487a2dff5b8ecd268a35686650fb95b45c3a05854a",
+      "sha256": "ee70413343f13cf91588ef218f05b157ccc0b6fc76fe5f4edf3fe3c61096519c",
       "status": "complete"
     },
     {

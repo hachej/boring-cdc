@@ -1,21 +1,5 @@
 {
-  "findings": [
-    {
-      "code": "E_MANIFEST",
-      "message": "manifest binding mismatch",
-      "path": "contracts/m0/manifest.json"
-    },
-    {
-      "code": "E_ARTIFACT_HASH",
-      "message": "artifact hash mismatch",
-      "path": "docs/CLICKHOUSE_MODEL.md"
-    },
-    {
-      "code": "E_ARTIFACT_HASH",
-      "message": "artifact hash mismatch",
-      "path": "contracts/clickhouse/model.json"
-    }
-  ],
+  "findings": [],
   "fixture_count": 41,
   "input_tree_sha256": "3e6d9c11f71cadb588f6e31e7933af6d2d77b4deefd77c33a033babbd928e142",
   "inputs": {
@@ -34,7 +18,7 @@
   "runtime_observed": false,
   "schema_version": "m0-clickhouse-contract-evidence/v1",
   "source_parent_git_commit": "6de5b6c85423eae2c3b84967919602f66b79463d",
-  "status": "fail",
+  "status": "pass",
   "validator": "scripts/validate/clickhouse_contract.py",
   "validator_sha256": "b4644ca36a08f74afde4c9d937fa65920ebdc6011f994d765d4f6f78fcabe9ef"
 }

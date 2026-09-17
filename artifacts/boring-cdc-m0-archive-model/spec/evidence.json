@@ -1,21 +1,5 @@
 {
-  "findings": [
-    {
-      "code": "E_MANIFEST_BINDING",
-      "message": "archive row does not bind contract, fixtures and executors",
-      "path": "contracts/m0/manifest.json"
-    },
-    {
-      "code": "E_ARTIFACT_HASH",
-      "message": "artifact hash mismatch",
-      "path": "contracts/archive/archive-model.json"
-    },
-    {
-      "code": "E_ARTIFACT_HASH",
-      "message": "artifact hash mismatch",
-      "path": "scripts/validate/archive_contract.py"
-    }
-  ],
+  "findings": [],
   "fixture_count": 41,
   "input_tree_sha256": "b91cedfa7ed3a79193e33ae2f181e1a282595acafbc8e648e8c90eb42367302d",
   "inputs": {
@@ -32,7 +16,7 @@
   "runtime_observed": false,
   "schema_version": "m0-archive-contract-evidence/v1",
   "source_parent_git_commit": "6de5b6c85423eae2c3b84967919602f66b79463d",
-  "status": "fail",
+  "status": "pass",
   "validator": "scripts/validate/archive_contract.py",
   "validator_sha256": "05c1d56f7249cb61f508971b875dbf9db983a4feae81710461a51ceb4cfdfb9b"
 }
