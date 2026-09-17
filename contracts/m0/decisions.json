@@ -127,6 +127,11 @@
       "status": "open"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-16T00:00:00Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "5b72e01797c88dc68dc5dbf21bc1b41b45284e12d75dd0746a1984516feb7cef"
+      },
       "executor_beads": [
         "boring-cdc-m1-decoder",
         "boring-cdc-m0-event-format"
@@ -136,8 +141,7 @@
       "id": "DEC-SUPPORTED-VALUES",
       "owner_bead": "boring-cdc-d-values",
       "proposed_value": "Owner-card accepted envelope v1 type tags; distinct null, absent, and unchanged states; bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; canonical bodies including corrected globally shortest round-trip float spelling; destination mappings; and limits.",
-      "provisional_markers": [],
-      "status": "open"
+      "status": "approved"
     },
     {
       "executor_beads": [
