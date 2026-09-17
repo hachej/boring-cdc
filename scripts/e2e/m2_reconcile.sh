@@ -4,7 +4,6 @@ cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
 work=$(mktemp -d /var/tmp/m2-reconcile-e2e.XXXXXX); project="m2-reconcile-$RANDOM-$$"; port=$((57000 + $$ % 1000))
 cleanup(){ if [[ "${KEEP:-0}" == 1 ]]; then return; fi; docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
 printf 'm2-reconcile-admin-%s\n' "$project" >"$work/postgres_password"; chmod 600 "$work/postgres_password"; export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"; export PGPASSWORD; PGPASSWORD=$(cat "$BORING_CDC_POSTGRES_PASSWORD_FILE")
-printf 'm2-reconcile-runtime-%s\n' "$project" >"$work/runtime_password"; chmod 600 "$work/runtime_password"
 cat >"$work/override.yml" <<YAML
 services:
   postgres:
@@ -13,12 +12,11 @@ services:
 YAML
 docker compose -p "$project" -f compose.yaml -f "$work/override.yml" up -d --wait postgres >/dev/null
 psqlc(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" exec -T postgres psql -v ON_ERROR_STOP=1 -U boring_cdc -d boring_cdc "$@"; }
-runtime_password=$(cat "$work/runtime_password")
-psqlc -v runtime_password="$runtime_password" <<'SQL' >/dev/null
+psqlc <<SQL >/dev/null
 CREATE TABLE orders(id bigint primary key);
 CREATE PUBLICATION article1_publication FOR TABLE orders WITH (publish='insert,update,delete,truncate');
 SELECT * FROM pg_create_logical_replication_slot('article1_slot','pgoutput');
-CREATE ROLE cdc_runtime LOGIN REPLICATION PASSWORD :'runtime_password';
+CREATE ROLE cdc_runtime LOGIN REPLICATION PASSWORD '$PGPASSWORD';
 GRANT CONNECT ON DATABASE boring_cdc TO cdc_runtime;
 GRANT USAGE ON SCHEMA public TO cdc_runtime;
 GRANT SELECT ON orders TO cdc_runtime;
@@ -27,8 +25,8 @@ SQL
 cargo build --quiet --locked --bin boring-cdc
 mkdir -p "$work/run/state/spool"; chmod 700 "$work/run/state" "$work/run/state/spool"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 sed -i 's/publication = "boring_publication"/publication = "article1_publication"/; s/slot = "boring_slot"/slot = "article1_slot"/' "$work/run/boring-cdc.toml"
-runtime_dsn="postgresql://cdc_runtime:${runtime_password}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
-admin_dsn="postgresql://boring_cdc:${PGPASSWORD}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
+runtime_dsn="postgresql://cdc_runtime@127.0.0.1:${port}/boring_cdc?sslmode=disable"
+admin_dsn="postgresql://boring_cdc@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_RUNTIME="$runtime_dsn" PG_CONTROL="$admin_dsn" PG_ADMIN="$admin_dsn" CH_RUNTIME='https://unused.invalid' CH_MAINT='https://unused.invalid'
 run_connector(){ (cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run); }
 # A pre-existing slot beside a fresh durable journal is never silently adopted.

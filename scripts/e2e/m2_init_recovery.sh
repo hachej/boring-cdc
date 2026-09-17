@@ -3,7 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
 work=$(mktemp -d /var/tmp/m2-init-e2e.XXXXXX); project="m2-init-$RANDOM-$$"; port=$((58000 + $$ % 1000))
 cleanup(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
-printf 'm2-init-password-%s\n' "$project" >"$work/postgres_password"; chmod 600 "$work/postgres_password"; export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"
+printf 'm2-init-password-%s\n' "$project" >"$work/postgres_password"; chmod 600 "$work/postgres_password"; export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"; export PGPASSWORD; PGPASSWORD=$(cat "$BORING_CDC_POSTGRES_PASSWORD_FILE")
 cat >"$work/override.yml" <<YAML
 services:
   postgres:
@@ -15,7 +15,7 @@ psqlc(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" ex
 psqlc -qc 'CREATE TABLE customers(id bigint primary key); CREATE TABLE order_items(id bigint primary key); CREATE TABLE orders(id bigint primary key); CREATE TABLE products(id bigint primary key)' >/dev/null
 cargo build --quiet --locked --bin boring-cdc
 mkdir -p "$work/run/state/spool"; chmod 700 "$work/run/state" "$work/run/state/spool"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
-password=$(cat "$work/postgres_password"); dsn="postgresql://boring_cdc:${password}@127.0.0.1:${port}/boring_cdc?sslmode=disable"; export PG_ADMIN="$dsn" CH_MAINT='https://unused.invalid'; unset PG_RUNTIME PG_CONTROL CH_RUNTIME || true
+dsn="postgresql://boring_cdc@127.0.0.1:${port}/boring_cdc?sslmode=disable"; export PG_ADMIN="$dsn" CH_MAINT='https://unused.invalid'; unset PG_RUNTIME PG_CONTROL CH_RUNTIME || true
 (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --dry-run --json) >"$work/dry.json"
 token=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["confirm_token"])' "$work/dry.json")
 (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token" --json) >"$work/first.json"

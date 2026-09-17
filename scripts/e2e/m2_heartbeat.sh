@@ -10,16 +10,19 @@ for attempt in 1 2; do
 done
 work=$(mktemp -d /var/tmp/m2-heartbeat-e2e.XXXXXX); project="m2-heartbeat-$RANDOM-$$"; port=$((58000 + $$ % 1000))
 cleanup(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
-printf 'heartbeat-admin-%s\n' "$project" >"$work/postgres_password";chmod 600 "$work/postgres_password";export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"
+printf 'heartbeat-admin-%s\n' "$project" >"$work/postgres_password";chmod 600 "$work/postgres_password";export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"; export PGPASSWORD; PGPASSWORD=$(cat "$BORING_CDC_POSTGRES_PASSWORD_FILE")
 cat >"$work/override.yml" <<YAML
 services:
   postgres:
     ports: ["127.0.0.1:${port}:5432"]
 YAML
 docker compose -p "$project" -f compose.yaml -f "$work/override.yml" up -d --wait postgres >/dev/null
-admin="postgresql://boring_cdc:$(cat "$work/postgres_password")@127.0.0.1:${port}/boring_cdc?sslmode=disable"
+admin="postgresql://boring_cdc@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 psql "$admin" -v ON_ERROR_STOP=1 -f tests/fixtures/m1-control/setup.sql >/dev/null
-control="postgresql://boring_cdc_control_writer:control_fixture_only@127.0.0.1:${port}/boring_cdc?sslmode=disable"
+psql "$admin" -v ON_ERROR_STOP=1 <<SQL >/dev/null
+ALTER ROLE boring_cdc_control_writer PASSWORD '$PGPASSWORD';
+SQL
+control="postgresql://boring_cdc_control_writer@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 first=$(M2_HEARTBEAT_DSN="$control" cargo run --quiet --locked --example m2_heartbeat_component -- 1)
 second=$(M2_HEARTBEAT_DSN="$control" cargo run --quiet --locked --example m2_heartbeat_component -- 2)
 [[ "$first" == '{"affected_rows":1,"selected_keys":1,"runtime_rust_writer":true}' && "$second" == "$first" ]]

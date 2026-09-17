@@ -51,7 +51,9 @@ def status_entries():
  return entries
 
 def exempt(path):
- return path=='.factory-sha' or path.startswith('.doctor/') or path.startswith('target/') or path.startswith('artifacts/boring-cdc-m2-complete/gate/')
+ # The v6 integration host explicitly preserves the unrelated, untracked v4
+ # planning packet; it is not an M2 implementation or certification input.
+ return path=='.factory-sha' or path.startswith('.doctor/') or path.startswith('docs/issues/boring-cdc-m2-v4/') or path.startswith('target/') or path.startswith('artifacts/boring-cdc-m2-complete/gate/')
 dirty=[]
 for xy,paths in status_entries():
  # A rename into an exempt directory is dirty when its tracked source is not exempt.
@@ -107,7 +109,7 @@ for leaf in leaves:
  for candidate in (root/'contracts').rglob('*.json'):
   try: value=json.loads(candidate.read_text())
   except (OSError,json.JSONDecodeError): continue
-  if value.get('owner_bead') in chain and value.get('schema_version'): expected_contracts.add(value['schema_version'])
+  if isinstance(value,dict) and value.get('owner_bead') in chain and value.get('schema_version'): expected_contracts.add(value['schema_version'])
  declared_contracts=set(leaf.get('contract_ids',[]))
  if declared_contracts!=expected_contracts: fail(f'{owner}: owned contract set mismatch: missing={sorted(expected_contracts-declared_contracts)} extra={sorted(declared_contracts-expected_contracts)}')
  for contract in declared_contracts:
