@@ -278,6 +278,26 @@ class ScaffoldTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(f"provisional-marker-malformed:{relative}", result.stdout)
 
+    def test_m1_completion_rejects_unauthorized_marker_in_artifacts(self):
+        """Generated evidence is part of the completion surface and must not
+        become a blind spot for unauthorized provisional markers."""
+        marker = ROOT / "artifacts" / ".test-provisional-marker"
+        marker.write_text("// M0-" + "PROVISIONAL: boring-cdc-d-values\n")
+        try:
+            result = subprocess.run(
+                ["scripts/acceptance/m1_complete.sh", "--probe"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+        finally:
+            marker.unlink(missing_ok=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "provisional-marker-unauthorized:artifacts/.test-provisional-marker:boring-cdc-d-values",
+            result.stdout,
+        )
+
     def test_m1_completion_rejects_unauthorized_decision_marker(self):
         """A well-formed marker naming a decision the registry does not grant for
         that path must still fail. This is the half of the registry contract that
