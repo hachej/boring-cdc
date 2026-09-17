@@ -2,18 +2,18 @@
 running 12 tests
 test m2_reconcile::tests::reports_are_bounded_and_read_only ... ok
 test m2_reconcile::tests::fresh_journal_with_preexisting_slot_is_ambiguous_without_provenance ... ok
-test m2_reconcile::tests::server_ahead_requires_reseed ... ok
 test m2_reconcile::tests::archive_hook_blocks_without_adopting ... ok
-test m2_reconcile::tests::startup_blocks_structurally_valid_payload_checksum_corruption ... ok
+test m2_reconcile::tests::server_ahead_requires_reseed ... ok
 test m2_reconcile::tests::identity_mismatch_blocks ... ok
-test m2_reconcile::tests::compatible_requests_durable_position_and_persists_before_ready ... ok
-test m2_reconcile::tests::external_ahead_blocks ... ok
 test m2_reconcile::tests::ambiguous_bootstrap_is_transitioned_and_persisted ... ok
+test m2_reconcile::tests::compatible_requests_durable_position_and_persists_before_ready ... ok
+test m2_reconcile::tests::startup_blocks_structurally_valid_payload_checksum_corruption ... ok
+test m2_reconcile::tests::external_ahead_blocks ... ok
 test m2_reconcile::tests::creation_floor_compound_safety_precedes_floor_resume ... ok
-test m2_reconcile::tests::creation_floor_null_or_equal_never_becomes_durable_progress ... ok
 test m2_reconcile::tests::invalid_slot_and_missing_wal_require_reseed ... ok
+test m2_reconcile::tests::creation_floor_null_or_equal_never_becomes_durable_progress ... ok
 
-test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 312 filtered out; finished in 1.97s
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 338 filtered out; finished in 2.03s
 
 
 running 0 tests

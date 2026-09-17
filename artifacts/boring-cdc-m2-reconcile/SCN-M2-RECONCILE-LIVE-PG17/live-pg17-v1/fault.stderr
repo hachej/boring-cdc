@@ -1,14 +1,14 @@
- Network m2-reconcile-9980-2851973_default  Creating
- Network m2-reconcile-9980-2851973_default  Created
- Volume "m2-reconcile-9980-2851973_pgdata"  Creating
- Volume "m2-reconcile-9980-2851973_pgdata"  Created
- Container m2-reconcile-9980-2851973-postgres-1  Creating
- Container m2-reconcile-9980-2851973-postgres-1  Created
- Container m2-reconcile-9980-2851973-postgres-1  Starting
- Container m2-reconcile-9980-2851973-postgres-1  Started
- Container m2-reconcile-9980-2851973-postgres-1  Waiting
- Container m2-reconcile-9980-2851973-postgres-1  Healthy
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+ Network m2-reconcile-15682-3226344_default  Creating
+ Network m2-reconcile-15682-3226344_default  Created
+ Volume "m2-reconcile-15682-3226344_pgdata"  Creating
+ Volume "m2-reconcile-15682-3226344_pgdata"  Created
+ Container m2-reconcile-15682-3226344-postgres-1  Creating
+ Container m2-reconcile-15682-3226344-postgres-1  Created
+ Container m2-reconcile-15682-3226344-postgres-1  Starting
+ Container m2-reconcile-15682-3226344-postgres-1  Started
+ Container m2-reconcile-15682-3226344-postgres-1  Waiting
+ Container m2-reconcile-15682-3226344-postgres-1  Healthy
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.16s
      Running unittests src/lib.rs (target/debug/deps/boring_cdc-215a04c5a0e6b11d)
      Running unittests src/main.rs (target/debug/deps/boring_cdc-175d1f19bac9dae3)
      Running tests/compile_fail.rs (target/debug/deps/compile_fail-8b561352160a8d94)
@@ -16,7 +16,10 @@
      Running unittests src/lib.rs (target/debug/deps/boring_cdc-215a04c5a0e6b11d)
      Running unittests src/main.rs (target/debug/deps/boring_cdc-175d1f19bac9dae3)
      Running tests/compile_fail.rs (target/debug/deps/compile_fail-8b561352160a8d94)
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.18s
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
      Running unittests src/lib.rs (target/debug/deps/boring_cdc-215a04c5a0e6b11d)
      Running unittests src/main.rs (target/debug/deps/boring_cdc-175d1f19bac9dae3)
      Running tests/compile_fail.rs (target/debug/deps/compile_fail-8b561352160a8d94)
