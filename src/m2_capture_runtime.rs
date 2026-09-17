@@ -807,7 +807,10 @@ fn tuples(value: Option<Vec<TupleValue>>) -> Option<Vec<EncodedTuple>> {
             .collect()
     })
 }
-fn encode_row(row: &RowChange, origin: Option<&(u64, String)>) -> Result<Vec<u8>, RuntimeError> {
+pub(crate) fn encode_row(
+    row: &RowChange,
+    origin: Option<&(u64, String)>,
+) -> Result<Vec<u8>, RuntimeError> {
     serde_json::to_vec(&EncodedRow {
         kind: match row.kind {
             crate::m1_decoder::RowKind::Insert => "insert",

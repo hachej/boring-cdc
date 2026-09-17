@@ -13,8 +13,8 @@ for n in files:h.update(n.encode()+(R/n).read_bytes())
 impl=h.hexdigest();git=os.popen(f'git -C {R} rev-parse HEAD').read().strip()
 obs=json.loads(pathlib.Path(os.environ['BORING_CDC_M3_FENCE_OBSERVATION']).read_text())
 if mode=='e2e':
- assert obs['anchor_state']=='complete' and obs['first_proof'] and obs['post_copy_fence_seq']==6 and obs['pgoutput_contains_nonce'] and obs['affected_rows']==1 and obs['deterministic_attempts']==2
- after={'anchor_state':'complete','first_proof':True,'post_copy_fence_seq':6,'pgoutput_observed':True,'fixed_row_affected_rows':1,'sampled_lsn_used':False,'deterministic_attempts':2}
+ assert obs['anchor_state']=='complete' and obs['first_proof'] and obs['post_copy_fence_seq']==6 and obs['pgoutput_contains_nonce'] and obs['m2_encoded_row_from_live_pgoutput'] and obs['affected_rows']==1 and obs['deterministic_attempts']==2
+ after={'anchor_state':'complete','first_proof':True,'post_copy_fence_seq':6,'pgoutput_observed':True,'m2_encoded_row_from_live_pgoutput':True,'fixed_row_affected_rows':1,'sampled_lsn_used':False,'deterministic_attempts':2}
  timeline=['intent_durable','fixed_row_update','pgoutput_update','pgoutput_commit','journal_transaction','anchor_complete']
 else:
  assert obs=={'anchor_before_durable_pair':False,'delayed_copy_blocked':True,'deterministic_attempts':2,'duplicate_audit_only':True,'restart_without_pair_blocked':True,'sampled_lsn_rejected':True}

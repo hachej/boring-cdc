@@ -51,7 +51,7 @@ commit=commits[-1]
 assert len(commit)>=26
 end_lsn=int.from_bytes(commit[10:18],'big')
 assert end_lsn>0
-pathlib.Path(sys.argv[2]).write_text(json.dumps({'affected_rows':1,'commit_end_lsn':f'{end_lsn:016X}','pgoutput_contains_nonce':True,'pgoutput_message_count':len(rows)},sort_keys=True))
+pathlib.Path(sys.argv[2]).write_text(json.dumps({'affected_rows':1,'commit_end_lsn':f'{end_lsn:016X}','pgoutput_contains_nonce':True,'pgoutput_message_count':len(rows),'pgoutput_messages':[{'lsn':lsn,'data_hex':data.hex()} for lsn,_,data in rows]},sort_keys=True))
 PY
   BORING_CDC_M3_FENCE_OBSERVATION="$work/observation-$attempt.json" BORING_CDC_M3_FENCE_RESULT="$work/result-$attempt.json" cargo test --locked m3_fence::tests::live_pgoutput_observation_uses_commit_message_end_lsn -- --exact
   "${psql_cmd[@]}" -c "SELECT pg_drop_replication_slot('${slot}')" >/dev/null
@@ -61,9 +61,9 @@ import json,pathlib,sys
 results=[json.loads(pathlib.Path(p).read_text()) for p in sys.argv[1:3]]
 observed=[json.loads(pathlib.Path(p).read_text()) for p in sys.argv[3:]]
 for result in results:
- assert result['anchor_state']=='complete' and result['first_proof'] and result['post_copy_fence_seq']==6 and result['pgoutput_contains_nonce'] and result['affected_rows']==1
+ assert result['anchor_state']=='complete' and result['first_proof'] and result['post_copy_fence_seq']==6 and result['pgoutput_contains_nonce'] and result['m2_encoded_row_from_live_pgoutput'] and result['affected_rows']==1
 assert all(x['pgoutput_contains_nonce'] and x['affected_rows']==1 and x['pgoutput_message_count']>=3 for x in observed)
-print(json.dumps({'anchor_state':'complete','first_proof':True,'post_copy_fence_seq':6,'pgoutput_contains_nonce':True,'affected_rows':1,'deterministic_attempts':2,'commit_end_lsns':[x['commit_end_lsn'] for x in observed]},sort_keys=True))
+print(json.dumps({'anchor_state':'complete','first_proof':True,'post_copy_fence_seq':6,'pgoutput_contains_nonce':True,'m2_encoded_row_from_live_pgoutput':True,'affected_rows':1,'deterministic_attempts':2,'commit_end_lsns':[x['commit_end_lsn'] for x in observed]},sort_keys=True))
 PY
 BORING_CDC_M3_FENCE_OBSERVATION="$work/result.json" python3 scripts/lib/m3_fence_evidence.py e2e
 scripts/validate/evidence.sh artifacts/boring-cdc-m3-fence/SCN-M3-FENCE-PGOUTPUT/fence-pg17-v1/evidence.json

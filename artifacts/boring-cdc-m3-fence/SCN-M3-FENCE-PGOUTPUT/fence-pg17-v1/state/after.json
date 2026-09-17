@@ -1,1 +1,1 @@
-{"anchor_state":"complete","deterministic_attempts":2,"first_proof":true,"fixed_row_affected_rows":1,"pgoutput_observed":true,"post_copy_fence_seq":6,"sampled_lsn_used":false}
+{"anchor_state":"complete","deterministic_attempts":2,"first_proof":true,"fixed_row_affected_rows":1,"m2_encoded_row_from_live_pgoutput":true,"pgoutput_observed":true,"post_copy_fence_seq":6,"sampled_lsn_used":false}

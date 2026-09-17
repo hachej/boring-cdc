@@ -64,9 +64,9 @@ pub struct FenceIntentInput {
     pub intent_id: String,
     pub generation_id: String,
     pub bootstrap_intent_id: String,
-    pub capture_epoch: String,
-    pub generation: u64,
-    pub nonce: u64,
+    pub capture_epoch: i64,
+    pub generation: i64,
+    pub nonce: i64,
     pub table_set_fingerprint: String,
     pub anchor_id: String,
     pub expires_at: String,
@@ -74,11 +74,11 @@ pub struct FenceIntentInput {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FenceDispatch {
     pub sql: String,
-    pub capture_epoch: String,
-    pub generation: u64,
+    pub capture_epoch: i64,
+    pub generation: i64,
     pub table_set_fingerprint: String,
     /// Kept out of logs and status; the dispatcher binds it as a query parameter.
-    pub nonce: u64,
+    pub nonce: i64,
 }
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct AnchorProof {
@@ -323,8 +323,8 @@ impl FenceStore {
             return Err(FenceError::Conflict("M3_FENCE_PREREQUISITE_MISSING"));
         };
         if state != "fencing"
-            || generation != input.generation as i64
-            || epoch != input.capture_epoch
+            || generation != input.generation
+            || epoch != input.capture_epoch.to_string()
             || tables != input.table_set_fingerprint
             || incomplete != 0
             || pending_imports != 0
@@ -338,7 +338,7 @@ impl FenceStore {
         }
         tx.execute("INSERT INTO m3_fence_intents(intent_id,generation_id,bootstrap_intent_id,capture_epoch,generation,nonce,table_set_fingerprint,anchor_id,expires_at,state) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,'intended')",params![input.intent_id,input.generation_id,input.bootstrap_intent_id,input.capture_epoch,input.generation,input.nonce,input.table_set_fingerprint,input.anchor_id,input.expires_at])?;
         tx.commit()?;
-        Ok(FenceDispatch { sql:"UPDATE boring_cdc_control.capture_fences SET capture_epoch=$1,generation=$2,table_set_fingerprint=$3,unique_nonce=$4 WHERE id='singleton'".into(), capture_epoch:input.capture_epoch.clone(), generation:input.generation, table_set_fingerprint:input.table_set_fingerprint.clone(), nonce:input.nonce })
+        Ok(FenceDispatch { sql:"UPDATE boring_cdc_control.capture_fences SET capture_epoch=$1,generation=$2,table_set_fingerprint=$3,unique_nonce=$4 WHERE id='singleton'".into(), capture_epoch:input.capture_epoch, generation:input.generation, table_set_fingerprint:input.table_set_fingerprint.clone(), nonce:input.nonce })
     }
 
     /// Records that the runtime credential's fixed-row UPDATE affected exactly one row.
@@ -438,7 +438,7 @@ impl FenceStore {
         )?;
         if first {
             tx.execute("INSERT INTO durable_capture_fences(fence_id,capture_epoch,generation,nonce,transaction_id,post_copy_fence_lsn,post_copy_fence_seq,first_proof) VALUES(?1,?2,?3,?4,?5,?6,?7,1)",params![format!("fence:{}",intent_id),intent.2,intent.3,intent.4,transaction_id,lsn,seq])?;
-            let snapshot:(String,i64,String,String)=tx.query_row("SELECT x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint,json_group_array(DISTINCT i.snapshot_schema_fingerprint) FROM m3_bootstrap_runtime x JOIN m3_planner_runs p ON p.bootstrap_intent_id=x.intent_id JOIN m3_bootstrap_importers i ON i.intent_id=x.intent_id WHERE x.intent_id=?1 GROUP BY x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint",[&intent.1],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)))?;
+            let snapshot:(String,i64,String,String)=tx.query_row("SELECT x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint,json_group_array(DISTINCT i.snapshot_schema_fingerprint) FROM m3_bootstrap_runtime x JOIN m3_planner_runs p ON p.bootstrap_intent_id=x.intent_id AND p.generation_id=?2 JOIN m3_bootstrap_importers i ON i.intent_id=x.intent_id WHERE x.intent_id=?1 GROUP BY x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint",params![intent.1,intent.0],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)))?;
             tx.execute("UPDATE backfill_generations SET state='complete' WHERE generation_id=?1 AND state='fencing'",[&intent.0])?;
             tx.execute("UPDATE backfill_runs SET state='complete',revision=revision+1 WHERE run_id=(SELECT run_id FROM backfill_generations WHERE generation_id=?1) AND state='running'",[&intent.0])?;
             tx.execute("INSERT INTO bootstrap_anchors(anchor_id,capture_epoch,generation,lower_stitch_lsn,start_seq,snapshot_boundary_lsn,snapshot_complete_seq,post_copy_fence_nonce,post_copy_fence_lsn,post_copy_fence_seq,table_set_fingerprint,snapshot_schema_fingerprints,state,expires_at,generation_id,bootstrap_intent_id) VALUES(?1,?2,?3,NULL,0,?4,?5,?6,?7,?8,?9,?10,'complete',?11,?12,?13)",params![intent.6,intent.2,intent.3,snapshot.0,snapshot.1,intent.4,lsn,seq,snapshot.2,snapshot.3,intent.7,intent.0,intent.1])?;
@@ -479,13 +479,9 @@ fn valid(v: &str) -> bool {
     !v.is_empty() && v.len() <= 256 && v.is_ascii()
 }
 fn validate_input(v: &FenceIntentInput) -> Result<(), FenceError> {
-    if v.generation == 0
-        || v.nonce == 0
-        || v.capture_epoch
-            .parse::<u64>()
-            .ok()
-            .filter(|x| *x > 0)
-            .is_none()
+    if v.generation <= 0
+        || v.nonce <= 0
+        || v.capture_epoch <= 0
         || v.table_set_fingerprint.len() != 64
         || !v
             .table_set_fingerprint
@@ -495,7 +491,6 @@ fn validate_input(v: &FenceIntentInput) -> Result<(), FenceError> {
             &v.intent_id,
             &v.generation_id,
             &v.bootstrap_intent_id,
-            &v.capture_epoch,
             &v.table_set_fingerprint,
             &v.anchor_id,
             &v.expires_at,
@@ -507,14 +502,17 @@ fn validate_input(v: &FenceIntentInput) -> Result<(), FenceError> {
     }
     Ok(())
 }
-pub fn nonce_hash(nonce: u64) -> String {
+pub fn nonce_hash(nonce: i64) -> String {
     format!("{:x}", Sha256::digest(nonce.to_be_bytes()))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::m2_capture_runtime::FeedbackGate;
+    use crate::m1_decoder::{
+        ControlContract, CopyBothEvent, Decoder, PgoutputEvent, RelationContract, WireLimits,
+    };
+    use crate::m2_capture_runtime::{FeedbackGate, encode_row};
     use crate::m2_schema::open_writer;
     use std::time::{SystemTime, UNIX_EPOCH};
     fn path(name: &str) -> std::path::PathBuf {
@@ -542,7 +540,7 @@ mod tests {
             intent_id: "intent".into(),
             generation_id: "gen".into(),
             bootstrap_intent_id: "boot".into(),
-            capture_epoch: "1".into(),
+            capture_epoch: 1,
             generation: 1,
             nonce: 700000000000000007,
             table_set_fingerprint:
@@ -551,28 +549,61 @@ mod tests {
             expires_at: "later".into(),
         }
     }
-    fn journal(s: &mut FenceStore, txid: &str, lsn: &str, nonce: u64) {
-        let p = fence_payload(
-            "1",
-            1,
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            nonce,
-        );
-        let h = crate::m2_journal::sha256(&p);
+    fn journal_payload(s: &mut FenceStore, txid: &str, lsn: &str, payload: Vec<u8>) {
+        let hash = crate::m2_journal::sha256(&payload);
         s.writer.connection().execute("INSERT INTO source_transactions VALUES(?1,'1','sys','db','slot','7',?2,6,6,1,'sum','committed')",params![txid,lsn]).unwrap();
         s.writer
             .connection()
             .execute(
                 "INSERT INTO journal_events VALUES(6,?1,?2,0,'1',NULL,'capture_fence',?3,?4)",
-                params![format!("event-{txid}"), txid, p, h],
+                params![format!("event-{txid}"), txid, payload, hash],
             )
             .unwrap();
+    }
+    fn journal(s: &mut FenceStore, txid: &str, lsn: &str, nonce: u64) {
+        journal_payload(
+            s,
+            txid,
+            lsn,
+            fence_payload(
+                "1",
+                1,
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                nonce,
+            ),
+        );
+    }
+    fn decode_hex(value: &str) -> Vec<u8> {
+        value
+            .as_bytes()
+            .chunks_exact(2)
+            .map(|pair| {
+                let digit = |v: u8| match v {
+                    b'0'..=b'9' => v - b'0',
+                    b'a'..=b'f' => v - b'a' + 10,
+                    b'A'..=b'F' => v - b'A' + 10,
+                    _ => panic!("invalid fixture hex"),
+                };
+                (digit(pair[0]) << 4) | digit(pair[1])
+            })
+            .collect()
+    }
+    fn parse_pg_lsn(value: &str) -> u64 {
+        let (hi, lo) = value.split_once('/').unwrap();
+        (u64::from_str_radix(hi, 16).unwrap() << 32) | u64::from_str_radix(lo, 16).unwrap()
     }
     #[test]
     fn exact_durable_pair_completes_anchor_and_duplicate_is_audit_only() {
         let mut s = setup("pair");
         s.prepare_after_copy(&input()).unwrap();
         s.mark_dispatched("intent", 1).unwrap();
+        s.writer
+            .connection()
+            .execute(
+                "INSERT INTO m3_planner_runs VALUES('other-generation','boot',999)",
+                [],
+            )
+            .unwrap();
         journal(&mut s, "tx", "0000000000000010", 700000000000000007);
         let p = s.observe_durable("intent", "tx").unwrap();
         assert!(p.first_proof);
@@ -760,15 +791,52 @@ mod tests {
         assert_eq!(observed["affected_rows"], 1);
         let lsn = observed["commit_end_lsn"].as_str().unwrap();
         assert_eq!(lsn.len(), 16);
+        let mut decoder = Decoder::new(WireLimits::default());
+        let mut captured_payload = None;
+        let mut decoded_end_lsn = None;
+        for message in observed["pgoutput_messages"].as_array().unwrap() {
+            let position = parse_pg_lsn(message["lsn"].as_str().unwrap());
+            let data = decode_hex(message["data_hex"].as_str().unwrap());
+            let mut frame = vec![b'w'];
+            frame.extend_from_slice(&position.to_be_bytes());
+            frame.extend_from_slice(&position.to_be_bytes());
+            frame.extend_from_slice(&0_i64.to_be_bytes());
+            frame.extend_from_slice(&data);
+            match decoder.decode_copy_data(&frame).unwrap() {
+                CopyBothEvent::XLogData {
+                    event: PgoutputEvent::RelationNeedsValidation(relation),
+                    ..
+                } => decoder
+                    .admit_relation(RelationContract {
+                        relation,
+                        key_columns: vec![0],
+                        control: Some(ControlContract {
+                            immutable_key: vec![b"singleton".to_vec()],
+                            mutable_columns: vec![1, 2, 3, 4],
+                        }),
+                    })
+                    .unwrap(),
+                CopyBothEvent::XLogData {
+                    event: PgoutputEvent::Row(row),
+                    ..
+                } => captured_payload = Some(encode_row(&row, None).unwrap()),
+                CopyBothEvent::XLogData {
+                    event: PgoutputEvent::Commit { end_lsn, .. },
+                    ..
+                } => decoded_end_lsn = Some(format!("{end_lsn:016X}")),
+                _ => {}
+            }
+        }
+        assert_eq!(decoded_end_lsn.as_deref(), Some(lsn));
         let mut s = setup("live");
         s.prepare_after_copy(&input()).unwrap();
         s.mark_dispatched("intent", observed["affected_rows"].as_u64().unwrap())
             .unwrap();
-        journal(&mut s, "live-tx", lsn, 700000000000000007);
+        journal_payload(&mut s, "live-tx", lsn, captured_payload.unwrap());
         let proof = s.observe_durable("intent", "live-tx").unwrap();
         assert_eq!(proof.post_copy_fence_lsn, lsn);
         if let Some(out) = std::env::var_os("BORING_CDC_M3_FENCE_RESULT") {
-            std::fs::write(out, serde_json::to_vec(&serde_json::json!({"anchor_state":"complete","first_proof":proof.first_proof,"post_copy_fence_lsn":proof.post_copy_fence_lsn,"post_copy_fence_seq":proof.post_copy_fence_seq,"pgoutput_contains_nonce":true,"affected_rows":1})).unwrap()).unwrap();
+            std::fs::write(out, serde_json::to_vec(&serde_json::json!({"anchor_state":"complete","first_proof":proof.first_proof,"post_copy_fence_lsn":proof.post_copy_fence_lsn,"post_copy_fence_seq":proof.post_copy_fence_seq,"pgoutput_contains_nonce":true,"m2_encoded_row_from_live_pgoutput":true,"affected_rows":1})).unwrap()).unwrap();
         }
     }
     #[test]
