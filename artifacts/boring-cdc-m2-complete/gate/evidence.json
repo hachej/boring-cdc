@@ -17,7 +17,7 @@
       "argv": "cargo clippy --locked --workspace --all-targets --all-features",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-2.stderr",
-      "stderr_sha256": "9777f89b020ebe80e9fb127ff7ae1b3a6b996ebb9da499b11ca35e1c65f6e34b",
+      "stderr_sha256": "6d0032f8f2e08bbbe3240ae45543d2a6a94dfce6589a225cf1d7023c05e0fed3",
       "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-2.stdout",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "version": "m2-complete/v2"
@@ -26,9 +26,9 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-3.stderr",
-      "stderr_sha256": "80f25ffbfbba66c5fb4cc9477f2408fd0a7466f3fdea2ad6d59d5a32c51e9510",
+      "stderr_sha256": "1c4f45fa5fd22a7a519ecf47052c60dd23865053dc7c065b6d1cf3ae4b5ed3f0",
       "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-3.stdout",
-      "stdout_sha256": "e9a5952979ca324b11ea144fd6cc3a6ca9c8196260114b77d203f9b1d391e899",
+      "stdout_sha256": "a4ae034c595c419d4204d2f61ceeee9ae34eb7bfbd0620a4ad6ebc7c43697628",
       "version": "m2-complete/v2"
     },
     {
@@ -37,7 +37,7 @@
       "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-4.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-4.stdout",
-      "stdout_sha256": "a9c44ac25f0f4e48b1b4f77e84eab31e292d637fca21af1e15065c67e964fde8",
+      "stdout_sha256": "4c0f63202837a847cc780023de1263c8001d55c3bd7a0fc87eff6cc72b54daf8",
       "version": "m2-complete/v2"
     },
     {
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "milestone",
-  "git_commit": "368ff1a2e7ad76053f41f60fe2ec58bc2b1eb7d4",
+  "git_commit": "d05117b0e4a7879bfe6248e722fbce79f48230a0",
   "owner_bead": "boring-cdc-m2-complete",
   "redaction": {
     "checked": true,
@@ -76,7 +76,7 @@
       "attempt-5:f807dc608559dadfa998f24446a4a3203f312e182ab5f32ce1b4cacaa155ce03",
       "attempt-6:52beb557105e641a43fe971c41e5fcf8f7b7833897e1b6455d1e4d3e0b7cca84"
     ],
-    "digest": "252e474aad783442b9357e2428208c6e9e85b841fceed3d66e71d7315082fc53",
+    "digest": "804483d05f947ebb8c0eee01b89929c5779b3ae461283e6a989e4ad137d030f1",
     "product_faults": "factory completion consumes pinned PostgreSQL 17.6 Compose crash/fault proof; three review-cap residual handoffs remain explicit for owner disposition; downstream terminal proof remains excluded",
     "runtime_observed": true,
     "status": "pass"
@@ -85,8 +85,8 @@
   "schema_version": "evidence/v1",
   "seed": "m2-complete-v2",
   "source_preservation": {
-    "after_sha256": "84e2980df89db68dceadd8c87ac308af8b60b25c28fa30f12b9082736127d17f",
-    "before_sha256": "84e2980df89db68dceadd8c87ac308af8b60b25c28fa30f12b9082736127d17f",
+    "after_sha256": "56baa3eb03e688bf085a0a0774cd1c38615f4ba9a99b21c580ddd9f6cb4a7ca0",
+    "before_sha256": "56baa3eb03e688bf085a0a0774cd1c38615f4ba9a99b21c580ddd9f6cb4a7ca0",
     "preserved": true
   },
   "tier_proof": {
