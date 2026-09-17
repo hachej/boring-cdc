@@ -8,6 +8,7 @@ for attempt in 1 2; do
   cargo test --locked m3_fence::tests::delayed_copy_cannot_dispatch_or_complete_anchor -- --exact
   cargo test --locked m3_fence::tests::restart_reconciles_persisted_intent_without_inventing_a_proof -- --exact
   cargo test --locked m3_fence::tests::sampled_or_mismatched_observation_cannot_complete_anchor -- --exact
+  cargo test --locked m3_fence::tests::invalidation_marks_planner_generation_and_fence_intent_ineligible_atomically -- --exact
   cargo test --locked m3_fence::tests::repeated_matching_transaction_is_audit_only_and_first_pair_is_immutable -- --exact
 done
 cat >"$work/result.json" <<'JSON'

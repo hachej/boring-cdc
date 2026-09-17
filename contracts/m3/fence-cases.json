@@ -9,6 +9,8 @@
     {"scenario_id":"SCN-M3-FENCE-DUPLICATE","unit_test":"repeated_matching_transaction_is_audit_only_and_first_pair_is_immutable","expected":"first matching durable proof is immutable; repeats are audit-only"},
     {"scenario_id":"SCN-M3-FENCE-RESTART","unit_test":"restart_reconciles_persisted_intent_without_inventing_a_proof","expected":"a dispatched intent survives restart but remains unusable without its durable journal pair"},
     {"scenario_id":"SCN-M3-FENCE-FEEDBACK-GATE","unit_test":"feedback_gate_holds_opens_and_stale_generation_fails_closed","expected":"all-ack open, idempotent retry, stale refusal, invalidation and release are one persisted provider"},
+    {"scenario_id":"SCN-M3-FENCE-ATOMIC-INVALIDATION","unit_test":"invalidation_marks_planner_generation_and_fence_intent_ineligible_atomically","expected":"generation, pending snapshot work, fence intent and feedback release transition in one SQLite transaction"},
+    {"scenario_id":"SCN-M3-FENCE-RECONCILE-GATE","unit_test":"lost_response_never_recreates_or_drops_slot","expected":"restart ambiguity atomically releases the fence-owned persisted gate"},
     {"scenario_id":"SCN-M3-FENCE-PGOUTPUT","unit_test":"live_pgoutput_observation_uses_commit_message_end_lsn","expected":"PostgreSQL 17.6 pgoutput carries the fixed-row nonce and its Commit end LSN becomes the anchor pair"}
   ],
   "canonical_plan_assignment": "SCN-SNAPSHOT-COMPLETION-BEFORE-CAPTURE-FENCE"

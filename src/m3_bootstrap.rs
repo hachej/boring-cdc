@@ -332,15 +332,30 @@ impl BootstrapStore {
             return Ok(ReconcileDecision::RetryPreparedCreation);
         }
         if state == "prepared" && remote_slot_exists && token.is_none() {
-            self.writer.connection().execute("UPDATE m3_bootstrap_runtime SET state='bootstrap_ambiguous_requires_restart',exporter_liveness='lost',snapshot_promotable=0,feedback_gate_open=1,revision=revision+1 WHERE intent_id=?1 AND state='prepared'",[intent_id])?;
+            crate::m3_fence::reconcile_and_release(
+                self.writer.connection_mut(),
+                intent_id,
+                "bootstrap_ambiguous_requires_restart",
+            )
+            .map_err(|_| BootstrapError::Conflict("M3_RECONCILE_GATE_STALE"))?;
             return Ok(ReconcileDecision::BootstrapAmbiguousRequiresRestart);
         }
         if state == "bootstrap_ambiguous_requires_restart" || state == "snapshot_unusable" {
             if remote_slot_exists && wal_continuous && provenance_matches {
-                self.writer.connection().execute("UPDATE m3_bootstrap_runtime SET state='existing_slot_generation_required',feedback_gate_open=1,snapshot_promotable=0,revision=revision+1 WHERE intent_id=?1 AND state IN ('bootstrap_ambiguous_requires_restart','snapshot_unusable')",[intent_id])?;
+                crate::m3_fence::reconcile_and_release(
+                    self.writer.connection_mut(),
+                    intent_id,
+                    "existing_slot_generation_required",
+                )
+                .map_err(|_| BootstrapError::Conflict("M3_RECONCILE_GATE_STALE"))?;
                 return Ok(ReconcileDecision::ExistingSlotGenerationRequired);
             }
-            self.writer.connection().execute("UPDATE m3_bootstrap_runtime SET state='full_reseed_required',feedback_gate_open=1,snapshot_promotable=0,revision=revision+1 WHERE intent_id=?1 AND state IN ('bootstrap_ambiguous_requires_restart','snapshot_unusable')",[intent_id])?;
+            crate::m3_fence::reconcile_and_release(
+                self.writer.connection_mut(),
+                intent_id,
+                "full_reseed_required",
+            )
+            .map_err(|_| BootstrapError::Conflict("M3_RECONCILE_GATE_STALE"))?;
             return Ok(ReconcileDecision::FullReseedRequired);
         }
         Ok(ReconcileDecision::ResumeImports)
@@ -1046,6 +1061,13 @@ mod tests {
             s.reconcile("intent", true, true, true).unwrap(),
             ReconcileDecision::BootstrapAmbiguousRequiresRestart
         );
+        {
+            let mut gate = PersistedFeedbackGate::new(s.writer.connection(), "intent", 1);
+            assert_eq!(
+                gate.permit(Some(32)),
+                FeedbackPermit::AllowSafeBoundary { lsn: 32 }
+            );
+        }
         assert_eq!(
             s.reconcile("intent", true, true, true).unwrap(),
             ReconcileDecision::ExistingSlotGenerationRequired

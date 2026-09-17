@@ -66,7 +66,7 @@ pub struct FenceIntentInput {
     pub bootstrap_intent_id: String,
     pub capture_epoch: String,
     pub generation: u64,
-    pub nonce: String,
+    pub nonce: u64,
     pub table_set_fingerprint: String,
     pub anchor_id: String,
     pub expires_at: String,
@@ -78,7 +78,7 @@ pub struct FenceDispatch {
     pub generation: u64,
     pub table_set_fingerprint: String,
     /// Kept out of logs and status; the dispatcher binds it as a query parameter.
-    pub nonce: String,
+    pub nonce: u64,
 }
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct AnchorProof {
@@ -89,12 +89,16 @@ pub struct AnchorProof {
     pub first_proof: bool,
 }
 #[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct FencePayload {
-    capture_epoch: String,
-    generation: u64,
-    table_set_fingerprint: String,
-    unique_nonce: String,
+struct CapturedFenceRow {
+    kind: String,
+    new: Option<Vec<CapturedTuple>>,
+}
+#[derive(Deserialize)]
+#[serde(tag = "state", content = "bytes", rename_all = "snake_case")]
+enum CapturedTuple {
+    Null,
+    UnchangedToast,
+    Text(Vec<u8>),
 }
 
 pub fn install(connection: &Connection) -> Result<(), FenceError> {
@@ -168,6 +172,47 @@ pub(crate) fn acknowledge_and_open(
 }
 
 /// Invalidates snapshot eligibility, importer states, and releases WAL feedback atomically.
+pub(crate) fn reconcile_and_release(
+    connection: &mut Connection,
+    intent_id: &str,
+    target: &str,
+) -> Result<(), FenceError> {
+    let assignment = match target {
+        "bootstrap_ambiguous_requires_restart" => {
+            "state='bootstrap_ambiguous_requires_restart',exporter_liveness='lost',snapshot_promotable=0,feedback_gate_open=1"
+        }
+        "existing_slot_generation_required" => {
+            "state='existing_slot_generation_required',snapshot_promotable=0,feedback_gate_open=1"
+        }
+        "full_reseed_required" => {
+            "state='full_reseed_required',snapshot_promotable=0,feedback_gate_open=1"
+        }
+        _ => return Err(FenceError::Invalid("M3_RECONCILE_TARGET_INVALID")),
+    };
+    let source_states = match target {
+        "bootstrap_ambiguous_requires_restart" => "state='prepared'",
+        _ => "state IN ('bootstrap_ambiguous_requires_restart','snapshot_unusable')",
+    };
+    let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let changed=tx.execute(&format!("UPDATE m3_bootstrap_runtime SET {assignment},revision=revision+1 WHERE intent_id=?1 AND {source_states}"),[intent_id])?;
+    if changed != 1 {
+        return Err(FenceError::Conflict("M3_RECONCILE_GATE_STALE"));
+    }
+    let gate_state: String = tx.query_row(
+        "SELECT state FROM m3_feedback_gates WHERE intent_id=?1",
+        [intent_id],
+        |r| r.get(0),
+    )?;
+    if gate_state != "invalidated" {
+        let gate=tx.execute("UPDATE m3_feedback_gates SET state='invalidated',revision=revision+1 WHERE intent_id=?1 AND state IN ('hold','open')",[intent_id])?;
+        if gate != 1 {
+            return Err(FenceError::Conflict("M3_RECONCILE_GATE_STALE"));
+        }
+    }
+    tx.commit()?;
+    Ok(())
+}
+
 pub(crate) fn invalidate_and_release(
     connection: &mut Connection,
     intent_id: &str,
@@ -178,6 +223,17 @@ pub(crate) fn invalidate_and_release(
         return Err(FenceError::Invalid("M3_LOST_SESSION_INVALID"));
     }
     let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let planner_installed: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='m3_planner_runs')",
+        [],
+        |r| r.get(0),
+    )?;
+    if planner_installed {
+        tx.execute("UPDATE backfill_chunks SET state='invalidated' WHERE generation_id IN (SELECT generation_id FROM m3_planner_runs WHERE bootstrap_intent_id=?1) AND state='pending'", [intent_id])?;
+        tx.execute("DELETE FROM m3_chunk_claims WHERE generation_id IN (SELECT generation_id FROM m3_planner_runs WHERE bootstrap_intent_id=?1)", [intent_id])?;
+        tx.execute("UPDATE backfill_generations SET state='invalidated' WHERE generation_id IN (SELECT generation_id FROM m3_planner_runs WHERE bootstrap_intent_id=?1) AND state IN ('copying','fencing')", [intent_id])?;
+    }
+    tx.execute("UPDATE m3_fence_intents SET state='invalidated',revision=revision+1 WHERE bootstrap_intent_id=?1 AND state IN ('intended','dispatched')", [intent_id])?;
     let (liveness, guard) = (
         if lost_session == "exporter" {
             "exporter_liveness='lost',"
@@ -282,7 +338,7 @@ impl FenceStore {
         }
         tx.execute("INSERT INTO m3_fence_intents(intent_id,generation_id,bootstrap_intent_id,capture_epoch,generation,nonce,table_set_fingerprint,anchor_id,expires_at,state) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,'intended')",params![input.intent_id,input.generation_id,input.bootstrap_intent_id,input.capture_epoch,input.generation,input.nonce,input.table_set_fingerprint,input.anchor_id,input.expires_at])?;
         tx.commit()?;
-        Ok(FenceDispatch { sql:"UPDATE boring_cdc_control.capture_fences SET capture_epoch=$1,generation=$2,table_set_fingerprint=$3,unique_nonce=$4 WHERE id='singleton'".into(), capture_epoch:input.capture_epoch.clone(), generation:input.generation, table_set_fingerprint:input.table_set_fingerprint.clone(), nonce:input.nonce.clone() })
+        Ok(FenceDispatch { sql:"UPDATE boring_cdc_control.capture_fences SET capture_epoch=$1,generation=$2,table_set_fingerprint=$3,unique_nonce=$4 WHERE id='singleton'".into(), capture_epoch:input.capture_epoch.clone(), generation:input.generation, table_set_fingerprint:input.table_set_fingerprint.clone(), nonce:input.nonce })
     }
 
     /// Records that the runtime credential's fixed-row UPDATE affected exactly one row.
@@ -327,16 +383,42 @@ impl FenceStore {
         if !matches!(intent.8.as_str(), "dispatched" | "complete") {
             return Err(FenceError::Conflict("M3_FENCE_OBSERVATION_STALE"));
         }
-        let durable:Option<(String,i64,Vec<u8>)>=tx.query_row("SELECT t.end_lsn,t.last_seq,e.payload FROM source_transactions t JOIN journal_events e ON e.transaction_id=t.transaction_id AND e.journal_seq=t.last_seq WHERE t.transaction_id=?1 AND t.capture_epoch=?2 AND t.state='committed' AND e.control_kind='capture_fence'",params![transaction_id,intent.2],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
+        let durable:Option<(String,i64,Vec<u8>)>=tx.query_row("SELECT t.end_lsn,t.last_seq,e.payload FROM source_transactions t JOIN journal_events e ON e.transaction_id=t.transaction_id AND e.journal_seq=t.last_seq WHERE t.transaction_id=?1 AND t.capture_epoch=?2 AND t.state='committed' AND t.event_count=1 AND t.first_seq=t.last_seq AND e.control_kind='capture_fence'",params![transaction_id,intent.2],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?;
         let Some((lsn, seq, payload)) = durable else {
             return Err(FenceError::Conflict("M3_FENCE_DURABLE_PAIR_MISSING"));
         };
-        let decoded: FencePayload = serde_json::from_slice(&payload)
+        let decoded: CapturedFenceRow = serde_json::from_slice(&payload)
             .map_err(|_| FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))?;
-        if decoded.capture_epoch != intent.2
-            || decoded.generation != intent.3 as u64
-            || decoded.unique_nonce != intent.4
-            || decoded.table_set_fingerprint != intent.5
+        let values = decoded
+            .new
+            .ok_or(FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))?;
+        if decoded.kind != "update" || values.len() != 5 {
+            return Err(FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"));
+        }
+        let text = values
+            .into_iter()
+            .map(|value| match value {
+                CapturedTuple::Text(bytes) => String::from_utf8(bytes)
+                    .map_err(|_| FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID")),
+                CapturedTuple::Null | CapturedTuple::UnchangedToast => {
+                    Err(FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))
+                }
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let observed_epoch = text[1]
+            .parse::<u64>()
+            .map_err(|_| FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))?;
+        let observed_generation = text[2]
+            .parse::<u64>()
+            .map_err(|_| FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))?;
+        let observed_nonce = text[4]
+            .parse::<u64>()
+            .map_err(|_| FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))?;
+        if text[0] != "singleton"
+            || intent.2.parse::<u64>().ok() != Some(observed_epoch)
+            || observed_generation != intent.3 as u64
+            || intent.4.parse::<u64>().ok() != Some(observed_nonce)
+            || text[3] != intent.5
         {
             return Err(FenceError::Conflict("M3_FENCE_IDENTITY_MISMATCH"));
         }
@@ -383,21 +465,37 @@ pub fn fence_payload(
     capture_epoch: &str,
     generation: u64,
     table_set_fingerprint: &str,
-    nonce: &str,
+    nonce: u64,
 ) -> Vec<u8> {
-    serde_json::to_vec(&serde_json::json!({"capture_epoch":capture_epoch,"generation":generation,"table_set_fingerprint":table_set_fingerprint,"unique_nonce":nonce})).expect("typed fence payload")
+    let text = |value: &str| serde_json::json!({"state":"text","bytes":value.as_bytes()});
+    serde_json::to_vec(&serde_json::json!({
+        "kind":"update","relation_id":42,"ordinal":0,"old_kind":"key",
+        "old":[text("singleton")],
+        "new":[text("singleton"),text(capture_epoch),text(&generation.to_string()),text(table_set_fingerprint),text(&nonce.to_string())],
+        "origin_lsn":null,"origin_name":null
+    })).expect("typed M2 encoded fence row")
 }
 fn valid(v: &str) -> bool {
     !v.is_empty() && v.len() <= 256 && v.is_ascii()
 }
 fn validate_input(v: &FenceIntentInput) -> Result<(), FenceError> {
     if v.generation == 0
+        || v.nonce == 0
+        || v.capture_epoch
+            .parse::<u64>()
+            .ok()
+            .filter(|x| *x > 0)
+            .is_none()
+        || v.table_set_fingerprint.len() != 64
+        || !v
+            .table_set_fingerprint
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
         || ![
             &v.intent_id,
             &v.generation_id,
             &v.bootstrap_intent_id,
             &v.capture_epoch,
-            &v.nonce,
             &v.table_set_fingerprint,
             &v.anchor_id,
             &v.expires_at,
@@ -409,8 +507,8 @@ fn validate_input(v: &FenceIntentInput) -> Result<(), FenceError> {
     }
     Ok(())
 }
-pub fn nonce_hash(nonce: &str) -> String {
-    format!("{:x}", Sha256::digest(nonce.as_bytes()))
+pub fn nonce_hash(nonce: u64) -> String {
+    format!("{:x}", Sha256::digest(nonce.to_be_bytes()))
 }
 
 #[cfg(test)]
@@ -434,9 +532,9 @@ mod tests {
     }
     fn setup(name: &str) -> FenceStore {
         let w = writer(name);
-        w.connection().execute_batch("CREATE TABLE m3_bootstrap_runtime(intent_id TEXT PRIMARY KEY,generation INTEGER,start_seq INTEGER,consistent_lsn TEXT,table_set_fingerprint TEXT,state TEXT,exporter_liveness TEXT,guard_liveness TEXT,snapshot_promotable INTEGER,feedback_gate_open INTEGER,revision INTEGER); CREATE TABLE m3_bootstrap_importers(intent_id TEXT,importer_id TEXT,state TEXT,revision INTEGER,snapshot_schema_fingerprint TEXT,PRIMARY KEY(intent_id,importer_id)); CREATE TABLE m3_planner_runs(generation_id TEXT,bootstrap_intent_id TEXT,next_snapshot_seq INTEGER);").unwrap();
+        w.connection().execute_batch("CREATE TABLE m3_bootstrap_runtime(intent_id TEXT PRIMARY KEY,generation INTEGER,start_seq INTEGER,consistent_lsn TEXT,table_set_fingerprint TEXT,state TEXT,exporter_liveness TEXT,guard_liveness TEXT,snapshot_promotable INTEGER,feedback_gate_open INTEGER,revision INTEGER); CREATE TABLE m3_bootstrap_importers(intent_id TEXT,importer_id TEXT,state TEXT,revision INTEGER,snapshot_schema_fingerprint TEXT,PRIMARY KEY(intent_id,importer_id)); CREATE TABLE m3_planner_runs(generation_id TEXT,bootstrap_intent_id TEXT,next_snapshot_seq INTEGER); CREATE TABLE m3_chunk_claims(generation_id TEXT);").unwrap();
         install(w.connection()).unwrap();
-        w.connection().execute_batch("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','epoch',1); INSERT INTO bootstrap_intents VALUES('boot','epoch','sys','db','slot','0000000000000001','slot_created',0,'now'); INSERT INTO m3_bootstrap_runtime VALUES('boot',1,0,'0000000000000001','tables','exporter_released','released','held',1,1,0); INSERT INTO m3_bootstrap_importers VALUES('boot','worker','acknowledged',0,'schema'); INSERT INTO m3_feedback_gates VALUES('boot',1,'open',NULL,0); INSERT INTO bootstrap_imports VALUES('import','boot','d','acknowledged',0); INSERT INTO backfill_runs VALUES('run','d','epoch','running',0); INSERT INTO backfill_generations VALUES('gen','run',1,NULL,'fencing'); INSERT INTO backfill_chunks VALUES('chunk','gen',X'',X'','complete',5,'sum'); INSERT INTO m3_planner_runs VALUES('gen','boot',5); INSERT INTO relation_schemas VALUES('schema','epoch','rel',X'00','sum',1);").unwrap();
+        w.connection().execute_batch("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','1',1); INSERT INTO bootstrap_intents VALUES('boot','1','sys','db','slot','0000000000000001','slot_created',0,'now'); INSERT INTO m3_bootstrap_runtime VALUES('boot',1,0,'0000000000000001','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','exporter_released','released','held',1,1,0); INSERT INTO m3_bootstrap_importers VALUES('boot','worker','acknowledged',0,'schema'); INSERT INTO m3_feedback_gates VALUES('boot',1,'open',NULL,0); INSERT INTO bootstrap_imports VALUES('import','boot','d','acknowledged',0); INSERT INTO backfill_runs VALUES('run','d','1','running',0); INSERT INTO backfill_generations VALUES('gen','run',1,NULL,'fencing'); INSERT INTO backfill_chunks VALUES('chunk','gen',X'',X'','complete',5,'sum'); INSERT INTO m3_planner_runs VALUES('gen','boot',5); INSERT INTO relation_schemas VALUES('schema','1','rel',X'00','sum',1);").unwrap();
         FenceStore::open(w).unwrap()
     }
     fn input() -> FenceIntentInput {
@@ -444,22 +542,28 @@ mod tests {
             intent_id: "intent".into(),
             generation_id: "gen".into(),
             bootstrap_intent_id: "boot".into(),
-            capture_epoch: "epoch".into(),
+            capture_epoch: "1".into(),
             generation: 1,
-            nonce: "nonce-1".into(),
-            table_set_fingerprint: "tables".into(),
+            nonce: 700000000000000007,
+            table_set_fingerprint:
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             anchor_id: "anchor".into(),
             expires_at: "later".into(),
         }
     }
-    fn journal(s: &mut FenceStore, txid: &str, lsn: &str, nonce: &str) {
-        let p = fence_payload("epoch", 1, "tables", nonce);
+    fn journal(s: &mut FenceStore, txid: &str, lsn: &str, nonce: u64) {
+        let p = fence_payload(
+            "1",
+            1,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            nonce,
+        );
         let h = crate::m2_journal::sha256(&p);
-        s.writer.connection().execute("INSERT INTO source_transactions VALUES(?1,'epoch','sys','db','slot','7',?2,6,6,1,'sum','committed')",params![txid,lsn]).unwrap();
+        s.writer.connection().execute("INSERT INTO source_transactions VALUES(?1,'1','sys','db','slot','7',?2,6,6,1,'sum','committed')",params![txid,lsn]).unwrap();
         s.writer
             .connection()
             .execute(
-                "INSERT INTO journal_events VALUES(6,?1,?2,0,'epoch',NULL,'capture_fence',?3,?4)",
+                "INSERT INTO journal_events VALUES(6,?1,?2,0,'1',NULL,'capture_fence',?3,?4)",
                 params![format!("event-{txid}"), txid, p, h],
             )
             .unwrap();
@@ -469,7 +573,7 @@ mod tests {
         let mut s = setup("pair");
         s.prepare_after_copy(&input()).unwrap();
         s.mark_dispatched("intent", 1).unwrap();
-        journal(&mut s, "tx", "0000000000000010", "nonce-1");
+        journal(&mut s, "tx", "0000000000000010", 700000000000000007);
         let p = s.observe_durable("intent", "tx").unwrap();
         assert!(p.first_proof);
         let again = s.observe_durable("intent", "tx").unwrap();
@@ -566,7 +670,7 @@ mod tests {
         let mut s = setup("mismatch");
         s.prepare_after_copy(&input()).unwrap();
         s.mark_dispatched("intent", 1).unwrap();
-        journal(&mut s, "tx", "0000000000000010", "other");
+        journal(&mut s, "tx", "0000000000000010", 8);
         assert!(matches!(
             s.observe_durable("intent", "tx"),
             Err(FenceError::Conflict("M3_FENCE_IDENTITY_MISMATCH"))
@@ -585,12 +689,17 @@ mod tests {
         let mut s = setup("audit");
         s.prepare_after_copy(&input()).unwrap();
         s.mark_dispatched("intent", 1).unwrap();
-        journal(&mut s, "tx", "0000000000000010", "nonce-1");
+        journal(&mut s, "tx", "0000000000000010", 700000000000000007);
         let first = s.observe_durable("intent", "tx").unwrap();
-        let payload = fence_payload("epoch", 1, "tables", "nonce-1");
+        let payload = fence_payload(
+            "1",
+            1,
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            700000000000000007,
+        );
         let hash = crate::m2_journal::sha256(&payload);
-        s.writer.connection().execute("INSERT INTO source_transactions VALUES('tx2','epoch','sys','db','slot','8','0000000000000020',7,7,1,'sum2','committed')", []).unwrap();
-        s.writer.connection().execute("INSERT INTO journal_events VALUES(7,'event-tx2','tx2',0,'epoch',NULL,'capture_fence',?1,?2)", params![payload,hash]).unwrap();
+        s.writer.connection().execute("INSERT INTO source_transactions VALUES('tx2','1','sys','db','slot','8','0000000000000020',7,7,1,'sum2','committed')", []).unwrap();
+        s.writer.connection().execute("INSERT INTO journal_events VALUES(7,'event-tx2','tx2',0,'1',NULL,'capture_fence',?1,?2)", params![payload,hash]).unwrap();
         let duplicate = s.observe_durable("intent", "tx2").unwrap();
         assert!(!duplicate.first_proof);
         assert_eq!(duplicate.transaction_id, first.transaction_id);
@@ -616,6 +725,31 @@ mod tests {
         s.mark_dispatched("intent", 1).unwrap();
     }
     #[test]
+    fn invalidation_marks_planner_generation_and_fence_intent_ineligible_atomically() {
+        let mut s = setup("invalidate");
+        s.prepare_after_copy(&input()).unwrap();
+        s.mark_dispatched("intent", 1).unwrap();
+        invalidate_and_release(s.writer.connection_mut(), "boot", 1, "guard").unwrap();
+        let states: (String,String,String,String)=s.writer.connection().query_row(
+            "SELECT x.state,f.state,g.state,i.state FROM m3_bootstrap_runtime x JOIN m3_feedback_gates f USING(intent_id) JOIN m3_planner_runs p ON p.bootstrap_intent_id=x.intent_id JOIN backfill_generations g USING(generation_id) JOIN m3_fence_intents i USING(generation_id) WHERE x.intent_id='boot'",
+            [],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+        ).unwrap();
+        assert_eq!(
+            states,
+            (
+                "snapshot_unusable".into(),
+                "invalidated".into(),
+                "invalidated".into(),
+                "invalidated".into()
+            )
+        );
+        let mut gate = PersistedFeedbackGate::new(s.writer.connection(), "boot", 1);
+        assert_eq!(
+            gate.permit(Some(11)),
+            FeedbackPermit::AllowSafeBoundary { lsn: 11 }
+        );
+    }
+    #[test]
     fn live_pgoutput_observation_uses_commit_message_end_lsn() {
         let Some(path) = std::env::var_os("BORING_CDC_M3_FENCE_OBSERVATION") else {
             return;
@@ -630,7 +764,7 @@ mod tests {
         s.prepare_after_copy(&input()).unwrap();
         s.mark_dispatched("intent", observed["affected_rows"].as_u64().unwrap())
             .unwrap();
-        journal(&mut s, "live-tx", lsn, "nonce-1");
+        journal(&mut s, "live-tx", lsn, 700000000000000007);
         let proof = s.observe_durable("intent", "live-tx").unwrap();
         assert_eq!(proof.post_copy_fence_lsn, lsn);
         if let Some(out) = std::env::var_os("BORING_CDC_M3_FENCE_RESULT") {
