@@ -7,9 +7,11 @@
 //! boundary so driver errors and credentials cannot leak into durable state.
 
 use crate::failure_policy::{
-    Component, FailedBoundary, FailureClass, FailureObservation, FingerprintInput, SafeContextKey,
-    SafeContextValue, StableErrorCode,
+    Component, FailedBoundary, FailureClass, FailureObservation, FailureRecord, FingerprintInput,
+    PolicyAction, PolicyEvent, PreparedFailureOperation, SafeContextKey, SafeContextValue,
+    StableErrorCode, load_failure, transition,
 };
+use crate::m1_transition_kernel::TransitionContext;
 use crate::m2_journal::{CopiedEvent, CopiedRange};
 use crate::m2_leases::{
     LeaseError, LeaseToken, SideEffectAdapter, SideEffectOutcome, complete_local,
@@ -95,6 +97,11 @@ pub struct DispatchError;
 /// after each insert is acknowledged. Readback must be a fresh server query, never a client cache.
 pub trait ClickHouseBatchExecutor {
     fn insert_events_synchronously(&mut self, batch: &PreparedBatch) -> Result<(), DispatchError>;
+    /// Reconstruct actual stored payloads before any marker is inserted.
+    fn read_events(
+        &mut self,
+        batch: &PreparedBatch,
+    ) -> Result<Vec<RemoteEventIdentity>, DispatchError>;
     fn insert_marker_synchronously(&mut self, marker: &BatchMarker) -> Result<(), DispatchError>;
     fn read_batch(&mut self, marker: &BatchMarker) -> Result<Option<RemoteBatch>, DispatchError>;
     /// Recompute the live correctness-object/settings fingerprint from server metadata.
@@ -176,6 +183,16 @@ pub fn dispatch_owned_batch<C>(
 where
     C: FnMut() -> u64,
 {
+    let context = context_from_lease(token);
+    if batch.destination_id != context.destination_id
+        || batch.capture_epoch_text != context.capture_epoch
+        || batch.marker.generation != context.generation
+        || batch.configuration_fingerprint != context.configuration_fingerprint
+        || batch.lease_id != context.lease_id
+        || batch.run_id != context.run_id
+    {
+        return Err(DurabilityError::OwnershipLost);
+    }
     complete_local(writer, token, clock_mono_ms, |transaction| {
         mark_insert_dispatched(transaction, batch).map_err(|error| match error {
             DurabilityError::Sqlite(message) => LeaseError::Sqlite(message),
@@ -382,6 +399,10 @@ pub fn dispatch_and_readback(
     executor
         .insert_events_synchronously(batch)
         .map_err(|DispatchError| DurabilityError::Dispatch)?;
+    let events = executor
+        .read_events(batch)
+        .map_err(|DispatchError| DurabilityError::Dispatch)?;
+    verify_remote_events(batch, &events)?;
     executor
         .insert_marker_synchronously(&batch.marker)
         .map_err(|DispatchError| DurabilityError::Dispatch)?;
@@ -477,6 +498,56 @@ pub fn finalize_checkpoint(
         ));
     }
     Ok(())
+}
+
+/// Run the unchanged shared policy and persist its exact CAS projection in the caller's sole-writer
+/// transaction. This is the ClickHouse domain adapter; it does not define a second retry policy.
+pub fn persist_failure(
+    transaction: &Transaction<'_>,
+    context: &BatchContext,
+    batch: &PreparedBatch,
+    class: FailureClass,
+    code: StableErrorCode,
+    transition_context: &mut TransitionContext<'_>,
+) -> Result<FailureRecord, DurabilityError> {
+    let boundary = FailedBoundary::Destination {
+        capture_epoch: context.capture_epoch.clone(),
+        generation: context.generation,
+        first_seq: batch.marker.first_journal_seq,
+        last_seq: batch.marker.last_journal_seq,
+    };
+    let current_failure_id: Option<String> = transaction.query_row(
+        "SELECT current_failure_id FROM destinations WHERE destination_id=?1",
+        [&context.destination_id],
+        |row| row.get(0),
+    )?;
+    let current = current_failure_id
+        .as_deref()
+        .map(|failure_id| load_failure(transaction, failure_id, boundary.clone()))
+        .transpose()?
+        .flatten();
+    let action = transition(
+        current.as_ref(),
+        PolicyEvent::Observe(failure_observation(context, batch, class, code)),
+        transition_context,
+    );
+    let record = match &action {
+        PolicyAction::Persist(record) => record.clone(),
+        PolicyAction::Suppressed => current.ok_or(DurabilityError::Conflict(
+            "failure policy suppressed without persisted state",
+        ))?,
+        _ => {
+            return Err(DurabilityError::Conflict(
+                "failure policy rejected observation",
+            ));
+        }
+    };
+    if let Some(operation) =
+        PreparedFailureOperation::from_policy_action(action, current_failure_id)
+    {
+        operation.execute(transaction)?;
+    }
+    Ok(record)
 }
 
 pub fn failure_observation(
@@ -696,6 +767,13 @@ fn verify_remote_batch(batch: &PreparedBatch, remote: &RemoteBatch) -> Result<()
     if remote.marker != batch.marker {
         return Err(DurabilityError::Conflict("remote batch marker mismatch"));
     }
+    verify_remote_events(batch, &remote.events)
+}
+
+fn verify_remote_events(
+    batch: &PreparedBatch,
+    remote_events: &[RemoteEventIdentity],
+) -> Result<(), DurabilityError> {
     let expected = batch
         .events
         .iter()
@@ -712,7 +790,7 @@ fn verify_remote_batch(batch: &PreparedBatch, remote: &RemoteBatch) -> Result<()
         ));
     }
     let mut observed = BTreeMap::<&str, (&str, &[u8])>::new();
-    for event in &remote.events {
+    for event in remote_events {
         let recomputed = format!("{:x}", Sha256::digest(&event.canonical_payload));
         if recomputed != event.payload_hash {
             return Err(DurabilityError::Conflict(
@@ -748,10 +826,18 @@ fn hash_part(digest: &mut Sha256, bytes: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::m1_transition_kernel::{Randomness, VirtualClock};
     use crate::m2_leases::{LeaseIdentity, acquire};
     use crate::m2_schema::{WriterConnection, open_writer};
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct FixedRandomness;
+    impl Randomness for FixedRandomness {
+        fn next_u64(&mut self) -> u64 {
+            7
+        }
+    }
 
     struct FakeClickHouse {
         remote: Option<RemoteBatch>,
@@ -778,6 +864,16 @@ mod tests {
                 events,
             });
             Ok(())
+        }
+        fn read_events(
+            &mut self,
+            _batch: &PreparedBatch,
+        ) -> Result<Vec<RemoteEventIdentity>, DispatchError> {
+            Ok(self
+                .remote
+                .as_ref()
+                .map(|remote| remote.events.clone())
+                .unwrap_or_default())
         }
         fn insert_marker_synchronously(
             &mut self,
@@ -1115,6 +1211,56 @@ mod tests {
                 .unwrap(),
             0
         );
+    }
+
+    #[test]
+    fn shared_failure_policy_adapter_persists_attempts_and_exact_boundary() {
+        let (_path, mut writer) = writer("policy-persistence");
+        seed(&mut writer);
+        let batch = prepare(&mut writer, copied(false));
+        let clock = VirtualClock::new(10_000);
+        let mut randomness = FixedRandomness;
+        let transaction = writer.connection_mut().transaction().unwrap();
+        let mut transition_context = TransitionContext {
+            clock: &clock,
+            randomness: &mut randomness,
+        };
+        let first = persist_failure(
+            &transaction,
+            &context(),
+            &batch,
+            FailureClass::TransientDestination,
+            StableErrorCode::TransportUnavailable,
+            &mut transition_context,
+        )
+        .unwrap();
+        transaction.commit().unwrap();
+        assert_eq!(first.attempt, 1);
+        assert_eq!(writer.connection().query_row(
+            "SELECT current_failure_id FROM destinations WHERE destination_id='clickhouse-a'",
+            [],
+            |row| row.get::<_, String>(0),
+        ).unwrap(), first.failure_id);
+
+        let clock = VirtualClock::new(20_000);
+        let mut randomness = FixedRandomness;
+        let transaction = writer.connection_mut().transaction().unwrap();
+        let mut transition_context = TransitionContext {
+            clock: &clock,
+            randomness: &mut randomness,
+        };
+        let second = persist_failure(
+            &transaction,
+            &context(),
+            &batch,
+            FailureClass::TransientDestination,
+            StableErrorCode::TransportUnavailable,
+            &mut transition_context,
+        )
+        .unwrap();
+        transaction.commit().unwrap();
+        assert_eq!(second.failure_id, first.failure_id);
+        assert_eq!(second.attempt, 2);
     }
 
     #[test]
