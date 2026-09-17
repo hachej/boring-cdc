@@ -136,7 +136,7 @@
         "boring-cdc-m1-decoder",
         "boring-cdc-m0-event-format"
       ],
-      "fixture_sha256": "eb4c3e4825a9dba19a0c1aa4c33ba82a300ef782507178914bf3661bf1c06a4b",
+      "fixture_sha256": "057219e927dc55a27837c73faddf17c16859b5a357200576e87bab11df417e71",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-values.json",
       "id": "DEC-SUPPORTED-VALUES",
       "owner_bead": "boring-cdc-d-values",
