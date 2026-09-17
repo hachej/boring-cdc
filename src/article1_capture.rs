@@ -443,10 +443,11 @@ mod tests {
             [
                 ("proto_version", "1"),
                 ("publication_names", "article1_publication"),
-                ("origin", "any"),
+                ("binary", "false"),
+                ("messages", "true"),
                 ("streaming", "false"),
                 ("two_phase", "false"),
-                ("binary", "false"),
+                ("origin", "any"),
             ]
         );
         assert_eq!(
