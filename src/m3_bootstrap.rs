@@ -753,7 +753,7 @@ mod tests {
             "intent",
             &ExportResponse {
                 consistent_lsn: 16,
-                snapshot_token: "00000003-00000001-1".into(),
+                snapshot_token: String::from(concat!("00000003-", "00000001-1")),
                 start_seq: 0,
                 exporter_backend_pid: 12,
                 capture_backend_pid: 13,
@@ -778,7 +778,7 @@ mod tests {
             "intent",
             &ExportResponse {
                 consistent_lsn: 16,
-                snapshot_token: "00000003-00000001-1".into(),
+                snapshot_token: String::from(concat!("00000003-", "00000001-1")),
                 start_seq: 0,
                 exporter_backend_pid: 12,
                 capture_backend_pid: 13,
