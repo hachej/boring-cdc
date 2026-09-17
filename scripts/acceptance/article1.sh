@@ -7,10 +7,21 @@ export TMPDIR="${TMPDIR:-/var/tmp}"
 PORT="${ARTICLE1_PG_PORT:-55696}"
 PROJECT="${ARTICLE1_PROJECT:-boring-cdc-article1-evidence}"
 COMPOSE=(docker compose -p "$PROJECT" -f fixtures/article1/compose.yml)
-PASSWORD_FILE="${BORING_CDC_POSTGRES_PASSWORD_FILE:-.secrets/postgres_password}"
+PASSWORD_FILE="${BORING_CDC_POSTGRES_PASSWORD_FILE:-}"
 if [[ -z "${PGPASSWORD:-}" ]]; then
-  [[ -r "$PASSWORD_FILE" ]] || { echo "ARTICLE1_ACCEPTANCE_FAILED: unreadable PostgreSQL password file: $PASSWORD_FILE" >&2; exit 1; }
-  PGPASSWORD=$(cat "$PASSWORD_FILE")
+  if [[ -n "$PASSWORD_FILE" ]]; then
+    [[ -r "$PASSWORD_FILE" ]] || { echo "ARTICLE1_ACCEPTANCE_FAILED: unreadable PostgreSQL password file: $PASSWORD_FILE" >&2; exit 1; }
+    PGPASSWORD=$(cat "$PASSWORD_FILE")
+  else
+    # The article-1 fixture initializes its own throwaway PostgreSQL in
+    # fixtures/article1/compose.yml. Read the value from the fixture itself so the
+    # two cannot drift, and so a clean clone can run this with no local setup.
+    PGPASSWORD=$(sed -n 's/^[[:space:]]*POSTGRES_PASSWORD:[[:space:]]*//p' fixtures/article1/compose.yml | head -n 1 | tr -d '\r')
+  fi
+fi
+if [[ -z "${PGPASSWORD:-}" ]]; then
+  echo "ARTICLE1_ACCEPTANCE_FAILED: could not determine the article-1 fixture PostgreSQL password" >&2
+  exit 1
 fi
 export PGPASSWORD
 DSN="postgresql://postgres@127.0.0.1:${PORT}/article1?sslmode=disable"
