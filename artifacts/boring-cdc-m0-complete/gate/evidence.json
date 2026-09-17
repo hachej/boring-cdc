@@ -10,7 +10,7 @@
       "stderr_path": "artifacts/boring-cdc-m0-complete/gate/run-1.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-complete/gate/run-1.log",
-      "stdout_sha256": "8db7210927f7c97daa60f479c280f149c18bc399e6cb13ea31bad50429e69864",
+      "stdout_sha256": "bccf866d3877b21222557e5f366494fd244f77fc737aa8a7b7d65de94a2e57a1",
       "version": "m0-complete/v1"
     },
     {
@@ -19,13 +19,13 @@
       "stderr_path": "artifacts/boring-cdc-m0-complete/gate/run-2.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m0-complete/gate/run-2.log",
-      "stdout_sha256": "8db7210927f7c97daa60f479c280f149c18bc399e6cb13ea31bad50429e69864",
+      "stdout_sha256": "bccf866d3877b21222557e5f366494fd244f77fc737aa8a7b7d65de94a2e57a1",
       "version": "m0-complete/v1"
     }
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "milestone",
-  "git_commit": "82ce5de23601d02648ba167ebb6fcba408dddd62",
+  "git_commit": "129f8fbe30bed3722090d3d766367f60e03bc870",
   "owner_bead": "boring-cdc-m0-complete",
   "redaction": {
     "checked": true,
@@ -38,7 +38,7 @@
       "contracts/m0/decisions.json",
       "artifacts/boring-cdc-m0-complete/gate/completion-summary.json"
     ],
-    "digest": "79879d113abfb0b07b2ee4082526c5e46c742797f6160991392238cd4d14e512",
+    "digest": "6afcf443a0dc92237d8d3c1b000f3234dcaf8528fd43437b28b8cc1def1ad10c",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -47,8 +47,8 @@
   "schema_version": "evidence/v1",
   "seed": "m0-complete-v1",
   "source_preservation": {
-    "after_sha256": "dacf9bfd41582697ec2060b4038cfc171e7cf6eeb88fef0a2ed6745268612c17",
-    "before_sha256": "dacf9bfd41582697ec2060b4038cfc171e7cf6eeb88fef0a2ed6745268612c17",
+    "after_sha256": "263ad4ce28adb94bac4b0565e16e67c6ee3ac9343e8d14ad6fe5fb49e384f8aa",
+    "before_sha256": "263ad4ce28adb94bac4b0565e16e67c6ee3ac9343e8d14ad6fe5fb49e384f8aa",
     "preserved": true
   },
   "tier_proof": {

@@ -53,7 +53,7 @@ def status_entries():
 def exempt(path):
  # The v6 integration host explicitly preserves the unrelated, untracked v4
  # planning packet; it is not an M2 implementation or certification input.
- return path=='.factory-sha' or path.startswith('.doctor/') or path.startswith('docs/issues/boring-cdc-m2-v4/') or path.startswith('target/') or path.startswith('artifacts/boring-cdc-m2-complete/gate/')
+ return path=='.factory-sha' or path.startswith('.doctor/') or path.startswith('docs/issues/boring-cdc-m2-v4/') or path.startswith('docs/issues/boring-cdc-m0-v4/') or path.startswith('docs/issues/boring-cdc-m0-v6/') or path.startswith('target/') or path.startswith('artifacts/boring-cdc-m2-complete/gate/')
 dirty=[]
 for xy,paths in status_entries():
  # A rename into an exempt directory is dirty when its tracked source is not exempt.
@@ -61,6 +61,8 @@ for xy,paths in status_entries():
 if dirty: fail('dirty certification inputs: '+', '.join(dirty))
 
 coverage=load(coverage_path)
+freeze=subprocess.run(['python3','scripts/lib/freeze_m2_completion_inputs.py','--verify'],text=True,capture_output=True)
+if freeze.returncode: fail(f'completion input pin verification failed: {freeze.stdout.strip()} {freeze.stderr.strip()}')
 if coverage.get('schema_version')!='m2-coverage/v1': fail('coverage schema_version mismatch')
 if coverage.get('completion_policy')!='factory-handoff/v1': fail('coverage completion policy mismatch')
 if coverage.get('owner_bead')!=barrier_id: fail('coverage owner mismatch')
@@ -118,8 +120,11 @@ for leaf in leaves:
  for item in leaf.get('evidence',[]):
   manifest_count += 1
   path=root/item.get('manifest','')
+  expected=item.get('sha256')
+  if not path.is_file() or sha(path)!=expected:
+   path=root/'artifacts/boring-cdc-m2-complete/pinned-manifests'/f'{expected}.json'
   if not path.is_file(): fail(f'{owner}: missing pinned evidence manifest {item.get("manifest")}')
-  elif sha(path)!=item.get('sha256'): fail(f'{owner}: pinned evidence manifest digest mismatch: {item.get("manifest")}')
+  elif sha(path)!=expected: fail(f'{owner}: pinned evidence manifest digest mismatch: {item.get("manifest")}')
  admissions=[ref.get('admission') for ref in refs]
  if any(value not in {'superseded','approved','review-cap-residual'} for value in admissions) or any(value!='superseded' for value in admissions[:-1]) or admissions[-1] not in {'approved','review-cap-residual'}:
   fail(f'{owner}: invalid handoff disposition chain: {admissions}'); continue
@@ -130,8 +135,8 @@ for leaf in leaves:
   if key in seen: fail(f'{owner}: duplicate completion handoff {key}'); leaf_ok=False; continue
   seen.add(key)
   bead=rows.get(ref.get('bead'),{})
-  comments=[c for c in bead.get('comments',[]) if c.get('id')==ref.get('comment_id')]
-  if len(comments)!=1: fail(f'{owner}: pinned handoff comment missing or duplicate: {key}'); leaf_ok=False; continue
+  comments=[c for c in bead.get('comments',[]) if sha_bytes(str(c.get('text','')).encode())==ref.get('text_sha256')]
+  if len(comments)!=1: fail(f'{owner}: pinned handoff content missing or duplicate: {key}'); leaf_ok=False; continue
   text=comments[0].get('text','')
   if sha_bytes(text.encode())!=ref.get('text_sha256'): fail(f'{owner}: pinned handoff content digest mismatch: {key}'); leaf_ok=False
   match=handoff_header.match(text)

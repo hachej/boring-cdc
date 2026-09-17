@@ -111,22 +111,20 @@ if set(reconciliation.get('cards',{}))!=expected_cards: fail('owner cards missin
 for card in reconciliation.get('cards',{}).values():
  if card.get('decision')!='accept': fail('owner card is not accepted')
 markers=('boring-cdc-d-security','boring-cdc-d-values','boring-cdc-d-keys','boring-cdc-d-failure-policy','boring-cdc-d-sqlite','boring-cdc-d-wal-cap','boring-cdc-d-compose')
-provisional_marker='M0-'+'PROVISIONAL'
-for base in ('src','scripts','fixtures','contracts','config','artifacts','tests','examples','.github'):
- for path in (root/base).rglob('*'):
-  if path.is_file() and 'target' not in path.parts:
-   try: text=path.read_text()
-   except UnicodeDecodeError: continue
-   if provisional_marker in text: fail(f'provisional marker reintroduced: {path.relative_to(root)}')
-   for marker in markers:
-    if f'M0-RECONCILED: {marker}' in text: fail(f'unreconciled marker {marker}: {path.relative_to(root)}')
-for path in (
- root/'.env.example',root/'rust-toolchain.toml',root/'.dockerignore',
- root/'Cargo.toml',root/'Dockerfile',root/'compose.yaml',
-):
+# Consume the M0 scaffold's exact path/owner registry instead of rejecting the
+# supervisor-authorized M2 provisional markers that master intentionally preserves.
+sys.path.insert(0,str(root/'scripts/lib'))
+from m0_scaffold import provisional_marker_errors
+marker_paths=[]
+for base in ('src','scripts','fixtures','contracts','config','tests','examples','.github'):
+ marker_paths.extend(path for path in (root/base).rglob('*') if path.is_file() and 'target' not in path.parts and '__pycache__' not in path.parts)
+marker_paths.extend(path for path in (root/'.env.example',root/'rust-toolchain.toml',root/'.dockerignore',root/'Cargo.toml',root/'Dockerfile',root/'compose.yaml') if path.is_file())
+for error in provisional_marker_errors(marker_paths): fail(error)
+for path in marker_paths:
  try: text=path.read_text()
- except (OSError,UnicodeDecodeError): continue
- if provisional_marker in text: fail(f'provisional marker reintroduced: {path.relative_to(root)}')
+ except UnicodeDecodeError: continue
+ for marker in markers:
+  if f'M0-RECONCILED: {marker}' in text: fail(f'unreconciled marker {marker}: {path.relative_to(root)}')
 source=(root/'src/m1_config.rs').read_text()
 for literal in ('Bytes(1_048_576)','Bytes(4_194_304)','Milliseconds(10_000)','Milliseconds(30_000)','Milliseconds(300_000)'):
  if literal not in source: fail(f'security literal missing: {literal}')

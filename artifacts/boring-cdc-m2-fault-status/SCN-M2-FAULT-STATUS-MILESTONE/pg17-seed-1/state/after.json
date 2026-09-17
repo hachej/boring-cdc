@@ -1,1 +1,9 @@
-{"snapshot":"after","durable_before_feedback":true}
+{
+  "redacted": true,
+  "slot_states": [
+    "missing",
+    "unreserved",
+    "lost"
+  ],
+  "status_projection": "stable"
+}
