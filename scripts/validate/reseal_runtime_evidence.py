@@ -120,8 +120,19 @@ def reseal() -> None:
     # real scenario, then package the live reconcile and fault/status scenarios.
     run(["scripts/e2e/m2_capture_runtime.sh"])
     run(["scripts/faults/m2_capture_runtime.sh"])
+    run(["scripts/e2e/m2_heartbeat.sh"])
+    run(["scripts/faults/m2_heartbeat.sh"])
+    run(["scripts/e2e/m2_jsonl.sh"])
+    run(["scripts/faults/m2_jsonl.sh"])
+    run(["scripts/e2e/m2_pressure.sh"])
+    run(["scripts/faults/m2_pressure.sh"])
+    run(["scripts/e2e/m2_spool.sh"])
+    run(["scripts/faults/m2_spool.sh"])
+    run(["python3", "scripts/validate/m2_leases.py"])
     reconcile()
     fault_status()
+    run(["scripts/acceptance/m2_complete.sh", "--write"])
+    run(["scripts/acceptance/m1_complete.sh", "--write"])
 
 
 if __name__ == "__main__":
