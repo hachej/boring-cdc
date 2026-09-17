@@ -38,6 +38,20 @@ class StorageContractTests(unittest.TestCase):
   self.assertIn('canonical full lowercase commit OID',error)
   parent,error=m.resolve_source_parent({'inputs':{},'validator_sha256':validator_sha,'source_parent_git_commit':'0'*40},inputs,validator_sha)
   self.assertIsNone(error); self.assertEqual(m.subprocess.check_output(['git','rev-parse','HEAD'],cwd=m.ROOT,text=True).strip(),parent)
+ def test_evidence_parent_hashes_recorded_commit_blobs(self):
+  evidence=m.load(m.E); candidate=evidence['source_parent_git_commit']
+  def commit_sha(path):
+   blob=m.subprocess.check_output(['git','show',f'{candidate}:{path}'],cwd=m.ROOT)
+   return m.hashlib.sha256(blob).hexdigest()
+  inputs={path:commit_sha(path) for path in evidence['inputs']}
+  validator_path=str(m.V.relative_to(m.ROOT)); validator_sha=commit_sha(validator_path)
+  prior={'inputs':inputs,'validator_sha256':validator_sha,'source_parent_git_commit':candidate}
+  parent,error=m.resolve_source_parent(prior,inputs,validator_sha)
+  self.assertIsNone(error); self.assertEqual(candidate,parent)
+  old=m.subprocess.check_output(['git','rev-parse',candidate+'^'],cwd=m.ROOT,text=True).strip()
+  prior['source_parent_git_commit']=old
+  _,error=m.resolve_source_parent(prior,inputs,validator_sha)
+  self.assertRegex(error,r'(missing recorded blob|blob hash differs)')
  def test_provisional_inventory_is_card_bound(self):
   c=m.load(m.C); marker=lambda decision:f'// M0-PROVISIONAL: {decision}'
   self.assertEqual(c['authority']['owner_cards'],['59a63169'])

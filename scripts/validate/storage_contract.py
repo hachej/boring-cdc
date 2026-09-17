@@ -113,6 +113,11 @@ def resolve_source_parent(prior,inputs,validator_sha256):
  except subprocess.CalledProcessError:return candidate,'stored source parent is not an existing commit'
  if resolved!=candidate:return candidate,'stored source parent does not resolve canonically'
  if subprocess.run(['git','merge-base','--is-ancestor',candidate,head],cwd=ROOT).returncode:return candidate,'stored source parent is not an ancestor of HEAD'
+ recorded={**inputs,str(V.relative_to(ROOT)):validator_sha256}
+ for path,expected in recorded.items():
+  try: blob=subprocess.check_output(['git','show',f'{candidate}:{path}'],cwd=ROOT,stderr=subprocess.DEVNULL)
+  except subprocess.CalledProcessError:return candidate,f'stored source parent is missing recorded blob {path}'
+  if hashlib.sha256(blob).hexdigest()!=expected:return candidate,f'stored source parent blob hash differs for {path}'
  return candidate,None
 def main():
  fs,inputs=validate(); prior=load(E) if E.exists() else {}; validator_sha256=hashlib.sha256(V.read_bytes()).hexdigest(); parent,error=resolve_source_parent(prior,inputs,validator_sha256)
