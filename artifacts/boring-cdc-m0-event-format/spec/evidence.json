@@ -4,14 +4,14 @@
   "inputs": {
     "contracts/event/event-format.json": "9eca4905a8760b6ae940bb32941a69daa60cc09c6bc7076439e8936ac17e448d",
     "contracts/event/event.schema.json": "1566381ff064a381dfed417d404acbb057c1a4a692a8ca9a1ced1c73aef588f7",
-    "docs/EVENT_FORMAT.md": "628480c5a7661ed0c413b88a381618917167466948d0cc8f098b8f99aa8a04ad",
+    "docs/EVENT_FORMAT.md": "53e7f1a0ef46287039371775ee34b8569a740da6173fd1c81b7aaff33d0ba5da",
     "fixtures/m0/event-format/golden-vectors.json": "bde306cec5b72c150d68ef59073a5b7f7310042d0b6a3d476f4535f91c2debff"
   },
   "owner_bead": "boring-cdc-m0-event-format",
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-event-format-evidence/v1",
-  "source_parent_git_commit": "2d4eb19fd4027c3f45708290f2ae9a2a4532a548",
+  "source_parent_git_commit": "2b037cb23540a5c81a55094113ff8a2bc11a07c1",
   "status": "pass",
   "validator": "scripts/validate/event_format.py",
   "validator_sha256": "6dc3235fca69e2267130420cdf0a6d2c1c275891e5eee1acc12b366ef2920c50"
