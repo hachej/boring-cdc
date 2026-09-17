@@ -1,1 +1,5 @@
-[{"fault_hook":"reconcile_before_source_receipt","outcome":"sigkill_then_recovered"},{"fault_hook":"slot_wal_removed","outcome":"reseed_required"}]
+{
+  "postgres": "17.6",
+  "product_boundaries_aborted": 16,
+  "reruns": 2
+}

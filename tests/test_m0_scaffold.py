@@ -258,7 +258,7 @@ class ScaffoldTests(unittest.TestCase):
         finally:
             marker.unlink(missing_ok=True)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("provisional marker reintroduced", result.stdout)
+        self.assertIn("provisional-marker-malformed", result.stdout)
 
     def test_m1_completion_rejects_marker_in_root_product_files(self):
         for relative in (".env.example", "rust-toolchain.toml", ".dockerignore"):
@@ -276,7 +276,53 @@ class ScaffoldTests(unittest.TestCase):
                 finally:
                     path.write_bytes(original)
                 self.assertNotEqual(result.returncode, 0)
-                self.assertIn(f"provisional marker reintroduced: {relative}", result.stdout)
+                self.assertIn(f"provisional-marker-malformed:{relative}", result.stdout)
+
+    def test_m1_completion_rejects_unauthorized_decision_marker(self):
+        """A well-formed marker naming a decision the registry does not grant for
+        that path must still fail. This is the half of the registry contract that
+        a bare-token test cannot reach."""
+        path = ROOT / "src" / "m2_spool.rs"
+        original = path.read_bytes()
+        marker = b"\n// M0-" + b"PROVISIONAL: boring-cdc-d-not-authorized-here\n"
+        path.write_bytes(original + marker)
+        try:
+            result = subprocess.run(
+                ["scripts/acceptance/m1_complete.sh", "--probe"],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+            )
+        finally:
+            path.write_bytes(original)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "provisional-marker-unauthorized:src/m2_spool.rs:boring-cdc-d-not-authorized-here",
+            result.stdout,
+        )
+
+    def test_m1_completion_accepts_registry_authorized_markers(self):
+        """The other half: markers the registry DOES grant must not be reported.
+        The working tree carries supervisor-authorized M2 markers, so a clean probe
+        must report no marker finding at all. Without this, the two rejection tests
+        above would still pass if the check rejected every marker unconditionally,
+        which is the behaviour this registry deliberately replaced."""
+        self.assertIn(
+            "M0-" + "PROVISIONAL",
+            (ROOT / "src" / "m2_spool.rs").read_text(),
+            "fixture precondition: an authorized marker must exist in the tree",
+        )
+        result = subprocess.run(
+            ["scripts/acceptance/m1_complete.sh", "--probe"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        findings = json.loads(result.stdout).get("findings", [])
+        self.assertEqual(
+            [], [f for f in findings if "provisional-marker" in str(f)], findings
+        )
 
 if __name__ == "__main__":
     unittest.main()

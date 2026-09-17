@@ -17,7 +17,7 @@
       "argv": "cargo clippy --locked --workspace --all-targets --all-features",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-2.stderr",
-      "stderr_sha256": "95c5ba263804fb8ac848353ff345726fe477cd1a72465aa4c4039149174efc59",
+      "stderr_sha256": "8950be1e8f4499f41b8e38ef15f09a0e2671be53a43aa5dec4d794320908881d",
       "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-2.stdout",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "version": "m2-complete/v2"
@@ -26,9 +26,9 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-3.stderr",
-      "stderr_sha256": "1dd98d93e1cd071fd569c44706c234109e391e56946cdb216705573e8eef6741",
+      "stderr_sha256": "eb131d55ec420dfc77973309a1ff455ca4ff3e93e1b1d78cbbca3001d3f95174",
       "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-3.stdout",
-      "stdout_sha256": "3c9c652f410c72c8b1554828aa3e75c348c16fc53b8ce11cb129e23f00dea614",
+      "stdout_sha256": "c365f7478bd9d37d7a9acc672b33c22442f3dbcfedd31a7f6dac19f963673659",
       "version": "m2-complete/v2"
     },
     {
@@ -37,7 +37,7 @@
       "stderr_path": "artifacts/boring-cdc-m2-complete/gate/command-4.stderr",
       "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "stdout_path": "artifacts/boring-cdc-m2-complete/gate/command-4.stdout",
-      "stdout_sha256": "6fb9ffaddc3a3e7bfe9d6562bae4060ac4e1018c0b44ea520da3cc4d8684086d",
+      "stdout_sha256": "31e631cf452b87937401789edbfb49f5e4f340da0c7d2acc3925fe34eea3ee45",
       "version": "m2-complete/v2"
     },
     {
@@ -61,7 +61,7 @@
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "milestone",
-  "git_commit": "7d36e0b53a0d6231f1a142da78141bf32c8bbd89",
+  "git_commit": "c21072149d8ff16ecfec44a1d79a2e5e1002d4f2",
   "owner_bead": "boring-cdc-m2-complete",
   "redaction": {
     "checked": true,

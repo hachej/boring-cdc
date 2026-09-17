@@ -73,14 +73,14 @@ SPEC_INPUTS = {
     },
 }
 
-PROVISIONAL = set()
+PROVISIONAL: set[str] = set()
 def provisional_marker(owner: str) -> str:
     # Split the sentinel so the repository scanner does not mistake validator
     # source for a consumer of an owner-controlled recommendation.
     return "// M0-" + "PROVISIONAL: " + owner
 
 
-OPEN_DECISIONS = {}
+OPEN_DECISIONS: dict[str, set[str]] = {}
 REQUIRED_M0_OWNERS = {
     "boring-cdc-d-additive", "boring-cdc-d-admission", "boring-cdc-d-anchor",
     "boring-cdc-d-archive-durability", "boring-cdc-d-archive-scope",
@@ -281,7 +281,7 @@ def probe() -> dict:
         "decision_manifest_owners": sorted(DECISION_OWNERS),
         "required_m0_owners": sorted(REQUIRED_M0_OWNERS),
         "provisional_decisions": sorted(PROVISIONAL),
-        "supervisor_override": "open recommendations require exact " + "M0-" + "PROVISIONAL markers; no approval inferred",
+        "supervisor_override": "answered owner card 59a63169 authorizes the four exact accepted decision literals; unrelated provisional markers remain governed separately",
         "article1_boundary": "raw pgoutput plus same-stream process-local non-durable teaching view; ClickHouse deferred to Article 4",
         "duplicate_bead_ids": 0 if not any(x.startswith("duplicate Bead IDs") for x in findings) else None,
         "checks": checks,
