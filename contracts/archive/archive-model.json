@@ -116,7 +116,7 @@
       "confirmed_projection_source": "contracts/storage/storage-model.json",
       "decision_id": "boring-cdc-d-archive-durability",
       "projection": "ext4/xfs local allowlist; descriptor-relative no-follow lifecycle; parent directory sync; owner-only modes",
-      "source_sha256": "c27dae8e706f2f454665c5dcc98b85ea85a1f7bca0179affc97b8951b2cc5ef3"
+      "source_sha256": "a9b387f549da61b42bd32ac31ea7a8a7d2e9f69bf99a000d5cb3e026065ba9e6"
     },
     "event_contract": {
       "path": "contracts/event/event-format.json",
@@ -125,10 +125,10 @@
     "failure_policy": {
       "base_delay_ms": 250,
       "cap_delay_ms": 30000,
-      "confirmed_projection_source": "contracts/scaffold/m0-scaffold.json",
+      "confirmed_projection_source": "contracts/m0/failure-policy.json",
       "decision_id": "boring-cdc-d-failure-policy",
       "maximum_attempts": 10,
-      "source_sha256": "a96ac9a4afcb2cbdfc708b731c0b7e96838b6dce77eb31ff6ca2d13e901d15fd",
+      "source_sha256": "d0e3e956bc79ddcde4fc77bb8804100a7d56cda6778059028d3b940f98fce831",
       "version": 1
     },
     "promotion": {

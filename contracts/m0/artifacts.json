@@ -4,14 +4,14 @@
       "id": "ART-M0-ARCHIVE-DURABILITY-FIXTURE",
       "owner_bead": "boring-cdc-d-archive-durability",
       "path": "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
-      "sha256": "27aa16f3d26131f94ea9b44671a5c514e6946ab9670b7cfc27b3fcfc0d88e6ba",
+      "sha256": "a9b387f549da61b42bd32ac31ea7a8a7d2e9f69bf99a000d5cb3e026065ba9e6",
       "status": "complete"
     },
     {
       "id": "ART-M0-ARCHIVE-DURABILITY-PROBE",
       "owner_bead": "boring-cdc-d-archive-durability",
       "path": "artifacts/m0/decisions/boring-cdc-d-archive-durability/fixture-run.jsonl",
-      "sha256": "c0130cb37f3fd7236cea40d7de620a83a0651455696d9e98ed27d57f77f36d09",
+      "sha256": "00a3494ec13ef7c47a993c16213d18a2bf87f1e18ce44eecd3579678904e37da",
       "status": "complete"
     },
     {
@@ -53,7 +53,7 @@
       "id": "ART-M0-ARCHIVE-MODEL",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.json",
-      "sha256": "f82424d3404ce2bec6bd3648d3ea0d23f94910dccdfa1a0256c2ab6519160c3e",
+      "sha256": "2b6ea7f51eb637e4b66082ebaf6f5109e7d405eaec7383e22a9d85e6e7e08a70",
       "status": "complete"
     },
     {
@@ -67,7 +67,7 @@
       "id": "ART-M0-ARCHIVE-SCHEMA",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.schema.json",
-      "sha256": "c67301fe20ed682a0725594a97d2505e5b435133a6b222aa50c797c68eb040e1",
+      "sha256": "732aa16c9195bec011dc144c8a77e2af45180f068c20e07e665e96798dbc441a",
       "status": "complete"
     },
     {
@@ -102,7 +102,7 @@
       "id": "ART-M0-ARCHIVE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "scripts/validate/archive_contract.py",
-      "sha256": "9f39dd817194434062be8f1b8f770946eb1b1c4168ab80dfcc2bf4d003469888",
+      "sha256": "7af08d8bcb11fb732503196f789c40e68aa0e7d9a0e9ba9cfa0b4b48d3d683df",
       "status": "complete"
     },
     {
@@ -123,7 +123,7 @@
       "id": "ART-M0-CLICKHOUSE-DOC",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "docs/CLICKHOUSE_MODEL.md",
-      "sha256": "be22bc2ae22f61275cb74f0e0c5f25fa3ec455533a01d85d653683e872758171",
+      "sha256": "a42b361438fd557dd35ff333b8c2f4efeabe84eb4f6582f55de02efbb1bedee5",
       "status": "complete"
     },
     {
@@ -151,7 +151,7 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "83bc5438ef2e0fb1a8a799985e7f17ddbb2200e1853633f082e61a832197d5d4",
+      "sha256": "093e8b55b0ea30b485de3c4e3f7428f287639626540c17f7b14186e5feb3166a",
       "status": "complete"
     },
     {
@@ -179,21 +179,28 @@
       "id": "ART-M0-CLICKHOUSE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "scripts/validate/clickhouse_contract.py",
-      "sha256": "2972dbcef6c3911ea74a45340058c5febec120a3d0b2d9ecc023d91a95035343",
+      "sha256": "9c2af4e24bb71ffeda0c4f1b6b6d33286b748e4799af0476483c959485ab4d84",
       "status": "complete"
     },
     {
       "id": "ART-M0-COMPOSE-CONTRACT",
       "owner_bead": "boring-cdc-d-compose",
       "path": "contracts/m0/compose.json",
-      "sha256": "2ee8964ab1d5c065f7df9020d5511e74a8df273845c23a302e2b95639829cfd4",
+      "sha256": "5130171ab036ca44daa030e58bf5ef5c98fb6f235ea5db95388565db63c8a3ca",
       "status": "complete"
     },
     {
       "id": "ART-M0-COMPOSE-FIXTURE",
       "owner_bead": "boring-cdc-d-compose",
       "path": "fixtures/m0/decisions/boring-cdc-d-compose.json",
-      "sha256": "6a006e66448934224f60083677f3b8a6ab0de09550b2a1757144d3fc033e3c0b",
+      "sha256": "325cfbd390c2093e82910ed62a73280a457a6d61b376da48bad74fd1b27d46df",
+      "status": "complete"
+    },
+    {
+      "id": "ART-M0-COMPOSE-MANIFEST-VALIDATOR",
+      "owner_bead": "boring-cdc-d-compose",
+      "path": "scripts/validate/compose_manifests.py",
+      "sha256": "5b35a00e1c6f6b14672986b85865b310a4fc523e0cb240a2b3f22cf17d689d62",
       "status": "complete"
     },
     {
@@ -207,21 +214,21 @@
       "id": "ART-M0-COMPOSE-RESULT-REJECT-UNKNOWN",
       "owner_bead": "boring-cdc-d-compose",
       "path": "fixtures/m0/compose-execution-result/reject-unknown-field.json",
-      "sha256": "2775f59fba1bbc78e00876b0f8d015acb320bb574fb85b5493b43e0369ca67e8",
+      "sha256": "dc04bb100f754164cdc7d8f717891df1331b9d2fcc4ae8bbb5e564d017f25931",
       "status": "complete"
     },
     {
       "id": "ART-M0-COMPOSE-RESULT-SCHEMA",
       "owner_bead": "boring-cdc-d-compose",
       "path": "contracts/m0/compose-execution-result.schema.json",
-      "sha256": "1bf2a5ce493239bbd173d3b23c36d1c7aa15703e044a5c45a64687f0f8ae1291",
+      "sha256": "f5102fc6d6d8250bebd590774e700eebff8ef2653b50dde4564cb12b75ba47fd",
       "status": "complete"
     },
     {
       "id": "ART-M0-COMPOSE-RESULT-VALID",
       "owner_bead": "boring-cdc-d-compose",
       "path": "fixtures/m0/compose-execution-result/valid.json",
-      "sha256": "0cf331256b61790ef98e366fd002096bbdd2110be3d6f9482f5fad28de7162f3",
+      "sha256": "f4c45902204b04fb36679b26d149de505c33c6085cda57cc9f8fe2ab627d3e76",
       "status": "complete"
     },
     {
@@ -494,7 +501,7 @@
       "id": "ART-M0-STORAGE-MODEL",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.json",
-      "sha256": "9b6f48a65557ac3a70fb5ab8eb2cadb4b1f3dd7457f7306bda31197325d24a7f",
+      "sha256": "c27dae8e706f2f454665c5dcc98b85ea85a1f7bca0179affc97b8951b2cc5ef3",
       "status": "complete"
     },
     {
@@ -508,7 +515,7 @@
       "id": "ART-M0-STORAGE-SCHEMA",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.schema.json",
-      "sha256": "d0e0b58da4852688b48acb62f73b1e7a28c541ae6d7413465d80bad5affcc48b",
+      "sha256": "42d695f8b12169c4724f7a65d9bfcbfd1029fa687004967d11b5168d11241cf7",
       "status": "complete"
     },
     {
@@ -522,7 +529,7 @@
       "id": "ART-M0-STORAGE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "scripts/validate/storage_contract.py",
-      "sha256": "5df1ddcf3ef02540ec5456169cee79b80a7132964ad4158a263f9a490768b57b",
+      "sha256": "18f8ab10d382a7508b52b8f7e27ea4a23356e26cc787e63981825cb7f51e5d9f",
       "status": "complete"
     },
     {

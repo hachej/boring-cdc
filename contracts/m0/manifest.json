@@ -52,7 +52,7 @@
       "id": "ART-M0-ARCHIVE-MODEL",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.json",
-      "sha256": "f82424d3404ce2bec6bd3648d3ea0d23f94910dccdfa1a0256c2ab6519160c3e",
+      "sha256": "2b6ea7f51eb637e4b66082ebaf6f5109e7d405eaec7383e22a9d85e6e7e08a70",
       "status": "complete"
     },
     {
@@ -107,7 +107,7 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "83bc5438ef2e0fb1a8a799985e7f17ddbb2200e1853633f082e61a832197d5d4",
+      "sha256": "093e8b55b0ea30b485de3c4e3f7428f287639626540c17f7b14186e5feb3166a",
       "status": "complete"
     },
     {
@@ -271,7 +271,7 @@
       "id": "ART-M0-STORAGE-MODEL",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.json",
-      "sha256": "9b6f48a65557ac3a70fb5ab8eb2cadb4b1f3dd7457f7306bda31197325d24a7f",
+      "sha256": "c27dae8e706f2f454665c5dcc98b85ea85a1f7bca0179affc97b8951b2cc5ef3",
       "status": "complete"
     }
   ],
