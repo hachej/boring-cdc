@@ -452,7 +452,7 @@
       "id": "ART-M0-STORAGE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "artifacts/boring-cdc-m0-storage-model/spec/evidence.json",
-      "sha256": "633618399f5d674923155882200bcf3d5371db3cb1cd92fff5f8a0d86422e886",
+      "sha256": "1dbb3428e07686052644b221176a206148bcee285604e0592ed44d380255fec4",
       "status": "complete"
     },
     {
@@ -473,7 +473,7 @@
       "id": "ART-M0-STORAGE-MODEL",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.json",
-      "sha256": "fabfcdc0606dd5c8e3973eee8707d486003f967b74270eacd3d6634354487d0d",
+      "sha256": "fc70dd8474688c9625260b8dc4f1939cb3ea7c05b4d7a1f98f7f26bc2790616f",
       "status": "complete"
     },
     {
@@ -501,7 +501,7 @@
       "id": "ART-M0-STORAGE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "scripts/validate/storage_contract.py",
-      "sha256": "891f23997caf77eb18f6bd304bb9c0f72924ecd79155d8ee2c38b4adec53e996",
+      "sha256": "4532cafebb6470ab38bd292d7118400c9be066c33dcc30ea18bf175cd1b545b4",
       "status": "complete"
     },
     {
@@ -550,21 +550,21 @@
       "id": "ART-M0-WAL-CAP-FIXTURE",
       "owner_bead": "boring-cdc-d-wal-cap",
       "path": "fixtures/m0/decisions/boring-cdc-d-wal-cap.json",
-      "sha256": "ede1aacfd1f4678f262874bc3a00ed2e8230b6e31be1f59389ef061fc18a57ea",
+      "sha256": "3ed9a28af5607eab15cadff25a8dec19ee4f241ec38dc0e34fdf5142657c80e0",
       "status": "complete"
     },
     {
       "id": "ART-M0-WAL-CAP-PROBE",
       "owner_bead": "boring-cdc-d-wal-cap",
       "path": "artifacts/m0/decisions/boring-cdc-d-wal-cap/fixture-run.jsonl",
-      "sha256": "04681c0e7933ba659f52e4c8c40f157ea4c014f85c356f64ecda0d3f4dfb5468",
+      "sha256": "9cafab983336ead8c10f9c03cb89003f2e92cb2792bdfaf1e147c087c419bafa",
       "status": "complete"
     },
     {
       "id": "ART-M0-WAL-CAP-VALIDATION",
       "owner_bead": "boring-cdc-d-wal-cap",
       "path": "artifacts/m0/decisions/boring-cdc-d-wal-cap/evidence.json",
-      "sha256": "85b29aa1937c77bfdb730c2424c880143968773e6d2a1e7b1a4cd47f7d3f5220",
+      "sha256": "f61e1a15dcd3428d8f8675e04ae3d00b34a596fa4acb67ac9fd881a4a9f0d7c1",
       "status": "complete"
     }
   ],
