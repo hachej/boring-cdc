@@ -17,7 +17,8 @@ export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"
 export PGPASSWORD
 PGPASSWORD=$(cat "$BORING_CDC_POSTGRES_PASSWORD_FILE")
 export PGHOST=127.0.0.1 PGPORT="$port" PGUSER=boring_cdc PGDATABASE=boring_cdc
-export BORING_CDC_M3_DSN="postgresql://boring_cdc:${PGPASSWORD}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
+export BORING_CDC_M3_DSN
+BORING_CDC_M3_DSN=$(printf 'postgresql://%s@127.0.0.1:%s/boring_cdc?sslmode=disable' "boring_cdc:${PGPASSWORD}" "$port")
 cat >"$work/override.yml" <<YAML
 services:
   postgres:
