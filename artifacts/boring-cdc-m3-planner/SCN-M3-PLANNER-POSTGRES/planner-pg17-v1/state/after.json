@@ -1,1 +1,1 @@
-{"atomic_chunk_event_commit":true,"bounded_reader_released":true,"complete_chunks":3,"generation_state":"fencing","keyset_only":true,"remaining_claims":0,"snapshot_events":5}
+{"atomic_chunk_event_commit":true,"bounded_reader_released":true,"complete_chunks":3,"exported_snapshot_importer_handoff":true,"generation_state":"fencing","keyset_only":true,"memory_refused_before_payload":true,"remaining_claims":0,"snapshot_events":5}
