@@ -16,6 +16,18 @@ use std::time::{Duration, Instant};
 
 pub const OWNER_BEAD: &str = "boring-cdc-m3-planner";
 const MAX_KEY_BYTES: usize = 4096;
+type ExecutionProofRow = (
+    Vec<u8>,
+    Vec<u8>,
+    Vec<u8>,
+    i64,
+    String,
+    String,
+    String,
+    String,
+    String,
+    String,
+);
 type BootstrapProofRow = (
     i64,
     String,
@@ -249,7 +261,18 @@ pub struct ReadBudget {
     pub max_rows_per_second: u64,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct SourceBinding {
+    importer_id: String,
+    assigned_ranges_digest: String,
+    schema_fingerprint: String,
+}
+
 pub trait BoundedRangeSource {
+    fn binding(&self) -> Option<&SourceBinding> {
+        None
+    }
+
     /// Reads one complete preplanned range with the supplied hard bounds. Implementations must stop
     /// before exceeding any bound and return `Limit` rather than an incomplete successful range.
     fn read_range(
@@ -452,9 +475,9 @@ impl PlannerStore {
         source: &mut S,
         now_mono_ms: u64,
     ) -> Result<u64, PlannerError> {
-        let persisted:(Vec<u8>,Vec<u8>,Vec<u8>,i64,String,String,String)=self.writer.connection().query_row(
-            "SELECT p.key_schema,c.range_start,c.range_end,r.snapshot_promotable,r.guard_liveness,r.state,i.state FROM m3_planner_runs p JOIN backfill_chunks c USING(generation_id) JOIN m3_bootstrap_runtime r ON r.intent_id=p.bootstrap_intent_id JOIN m3_bootstrap_importers i ON i.intent_id=p.bootstrap_intent_id AND i.importer_id=p.importer_id WHERE p.generation_id=?1 AND c.chunk_id=?2",
-            params![claim.generation_id,claim.chunk_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?)))?;
+        let persisted: ExecutionProofRow = self.writer.connection().query_row(
+            "SELECT p.key_schema,c.range_start,c.range_end,r.snapshot_promotable,r.guard_liveness,r.state,i.state,p.importer_id,i.assigned_ranges_digest,p.snapshot_schema_fingerprint FROM m3_planner_runs p JOIN backfill_chunks c USING(generation_id) JOIN m3_bootstrap_runtime r ON r.intent_id=p.bootstrap_intent_id JOIN m3_bootstrap_importers i ON i.intent_id=p.bootstrap_intent_id AND i.importer_id=p.importer_id WHERE p.generation_id=?1 AND c.chunk_id=?2",
+            params![claim.generation_id,claim.chunk_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?)))?;
         if persisted.3 != 1
             || persisted.4 != "held"
             || !matches!(
@@ -464,6 +487,13 @@ impl PlannerStore {
             || persisted.6 != "acknowledged"
         {
             return Err(PlannerError::StaleGeneration);
+        }
+        if let Some(binding) = source.binding()
+            && (binding.importer_id != persisted.7
+                || binding.assigned_ranges_digest != persisted.8
+                || binding.schema_fingerprint != persisted.9)
+        {
+            return Err(PlannerError::Conflict("M3_SOURCE_BINDING_MISMATCH"));
         }
         let schema = persisted
             .0
@@ -818,6 +848,7 @@ pub fn keyset_select_sql(
 /// `SET TRANSACTION SNAPSHOT` through the bootstrap-owned lifecycle.
 pub struct PostgresRangeSource {
     connection: PgReplicationConnection,
+    binding: SourceBinding,
     table: String,
     key_columns: Vec<String>,
     last_copy_peaks: Option<CopyPeaks>,
@@ -890,6 +921,20 @@ struct ResultFootprint {
     metadata_result_bytes: usize,
     key_text_bytes: usize,
     key_column_name_bytes: usize,
+    max_metadata_row_value_bytes: usize,
+    max_data_row_value_bytes: usize,
+}
+
+fn wire_data_row_allocation(columns: usize, value_bytes: usize) -> Result<usize, PlannerError> {
+    let mut total = 1 + 4 + 2;
+    checked_add_peak(
+        &mut total,
+        columns
+            .checked_mul(4)
+            .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?,
+    )?;
+    checked_add_peak(&mut total, value_bytes)?;
+    Ok(total)
 }
 
 fn postgres_copy_peaks(
@@ -904,6 +949,8 @@ fn postgres_copy_peaks(
         metadata_result_bytes,
         key_text_bytes,
         key_column_name_bytes,
+        max_metadata_row_value_bytes,
+        max_data_row_value_bytes,
     } = footprint;
     let key_buffers = expected.iter().try_fold(0usize, |mut total, key| {
         checked_add_peak(&mut total, key.0.capacity())?;
@@ -933,6 +980,10 @@ fn postgres_copy_peaks(
         metadata_columns,
         metadata_result_bytes,
         metadata_column_names,
+    )?;
+    checked_add_peak(
+        &mut metadata,
+        wire_data_row_allocation(metadata_columns, max_metadata_row_value_bytes)?,
     )?;
     for value in [
         std::mem::size_of::<Vec<CanonicalKey>>(),
@@ -964,6 +1015,10 @@ fn postgres_copy_peaks(
         metadata_columns,
         data_result_bytes,
         data_column_names,
+    )?;
+    checked_add_peak(
+        &mut payload,
+        wire_data_row_allocation(metadata_columns, max_data_row_value_bytes)?,
     )?;
     // The native result already owns the payload hex and key text; add only application buffers.
     for value in [
@@ -1009,6 +1064,11 @@ impl PostgresRangeSource {
             .map_err(|_| PlannerError::Conflict("M3_IMPORTER_CAPABILITY_MISMATCH"))?;
         Ok(Self {
             connection,
+            binding: SourceBinding {
+                importer_id: importer_id.to_owned(),
+                assigned_ranges_digest: assigned_ranges_digest.to_owned(),
+                schema_fingerprint: schema_fingerprint.to_owned(),
+            },
             table: table.to_owned(),
             key_columns: key_columns.iter().map(|v| (*v).to_owned()).collect(),
             last_copy_peaks: None,
@@ -1020,6 +1080,10 @@ impl PostgresRangeSource {
     }
 }
 impl BoundedRangeSource for PostgresRangeSource {
+    fn binding(&self) -> Option<&SourceBinding> {
+        Some(&self.binding)
+    }
+
     fn read_range(
         &mut self,
         range: &KeyRange,
@@ -1093,6 +1157,8 @@ impl BoundedRangeSource for PostgresRangeSource {
         let mut payload_lengths = Vec::with_capacity(row_count);
         let mut metadata_result_bytes = 0usize;
         let mut key_text_bytes = 0usize;
+        let mut max_metadata_row_value_bytes = 0usize;
+        let mut max_data_row_value_bytes = 0usize;
         for row in 0..meta.ntuples() {
             let mut parts = Vec::with_capacity(schema.len());
             let mut row_key_text_bytes = 0usize;
@@ -1143,12 +1209,22 @@ impl BoundedRangeSource for PostgresRangeSource {
             key_text_bytes = key_text_bytes
                 .checked_add(row_key_text_bytes)
                 .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+            let metadata_row_value_bytes = row_key_text_bytes
+                .checked_add(bytes_text.len())
+                .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+            max_metadata_row_value_bytes =
+                max_metadata_row_value_bytes.max(metadata_row_value_bytes);
             let bytes = bytes_text
                 .parse::<usize>()
                 .map_err(|_| PlannerError::Conflict("M3_SOURCE_ROW"))?;
             payload_bytes = payload_bytes
                 .checked_add(bytes)
                 .ok_or(PlannerError::Limit("M3_CHUNK_BYTES"))?;
+            let data_row_value_bytes = bytes
+                .checked_mul(2)
+                .and_then(|value| value.checked_add(row_key_text_bytes))
+                .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+            max_data_row_value_bytes = max_data_row_value_bytes.max(data_row_value_bytes);
             payload_lengths.push(bytes);
             expected.push(key);
         }
@@ -1174,6 +1250,8 @@ impl BoundedRangeSource for PostgresRangeSource {
                 metadata_result_bytes,
                 key_text_bytes,
                 key_column_name_bytes: self.key_columns.iter().map(String::len).sum(),
+                max_metadata_row_value_bytes,
+                max_data_row_value_bytes,
             },
         )?;
         self.last_copy_peaks = Some(peaks);
@@ -1322,6 +1400,23 @@ mod tests {
         rows: Vec<SnapshotRow>,
         delay: Duration,
     }
+    struct BoundFixtureSource {
+        binding: SourceBinding,
+    }
+    impl BoundedRangeSource for BoundFixtureSource {
+        fn binding(&self) -> Option<&SourceBinding> {
+            Some(&self.binding)
+        }
+
+        fn read_range(
+            &mut self,
+            _: &KeyRange,
+            _: &[KeyPartType],
+            _: ReadBudget,
+        ) -> Result<Vec<SnapshotRow>, PlannerError> {
+            panic!("mismatched binding must fail before source read")
+        }
+    }
     impl BoundedRangeSource for FixtureSource {
         fn read_range(
             &mut self,
@@ -1407,6 +1502,8 @@ mod tests {
                 metadata_result_bytes,
                 key_text_bytes,
                 key_column_name_bytes,
+                max_metadata_row_value_bytes: 10,
+                max_data_row_value_bytes: 120,
             },
         )
         .unwrap();
@@ -1428,6 +1525,7 @@ mod tests {
                 key_column_name_bytes + "payload_bytes".len(),
             )
             .unwrap()
+                + wire_data_row_allocation(2, 10).unwrap()
                 + std::mem::size_of::<Vec<CanonicalKey>>()
                 + expected.capacity() * std::mem::size_of::<CanonicalKey>()
                 + key_buffers
@@ -1449,6 +1547,7 @@ mod tests {
                 key_column_name_bytes + "payload_hex".len(),
             )
             .unwrap()
+                + wire_data_row_allocation(2, 120).unwrap()
                 + std::mem::size_of::<Vec<CanonicalKey>>()
                 + expected.capacity() * std::mem::size_of::<CanonicalKey>()
                 + key_buffers
@@ -1469,6 +1568,8 @@ mod tests {
                     metadata_result_bytes: 0,
                     key_text_bytes: 0,
                     key_column_name_bytes: 0,
+                    max_metadata_row_value_bytes: 0,
+                    max_data_row_value_bytes: 0,
                 }
             )
             .is_err()
@@ -1497,6 +1598,27 @@ mod tests {
         assert!(!q.to_lowercase().contains("ctid"));
         assert!(keyset_select_sql("items;drop", &["id"], false, false).is_err());
     }
+    #[test]
+    fn execution_rejects_source_capability_for_another_assignment() {
+        let (_p, mut store) = store();
+        plan(&mut store, vec![]);
+        let claim = store
+            .claim_next("gen", "worker", 101, Duration::from_secs(2))
+            .unwrap()
+            .unwrap();
+        let mut source = BoundFixtureSource {
+            binding: SourceBinding {
+                importer_id: "other-worker".into(),
+                assigned_ranges_digest: "other-digest".into(),
+                schema_fingerprint: "schema-fp".into(),
+            },
+        };
+        assert!(matches!(
+            store.execute_claim(&claim, &mut source, 102),
+            Err(PlannerError::Conflict("M3_SOURCE_BINDING_MISMATCH"))
+        ));
+    }
+
     #[test]
     fn persisted_chunks_resume_and_event_commit_is_atomic() {
         let (p, mut s) = store();

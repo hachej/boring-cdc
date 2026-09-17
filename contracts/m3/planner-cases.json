@@ -13,6 +13,7 @@
     {"scenario_id":"SCN-M3-PLANNER-LIMITS","unit_test":"row_byte_time_rate_source_and_range_bounds_are_enforced","expected":"row, byte, time, source-impact, rate, and range limits fail closed"},
     {"scenario_id":"SCN-M3-PLANNER-STALE","unit_test":"limits_concurrency_and_stale_generation_are_enforced","expected":"bounded concurrency and generation fencing reject stale completion"},
     {"scenario_id":"SCN-M3-PLANNER-EXECUTION-FENCE","unit_test":"execution_reloads_range_bootstrap_and_expiry","expected":"execution reloads persisted range and bootstrap eligibility and rejects expiry during source read"},
+    {"scenario_id":"SCN-M3-PLANNER-SOURCE-BINDING","unit_test":"execution_rejects_source_capability_for_another_assignment","expected":"execution rejects a source capability whose importer, assigned-range digest, or schema fingerprint differs from the persisted run"},
     {"scenario_id":"SCN-M3-PLANNER-ETA","unit_test":"progress_eta_is_redacted_and_deterministic","expected":"persisted progress and ETA expose no canonical key material"},
     {"scenario_id":"SCN-M3-PLANNER-READER-AGE","unit_test":"persisted_chunks_resume_and_event_commit_is_atomic","expected":"bounded M2 reader is dropped before caller awaits external work"},
     {"scenario_id":"SCN-M3-PLANNER-ATOMIC-COMMIT","unit_test":"persisted_chunks_resume_and_event_commit_is_atomic","expected":"snapshot events and completion marker share one SQLite transaction"}
