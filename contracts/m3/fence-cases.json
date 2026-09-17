@@ -1,0 +1,15 @@
+{
+  "schema_version": "boring-cdc/m3-fence-cases/v1",
+  "owner_bead": "boring-cdc-m3-fence",
+  "cases": [
+    {"scenario_id":"SCN-M3-FENCE-PREREQUISITES","unit_test":"delayed_copy_cannot_dispatch_or_complete_anchor","expected":"all durable chunks, all importer acknowledgements, and the open persisted gate precede nonce intent"},
+    {"scenario_id":"SCN-M3-FENCE-INTENT-CARDINALITY","unit_test":"fixed_row_dispatch_requires_exactly_one_row","expected":"unique nonce is durable before exactly-one-row fixed control UPDATE"},
+    {"scenario_id":"SCN-M3-FENCE-DURABLE-PAIR","unit_test":"exact_durable_pair_completes_anchor_and_duplicate_is_audit_only","expected":"only the journaled pgoutput transaction end LSN and complete sequence complete the anchor"},
+    {"scenario_id":"SCN-M3-FENCE-MISMATCH","unit_test":"sampled_or_mismatched_observation_cannot_complete_anchor","expected":"sampled, missing, or identity-mismatched evidence cannot complete an anchor"},
+    {"scenario_id":"SCN-M3-FENCE-DUPLICATE","unit_test":"repeated_matching_transaction_is_audit_only_and_first_pair_is_immutable","expected":"first matching durable proof is immutable; repeats are audit-only"},
+    {"scenario_id":"SCN-M3-FENCE-RESTART","unit_test":"restart_reconciles_persisted_intent_without_inventing_a_proof","expected":"a dispatched intent survives restart but remains unusable without its durable journal pair"},
+    {"scenario_id":"SCN-M3-FENCE-FEEDBACK-GATE","unit_test":"feedback_gate_holds_opens_and_stale_generation_fails_closed","expected":"all-ack open, idempotent retry, stale refusal, invalidation and release are one persisted provider"},
+    {"scenario_id":"SCN-M3-FENCE-PGOUTPUT","unit_test":"live_pgoutput_observation_uses_commit_message_end_lsn","expected":"PostgreSQL 17.6 pgoutput carries the fixed-row nonce and its Commit end LSN becomes the anchor pair"}
+  ],
+  "canonical_plan_assignment": "SCN-SNAPSHOT-COMPLETION-BEFORE-CAPTURE-FENCE"
+}

@@ -4720,7 +4720,7 @@
       "evidence_status": "pending",
       "id": "SCN-SNAPSHOT-COMPLETION-BEFORE-CAPTURE-FENCE",
       "namespace": "SCN",
-      "owner_bead": "boring-cdc-m3-bootstrap",
+      "owner_bead": "boring-cdc-m3-fence",
       "source": "docs/PLAN.md",
       "source_anchor": "| Transactions before/during/after snapshot creation | Snapshot plus WAL total version converges at the transactional fence watermark |\n| Snapshot completion before capture fence | Anchor remains unusable until the published fence nonce, target LSN, and complete journal sequence are durably paired |\n| Backfill with concurrent writes | Final keyed checksum matches at the mutation watermark |",
       "source_digest": "349c095117b26864c02fcc3423066e2dee228fd9a91abdc4e53536b0f675cd7d",
@@ -5029,7 +5029,7 @@
       "summary": "publication_drift_requires_reseed"
     }
   ],
-  "inventory_digest": "45f66c59261e3489c38d211400cab66218e14060e524ae746bdb31b94793bc2c",
+  "inventory_digest": "dc14eb2618aa42d48b5377a039dce15530fee5609fc341349dfce0a4ecd3954b",
   "schema_version": "stable-registry/v1",
   "source_files": {
     "docs/PLAN.md": "0e4ebaa072453ea24f0dfc3f22a025b919970fe556eb0d90f026235e8029af4d",

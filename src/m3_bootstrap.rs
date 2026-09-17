@@ -5,9 +5,8 @@
 //! orchestration is exposed behind small capabilities so the permanent-slot creation response can
 //! be committed before CopyBoth starts on a different connection.
 
-use crate::m2_capture_runtime::{FeedbackGate, FeedbackPermit};
 use crate::m2_schema::WriterConnection;
-use rusqlite::{OptionalExtension, params};
+use rusqlite::params;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fmt;
@@ -130,6 +129,8 @@ pub struct BootstrapStore {
 impl BootstrapStore {
     pub fn open(writer: WriterConnection) -> Result<Self, BootstrapError> {
         writer.connection().execute_batch(INSTALL_SQL)?;
+        crate::m3_fence::install(writer.connection())
+            .map_err(|_| BootstrapError::Conflict("M3_FEEDBACK_GATE_INSTALL_FAILED"))?;
         Ok(Self { writer })
     }
 
@@ -144,6 +145,8 @@ impl BootstrapStore {
             "INSERT INTO m3_bootstrap_runtime(intent_id,generation,table_set_fingerprint,configuration_fingerprint,exporter_liveness,guard_liveness,snapshot_promotable,feedback_gate_open,state,guard_backend_pid) VALUES(?1,?2,?3,?4,'not_started','not_started',0,0,'prepared',NULL)",
             params![input.intent_id,input.generation,input.table_set_fingerprint,input.configuration_fingerprint],
         )?;
+        crate::m3_fence::register_feedback_gate(&tx, &input.intent_id, input.generation)
+            .map_err(|_| BootstrapError::Conflict("M3_FEEDBACK_GATE_PREPARE_FAILED"))?;
         for importer in &input.importers {
             tx.execute("INSERT INTO m3_bootstrap_importers(intent_id,importer_id,assigned_ranges_digest,state) VALUES(?1,?2,?3,'assigned')", params![input.intent_id,importer.importer_id,importer.assigned_ranges_digest])?;
         }
@@ -269,23 +272,18 @@ impl BootstrapStore {
         intent_id: &str,
         importer_id: &str,
     ) -> Result<(), BootstrapError> {
-        let tx = self.writer.connection_mut().transaction()?;
-        let changed = tx.execute(
-            "UPDATE m3_bootstrap_importers SET state='acknowledged',revision=revision+1 WHERE intent_id=?1 AND importer_id=?2 AND state='contract_bound'",
-            params![intent_id, importer_id],
+        let generation: i64 = self.writer.connection().query_row(
+            "SELECT generation FROM m3_bootstrap_runtime WHERE intent_id=?1",
+            [intent_id],
+            |r| r.get(0),
         )?;
-        if changed != 1 {
-            return Err(BootstrapError::Conflict("M3_IMPORTER_COMPLETION_STALE"));
-        }
-        let pending: i64 = tx.query_row("SELECT count(*) FROM m3_bootstrap_importers WHERE intent_id=?1 AND state!='acknowledged'",[intent_id],|r|r.get(0))?;
-        if pending == 0 {
-            let changed=tx.execute("UPDATE m3_bootstrap_runtime SET state='exporter_release_permitted',feedback_gate_open=1,revision=revision+1 WHERE intent_id=?1 AND state='imports_pending' AND exporter_liveness='command_idle' AND guard_liveness='held'",[intent_id])?;
-            if changed != 1 {
-                return Err(BootstrapError::Conflict("M3_IMPORT_ACK_GATE_STALE"));
-            }
-        }
-        tx.commit()?;
-        Ok(())
+        crate::m3_fence::acknowledge_and_open(
+            self.writer.connection_mut(),
+            intent_id,
+            importer_id,
+            generation as u64,
+        )
+        .map_err(|_| BootstrapError::Conflict("M3_IMPORT_ACK_GATE_STALE"))
     }
     pub fn release_exporter(&mut self, intent_id: &str) -> Result<(), BootstrapError> {
         let changed=self.writer.connection().execute("UPDATE m3_bootstrap_runtime SET state='exporter_released',exporter_liveness='released',revision=revision+1 WHERE intent_id=?1 AND state='exporter_release_permitted' AND NOT EXISTS(SELECT 1 FROM m3_bootstrap_importers WHERE intent_id=?1 AND state!='acknowledged')",[intent_id])?;
@@ -304,29 +302,18 @@ impl BootstrapStore {
         intent_id: &str,
         lost_session: &str,
     ) -> Result<(), BootstrapError> {
-        if !matches!(lost_session, "exporter" | "importer" | "guard") {
-            return Err(BootstrapError::Invalid("M3_LOST_SESSION_INVALID"));
-        }
-        let tx = self.writer.connection_mut().transaction()?;
-        let liveness = if lost_session == "exporter" {
-            "exporter_liveness='lost',"
-        } else {
-            ""
-        };
-        let guard = if lost_session == "guard" {
-            "guard_liveness='lost',"
-        } else {
-            ""
-        };
-        let sql = format!(
-            "UPDATE m3_bootstrap_runtime SET {liveness}{guard} state='snapshot_unusable',snapshot_promotable=0,feedback_gate_open=1,revision=revision+1 WHERE intent_id=?1 AND state IN ('snapshot_exported','imports_pending','exporter_release_permitted','exporter_released')"
-        );
-        if tx.execute(&sql, [intent_id])? != 1 {
-            return Err(BootstrapError::Conflict("M3_INVALIDATION_STALE"));
-        }
-        tx.execute("UPDATE m3_bootstrap_importers SET state='invalidated',revision=revision+1 WHERE intent_id=?1 AND state NOT IN ('reads_complete','invalidated')",[intent_id])?;
-        tx.commit()?;
-        Ok(())
+        let generation: i64 = self.writer.connection().query_row(
+            "SELECT generation FROM m3_bootstrap_runtime WHERE intent_id=?1",
+            [intent_id],
+            |r| r.get(0),
+        )?;
+        crate::m3_fence::invalidate_and_release(
+            self.writer.connection_mut(),
+            intent_id,
+            generation as u64,
+            lost_session,
+        )
+        .map_err(|_| BootstrapError::Conflict("M3_INVALIDATION_STALE"))
     }
 
     pub fn reconcile(
@@ -379,44 +366,6 @@ impl BootstrapStore {
             return Err(BootstrapError::Conflict("M3_IMPORTER_COMPLETION_STALE"));
         }
         Ok(())
-    }
-}
-
-pub struct StoreFeedbackGate<'a> {
-    store: &'a BootstrapStore,
-    intent_id: &'a str,
-}
-impl<'a> StoreFeedbackGate<'a> {
-    pub fn new(store: &'a BootstrapStore, intent_id: &'a str) -> Self {
-        Self { store, intent_id }
-    }
-}
-impl FeedbackGate for StoreFeedbackGate<'_> {
-    fn permit(&mut self, durable_end_lsn: Option<u64>) -> FeedbackPermit {
-        let row = self
-            .store
-            .writer
-            .connection()
-            .query_row(
-                "SELECT feedback_gate_open,state FROM m3_bootstrap_runtime WHERE intent_id=?1",
-                [self.intent_id],
-                |r| Ok((r.get::<_, i64>(0)? == 1, r.get::<_, String>(1)?)),
-            )
-            .optional();
-        match row {
-            Ok(Some((true, _))) => FeedbackPermit::AllowSafeBoundary {
-                lsn: durable_end_lsn.unwrap_or(0),
-            },
-            Ok(Some((false, state)))
-                if matches!(
-                    state.as_str(),
-                    "imports_pending" | "exporter_release_permitted" | "exporter_released"
-                ) =>
-            {
-                FeedbackPermit::Hold
-            }
-            _ => FeedbackPermit::Stale,
-        }
     }
 }
 
@@ -944,7 +893,9 @@ mod live_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::m2_capture_runtime::{FeedbackGate, FeedbackPermit};
     use crate::m2_schema::open_writer;
+    use crate::m3_fence::PersistedFeedbackGate;
     use tempfile_path::TempPath;
     mod tempfile_path {
         use std::path::{Path, PathBuf};
@@ -1074,7 +1025,7 @@ mod tests {
         let st = s.status("intent").unwrap();
         assert_eq!(st.state, "snapshot_unusable");
         assert!(!st.snapshot_promotable && st.feedback_gate_open);
-        let mut gate = StoreFeedbackGate::new(&s, "intent");
+        let mut gate = PersistedFeedbackGate::new(s.writer.connection(), "intent", 1);
         assert_eq!(
             gate.permit(Some(32)),
             FeedbackPermit::AllowSafeBoundary { lsn: 32 }
@@ -1084,7 +1035,7 @@ mod tests {
     fn pending_imports_hold_feedback() {
         let (_p, mut s) = store();
         exported(&mut s);
-        let mut gate = StoreFeedbackGate::new(&s, "intent");
+        let mut gate = PersistedFeedbackGate::new(s.writer.connection(), "intent", 1);
         assert_eq!(gate.permit(Some(32)), FeedbackPermit::Hold);
     }
     #[test]
