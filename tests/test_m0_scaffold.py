@@ -155,6 +155,14 @@ class ScaffoldTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(relative, result.stderr)
 
+    def test_clean_pull_verifies_raw_manifests_before_build(self):
+        source = (ROOT / "scripts/lib/m0_scaffold.py").read_text()
+        verify = source.index('["python3","scripts/validate/compose_manifests.py"]')
+        build = source.index('["docker","buildx","create"')
+        start = source.index('["docker","compose","-f","compose.yaml","up"')
+        self.assertLess(verify, build)
+        self.assertLess(verify, start)
+
     def test_package_excludes_internal_metadata_and_evidence(self):
         out = json.loads(run("scripts/validate/scaffold_package.sh").stdout)
         self.assertEqual(out["status"], "pass")

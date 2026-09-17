@@ -262,6 +262,9 @@ def execute(out:Path)->None:
     proof=proof_root/f"attempt-{attempt+1}";proof.mkdir();common=[];scenarios={}
     try:
      for argv in (["cargo","test","--locked","--workspace","--all-targets"],["cargo","test","--locked","m0_scaffold::tests"],["docker","compose","-f","compose.yaml","config"]):common.append(run_record(list(argv),proof,env))
+     # Fail before build/service creation unless both approved raw OCI index bytes and
+     # their unique linux/amd64 child manifests match the owner-card digests.
+     common.append(run_record(["python3","scripts/validate/compose_manifests.py"],proof,env,78))
      common.append(run_record(["docker","buildx","create","--name",builder,"--driver","docker-container","--driver-opt",f"image=moby/buildkit@{PINS['buildkit']}","--driver-opt","network=host","--bootstrap"],proof,env))
      common.append(run_record(["docker","buildx","build","--builder",builder,"--platform","linux/amd64","--build-arg","SOURCE_DATE_EPOCH=0","--output",f"type=docker,name={image},rewrite-timestamp=true","."],proof,env))
      buildkit_container=subprocess.check_output(["docker","ps","--filter",f"name=buildx_buildkit_{builder}","--format","{{.Names}}"],env=env,text=True).strip()

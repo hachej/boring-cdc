@@ -46,7 +46,7 @@
         "boring-cdc-m6-failure-matrix",
         "boring-cdc-m7-artifacts"
       ],
-      "fixture_sha256": "325cfbd390c2093e82910ed62a73280a457a6d61b376da48bad74fd1b27d46df",
+      "fixture_sha256": "997f59d3657a0b54a41358181173ad92c4bd0ea959a22e35b163482131af6c30",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-compose.json",
       "id": "DEC-COMPOSE-IMAGES-RUNTIME-RECOVERY",
       "owner_bead": "boring-cdc-d-compose",
