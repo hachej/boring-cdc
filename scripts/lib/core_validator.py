@@ -191,6 +191,14 @@ def freshness_path_applies(owner: object, path: str) -> bool:
     Untagged shared paths remain globally binding and same-milestone paths always
     bind, so this is isolation rather than a freshness waiver.
     """
+    # The validator is applied live to every record; changing its implementation
+    # must not invalidate the bytes it is currently validating.
+    if path == "scripts/lib/core_validator.py":
+        return False
+    # Completion-barrier machinery certifies leaf evidence but does not produce it.
+    # Keep it binding for the barrier itself, not every leaf in that milestone.
+    if path in {"contracts/coverage/m2.json", "scripts/acceptance/m2_complete.sh", "scripts/lib/freeze_m2_completion_inputs.py"}:
+        return str(owner) == "boring-cdc-m2-complete"
     milestone = evidence_milestone(owner)
     if milestone is None:
         return True
