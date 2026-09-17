@@ -23,3 +23,5 @@ results/raw/
 # Local Compose credentials and generated component evidence
 .secrets/
 artifacts/boring-cdc-m0-scaffold/
+# br doctor per-run artifacts
+.doctor/
