@@ -7,6 +7,9 @@ pat=re.compile(r'(?i)(postgres(?:ql)?://[^\s:@]+:[^\s@]+@|-----BEGIN [A-Z ]*PRIV
 synthetic_line_sha256 = {
  ('tests/test_context.py','5883f5c0337185c232e27e463d28012fab24d4ffd6d361b0117d8ac86b31ce69'),
  ('tests/validate_knowledge.py','3017c62f5055319a24264fab01d9ac94de78c8354d3c4c079db09e334c936353'),
+ ('scripts/validate/failure_policy.py','cdf586d916094a050143f668573a622d0ef7b37b114dc7e4d72377c7546f7541'),
+ ('src/failure_policy.rs','265977cf786da300c32cbd0fb0db99c25b2390f0dd24a2a75137ac37ab917df8'),
+ ('src/m2_ownership.rs','7a7210fa8294ef38edf962dca6fc617ae3a3c17e1cc939becdb65348c4482940'),
 }
 hits=[]
 for name in paths:
