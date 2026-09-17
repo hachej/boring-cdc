@@ -207,7 +207,7 @@
               },
               "value": {
                 "maxLength": 1366,
-                "minLength": 2,
+                "minLength": 0,
                 "pattern": "^(?:[A-Za-z0-9_-]{4})*(?:[A-Za-z0-9_-][AQgw]|[A-Za-z0-9_-]{2}[AEIMQUYcgkosw048])?$",
                 "type": "string"
               }
@@ -304,7 +304,7 @@
               },
               "value": {
                 "maxLength": 1024,
-                "minLength": 1,
+                "minLength": 0,
                 "type": "string"
               }
             },

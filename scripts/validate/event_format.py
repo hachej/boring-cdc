@@ -139,8 +139,18 @@ def key_component_bytes(component: dict) -> bytes:
         expected_widths = {2950: 16, 1082: 4, 1114: 8, 1184: 8}
         if oid in expected_widths and len(decoded) != expected_widths[oid]:
             raise ValueError(f"OID {oid} key payload must contain exactly {expected_widths[oid]} bytes")
-        if oid == 1700 and (len(decoded) < 5 or decoded[:1] not in (b"+", b"-") or not decoded[3:4] or decoded[3] != len(decoded[4:])):
-            raise ValueError("numeric key payload is not canonical sign/exponent/digits")
+        if oid == 1700:
+            if len(decoded) < 5 or decoded[:1] not in (b"+", b"-") or decoded[3] != len(decoded[4:]):
+                raise ValueError("numeric key payload is not canonical sign/exponent/digits")
+            exponent = int.from_bytes(decoded[1:3], "big", signed=True)
+            digits = decoded[4:]
+            if not 1 <= len(digits) <= 100 or not all(48 <= byte <= 57 for byte in digits):
+                raise ValueError("numeric key digits are invalid")
+            if digits == b"0":
+                if decoded[:1] != b"+" or exponent != 0:
+                    raise ValueError("numeric zero must be canonical +/0/0")
+            elif digits[:1] == b"0" or digits[-1:] == b"0" or not -18 <= exponent <= 18:
+                raise ValueError("numeric key precision/scale or zero trimming is invalid")
         return decoded
     if kind == "text":
         return value.encode()

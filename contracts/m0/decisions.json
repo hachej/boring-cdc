@@ -136,7 +136,7 @@
         "boring-cdc-m1-ordering",
         "boring-cdc-m3-planner"
       ],
-      "fixture_sha256": "270201578a48f216e9b480aac6c3c819e5442906bae13e65cdbc35a835525d96",
+      "fixture_sha256": "0bd930b25db7ef87c9902ed596cd2d45f6d42b73dfcf098c2e1e0b25a0468df3",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-keys.json",
       "id": "DEC-SUPPORTED-KEYS",
       "owner_bead": "boring-cdc-d-keys",
@@ -161,6 +161,11 @@
       "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-16T06:05:55.752Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "10ad7685fea445c94f416d8c673ba9b0dfdb6e41e836386376ad9c462b1e2f2f"
+      },
       "executor_beads": [
         "boring-cdc-m2-pressure",
         "boring-cdc-m6-safety-sm",
@@ -171,10 +176,7 @@
       "id": "DEC-WAL-CAP",
       "owner_bead": "boring-cdc-d-wal-cap",
       "proposed_value": "max_slot_wal_keep_size=64 GiB (68,719,476,736 bytes); raw headroom=max(0,min(cap-retained_slot_bytes,source_free_bytes-16 GiB)); WAL rate=nearest-rank p95 (rank 15 after ascending sort) over exactly 15 complete 1-minute byte/s buckets, stale after 3 minutes; fresh zero rate gives infinite horizon only with positive headroom; raw horizon=floor(raw_headroom/rate), safety horizon=max(0,raw_horizon-30-second monitor delay-120-second reaction reserve); warning <=60 minutes, action_required <=30 minutes, critical <=10 minutes on safety horizon with equality more severe; missing/unsupported/stale inputs produce unknown, block new bootstrap/backfill, and preserve healthy capture; local-only --unsafe-unbounded-slot-wal expires at 24 hours, requires confirmation UNBOUNDED_WAL_LOCAL_ONLY and actor/time/config-digest audit, and is forbidden remotely; invalidated slots require explicit reseed.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-wal-cap"
-      ],
-      "status": "open"
+      "status": "approved"
     }
   ],
   "schema_version": "m0-decisions/v1"
