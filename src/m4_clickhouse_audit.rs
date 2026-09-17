@@ -5,6 +5,12 @@
 //! snapshot before returning), compares them with freshly reconstructed ClickHouse rows, then
 //! persists progress and independently expiring coverage through the sole writer.
 
+use crate::failure_policy::{
+    Component, FailedBoundary, FailureClass, FailureObservation, FingerprintInput, PolicyAction,
+    PolicyEvent, PreparedFailureOperation, SafeContextKey, SafeContextValue, StableErrorCode,
+    load_failure, transition,
+};
+use crate::m1_transition_kernel::TransitionContext;
 use crate::m2_journal::{CopiedRange, JournalError, read_complete_range};
 use crate::m2_schema::WriterConnection;
 use rusqlite::{OptionalExtension, params};
@@ -45,6 +51,12 @@ pub struct AuditBudget {
     pub max_bytes: usize,
     pub max_reader_age: Duration,
     pub max_milliseconds: u64,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct AuditPass<'a> {
+    pub budget: AuditBudget,
+    pub observed_at: &'a str,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -99,6 +111,9 @@ pub enum AuditOutcome {
         verified_start: u64,
         verified_end: u64,
     },
+    BudgetExhausted {
+        next_seq: u64,
+    },
     Blocked {
         fingerprint: String,
     },
@@ -137,6 +152,9 @@ pub fn round_identity_digest(identity: &AuditIdentity) -> String {
         identity.selector_fingerprint.as_str(),
         identity.object_fingerprint.as_str(),
         identity.contract_digest.as_str(),
+        identity.freshness_started_at.as_str(),
+        identity.freshness_expires_at.as_str(),
+        &identity.retained_history_start_seq.to_string(),
     ] {
         hash_part(&mut digest, value.as_bytes());
     }
@@ -193,14 +211,20 @@ pub fn freeze_round(
 }
 
 /// Execute one bounded pass. This function never reads PostgreSQL and never moves a checkpoint.
-pub fn run_audit_pass(
+pub fn run_audit_pass<C>(
     journal_path: &Path,
     writer: &mut WriterConnection,
     executor: &mut impl ClickHouseAuditExecutor,
     identity: &AuditIdentity,
-    budget: AuditBudget,
-    elapsed_milliseconds: u64,
-) -> Result<AuditOutcome, AuditError> {
+    pass: AuditPass<'_>,
+    clock_milliseconds: &mut C,
+    transition_context: &mut TransitionContext<'_>,
+) -> Result<AuditOutcome, AuditError>
+where
+    C: FnMut() -> u64,
+{
+    let budget = pass.budget;
+    let observed_at = pass.observed_at;
     if budget.max_events == 0
         || budget.max_bytes == 0
         || budget.max_reader_age.is_zero()
@@ -209,6 +233,10 @@ pub fn run_audit_pass(
         return Err(AuditError::Invalid("zero audit budget"));
     }
     freeze_round(writer, identity)?;
+    if observed_at < identity.freshness_started_at.as_str() {
+        return Err(AuditError::Invalid("observation predates frozen round"));
+    }
+    let started = clock_milliseconds();
     let digest = round_identity_digest(identity);
     let (cursor, mismatch): (u64, Option<String>) = writer.connection().query_row(
         "SELECT journal_cursor_seq,first_mismatch FROM destination_audits WHERE audit_id=?1 AND round_identity_digest=?2",
@@ -218,25 +246,51 @@ pub fn run_audit_pass(
         return Ok(AuditOutcome::Blocked { fingerprint });
     }
 
-    let observed = executor
-        .inspect_contract()
-        .map_err(|_| AuditError::Dispatch)?;
+    let observed = match executor.inspect_contract() {
+        Ok(observed) => observed,
+        Err(_) => {
+            return persist_failure(
+                writer,
+                identity,
+                FailureClass::TransientDestination,
+                StableErrorCode::TransportUnavailable,
+                "destination-read-unavailable",
+                transition_context,
+            );
+        }
+    };
     if observed.selector_fingerprint != identity.selector_fingerprint
         || observed.object_fingerprint != identity.object_fingerprint
         || observed.settings_fingerprint != observed.expected_settings_fingerprint
         || observed.event_identity_conflicts != 0
         || observed.marker_identity_conflicts != 0
     {
-        return persist_mismatch(writer, identity, "destination-contract-drift");
-    }
-    if cursor >= identity.target_checkpoint {
-        return persist_complete(
+        return persist_failure(
             writer,
             identity,
-            cursor,
-            elapsed_milliseconds,
-            "self-check-only",
+            FailureClass::Integrity,
+            StableErrorCode::ChecksumMismatch,
+            "destination-contract-drift",
+            transition_context,
         );
+    }
+    if elapsed(started, clock_milliseconds()) >= budget.max_milliseconds {
+        return Ok(AuditOutcome::BudgetExhausted {
+            next_seq: cursor.saturating_add(1),
+        });
+    }
+    if cursor >= identity.target_checkpoint {
+        if !coverage_is_fresh(writer, identity, cursor, observed_at)? {
+            return persist_failure(
+                writer,
+                identity,
+                FailureClass::Integrity,
+                StableErrorCode::HistoryUnavailable,
+                "coverage-expired-or-gapped",
+                transition_context,
+            );
+        }
+        return persist_complete(writer, identity, cursor, observed_at, "self-check-only");
     }
 
     let range = match read_complete_range(
@@ -247,37 +301,81 @@ pub fn run_audit_pass(
         budget.max_reader_age,
     ) {
         Ok(Some(range)) => range,
-        Ok(None) => return persist_mismatch(writer, identity, "journal-range-unavailable"),
+        Ok(None) => {
+            return persist_failure(
+                writer,
+                identity,
+                FailureClass::Integrity,
+                StableErrorCode::HistoryUnavailable,
+                "journal-range-unavailable",
+                transition_context,
+            );
+        }
         Err(JournalError::Limit(_)) => {
-            return persist_mismatch(writer, identity, "audit-unit-exceeds-approved-bound");
+            return persist_failure(
+                writer,
+                identity,
+                FailureClass::Configuration,
+                StableErrorCode::ResourceLimit,
+                "audit-unit-exceeds-approved-bound",
+                transition_context,
+            );
         }
         Err(error) => return Err(AuditError::Journal(error.to_string())),
     };
     if range.last_seq > identity.target_checkpoint {
-        return persist_mismatch(writer, identity, "frozen-target-splits-transaction");
-    }
-    let remote = executor
-        .read_stored_range(identity, range.first_seq, range.last_seq)
-        .map_err(|_| AuditError::Dispatch)?;
-    if let Err(code) = verify_range(&range, &remote) {
-        return persist_mismatch(writer, identity, code);
-    }
-    let evidence = range_evidence_digest(&range, &remote);
-    persist_progress(
-        writer,
-        identity,
-        &range,
-        elapsed_milliseconds.min(budget.max_milliseconds),
-        &evidence,
-    )?;
-    if range.last_seq == identity.target_checkpoint {
-        persist_complete(
+        return persist_failure(
             writer,
             identity,
-            range.last_seq,
-            elapsed_milliseconds,
-            &evidence,
-        )
+            FailureClass::Integrity,
+            StableErrorCode::InvalidRecord,
+            "frozen-target-splits-transaction",
+            transition_context,
+        );
+    }
+    let remote = match executor.read_stored_range(identity, range.first_seq, range.last_seq) {
+        Ok(remote) => remote,
+        Err(_) => {
+            return persist_failure(
+                writer,
+                identity,
+                FailureClass::TransientDestination,
+                StableErrorCode::TransportUnavailable,
+                "destination-range-read-unavailable",
+                transition_context,
+            );
+        }
+    };
+    let used_milliseconds = elapsed(started, clock_milliseconds());
+    if used_milliseconds > budget.max_milliseconds {
+        return Ok(AuditOutcome::BudgetExhausted {
+            next_seq: cursor.saturating_add(1),
+        });
+    }
+    if let Err(code) = verify_range(&range, &remote) {
+        return persist_failure(
+            writer,
+            identity,
+            FailureClass::Integrity,
+            StableErrorCode::ChecksumMismatch,
+            code,
+            transition_context,
+        );
+    }
+    let evidence = range_evidence_digest(&range, &remote);
+    persist_progress(writer, identity, &range, used_milliseconds, &evidence)?;
+    if range.last_seq == identity.target_checkpoint {
+        if !coverage_is_fresh(writer, identity, range.last_seq, observed_at)? {
+            return persist_failure(
+                writer,
+                identity,
+                FailureClass::Integrity,
+                StableErrorCode::HistoryUnavailable,
+                "coverage-expired-or-gapped",
+                transition_context,
+            );
+        }
+        persist_complete(writer, identity, range.last_seq, observed_at, &evidence)
     } else {
         Ok(AuditOutcome::Progress {
             next_seq: range.last_seq + 1,
@@ -381,18 +479,70 @@ fn persist_progress(
     Ok(())
 }
 
+fn coverage_is_fresh(
+    writer: &WriterConnection,
+    identity: &AuditIdentity,
+    end: u64,
+    observed_at: &str,
+) -> Result<bool, AuditError> {
+    if end == identity.retained_history_start_seq {
+        return Ok(true);
+    }
+    for kind in ["journal_verified", "self_consistent"] {
+        let mut statement = writer.connection().prepare("SELECT start_seq,end_seq,fresh_until FROM audit_coverage_subranges WHERE audit_id=?1 AND coverage_kind=?2 ORDER BY start_seq,end_seq")?;
+        let mut rows = statement.query(params![identity.audit_id, kind])?;
+        let mut next = identity.retained_history_start_seq + 1;
+        while let Some(row) = rows.next()? {
+            let range_start: u64 = row.get(0)?;
+            let range_end: u64 = row.get(1)?;
+            let fresh_until: String = row.get(2)?;
+            if fresh_until.as_str() <= observed_at || range_start != next || range_end < range_start
+            {
+                return Ok(false);
+            }
+            next = range_end.saturating_add(1);
+        }
+        if next != end.saturating_add(1) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 fn persist_complete(
     writer: &mut WriterConnection,
     identity: &AuditIdentity,
     end: u64,
-    milliseconds: u64,
+    observed_at: &str,
     evidence: &str,
 ) -> Result<AuditOutcome, AuditError> {
     let start = identity.retained_history_start_seq;
     let tx = writer.connection_mut().transaction()?;
+    if end > start {
+        for kind in ["journal_verified", "self_consistent"] {
+            let mut statement = tx.prepare("SELECT start_seq,end_seq,fresh_until FROM audit_coverage_subranges WHERE audit_id=?1 AND coverage_kind=?2 ORDER BY start_seq,end_seq")?;
+            let mut rows = statement.query(params![identity.audit_id, kind])?;
+            let mut next = start + 1;
+            while let Some(row) = rows.next()? {
+                let range_start: u64 = row.get(0)?;
+                let range_end: u64 = row.get(1)?;
+                let fresh_until: String = row.get(2)?;
+                if fresh_until.as_str() <= observed_at
+                    || range_start != next
+                    || range_end < range_start
+                {
+                    return Err(AuditError::DestinationBlocked);
+                }
+                next = range_end.saturating_add(1);
+            }
+            if next != end.saturating_add(1) {
+                return Err(AuditError::DestinationBlocked);
+            }
+        }
+    }
     let changed = tx.execute(
-        "UPDATE destination_audits SET journal_verified_start_seq=?2,journal_verified_end_seq=?3,self_consistent_start_seq=?2,self_consistent_end_seq=?3,budget_ms_used=budget_ms_used+?4,evidence_digest=?5,revision=revision+1 WHERE audit_id=?1 AND round_identity_digest=?6 AND journal_cursor_seq=?3 AND self_cursor_seq=?3 AND first_mismatch IS NULL",
-        params![identity.audit_id, start, end, milliseconds, evidence, round_identity_digest(identity)],
+        "UPDATE destination_audits SET journal_verified_start_seq=?2,journal_verified_end_seq=?3,self_consistent_start_seq=?2,self_consistent_end_seq=?3,evidence_digest=?4,revision=revision+1 WHERE audit_id=?1 AND round_identity_digest=?5 AND journal_cursor_seq=?3 AND self_cursor_seq=?3 AND first_mismatch IS NULL",
+        params![identity.audit_id, start, end, evidence, round_identity_digest(identity)],
     )?;
     if changed != 1 {
         return Err(AuditError::IdentityConflict);
@@ -404,18 +554,66 @@ fn persist_complete(
     })
 }
 
-fn persist_mismatch(
+fn persist_failure(
     writer: &mut WriterConnection,
     identity: &AuditIdentity,
-    code: &str,
+    class: FailureClass,
+    stable_code: StableErrorCode,
+    mismatch_code: &str,
+    transition_context: &mut TransitionContext<'_>,
 ) -> Result<AuditOutcome, AuditError> {
-    let mut digest = Sha256::new();
-    hash_part(&mut digest, b"boring-cdc/clickhouse-audit-mismatch/v1");
-    hash_part(&mut digest, code.as_bytes());
-    hash_part(&mut digest, round_identity_digest(identity).as_bytes());
-    let fingerprint = format!("{:x}", digest.finalize());
     let tx = writer.connection_mut().transaction()?;
-    let changed = tx.execute("UPDATE destination_audits SET first_mismatch=?2,evidence_digest=?2,journal_verified_start_seq=NULL,journal_verified_end_seq=NULL,self_consistent_start_seq=NULL,self_consistent_end_seq=NULL,revision=revision+1 WHERE audit_id=?1 AND round_identity_digest=?3", params![identity.audit_id, fingerprint, round_identity_digest(identity)])?;
+    let boundary = FailedBoundary::Destination {
+        capture_epoch: identity.capture_epoch.clone(),
+        generation: identity.generation,
+        first_seq: identity.retained_history_start_seq,
+        last_seq: identity.target_checkpoint,
+    };
+    let current_failure_id: Option<String> = tx.query_row(
+        "SELECT current_failure_id FROM destinations WHERE destination_id=?1",
+        [&identity.destination_id],
+        |row| row.get(0),
+    )?;
+    let current = current_failure_id
+        .as_deref()
+        .map(|id| load_failure(&tx, id, boundary.clone()))
+        .transpose()?
+        .flatten();
+    let action = transition(
+        current.as_ref(),
+        PolicyEvent::Observe(FailureObservation {
+            destination_id: Some(identity.destination_id.clone()),
+            fingerprint: FingerprintInput {
+                component: Component::ClickHouse,
+                class,
+                code: stable_code,
+                boundary,
+                relevant_configuration_fingerprint: identity.configuration_fingerprint.clone(),
+                context: BTreeMap::from([
+                    (SafeContextKey::Operation, SafeContextValue::Verify),
+                    (
+                        SafeContextKey::DestinationKind,
+                        SafeContextValue::ClickHouse,
+                    ),
+                ]),
+            },
+        }),
+        transition_context,
+    );
+    let record = match &action {
+        PolicyAction::Persist(record) => record.clone(),
+        PolicyAction::Suppressed => current.ok_or(AuditError::DestinationBlocked)?,
+        _ => return Err(AuditError::DestinationBlocked),
+    };
+    if let Some(operation) =
+        PreparedFailureOperation::from_policy_action(action, current_failure_id)
+    {
+        operation.execute(&tx)?;
+    }
+    let changed = tx.execute(
+        "UPDATE destination_audits SET first_mismatch=?2,evidence_digest=?3,journal_verified_start_seq=NULL,journal_verified_end_seq=NULL,self_consistent_start_seq=NULL,self_consistent_end_seq=NULL,revision=revision+1 WHERE audit_id=?1 AND round_identity_digest=?4",
+        params![identity.audit_id, record.fingerprint, mismatch_code, round_identity_digest(identity)],
+    )?;
     if changed != 1 {
         return Err(AuditError::IdentityConflict);
     }
@@ -423,14 +621,14 @@ fn persist_mismatch(
         "DELETE FROM audit_coverage_subranges WHERE audit_id=?1",
         [&identity.audit_id],
     )?;
-    // Destination-local fail closed: capture and every other destination remain untouched.
-    tx.execute("UPDATE destinations SET current_failure_id=coalesce(current_failure_id,?2),revision=revision+1 WHERE destination_id=?1", params![identity.destination_id, format!("audit:{fingerprint}")]).or_else(|_| {
-        // processing_failures owns the FK. Persist a stable integrity row before linking it.
-        tx.execute("INSERT OR IGNORE INTO processing_failures(failure_id,destination_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES(?1,?2,'clickhouse','integrity',?3,?4,?5,'integrity_mismatch',1,NULL,1,?6,?6)", params![format!("audit:{fingerprint}"), identity.destination_id, fingerprint, identity.retained_history_start_seq, identity.target_checkpoint, identity.freshness_started_at])?;
-        tx.execute("UPDATE destinations SET current_failure_id=?2,revision=revision+1 WHERE destination_id=?1 AND current_failure_id IS NULL", params![identity.destination_id, format!("audit:{fingerprint}")])
-    })?;
     tx.commit()?;
-    Ok(AuditOutcome::Blocked { fingerprint })
+    Ok(AuditOutcome::Blocked {
+        fingerprint: record.fingerprint,
+    })
+}
+
+fn elapsed(start: u64, end: u64) -> u64 {
+    end.saturating_sub(start)
 }
 
 fn validate_identity(identity: &AuditIdentity) -> Result<(), AuditError> {
@@ -457,12 +655,20 @@ fn hash_part(digest: &mut Sha256, bytes: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
     use crate::m2_journal::{
         CommitFault, CommitLimits, JournalEvent, JournalStore, SourceCommit, SourceIdentity,
         sha256, transaction_checksum,
     };
     use crate::m2_schema::open_writer;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct FixedRandomness;
+    impl Randomness for FixedRandomness {
+        fn next_u64(&mut self) -> u64 {
+            7
+        }
+    }
 
     struct Fake {
         corrupt: bool,
@@ -572,10 +778,49 @@ mod tests {
         };
         (path, writer, identity)
     }
+
+    fn run(
+        path: &Path,
+        writer: &mut WriterConnection,
+        fake: &mut Fake,
+        identity: &AuditIdentity,
+    ) -> Result<AuditOutcome, AuditError> {
+        let values = [0_u64, 5_u64];
+        let mut index = 0;
+        let mut clock_ms = || {
+            let value = values[index.min(1)];
+            index += 1;
+            value
+        };
+        let clock = VirtualClock::new(10_000);
+        let mut randomness = FixedRandomness;
+        let mut context = TransitionContext {
+            clock: &clock,
+            randomness: &mut randomness,
+        };
+        run_audit_pass(
+            path,
+            writer,
+            fake,
+            identity,
+            AuditPass {
+                budget: AuditBudget {
+                    max_events: 4,
+                    max_bytes: 4096,
+                    max_reader_age: Duration::from_secs(1),
+                    max_milliseconds: 100,
+                },
+                observed_at: "2026-01-01T00:00:01Z",
+            },
+            &mut clock_ms,
+            &mut context,
+        )
+    }
+
     #[test]
     fn bounded_round_persists_fresh_coverage_and_completes() {
         let (path, mut writer, identity) = fixture("complete");
-        let outcome = run_audit_pass(
+        let outcome = run(
             &path,
             &mut writer,
             &mut Fake {
@@ -583,13 +828,6 @@ mod tests {
                 drift: false,
             },
             &identity,
-            AuditBudget {
-                max_events: 4,
-                max_bytes: 4096,
-                max_reader_age: Duration::from_secs(1),
-                max_milliseconds: 100,
-            },
-            5,
         )
         .unwrap();
         assert_eq!(
@@ -629,20 +867,7 @@ mod tests {
             ),
         ] {
             let (path, mut writer, identity) = fixture(name);
-            let outcome = run_audit_pass(
-                &path,
-                &mut writer,
-                &mut fake,
-                &identity,
-                AuditBudget {
-                    max_events: 4,
-                    max_bytes: 4096,
-                    max_reader_age: Duration::from_secs(1),
-                    max_milliseconds: 100,
-                },
-                5,
-            )
-            .unwrap();
+            let outcome = run(&path, &mut writer, &mut fake, &identity).unwrap();
             assert!(matches!(outcome, AuditOutcome::Blocked { .. }));
             assert!(writer.connection().query_row("SELECT current_failure_id IS NOT NULL FROM destinations WHERE destination_id='ch'", [], |r| r.get::<_,bool>(0)).unwrap());
         }
@@ -650,7 +875,7 @@ mod tests {
     #[test]
     fn identity_change_discards_old_coverage_before_reset() {
         let (path, mut writer, mut identity) = fixture("identity");
-        run_audit_pass(
+        run(
             &path,
             &mut writer,
             &mut Fake {
@@ -658,13 +883,6 @@ mod tests {
                 drift: false,
             },
             &identity,
-            AuditBudget {
-                max_events: 4,
-                max_bytes: 4096,
-                max_reader_age: Duration::from_secs(1),
-                max_milliseconds: 100,
-            },
-            5,
         )
         .unwrap();
         writer

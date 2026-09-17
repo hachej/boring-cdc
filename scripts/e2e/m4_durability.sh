@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
+cargo test --quiet --locked m4_clickhouse_ -- --nocapture
 work=$(mktemp -d /var/tmp/m4-durability-e2e.XXXXXX); project="m4-durability-e2e-$RANDOM-$$"
 cleanup(){ docker compose -p "$project" -f compose.yaml down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
 printf 'm4-durability-synthetic-%s\n' "$project" >"$work/postgres_password"; chmod 600 "$work/postgres_password"; export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"

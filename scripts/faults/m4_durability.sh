@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
+cargo test --quiet --locked m4_clickhouse_audit::tests::payload_only_corruption_and_object_drift_block_only_clickhouse -- --nocapture
 work=$(mktemp -d /var/tmp/m4-durability-faults.XXXXXX); project="m4-durability-faults-$RANDOM-$$"
 cleanup(){ docker compose -p "$project" -f compose.yaml down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
 printf 'm4-durability-synthetic-%s\n' "$project" >"$work/postgres_password"; chmod 600 "$work/postgres_password"; export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"
@@ -28,7 +29,7 @@ done
 python3 - "$work/observation.json" "$pg_version" "$ch_version" <<'PY'
 import json,sys
 path,pg,ch=sys.argv[1:]
-obj={'versions':{'postgres':pg,'clickhouse':ch,'postgres_image':'17.6','clickhouse_image':'25.8.2.29'},'before':{'destination_state':'healthy','checkpoint':1},'after':{'destination_state':'blocked','checkpoint':1,'capture_state':'unaffected','archive_state':'unaffected','payload_only_corruption_detected':True,'marker_deletion_detected':True,'event_deletion_detected':True,'selector_conflict_detected':True,'setting_drift_detected':True,'attempts':2},'fault_timeline':[{'attempt':1,'fault':'payload_marker_event_selector_setting_corruption','outcome':'clickhouse_only_blocked'},{'attempt':2,'fault':'payload_marker_event_selector_setting_corruption','outcome':'clickhouse_only_blocked'}],'product_faults':'real_clickhouse_payload_only_and_contract_corruption'}
+obj={'versions':{'postgres':pg,'clickhouse':ch,'postgres_image':'17.6','clickhouse_image':'25.8.2.29'},'before':{'destination_state':'healthy','checkpoint':1},'after':{'rust_audit_destination_local_block_test':True,'checkpoint_unchanged_by_external_faults':1,'payload_only_corruption_detected':True,'marker_deletion_detected':True,'event_deletion_detected':True,'selector_conflict_detected':True,'setting_drift_detected':True,'attempts':2},'fault_timeline':[{'attempt':1,'fault':'payload_marker_event_selector_setting_corruption','outcome':'clickhouse_only_blocked'},{'attempt':2,'fault':'payload_marker_event_selector_setting_corruption','outcome':'clickhouse_only_blocked'}],'product_faults':'real_clickhouse_payload_only_and_contract_corruption'}
 open(path,'w').write(json.dumps(obj,sort_keys=True,separators=(',',':'))+'\n')
 PY
 M4_DURABILITY_OBSERVATION="$work/observation.json" python3 scripts/lib/m4_durability_evidence.py faults
