@@ -766,7 +766,8 @@
     "result_schema",
     "schema_evolution",
     "schema_version",
-    "fixture_fault_abi"
+    "fixture_fault_abi",
+    "provisional_markers"
   ],
   "type": "object"
 }
