@@ -3,7 +3,7 @@ import hashlib, importlib.util, json, re, sqlite3, subprocess, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; OWNER='boring-cdc-m0-storage-model'
 C=ROOT/'contracts/storage/storage-model.json'; S=ROOT/'contracts/storage/storage-model.schema.json'; Q=ROOT/'contracts/storage/sqlite-schema.sql'; F=ROOT/'fixtures/m0/storage/scenarios.json'; FS=ROOT/'contracts/storage/storage-fixtures.schema.json'; R=ROOT/'contracts/storage/storage-result.schema.json'; E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence.json'; V=Path(__file__); M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
-EXPECTED_CONTRACT_SHA256='72e14042b01a2c0709233e591968cddf3698b30455d62f751d644676424158b8'
+EXPECTED_CONTRACT_SHA256='95e8e432a09ce4684e0b095cdecfa9a788950bb88ede0ad78ef28051d07335a3'
 EXPECTED_FIXTURES_SHA256='1cd91668950293580ab810814f948501b4dcbe90e40951bfcb99617ee9ef3e8b'
 core_spec=importlib.util.spec_from_file_location('core_validator',ROOT/'scripts/lib/core_validator.py'); core=importlib.util.module_from_spec(core_spec); core_spec.loader.exec_module(core)
 def load(p):
@@ -39,6 +39,10 @@ def validate():
  p=c['sqlite']; expected=('3.45.3',4096,5000,0,16,5000,4096,10000)
  got=(p['version'],p['page_size_bytes'],p['connection_pragmas']['busy_timeout_ms'],p['connection_pragmas']['wal_autocheckpoint_pages'],p['connections']['max_readers'],p['connections']['max_reader_age_ms'],p['connections']['max_reader_pages'],p['actual_connection_attestation']['freshness_ms'])
  if got!=expected:add(fs,'E_SQLITE_LITERALS','sqlite','recommended SQLite literals changed')
+ if p['connection_pragmas']!={'busy_timeout_ms':5000,'foreign_keys':'ON','journal_size_limit_bytes':268435456,'mmap_size_bytes':0,'secure_delete':'FAST','synchronous':'FULL','temp_store':'FILE','trusted_schema':'OFF','wal_autocheckpoint_pages':0}:add(fs,'E_SQLITE_LITERALS','sqlite/connection_pragmas','accepted connection-local PRAGMAs changed')
+ if p['filesystem_attestation']!={'invalidate_on':['mount_change','device_change'],'validity_seconds':86400}:add(fs,'E_SQLITE_LITERALS','sqlite/filesystem_attestation','accepted filesystem attestation boundary changed')
+ expected_readback={'auto_vacuum':2,'foreign_keys':1,'journal_mode':'wal','journal_size_limit':268435456,'mmap_size':0,'secure_delete':2,'synchronous':2,'temp_store':1,'trusted_schema':0,'wal_autocheckpoint':0}
+ if p['actual_connection_attestation']['required_observed_values']!=expected_readback or set(p['actual_connection_attestation']['writer_applies_and_reads_back'])!=set(expected_readback):add(fs,'E_SQLITE_LITERALS','sqlite/actual_connection_attestation','accepted writer PRAGMA readback set changed')
  if p['connection_pragmas']['synchronous']!='FULL' or p['persistent_pragmas']['journal_mode']!='WAL' or p['persistent_pragmas']['auto_vacuum']!='INCREMENTAL':add(fs,'E_PRAGMA','sqlite','durability PRAGMAs weakened')
  if p['maintenance']!={'owner':'single run-owned maintenance scheduler','wal_autocheckpoint_pages':0,'checkpoint_mode':'PASSIVE','checkpoint_cadence_ms':30000,'checkpoint_request_wal_pages':1000,'checkpoint_busy_timeout_ms':50,'incremental_vacuum_max_pages':1000,'incremental_vacuum_cadence_ms':1000,'automatic_full_vacuum':'forbidden','offline_full_vacuum':'stopped and backed-up store only'}:add(fs,'E_MAINTENANCE','sqlite/maintenance','checkpoint/vacuum ownership or bound changed')
  allow=[x['type'] for x in c['filesystem']['allowlist']]
@@ -79,10 +83,10 @@ def validate():
  try:
   with tempfile.TemporaryDirectory() as td:
    db=Path(td)/'journal.sqlite'; con=sqlite3.connect(db)
-   con.execute('PRAGMA page_size=4096'); con.execute('PRAGMA auto_vacuum=INCREMENTAL'); con.execute('PRAGMA journal_mode=WAL'); con.execute('PRAGMA synchronous=FULL'); con.execute('PRAGMA foreign_keys=ON'); con.execute('PRAGMA trusted_schema=OFF'); con.execute('PRAGMA wal_autocheckpoint=0'); con.execute('PRAGMA busy_timeout=5000'); con.execute('PRAGMA temp_store=FILE')
+   con.execute('PRAGMA page_size=4096'); con.execute('PRAGMA auto_vacuum=INCREMENTAL'); con.execute('PRAGMA journal_mode=WAL'); con.execute('PRAGMA synchronous=FULL'); con.execute('PRAGMA foreign_keys=ON'); con.execute('PRAGMA trusted_schema=OFF'); con.execute('PRAGMA wal_autocheckpoint=0'); con.execute('PRAGMA busy_timeout=5000'); con.execute('PRAGMA temp_store=FILE'); con.execute('PRAGMA journal_size_limit=268435456'); con.execute('PRAGMA mmap_size=0'); con.execute('PRAGMA secure_delete=FAST')
    con.executescript(Q.read_text())
-   observed=(con.execute('PRAGMA journal_mode').fetchone()[0],con.execute('PRAGMA synchronous').fetchone()[0],con.execute('PRAGMA auto_vacuum').fetchone()[0],con.execute('PRAGMA foreign_keys').fetchone()[0],con.execute('PRAGMA trusted_schema').fetchone()[0],con.execute('PRAGMA wal_autocheckpoint').fetchone()[0],con.execute('PRAGMA temp_store').fetchone()[0])
-   if observed!=('wal',2,2,1,0,0,1):add(fs,'E_ACTUAL_ATTESTATION','sqlite-schema.sql',repr(observed))
+   observed=(con.execute('PRAGMA journal_mode').fetchone()[0],con.execute('PRAGMA synchronous').fetchone()[0],con.execute('PRAGMA auto_vacuum').fetchone()[0],con.execute('PRAGMA foreign_keys').fetchone()[0],con.execute('PRAGMA trusted_schema').fetchone()[0],con.execute('PRAGMA wal_autocheckpoint').fetchone()[0],con.execute('PRAGMA temp_store').fetchone()[0],con.execute('PRAGMA journal_size_limit').fetchone()[0],con.execute('PRAGMA mmap_size').fetchone()[0],con.execute('PRAGMA secure_delete').fetchone()[0])
+   if observed!=('wal',2,2,1,0,0,1,268435456,0,2):add(fs,'E_ACTUAL_ATTESTATION','sqlite-schema.sql',repr(observed))
    tables={x[0] for x in con.execute("SELECT name FROM sqlite_schema WHERE type='table'")}; required_tables={'journal_events','source_transactions','source_state','runtime_ownership','writer_attestations','operator_command_requests','relation_schemas','destinations','destination_checkpoints','backfill_runs','backfill_generations','backfill_chunks','bootstrap_intents','bootstrap_imports','durable_capture_fences','bootstrap_anchors','reseed_intents','destination_generation_leases','destination_promotion_intents','clickhouse_batch_intents','archive_generations','archive_segment_intents','archive_segments','archive_generation_markers','processing_failures','destination_audits','logical_range_pins','condition_hysteresis','alerts','schema_migrations'}
    if not required_tables<=tables:add(fs,'E_SQL_SCHEMA','sqlite-schema.sql',','.join(sorted(required_tables-tables)))
    con.close()

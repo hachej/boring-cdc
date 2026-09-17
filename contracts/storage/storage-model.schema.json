@@ -641,6 +641,15 @@
                 },
                 "wal_autocheckpoint": {
                   "type": "integer"
+                },
+                "journal_size_limit": {
+                  "type": "integer"
+                },
+                "mmap_size": {
+                  "type": "integer"
+                },
+                "secure_delete": {
+                  "type": "integer"
                 }
               },
               "required": [
@@ -650,7 +659,10 @@
                 "foreign_keys",
                 "trusted_schema",
                 "wal_autocheckpoint",
-                "temp_store"
+                "temp_store",
+                "journal_size_limit",
+                "mmap_size",
+                "secure_delete"
               ],
               "type": "object"
             },
@@ -694,6 +706,15 @@
             },
             "wal_autocheckpoint_pages": {
               "type": "integer"
+            },
+            "journal_size_limit_bytes": {
+              "type": "integer"
+            },
+            "mmap_size_bytes": {
+              "type": "integer"
+            },
+            "secure_delete": {
+              "type": "string"
             }
           },
           "required": [
@@ -702,7 +723,10 @@
             "synchronous",
             "temp_store",
             "trusted_schema",
-            "wal_autocheckpoint_pages"
+            "wal_autocheckpoint_pages",
+            "journal_size_limit_bytes",
+            "mmap_size_bytes",
+            "secure_delete"
           ],
           "type": "object"
         },
@@ -922,6 +946,25 @@
         },
         "version": {
           "type": "string"
+        },
+        "filesystem_attestation": {
+          "additionalProperties": false,
+          "properties": {
+            "invalidate_on": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "validity_seconds": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "invalidate_on",
+            "validity_seconds"
+          ],
+          "type": "object"
         }
       },
       "required": [
@@ -938,7 +981,8 @@
         "persistent_pragmas",
         "schema_path",
         "single_database",
-        "version"
+        "version",
+        "filesystem_attestation"
       ],
       "type": "object"
     },
