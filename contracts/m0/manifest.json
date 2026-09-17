@@ -271,7 +271,7 @@
       "id": "ART-M0-STORAGE-MODEL",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.json",
-      "sha256": "81185e4b3d81c7344880c797e60d61169a0a77d852d4d0442486f73efea6c9d5",
+      "sha256": "72e14042b01a2c0709233e591968cddf3698b30455d62f751d644676424158b8",
       "status": "complete"
     }
   ],
