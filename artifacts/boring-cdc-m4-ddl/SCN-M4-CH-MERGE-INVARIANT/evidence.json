@@ -1,0 +1,34 @@
+{
+  "credentials_recorded": false,
+  "git_commit": "e4308f36fdec7d659cf203f6be6560f46ff0e2a2",
+  "history_interface": {
+    "ordered_without_final": true,
+    "rows": 4
+  },
+  "images": {
+    "clickhouse": "25.8.2.29",
+    "postgres": "17.6"
+  },
+  "merge_invariant": {
+    "active_parts_after": 1,
+    "after_sha256": "5f1bf8cbf6c4ef9a3034c3386c653c657882912ed72b51409eed55142e94c596",
+    "before_sha256": "5f1bf8cbf6c4ef9a3034c3386c653c657882912ed72b51409eed55142e94c596",
+    "during_sha256": "5f1bf8cbf6c4ef9a3034c3386c653c657882912ed72b51409eed55142e94c596",
+    "stopped_sha256": "5f1bf8cbf6c4ef9a3034c3386c653c657882912ed72b51409eed55142e94c596",
+    "system_merges_observed": true
+  },
+  "object_fingerprint": "7f4c6dc18f4cbce89812d93f2b3281b0fe58447c1b9fadfe348f7f9064544237",
+  "objects_verified": 6,
+  "observed_versions": {
+    "clickhouse": "25.8.2.29",
+    "postgres": "17.6 (Debian 17.6-2.pgdg13+1)"
+  },
+  "ordinary_runtime": {
+    "alter_denied": true,
+    "canonical_select_allowed": true,
+    "ddl_denied": true
+  },
+  "schema_version": "m4-clickhouse-ddl-evidence/v1",
+  "status": "pass"
+}
+
