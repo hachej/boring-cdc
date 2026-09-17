@@ -164,8 +164,21 @@ class ScaffoldTests(unittest.TestCase):
         self.assertLess(verify, build)
         self.assertLess(verify, start)
         self.assertNotIn(invocation[:-1] + ',78)', source)
-        self.assertIn('clean_env={"DOCKER_CONFIG":str(cli_config),"HOME":str(proof_root),"LC_ALL":"C","PATH":"/usr/bin:/bin","SOURCE_DATE_EPOCH":"0","TZ":"UTC"}', source)
-        self.assertNotIn('clean_env=os.environ', source)
+        self.assertIn('clean_env=isolated_clean_environment(cli_config,proof_root,author_timestamp,os.environ)', source)
+        self.assertIn('"--build-arg",f"SOURCE_DATE_EPOCH={author_timestamp}"', source)
+
+    def test_clean_environment_ignores_all_ambient_values(self):
+        hostile = {
+            "DOCKER_HOST": "tcp://attacker", "COMPOSE_FILE": "attacker.yml",
+            "HTTP_PROXY": "http://attacker", "RUSTFLAGS": "-C target-cpu=native",
+            "CARGO_HOME": "/attacker/cargo", "RUSTUP_HOME": "/attacker/rustup",
+            "PATH": "/attacker/bin", "SOURCE_DATE_EPOCH": "0",
+        }
+        clean = m0_scaffold.isolated_clean_environment(Path("/isolated/docker"), Path("/isolated/home"), "1789654678", hostile)
+        self.assertEqual(m0_scaffold.CLEAN_ENVIRONMENT_KEYS, set(clean))
+        self.assertEqual("/usr/bin:/bin", clean["PATH"])
+        self.assertEqual("1789654678", clean["SOURCE_DATE_EPOCH"])
+        self.assertFalse(set(hostile) - {"PATH", "SOURCE_DATE_EPOCH"} & set(clean))
 
     def test_package_excludes_internal_metadata_and_evidence(self):
         out = json.loads(run("scripts/validate/scaffold_package.sh").stdout)
