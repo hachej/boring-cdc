@@ -27,8 +27,10 @@ YAML
 docker compose -p "$project" -f compose.yaml -f "$work/override.yml" up -d --wait postgres >/dev/null
 psql_cmd=(psql -X -v ON_ERROR_STOP=1 -At -h 127.0.0.1 -p "$port" -U boring_cdc -d boring_cdc)
 cat >"$work/fixture.sql" <<'SQL'
+DROP PUBLICATION IF EXISTS boring_cdc_m3_planner_pub;
 DROP TABLE IF EXISTS m3_planner_fixture;
 CREATE TABLE m3_planner_fixture(tenant bigint NOT NULL, id uuid NOT NULL, payload text NOT NULL, PRIMARY KEY(tenant,id));
+CREATE PUBLICATION boring_cdc_m3_planner_pub FOR TABLE m3_planner_fixture;
 INSERT INTO m3_planner_fixture VALUES
 (-9223372036854775808,'00000000-0000-0000-0000-000000000000','min'),
 (-7,'00000000-0000-0000-0000-000000000001','sparse-a'),
@@ -51,7 +53,7 @@ python3 - "$work/result-1" "$work/rust-1.json" "$work/rust-2.json" >"$work/obser
 import hashlib,json,pathlib,sys
 b=pathlib.Path(sys.argv[1]).read_bytes(); runs=[json.loads(pathlib.Path(p).read_text()) for p in sys.argv[2:]]
 assert runs[0]==runs[1]
-o=runs[0];assert o=={'atomic_chunk_event_commit':True,'complete_chunks':3,'generation_state':'fencing','pending_before':3,'remaining_claims':0,'snapshot_events':5}
+o=runs[0];assert o=={'atomic_chunk_event_commit':True,'complete_chunks':3,'exported_snapshot_importer_handoff':True,'generation_state':'fencing','memory_refused_before_payload':True,'pending_before':3,'remaining_claims':0,'snapshot_events':5}
 o.update(row_count=len(b.splitlines()),result_sha256=hashlib.sha256(b).hexdigest(),rust_worker_runs=len(runs),postgres_keyset_runs=2,bounded_reader_released=o['pending_before']==3 and o['complete_chunks']==3,limits_respected=o['snapshot_events']==5)
 print(json.dumps(o,sort_keys=True))
 PY

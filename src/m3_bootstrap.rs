@@ -580,6 +580,19 @@ pub struct ImporterSession {
     connection: pg_walstream::PgReplicationConnection,
     pub backend_pid: i32,
 }
+
+/// Capability proving that bootstrap imported the exported snapshot, verified the guarded schema,
+/// and durably acknowledged that exact importer. There is deliberately no raw-connection
+/// constructor: only [`BootstrapRuntime`] can mint and transfer this capability.
+pub struct ImportedSnapshotSession {
+    connection: pg_walstream::PgReplicationConnection,
+}
+impl ImportedSnapshotSession {
+    pub(crate) fn into_connection(self) -> pg_walstream::PgReplicationConnection {
+        self.connection
+    }
+}
+
 impl ImporterSession {
     /// `SET TRANSACTION SNAPSHOT` is sent in the same simple-query batch as BEGIN and before any
     /// catalog/data statement; callers cannot obtain a session in a pre-import queryable state.
@@ -614,6 +627,12 @@ impl ImporterSession {
                 .map_err(|_| BootstrapError::Conflict("M3_IMPORTED_CONTRACT_FAILED"))?;
         }
         Ok(())
+    }
+
+    fn into_acknowledged(self) -> ImportedSnapshotSession {
+        ImportedSnapshotSession {
+            connection: self.connection,
+        }
     }
 }
 
@@ -671,7 +690,7 @@ pub struct BootstrapRuntime {
     intent_id: String,
     guard: GuardSession,
     _capture: CaptureSession,
-    _importers: Vec<ImporterSession>,
+    importers: Vec<(String, ImportedSnapshotSession)>,
 }
 impl BootstrapRuntime {
     pub fn start(
@@ -726,7 +745,7 @@ impl BootstrapRuntime {
                 &intent.table_set_fingerprint,
             )?;
             store.acknowledge_import(&intent.intent_id, &assignment.importer_id)?;
-            importers.push(importer);
+            importers.push((assignment.importer_id.clone(), importer.into_acknowledged()));
         }
         store.release_exporter(&intent.intent_id)?;
         drop(exporter);
@@ -735,8 +754,25 @@ impl BootstrapRuntime {
             intent_id: intent.intent_id,
             guard,
             _capture: capture,
-            _importers: importers,
+            importers,
         })
+    }
+
+    /// Transfers one acknowledged imported session to its assigned planner worker. The runtime
+    /// never exposes a connection before the acknowledgement transaction has committed, and a
+    /// capability can be taken only once.
+    pub fn take_importer(
+        &mut self,
+        importer_id: &str,
+    ) -> Result<ImportedSnapshotSession, BootstrapError> {
+        let position = self
+            .importers
+            .iter()
+            .position(|(id, _)| id == importer_id)
+            .ok_or(BootstrapError::Conflict(
+                "M3_IMPORTER_CAPABILITY_UNAVAILABLE",
+            ))?;
+        Ok(self.importers.swap_remove(position).1)
     }
 
     pub fn keepalive(&mut self) -> Result<(), BootstrapError> {
