@@ -473,7 +473,7 @@ def validate() -> tuple[list[dict], dict]:
     if set(contract["fixture_ids"]) != ids:
         fail(findings, "E_FIXTURE_INVENTORY", "contract/fixture_ids", "contract and vector IDs differ")
     limits = contract["limits"]
-    if (limits["canonical_key_components"], limits["key_component_bytes"], limits["scalar_bytes"], limits["row_bytes"], limits["event_bytes"]) != (32, 1024, 1048576, 4194304, 8388608):
+    if (limits["canonical_key_components"], limits["key_component_bytes"], limits["scalar_bytes"], limits["row_bytes"], limits["event_bytes"]) != (8, 1024, 1048576, 4194304, 8388608):
         fail(findings, "E_LIMIT_LITERAL", "contract/limits", "recommended limits changed")
     if contract["hashing"]["algorithm"] != "SHA-256" or contract["hashing"]["field_framing"] != "u64-be byte length followed by bytes":
         fail(findings, "E_HASH_LITERAL", "contract/hashing", "hash ABI changed")

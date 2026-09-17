@@ -108,7 +108,6 @@
     }
   ],
   "untouched_provisional_owners": [
-    "boring-cdc-d-archive-durability",
     "boring-cdc-d-backfill",
     "boring-cdc-d-ch-accept",
     "boring-cdc-d-ddl",

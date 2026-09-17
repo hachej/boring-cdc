@@ -64,4 +64,4 @@ Later execution belongs to `boring-cdc-m1-ordering`, `boring-cdc-m1-decoder`, an
 
 The envelope/schema, hash domains, field order/width, tags, canonical type matrix, size limits, identity inputs, source-order tuple, control routes, and failure outcomes are ABI. Additive optional envelope fields require a new schema minor version only after old readers are proven to ignore them; this v1 schema deliberately rejects unknown fields, so current v1 additions require a new schema URI/version. Any change to canonical bytes, hash inputs/domain/framing, required fields, meanings, routing, or ordering requires a new major event format and explicit migration or new capture epoch/full re-seed. Hash/version comparison across capture epochs is forbidden.
 
-The recommended constants are provisional pending owner card `59a63169`; decision Bead state remains separately governed. This artifact records recommendations without approving or materializing any blocked decision.
+Owner card `59a63169` accepted these exact constants; decision Bead lifecycle remains separately governed.

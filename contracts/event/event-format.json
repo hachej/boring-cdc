@@ -112,7 +112,7 @@
     "bytea"
   ],
   "limits": {
-    "canonical_key_components": 32,
+    "canonical_key_components": 8,
     "event_bytes": 8388608,
     "key_component_bytes": 1024,
     "row_bytes": 4194304,

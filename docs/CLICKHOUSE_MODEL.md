@@ -1,8 +1,8 @@
 # ClickHouse model v1
 
-**Canonical artifact:** `contracts/clickhouse/model.json` (`ART-M0-CLICKHOUSE-MODEL`). The artifact retains the recommended values under unresolved owner card `59a63169`; it does not close or materialize decision Beads. This document is explanatory; JSON, SQL, schemas, fixtures, and their registered hashes are executable authority.
+**Canonical artifact:** `contracts/clickhouse/model.json` (`ART-M0-CLICKHOUSE-MODEL`). The artifact materializes the exact values accepted on owner card `59a63169`; decision Bead lifecycle remains separately governed. This document is explanatory; JSON, SQL, schemas, fixtures, and their registered hashes are executable authority.
 
-The directly consumed recommendations remain visibly provisional:
+The directly consumed recommendations are confirmed:
 
 
 `boring-cdc-d-wal-cap`, `boring-cdc-d-sqlite`, and `boring-cdc-d-archive-durability` are not ClickHouse-owned literals here. `boring-cdc-d-pg-protocol` and its `ARTICLE1-PROVISIONAL` candidates remain open and untouched.
