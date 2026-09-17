@@ -16,6 +16,7 @@ class EvidenceFreshnessScopeTests(unittest.TestCase):
         self.assertFalse(CORE.freshness_path_applies("boring-cdc-m2-heartbeat", "scripts/acceptance/m2_complete.sh"))
         self.assertTrue(CORE.freshness_path_applies("boring-cdc-m2-complete", "scripts/acceptance/m2_complete.sh"))
         self.assertFalse(CORE.freshness_path_applies("boring-cdc-m2-complete", "scripts/lib/core_validator.py"))
+        self.assertFalse(CORE.freshness_path_applies("boring-cdc-m2-heartbeat", "tests/test_m2_completion_freshness.py"))
 
     def test_later_milestone_paths_do_not_stale_earlier_evidence(self):
         self.assertFalse(CORE.freshness_path_applies("boring-cdc-m2-complete", "contracts/m3/planner-cases.json"))

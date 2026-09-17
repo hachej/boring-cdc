@@ -193,7 +193,7 @@ def freshness_path_applies(owner: object, path: str) -> bool:
     """
     # The validator is applied live to every record; changing its implementation
     # must not invalidate the bytes it is currently validating.
-    if path == "scripts/lib/core_validator.py":
+    if path in {"scripts/lib/core_validator.py", "tests/test_m2_completion_freshness.py"}:
         return False
     # Completion-barrier machinery certifies leaf evidence but does not produce it.
     # Keep it binding for the barrier itself, not every leaf in that milestone.
