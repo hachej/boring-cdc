@@ -26,12 +26,12 @@ CREATE TABLE IF NOT EXISTS m3_bootstrap_runtime(
  consistent_lsn TEXT CHECK(consistent_lsn IS NULL OR (length(consistent_lsn)=16 AND consistent_lsn NOT GLOB '*[^0-9A-F]*')),
  start_seq INTEGER CHECK(start_seq IS NULL OR start_seq>=0),
  exporter_liveness TEXT NOT NULL CHECK(exporter_liveness IN ('not_started','command_idle','released','lost')),
- guard_liveness TEXT NOT NULL CHECK(guard_liveness IN ('held','released','lost')),
+ guard_liveness TEXT NOT NULL CHECK(guard_liveness IN ('not_started','held','released','lost')),
  snapshot_promotable INTEGER NOT NULL CHECK(snapshot_promotable IN(0,1)),
  feedback_gate_open INTEGER NOT NULL CHECK(feedback_gate_open IN(0,1)),
  state TEXT NOT NULL CHECK(state IN ('prepared','snapshot_exported','imports_pending','imports_complete','exporter_release_permitted','exporter_released','snapshot_unusable','bootstrap_ambiguous_requires_restart','existing_slot_generation_required','full_reseed_required')),
  exporter_backend_pid INTEGER,
- guard_backend_pid INTEGER NOT NULL,
+ guard_backend_pid INTEGER,
  capture_backend_pid INTEGER,
  revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0),
  CHECK((snapshot_token IS NULL)=(consistent_lsn IS NULL)),
@@ -85,7 +85,6 @@ pub struct PrepareIntent {
     pub generation: u64,
     pub table_set_fingerprint: String,
     pub configuration_fingerprint: String,
-    pub guard_backend_pid: i32,
     pub importers: Vec<ImporterAssignment>,
     pub created_at: String,
 }
@@ -101,7 +100,6 @@ pub struct ExportResponse {
     pub snapshot_token: String,
     pub start_seq: u64,
     pub exporter_backend_pid: i32,
-    pub capture_backend_pid: i32,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReconcileDecision {
@@ -143,13 +141,32 @@ impl BootstrapStore {
             params![input.intent_id,input.capture_epoch,input.source_system_id,input.database_id,input.slot_name,input.created_at],
         )?;
         tx.execute(
-            "INSERT INTO m3_bootstrap_runtime(intent_id,generation,table_set_fingerprint,configuration_fingerprint,exporter_liveness,guard_liveness,snapshot_promotable,feedback_gate_open,state,guard_backend_pid) VALUES(?1,?2,?3,?4,'not_started','held',0,0,'prepared',?5)",
-            params![input.intent_id,input.generation,input.table_set_fingerprint,input.configuration_fingerprint,input.guard_backend_pid],
+            "INSERT INTO m3_bootstrap_runtime(intent_id,generation,table_set_fingerprint,configuration_fingerprint,exporter_liveness,guard_liveness,snapshot_promotable,feedback_gate_open,state,guard_backend_pid) VALUES(?1,?2,?3,?4,'not_started','not_started',0,0,'prepared',NULL)",
+            params![input.intent_id,input.generation,input.table_set_fingerprint,input.configuration_fingerprint],
         )?;
         for importer in &input.importers {
             tx.execute("INSERT INTO m3_bootstrap_importers(intent_id,importer_id,assigned_ranges_digest,state) VALUES(?1,?2,?3,'assigned')", params![input.intent_id,importer.importer_id,importer.assigned_ranges_digest])?;
         }
         tx.commit()?;
+        Ok(())
+    }
+
+    /// Persists guard acquisition after the prepared intent, and before slot creation.
+    pub fn record_guard_acquired(
+        &mut self,
+        intent_id: &str,
+        guard_backend_pid: i32,
+    ) -> Result<(), BootstrapError> {
+        if guard_backend_pid <= 0 {
+            return Err(BootstrapError::Invalid("M3_GUARD_PID_INVALID"));
+        }
+        let changed = self.writer.connection().execute(
+            "UPDATE m3_bootstrap_runtime SET guard_liveness='held',guard_backend_pid=?2,revision=revision+1 WHERE intent_id=?1 AND state='prepared' AND guard_liveness='not_started' AND guard_backend_pid IS NULL",
+            params![intent_id, guard_backend_pid],
+        )?;
+        if changed != 1 {
+            return Err(BootstrapError::Conflict("M3_GUARD_ACQUIRE_STALE"));
+        }
         Ok(())
     }
 
@@ -165,16 +182,14 @@ impl BootstrapStore {
             || response.snapshot_token.len() > MAX_TOKEN_BYTES
             || !response.snapshot_token.is_ascii()
             || response.exporter_backend_pid <= 0
-            || response.capture_backend_pid <= 0
-            || response.exporter_backend_pid == response.capture_backend_pid
         {
             return Err(BootstrapError::Invalid("M3_EXPORT_RESPONSE_INVALID"));
         }
         let lsn = format!("{:016X}", response.consistent_lsn);
         let tx = self.writer.connection_mut().transaction()?;
         let changed = tx.execute(
-            "UPDATE m3_bootstrap_runtime SET snapshot_token=?2,consistent_lsn=?3,start_seq=?4,exporter_liveness='command_idle',capture_backend_pid=?5,exporter_backend_pid=?6,snapshot_promotable=1,state='imports_pending',revision=revision+1 WHERE intent_id=?1 AND state='prepared' AND guard_liveness='held' AND exporter_liveness='not_started'",
-            params![intent_id,response.snapshot_token,lsn,response.start_seq,response.capture_backend_pid,response.exporter_backend_pid],
+            "UPDATE m3_bootstrap_runtime SET snapshot_token=?2,consistent_lsn=?3,start_seq=?4,exporter_liveness='command_idle',exporter_backend_pid=?5,snapshot_promotable=1,state='imports_pending',revision=revision+1 WHERE intent_id=?1 AND state='prepared' AND guard_liveness='held' AND exporter_liveness='not_started'",
+            params![intent_id,response.snapshot_token,lsn,response.start_seq,response.exporter_backend_pid],
         )?;
         if changed != 1 {
             return Err(BootstrapError::Conflict("M3_EXPORT_RESPONSE_STALE"));
@@ -191,6 +206,25 @@ impl BootstrapStore {
             ));
         }
         tx.commit()?;
+        Ok(())
+    }
+
+    /// Records the separate CopyBoth backend only after the export response transaction commits.
+    pub fn record_capture_started(
+        &mut self,
+        intent_id: &str,
+        capture_backend_pid: i32,
+    ) -> Result<(), BootstrapError> {
+        if capture_backend_pid <= 0 {
+            return Err(BootstrapError::Invalid("M3_CAPTURE_PID_INVALID"));
+        }
+        let changed = self.writer.connection().execute(
+            "UPDATE m3_bootstrap_runtime SET capture_backend_pid=?2,revision=revision+1 WHERE intent_id=?1 AND state='imports_pending' AND capture_backend_pid IS NULL AND exporter_backend_pid!=?2",
+            params![intent_id, capture_backend_pid],
+        )?;
+        if changed != 1 {
+            return Err(BootstrapError::Conflict("M3_CAPTURE_START_STALE"));
+        }
         Ok(())
     }
 
@@ -391,7 +425,6 @@ fn valid_id(value: &str) -> bool {
 }
 fn validate_prepare(input: &PrepareIntent) -> Result<(), BootstrapError> {
     if input.generation == 0
-        || input.guard_backend_pid <= 0
         || input.importers.is_empty()
         || input.importers.len() > 16
         || ![
@@ -504,10 +537,15 @@ impl GuardSession {
             .map_err(|_| BootstrapError::Conflict("M3_GUARD_CONNECT_FAILED"))?;
         let backend_pid = query_pid(&mut connection)?;
         connection.exec(&format!("SET statement_timeout='{statement_timeout_ms}ms'; SET idle_in_transaction_session_timeout='{idle_timeout_ms}ms'; BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY")).map_err(|_|BootstrapError::Conflict("M3_GUARD_BEGIN_FAILED"))?;
-        let locked = relations
+        let mut locked = relations
             .iter()
             .map(|r| quote_relation(r))
             .collect::<Result<Vec<_>, _>>()?;
+        locked.sort_unstable();
+        locked.dedup();
+        if locked.len() != relations.len() {
+            return Err(BootstrapError::Invalid("M3_GUARD_RELATION_DUPLICATE"));
+        }
         connection
             .exec(&format!(
                 "LOCK TABLE {} IN ACCESS SHARE MODE",
@@ -550,8 +588,8 @@ impl ImporterSession {
         }
         let mut connection = pg_walstream::PgReplicationConnection::connect(dsn)
             .map_err(|_| BootstrapError::Conflict("M3_IMPORTER_CONNECT_FAILED"))?;
-        let backend_pid = query_pid(&mut connection)?;
         connection.exec(&format!("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET TRANSACTION SNAPSHOT '{snapshot_token}'; SET LOCAL statement_timeout='{statement_timeout_ms}ms'; SET LOCAL idle_in_transaction_session_timeout='{idle_timeout_ms}ms'")).map_err(|_|BootstrapError::Conflict("M3_SNAPSHOT_IMPORT_FAILED"))?;
+        let backend_pid = query_pid(&mut connection)?;
         Ok(Self {
             connection,
             backend_pid,
@@ -739,7 +777,6 @@ mod tests {
             generation: 1,
             table_set_fingerprint: "tables".into(),
             configuration_fingerprint: "config".into(),
-            guard_backend_pid: 11,
             importers: vec![ImporterAssignment {
                 importer_id: "worker-0".into(),
                 assigned_ranges_digest: digest_assignment(b"all"),
@@ -749,6 +786,7 @@ mod tests {
     }
     fn exported(s: &mut BootstrapStore) {
         s.prepare(&intent()).unwrap();
+        s.record_guard_acquired("intent", 11).unwrap();
         s.persist_export_response(
             "intent",
             &ExportResponse {
@@ -756,10 +794,23 @@ mod tests {
                 snapshot_token: String::from(concat!("00000003-", "00000001-1")),
                 start_seq: 0,
                 exporter_backend_pid: 12,
-                capture_backend_pid: 13,
             },
         )
         .unwrap();
+        let capture_pid: Option<i32> = s
+            .writer
+            .connection()
+            .query_row(
+                "SELECT capture_backend_pid FROM m3_bootstrap_runtime WHERE intent_id='intent'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            capture_pid, None,
+            "CopyBoth cannot predate token durability"
+        );
+        s.record_capture_started("intent", 13).unwrap();
     }
     #[test]
     fn intent_is_durable_before_export_and_floor_is_separate() {
@@ -774,6 +825,7 @@ mod tests {
         assert_eq!(st.start_seq, Some(0));
     }
     fn exported_after_prepare(s: &mut BootstrapStore) {
+        s.record_guard_acquired("intent", 11).unwrap();
         s.persist_export_response(
             "intent",
             &ExportResponse {
@@ -781,11 +833,12 @@ mod tests {
                 snapshot_token: String::from(concat!("00000003-", "00000001-1")),
                 start_seq: 0,
                 exporter_backend_pid: 12,
-                capture_backend_pid: 13,
             },
         )
         .unwrap();
+        s.record_capture_started("intent", 13).unwrap();
     }
+
     #[test]
     fn importer_acknowledgements_gate_exporter_release() {
         let (_p, mut s) = store();
