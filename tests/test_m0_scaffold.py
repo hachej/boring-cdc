@@ -1,7 +1,9 @@
 import json
+import os
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -154,6 +156,89 @@ class ScaffoldTests(unittest.TestCase):
                     path.write_bytes(original)
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(relative, result.stderr)
+
+    def test_clean_pull_verifies_raw_manifests_before_build(self):
+        source = (ROOT / "scripts/lib/m0_scaffold.py").read_text()
+        invocation = 'run_record(["python3","scripts/validate/compose_manifests.py"],proof,clean_env)'
+        verify = source.index(invocation)
+        build = source.index('["docker","buildx","create"')
+        start = source.index('["docker","compose","-f","compose.yaml","up"')
+        self.assertLess(verify, build)
+        self.assertLess(verify, start)
+        self.assertNotIn(invocation[:-1] + ',78)', source)
+        self.assertIn('clean_env=isolated_clean_environment(cli_config,proof_root,author_timestamp,os.environ)', source)
+        self.assertIn('"--build-arg",f"SOURCE_DATE_EPOCH={author_timestamp}"', source)
+
+    def test_outer_launcher_environment_ignores_hostile_ambient_values(self):
+        hostile = {
+            "DOCKER_CONFIG": "/attacker/docker", "DOCKER_HOST": "tcp://attacker",
+            "DOCKER_TLS_VERIFY": "1", "DOCKER_CERT_PATH": "/attacker/certs",
+            "BUILDKIT_HOST": "tcp://attacker", "COMPOSE_FILE": "attacker.yml",
+            "COMPOSE_PROFILES": "attacker", "DOCKER_CONTEXT": "attacker",
+            "DOCKER_DEFAULT_PLATFORM": "linux/arm64", "HTTP_PROXY": "http://attacker",
+            "HTTPS_PROXY": "http://attacker", "NO_PROXY": "", "ALL_PROXY": "http://attacker",
+            "CARGO_HOME": "/attacker/cargo", "RUSTUP_HOME": "/attacker/rustup",
+            "RUSTFLAGS": "-C target-cpu=native", "PATH": "/attacker/bin",
+        }
+        outer = m0_scaffold.outer_launcher_environment(
+            Path("/isolated/docker"), Path("/isolated/home"), hostile
+        )
+        self.assertEqual(m0_scaffold.OUTER_LAUNCH_ENVIRONMENT_KEYS, set(outer))
+        self.assertEqual("/isolated/docker", outer["DOCKER_CONFIG"])
+        self.assertEqual("/isolated/home", outer["HOME"])
+        self.assertEqual("/usr/bin:/bin", outer["PATH"])
+        self.assertFalse(set(hostile) - {"DOCKER_CONFIG", "PATH"} & set(outer))
+        source = (ROOT / "scripts/lib/m0_scaffold.py").read_text()
+        self.assertIn("outer=outer_launcher_environment(cli_config,launcher_home,os.environ)", source)
+        self.assertIn("docker=trusted_docker_executable()", source)
+
+    def test_execute_uses_isolated_outer_launcher_under_hostile_ambient(self):
+        hostile = {
+            "DOCKER_CONFIG": "/attacker/docker", "DOCKER_HOST": "tcp://attacker",
+            "DOCKER_TLS_VERIFY": "1", "DOCKER_CERT_PATH": "/attacker/certs",
+            "BUILDKIT_HOST": "tcp://attacker", "COMPOSE_FILE": "attacker.yml",
+            "HTTP_PROXY": "http://attacker", "HTTPS_PROXY": "http://attacker",
+            "CARGO_HOME": "/attacker/cargo", "RUSTUP_HOME": "/attacker/rustup",
+            "RUSTFLAGS": "-C target-cpu=native", "PATH": "/attacker/bin",
+        }
+        observed = {}
+
+        def stop_at_first_launch(argv, **kwargs):
+            observed["argv"] = argv
+            observed["env"] = kwargs["env"]
+            raise RuntimeError("launch observed")
+
+        def fake_git(*args):
+            return "a" * 40 if args == ("rev-parse", "HEAD") else "1789654678"
+
+        with patch.dict(os.environ, hostile, clear=True), \
+             patch.object(m0_scaffold, "validate", return_value=[]), \
+             patch.object(m0_scaffold, "source_snapshot", return_value="source-digest"), \
+             patch.object(m0_scaffold, "git", side_effect=fake_git), \
+             patch.object(m0_scaffold, "trusted_docker_executable", return_value="/usr/bin/docker"), \
+             patch.object(m0_scaffold.subprocess, "run", side_effect=stop_at_first_launch):
+            with self.assertRaisesRegex(RuntimeError, "launch observed"):
+                m0_scaffold.execute(Path("unused"))
+
+        self.assertEqual(["/usr/bin/docker", "rm", "-f", "m0-scaffold-dind-aaaaaaaaaaaa"], observed["argv"])
+        self.assertEqual(m0_scaffold.OUTER_LAUNCH_ENVIRONMENT_KEYS, set(observed["env"]))
+        self.assertEqual("/usr/bin:/bin", observed["env"]["PATH"])
+        self.assertNotIn("DOCKER_HOST", observed["env"])
+        self.assertNotIn("HTTP_PROXY", observed["env"])
+        self.assertTrue(observed["env"]["DOCKER_CONFIG"].startswith("/var/tmp/m0-scaffold-"))
+
+    def test_clean_environment_ignores_all_ambient_values(self):
+        hostile = {
+            "DOCKER_HOST": "tcp://attacker", "COMPOSE_FILE": "attacker.yml",
+            "HTTP_PROXY": "http://attacker", "RUSTFLAGS": "-C target-cpu=native",
+            "CARGO_HOME": "/attacker/cargo", "RUSTUP_HOME": "/attacker/rustup",
+            "PATH": "/attacker/bin", "SOURCE_DATE_EPOCH": "0",
+        }
+        clean = m0_scaffold.isolated_clean_environment(Path("/isolated/docker"), Path("/isolated/home"), "1789654678", hostile)
+        self.assertEqual(m0_scaffold.CLEAN_ENVIRONMENT_KEYS, set(clean))
+        self.assertEqual("/usr/bin:/bin", clean["PATH"])
+        self.assertEqual("1789654678", clean["SOURCE_DATE_EPOCH"])
+        self.assertFalse(set(hostile) - {"PATH", "SOURCE_DATE_EPOCH"} & set(clean))
 
     def test_package_excludes_internal_metadata_and_evidence(self):
         out = json.loads(run("scripts/validate/scaffold_package.sh").stdout)
