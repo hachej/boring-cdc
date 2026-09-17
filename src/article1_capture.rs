@@ -14,23 +14,14 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fmt;
 
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const POSTGRES_VERSION_NUM: i32 = 170_006;
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const PUBLICATION: &str = "article1_publication";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const SLOT: &str = "article1_slot";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const PROTO_VERSION: &str = "1";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const ORIGIN: &str = "any";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const STREAMING: &str = "false";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const TWO_PHASE: &str = "false";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const BINARY: &str = "false";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const TABLES_CSV: &str = "public.customers,public.order_items,public.orders,public.products";
 
 #[derive(Clone, Copy)]
@@ -39,25 +30,46 @@ struct Expectations<'a> {
     publication: &'a str,
     slot: &'a str,
     tables_csv: &'a str,
+    publication_operations: &'a str,
     continuity_available: bool,
 }
 
-const PROVISIONAL_EXPECTATIONS: Expectations<'static> = Expectations {
+#[cfg(test)]
+const ARTICLE1_EXPECTATIONS: Expectations<'static> = Expectations {
     version: POSTGRES_VERSION_NUM,
     publication: PUBLICATION,
     slot: SLOT,
     tables_csv: TABLES_CSV,
+    publication_operations: "1,1,1,0",
     continuity_available: true,
 };
 
-const START_OPTIONS: [(&str, &str); 6] = [
-    ("proto_version", PROTO_VERSION), // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-    ("publication_names", PUBLICATION), // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-    ("origin", ORIGIN),               // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-    ("streaming", STREAMING),         // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-    ("two_phase", TWO_PHASE),         // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-    ("binary", BINARY),               // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-];
+fn start_options(publication: &str) -> [(&str, &str); 6] {
+    [
+        ("proto_version", PROTO_VERSION),
+        ("publication_names", publication),
+        ("origin", ORIGIN),
+        ("streaming", STREAMING),
+        ("two_phase", TWO_PHASE),
+        ("binary", BINARY),
+    ]
+}
+
+pub(crate) fn valid_pg_identifier(value: &str) -> bool {
+    let mut chars = value.chars();
+    value.len() <= 63
+        && matches!(chars.next(), Some('a'..='z' | 'A'..='Z' | '_'))
+        && chars.all(|character| character.is_ascii_alphanumeric() || character == '_')
+}
+
+fn valid_relation(value: &str) -> bool {
+    let mut parts = value.split('.');
+    matches!(
+        (parts.next(), parts.next(), parts.next()),
+        (Some(schema), Some(table), None)
+            if valid_pg_identifier(schema) && valid_pg_identifier(table)
+    )
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CaptureFailure {
@@ -79,11 +91,15 @@ impl fmt::Display for CaptureFailure {
 
 impl std::error::Error for CaptureFailure {}
 
-/// Configuration intentionally permits only connection location and a caller-owned finite stop.
+/// Validated connection and single-publication/single-slot protocol configuration.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CaptureConfig {
     pub dsn: String,
     pub stop_after_commits: usize,
+    publication: String,
+    slot: String,
+    tables_csv: String,
+    publication_operations: &'static str,
 }
 
 impl CaptureConfig {
@@ -91,21 +107,82 @@ impl CaptureConfig {
         dsn: impl Into<String>,
         stop_after_commits: usize,
     ) -> Result<Self, CaptureFailure> {
+        Self::new(
+            dsn,
+            stop_after_commits,
+            PUBLICATION,
+            SLOT,
+            TABLES_CSV.split(',').map(str::to_owned),
+            "1,1,1,0",
+            "ARTICLE1_CONFIG_INVALID",
+        )
+    }
+
+    pub(crate) fn production(
+        dsn: impl Into<String>,
+        publication: impl Into<String>,
+        slot: impl Into<String>,
+        tables: impl IntoIterator<Item = String>,
+    ) -> Result<Self, CaptureFailure> {
+        Self::new(
+            dsn,
+            usize::MAX,
+            publication,
+            slot,
+            tables.into_iter().chain([
+                crate::m1_control_fixtures::HEARTBEAT_RELATION.to_owned(),
+                crate::m1_control_fixtures::FENCE_RELATION.to_owned(),
+            ]),
+            "1,1,1,1",
+            "M2_PROTOCOL_CONFIG_INVALID",
+        )
+    }
+
+    fn new(
+        dsn: impl Into<String>,
+        stop_after_commits: usize,
+        publication: impl Into<String>,
+        slot: impl Into<String>,
+        tables: impl IntoIterator<Item = String>,
+        publication_operations: &'static str,
+        invalid_code: &'static str,
+    ) -> Result<Self, CaptureFailure> {
         let dsn = dsn.into();
+        let publication = publication.into();
+        let slot = slot.into();
+        let mut tables = tables.into_iter().collect::<Vec<_>>();
+        tables.sort();
         if dsn.trim().is_empty()
             || dsn.contains("replication=")
             || dsn.contains('\n')
             || stop_after_commits == 0
+            || !valid_pg_identifier(&publication)
+            || !valid_pg_identifier(&slot)
+            || tables.is_empty()
+            || tables.iter().any(|table| !valid_relation(table))
         {
-            return Err(CaptureFailure::at(
-                "configuration",
-                "ARTICLE1_CONFIG_INVALID",
-            ));
+            return Err(CaptureFailure::at("configuration", invalid_code));
         }
+        tables.dedup();
         Ok(Self {
             dsn,
             stop_after_commits,
+            publication,
+            slot,
+            tables_csv: tables.join(","),
+            publication_operations,
         })
+    }
+
+    fn expectations(&self) -> Expectations<'_> {
+        Expectations {
+            version: POSTGRES_VERSION_NUM,
+            publication: &self.publication,
+            slot: &self.slot,
+            tables_csv: &self.tables_csv,
+            publication_operations: self.publication_operations,
+            continuity_available: true,
+        }
     }
 }
 
@@ -187,7 +264,7 @@ where
 pub(crate) fn setup_runtime(
     config: &CaptureConfig,
 ) -> Result<(PgReplicationConnection, BTreeMap<u32, RelationContract>), CaptureFailure> {
-    let contracts = preflight(config, &PROVISIONAL_EXPECTATIONS)?;
+    let contracts = preflight(config, &config.expectations())?;
     let replication_dsn = if config.dsn.contains('?') {
         format!("{}&replication=database", config.dsn)
     } else {
@@ -201,8 +278,9 @@ pub(crate) fn setup_runtime(
             "ARTICLE1_VERSION_MISMATCH",
         ));
     }
+    let options = start_options(&config.publication);
     connection
-        .start_replication(SLOT, 0, &START_OPTIONS)
+        .start_replication(&config.slot, 0, &options)
         .map_err(|_| {
             CaptureFailure::at("start_replication", "ARTICLE1_START_REPLICATION_FAILED")
         })?;
@@ -228,7 +306,9 @@ fn preflight(
     let publication = connection
         .exec(&publication_query)
         .map_err(|_| CaptureFailure::at("publication", "ARTICLE1_PUBLICATION_QUERY_FAILED"))?;
-    if publication.ntuples() != 1 || publication.get_value(0, 0).as_deref() != Some("1,1,1,0") {
+    if publication.ntuples() != 1
+        || publication.get_value(0, 0).as_deref() != Some(expected.publication_operations)
+    {
         return Err(CaptureFailure::at(
             "publication",
             "ARTICLE1_PUBLICATION_MISMATCH",
@@ -443,7 +523,7 @@ mod tests {
     #[test]
     fn exact_options_and_fail_closed_config_are_stable() {
         assert_eq!(
-            START_OPTIONS,
+            start_options(PUBLICATION),
             [
                 ("proto_version", "1"),
                 ("publication_names", "article1_publication"),
@@ -475,6 +555,48 @@ mod tests {
                 .code,
             "ARTICLE1_PROTOCOL_REJECTED"
         );
+    }
+
+    #[test]
+    fn production_protocol_names_are_runtime_configured_and_injection_safe() {
+        let configured = CaptureConfig::production(
+            "postgresql://x/y",
+            "tenant_publication",
+            "tenant_slot",
+            ["audit.events".into(), "public.orders".into()],
+        )
+        .unwrap();
+        assert_eq!(configured.publication, "tenant_publication");
+        assert_eq!(configured.slot, "tenant_slot");
+        assert_eq!(
+            configured.tables_csv,
+            "audit.events,boring_cdc_control.capture_fences,boring_cdc_control.heartbeat,public.orders"
+        );
+        assert_eq!(configured.publication_operations, "1,1,1,1");
+        assert_eq!(
+            start_options(&configured.publication)[1],
+            ("publication_names", "tenant_publication")
+        );
+
+        for (publication, slot, table) in [
+            ("bad';DROP PUBLICATION x;--", "safe_slot", "public.orders"),
+            ("safe_publication", "bad-slot", "public.orders"),
+            ("safe_publication", "safe_slot", "public.orders.extra"),
+            ("safe_publication", "safe_slot", "public.bad table"),
+        ] {
+            assert_eq!(
+                CaptureConfig::production(
+                    "postgresql://x/y",
+                    publication,
+                    slot,
+                    [table.to_owned()]
+                )
+                .unwrap_err()
+                .code,
+                "M2_PROTOCOL_CONFIG_INVALID"
+            );
+        }
+        assert!(!valid_pg_identifier(&format!("p{}", "x".repeat(63))));
     }
 
     #[test]
@@ -534,7 +656,7 @@ mod tests {
             (
                 Expectations {
                     version: 170_005,
-                    ..PROVISIONAL_EXPECTATIONS
+                    ..ARTICLE1_EXPECTATIONS
                 },
                 "server_version",
                 "ARTICLE1_VERSION_MISMATCH",
@@ -542,7 +664,7 @@ mod tests {
             (
                 Expectations {
                     publication: "wrong_publication",
-                    ..PROVISIONAL_EXPECTATIONS
+                    ..ARTICLE1_EXPECTATIONS
                 },
                 "publication",
                 "ARTICLE1_PUBLICATION_MISMATCH",
@@ -550,7 +672,7 @@ mod tests {
             (
                 Expectations {
                     slot: "wrong_slot",
-                    ..PROVISIONAL_EXPECTATIONS
+                    ..ARTICLE1_EXPECTATIONS
                 },
                 "slot",
                 "ARTICLE1_SLOT_MISMATCH",
@@ -558,7 +680,7 @@ mod tests {
             (
                 Expectations {
                     tables_csv: "other.customers",
-                    ..PROVISIONAL_EXPECTATIONS
+                    ..ARTICLE1_EXPECTATIONS
                 },
                 "publication",
                 "ARTICLE1_PUBLICATION_TABLES_MISMATCH",
@@ -566,7 +688,7 @@ mod tests {
             (
                 Expectations {
                     continuity_available: false,
-                    ..PROVISIONAL_EXPECTATIONS
+                    ..ARTICLE1_EXPECTATIONS
                 },
                 "wal_continuity",
                 "ARTICLE1_CONTINUITY_UNAVAILABLE",

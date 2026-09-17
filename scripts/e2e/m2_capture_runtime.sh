@@ -15,12 +15,17 @@ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" up -d --wai
 psqlc(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" exec -T postgres psql -v ON_ERROR_STOP=1 -U boring_cdc -d boring_cdc "$@"; }
 psqlc <<'SQL' >/dev/null
 CREATE TABLE customers(id bigint primary key,name text,tier int); CREATE TABLE order_items(id bigint primary key); CREATE TABLE orders(id bigint primary key); CREATE TABLE products(id bigint primary key);
-CREATE PUBLICATION article1_publication FOR TABLE customers,order_items,orders,products WITH (publish='insert,update,delete');
-SELECT * FROM pg_create_logical_replication_slot('article1_slot','pgoutput');
+CREATE SCHEMA boring_cdc_control;
+CREATE TABLE boring_cdc_control.heartbeat(id text PRIMARY KEY,nonce bigint NOT NULL,updated_at timestamptz NOT NULL);
+CREATE TABLE boring_cdc_control.capture_fences(id text PRIMARY KEY,capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint text NOT NULL,unique_nonce bigint NOT NULL);
+INSERT INTO boring_cdc_control.heartbeat VALUES('singleton',0,clock_timestamp());
+INSERT INTO boring_cdc_control.capture_fences VALUES('singleton',0,0,repeat('0',64),0);
+CREATE PUBLICATION boring_publication FOR TABLE orders,boring_cdc_control.heartbeat,boring_cdc_control.capture_fences WITH (publish='insert,update,delete,truncate');
+SELECT * FROM pg_create_logical_replication_slot('boring_slot','pgoutput');
 SQL
 cargo build --quiet --locked --bin boring-cdc
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run/state" "$work/run/state/spool"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
-sed -i 's/publication = "boring_publication"/publication = "article1_publication"/; s/slot = "boring_slot"/slot = "article1_slot"/; s#sqlite_path = "state/boring.db"#sqlite_path = "state/journal.sqlite"#' "$work/run/boring-cdc.toml"
+sed -i 's#sqlite_path = "state/boring.db"#sqlite_path = "state/journal.sqlite"#' "$work/run/boring-cdc.toml"
 dsn="postgresql://boring_cdc@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_RUNTIME="$dsn" PG_CONTROL="${dsn}&application_name=control" PG_ADMIN="${dsn}&application_name=admin"
 export CH_RUNTIME='https://runtime:runtime-only@127.0.0.1:8443' CH_MAINT='https://maint:maint-only@127.0.0.1:8443'
@@ -40,13 +45,13 @@ PY2
   cd "$work/run"
   exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/runtime.out" 2>"$work/runtime.err"
 ) & pid=$!
-deadline=$((SECONDS+30)); until [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='article1_slot'")" == 1 ]]; do (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }; sleep .1; done
+deadline=$((SECONDS+30)); until [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='boring_slot'")" == 1 ]]; do (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }; sleep .1; done
 python3 - "$work/run/state/journal.sqlite" "$work/sqlite-locked" <<'PY2' & lock_pid=$!
 import pathlib,sqlite3,sys,time
 c=sqlite3.connect(sys.argv[1]); c.execute('BEGIN IMMEDIATE'); pathlib.Path(sys.argv[2]).touch(); time.sleep(2); c.commit()
 PY2
 deadline=$((SECONDS+10)); until [[ -e "$work/sqlite-locked" ]]; do (( SECONDS < deadline )); sleep .02; done
-psqlc -c "BEGIN; INSERT INTO customers VALUES(1,'one',1); UPDATE customers SET name='two' WHERE id=1; COMMIT" >/dev/null
+psqlc -c "BEGIN; INSERT INTO orders VALUES(1); UPDATE orders SET id=id WHERE id=1; COMMIT" >/dev/null
 sleep .25
 blocked_transactions=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
 import sqlite3,sys
