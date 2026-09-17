@@ -316,7 +316,7 @@ impl FenceStore {
             .connection_mut()
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         let proof:Option<(String,i64,String,String,i64,i64,String)>=tx.query_row(
-            "SELECT g.state,x.generation,b.capture_epoch,x.table_set_fingerprint,(SELECT count(*) FROM backfill_chunks c WHERE c.generation_id=g.generation_id AND c.state!='complete'),(SELECT count(*) FROM m3_bootstrap_importers i WHERE i.intent_id=x.intent_id AND i.state!='acknowledged'),f.state FROM backfill_generations g JOIN backfill_runs b ON b.run_id=g.run_id JOIN m3_bootstrap_runtime x ON x.intent_id=?2 JOIN m3_planner_runs p ON p.generation_id=g.generation_id AND p.bootstrap_intent_id=x.intent_id JOIN m3_feedback_gates f ON f.intent_id=x.intent_id AND f.generation=x.generation WHERE g.generation_id=?1",
+            "SELECT g.state,x.generation,b.capture_epoch,x.table_set_fingerprint,(SELECT count(*) FROM backfill_chunks c WHERE c.generation_id=g.generation_id AND c.state!='complete'),(SELECT count(*) FROM m3_bootstrap_importers i WHERE i.intent_id=x.intent_id AND i.state!='acknowledged'),f.state FROM backfill_generations g JOIN backfill_runs b ON b.run_id=g.run_id JOIN destinations d ON d.destination_id=b.destination_id JOIN m3_bootstrap_runtime x ON x.intent_id=?2 JOIN m3_planner_runs p ON p.generation_id=g.generation_id AND p.bootstrap_intent_id=x.intent_id JOIN bootstrap_imports i ON i.intent_id=x.intent_id AND i.destination_id=d.destination_id AND i.state='acknowledged' JOIN m3_canonical_import_proofs q ON q.import_id=i.import_id AND q.configuration_fingerprint=x.configuration_fingerprint AND q.configuration_fingerprint=d.configuration_fingerprint JOIN m3_feedback_gates f ON f.intent_id=x.intent_id AND f.generation=x.generation WHERE g.generation_id=?1",
             params![input.generation_id,input.bootstrap_intent_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?))).optional()?;
         let Some((state, generation, epoch, tables, incomplete, pending_imports, gate)) = proof
         else {
@@ -476,7 +476,10 @@ impl FenceStore {
         )?;
         if first {
             tx.execute("INSERT INTO durable_capture_fences(fence_id,capture_epoch,generation,nonce,transaction_id,post_copy_fence_lsn,post_copy_fence_seq,first_proof) VALUES(?1,?2,?3,?4,?5,?6,?7,1)",params![format!("fence:{}",intent_id),intent.2,intent.3,intent.4,transaction_id,lsn,seq])?;
-            let snapshot:(String,i64,String,String,i64)=tx.query_row("SELECT x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint,json_group_array(DISTINCT i.snapshot_schema_fingerprint),x.start_seq FROM m3_bootstrap_runtime x JOIN m3_planner_runs p ON p.bootstrap_intent_id=x.intent_id AND p.generation_id=?2 JOIN m3_bootstrap_importers i ON i.intent_id=x.intent_id WHERE x.intent_id=?1 GROUP BY x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint",params![intent.1,intent.0],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?)))?;
+            let snapshot:Option<(String,i64,String,String,i64)>=tx.query_row("SELECT x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint,json_group_array(DISTINCT i.snapshot_schema_fingerprint),x.start_seq FROM m3_bootstrap_runtime x JOIN m3_planner_runs p ON p.bootstrap_intent_id=x.intent_id AND p.generation_id=?2 JOIN backfill_generations g ON g.generation_id=p.generation_id JOIN backfill_runs b ON b.run_id=g.run_id JOIN destinations d ON d.destination_id=b.destination_id JOIN bootstrap_imports bi ON bi.intent_id=x.intent_id AND bi.destination_id=d.destination_id AND bi.state='acknowledged' JOIN m3_canonical_import_proofs q ON q.import_id=bi.import_id AND q.configuration_fingerprint=x.configuration_fingerprint AND q.configuration_fingerprint=d.configuration_fingerprint JOIN m3_bootstrap_importers i ON i.intent_id=x.intent_id WHERE x.intent_id=?1 GROUP BY x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint",params![intent.1,intent.0],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).optional()?;
+            let Some(snapshot) = snapshot else {
+                return Err(FenceError::Conflict("M3_FENCE_DESTINATION_BINDING_STALE"));
+            };
             tx.execute("UPDATE backfill_generations SET state='complete' WHERE generation_id=?1 AND state='fencing'",[&intent.0])?;
             tx.execute("UPDATE backfill_runs SET state='complete',revision=revision+1 WHERE run_id=(SELECT run_id FROM backfill_generations WHERE generation_id=?1) AND state='running'",[&intent.0])?;
             tx.execute("INSERT INTO bootstrap_anchors(anchor_id,capture_epoch,generation,lower_stitch_lsn,start_seq,snapshot_boundary_lsn,snapshot_complete_seq,post_copy_fence_nonce,post_copy_fence_lsn,post_copy_fence_seq,table_set_fingerprint,snapshot_schema_fingerprints,state,expires_at,generation_id,bootstrap_intent_id) VALUES(?1,?2,?3,NULL,?14,?4,?5,?6,?7,?8,?9,?10,'complete',?11,?12,?13)",params![intent.6,intent.2,intent.3,snapshot.0,snapshot.1,intent.4,lsn,seq,snapshot.2,snapshot.3,intent.7,intent.0,intent.1,snapshot.4])?;
@@ -596,9 +599,9 @@ mod tests {
     }
     fn setup(name: &str) -> FenceStore {
         let w = writer(name);
-        w.connection().execute_batch("CREATE TABLE m3_bootstrap_runtime(intent_id TEXT PRIMARY KEY,generation INTEGER,start_seq INTEGER,consistent_lsn TEXT,table_set_fingerprint TEXT,state TEXT,exporter_liveness TEXT,guard_liveness TEXT,snapshot_promotable INTEGER,feedback_gate_open INTEGER,revision INTEGER); CREATE TABLE m3_bootstrap_importers(intent_id TEXT,importer_id TEXT,state TEXT,revision INTEGER,snapshot_schema_fingerprint TEXT,PRIMARY KEY(intent_id,importer_id)); CREATE TABLE m3_planner_runs(generation_id TEXT,bootstrap_intent_id TEXT,next_snapshot_seq INTEGER); CREATE TABLE m3_chunk_claims(generation_id TEXT);").unwrap();
+        w.connection().execute_batch("CREATE TABLE m3_bootstrap_runtime(intent_id TEXT PRIMARY KEY,generation INTEGER,start_seq INTEGER,consistent_lsn TEXT,table_set_fingerprint TEXT,state TEXT,exporter_liveness TEXT,guard_liveness TEXT,snapshot_promotable INTEGER,feedback_gate_open INTEGER,revision INTEGER,configuration_fingerprint TEXT); CREATE TABLE m3_bootstrap_importers(intent_id TEXT,importer_id TEXT,state TEXT,revision INTEGER,snapshot_schema_fingerprint TEXT,PRIMARY KEY(intent_id,importer_id)); CREATE TABLE m3_planner_runs(generation_id TEXT,bootstrap_intent_id TEXT,next_snapshot_seq INTEGER); CREATE TABLE m3_canonical_import_proofs(import_id TEXT PRIMARY KEY,configuration_fingerprint TEXT); CREATE TABLE m3_chunk_claims(generation_id TEXT);").unwrap();
         install(w.connection()).unwrap();
-        w.connection().execute_batch("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','1',1); INSERT INTO bootstrap_intents VALUES('boot','1','sys','db','slot','0000000000000001','slot_created',0,'now'); INSERT INTO m3_bootstrap_runtime VALUES('boot',1,0,'0000000000000001','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','exporter_released','released','held',1,1,0); INSERT INTO m3_bootstrap_importers VALUES('boot','worker','acknowledged',0,'schema'); INSERT INTO m3_feedback_gates VALUES('boot',1,'open',NULL,0); INSERT INTO bootstrap_imports VALUES('import','boot','d','acknowledged',0); INSERT INTO backfill_runs VALUES('run','d','1','running',0); INSERT INTO backfill_generations VALUES('gen','run',1,NULL,'fencing'); INSERT INTO backfill_chunks VALUES('chunk','gen',X'',X'','complete',5,'sum'); INSERT INTO m3_planner_runs VALUES('gen','boot',5); INSERT INTO relation_schemas VALUES('schema','1','rel',X'00','sum',1);").unwrap();
+        w.connection().execute_batch("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','1',1); INSERT INTO bootstrap_intents VALUES('boot','1','sys','db','slot','0000000000000001','slot_created',0,'now'); INSERT INTO m3_bootstrap_runtime VALUES('boot',1,0,'0000000000000001','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','exporter_released','released','held',1,1,0,'cfg'); INSERT INTO m3_bootstrap_importers VALUES('boot','worker','acknowledged',0,'schema'); INSERT INTO m3_feedback_gates VALUES('boot',1,'open',NULL,0); INSERT INTO bootstrap_imports VALUES('import','boot','d','acknowledged',0); INSERT INTO m3_canonical_import_proofs VALUES('import','cfg'); INSERT INTO backfill_runs VALUES('run','d','1','running',0); INSERT INTO backfill_generations VALUES('gen','run',1,NULL,'fencing'); INSERT INTO backfill_chunks VALUES('chunk','gen',X'',X'','complete',5,'sum'); INSERT INTO m3_planner_runs VALUES('gen','boot',5); INSERT INTO relation_schemas VALUES('schema','1','rel',X'00','sum',1);").unwrap();
         FenceStore::open(w).unwrap()
     }
     fn nonce() -> [u8; 16] {
@@ -814,6 +817,18 @@ mod tests {
         drop(planner);
 
         let mut fence = FenceStore::open(open_writer(&database, "fence", 4, 4).unwrap()).unwrap();
+        fence.writer.connection().execute(
+            "UPDATE destinations SET configuration_fingerprint='post-plan-drift',revision=revision+1 WHERE destination_id='destination'",
+            [],
+        ).unwrap();
+        assert!(matches!(
+            fence.prepare_after_copy(&input()),
+            Err(FenceError::Conflict("M3_FENCE_PREREQUISITE_MISSING"))
+        ));
+        fence.writer.connection().execute(
+            "UPDATE destinations SET configuration_fingerprint='cfg',revision=revision+1 WHERE destination_id='destination'",
+            [],
+        ).unwrap();
         assert_eq!(
             fence
                 .writer
@@ -829,12 +844,34 @@ mod tests {
         fence.prepare_after_copy(&input()).unwrap();
         fence.mark_dispatched("intent", 1).unwrap();
         journal(&mut fence, "tx", "0000000000000010", nonce());
+        fence.writer.connection().execute(
+            "UPDATE destinations SET configuration_fingerprint='post-fence-drift',revision=revision+1 WHERE destination_id='destination'",
+            [],
+        ).unwrap();
+        assert!(matches!(
+            fence.observe_durable("intent", "tx"),
+            Err(FenceError::Conflict("M3_FENCE_DESTINATION_BINDING_STALE"))
+        ));
+        fence.writer.connection().execute(
+            "UPDATE destinations SET configuration_fingerprint='cfg',revision=revision+1 WHERE destination_id='destination'",
+            [],
+        ).unwrap();
         let proof = fence.observe_durable("intent", "tx").unwrap();
         assert!(proof.first_proof);
         assert_eq!(fence.writer.connection().query_row(
             "SELECT bootstrap_intent_id||':'||generation_id||':'||state FROM bootstrap_anchors WHERE anchor_id='anchor'", [],
             |row| row.get::<_, String>(0),
         ).unwrap(), "boot:gen:complete");
+        assert!(
+            fence
+                .writer
+                .connection()
+                .execute(
+                    "UPDATE m3_canonical_import_proofs SET configuration_fingerprint='mutated'",
+                    [],
+                )
+                .is_err()
+        );
     }
 
     #[test]

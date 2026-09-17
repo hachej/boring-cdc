@@ -47,6 +47,18 @@ CREATE TABLE IF NOT EXISTS m3_planner_runs(
  key_schema BLOB NOT NULL, key_schema_digest TEXT NOT NULL, estimated_rows INTEGER NOT NULL CHECK(estimated_rows>=0), completed_rows INTEGER NOT NULL DEFAULT 0 CHECK(completed_rows>=0),
  completed_bytes INTEGER NOT NULL DEFAULT 0 CHECK(completed_bytes>=0), started_mono_ms INTEGER NOT NULL CHECK(started_mono_ms>=0), next_snapshot_seq INTEGER NOT NULL CHECK(next_snapshot_seq>=0),
  max_concurrency INTEGER NOT NULL CHECK(max_concurrency>0), revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0));
+CREATE TABLE IF NOT EXISTS m3_canonical_import_proofs(
+ import_id TEXT PRIMARY KEY REFERENCES bootstrap_imports(import_id) ON DELETE CASCADE,
+ configuration_fingerprint TEXT NOT NULL);
+CREATE TRIGGER IF NOT EXISTS m3_import_proof_update_immutable BEFORE UPDATE ON m3_canonical_import_proofs
+ WHEN EXISTS(SELECT 1 FROM bootstrap_imports i JOIN bootstrap_anchors a ON a.bootstrap_intent_id=i.intent_id WHERE i.import_id=OLD.import_id AND a.state='complete')
+ BEGIN SELECT RAISE(ABORT,'anchor destination binding is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS m3_import_proof_delete_immutable BEFORE DELETE ON m3_canonical_import_proofs
+ WHEN EXISTS(SELECT 1 FROM bootstrap_imports i JOIN bootstrap_anchors a ON a.bootstrap_intent_id=i.intent_id WHERE i.import_id=OLD.import_id AND a.state='complete')
+ BEGIN SELECT RAISE(ABORT,'anchor destination binding is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS m3_import_proof_insert_immutable BEFORE INSERT ON m3_canonical_import_proofs
+ WHEN EXISTS(SELECT 1 FROM bootstrap_imports i JOIN bootstrap_anchors a ON a.bootstrap_intent_id=i.intent_id WHERE i.import_id=NEW.import_id AND a.state='complete')
+ BEGIN SELECT RAISE(ABORT,'anchor destination binding is immutable'); END;
 CREATE TABLE IF NOT EXISTS m3_chunk_claims(
  chunk_id TEXT PRIMARY KEY REFERENCES backfill_chunks(chunk_id) ON DELETE CASCADE, generation_id TEXT NOT NULL REFERENCES backfill_generations(generation_id),
  worker_id TEXT NOT NULL, claim_token TEXT NOT NULL UNIQUE, claimed_mono_ms INTEGER NOT NULL, expires_mono_ms INTEGER NOT NULL CHECK(expires_mono_ms>claimed_mono_ms));
@@ -393,6 +405,13 @@ impl PlannerStore {
             [&import_id],
         )?;
         if importing != 1 || acknowledged != 1 {
+            return Err(PlannerError::Conflict("M3_CANONICAL_IMPORT_PROOF_MISSING"));
+        }
+        let bound = tx.execute(
+            "INSERT INTO m3_canonical_import_proofs(import_id,configuration_fingerprint) SELECT ?1,r.configuration_fingerprint FROM m3_bootstrap_runtime r JOIN destinations d ON d.destination_id=?3 AND d.capture_epoch=?4 AND d.generation=?5 AND d.configuration_fingerprint=r.configuration_fingerprint WHERE r.intent_id=?2",
+            params![import_id,input.bootstrap_intent_id,input.destination_id,input.capture_epoch,input.generation],
+        )?;
+        if bound != 1 {
             return Err(PlannerError::Conflict("M3_CANONICAL_IMPORT_PROOF_MISSING"));
         }
         tx.execute("INSERT INTO backfill_runs(run_id,destination_id,capture_epoch,state,revision) VALUES(?1,?2,?3,'running',0)", params![input.run_id,input.destination_id,input.capture_epoch])?;
