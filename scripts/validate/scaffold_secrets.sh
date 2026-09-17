@@ -1,9 +1,13 @@
 #!/bin/sh
 set -eu
 python3 - <<'PY'
-import pathlib,re,subprocess
+import hashlib,pathlib,re,subprocess
 paths=subprocess.check_output(['git','ls-files'],text=True).splitlines()
 pat=re.compile(r'(?i)(postgres(?:ql)?://[^\s:@]+:[^\s@]+@|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:password|api[_-]?key|secret|token)\s*[=:]\s*["\x27][^"\x27]{4,})')
+synthetic_line_sha256 = {
+ ('tests/test_context.py','5883f5c0337185c232e27e463d28012fab24d4ffd6d361b0117d8ac86b31ce69'),
+ ('tests/validate_knowledge.py','3017c62f5055319a24264fab01d9ac94de78c8354d3c4c079db09e334c936353'),
+}
 hits=[]
 for name in paths:
  p=pathlib.Path(name)
@@ -12,7 +16,7 @@ for name in paths:
  except UnicodeDecodeError:continue
  for n,line in enumerate(text.splitlines(),1):
   if not pat.search(line):continue
-  synthetic = ((name == 'tests/test_context.py' and 'postgres://user:supersecret@example.invalid/db' in line) or (name == 'tests/validate_knowledge.py' and 'postgresql://user:pw@host/db' in line) or (name in ('scripts/lib/core_validator.py','scripts/lib/knowledge_validator.py','scripts/validate/scaffold_secrets.sh') and ('SECRET = re.compile' in line or 'pat=re.compile' in line)))
+  synthetic = (name,hashlib.sha256(line.encode()).hexdigest()) in synthetic_line_sha256
   approved_file_reference = (name,line.strip()) in {
    ('compose.yaml','POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password'),
    ('.env.example','BORING_CDC_POSTGRES_PASSWORD_FILE=.secrets/postgres_password'),
