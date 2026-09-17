@@ -19,7 +19,7 @@
   ],
   "confirmation_inventory": {
     "confirmed_consumed": ["failure-policy-v1", "failure base_delay_ms=250", "failure max_delay_ms=30000", "failure max_attempts=10", "sqlite_writer_busy_timeout_ms=5000"],
-    "provisional_owned": ["M0-PROVISIONAL: boring-cdc-d-admission must approve the recommended spool format version=1"],
+    "provisional_owned": ["// M0-PROVISIONAL: boring-cdc-d-admission must approve the recommended spool format version=1"],
     "unrelated_provisional_markers": "preserved unchanged via contracts/m2/m0-provisional-reconciliation.json"
   }
 }

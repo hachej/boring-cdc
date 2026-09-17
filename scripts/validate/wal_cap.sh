@@ -9,7 +9,7 @@ root=Path(sys.argv[1]); selected=sys.argv[2]
 owner='boring-cdc-d-wal-cap'; decision_id='DEC-WAL-CAP'
 fixture_rel='fixtures/m0/decisions/boring-cdc-d-wal-cap.json'
 executors=['boring-cdc-m2-pressure','boring-cdc-m6-safety-sm','boring-cdc-m6-metrics']
-markers=['// M0-PROVISIONAL: boring-cdc-d-wal-cap']
+markers=[]
 proposed='max_slot_wal_keep_size=64 GiB (68,719,476,736 bytes); raw headroom=max(0,min(cap-retained_slot_bytes,source_free_bytes-16 GiB)); WAL rate=nearest-rank p95 (rank 15 after ascending sort) over exactly 15 complete 1-minute byte/s buckets, stale after 3 minutes; fresh zero rate gives infinite horizon only with positive headroom; raw horizon=floor(raw_headroom/rate), safety horizon=max(0,raw_horizon-30-second monitor delay-120-second reaction reserve); warning <=60 minutes, action_required <=30 minutes, critical <=10 minutes on safety horizon with equality more severe; missing/unsupported/stale inputs produce unknown, block new bootstrap/backfill, and preserve healthy capture; local-only --unsafe-unbounded-slot-wal expires at 24 hours, requires confirmation UNBOUNDED_WAL_LOCAL_ONLY and actor/time/config-digest audit, and is forbidden remotely; invalidated slots require explicit reseed.'
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 def fail():
@@ -50,12 +50,12 @@ try:
  spec=json.loads((root/fixture_rel).read_text()); decisions=json.loads((root/'contracts/m0/decisions.json').read_text())
  artifacts=json.loads((root/'contracts/m0/artifacts.json').read_text()); registry=json.loads((root/'contracts/agent/stable-ids.json').read_text())
  coverage=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text()); graph=[json.loads(x) for x in (root/'.beads/issues.jsonl').read_text().splitlines()]
- required=('inputs','preconditions','supported_matrix','deterministic_phase','expected','expected_failure','result_contract','redaction_assertions','later_executors','vectors','provisional_boundary')
+ required=('inputs','preconditions','supported_matrix','deterministic_phase','expected','expected_failure','result_contract','redaction_assertions','later_executors','vectors','confirmed_boundary')
  if any(not spec.get(x) for x in required): fail()
  if spec.get('schema_version')!='m0-decision-fixture/v1' or spec.get('fixture_id')!=decision_id or spec.get('decision_id')!=decision_id or spec.get('owner_bead')!=owner or spec.get('later_executors')!=executors: fail()
- markers=['// M0-PROVISIONAL: boring-cdc-d-wal-cap']
- if spec.get('provisional_markers')!=markers or spec.get('fixed_seed')!='0x424344435f57414c4341505f563031': fail()
- b=spec['provisional_boundary']
+ markers=[]
+ if spec.get('provisional_markers',[])!=markers or spec.get('fixed_seed')!='0x424344435f57414c4341505f563031': fail()
+ b=spec['confirmed_boundary']
  if b.get('max_slot_wal_keep_size')!={'bytes':68719476736,'display':'64 GiB','required':'finite_exact'} or b.get('source_free_space_reserve_bytes')!=17179869184: fail()
  if b.get('headroom')!={'raw_bytes':'max(0, min(68719476736 - retained_slot_bytes, source_free_bytes - 17179869184))','reaction_adjusted_bytes':'max(0, raw_bytes - wal_rate_bytes_per_second * (30 + 120))','unit':'byte'}: fail()
  if b.get('wal_rate')!={'bucket_count':15,'bucket_seconds':60,'window_seconds':900,'statistic':'nearest_rank_p95','rank_formula':'ceil(0.95 * 15) = 15 after ascending sort','unit':'byte_per_second','fresh_through_age_seconds':180,'stale_after_age_seconds':180,'zero_rate_horizon':'infinite_when_fresh_and_raw_headroom_positive','zero_headroom_horizon_seconds':0}: fail()
@@ -96,8 +96,7 @@ try:
  expected_probe=[{'code':'WAL_CAP_FIXTURE_VALID','outcome':'pass','phase':'validate_spec','vector_count':30}]
  if probe!=expected_probe or spec['execution_probe']!={'expected_lines':expected_probe,'path':probe_rel,'sha256':sha(root/probe_rel)}: fail()
  decision=next(x for x in decisions['decisions'] if x['id']==decision_id)
- decision_markers=['// M0-PROVISIONAL: boring-cdc-d-wal-cap']
- if decision!={'executor_beads':executors,'fixture_sha256':sha(root/fixture_rel),'fixture_spec':fixture_rel,'id':decision_id,'owner_bead':owner,'proposed_value':proposed,'status':'open','provisional_markers':markers}: fail()
+ if not (decision['executor_beads']==executors and decision['fixture_sha256']==sha(root/fixture_rel) and decision['fixture_spec']==fixture_rel and decision['owner_bead']==owner and decision['proposed_value']==proposed and decision['status']=='approved' and not decision.get('provisional_markers') and decision.get('approval',{}).get('approved_by','').endswith('owner card 59a63169') and decision.get('approval',{}).get('value_digest')==hashlib.sha256(proposed.encode()).hexdigest()): fail()
  needed={'ART-M0-WAL-CAP-FIXTURE':fixture_rel,'ART-M0-WAL-CAP-PROBE':probe_rel,'ART-M0-WAL-CAP-VALIDATION':'artifacts/m0/decisions/boring-cdc-d-wal-cap/evidence.json'}
  owned={x['id']:x for x in artifacts['artifacts'] if x.get('owner_bead')==owner}
  if set(owned)!=set(needed): fail()

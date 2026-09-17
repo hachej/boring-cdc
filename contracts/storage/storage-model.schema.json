@@ -218,7 +218,6 @@
         "filesystem_equation",
         "limits",
         "profiles",
-        "provisional",
         "reservation_rules",
         "runtime_memory",
         "source_wal_reaction_reserve_seconds",
@@ -338,8 +337,7 @@
         "denied",
         "modes",
         "ownership",
-        "probe",
-        "provisional"
+        "probe"
       ],
       "type": "object"
     },
@@ -436,7 +434,6 @@
         "loss",
         "ownership_deadline_ms",
         "probe_interval_ms",
-        "provisional",
         "source_lock",
         "state_lock",
         "takeover_wait_ms"
@@ -939,7 +936,6 @@
         "page_size_bytes",
         "payload_log_file",
         "persistent_pragmas",
-        "provisional",
         "schema_path",
         "single_database",
         "version"
@@ -986,7 +982,6 @@
         "essential_classes",
         "noncapture_max_wait_ms",
         "overload",
-        "provisional",
         "queue_capacity",
         "scheduling",
         "single_writer"
@@ -1006,7 +1001,6 @@
     "owner_bead",
     "ownership_commands",
     "pins_gc",
-    "provisional_markers",
     "result_schema",
     "safe_stop",
     "schema_version",

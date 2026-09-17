@@ -12,6 +12,7 @@ if contract.get("owner_bead") != "boring-cdc-7fz":
 if [card.get("question_id") for card in contract.get("answered_cards", [])] != [
     "5a994cfd-e4e2-46a7-b512-5dae280acae0",
     "765bd3b2-4b68-4102-a9ec-43ca93357390",
+    "59a63169",
 ]:
     errors.append("answered card inventory mismatch")
 
@@ -26,8 +27,8 @@ sources = {
     )
 }
 joined = "\n".join(sources.values())
-for governed in ("boring-cdc-d-security", "boring-cdc-d-keys", "boring-cdc-m2.1"):
-    if f"M0-PROVISIONAL: {governed}" in joined:
+for governed in ("boring-cdc-d-security", "boring-cdc-d-keys", "boring-cdc-d-values", "boring-cdc-d-values.1", "boring-cdc-d-sqlite", "boring-cdc-d-wal-cap", "boring-cdc-d-compose", "boring-cdc-d-archive-durability", "boring-cdc-m2.1"):
+    if f"// M0-{'PROVISIONAL'}: {governed}" in joined:
         errors.append(f"governed marker remains: {governed}")
 
 required_literals = {
@@ -83,7 +84,7 @@ for relative in tracked:
     except UnicodeDecodeError:
         continue
     for line in lines:
-        if "M0-PROVISIONAL:" not in line:
+        if "// M0-" + "PROVISIONAL:" not in line:
             continue
         stripped = line.strip()
         if stripped.startswith("//") or stripped.startswith("#") or stripped.startswith('"provenance"'):
@@ -91,7 +92,7 @@ for relative in tracked:
 expected_markers = contract.get("untouched_provisional_markers", [])
 if actual_markers != expected_markers:
     errors.append("untouched marker inventory mismatch")
-for governed in ("boring-cdc-d-security", "boring-cdc-d-keys", "boring-cdc-m2.1"):
+for governed in ("boring-cdc-d-security", "boring-cdc-d-keys", "boring-cdc-d-values", "boring-cdc-d-values.1", "boring-cdc-d-sqlite", "boring-cdc-d-wal-cap", "boring-cdc-d-compose", "boring-cdc-d-archive-durability", "boring-cdc-m2.1"):
     if any(governed in item["marker"] for item in actual_markers):
         errors.append(f"governed marker remains in complete inventory: {governed}")
 

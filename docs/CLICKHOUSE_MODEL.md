@@ -4,10 +4,6 @@
 
 The directly consumed recommendations remain visibly provisional:
 
-- `// M0-PROVISIONAL: boring-cdc-d-compose` — pinned `linux/amd64` ClickHouse profile;
-- `// M0-PROVISIONAL: boring-cdc-d-keys` — canonical key types, encoding, component count, and decoded-byte cap;
-- `// M0-PROVISIONAL: boring-cdc-d-values` — admitted value encodings and scalar/row/event limits;
-- `// M0-PROVISIONAL: boring-cdc-d-values.1` — shortest round-tripping float spelling and ties.
 
 `boring-cdc-d-wal-cap`, `boring-cdc-d-sqlite`, and `boring-cdc-d-archive-durability` are not ClickHouse-owned literals here. `boring-cdc-d-pg-protocol` and its `ARTICLE1-PROVISIONAL` candidates remain open and untouched.
 

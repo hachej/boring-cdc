@@ -120,11 +120,6 @@
     "units": "bytes (octets); limits are inclusive over canonical decoded bytes"
   },
   "owner_bead": "boring-cdc-m0-event-format",
-  "provisional_markers": [
-    "// M0-PROVISIONAL: boring-cdc-d-values",
-    "// M0-PROVISIONAL: boring-cdc-d-values.1",
-    "// M0-PROVISIONAL: boring-cdc-d-keys"
-  ],
   "relation_contract_encoding": "u64-length-framed logical_table_id; u32-be relation_id; u32-be physical-column count; each physical attnum ascending: i16-be attnum, u32-be logical ordinal (ffffffff if dropped), framed UTF-8 name (empty only if dropped), one-byte dropped, u32-be type OID, i32-be typmod, u32-be collation OID, one-byte nullable, framed SHA-256 default-expression hash or empty, framed SHA-256 generated-expression hash or empty, framed SHA-256 identity-expression hash or empty; one-byte replica mode d=0 n=1 f=2 i=3; framed replica-index definition hash or empty; framed primary/unique effective-key definition hash; framed partition-root logical_table_id or empty; framed partition-routing definition hash or empty; framed partition-key hash or empty; framed partition-bounds hash or empty; one-byte publication action bits INSERT=1 UPDATE=2 DELETE=4 TRUNCATE=8; one-byte publication membership; framed publication row-filter hash or empty; framed publication column-projection hash or empty",
   "schema_version": "boring-cdc/event-format-contract/v1",
   "tags": {

@@ -18,20 +18,22 @@
       "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-17",
+        "approved_by": "Julien Hurault (repository owner), owner card 59a63169",
+        "value_digest": "c5d9fc4ffb15051f9ce59a30d761d6f2beb38a8b5d1ca8fef3fae5536e0625cb"
+      },
       "executor_beads": [
         "boring-cdc-m0-scaffold",
         "boring-cdc-m6-failure-matrix",
         "boring-cdc-m7-artifacts"
       ],
-      "fixture_sha256": "6a006e66448934224f60083677f3b8a6ab0de09550b2a1757144d3fc033e3c0b",
+      "fixture_sha256": "840c5fb8a7134c2a32c7b26304cd6700df147bdce11f2863d84bf70f624b8f1f",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-compose.json",
       "id": "DEC-COMPOSE-IMAGES-RUNTIME-RECOVERY",
       "owner_bead": "boring-cdc-d-compose",
       "proposed_value": "linux/amd64 only; PostgreSQL 17.6, ClickHouse 25.8.2.29, Rust 1.89.0 Bookworm builder, and Debian bookworm-20250811-slim runtime are pinned by recommended OCI index and amd64 digests; Docker Engine 28.3.3, Compose 2.39.2, BuildKit 0.24.0, and Dockerfile frontend 1.12.0; cargo build --locked --release; project boring-cdc with postgres, clickhouse, connector and pgdata, chdata, cdcdata; connector restart unless-stopped with unlimited supervisor attempts while the provisional persisted FailurePolicy remains retry authority; PostgreSQL keepalive 30/10/3 and client check 10 seconds, measured reap <=70 seconds, takeover at 90 seconds; health 5/3/12 with 30-second start period and 120-second readiness; patch/minor changes rerun clean-pull with rollback-compatible state, major PostgreSQL/ClickHouse changes require migration plan and reseed.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-compose"
-      ],
-      "status": "open"
+      "status": "approved"
     },
     {
       "approval": {
@@ -109,6 +111,11 @@
       "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-17",
+        "approved_by": "Julien Hurault (repository owner), owner card 59a63169",
+        "value_digest": "5305494ede2e8716d69f457d5aed3f4e2616c5cd2a1b774153e1c4223dcc3602"
+      },
       "executor_beads": [
         "boring-cdc-m1-preflight",
         "boring-cdc-m2-schema",
@@ -116,47 +123,47 @@
         "boring-cdc-m2-pressure",
         "boring-cdc-m2-reconcile"
       ],
-      "fixture_sha256": "5abe431e27f4a0b5193e32038cbe4e3e9fd686b25f7a8594c6befe795927e76b",
+      "fixture_sha256": "b2ee521a0a0ae4d646915ad3ece996221fb3cf725c798133532b0e425a9705e5",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-sqlite.json",
       "id": "DEC-SQLITE-PHYSICAL-JOURNAL-DURABILITY",
       "owner_bead": "boring-cdc-d-sqlite",
       "proposed_value": "SQLite 3.45.3; one physical database with logically append-only journal_events; WAL; synchronous=FULL on every admitted durability connection; journal_size_limit=256 MiB; page_size=4096; temp_store=FILE; foreign_keys=ON; secure_delete=FAST; pre-schema auto_vacuum=INCREMENTAL; wal_autocheckpoint=0; busy_timeout=5000 ms; mmap_size=0; at most 16 readers; local ext4/XFS non-network block devices only; PASSIVE checkpoint at 1,000 WAL pages or 30 seconds, RESTART only when pins permit, TRUNCATE maintenance-only; incremental vacuum at most 1,000 pages per cycle; attestation valid 24 hours and invalid on mount/device change; FULL sync of database/WAL and required directory lifecycle; quick_check at startup and daily, integrity_check maintenance-only; SHA-256 exported evidence/backups; no automatic full VACUUM.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-sqlite"
-      ],
-      "status": "open"
+      "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-17",
+        "approved_by": "Julien Hurault (repository owner), owner card 59a63169",
+        "value_digest": "37d02ff83313f390b636b4a8b92338d0fb90d73916569016e3570f9cd4cadb51"
+      },
       "executor_beads": [
         "boring-cdc-m1-decoder",
         "boring-cdc-m0-event-format"
       ],
-      "fixture_sha256": "491c789ebc5802aca0b2086e5cf0d50f31426de2d273b96c22621436003b504a",
+      "fixture_sha256": "8ca1946296fd9ace94baf6f4558bb950b3ac0884f68a5602d4d196e7a82ffe01",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-values.json",
       "id": "DEC-SUPPORTED-VALUES",
       "owner_bead": "boring-cdc-d-values",
       "proposed_value": "Envelope v1 uses type tags and distinct null, absent, and unchanged states for the recommended bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; canonical bodies, destination mappings, and limits are retained as a provisional owner-card recommendation.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-values",
-        "// M0-PROVISIONAL: boring-cdc-d-values.1"
-      ],
-      "status": "open"
+      "status": "approved"
     },
     {
+      "approval": {
+        "approved_at": "2026-09-17",
+        "approved_by": "Julien Hurault (repository owner), owner card 59a63169",
+        "value_digest": "10ad7685fea445c94f416d8c673ba9b0dfdb6e41e836386376ad9c462b1e2f2f"
+      },
       "executor_beads": [
         "boring-cdc-m2-pressure",
         "boring-cdc-m6-safety-sm",
         "boring-cdc-m6-metrics"
       ],
-      "fixture_sha256": "ede1aacfd1f4678f262874bc3a00ed2e8230b6e31be1f59389ef061fc18a57ea",
+      "fixture_sha256": "f2cc4cbc7d798f30f2841489539256a824a4144cc5b599638de2b505e9550917",
       "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-wal-cap.json",
       "id": "DEC-WAL-CAP",
       "owner_bead": "boring-cdc-d-wal-cap",
       "proposed_value": "max_slot_wal_keep_size=64 GiB (68,719,476,736 bytes); raw headroom=max(0,min(cap-retained_slot_bytes,source_free_bytes-16 GiB)); WAL rate=nearest-rank p95 (rank 15 after ascending sort) over exactly 15 complete 1-minute byte/s buckets, stale after 3 minutes; fresh zero rate gives infinite horizon only with positive headroom; raw horizon=floor(raw_headroom/rate), safety horizon=max(0,raw_horizon-30-second monitor delay-120-second reaction reserve); warning <=60 minutes, action_required <=30 minutes, critical <=10 minutes on safety horizon with equality more severe; missing/unsupported/stale inputs produce unknown, block new bootstrap/backfill, and preserve healthy capture; local-only --unsafe-unbounded-slot-wal expires at 24 hours, requires confirmation UNBOUNDED_WAL_LOCAL_ONLY and actor/time/config-digest audit, and is forbidden remotely; invalidated slots require explicit reseed.",
-      "provisional_markers": [
-        "// M0-PROVISIONAL: boring-cdc-d-wal-cap"
-      ],
-      "status": "open"
+      "status": "approved"
     }
   ],
   "schema_version": "m0-decisions/v1"

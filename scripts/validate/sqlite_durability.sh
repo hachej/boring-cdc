@@ -9,7 +9,7 @@ root=Path(sys.argv[1]); selected=sys.argv[2]
 owner='boring-cdc-d-sqlite'; decision_id='DEC-SQLITE-PHYSICAL-JOURNAL-DURABILITY'
 fixture_rel='fixtures/m0/decisions/boring-cdc-d-sqlite.json'
 executors=['boring-cdc-m1-preflight','boring-cdc-m2-schema','boring-cdc-m2-journal','boring-cdc-m2-pressure','boring-cdc-m2-reconcile']
-markers=['// M0-PROVISIONAL: boring-cdc-d-sqlite']
+markers=[]
 proposed='SQLite 3.45.3; one physical database with logically append-only journal_events; WAL; synchronous=FULL on every admitted durability connection; journal_size_limit=256 MiB; page_size=4096; temp_store=FILE; foreign_keys=ON; secure_delete=FAST; pre-schema auto_vacuum=INCREMENTAL; wal_autocheckpoint=0; busy_timeout=5000 ms; mmap_size=0; at most 16 readers; local ext4/XFS non-network block devices only; PASSIVE checkpoint at 1,000 WAL pages or 30 seconds, RESTART only when pins permit, TRUNCATE maintenance-only; incremental vacuum at most 1,000 pages per cycle; attestation valid 24 hours and invalid on mount/device change; FULL sync of database/WAL and required directory lifecycle; quick_check at startup and daily, integrity_check maintenance-only; SHA-256 exported evidence/backups; no automatic full VACUUM.'
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 def fail():
@@ -21,9 +21,9 @@ try:
  required=('inputs','preconditions','supported_matrix','deterministic_phase','expected','expected_failure','result_contract','redaction_assertions','later_executors','vectors')
  if any(not spec.get(x) for x in required): fail()
  if spec.get('schema_version')!='m0-decision-fixture/v1' or spec.get('fixture_id')!=decision_id or spec.get('decision_id')!=decision_id or spec.get('owner_bead')!=owner or spec.get('later_executors')!=executors: fail()
- if spec.get('provisional_markers')!=markers: fail()
+ if spec.get('provisional_markers',[])!=markers: fail()
  expected_boundary={'sqlite_version':'3.45.3','database_count':1,'payload_journal':'journal_events_logically_append_only','pragmas':{'journal_mode':'WAL','synchronous':'FULL','journal_size_limit_bytes':268435456,'page_size_bytes':4096,'temp_store':'FILE','foreign_keys':'ON','secure_delete':'FAST','auto_vacuum':'INCREMENTAL','wal_autocheckpoint_pages':0,'busy_timeout_ms':5000,'mmap_size_bytes':0},'max_readers':16,'filesystems':{'allow':['ext4','xfs'],'device':'local_non_network_block_device','reject':['nfs','smb_cifs','fuse','tmpfs','overlayfs','remote_volume']},'checkpoint':{'passive_wal_pages':1000,'passive_interval_seconds':30,'restart':'only_when_no_pin_blocks_recycling','truncate':'maintenance_only'},'incremental_vacuum_pages_per_cycle_max':1000,'automatic_full_vacuum':'prohibited','attestation':{'validity_seconds':86400,'invalidate_on':['mount_change','device_change']},'integrity':{'quick_check':['startup','daily'],'integrity_check':'maintenance_only','exported_evidence_backup_digest':'SHA-256'},'permissions':{'directory_mode':'0700','database_wal_and_related_file_mode':'0600_or_stricter'},'crash_claim':{'guarantees':['process_crash','container_crash','abrupt_host_restart_on_honest_tested_storage_stack'],'does_not_guarantee':['media_or_controller_failure','filesystem_corruption','hardware_lying_about_flushes']}}
- if spec.get('provisional_boundary')!=expected_boundary: fail()
+ if spec.get('confirmed_boundary')!=expected_boundary: fail()
  if spec.get('connection_admission')!={'actual_writer_must_read_back':{'journal_mode':'WAL','synchronous':'FULL'},'observer_readback_cannot_certify_writer':True,'persistent_settings':['journal_mode','auto_vacuum','page_size'],'connection_local_settings':['synchronous','temp_store','foreign_keys','secure_delete','busy_timeout','mmap_size'],'reopened_and_maintenance_writers_rechecked':True}: fail()
  if spec.get('directory_sync')!={'create':['sync_database_file','sync_wal_file_when_present','sync_parent_directory'],'replace_or_rename':['sync_replacement_file','sync_source_parent_before_rename','atomic_rename','sync_destination_parent_after_rename'],'delete':['sync_parent_directory_after_delete'],'publication':['sync_file_and_parent_before_rename','atomic_rename','sync_parent_after_rename']}: fail()
  cases={x['case_id']:x for x in spec['supported_matrix']}; vectors=spec['vectors']
@@ -52,8 +52,8 @@ try:
  expected_probe=[{'code':'SQLITE_DURABILITY_FIXTURE_VALID','outcome':'pass','phase':'validate_spec','vector_count':18}]
  if probe!=expected_probe or spec['execution_probe']!={'expected_lines':expected_probe,'path':probe_rel,'sha256':sha(root/probe_rel)}: fail()
  decision=next(x for x in decisions['decisions'] if x['id']==decision_id)
- markers=['// M0-PROVISIONAL: boring-cdc-d-sqlite']
- if decision!={'executor_beads':executors,'fixture_sha256':sha(root/fixture_rel),'fixture_spec':fixture_rel,'id':decision_id,'owner_bead':owner,'proposed_value':proposed,'status':'open','provisional_markers':markers}: fail()
+ markers=[]
+ if not (decision['executor_beads']==executors and decision['fixture_sha256']==sha(root/fixture_rel) and decision['fixture_spec']==fixture_rel and decision['owner_bead']==owner and decision['proposed_value']==proposed and decision['status']=='approved' and not decision.get('provisional_markers') and decision.get('approval',{}).get('approved_by','').endswith('owner card 59a63169') and decision.get('approval',{}).get('value_digest')==hashlib.sha256(proposed.encode()).hexdigest()): fail()
  needed={'ART-M0-SQLITE-DURABILITY-FIXTURE':fixture_rel,'ART-M0-SQLITE-DURABILITY-PROBE':probe_rel,'ART-M0-SQLITE-DURABILITY-VALIDATION':'artifacts/m0/decisions/boring-cdc-d-sqlite/evidence.json'}
  owned={x['id']:x for x in artifacts['artifacts'] if x.get('owner_bead')==owner}
  if set(owned)!=set(needed): fail()

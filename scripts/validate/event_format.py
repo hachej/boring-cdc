@@ -334,15 +334,9 @@ def validate() -> tuple[list[dict], dict]:
     for title in required_sections:
         if f"## {title}" not in document:
             fail(findings, "E_DOC_SECTION", "docs/EVENT_FORMAT.md", title)
-    provisional_markers = {
-        "// M0-PROVISIONAL: boring-cdc-d-values",
-        "// M0-PROVISIONAL: boring-cdc-d-values.1",
-        "// M0-PROVISIONAL: boring-cdc-d-keys",
-    }
-    if set(contract.get("provisional_markers", [])) != provisional_markers or any(
-        marker not in document for marker in provisional_markers
-    ):
-        fail(findings, "E_PROVISIONAL", "contract", "owner-pending recommendation markers changed or are missing")
+    provisional_markers = set()
+    if set(contract.get("provisional_markers", [])):
+        fail(findings, "E_PROVISIONAL", "contract", "accepted owner-card markers remain")
 
     primitives = vectors["identity_primitives"]
     observed_slot = source_slot_identity(primitives["source_slot"]["input"])

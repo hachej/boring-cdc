@@ -70,30 +70,16 @@ SPEC_INPUTS = {
     },
 }
 
-PROVISIONAL = {
-    "boring-cdc-d-archive-durability",
-    "boring-cdc-d-compose",
-    "boring-cdc-d-keys",
-    "boring-cdc-d-sqlite",
-    "boring-cdc-d-values",
-    "boring-cdc-d-values.1",
-    "boring-cdc-d-wal-cap",
-}
+PROVISIONAL = set()
+
 def provisional_marker(owner: str) -> str:
     # Split the sentinel so the repository scanner does not mistake validator
     # source for a consumer of an owner-controlled recommendation.
     return "// M0-" + "PROVISIONAL: " + owner
 
 
-OPEN_DECISIONS = {
-    "boring-cdc-d-compose": {provisional_marker("boring-cdc-d-compose")},
-    "boring-cdc-d-sqlite": {provisional_marker("boring-cdc-d-sqlite")},
-    "boring-cdc-d-values": {
-        provisional_marker("boring-cdc-d-values"),
-        provisional_marker("boring-cdc-d-values.1"),
-    },
-    "boring-cdc-d-wal-cap": {provisional_marker("boring-cdc-d-wal-cap")},
-}
+OPEN_DECISIONS = {}
+
 REQUIRED_M0_OWNERS = {
     "boring-cdc-d-additive", "boring-cdc-d-admission", "boring-cdc-d-anchor",
     "boring-cdc-d-archive-durability", "boring-cdc-d-archive-scope",
