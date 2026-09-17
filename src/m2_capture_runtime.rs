@@ -1408,7 +1408,7 @@ pub fn observe_live_source(
     use std::collections::BTreeSet;
 
     if !crate::article1_capture::valid_pg_identifier(publication_name)
-        || !crate::article1_capture::valid_pg_identifier(slot_name)
+        || !crate::article1_capture::valid_pg_slot_name(slot_name)
     {
         return Err(CaptureFailure::at(
             "configuration",

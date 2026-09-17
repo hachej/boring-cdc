@@ -62,6 +62,14 @@ pub(crate) fn valid_pg_identifier(value: &str) -> bool {
         && chars.all(|character| character.is_ascii_alphanumeric() || character == '_')
 }
 
+pub(crate) fn valid_pg_slot_name(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 63
+        && value.bytes().all(|character| {
+            character.is_ascii_lowercase() || character.is_ascii_digit() || character == b'_'
+        })
+}
+
 fn valid_relation(value: &str) -> bool {
     let mut parts = value.split('.');
     matches!(
@@ -97,6 +105,7 @@ pub struct CaptureConfig {
     pub dsn: String,
     pub stop_after_commits: usize,
     publication: String,
+    publication_option: String,
     slot: String,
     tables_csv: String,
     publication_operations: &'static str,
@@ -113,8 +122,8 @@ impl CaptureConfig {
             PUBLICATION,
             SLOT,
             TABLES_CSV.split(',').map(str::to_owned),
+            false,
             "1,1,1,0",
-            "ARTICLE1_CONFIG_INVALID",
         )
     }
 
@@ -133,8 +142,8 @@ impl CaptureConfig {
                 crate::m1_control_fixtures::HEARTBEAT_RELATION.to_owned(),
                 crate::m1_control_fixtures::FENCE_RELATION.to_owned(),
             ]),
+            true,
             "1,1,1,1",
-            "M2_PROTOCOL_CONFIG_INVALID",
         )
     }
 
@@ -144,8 +153,8 @@ impl CaptureConfig {
         publication: impl Into<String>,
         slot: impl Into<String>,
         tables: impl IntoIterator<Item = String>,
+        quote_publication_option: bool,
         publication_operations: &'static str,
-        invalid_code: &'static str,
     ) -> Result<Self, CaptureFailure> {
         let dsn = dsn.into();
         let publication = publication.into();
@@ -157,17 +166,30 @@ impl CaptureConfig {
             || dsn.contains('\n')
             || stop_after_commits == 0
             || !valid_pg_identifier(&publication)
-            || !valid_pg_identifier(&slot)
+            || !valid_pg_slot_name(&slot)
             || tables.is_empty()
             || tables.iter().any(|table| !valid_relation(table))
         {
-            return Err(CaptureFailure::at("configuration", invalid_code));
+            return Err(CaptureFailure::at(
+                "configuration",
+                if quote_publication_option {
+                    "M2_PROTOCOL_CONFIG_INVALID"
+                } else {
+                    "ARTICLE1_CONFIG_INVALID"
+                },
+            ));
         }
         tables.dedup();
+        let publication_option = if quote_publication_option {
+            format!("\"{publication}\"")
+        } else {
+            publication.clone()
+        };
         Ok(Self {
             dsn,
             stop_after_commits,
             publication,
+            publication_option,
             slot,
             tables_csv: tables.join(","),
             publication_operations,
@@ -278,7 +300,7 @@ pub(crate) fn setup_runtime(
             "ARTICLE1_VERSION_MISMATCH",
         ));
     }
-    let options = start_options(&config.publication);
+    let options = start_options(&config.publication_option);
     connection
         .start_replication(&config.slot, 0, &options)
         .map_err(|_| {
@@ -567,6 +589,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(configured.publication, "tenant_publication");
+        assert_eq!(configured.publication_option, "\"tenant_publication\"");
         assert_eq!(configured.slot, "tenant_slot");
         assert_eq!(
             configured.tables_csv,
@@ -574,9 +597,18 @@ mod tests {
         );
         assert_eq!(configured.publication_operations, "1,1,1,1");
         assert_eq!(
-            start_options(&configured.publication)[1],
-            ("publication_names", "tenant_publication")
+            start_options(&configured.publication_option)[1],
+            ("publication_names", "\"tenant_publication\"")
         );
+        let mixed_case = CaptureConfig::production(
+            "postgresql://x/y",
+            "TenantPublication",
+            "tenant_slot",
+            ["public.orders".into()],
+        )
+        .unwrap();
+        assert_eq!(mixed_case.publication_option, "\"TenantPublication\"");
+        assert!(!valid_pg_slot_name("TenantSlot"));
 
         for (publication, slot, table) in [
             ("bad';DROP PUBLICATION x;--", "safe_slot", "public.orders"),
