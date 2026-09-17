@@ -194,8 +194,9 @@ else:
   commit=evidence.get('git_commit','')
   exists=subprocess.run(['git','cat-file','-e',str(commit)+'^{commit}'],capture_output=True).returncode==0
   ancestor=exists and subprocess.run(['git','merge-base','--is-ancestor',str(commit),'HEAD'],capture_output=True).returncode==0
-  clean_inputs=ancestor and subprocess.run(['git','diff','--quiet',str(commit)+'..HEAD','--','.beads/issues.jsonl','src','fixtures','contracts','scripts','tests','artifacts',':(exclude)artifacts/boring-cdc-m1-complete']).returncode==0
-  if not (exists and ancestor and clean_inputs): fail('gate git_commit is missing, non-ancestor, or stale')
+  if not (exists and ancestor): fail('gate git_commit is missing or non-ancestor')
+  # The canonical evidence validator below owns freshness classification. Keep
+  # this gate from reintroducing cross-milestone invalidation over broad roots.
   if evidence.get('result',{}).get('status')!='pass': fail('gate result is not pass')
   paths=[root/p for p in evidence.get('result',{}).get('artifacts',[])]
   if not all(p.is_file() for p in paths) or hashlib.sha256(b''.join(p.read_bytes() for p in paths)).hexdigest()!=evidence.get('result',{}).get('digest'):
