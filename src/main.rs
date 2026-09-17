@@ -14,7 +14,8 @@ use boring_cdc::m2_journal::journal_inspect_event;
 use boring_cdc::m2_reconcile::{journal_report, recover_report};
 use boring_cdc::m2_schema::open_writer;
 use boring_cdc::m3_bootstrap::{
-    BootstrapError, BootstrapRuntime, ImporterAssignment, PrepareIntent, digest_assignment,
+    BootstrapError, BootstrapRuntime, ImporterAssignment, PrepareIntent, SessionBounds,
+    digest_assignment,
 };
 use pg_walstream::CancellationToken;
 use serde::Deserialize;
@@ -342,8 +343,10 @@ fn run_m3_bootstrap() -> Result<(), ReaderFailure> {
         dsn,
         &relations,
         &config.public().source.publication,
-        timeout,
-        timeout,
+        SessionBounds {
+            statement_timeout_ms: timeout,
+            idle_timeout_ms: timeout,
+        },
         start_seq.unwrap_or(0) as u64,
     )
     .map_err(bootstrap_failure)?;

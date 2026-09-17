@@ -660,6 +660,12 @@ impl CaptureSession {
 }
 /// Live intent-bound session bundle. Construction is the only production path that can create the
 /// permanent slot, so the type itself preserves intent -> guard -> export persistence -> CopyBoth.
+#[derive(Clone, Copy, Debug)]
+pub struct SessionBounds {
+    pub statement_timeout_ms: u64,
+    pub idle_timeout_ms: u64,
+}
+
 pub struct BootstrapRuntime {
     store: BootstrapStore,
     intent_id: String,
@@ -674,14 +680,17 @@ impl BootstrapRuntime {
         dsn: &str,
         relations: &[String],
         publication: &str,
-        statement_timeout_ms: u64,
-        idle_timeout_ms: u64,
+        bounds: SessionBounds,
         start_seq: u64,
     ) -> Result<Self, BootstrapError> {
         let mut store = BootstrapStore::open(writer)?;
         store.prepare(&intent)?;
-        let mut guard =
-            GuardSession::acquire(dsn, relations, statement_timeout_ms, idle_timeout_ms)?;
+        let mut guard = GuardSession::acquire(
+            dsn,
+            relations,
+            bounds.statement_timeout_ms,
+            bounds.idle_timeout_ms,
+        )?;
         guard.verify_relations(relations)?;
         store.record_guard_acquired(&intent.intent_id, guard.backend_pid)?;
         let exporter = ExportedSlotSession::create(dsn, &intent.slot_name)?;
@@ -702,8 +711,8 @@ impl BootstrapRuntime {
             let mut importer = ImporterSession::import(
                 dsn,
                 exporter.snapshot_token(),
-                statement_timeout_ms,
-                idle_timeout_ms,
+                bounds.statement_timeout_ms,
+                bounds.idle_timeout_ms,
             )?;
             store.snapshot_set_first(
                 &intent.intent_id,
@@ -823,8 +832,10 @@ mod live_tests {
             &dsn,
             &relations,
             "boring_cdc_m3_pub",
-            10_000,
-            30_000,
+            SessionBounds {
+                statement_timeout_ms: 10_000,
+                idle_timeout_ms: 30_000,
+            },
             0,
         )
         .unwrap();
