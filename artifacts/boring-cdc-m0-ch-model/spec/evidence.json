@@ -1,24 +1,40 @@
 {
-  "findings": [],
+  "findings": [
+    {
+      "code": "E_MANIFEST",
+      "message": "manifest binding mismatch",
+      "path": "contracts/m0/manifest.json"
+    },
+    {
+      "code": "E_ARTIFACT_HASH",
+      "message": "artifact hash mismatch",
+      "path": "docs/CLICKHOUSE_MODEL.md"
+    },
+    {
+      "code": "E_ARTIFACT_HASH",
+      "message": "artifact hash mismatch",
+      "path": "contracts/clickhouse/model.json"
+    }
+  ],
   "fixture_count": 41,
-  "input_tree_sha256": "fa0bfe2b874674c3297988dede85c6a785126306dc0693822acd008e29388016",
+  "input_tree_sha256": "3e6d9c11f71cadb588f6e31e7933af6d2d77b4deefd77c33a033babbd928e142",
   "inputs": {
     "contracts/clickhouse/canonical-query.sql": "0c1a0008e94cc1104e2b6964d39cc9aae26cddb76ba1f38372dc7c5d5442c8df",
     "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
     "contracts/clickhouse/fixtures.schema.json": "894bed006fdc7b5b162024b68aed22e8d7e7b691b57a509bb33c2179b71bec81",
-    "contracts/clickhouse/model.json": "c4d94c32e81c86f54ebdebada6affede308e1ae619da37b9070c91019c27869a",
+    "contracts/clickhouse/model.json": "42cb96c35582a383ba654be0e1fe2bd15d1c65bc5a38b39f46666c43b8377cc5",
     "contracts/clickhouse/model.schema.json": "eeda79f6c10557ab4867dcee20b8561e3f0651cd587a3cc8a70edea3a4853084",
     "contracts/clickhouse/result.schema.json": "80ad19fb794e6b6caba1dd45bbcfe63f75c83f6ae7c2d0b81b16da404b8ace8e",
     "contracts/clickhouse/retire-generation.sql": "0f18d6679a6b6bbf58fde38f6c35b09c3c8dca3e2b99a75f8623b0176fb9ae06",
-    "docs/CLICKHOUSE_MODEL.md": "1db317853a89158160e053371699bf4f5180e344b4c89fabe558547a7a882cd5",
+    "docs/CLICKHOUSE_MODEL.md": "aa80f08a49b621df839367412c3834900c1a3289054b445603a6a76ee4f5ff87",
     "fixtures/m0/clickhouse/scenarios.json": "d1eb388ece27906b91f97707e32745c01a34e51b62634bbd6159d473c6b9cbf8"
   },
   "owner_bead": "boring-cdc-m0-ch-model",
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-clickhouse-contract-evidence/v1",
-  "source_parent_git_commit": "b02f45e0e461ff2ef539e442be3003f83de6f381",
-  "status": "pass",
+  "source_parent_git_commit": "6de5b6c85423eae2c3b84967919602f66b79463d",
+  "status": "fail",
   "validator": "scripts/validate/clickhouse_contract.py",
   "validator_sha256": "b4644ca36a08f74afde4c9d937fa65920ebdc6011f994d765d4f6f78fcabe9ef"
 }

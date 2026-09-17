@@ -4,7 +4,7 @@
       "id": "ART-M0-ARCHIVE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "artifacts/boring-cdc-m0-archive-model/spec/evidence.json",
-      "sha256": "7f141aba5b859f5aa91ff5d8e3c11a30d014923b2e6e3d9504cfdb7b3283bf9a",
+      "sha256": "05fee746246c01331670816287dd303907ecaa2f7eebcd957f40b716403bf906",
       "status": "complete"
     },
     {
@@ -32,7 +32,7 @@
       "id": "ART-M0-ARCHIVE-MODEL",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.json",
-      "sha256": "710383635f2327b793f1f612d2ee7bfde6000f089495a30c83d5bf97fb072fb8",
+      "sha256": "d629b144e9e978885b92894e4a55593c1c5d9403985a04a571c3b971329cd9b3",
       "status": "complete"
     },
     {
@@ -81,7 +81,7 @@
       "id": "ART-M0-ARCHIVE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "scripts/validate/archive_contract.py",
-      "sha256": "308e300b4826462b0e1fcfe58683d9387a9f57b362b9c0ebc191efe881217df3",
+      "sha256": "05c1d56f7249cb61f508971b875dbf9db983a4feae81710461a51ceb4cfdfb9b",
       "status": "complete"
     },
     {
@@ -102,14 +102,14 @@
       "id": "ART-M0-CLICKHOUSE-DOC",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "docs/CLICKHOUSE_MODEL.md",
-      "sha256": "1db317853a89158160e053371699bf4f5180e344b4c89fabe558547a7a882cd5",
+      "sha256": "aa80f08a49b621df839367412c3834900c1a3289054b445603a6a76ee4f5ff87",
       "status": "complete"
     },
     {
       "id": "ART-M0-CLICKHOUSE-EVIDENCE",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json",
-      "sha256": "387619ad155671f49e32ffdd57d4d8576d1907117fe9976095d170c3ea46233d",
+      "sha256": "bdcee02564767a1dd6038256e2a55d7ac8428c7b9dbad4f73095f86a0d5fd424",
       "status": "complete"
     },
     {
@@ -130,7 +130,7 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "c4d94c32e81c86f54ebdebada6affede308e1ae619da37b9070c91019c27869a",
+      "sha256": "42cb96c35582a383ba654be0e1fe2bd15d1c65bc5a38b39f46666c43b8377cc5",
       "status": "complete"
     },
     {
@@ -214,21 +214,21 @@
       "id": "ART-M0-EVENT-FORMAT-CONTRACT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",
-      "sha256": "ec09bf8ab2df2fd9fc035ee6021297a0b5c31551cc183c2d26e4d91f0a918547",
+      "sha256": "7dee4435521916a1aff5ef6fd2bbcb75f7cf1429928debb91df55793c9799343",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-DOC",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "docs/EVENT_FORMAT.md",
-      "sha256": "bd3bf1105618f9d723daf734c0f750c944a94cd0c5c63f26df0827fc45e8494d",
+      "sha256": "d2e32562ea48cc526b17a38526e7c177f391eaca62a8e86c89b0b5bea09b8562",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-EVIDENCE",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "artifacts/boring-cdc-m0-event-format/spec/evidence.json",
-      "sha256": "87191b6f6c81ed50a8ca763f71a8989d9e8c88510a5fe5733953a4d0141ac5ed",
+      "sha256": "d873a4a699015271183562487a2dff5b8ecd268a35686650fb95b45c3a05854a",
       "status": "complete"
     },
     {
@@ -242,7 +242,7 @@
       "id": "ART-M0-EVENT-FORMAT-VALIDATOR",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "scripts/validate/event_format.py",
-      "sha256": "b894988e00e88f8f40f555883c7d7316943eda8f9b7d8f6c5235055a68bdc80f",
+      "sha256": "00842637a4d6a4df0a2ea455d59c3e48841133fdd6a92757615bd95ae71a7726",
       "status": "complete"
     },
     {

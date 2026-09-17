@@ -1,18 +1,1 @@
-{
-  "findings": [],
-  "fixture_count": 14,
-  "inputs": {
-    "contracts/event/event-format.json": "ec09bf8ab2df2fd9fc035ee6021297a0b5c31551cc183c2d26e4d91f0a918547",
-    "contracts/event/event.schema.json": "bef8393066708831ee19352466f862dd7151fa049f6d57f3e1a93791e9d11ede",
-    "docs/EVENT_FORMAT.md": "bd3bf1105618f9d723daf734c0f750c944a94cd0c5c63f26df0827fc45e8494d",
-    "fixtures/m0/event-format/golden-vectors.json": "98ed0c59f6e4735463484648e981b258a0077e4fc2facd458bce46b1cfaeed93"
-  },
-  "owner_bead": "boring-cdc-m0-event-format",
-  "product_faults": "fault_not_applicable",
-  "runtime_observed": false,
-  "schema_version": "m0-event-format-evidence/v1",
-  "source_parent_git_commit": "b02f45e0e461ff2ef539e442be3003f83de6f381",
-  "status": "pass",
-  "validator": "scripts/validate/event_format.py",
-  "validator_sha256": "b894988e00e88f8f40f555883c7d7316943eda8f9b7d8f6c5235055a68bdc80f"
-}
+{"findings":[],"fixture_count":14,"inputs":{"contracts/event/event-format.json":"7dee4435521916a1aff5ef6fd2bbcb75f7cf1429928debb91df55793c9799343","contracts/event/event.schema.json":"bef8393066708831ee19352466f862dd7151fa049f6d57f3e1a93791e9d11ede","docs/EVENT_FORMAT.md":"d2e32562ea48cc526b17a38526e7c177f391eaca62a8e86c89b0b5bea09b8562","fixtures/m0/event-format/golden-vectors.json":"98ed0c59f6e4735463484648e981b258a0077e4fc2facd458bce46b1cfaeed93"},"owner_bead":"boring-cdc-m0-event-format","product_faults":"fault_not_applicable","runtime_observed":false,"schema_version":"m0-event-format-evidence/v1","source_parent_git_commit":"6de5b6c85423eae2c3b84967919602f66b79463d","status":"pass","validator":"scripts/validate/event_format.py","validator_sha256":"00842637a4d6a4df0a2ea455d59c3e48841133fdd6a92757615bd95ae71a7726"}
