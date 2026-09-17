@@ -120,9 +120,7 @@
     },
     "ownership": "connector uid only; reject symlink, hardlink count != 1, type/uid/mode swaps",
     "probe": "disposable child below each configured root; descriptor-relative no-follow operations; sync and remove then parent fsync",
-    "provisional": [
-      "// M0-PROVISIONAL: boring-cdc-d-archive-durability"
-    ]
+    "provisional": []
   },
   "fixture_ids": [
     "SCN-M0-STORAGE-FRESH-INIT",
@@ -223,7 +221,6 @@
   },
   "provisional_markers": [
     "// M0-PROVISIONAL: boring-cdc-d-admission",
-    "// M0-PROVISIONAL: boring-cdc-d-archive-durability",
     "// M0-PROVISIONAL: boring-cdc-d-compose"
   ],
   "result_schema": "contracts/storage/storage-result.schema.json",
@@ -357,6 +354,13 @@
       ],
       "feedback_boundary": "events, source transaction, and durable source checkpoint committed atomically before feedback"
     },
+    "filesystem_attestation": {
+      "invalidate_on": [
+        "mount_change",
+        "device_change"
+      ],
+      "validity_seconds": 86400
+    },
     "init_order": [
       "create parent 0700 and fsync parent",
       "exclusive state lock",
@@ -415,14 +419,7 @@
     },
     "schema_path": "contracts/storage/sqlite-schema.sql",
     "single_database": true,
-    "version": "3.45.3",
-    "filesystem_attestation": {
-      "invalidate_on": [
-        "mount_change",
-        "device_change"
-      ],
-      "validity_seconds": 86400
-    }
+    "version": "3.45.3"
   },
   "writer_service": {
     "blocking_worker_capacity": 4,

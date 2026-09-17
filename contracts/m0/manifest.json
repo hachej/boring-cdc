@@ -52,7 +52,7 @@
       "id": "ART-M0-ARCHIVE-MODEL",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.json",
-      "sha256": "0acaa38c019856d93de33037bc5344ee34ecf53a8c703fce2d6efa5dc2d5ad67",
+      "sha256": "f82424d3404ce2bec6bd3648d3ea0d23f94910dccdfa1a0256c2ab6519160c3e",
       "status": "complete"
     },
     {
@@ -271,7 +271,7 @@
       "id": "ART-M0-STORAGE-MODEL",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.json",
-      "sha256": "95e8e432a09ce4684e0b095cdecfa9a788950bb88ede0ad78ef28051d07335a3",
+      "sha256": "9b6f48a65557ac3a70fb5ab8eb2cadb4b1f3dd7457f7306bda31197325d24a7f",
       "status": "complete"
     }
   ],

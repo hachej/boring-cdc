@@ -3,7 +3,7 @@ import hashlib, importlib.util, json, re, sqlite3, subprocess, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; OWNER='boring-cdc-m0-storage-model'
 C=ROOT/'contracts/storage/storage-model.json'; S=ROOT/'contracts/storage/storage-model.schema.json'; Q=ROOT/'contracts/storage/sqlite-schema.sql'; F=ROOT/'fixtures/m0/storage/scenarios.json'; FS=ROOT/'contracts/storage/storage-fixtures.schema.json'; R=ROOT/'contracts/storage/storage-result.schema.json'; E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence.json'; V=Path(__file__); M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
-EXPECTED_CONTRACT_SHA256='95e8e432a09ce4684e0b095cdecfa9a788950bb88ede0ad78ef28051d07335a3'
+EXPECTED_CONTRACT_SHA256='9b6f48a65557ac3a70fb5ab8eb2cadb4b1f3dd7457f7306bda31197325d24a7f'
 EXPECTED_FIXTURES_SHA256='1cd91668950293580ab810814f948501b4dcbe90e40951bfcb99617ee9ef3e8b'
 core_spec=importlib.util.spec_from_file_location('core_validator',ROOT/'scripts/lib/core_validator.py'); core=importlib.util.module_from_spec(core_spec); core_spec.loader.exec_module(core)
 def load(p):
@@ -24,11 +24,11 @@ def validate():
  sf=[]; core.validate_schema_instance(f,fschema,sf,base=FS.parent,root=fschema)
  for x in sf:add(fs,'E_FIXTURE_SCHEMA',x['pointer'],x['message'])
  marker=lambda decision:f'// M0-PROVISIONAL: {decision}'
- markers={marker(x) for x in ('boring-cdc-d-admission','boring-cdc-d-archive-durability','boring-cdc-d-compose')}
+ markers={marker(x) for x in ('boring-cdc-d-admission','boring-cdc-d-compose')}
  if set(c['provisional_markers'])!=markers:add(fs,'E_PROVISIONAL','provisional_markers','exact provisional dependency inventory changed')
  expected_nested={
   'admission':{marker(x) for x in ('boring-cdc-d-admission',)},
-  'filesystem':{marker(x) for x in ('boring-cdc-d-archive-durability',)},
+  'filesystem':set(),
  }
  if set(c['admission']['provisional'])!=expected_nested['admission']:add(fs,'E_PROVISIONAL','admission/provisional','admission recommendations must retain exact decision markers')
  if set(c['filesystem']['provisional'])!=expected_nested['filesystem']:add(fs,'E_PROVISIONAL','filesystem/provisional','filesystem recommendations must retain exact decision markers')

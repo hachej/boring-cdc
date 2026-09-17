@@ -15,7 +15,7 @@ FS = ROOT / "contracts/archive/archive-fixtures.schema.json"
 RS = ROOT / "contracts/archive/archive-result.schema.json"
 SMS = ROOT / "contracts/archive/segment-manifest.schema.json"
 GMS = ROOT / "contracts/archive/generation-manifest.schema.json"
-EXPECTED_CONTRACT_SHA256 = "0acaa38c019856d93de33037bc5344ee34ecf53a8c703fce2d6efa5dc2d5ad67"
+EXPECTED_CONTRACT_SHA256 = "f82424d3404ce2bec6bd3648d3ea0d23f94910dccdfa1a0256c2ab6519160c3e"
 EXPECTED_FIXTURES_SHA256 = "8b1f4f0561d9d06037f9985327064ec63c1c90afa1ab08705d3d6224bc0b8e69"
 E = ROOT / "artifacts/boring-cdc-m0-archive-model/spec/evidence.json"
 M = ROOT / "contracts/m0/manifest.json"
@@ -77,16 +77,14 @@ def validate():
             finding(out, code, item["pointer"], item["message"])
     text = "\n".join(path.read_text(errors="replace") for path in (C, S, F, FS, RS, SMS, GMS))
     marker = lambda decision: f"// M0-PROVISIONAL: {decision}"
-    expected_markers = {marker("boring-cdc-d-archive-durability"), marker("boring-cdc-d-compose")}
+    expected_markers = {marker("boring-cdc-d-compose")}
     if set(contract.get("provisional_markers", [])) != expected_markers:
         finding(out, "E_PROVISIONAL", "provisional_markers", "exact provisional dependency inventory changed")
-    if contract["consumes"]["durability"].get("provisional") != marker("boring-cdc-d-archive-durability") or contract["layout"].get("provisional") != marker("boring-cdc-d-archive-durability"):
-        finding(out, "E_PROVISIONAL", "consumes/durability", "archive durability recommendations must retain their exact decision marker")
     if contract["writer_profile"].get("provisional") != marker("boring-cdc-d-compose"):
         finding(out, "E_PROVISIONAL", "writer_profile", "linux/amd64 writer recommendation must retain the Compose decision marker")
     authority = contract["authority"]
-    if authority.get("owner_cards") != ["59a63169"] or not authority.get("status", "").startswith("provisional engineering artifact"):
-        finding(out, "E_PROVISIONAL", "authority", "blocked recommendations must remain bound to owner card 59a63169 without decision closure")
+    if authority.get("owner_cards") != ["59a63169"] or not authority.get("status", "").startswith("engineering artifact with accepted d-archive-durability literals"):
+        finding(out, "E_PROVISIONAL", "authority", "accepted archive durability and remaining recommendations must remain bound to owner card 59a63169 without decision closure")
     profile = contract["writer_profile"]
     expected_profile = ("2.6", "parquet 57.0.0", "arrow 57.0.0", "zstd 1.5.7", 3, True, True, 0, 65536, 1048576, False)
     observed_profile = (profile["parquet_format_version"], profile["parquet_writer_crate"], profile["arrow_crate"], profile["zstd_library"], profile["zstd_level"], profile["zstd_checksum"], profile["zstd_content_size"], profile["zstd_workers"], profile["row_group_max_rows"], profile["data_page_max_bytes"], profile["dictionary_enabled"])

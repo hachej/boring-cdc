@@ -1,267 +1,58 @@
 {
-  "schema_version": "archive-contract/v1",
   "artifact_id": "ART-M0-ARCHIVE-MODEL",
-  "owner_bead": "boring-cdc-m0-archive-model",
+  "artifact_root": "artifacts/boring-cdc-m0-archive-model/spec",
+  "audit": {
+    "budgets": {
+      "cadence_seconds": 300,
+      "freshness_seconds": 900,
+      "max_bytes_per_pass": 67108864,
+      "max_events_per_pass": 100000,
+      "max_milliseconds_per_pass": 5000
+    },
+    "checkpoint_moves": false,
+    "cursor": [
+      "segment_relative_path",
+      "file_ordinal",
+      "byte_offset",
+      "event_offset"
+    ],
+    "gap_or_expiry": "report partial/unknown; never bridge gaps or invent older coverage",
+    "identity": [
+      "capture_epoch",
+      "generation",
+      "promotion_fence",
+      "selector_sha256",
+      "target_archive_checkpoint",
+      "config_fingerprint",
+      "event_contract_sha256"
+    ],
+    "identity_change": "discard partial round and restart from new finite target",
+    "mismatch": "persist integrity fingerprint and block archive only; capture and ClickHouse continue",
+    "oversized_part": "verify in bounded byte chunks with persisted hash state/version and resume offset",
+    "read_only": true,
+    "separate_ranges": [
+      "journal_verified_range",
+      "self_consistent_range"
+    ]
+  },
   "authority": {
-    "owner_confirmation_date": "2026-09-10",
+    "architecture": "docs/PLAN.md \u00a7\u00a79.2/9.4/16/19",
     "owner_cards": [
       "59a63169"
     ],
+    "owner_confirmation_date": "2026-09-10",
     "requirements": "docs/REQUIREMENTS.md \u00a77",
-    "architecture": "docs/PLAN.md \u00a7\u00a79.2/9.4/16/19",
-    "status": "provisional engineering artifact using card-recommended values; does not close decision Beads"
-  },
-  "consumes": {
-    "event_contract": {
-      "path": "contracts/event/event-format.json",
-      "sha256": "ab44eb632693bb2eeef84b8a030452f730d5e00a1d08d56bc86c221a213eaf1f"
-    },
-    "archive_scope": {
-      "decision_id": "DEC-ARCHIVE-SCOPE",
-      "path": "fixtures/m0/decisions/boring-cdc-d-archive-scope.json",
-      "sha256": "cb022782a56ce331b5e35b95d89696fd292522ff9b7a69736a44bea6216826b9"
-    },
-    "failure_policy": {
-      "decision_id": "boring-cdc-d-failure-policy",
-      "confirmed_projection_source": "contracts/scaffold/m0-scaffold.json",
-      "source_sha256": "a96ac9a4afcb2cbdfc708b731c0b7e96838b6dce77eb31ff6ca2d13e901d15fd",
-      "version": 1,
-      "base_delay_ms": 250,
-      "cap_delay_ms": 30000,
-      "maximum_attempts": 10
-    },
-    "promotion": {
-      "decision_id": "boring-cdc-d-promotion",
-      "confirmed_projection_source": "contracts/storage/storage-model.json",
-      "source_sha256": "8f09ff584867f45a7bb122f1142eab9afd17fc0384a0e711e665985d0b29e1ff",
-      "projection": "strictly increasing destination fence; lower no-op; same-fence conflict; external-ahead maintenance adoption"
-    },
-    "durability": {
-      "decision_id": "boring-cdc-d-archive-durability",
-      "confirmed_projection_source": "contracts/storage/storage-model.json",
-      "source_sha256": "8f09ff584867f45a7bb122f1142eab9afd17fc0384a0e711e665985d0b29e1ff",
-      "projection": "ext4/xfs local allowlist; descriptor-relative no-follow lifecycle; parent directory sync; owner-only modes",
-      "provisional": "// M0-PROVISIONAL: boring-cdc-d-archive-durability"
-    },
-    "confirmation": {
-      "date": "2026-09-10",
-      "cards": [
-        "5a994cfd",
-        "765bd3b2"
-      ],
-      "scope": "archive artifact design accepted; blocked durability and Compose recommendations remain provisional under owner card 59a63169"
-    }
-  },
-  "formats": {
-    "enabled": [
-      "jsonl-zstd",
-      "parquet-zstd"
-    ],
-    "one_materializer": true,
-    "shared_generation_checkpoint": true,
-    "source": "same SQLite journal only",
-    "schedule": {
-      "cadence_seconds": 300,
-      "range_boundary": "complete committed journal transactions only",
-      "empty_range": "no segment and checkpoint unchanged"
-    }
-  },
-  "writer_profile": {
-    "id": "archive-writer/v1",
-    "platform": "linux/amd64",
-    "parquet_format_version": "2.6",
-    "parquet_writer_crate": "parquet 57.0.0",
-    "arrow_crate": "arrow 57.0.0",
-    "zstd_library": "zstd 1.5.7",
-    "zstd_level": 3,
-    "zstd_checksum": true,
-    "zstd_content_size": true,
-    "zstd_workers": 0,
-    "row_group_max_rows": 65536,
-    "data_page_max_bytes": 1048576,
-    "dictionary_enabled": false,
-    "statistics": "page_and_chunk exact min/max/null_count",
-    "bloom_filter": false,
-    "column_order": "event contract positional column_id ascending",
-    "row_order": "journal_seq,event_index",
-    "created_by": "boring-cdc/archive-writer/v1",
-    "timestamps_and_host_metadata": "forbidden",
-    "retry_scope": "byte-identical only under exact platform, versions, event/config fingerprints and profile",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-compose"
-  },
-  "layout": {
-    "root_mode": "0700",
-    "file_mode": "0600",
-    "allowed_filesystems": [
-      "ext4",
-      "xfs"
-    ],
-    "remote_or_network_filesystems": "forbidden",
-    "component_grammar": {
-      "opaque_hash": "lowercase hex exactly 64",
-      "generation_and_fence": "zero-padded decimal exactly 20",
-      "range": "r-{start20}-{end20}",
-      "table": "t-{logical_table_id64}",
-      "schema": "s-{relation_schema_fingerprint64}",
-      "intent": "i-{intent_id64}"
-    },
-    "staging": ".staging/e-{epoch64}/g-{generation20}/r-{start20}-{end20}/i-{intent64}",
-    "final": "v1/e-{epoch64}/g-{generation20}/segments/r-{start20}-{end20}/i-{intent64}",
-    "files": [
-      "events.jsonl.zst",
-      "t-{table64}/s-{schema64}/part-{ordinal6}.parquet",
-      "segment-manifest.json",
-      "SEGMENT_READY"
-    ],
-    "selector": "v1/e-{epoch64}/selectors/f-{fence20}-g-{generation20}-m-{generation_manifest_sha256}.json",
-    "path_rules": [
-      "opaque IDs only; raw and sanitized source identifiers forbidden",
-      "open root once; all operations descriptor-relative with no-follow and exclusive creation",
-      "reject symlink, non-directory intermediate, type swap, uid/mode mismatch, and link count other than one"
-    ],
-    "generation_manifest": "v1/e-{epoch64}/g-{generation20}/generation-manifest.json",
-    "generation_ready": "v1/e-{epoch64}/g-{generation20}/GENERATION_READY",
-    "provisional": "// M0-PROVISIONAL: boring-cdc-d-archive-durability"
-  },
-  "jsonl": {
-    "encoding": "UTF-8",
-    "record": "event schema canonical JSON with lexicographically sorted object keys, no insignificant whitespace, ensure_ascii=true, LF after every record including last",
-    "compression": "one deterministic Zstd frame using writer profile",
-    "grouping": "one generation segment file ordered by journal_seq,event_index"
-  },
-  "parquet": {
-    "grouping": "one file sequence per logical_table_id and relation_schema_fingerprint; transactions may span files but segment range/checkpoint remains atomic",
-    "physical_schema": "event envelope fields followed by positional relation columns; field IDs equal stable column_id; value-state tag retained",
-    "part_rotation": "before adding a row group that would exceed 1 GiB uncompressed segment reservation; ordinal starts 000000",
-    "compression": "ZSTD using writer profile",
-    "determinism": [
-      "fixed row/page grouping",
-      "no dictionary or bloom filter",
-      "fixed created_by; no wall clock, host, random UUID, absolute path or unordered map metadata",
-      "footer key-value metadata sorted by UTF-8 key bytes"
-    ]
-  },
-  "hashes": {
-    "algorithm": "SHA-256",
-    "hex": "lowercase",
-    "file_scope": "exact persisted compressed file bytes",
-    "manifest_encoding": "RFC 8785 JCS UTF-8 bytes with no trailing newline",
-    "manifest_scope": "entire manifest object; manifest never contains its own hash",
-    "ready_bytes": "UTF-8 bytes intent:{intent_id64}\\nmanifest-sha256:{segment_manifest_sha256}\\n",
-    "selector_scope": "RFC 8785 JCS bytes containing epoch,generation,promotion_fence,generation_manifest_sha256 and generation relative path",
-    "golden_manifest": {
-      "schema_version": "archive-segment-manifest/v1",
-      "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "generation": 7,
-      "promotion_fence": 9,
-      "range": {
-        "start_journal_seq": 100,
-        "end_journal_seq": 120,
-        "end_commit_lsn_u64": 4096
-      },
-      "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "event_contract_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-      "writer_profile": "archive-writer/v1",
-      "files": [
-        {
-          "path": "events.jsonl.zst",
-          "size_bytes": 66,
-          "sha256": "203a180a85e1d76dc8817bf5dbf71b254137b9950c6a46fdf5b3ee2c3901d554",
-          "format": "jsonl-zstd",
-          "logical_table_id": "0000000000000000000000000000000000000000000000000000000000000000",
-          "relation_schema_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
-          "part_ordinal": 0,
-          "row_count": 2
-        },
-        {
-          "path": "t-1111111111111111111111111111111111111111111111111111111111111111/s-2222222222222222222222222222222222222222222222222222222222222222/part-000000.parquet",
-          "size_bytes": 742,
-          "sha256": "cf17581ecf75d86cc9c5bad6a594c9ee8183bee086d1fdd524a8b7db1456caee",
-          "format": "parquet-zstd",
-          "logical_table_id": "1111111111111111111111111111111111111111111111111111111111111111",
-          "relation_schema_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
-          "part_ordinal": 0,
-          "row_count": 2
-        }
-      ],
-      "intent_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-      "enabled_formats": [
-        "jsonl-zstd",
-        "parquet-zstd"
-      ],
-      "writer_config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "event_count": 2,
-      "schema_fingerprints": [
-        "2222222222222222222222222222222222222222222222222222222222222222"
-      ],
-      "display_mappings": {
-        "1111111111111111111111111111111111111111111111111111111111111111": {
-          "schema_display": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
-          "table_display": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
-        }
-      },
-      "format_versions": {
-        "jsonl": "event-canonical-json/v1+zstd-1.5.7",
-        "parquet": "parquet-2.6+arrow-rs-57.0.0+zstd-1.5.7"
-      },
-      "compatible_anchor": {
-        "anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        "lower_journal_seq": 99,
-        "post_copy_journal_seq": 100
-      }
-    },
-    "golden_manifest_sha256": "5dff5751fb2a7c38e6dae45df73df82380192d83eb87a43057ff47a14610ada6",
-    "generation_ready_bytes": "UTF-8 bytes generation-manifest-sha256:{generation_manifest_sha256} followed by LF",
-    "golden_generation_manifest": {
-      "schema_version": "archive-generation-manifest/v1",
-      "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "generation": 7,
-      "promotion_fence": 9,
-      "compatible_anchor": {
-        "anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        "lower_journal_seq": 99,
-        "post_copy_journal_seq": 100
-      },
-      "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
-      "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-      "writer_config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-      "enabled_formats": [
-        "jsonl-zstd",
-        "parquet-zstd"
-      ],
-      "segment_manifests": [
-        {
-          "relative_path": "segments/r-00000000000000000100-00000000000000000120/i-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-          "manifest_sha256": "5dff5751fb2a7c38e6dae45df73df82380192d83eb87a43057ff47a14610ada6",
-          "start_journal_seq": 100,
-          "end_journal_seq": 120,
-          "event_count": 2
-        }
-      ],
-      "complete_checkpoint": {
-        "journal_seq": 120,
-        "commit_lsn_u64": 4096
-      },
-      "verification": {
-        "anchor": true,
-        "watermark": true,
-        "formats_semantically_equal": true,
-        "no_gaps_or_overlaps": true
-      }
-    },
-    "golden_generation_manifest_sha256": "beaf0c84efe35c7399ed71623ccdd925e8c411687345ba423bdc03e4ac4cdd58",
-    "golden_selector": {
-      "schema_version": "archive-selector/v1",
-      "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "generation": 7,
-      "promotion_fence": 9,
-      "generation_manifest_sha256": "beaf0c84efe35c7399ed71623ccdd925e8c411687345ba423bdc03e4ac4cdd58",
-      "generation_relative_path": "v1/e-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/g-00000000000000000007"
-    },
-    "golden_selector_sha256": "54fec9a24f3aaf725de96758082302fd2279568b544cd82a017ace079fb25b88",
-    "golden_generation_ready_base64": "Z2VuZXJhdGlvbi1tYW5pZmVzdC1zaGEyNTY6YmVhZjBjODRlZmUzNWM3Mzk5ZWQ3MTYyM2NjZGQ5MjVlOGM0MTE2ODczNDViYTQyM2JkYzAzZTRhYzRjZGQ1OAo="
+    "status": "engineering artifact with accepted d-archive-durability literals; Compose recommendations remain provisional"
   },
   "commit_protocol": {
+    "checkpoint_rule": "never beyond a complete transaction or before durable ready segment; selector promotion is separate and monotonic",
+    "generation_promotion_steps": [
+      "persist candidate_complete only after compatible complete anchor and finite verification checkpoint cover every required table/schema and enabled format",
+      "write generation-manifest.json exclusively over the ordered complete segment set; fsync file and generation directory; persist generation_manifest_synced",
+      "create GENERATION_READY exclusively; fsync marker and generation directory; persist generation_ready",
+      "write immutable greater-fence generation selector exclusively; fsync selector and parent; persist selector_synced",
+      "commit promoted generation and highest external fence in SQLite; old generation remains readable through retirement grace"
+    ],
     "intent_fields": [
       "intent_id",
       "capture_epoch",
@@ -279,6 +70,15 @@
       "enabled_formats",
       "writer_config_sha256"
     ],
+    "ordered_steps": [
+      "commit immutable pending intent including compatible anchor, formats and writer-config hash in SQLite before external write",
+      "exclusive mkdir staging path and fsync each new parent",
+      "write each file exclusively; fdatasync each file; persist files_synced",
+      "write segment-manifest.json exclusively; fsync; persist manifest_synced",
+      "rename staging directory to canonical final path atomically; fsync final parent; persist final_renamed",
+      "create SEGMENT_READY exclusively with intent and segment-manifest hash; fsync marker then final directory; persist ready_synced",
+      "validate all hashes and commit segment_ready plus archive checkpoint=end_journal_seq in one SQLite transaction"
+    ],
     "phases": [
       "pending",
       "files_synced",
@@ -295,93 +95,66 @@
       "blocked",
       "quarantined"
     ],
-    "ordered_steps": [
-      "commit immutable pending intent including compatible anchor, formats and writer-config hash in SQLite before external write",
-      "exclusive mkdir staging path and fsync each new parent",
-      "write each file exclusively; fdatasync each file; persist files_synced",
-      "write segment-manifest.json exclusively; fsync; persist manifest_synced",
-      "rename staging directory to canonical final path atomically; fsync final parent; persist final_renamed",
-      "create SEGMENT_READY exclusively with intent and segment-manifest hash; fsync marker then final directory; persist ready_synced",
-      "validate all hashes and commit segment_ready plus archive checkpoint=end_journal_seq in one SQLite transaction"
-    ],
-    "visibility": "segment readers ignore directories without valid SEGMENT_READY; live readers resolve only a valid generation selector whose GENERATION_READY and generation manifest prove a complete verified generation",
-    "checkpoint_rule": "never beyond a complete transaction or before durable ready segment; selector promotion is separate and monotonic",
-    "generation_promotion_steps": [
-      "persist candidate_complete only after compatible complete anchor and finite verification checkpoint cover every required table/schema and enabled format",
-      "write generation-manifest.json exclusively over the ordered complete segment set; fsync file and generation directory; persist generation_manifest_synced",
-      "create GENERATION_READY exclusively; fsync marker and generation directory; persist generation_ready",
-      "write immutable greater-fence generation selector exclusively; fsync selector and parent; persist selector_synced",
-      "commit promoted generation and highest external fence in SQLite; old generation remains readable through retirement grace"
-    ]
+    "visibility": "segment readers ignore directories without valid SEGMENT_READY; live readers resolve only a valid generation selector whose GENERATION_READY and generation manifest prove a complete verified generation"
   },
-  "reconciliation": {
-    "staging": "remove only when immutable intent identifies it and no complete valid manifest; otherwise validate and continue",
-    "final_without_ready": "validate intent, path, manifest and every file; resync and create marker, else quarantine and block",
-    "ready_without_sqlite": "validate exact intent and adopt idempotently; conflicting range/identity blocks",
-    "same_intent_retry": "existing bytes must match expected size/hash; mismatch quarantines and blocks",
-    "orphan_without_intent": "quarantine; never adopt or delete automatically"
-  },
-  "promotion": {
-    "selector_resolution": "parse valid immutable generation selectors for epoch; unique greatest promotion_fence selects one complete GENERATION_READY generation",
-    "lower_fence": "no-op",
-    "same_fence_same_state": "idempotent",
-    "same_fence_different_state": "corruption block",
-    "external_ahead": "block allocation and dispatch until maintenance proves/adopts unique highest fence or rejects it",
-    "format_or_writer_change": "new generation from compatible complete anchor or explicit discontinuity; never mutate published generation"
-  },
-  "audit": {
-    "read_only": true,
-    "checkpoint_moves": false,
-    "identity": [
-      "capture_epoch",
-      "generation",
-      "promotion_fence",
-      "selector_sha256",
-      "target_archive_checkpoint",
-      "config_fingerprint",
-      "event_contract_sha256"
-    ],
-    "separate_ranges": [
-      "journal_verified_range",
-      "self_consistent_range"
-    ],
-    "budgets": {
-      "max_bytes_per_pass": 67108864,
-      "max_events_per_pass": 100000,
-      "max_milliseconds_per_pass": 5000,
-      "cadence_seconds": 300,
-      "freshness_seconds": 900
+  "consumes": {
+    "archive_scope": {
+      "decision_id": "DEC-ARCHIVE-SCOPE",
+      "path": "fixtures/m0/decisions/boring-cdc-d-archive-scope.json",
+      "sha256": "cb022782a56ce331b5e35b95d89696fd292522ff9b7a69736a44bea6216826b9"
     },
-    "cursor": [
-      "segment_relative_path",
-      "file_ordinal",
-      "byte_offset",
-      "event_offset"
-    ],
-    "oversized_part": "verify in bounded byte chunks with persisted hash state/version and resume offset",
-    "identity_change": "discard partial round and restart from new finite target",
-    "gap_or_expiry": "report partial/unknown; never bridge gaps or invent older coverage",
-    "mismatch": "persist integrity fingerprint and block archive only; capture and ClickHouse continue"
+    "confirmation": {
+      "cards": [
+        "5a994cfd",
+        "765bd3b2"
+      ],
+      "date": "2026-09-10",
+      "scope": "archive artifact design accepted; blocked durability and Compose recommendations remain provisional under owner card 59a63169"
+    },
+    "durability": {
+      "approval_card": "59a63169",
+      "confirmed_projection_source": "contracts/storage/storage-model.json",
+      "decision_id": "boring-cdc-d-archive-durability",
+      "projection": "ext4/xfs local allowlist; descriptor-relative no-follow lifecycle; parent directory sync; owner-only modes",
+      "source_sha256": "9b6f48a65557ac3a70fb5ab8eb2cadb4b1f3dd7457f7306bda31197325d24a7f"
+    },
+    "event_contract": {
+      "path": "contracts/event/event-format.json",
+      "sha256": "9eca4905a8760b6ae940bb32941a69daa60cc09c6bc7076439e8936ac17e448d"
+    },
+    "failure_policy": {
+      "base_delay_ms": 250,
+      "cap_delay_ms": 30000,
+      "confirmed_projection_source": "contracts/scaffold/m0-scaffold.json",
+      "decision_id": "boring-cdc-d-failure-policy",
+      "maximum_attempts": 10,
+      "source_sha256": "a96ac9a4afcb2cbdfc708b731c0b7e96838b6dce77eb31ff6ca2d13e901d15fd",
+      "version": 1
+    },
+    "promotion": {
+      "confirmed_projection_source": "contracts/storage/storage-model.json",
+      "decision_id": "boring-cdc-d-promotion",
+      "projection": "strictly increasing destination fence; lower no-op; same-fence conflict; external-ahead maintenance adoption",
+      "source_sha256": "9b6f48a65557ac3a70fb5ab8eb2cadb4b1f3dd7457f7306bda31197325d24a7f"
+    }
   },
-  "gc_retention": {
-    "owner": "single run-owned archive GC through persisted intents",
-    "live": [
-      "winning selector generation",
-      "unexpired audit round targets",
-      "logical journal/history pins",
-      "pending or ambiguous intents"
-    ],
-    "retirement": "only explicit retired generation after 86400 second grace and no pins/audit references",
-    "delete_order": "descriptor-relative unlink files, fsync directories bottom-up, remove empty generation, fsync parent; persist completion",
-    "orphan_staging_age_seconds": 3600,
-    "same_account_readers_only": true
-  },
+  "executors": [
+    "boring-cdc-m2-jsonl",
+    "boring-cdc-m5-segment-set",
+    "boring-cdc-m5-loops"
+  ],
   "failure_and_observability": {
-    "shared_policy": "reference processing_failures; do not duplicate schedule",
-    "transient": "persist attempt and due time across restart; no work before due",
-    "deterministic": "blocked with unchanged failed boundary; no hot loop or checkpoint skip",
-    "resume": "explicit request must revalidate corrected cause, same epoch/generation/range/config and unchanged checkpoint",
     "corruption": "block archive only and preserve evidence/quarantine",
+    "deterministic": "blocked with unchanged failed boundary; no hot loop or checkpoint skip",
+    "exit_codes": {
+      "configuration": 78,
+      "continuity": 66,
+      "integrity": 65,
+      "temporary": 75
+    },
+    "redaction": "never payload, key, raw identifier, DSN, credential, raw error, absolute path or nonce",
+    "resume": "explicit request must revalidate corrected cause, same epoch/generation/range/config and unchanged checkpoint",
+    "shared_policy": "reference processing_failures; do not duplicate schedule",
     "status_fields": [
       "state",
       "generation",
@@ -398,17 +171,8 @@
       "audit_fresh_until",
       "archive_bytes"
     ],
-    "redaction": "never payload, key, raw identifier, DSN, credential, raw error, absolute path or nonce",
-    "exit_codes": {
-      "integrity": 65,
-      "continuity": 66,
-      "temporary": 75,
-      "configuration": 78
-    }
+    "transient": "persist attempt and due time across restart; no work before due"
   },
-  "fixture_path": "fixtures/m0/archive/scenarios.json",
-  "result_schema": "contracts/archive/archive-result.schema.json",
-  "artifact_root": "artifacts/boring-cdc-m0-archive-model/spec",
   "fixture_ids": [
     "SCN-M0-ARCHIVE-EMPTY-RANGE",
     "SCN-M0-ARCHIVE-JSONL-BYTE-RETRY",
@@ -452,13 +216,268 @@
     "SCN-M0-ARCHIVE-FORMAT-CHANGE-NEW-GENERATION",
     "SCN-M0-ARCHIVE-EXPLICIT-DISCONTINUITY"
   ],
-  "executors": [
-    "boring-cdc-m2-jsonl",
-    "boring-cdc-m5-segment-set",
-    "boring-cdc-m5-loops"
+  "fixture_path": "fixtures/m0/archive/scenarios.json",
+  "fixture_schemas": [
+    "contracts/archive/archive-fixtures.schema.json",
+    "contracts/archive/archive-result.schema.json"
   ],
+  "formats": {
+    "enabled": [
+      "jsonl-zstd",
+      "parquet-zstd"
+    ],
+    "one_materializer": true,
+    "schedule": {
+      "cadence_seconds": 300,
+      "empty_range": "no segment and checkpoint unchanged",
+      "range_boundary": "complete committed journal transactions only"
+    },
+    "shared_generation_checkpoint": true,
+    "source": "same SQLite journal only"
+  },
+  "gc_retention": {
+    "delete_order": "descriptor-relative unlink files, fsync directories bottom-up, remove empty generation, fsync parent; persist completion",
+    "live": [
+      "winning selector generation",
+      "unexpired audit round targets",
+      "logical journal/history pins",
+      "pending or ambiguous intents"
+    ],
+    "orphan_staging_age_seconds": 3600,
+    "owner": "single run-owned archive GC through persisted intents",
+    "retirement": "only explicit retired generation after 86400 second grace and no pins/audit references",
+    "same_account_readers_only": true
+  },
+  "generation_manifest": {
+    "required_fields": [
+      "schema_version",
+      "capture_epoch",
+      "generation",
+      "promotion_fence",
+      "compatible_anchor",
+      "table_set_fingerprint",
+      "config_fingerprint",
+      "writer_config_sha256",
+      "enabled_formats",
+      "segment_manifests",
+      "complete_checkpoint",
+      "verification"
+    ],
+    "schema_path": "contracts/archive/generation-manifest.schema.json",
+    "segment_entry_fields": [
+      "relative_path",
+      "manifest_sha256",
+      "start_journal_seq",
+      "end_journal_seq",
+      "event_count"
+    ],
+    "verification": "all intended complete ranges through finite checkpoint, every table/schema group, no overlaps/gaps, JSONL and Parquet semantic equivalence, anchor and watermark verified before ready or selector"
+  },
+  "golden_vectors": "fixtures/m0/archive/scenarios.json#golden_vectors",
+  "hashes": {
+    "algorithm": "SHA-256",
+    "file_scope": "exact persisted compressed file bytes",
+    "generation_ready_bytes": "UTF-8 bytes generation-manifest-sha256:{generation_manifest_sha256} followed by LF",
+    "golden_generation_manifest": {
+      "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compatible_anchor": {
+        "anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "lower_journal_seq": 99,
+        "post_copy_journal_seq": 100
+      },
+      "complete_checkpoint": {
+        "commit_lsn_u64": 4096,
+        "journal_seq": 120
+      },
+      "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "enabled_formats": [
+        "jsonl-zstd",
+        "parquet-zstd"
+      ],
+      "generation": 7,
+      "promotion_fence": 9,
+      "schema_version": "archive-generation-manifest/v1",
+      "segment_manifests": [
+        {
+          "end_journal_seq": 120,
+          "event_count": 2,
+          "manifest_sha256": "5dff5751fb2a7c38e6dae45df73df82380192d83eb87a43057ff47a14610ada6",
+          "relative_path": "segments/r-00000000000000000100-00000000000000000120/i-dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "start_journal_seq": 100
+        }
+      ],
+      "table_set_fingerprint": "6666666666666666666666666666666666666666666666666666666666666666",
+      "verification": {
+        "anchor": true,
+        "formats_semantically_equal": true,
+        "no_gaps_or_overlaps": true,
+        "watermark": true
+      },
+      "writer_config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    "golden_generation_manifest_sha256": "beaf0c84efe35c7399ed71623ccdd925e8c411687345ba423bdc03e4ac4cdd58",
+    "golden_generation_ready_base64": "Z2VuZXJhdGlvbi1tYW5pZmVzdC1zaGEyNTY6YmVhZjBjODRlZmUzNWM3Mzk5ZWQ3MTYyM2NjZGQ5MjVlOGM0MTE2ODczNDViYTQyM2JkYzAzZTRhYzRjZGQ1OAo=",
+    "golden_manifest": {
+      "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "compatible_anchor": {
+        "anchor_id": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "lower_journal_seq": 99,
+        "post_copy_journal_seq": 100
+      },
+      "config_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "display_mappings": {
+        "1111111111111111111111111111111111111111111111111111111111111111": {
+          "schema_display": "sha256:4444444444444444444444444444444444444444444444444444444444444444",
+          "table_display": "sha256:5555555555555555555555555555555555555555555555555555555555555555"
+        }
+      },
+      "enabled_formats": [
+        "jsonl-zstd",
+        "parquet-zstd"
+      ],
+      "event_contract_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "event_count": 2,
+      "files": [
+        {
+          "format": "jsonl-zstd",
+          "logical_table_id": "0000000000000000000000000000000000000000000000000000000000000000",
+          "part_ordinal": 0,
+          "path": "events.jsonl.zst",
+          "relation_schema_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+          "row_count": 2,
+          "sha256": "203a180a85e1d76dc8817bf5dbf71b254137b9950c6a46fdf5b3ee2c3901d554",
+          "size_bytes": 66
+        },
+        {
+          "format": "parquet-zstd",
+          "logical_table_id": "1111111111111111111111111111111111111111111111111111111111111111",
+          "part_ordinal": 0,
+          "path": "t-1111111111111111111111111111111111111111111111111111111111111111/s-2222222222222222222222222222222222222222222222222222222222222222/part-000000.parquet",
+          "relation_schema_fingerprint": "2222222222222222222222222222222222222222222222222222222222222222",
+          "row_count": 2,
+          "sha256": "cf17581ecf75d86cc9c5bad6a594c9ee8183bee086d1fdd524a8b7db1456caee",
+          "size_bytes": 742
+        }
+      ],
+      "format_versions": {
+        "jsonl": "event-canonical-json/v1+zstd-1.5.7",
+        "parquet": "parquet-2.6+arrow-rs-57.0.0+zstd-1.5.7"
+      },
+      "generation": 7,
+      "intent_id": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "promotion_fence": 9,
+      "range": {
+        "end_commit_lsn_u64": 4096,
+        "end_journal_seq": 120,
+        "start_journal_seq": 100
+      },
+      "schema_fingerprints": [
+        "2222222222222222222222222222222222222222222222222222222222222222"
+      ],
+      "schema_version": "archive-segment-manifest/v1",
+      "writer_config_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "writer_profile": "archive-writer/v1"
+    },
+    "golden_manifest_sha256": "5dff5751fb2a7c38e6dae45df73df82380192d83eb87a43057ff47a14610ada6",
+    "golden_selector": {
+      "capture_epoch": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "generation": 7,
+      "generation_manifest_sha256": "beaf0c84efe35c7399ed71623ccdd925e8c411687345ba423bdc03e4ac4cdd58",
+      "generation_relative_path": "v1/e-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/g-00000000000000000007",
+      "promotion_fence": 9,
+      "schema_version": "archive-selector/v1"
+    },
+    "golden_selector_sha256": "54fec9a24f3aaf725de96758082302fd2279568b544cd82a017ace079fb25b88",
+    "hex": "lowercase",
+    "manifest_encoding": "RFC 8785 JCS UTF-8 bytes with no trailing newline",
+    "manifest_scope": "entire manifest object; manifest never contains its own hash",
+    "ready_bytes": "UTF-8 bytes intent:{intent_id64}\\nmanifest-sha256:{segment_manifest_sha256}\\n",
+    "selector_scope": "RFC 8785 JCS bytes containing epoch,generation,promotion_fence,generation_manifest_sha256 and generation relative path"
+  },
+  "jsonl": {
+    "compression": "one deterministic Zstd frame using writer profile",
+    "encoding": "UTF-8",
+    "grouping": "one generation segment file ordered by journal_seq,event_index",
+    "record": "event schema canonical JSON with lexicographically sorted object keys, no insignificant whitespace, ensure_ascii=true, LF after every record including last"
+  },
+  "layout": {
+    "allowed_filesystems": [
+      "ext4",
+      "xfs"
+    ],
+    "component_grammar": {
+      "generation_and_fence": "zero-padded decimal exactly 20",
+      "intent": "i-{intent_id64}",
+      "opaque_hash": "lowercase hex exactly 64",
+      "range": "r-{start20}-{end20}",
+      "schema": "s-{relation_schema_fingerprint64}",
+      "table": "t-{logical_table_id64}"
+    },
+    "file_mode": "0600",
+    "files": [
+      "events.jsonl.zst",
+      "t-{table64}/s-{schema64}/part-{ordinal6}.parquet",
+      "segment-manifest.json",
+      "SEGMENT_READY"
+    ],
+    "final": "v1/e-{epoch64}/g-{generation20}/segments/r-{start20}-{end20}/i-{intent64}",
+    "generation_manifest": "v1/e-{epoch64}/g-{generation20}/generation-manifest.json",
+    "generation_ready": "v1/e-{epoch64}/g-{generation20}/GENERATION_READY",
+    "path_rules": [
+      "opaque IDs only; raw and sanitized source identifiers forbidden",
+      "open root once; all operations descriptor-relative with no-follow and exclusive creation",
+      "reject symlink, non-directory intermediate, type swap, uid/mode mismatch, and link count other than one"
+    ],
+    "remote_or_network_filesystems": "forbidden",
+    "root_mode": "0700",
+    "selector": "v1/e-{epoch64}/selectors/f-{fence20}-g-{generation20}-m-{generation_manifest_sha256}.json",
+    "staging": ".staging/e-{epoch64}/g-{generation20}/r-{start20}-{end20}/i-{intent64}"
+  },
+  "owner_bead": "boring-cdc-m0-archive-model",
+  "parquet": {
+    "compression": "ZSTD using writer profile",
+    "determinism": [
+      "fixed row/page grouping",
+      "no dictionary or bloom filter",
+      "fixed created_by; no wall clock, host, random UUID, absolute path or unordered map metadata",
+      "footer key-value metadata sorted by UTF-8 key bytes"
+    ],
+    "grouping": "one file sequence per logical_table_id and relation_schema_fingerprint; transactions may span files but segment range/checkpoint remains atomic",
+    "part_rotation": "before adding a row group that would exceed 1 GiB uncompressed segment reservation; ordinal starts 000000",
+    "physical_schema": "event envelope fields followed by positional relation columns; field IDs equal stable column_id; value-state tag retained"
+  },
+  "promotion": {
+    "external_ahead": "block allocation and dispatch until maintenance proves/adopts unique highest fence or rejects it",
+    "format_or_writer_change": "new generation from compatible complete anchor or explicit discontinuity; never mutate published generation",
+    "lower_fence": "no-op",
+    "same_fence_different_state": "corruption block",
+    "same_fence_same_state": "idempotent",
+    "selector_resolution": "parse valid immutable generation selectors for epoch; unique greatest promotion_fence selects one complete GENERATION_READY generation"
+  },
+  "provisional_markers": [
+    "// M0-PROVISIONAL: boring-cdc-d-compose"
+  ],
+  "reconciliation": {
+    "final_without_ready": "validate intent, path, manifest and every file; resync and create marker, else quarantine and block",
+    "orphan_without_intent": "quarantine; never adopt or delete automatically",
+    "ready_without_sqlite": "validate exact intent and adopt idempotently; conflicting range/identity blocks",
+    "same_intent_retry": "existing bytes must match expected size/hash; mismatch quarantines and blocks",
+    "staging": "remove only when immutable intent identifies it and no complete valid manifest; otherwise validate and continue"
+  },
+  "result_schema": "contracts/archive/archive-result.schema.json",
+  "schema_version": "archive-contract/v1",
   "segment_manifest": {
-    "schema_path": "contracts/archive/segment-manifest.schema.json",
+    "display_mappings": "hash-addressed display labels only; raw identifiers never occur in paths or logs",
+    "file_entry_fields": [
+      "path",
+      "format",
+      "logical_table_id",
+      "relation_schema_fingerprint",
+      "part_ordinal",
+      "row_count",
+      "size_bytes",
+      "sha256"
+    ],
     "required_fields": [
       "schema_version",
       "intent_id",
@@ -478,50 +497,29 @@
       "display_mappings",
       "files"
     ],
-    "file_entry_fields": [
-      "path",
-      "format",
-      "logical_table_id",
-      "relation_schema_fingerprint",
-      "part_ordinal",
-      "row_count",
-      "size_bytes",
-      "sha256"
-    ],
-    "display_mappings": "hash-addressed display labels only; raw identifiers never occur in paths or logs"
+    "schema_path": "contracts/archive/segment-manifest.schema.json"
   },
-  "generation_manifest": {
-    "schema_path": "contracts/archive/generation-manifest.schema.json",
-    "required_fields": [
-      "schema_version",
-      "capture_epoch",
-      "generation",
-      "promotion_fence",
-      "compatible_anchor",
-      "table_set_fingerprint",
-      "config_fingerprint",
-      "writer_config_sha256",
-      "enabled_formats",
-      "segment_manifests",
-      "complete_checkpoint",
-      "verification"
-    ],
-    "segment_entry_fields": [
-      "relative_path",
-      "manifest_sha256",
-      "start_journal_seq",
-      "end_journal_seq",
-      "event_count"
-    ],
-    "verification": "all intended complete ranges through finite checkpoint, every table/schema group, no overlaps/gaps, JSONL and Parquet semantic equivalence, anchor and watermark verified before ready or selector"
-  },
-  "fixture_schemas": [
-    "contracts/archive/archive-fixtures.schema.json",
-    "contracts/archive/archive-result.schema.json"
-  ],
-  "golden_vectors": "fixtures/m0/archive/scenarios.json#golden_vectors",
-  "provisional_markers": [
-    "// M0-PROVISIONAL: boring-cdc-d-archive-durability",
-    "// M0-PROVISIONAL: boring-cdc-d-compose"
-  ]
+  "writer_profile": {
+    "arrow_crate": "arrow 57.0.0",
+    "bloom_filter": false,
+    "column_order": "event contract positional column_id ascending",
+    "created_by": "boring-cdc/archive-writer/v1",
+    "data_page_max_bytes": 1048576,
+    "dictionary_enabled": false,
+    "id": "archive-writer/v1",
+    "parquet_format_version": "2.6",
+    "parquet_writer_crate": "parquet 57.0.0",
+    "platform": "linux/amd64",
+    "provisional": "// M0-PROVISIONAL: boring-cdc-d-compose",
+    "retry_scope": "byte-identical only under exact platform, versions, event/config fingerprints and profile",
+    "row_group_max_rows": 65536,
+    "row_order": "journal_seq,event_index",
+    "statistics": "page_and_chunk exact min/max/null_count",
+    "timestamps_and_host_metadata": "forbidden",
+    "zstd_checksum": true,
+    "zstd_content_size": true,
+    "zstd_level": 3,
+    "zstd_library": "zstd 1.5.7",
+    "zstd_workers": 0
+  }
 }

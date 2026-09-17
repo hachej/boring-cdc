@@ -24,9 +24,9 @@ class ArchiveContractTests(unittest.TestCase):
  def test_provisional_inventory_is_card_bound(self):
   c=m.load(m.C); marker=lambda decision:f'// M0-PROVISIONAL: {decision}'
   self.assertEqual(['59a63169'],c['authority']['owner_cards'])
-  self.assertEqual({marker('boring-cdc-d-archive-durability'),marker('boring-cdc-d-compose')},set(c['provisional_markers']))
-  self.assertEqual(marker('boring-cdc-d-archive-durability'),c['consumes']['durability']['provisional'])
-  self.assertEqual(marker('boring-cdc-d-archive-durability'),c['layout']['provisional'])
+  self.assertEqual({marker('boring-cdc-d-compose')},set(c['provisional_markers']))
+  self.assertEqual('59a63169',c['consumes']['durability']['approval_card'])
+  self.assertNotIn('provisional',c['layout'])
   self.assertEqual(marker('boring-cdc-d-compose'),c['writer_profile']['provisional'])
  def test_consumed_digests_are_current(self):
   c=m.load(m.C)

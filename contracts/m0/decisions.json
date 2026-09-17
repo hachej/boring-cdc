@@ -2,6 +2,24 @@
   "decisions": [
     {
       "approval": {
+        "approved_at": "2026-09-16T06:05:55.752Z",
+        "approved_by": "Julien Hurault (repository owner), answered owner card 59a63169",
+        "value_digest": "ac120fdef10b8141596e957e678ce5df1112d1e98ca5418c1b6f6bc771c7750b"
+      },
+      "executor_beads": [
+        "boring-cdc-m5-segment-set",
+        "boring-cdc-m5-loops",
+        "boring-cdc-m5-faults"
+      ],
+      "fixture_sha256": "bf93e232cf4ebf534209ec47d9e90879afe590e1cdea13630288ded099f7415c",
+      "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
+      "id": "DEC-ARCHIVE-DURABILITY-CONTINUITY",
+      "owner_bead": "boring-cdc-d-archive-durability",
+      "proposed_value": "Archive audit is read-only with separate journal/self-consistency ranges; each pass is bounded to 67,108,864 bytes, 100,000 events, and 5,000 ms; cadence is 300 seconds and freshness is 900 seconds, so three consecutive missed cadences are inadequate service; oversized units resume in bounded chunks; identity changes restart a finite round; gaps/expiry remain partial or unknown; integrity/continuity/configuration/unsupported failures block only archive under the shared FailurePolicy with stable archive codes and unchanged capture feedback.",
+      "status": "approved"
+    },
+    {
+      "approval": {
         "approved_at": "2026-09-09T08:58:19Z",
         "approved_by": "Julien Hurault (repository owner), intention d3e8abc3-d2f4-4bc0-8aec-d6ffd7bf2e36",
         "value_digest": "36e94526528793c4f9b72508a334ffbc9af72e545faa5bb7d326b23efda69ae3"

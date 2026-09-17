@@ -32,7 +32,7 @@
       "id": "ART-M0-ARCHIVE-MODEL",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.json",
-      "sha256": "0acaa38c019856d93de33037bc5344ee34ecf53a8c703fce2d6efa5dc2d5ad67",
+      "sha256": "f82424d3404ce2bec6bd3648d3ea0d23f94910dccdfa1a0256c2ab6519160c3e",
       "status": "complete"
     },
     {
@@ -46,7 +46,7 @@
       "id": "ART-M0-ARCHIVE-SCHEMA",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.schema.json",
-      "sha256": "4d9f9ac3f9beacb23fd4515c6bbb51eeaeceeca390b7a662b3ccac0e55378506",
+      "sha256": "a2120ca8ddaa8b532b77ece9a19ccbf5dd1555101933b7d62b6a4600e3426955",
       "status": "complete"
     },
     {
@@ -81,7 +81,7 @@
       "id": "ART-M0-ARCHIVE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "scripts/validate/archive_contract.py",
-      "sha256": "fae2d88199b265e6d05056b3903db0e41c86d9e2692442c74e68fb25c99c5cb6",
+      "sha256": "9f39dd817194434062be8f1b8f770946eb1b1c4168ab80dfcc2bf4d003469888",
       "status": "complete"
     },
     {
@@ -473,7 +473,7 @@
       "id": "ART-M0-STORAGE-MODEL",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "contracts/storage/storage-model.json",
-      "sha256": "95e8e432a09ce4684e0b095cdecfa9a788950bb88ede0ad78ef28051d07335a3",
+      "sha256": "9b6f48a65557ac3a70fb5ab8eb2cadb4b1f3dd7457f7306bda31197325d24a7f",
       "status": "complete"
     },
     {
@@ -501,7 +501,7 @@
       "id": "ART-M0-STORAGE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "scripts/validate/storage_contract.py",
-      "sha256": "8adf12e96ab61ee887bc488c620df5e6c0e32fd690639fd06f7466f7f73091c2",
+      "sha256": "5df1ddcf3ef02540ec5456169cee79b80a7132964ad4158a263f9a490768b57b",
       "status": "complete"
     },
     {
