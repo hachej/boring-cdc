@@ -237,15 +237,19 @@ class KickoffContracts(unittest.TestCase):
     def test_series_preparation_record_has_per_article_boundaries(self):
         checkpoints = {
             1: ("boring-cdc-m1-raw-demo", "boring-cdc-pci.6", "verified local demo",
-                "scripts/acceptance/article1.sh", "evidence/article1/manifest.json"),
-            2: ("boring-cdc-m2-fault-status", "M2/M3/M4", "**unavailable:**",
-                "no article-ready", "actually executed"),
-            3: ("boring-cdc-m3-faults", "boring-cdc-m3-oracle", "**unavailable:**",
-                "no article-ready", "frozen workload/oracle"),
-            4: ("boring-cdc-m4-bench", "boring-cdc-m5-table-add", "**unavailable:**",
-                "no article-ready", "table-add"),
+                "scripts/acceptance/article1.sh", "evidence/article1/manifest.json",
+                "fixtures/article1/compose.yml", "derives `PGPASSWORD`"),
+            2: ("boring-cdc-m2-fault-status", "docs/durable-simple-operator.md",
+                "bounded local command available", "scripts/acceptance/durable_simple_case.sh",
+                "six-transaction source-to-durable-SQLite simple case", "article composite unavailable"),
+            3: ("boring-cdc-m3-faults", "boring-cdc-m3-oracle",
+                "component routes exist, article result unavailable", "scripts/e2e/m3_bootstrap.sh",
+                "scripts/e2e/m3_planner.sh", "scripts/e2e/m3_oracle.sh"),
+            4: ("boring-cdc-m4-bench", "boring-cdc-m5-table-add",
+                "component routes exist, article result unavailable", "scripts/e2e/m4_clickhouse_ddl.sh",
+                "scripts/e2e/m4_durability.sh", "scripts/e2e/m4_bench.sh"),
             5: ("boring-cdc-m5-faults", "canonical M5 owners", "**unavailable:**",
-                "no article-ready", "reconstruct/verify"),
+                "scripts/acceptance/m5.sh", "scripts/e2e/m5_faults.sh", "reconstruct/verify"),
         }
         for article, required in checkpoints.items():
             rows = [line for line in self.series.splitlines()
@@ -260,6 +264,8 @@ class KickoffContracts(unittest.TestCase):
             for phrase in ("disclosure", "publication approval"):
                 self.assertIn(phrase, row.lower(), (article, phrase))
         self.assertIn("python3 scripts/validate/article1_transcript.py", self.series)
+        self.assertIn("current-master refresh", self.series)
+        self.assertIn("`origin/master` `f86e395`", self.series)
         self.assertIn("M7 consumes only measurements", self.series)
 
     def test_series_separates_baseline_event_delivery_and_convergence(self):
