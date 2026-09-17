@@ -3,7 +3,7 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 CASE_ID=${1:-all}
 exec python3 - "$ROOT" "$CASE_ID" <<'PY'
-import hashlib,json,sys
+import hashlib,json,re,subprocess,sys
 from pathlib import Path
 r=Path(sys.argv[1]); selected=sys.argv[2]
 def sha(p):return hashlib.sha256(p.read_bytes()).hexdigest()
@@ -49,6 +49,9 @@ try:
  needed={'ART-M0-ARCHIVE-DURABILITY-FIXTURE':'fixtures/m0/decisions/boring-cdc-d-archive-durability.json','ART-M0-ARCHIVE-DURABILITY-PROBE':'artifacts/m0/decisions/boring-cdc-d-archive-durability/fixture-run.jsonl','ART-M0-ARCHIVE-DURABILITY-VALIDATION':'artifacts/m0/decisions/boring-cdc-d-archive-durability/evidence.json'}
  owned={x['id']:x for x in ar['artifacts'] if x.get('owner_bead')=='boring-cdc-d-archive-durability'}
  if set(owned)!=set(needed) or any(owned[k]['path']!=p or owned[k]['sha256']!=sha(r/p) for k,p in needed.items()):fail()
+ evidence=json.loads((r/needed['ART-M0-ARCHIVE-DURABILITY-VALIDATION']).read_text())
+ if evidence.get('schema_version')!='validation-result/v1' or evidence.get('status')!='pass' or evidence.get('findings')!=[] or evidence.get('input_sha256')!=sha(r/'contracts/m0/decisions.json') or not re.fullmatch(r'[0-9a-f]{40}',evidence.get('git_commit','')):fail()
+ if subprocess.run(['git','cat-file','-e',evidence['git_commit']+'^{commit}'],cwd=r,capture_output=True).returncode or subprocess.run(['git','merge-base','--is-ancestor',evidence['git_commit'],'HEAD'],cwd=r,capture_output=True).returncode:fail()
 except Exception:fail()
 if selected=='all':print(json.dumps({'code':'ARCHIVE_DURABILITY_FIXTURE_VALID','outcome':'pass','phase':'validate_spec','vector_count':len(vs)},sort_keys=True,separators=(',',':')))
 elif selected in vs:print(json.dumps({'case_id':selected,'code':'ARCHIVE_DURABILITY_CASE_VALID','expected_outcome':vs[selected]['expected_outcome'],'outcome':'pass','phase':'validate_spec'},sort_keys=True,separators=(',',':')))

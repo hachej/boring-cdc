@@ -4,7 +4,7 @@
       "id": "ART-M0-ARCHIVE-DURABILITY-FIXTURE",
       "owner_bead": "boring-cdc-d-archive-durability",
       "path": "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
-      "sha256": "e4076e0f7c78c44018f1e8ec440d5cb6097e8ad3f7b62adb7677b528d51e5a57",
+      "sha256": "eb06373749e03e65aeb8c3043f63ac6c01b0067eb2cc5d3bfa5ed85e8ba97bc9",
       "status": "complete"
     },
     {
@@ -53,7 +53,7 @@
       "id": "ART-M0-ARCHIVE-MODEL",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "contracts/archive/archive-model.json",
-      "sha256": "f40b67ea9388a03455ac4600a89c6c1cb588ef682f89639cb90d95f2f795b2cb",
+      "sha256": "473a931d6072ba49c55f1958d165ef64b2542c6ffd0976dbfba309a0729ffe2b",
       "status": "complete"
     },
     {
@@ -102,7 +102,7 @@
       "id": "ART-M0-ARCHIVE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-archive-model",
       "path": "scripts/validate/archive_contract.py",
-      "sha256": "c4deb4d9d7e66763f20f3abd913bf4a9e8793011530b8728148dca420c68ee39",
+      "sha256": "344e86db1c3869f7397b2a358e9ab988730f67c69b01d238242a4b84e4b9bc45",
       "status": "complete"
     },
     {
