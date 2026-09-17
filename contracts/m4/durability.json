@@ -1,0 +1,44 @@
+{
+  "schema_version": "m4-clickhouse-durability/v1",
+  "owner_bead": "boring-cdc-m4-durability",
+  "condition": {
+    "name": "clickhouse_durability_unverified",
+    "stable_version": 1,
+    "condition_owner": "boring-cdc-m4-durability",
+    "procedure_owner": "boring-cdc-m6-runbooks",
+    "scope": "destination-local",
+    "entered_when": [
+      "batch acceptance cannot be freshly read back",
+      "persisted audit finds marker, event, payload, selector, object, or setting mismatch",
+      "frozen audit coverage is partial, expired, gapped, or unavailable"
+    ],
+    "allowed_actions": ["replay unchanged failed boundary", "block ClickHouse destination", "rebuild ClickHouse destination"],
+    "forbidden_actions": ["advance ClickHouse checkpoint", "block capture", "block archive", "read PostgreSQL", "assert freshness"]
+  },
+  "durable_batch_phases": [
+    "prepared",
+    "insert_dispatched",
+    "insert_finalized",
+    "marker_verified",
+    "checkpointed"
+  ],
+  "durable_audit_phases": [
+    "round_frozen",
+    "journal_compare",
+    "destination_self_check",
+    "coverage_persisted",
+    "blocked"
+  ],
+  "audit_identity": [
+    "destination_id",
+    "capture_epoch",
+    "generation",
+    "configuration_fingerprint",
+    "selector_fingerprint",
+    "target_checkpoint",
+    "object_fingerprint",
+    "event_contract_digest"
+  ],
+  "freshness_rule": "coverage belongs to its frozen round and each persisted subrange expires independently; slow completion never refreshes an expired subrange",
+  "payload_rule": "reconstruct actual stored key, operation, source version, schema identity and tagged values before comparing recomputed, stored and journal hashes"
+}
