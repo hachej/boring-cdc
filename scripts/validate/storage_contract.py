@@ -106,8 +106,8 @@ def validate():
  return fs,inputs
 def resolve_source_parent(prior,inputs,validator_sha256):
  head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
- if prior.get('inputs')!=inputs or prior.get('validator_sha256')!=validator_sha256:return head,None
- candidate=prior.get('source_parent_git_commit')
+ changed=prior.get('inputs')!=inputs or prior.get('validator_sha256')!=validator_sha256
+ candidate=head if changed else prior.get('source_parent_git_commit')
  if not isinstance(candidate,str) or re.fullmatch(r'[0-9a-f]{40}',candidate) is None:return candidate or '', 'stored source parent must be a canonical full lowercase commit OID'
  try: resolved=subprocess.check_output(['git','rev-parse',candidate+'^{commit}'],cwd=ROOT,text=True,stderr=subprocess.DEVNULL).strip()
  except subprocess.CalledProcessError:return candidate,'stored source parent is not an existing commit'

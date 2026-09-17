@@ -52,6 +52,9 @@ class StorageContractTests(unittest.TestCase):
   prior['source_parent_git_commit']=old
   _,error=m.resolve_source_parent(prior,inputs,validator_sha)
   self.assertRegex(error,r'(missing recorded blob|blob hash differs)')
+  missing={**inputs,'contracts/storage/not-present.json':'0'*64}
+  _,error=m.resolve_source_parent({'inputs':missing,'validator_sha256':validator_sha,'source_parent_git_commit':candidate},missing,validator_sha)
+  self.assertIn('missing recorded blob contracts/storage/not-present.json',error)
  def test_provisional_inventory_is_card_bound(self):
   c=m.load(m.C); marker=lambda decision:f'// M0-PROVISIONAL: {decision}'
   self.assertEqual(c['authority']['owner_cards'],['59a63169'])
