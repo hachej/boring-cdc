@@ -21,10 +21,6 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 pub const OWNER_BEAD: &str = "boring-cdc-m2-capture-runtime";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-pub const PUBLICATION: &str = crate::article1_capture::PUBLICATION;
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-pub const SLOT: &str = crate::article1_capture::SLOT;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct FeedbackPacket {
@@ -1408,10 +1404,20 @@ impl Drop for ProductionControlLane {
 
 pub fn observe_live_source(
     dsn: &str,
+    publication_name: &str,
+    slot_name: &str,
 ) -> Result<crate::m2_reconcile::LiveSourceObservation, CaptureFailure> {
     use crate::m1_control_fixtures::PublicationSpec;
     use std::collections::BTreeSet;
 
+    if !crate::article1_capture::valid_pg_identifier(publication_name)
+        || !crate::article1_capture::valid_pg_slot_name(slot_name)
+    {
+        return Err(CaptureFailure::at(
+            "configuration",
+            "M2_PROTOCOL_CONFIG_INVALID",
+        ));
+    }
     let has_replication_parameter = dsn.split_once('?').is_some_and(|(_, query)| {
         query.split('&').any(|item| {
             item.split_once('=')
@@ -1451,7 +1457,7 @@ pub fn observe_live_source(
     // Fingerprint the observed catalog definition, not the configured expectation. The two
     // catalog reads use stable order and the same typed canonical representation as init.
     let publication = connection.exec(&format!(
-        "SELECT p.pubname,pg_get_userbyid(p.pubowner),concat_ws(',',CASE WHEN p.pubdelete THEN 'delete' END,CASE WHEN p.pubinsert THEN 'insert' END,CASE WHEN p.pubtruncate THEN 'truncate' END,CASE WHEN p.pubupdate THEN 'update' END) FROM pg_publication p WHERE p.pubname='{PUBLICATION}'"
+        "SELECT p.pubname,pg_get_userbyid(p.pubowner),concat_ws(',',CASE WHEN p.pubdelete THEN 'delete' END,CASE WHEN p.pubinsert THEN 'insert' END,CASE WHEN p.pubtruncate THEN 'truncate' END,CASE WHEN p.pubupdate THEN 'update' END) FROM pg_publication p WHERE p.pubname='{publication_name}'"
     )).map_err(|_| CaptureFailure::at("reconciliation", "M2_PUBLICATION_OBSERVATION_FAILED"))?;
     let publication_value = |column| {
         publication.get_value(0, column).ok_or_else(|| {
@@ -1462,7 +1468,7 @@ pub fn observe_live_source(
     let owner_role = publication_value(1)?;
     let operations = publication_value(2)?;
     let relations = connection.exec(&format!(
-        "SELECT coalesce(string_agg(schemaname||'.'||tablename,chr(31) ORDER BY schemaname,tablename),'') FROM pg_publication_tables WHERE pubname='{PUBLICATION}'"
+        "SELECT coalesce(string_agg(schemaname||'.'||tablename,chr(31) ORDER BY schemaname,tablename),'') FROM pg_publication_tables WHERE pubname='{publication_name}'"
     )).map_err(|_| CaptureFailure::at("reconciliation", "M2_PUBLICATION_OBSERVATION_FAILED"))?
         .get_value(0, 0)
         .ok_or_else(|| CaptureFailure::at("reconciliation", "M2_PUBLICATION_OBSERVATION_FAILED"))?;
@@ -1481,7 +1487,7 @@ pub fn observe_live_source(
             .collect::<BTreeSet<_>>(),
     };
 
-    let slot = connection.exec(&format!("SELECT plugin,coalesce(confirmed_flush_lsn::text,''),coalesce(restart_lsn::text,''),coalesce(wal_status,''),coalesce(invalidation_reason,'') FROM pg_replication_slots WHERE slot_name='{SLOT}'"))
+    let slot = connection.exec(&format!("SELECT plugin,coalesce(confirmed_flush_lsn::text,''),coalesce(restart_lsn::text,''),coalesce(wal_status,''),coalesce(invalidation_reason,'') FROM pg_replication_slots WHERE slot_name='{slot_name}'"))
         .map_err(|_| CaptureFailure::at("reconciliation", "M2_SLOT_OBSERVATION_FAILED"))?;
     let plugin = slot.get_value(0, 0);
     let position = |column| {
@@ -1505,7 +1511,7 @@ pub fn observe_live_source(
         source_system_id,
         timeline_id,
         database_id,
-        slot_name: SLOT.into(),
+        slot_name: slot_name.into(),
         plugin: plugin.clone().unwrap_or_default(),
         publication_fingerprint: observed_publication.fingerprint(),
         protocol_fingerprint: "pgoutput-v1".into(),
@@ -1543,16 +1549,19 @@ pub async fn run_loaded_config(
     use std::path::PathBuf;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     let public = config.public();
-    if public.source.publication != PUBLICATION || public.source.slot != SLOT {
-        return Err(CaptureFailure::at(
-            "configuration",
-            "M2_ARTICLE1_PROTOCOL_LITERAL_MISMATCH",
-        ));
-    }
     let dsn = config
         .runtime_dsn()
         .ok_or_else(|| CaptureFailure::at("configuration", "M2_RUNTIME_DSN_UNAVAILABLE"))?
         .to_owned();
+    let capture_config = CaptureConfig::production(
+        dsn.clone(),
+        public.source.publication.clone(),
+        public.source.slot.clone(),
+        public
+            .tables
+            .iter()
+            .map(|table| table.source_relation.clone()),
+    )?;
     let heartbeat_dsn = config
         .control_writer_dsn()
         .ok_or_else(|| CaptureFailure::at("configuration", "M2_CONTROL_DSN_UNAVAILABLE"))?
@@ -1570,7 +1579,7 @@ pub async fn run_loaded_config(
         .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?;
     let now = elapsed.as_millis() as i64;
     let startup_run_id = format!("production-startup-{}", elapsed.as_nanos());
-    let live_source = observe_live_source(&dsn)?;
+    let live_source = observe_live_source(&dsn, &public.source.publication, &public.source.slot)?;
     // Initialization is keyed by durable schema/source state, never by path existence. A crash
     // after migrations but before this transaction leaves no partial identity receipt; retrying
     // observes zero rows and atomically writes the full live identity.
@@ -1703,7 +1712,7 @@ pub async fn run_loaded_config(
             source_system_id: live_source.source_system_id,
             timeline_id: live_source.timeline_id,
             database_id: live_source.database_id,
-            slot_name: SLOT.into(),
+            slot_name: public.source.slot.clone(),
             publication_fingerprint: live_source.publication_fingerprint.clone(),
             protocol_fingerprint: "pgoutput-v1".into(),
         },
@@ -1806,7 +1815,7 @@ pub async fn run_loaded_config(
         Duration::from_millis(public.source.lock_probe_interval_ms.0),
     )?;
     let result = capture_copyboth_until_with_probe(
-        &CaptureConfig::article1(dsn, 1)?,
+        &capture_config,
         cancellation,
         &mut runtime,
         u64::MAX,
@@ -1958,7 +1967,7 @@ pub mod tests {
                 source_system_id: "sys".into(),
                 timeline_id: "timeline".into(),
                 database_id: "db".into(),
-                slot_name: SLOT.into(),
+                slot_name: crate::article1_capture::SLOT.into(),
                 publication_fingerprint: "publication".into(),
                 protocol_fingerprint: "protocol".into(),
             },
