@@ -11,10 +11,15 @@ use crate::failure_policy::{
     SafeContextValue, StableErrorCode,
 };
 use crate::m2_journal::{CopiedEvent, CopiedRange};
+use crate::m2_leases::{
+    LeaseError, LeaseToken, SideEffectAdapter, SideEffectOutcome, complete_local,
+    dispatch as dispatch_with_lease,
+};
+use crate::m2_schema::WriterConnection;
 use crate::m4_clickhouse_schema::object_fingerprint;
 use rusqlite::{OptionalExtension, Transaction, params};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fmt;
 
 pub const FAILURE_CONDITION: &str = "clickhouse_durability_unverified";
@@ -70,6 +75,9 @@ pub struct PreparedBatch {
 pub struct RemoteEventIdentity {
     pub connector_event_id: String,
     pub payload_hash: String,
+    /// Canonical bytes reconstructed from the actual stored key, operation, source-version,
+    /// schema identity, and tagged column values. Returning only the stored hash is forbidden.
+    pub canonical_payload: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -89,12 +97,128 @@ pub trait ClickHouseBatchExecutor {
     fn insert_events_synchronously(&mut self, batch: &PreparedBatch) -> Result<(), DispatchError>;
     fn insert_marker_synchronously(&mut self, marker: &BatchMarker) -> Result<(), DispatchError>;
     fn read_batch(&mut self, marker: &BatchMarker) -> Result<Option<RemoteBatch>, DispatchError>;
+    /// Recompute the live correctness-object/settings fingerprint from server metadata.
+    fn inspect_object_fingerprint(&mut self) -> Result<String, DispatchError>;
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Reconciliation {
     ReplayRequired,
     Verified,
+}
+
+fn lease_error(error: LeaseError) -> DurabilityError {
+    match error {
+        LeaseError::Stale => DurabilityError::OwnershipLost,
+        LeaseError::Invalid(_) | LeaseError::Conflict => {
+            DurabilityError::Conflict("lease validation failed")
+        }
+        LeaseError::Sqlite(_) => DurabilityError::Sqlite("lease persistence failed".into()),
+        LeaseError::External(_) => DurabilityError::Dispatch,
+    }
+}
+
+fn context_from_lease(token: &LeaseToken) -> BatchContext {
+    BatchContext {
+        destination_id: token.identity.destination_id.clone(),
+        capture_epoch: token.identity.capture_epoch.clone(),
+        generation: token.identity.generation,
+        configuration_fingerprint: token.identity.configuration_fingerprint.clone(),
+        lease_id: token.identity.lease_id.clone(),
+        run_id: token.identity.run_id.clone(),
+    }
+}
+
+/// Production entry point for intent creation. M2 validates the complete lease incarnation,
+/// runtime ownership deadline, and monotonic expiry in the same local transaction.
+pub fn prepare_owned_batch<C>(
+    writer: &mut WriterConnection,
+    token: &LeaseToken,
+    clock_mono_ms: &mut C,
+    range: CopiedRange,
+) -> Result<PreparedBatch, DurabilityError>
+where
+    C: FnMut() -> u64,
+{
+    let context = context_from_lease(token);
+    complete_local(writer, token, clock_mono_ms, |transaction| {
+        prepare_batch(transaction, &context, range).map_err(|error| match error {
+            DurabilityError::OwnershipLost => LeaseError::Stale,
+            DurabilityError::Sqlite(message) => LeaseError::Sqlite(message),
+            _ => LeaseError::Conflict,
+        })
+    })
+    .map_err(lease_error)
+}
+
+struct BatchSideEffect<'a, E> {
+    executor: &'a mut E,
+    batch: &'a PreparedBatch,
+}
+impl<E: ClickHouseBatchExecutor> SideEffectAdapter for BatchSideEffect<'_, E> {
+    type Artifact = RemoteBatch;
+
+    fn apply_candidate(&mut self, _external_namespace: &str) -> Result<Self::Artifact, String> {
+        dispatch_and_readback(self.executor, self.batch)
+            .map_err(|_| "clickhouse_batch_dispatch_failed".to_owned())
+    }
+}
+
+/// Production dispatch path. The ambiguous-effect phase is committed first, then M2 checks the
+/// exact lease token immediately before and after the synchronous ClickHouse operation.
+pub fn dispatch_owned_batch<C>(
+    writer: &mut WriterConnection,
+    token: &LeaseToken,
+    clock_mono_ms: &mut C,
+    executor: &mut impl ClickHouseBatchExecutor,
+    batch: &PreparedBatch,
+) -> Result<RemoteBatch, DurabilityError>
+where
+    C: FnMut() -> u64,
+{
+    complete_local(writer, token, clock_mono_ms, |transaction| {
+        mark_insert_dispatched(transaction, batch).map_err(|error| match error {
+            DurabilityError::Sqlite(message) => LeaseError::Sqlite(message),
+            _ => LeaseError::Conflict,
+        })
+    })
+    .map_err(lease_error)?;
+    let mut adapter = BatchSideEffect { executor, batch };
+    match dispatch_with_lease(writer, token, clock_mono_ms, &mut adapter).map_err(lease_error)? {
+        SideEffectOutcome::Live(remote) => Ok(remote),
+        SideEffectOutcome::StaleArtifact(_) => Err(DurabilityError::OwnershipLost),
+    }
+}
+
+/// Production finalization path. M2 holds the sole-writer transaction and validates the exact
+/// lease token on both sides of the checkpoint/intent CAS.
+pub fn finalize_owned_batch<C>(
+    writer: &mut WriterConnection,
+    token: &LeaseToken,
+    clock_mono_ms: &mut C,
+    batch: &PreparedBatch,
+    remote: &RemoteBatch,
+    expected_checkpoint_revision: Option<u64>,
+) -> Result<(), DurabilityError>
+where
+    C: FnMut() -> u64,
+{
+    let context = context_from_lease(token);
+    complete_local(writer, token, clock_mono_ms, |transaction| {
+        finalize_checkpoint(
+            transaction,
+            &context,
+            batch,
+            remote,
+            expected_checkpoint_revision,
+        )
+        .map_err(|error| match error {
+            DurabilityError::OwnershipLost => LeaseError::Stale,
+            DurabilityError::Sqlite(message) => LeaseError::Sqlite(message),
+            _ => LeaseError::Conflict,
+        })
+    })
+    .map_err(lease_error)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -265,6 +389,14 @@ pub fn dispatch_and_readback(
         .read_batch(&batch.marker)
         .map_err(|DispatchError| DurabilityError::Dispatch)?
         .ok_or(DurabilityError::ReadbackMissing)?;
+    let live_fingerprint = executor
+        .inspect_object_fingerprint()
+        .map_err(|DispatchError| DurabilityError::Dispatch)?;
+    if live_fingerprint != batch.marker.object_fingerprint {
+        return Err(DurabilityError::Conflict(
+            "ClickHouse object fingerprint drift",
+        ));
+    }
     verify_remote_batch(batch, &remote)?;
     Ok(remote)
 }
@@ -281,6 +413,14 @@ pub fn reconcile_remote(
     else {
         return Ok(Reconciliation::ReplayRequired);
     };
+    let live_fingerprint = executor
+        .inspect_object_fingerprint()
+        .map_err(|DispatchError| DurabilityError::Dispatch)?;
+    if live_fingerprint != batch.marker.object_fingerprint {
+        return Err(DurabilityError::Conflict(
+            "ClickHouse object fingerprint drift",
+        ));
+    }
     verify_remote_batch(batch, &remote)?;
     Ok(Reconciliation::Verified)
 }
@@ -474,6 +614,7 @@ fn intent_state(transaction: &Transaction<'_>, intent_id: &str) -> Result<String
 fn destination_events(events: &[CopiedEvent]) -> Result<Vec<DestinationEvent>, DurabilityError> {
     let mut destination = Vec::new();
     let mut last_seq = None;
+    let mut control_kind: Option<&str> = None;
     for event in events {
         if last_seq.is_some_and(|seq| event.journal_seq != seq + 1)
             || format!("{:x}", Sha256::digest(&event.payload)) != event.payload_hash
@@ -481,8 +622,23 @@ fn destination_events(events: &[CopiedEvent]) -> Result<Vec<DestinationEvent>, D
             return Err(DurabilityError::Conflict("journal event content mismatch"));
         }
         last_seq = Some(event.journal_seq);
-        if event.control_kind.is_some() {
+        if let Some(kind) = event.control_kind.as_deref() {
+            if !matches!(kind, "heartbeat" | "capture_fence")
+                || event.relation_schema_fingerprint.is_some()
+                || !destination.is_empty()
+                || control_kind.is_some_and(|previous| previous != kind)
+            {
+                return Err(DurabilityError::Conflict(
+                    "invalid or mixed control transaction",
+                ));
+            }
+            control_kind = Some(kind);
             continue;
+        }
+        if control_kind.is_some() {
+            return Err(DurabilityError::Conflict(
+                "invalid or mixed control transaction",
+            ));
         }
         let relation_schema_fingerprint = event
             .relation_schema_fingerprint
@@ -546,19 +702,29 @@ fn verify_remote_batch(batch: &PreparedBatch, remote: &RemoteBatch) -> Result<()
         .map(|event| {
             (
                 event.connector_event_id.as_str(),
-                event.payload_hash.as_str(),
+                (event.payload_hash.as_str(), event.payload.as_slice()),
             )
         })
-        .collect::<BTreeSet<_>>();
+        .collect::<BTreeMap<_, _>>();
     if expected.len() != batch.events.len() {
         return Err(DurabilityError::Conflict(
             "duplicate connector event ID in intent",
         ));
     }
-    let mut observed = BTreeMap::<&str, &str>::new();
+    let mut observed = BTreeMap::<&str, (&str, &[u8])>::new();
     for event in &remote.events {
-        match observed.insert(&event.connector_event_id, &event.payload_hash) {
-            Some(previous) if previous != event.payload_hash => {
+        let recomputed = format!("{:x}", Sha256::digest(&event.canonical_payload));
+        if recomputed != event.payload_hash {
+            return Err(DurabilityError::Conflict(
+                "remote payload differs from its stored hash",
+            ));
+        }
+        let value = (
+            event.payload_hash.as_str(),
+            event.canonical_payload.as_slice(),
+        );
+        match observed.insert(&event.connector_event_id, value) {
+            Some(previous) if previous != value => {
                 return Err(DurabilityError::Conflict(
                     "remote connector event ID has multiple payloads",
                 ));
@@ -566,7 +732,6 @@ fn verify_remote_batch(batch: &PreparedBatch, remote: &RemoteBatch) -> Result<()
             _ => {}
         }
     }
-    let observed = observed.into_iter().collect::<BTreeSet<_>>();
     if observed != expected || observed.len() as u64 != batch.marker.event_count {
         return Err(DurabilityError::Conflict(
             "remote event set is incomplete or foreign",
@@ -583,6 +748,7 @@ fn hash_part(digest: &mut Sha256, bytes: &[u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::m2_leases::{LeaseIdentity, acquire};
     use crate::m2_schema::{WriterConnection, open_writer};
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -604,6 +770,7 @@ mod tests {
                 .map(|event| RemoteEventIdentity {
                     connector_event_id: event.connector_event_id.clone(),
                     payload_hash: event.payload_hash.clone(),
+                    canonical_payload: event.payload.clone(),
                 })
                 .collect();
             self.remote = Some(RemoteBatch {
@@ -625,6 +792,9 @@ mod tests {
             _marker: &BatchMarker,
         ) -> Result<Option<RemoteBatch>, DispatchError> {
             Ok(self.remote.clone())
+        }
+        fn inspect_object_fingerprint(&mut self) -> Result<String, DispatchError> {
+            Ok(object_fingerprint())
         }
     }
 
@@ -673,13 +843,7 @@ mod tests {
                 event_id: format!("event-{index}"),
                 relation_schema_fingerprint: (!control_only).then(|| "schema-a".into()),
                 source_relation_id: (!control_only).then(|| "relation-a".into()),
-                control_kind: control_only.then(|| {
-                    if index == 0 {
-                        "heartbeat".into()
-                    } else {
-                        "capture_fence".into()
-                    }
-                }),
+                control_kind: control_only.then(|| "heartbeat".into()),
                 payload: payload.to_vec(),
                 payload_hash: format!("{:x}", Sha256::digest(payload)),
             })
@@ -703,6 +867,81 @@ mod tests {
         let transaction = writer.connection_mut().transaction().unwrap();
         mark_insert_dispatched(&transaction, batch).unwrap();
         transaction.commit().unwrap();
+    }
+
+    fn owned_lease(writer: &mut WriterConnection) -> LeaseToken {
+        writer
+            .connection_mut()
+            .execute("DELETE FROM destination_generation_leases", [])
+            .unwrap();
+        writer.connection_mut().execute("INSERT INTO runtime_ownership(run_id,backend_pid,connection_nonce,ownership_deadline_mono_ms,state,connection_generation,expected_close_token,loss_evidence,takeover_evidence,revision) VALUES('run-a',1,'nonce-a',10000,'held',1,NULL,NULL,NULL,0)", []).unwrap();
+        acquire(
+            writer,
+            LeaseIdentity {
+                lease_id: "lease-a".into(),
+                destination_id: "clickhouse-a".into(),
+                capture_epoch: "7".into(),
+                anchor_id: None,
+                generation: 2,
+                configuration_fingerprint: "cfg-a".into(),
+                run_id: "run-a".into(),
+            },
+            100,
+            1_000,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn production_path_uses_full_m2_lease_fence_around_remote_effect() {
+        let (_path, mut writer) = writer("owned");
+        seed(&mut writer);
+        let token = owned_lease(&mut writer);
+        let mut now = || 100;
+        let batch = prepare_owned_batch(&mut writer, &token, &mut now, copied(false)).unwrap();
+        let mut clickhouse = FakeClickHouse {
+            remote: None,
+            event_inserts: 0,
+            marker_inserts: 0,
+        };
+        let remote =
+            dispatch_owned_batch(&mut writer, &token, &mut now, &mut clickhouse, &batch).unwrap();
+        finalize_owned_batch(&mut writer, &token, &mut now, &batch, &remote, None).unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT journal_seq FROM destination_checkpoints",
+                    [],
+                    |row| row.get::<_, u64>(0),
+                )
+                .unwrap(),
+            2
+        );
+
+        let (_path, mut expired_writer) = self::writer("expired-owned");
+        seed(&mut expired_writer);
+        let expired = owned_lease(&mut expired_writer);
+        let mut before = || 100;
+        let expired_batch =
+            prepare_owned_batch(&mut expired_writer, &expired, &mut before, copied(false)).unwrap();
+        let mut after_expiry = || 1_101;
+        let mut never_called = FakeClickHouse {
+            remote: None,
+            event_inserts: 0,
+            marker_inserts: 0,
+        };
+        assert_eq!(
+            dispatch_owned_batch(
+                &mut expired_writer,
+                &expired,
+                &mut after_expiry,
+                &mut never_called,
+                &expired_batch,
+            ),
+            Err(DurabilityError::OwnershipLost)
+        );
+        assert_eq!(never_called.event_inserts, 0);
     }
 
     #[test]
@@ -766,7 +1005,8 @@ mod tests {
             reconcile_remote(&mut clickhouse, &batch),
             Ok(Reconciliation::Verified)
         );
-        clickhouse.remote.as_mut().unwrap().events[0].payload_hash = "f".repeat(64);
+        // Payload-only corruption preserves event ID, stored hash, and marker.
+        clickhouse.remote.as_mut().unwrap().events[0].canonical_payload = b"tampered".to_vec();
         assert!(matches!(
             reconcile_remote(&mut clickhouse, &batch),
             Err(DurabilityError::Conflict(_))
@@ -797,32 +1037,54 @@ mod tests {
 
     #[test]
     fn heartbeat_and_capture_fence_advance_without_user_rows() {
-        let (_path, mut writer) = writer("control");
+        for kind in ["heartbeat", "capture_fence"] {
+            let (_path, mut writer) = writer(kind);
+            seed(&mut writer);
+            let mut range = copied(true);
+            for event in &mut range.events {
+                event.control_kind = Some(kind.into());
+            }
+            let batch = prepare(&mut writer, range);
+            assert!(batch.events.is_empty());
+            assert_eq!(batch.marker.event_count, 0);
+            mark(&mut writer, &batch);
+            let mut clickhouse = FakeClickHouse {
+                remote: None,
+                event_inserts: 0,
+                marker_inserts: 0,
+            };
+            let remote = dispatch_and_readback(&mut clickhouse, &batch).unwrap();
+            let transaction = writer.connection_mut().transaction().unwrap();
+            finalize_checkpoint(&transaction, &context(), &batch, &remote, None).unwrap();
+            transaction.commit().unwrap();
+            assert_eq!(
+                writer
+                    .connection()
+                    .query_row(
+                        "SELECT journal_seq FROM destination_checkpoints",
+                        [],
+                        |row| row.get::<_, u64>(0),
+                    )
+                    .unwrap(),
+                2
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_or_mixed_control_transactions_fail_before_intent() {
+        let (_path, mut writer) = writer("bad-control");
         seed(&mut writer);
-        let batch = prepare(&mut writer, copied(true));
-        assert!(batch.events.is_empty());
-        assert_eq!(batch.marker.event_count, 0);
-        mark(&mut writer, &batch);
-        let mut clickhouse = FakeClickHouse {
-            remote: None,
-            event_inserts: 0,
-            marker_inserts: 0,
-        };
-        let remote = dispatch_and_readback(&mut clickhouse, &batch).unwrap();
+        let mut range = copied(true);
+        range.events[1].control_kind = Some("capture_fence".into());
         let transaction = writer.connection_mut().transaction().unwrap();
-        finalize_checkpoint(&transaction, &context(), &batch, &remote, None).unwrap();
-        transaction.commit().unwrap();
         assert_eq!(
-            writer
-                .connection()
-                .query_row(
-                    "SELECT journal_seq FROM destination_checkpoints",
-                    [],
-                    |row| row.get::<_, u64>(0)
-                )
-                .unwrap(),
-            2
+            prepare_batch(&transaction, &context(), range),
+            Err(DurabilityError::Conflict(
+                "invalid or mixed control transaction"
+            ))
         );
+        transaction.rollback().unwrap();
     }
 
     #[test]
