@@ -10,7 +10,7 @@ shutil.rmtree(out,ignore_errors=True)
 def canon(v):return (json.dumps(v,sort_keys=True,separators=(',',':'))+'\n').encode()
 def sha(v):return hashlib.sha256(v).hexdigest()
 def wr(p,v):p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(v if isinstance(v,bytes) else v.encode())
-files=['Cargo.toml','Cargo.lock','src/m3_bootstrap.rs','src/m3_planner.rs','src/lib.rs','vendor/pg_walstream/src/lib.rs','vendor/pg_walstream/src/connection/mod.rs','vendor/pg_walstream/src/connection/native/mod.rs','vendor/pg_walstream/src/connection/native/connection.rs','vendor/pg_walstream/src/connection/native/query.rs','contracts/m3/planner-cases.json','scripts/e2e/m3_planner.sh','scripts/faults/m3_planner.sh','scripts/lib/m3_planner_evidence.py']
+files=['Cargo.toml','Cargo.lock','src/m3_bootstrap.rs','src/m3_planner.rs','src/lib.rs','vendor/pg_walstream/Cargo.toml','vendor/pg_walstream/src/lib.rs','vendor/pg_walstream/src/connection/mod.rs','vendor/pg_walstream/src/connection/native/mod.rs','vendor/pg_walstream/src/connection/native/connection.rs','vendor/pg_walstream/src/connection/native/query.rs','contracts/m3/planner-cases.json','scripts/e2e/m3_planner.sh','scripts/faults/m3_planner.sh','scripts/lib/m3_planner_evidence.py']
 h=hashlib.sha256()
 for n in files:
  b=(R/n).read_bytes();h.update(n.encode()+b)

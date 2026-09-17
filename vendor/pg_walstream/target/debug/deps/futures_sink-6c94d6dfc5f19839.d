@@ -1,0 +1,7 @@
+/home/ubuntu/projects/boring-cdc/.worktrees/epic-boring-cdc-m3/vendor/pg_walstream/target/debug/deps/futures_sink-6c94d6dfc5f19839.d: /home/ubuntu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-sink-0.3.33/src/lib.rs
+
+/home/ubuntu/projects/boring-cdc/.worktrees/epic-boring-cdc-m3/vendor/pg_walstream/target/debug/deps/libfutures_sink-6c94d6dfc5f19839.rlib: /home/ubuntu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-sink-0.3.33/src/lib.rs
+
+/home/ubuntu/projects/boring-cdc/.worktrees/epic-boring-cdc-m3/vendor/pg_walstream/target/debug/deps/libfutures_sink-6c94d6dfc5f19839.rmeta: /home/ubuntu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-sink-0.3.33/src/lib.rs
+
+/home/ubuntu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/futures-sink-0.3.33/src/lib.rs:

@@ -1,0 +1,66 @@
+cargo:rustc-check-cfg=cfg(use_instrument_hooks)
+cargo:rerun-if-changed=instrument-hooks/dist/core.c
+cargo:rerun-if-changed=instrument-hooks/includes/core.h
+cargo:rerun-if-changed=build.rs
+cargo:rustc-env=CODSPEED_RUSTC_VERSION=1.89.0 (29483883e 2025-08-04)
+cargo:rustc-env=CODSPEED_RUSTC_RELEASE=1.89.0
+cargo:rustc-env=CODSPEED_RUSTC_LLVM_VERSION=20.1.7
+cargo:rustc-env=CODSPEED_CARGO_VERSION=1.89.0 (c24e10642 2025-06-23)
+cargo:rustc-env=CODSPEED_BUILD_PROFILE=debug
+cargo:rustc-env=CODSPEED_BUILD_OPT_LEVEL=0
+cargo:rerun-if-env-changed=CC_FORCE_DISABLE
+CC_FORCE_DISABLE = None
+cargo:rerun-if-env-changed=CC_x86_64-unknown-linux-gnu
+CC_x86_64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=CC_x86_64_unknown_linux_gnu
+CC_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=HOST_CC
+HOST_CC = None
+cargo:rerun-if-env-changed=CC
+CC = None
+cargo:rerun-if-env-changed=CC_ENABLE_DEBUG_OUTPUT
+cargo:rerun-if-env-changed=CRATE_CC_NO_DEFAULTS
+CRATE_CC_NO_DEFAULTS = None
+cargo:rerun-if-env-changed=CFLAGS
+CFLAGS = None
+cargo:rerun-if-env-changed=HOST_CFLAGS
+HOST_CFLAGS = None
+cargo:rerun-if-env-changed=CFLAGS_x86_64_unknown_linux_gnu
+CFLAGS_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=CFLAGS_x86_64-unknown-linux-gnu
+CFLAGS_x86_64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=AR_x86_64-unknown-linux-gnu
+AR_x86_64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=AR_x86_64_unknown_linux_gnu
+AR_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=HOST_AR
+HOST_AR = None
+cargo:rerun-if-env-changed=AR
+AR = None
+cargo:rerun-if-env-changed=ARFLAGS
+ARFLAGS = None
+cargo:rerun-if-env-changed=HOST_ARFLAGS
+HOST_ARFLAGS = None
+cargo:rerun-if-env-changed=ARFLAGS_x86_64_unknown_linux_gnu
+ARFLAGS_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=ARFLAGS_x86_64-unknown-linux-gnu
+ARFLAGS_x86_64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=AR_x86_64-unknown-linux-gnu
+AR_x86_64-unknown-linux-gnu = None
+cargo:rerun-if-env-changed=AR_x86_64_unknown_linux_gnu
+AR_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=HOST_AR
+HOST_AR = None
+cargo:rerun-if-env-changed=AR
+AR = None
+cargo:rerun-if-env-changed=ARFLAGS
+ARFLAGS = None
+cargo:rerun-if-env-changed=HOST_ARFLAGS
+HOST_ARFLAGS = None
+cargo:rerun-if-env-changed=ARFLAGS_x86_64_unknown_linux_gnu
+ARFLAGS_x86_64_unknown_linux_gnu = None
+cargo:rerun-if-env-changed=ARFLAGS_x86_64-unknown-linux-gnu
+ARFLAGS_x86_64-unknown-linux-gnu = None
+cargo:rustc-link-lib=static=instrument_hooks
+cargo:rustc-link-search=native=/home/ubuntu/projects/boring-cdc/.worktrees/epic-boring-cdc-m3/vendor/pg_walstream/target/debug/build/codspeed-e29b3d86ae35001d/out
+cargo:rustc-cfg=use_instrument_hooks
