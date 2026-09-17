@@ -2,17 +2,17 @@
   "findings": [],
   "fixture_count": 14,
   "inputs": {
-    "contracts/event/event-format.json": "ab44eb632693bb2eeef84b8a030452f730d5e00a1d08d56bc86c221a213eaf1f",
+    "contracts/event/event-format.json": "2969282e59e61f442befdb888b86a3446535694581c6858a92dda100546786b8",
     "contracts/event/event.schema.json": "bef8393066708831ee19352466f862dd7151fa049f6d57f3e1a93791e9d11ede",
-    "docs/EVENT_FORMAT.md": "af3fc750496ab947f928c23b74dbbab9baf2a90372d34968be0a6df78d54dca5",
+    "docs/EVENT_FORMAT.md": "65252925cc76fccddba444d102ad394ab5f0cebf3a77cd3e3ab2d9bd2531da3a",
     "fixtures/m0/event-format/golden-vectors.json": "98ed0c59f6e4735463484648e981b258a0077e4fc2facd458bce46b1cfaeed93"
   },
   "owner_bead": "boring-cdc-m0-event-format",
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-event-format-evidence/v1",
-  "source_parent_git_commit": "23e9d31ad8e68b7e0edc4675954a76d66f2fd3f7",
+  "source_parent_git_commit": "8ffefefbd594c4028bc3efc2fb212383d9f7d6c7",
   "status": "pass",
   "validator": "scripts/validate/event_format.py",
-  "validator_sha256": "603127eeeeaaf79745c17a4b1743b42e72c02d31fb975b6dfe9932fcd9df89be"
+  "validator_sha256": "ee01e23e59d2127a6f559b0f153bef15c5ac1ca75c4074ee5002aec36c594ae5"
 }

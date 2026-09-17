@@ -1,24 +1,24 @@
 {
   "findings": [],
   "fixture_count": 41,
-  "input_tree_sha256": "159015ea08acb24d07033bc84e52d4a2698742254a3c59dbfd6e2486cc1e1690",
+  "input_tree_sha256": "7f73ba8914fd3375bd538a6370e221262ee97386dc8326ebc94fe6e5bcee8899",
   "inputs": {
     "contracts/clickhouse/canonical-query.sql": "0c1a0008e94cc1104e2b6964d39cc9aae26cddb76ba1f38372dc7c5d5442c8df",
     "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
     "contracts/clickhouse/fixtures.schema.json": "894bed006fdc7b5b162024b68aed22e8d7e7b691b57a509bb33c2179b71bec81",
-    "contracts/clickhouse/model.json": "35b14707438eb70d1cef5b1fe8d92067094b12e1f37afdbc57d4cae21f1356eb",
+    "contracts/clickhouse/model.json": "74962d321fafcb718cbc1d1db3963bbbd3995322c811535849e22fd20690568a",
     "contracts/clickhouse/model.schema.json": "4ec898368ada9d0e64f77a05340e1155836b3320163e270a0462252a4e64de71",
     "contracts/clickhouse/result.schema.json": "80ad19fb794e6b6caba1dd45bbcfe63f75c83f6ae7c2d0b81b16da404b8ace8e",
     "contracts/clickhouse/retire-generation.sql": "0f18d6679a6b6bbf58fde38f6c35b09c3c8dca3e2b99a75f8623b0176fb9ae06",
-    "docs/CLICKHOUSE_MODEL.md": "47528c341d172bd0b797eff7d9a0ebd6c3081730f1984d34c6c3eedd7044fc28",
+    "docs/CLICKHOUSE_MODEL.md": "06fc289d50b06060ea975641d6a77fe375ee43de31cef72ee8d1cd6f5cf8f63c",
     "fixtures/m0/clickhouse/scenarios.json": "d1eb388ece27906b91f97707e32745c01a34e51b62634bbd6159d473c6b9cbf8"
   },
   "owner_bead": "boring-cdc-m0-ch-model",
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-clickhouse-contract-evidence/v1",
-  "source_parent_git_commit": "7612b4abcddc1d0cb3326a1a09a1c236745e9647",
+  "source_parent_git_commit": "8ffefefbd594c4028bc3efc2fb212383d9f7d6c7",
   "status": "pass",
   "validator": "scripts/validate/clickhouse_contract.py",
-  "validator_sha256": "165f50b3acdbf4329c8e12901755baf55c84fa7ca56929977e5a64421df85568"
+  "validator_sha256": "58bf73c5547d8b8787c624e6fbe0f787a71a0ea437cd02a87d187fb642d9d91c"
 }
