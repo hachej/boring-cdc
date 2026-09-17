@@ -14,22 +14,17 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::fmt;
 
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const POSTGRES_VERSION_NUM: i32 = 170_006;
 // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const PUBLICATION: &str = "article1_publication";
 // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const SLOT: &str = "article1_slot";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const PROTO_VERSION: &str = "1";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const ORIGIN: &str = "any";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const STREAMING: &str = "false";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const TWO_PHASE: &str = "false";
-// ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const BINARY: &str = "false";
+pub const MESSAGES: &str = "true";
 // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pub const TABLES_CSV: &str = "public.customers,public.order_items,public.orders,public.products";
 
@@ -50,13 +45,14 @@ const PROVISIONAL_EXPECTATIONS: Expectations<'static> = Expectations {
     continuity_available: true,
 };
 
-const START_OPTIONS: [(&str, &str); 6] = [
-    ("proto_version", PROTO_VERSION), // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
+const START_OPTIONS: [(&str, &str); 7] = [
+    ("proto_version", PROTO_VERSION),
     ("publication_names", PUBLICATION), // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-    ("origin", ORIGIN),               // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-    ("streaming", STREAMING),         // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-    ("two_phase", TWO_PHASE),         // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-    ("binary", BINARY),               // ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
+    ("binary", BINARY),
+    ("messages", MESSAGES),
+    ("streaming", STREAMING),
+    ("two_phase", TWO_PHASE),
+    ("origin", ORIGIN),
 ];
 
 #[derive(Clone, Debug, Eq, PartialEq)]

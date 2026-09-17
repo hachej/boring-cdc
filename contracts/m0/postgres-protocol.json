@@ -1,0 +1,252 @@
+{
+  "article1": {
+    "publication_slot_and_table_literals": "remain ARTICLE1-PROVISIONAL and are not approved by this decision",
+    "transport_and_option_literals": "must equal this contract"
+  },
+  "authority": {
+    "approved_at": "2026-09-09T08:58:19Z",
+    "approved_by": "Julien Hurault (repository owner)",
+    "intention_id": "d3e8abc3-d2f4-4bc0-8aec-d6ffd7bf2e36",
+    "materialization_bead": "boring-cdc-4py0.15",
+    "selection_basis": [
+      "contracts/postgres/capture-backfill.json",
+      "Cargo.lock",
+      "evidence/article1/manifest.json"
+    ]
+  },
+  "creation_floor": {
+    "importer_gate": "0/0 or verified creation floor only until snapshot import acknowledgements complete or atomic invalidation releases the gate",
+    "proactive_acknowledgement": false,
+    "resume_requires": [
+      "slot identity valid",
+      "requested WAL available"
+    ],
+    "separate_from_durable_transaction_end": true
+  },
+  "decision_id": "DEC-POSTGRESQL-VERSIONS-TRANSPORT-OPTIONS",
+  "decoding_memory": {
+    "commit_burst": "server spill is admitted, but complete transaction is delivered at commit and must pass admission-owned transaction/spool limits",
+    "logical_decoding_work_mem_bytes": 67108864,
+    "preflight": "setting must equal 67108864 and all PG17 spill/stream counters must be readable",
+    "streamed_transactions": false
+  },
+  "executors": [
+    "boring-cdc-m1-decoder",
+    "boring-cdc-m2-spool",
+    "boring-cdc-m2-capture-runtime",
+    "boring-cdc-m3-bootstrap"
+  ],
+  "failure_policy": {
+    "contract": "contracts/m0/failure-policy.json",
+    "mapping": [
+      {
+        "cause": "copyboth_io",
+        "checkpoint": "unchanged",
+        "class": "transient_io",
+        "code": "BCDC_CAPTURE_COPYBOTH_IO",
+        "feedback": "unchanged",
+        "hook": "retry_same_boundary_after_persisted_schedule"
+      },
+      {
+        "cause": "source_shutdown_or_recovery",
+        "checkpoint": "unchanged",
+        "class": "transient_source",
+        "code": "BCDC_CAPTURE_SOURCE_TRANSIENT",
+        "feedback": "unchanged",
+        "hook": "retry_same_boundary_after_persisted_schedule"
+      },
+      {
+        "cause": "malformed_frame_or_pgoutput",
+        "checkpoint": "unchanged",
+        "class": "integrity",
+        "code": "BCDC_CAPTURE_PROTOCOL_INTEGRITY",
+        "feedback": "unchanged",
+        "hook": "reseed_new_capture_epoch"
+      },
+      {
+        "cause": "unsupported_server_or_protocol",
+        "checkpoint": "unchanged",
+        "class": "unsupported",
+        "code": "BCDC_CAPTURE_PROTOCOL_UNSUPPORTED",
+        "feedback": "unchanged",
+        "hook": "none"
+      },
+      {
+        "cause": "slot_identity_mismatch",
+        "checkpoint": "unchanged",
+        "class": "configuration",
+        "code": "BCDC_CAPTURE_SLOT_MISMATCH",
+        "feedback": "unchanged",
+        "hook": "validate_changed_relevant_configuration"
+      },
+      {
+        "cause": "resume_wal_unavailable_or_slot_invalidated",
+        "checkpoint": "unchanged",
+        "class": "integrity",
+        "code": "BCDC_CAPTURE_WAL_UNAVAILABLE",
+        "feedback": "unchanged",
+        "hook": "reseed_new_capture_epoch"
+      },
+      {
+        "cause": "admission_or_commit_burst_limit",
+        "checkpoint": "unchanged",
+        "class": "configuration",
+        "code": "BCDC_CAPTURE_LIMIT_EXCEEDED",
+        "feedback": "unchanged",
+        "hook": "validate_changed_limit_fingerprint_and_retained_wal"
+      },
+      {
+        "cause": "logical_decoding_work_mem_or_counter_preflight",
+        "checkpoint": "unchanged",
+        "class": "configuration",
+        "code": "BCDC_CAPTURE_SOURCE_CONFIGURATION",
+        "feedback": "unchanged",
+        "hook": "validate_changed_source_configuration"
+      },
+      {
+        "cause": "unexpected_copyboth_eof",
+        "checkpoint": "unchanged",
+        "class": "transient_source",
+        "code": "BCDC_CAPTURE_UNEXPECTED_LOSS",
+        "feedback": "unchanged",
+        "hook": "persist_then_supervisor_restart_under_ownership_fence"
+      },
+      {
+        "cause": "advisory_ownership_loss",
+        "checkpoint": "unchanged",
+        "class": "ownership_lost",
+        "code": "BCDC_CAPTURE_OWNERSHIP_LOST",
+        "feedback": "unchanged",
+        "hook": "new_generation_and_ownership_proof"
+      },
+      {
+        "cause": "matching_persisted_expected_close",
+        "checkpoint": "unchanged",
+        "class": null,
+        "code": "BCDC_CAPTURE_EXPECTED_CLOSE",
+        "expected_state": "capture_safe_stopped",
+        "feedback": "unchanged",
+        "hook": "match_run_generation_and_advisory_session_then_persist_then_close",
+        "policy_input_kind": "expected_close"
+      }
+    ],
+    "no_redefinition": "classes, schedule, fingerprint, persistence, transitions and re-arm remain solely owned by DEC-SHARED-FAILURE-RETRY-POLICY",
+    "sha256": "d0e3e956bc79ddcde4fc77bb8804100a7d56cda6778059028d3b940f98fce831"
+  },
+  "fixed_seed": "0x424344435f50475f50524f544f5f5631",
+  "owner_bead": "boring-cdc-d-pg-protocol",
+  "runtime_observed": false,
+  "schema_version": "postgres-protocol-contract/v1",
+  "start_replication": {
+    "option_order": [
+      "proto_version",
+      "publication_names",
+      "binary",
+      "messages",
+      "streaming",
+      "two_phase",
+      "origin"
+    ],
+    "options": {
+      "binary": "false",
+      "messages": "true",
+      "origin": "any",
+      "proto_version": "1",
+      "publication_names": "caller-owned quoted publication literal",
+      "streaming": "false",
+      "two_phase": "false"
+    },
+    "slot_plugin": "pgoutput",
+    "template": "START_REPLICATION SLOT {quoted_slot_identifier} LOGICAL {canonical_lsn} (proto_version '1', publication_names '{quoted_publication_literal}', binary 'false', messages 'true', streaming 'false', two_phase 'false', origin 'any')"
+  },
+  "supported_postgresql": [
+    {
+      "exact_fixture_version": "17.6",
+      "image_manifest": "sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
+      "major": 17,
+      "pg_stat_replication_slots": {
+        "spill_counters": [
+          "spill_txns",
+          "spill_count",
+          "spill_bytes"
+        ],
+        "stream_counters": [
+          "stream_txns",
+          "stream_count",
+          "stream_bytes"
+        ]
+      },
+      "platform": "linux/amd64"
+    }
+  ],
+  "transport": {
+    "crate": "pg_walstream",
+    "crate_sha256": "4cb204bf29c07ccaedb26f3c6c87fd02fc7cb99021bf7b40f339ddb3aae7fcc2",
+    "default_features": false,
+    "features": [
+      "rustls-tls"
+    ],
+    "required_capabilities": [
+      "incremental CopyBoth reads",
+      "standby status CopyData writes",
+      "caller-owned cancellation",
+      "no whole-transaction collection"
+    ],
+    "source": "registry+https://github.com/rust-lang/crates.io-index",
+    "tokio": {
+      "crate_sha256": "202caea871b69668250d242070849eb495be178ed697a3e98aebce5bc81a0bed",
+      "features": [
+        "rt-multi-thread"
+      ],
+      "version": "1.53.1"
+    },
+    "version": "0.8.1"
+  },
+  "wire": {
+    "admission_inputs": [
+      "limits.max_wire_frame_bytes",
+      "limits.max_copyboth_receive_buffer_bytes",
+      "limits.max_decoder_queue_bytes",
+      "limits.max_in_memory_event_staging_bytes"
+    ],
+    "admission_owner": "boring-cdc-d-admission",
+    "outer_copy_data": {
+      "length": "signed i32 big-endian including length field but excluding tag",
+      "tag_ascii": "d",
+      "validation": "reject length < 4 or payload length above consumed limits.max_wire_frame_bytes before allocation"
+    },
+    "ownership_rule": "this contract defines framing and pre-allocation checks but no numeric admission literal",
+    "primary_keepalive": {
+      "fields": [
+        "wal_end:u64-be",
+        "server_time:i64-be-postgres-2000-micros",
+        "reply_requested:u8-bool"
+      ],
+      "payload_bytes": 18,
+      "tag_ascii": "k"
+    },
+    "standby_status": {
+      "boundary": "write_lsn == flush_lsn == apply_lsn == last eligible persisted durable safe boundary",
+      "fields": [
+        "write_lsn:u64-be",
+        "flush_lsn:u64-be",
+        "apply_lsn:u64-be",
+        "client_time:i64-be-postgres-2000-micros",
+        "reply_requested:u8-zero"
+      ],
+      "payload_bytes": 34,
+      "requested_reply": "immediate; never copy keepalive wal_end or last_received_lsn",
+      "tag_ascii": "r"
+    },
+    "xlog_data": {
+      "fields": [
+        "wal_start:u64-be",
+        "wal_end:u64-be",
+        "server_time:i64-be-postgres-2000-micros",
+        "pgoutput:remaining-bytes"
+      ],
+      "fixed_prefix_bytes": 25,
+      "tag_ascii": "w"
+    }
+  }
+}

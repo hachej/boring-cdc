@@ -72,6 +72,25 @@
     {
       "approval": {
         "approved_at": "2026-09-09T08:58:19Z",
+        "approved_by": "Julien Hurault (repository owner), intention d3e8abc3-d2f4-4bc0-8aec-d6ffd7bf2e36; exact materialization boring-cdc-4py0.15",
+        "value_digest": "33ca465fab96a8010ad49a0131291f3fff2078def66937931037015a5cb0be3f"
+      },
+      "executor_beads": [
+        "boring-cdc-m1-decoder",
+        "boring-cdc-m2-spool",
+        "boring-cdc-m2-capture-runtime",
+        "boring-cdc-m3-bootstrap"
+      ],
+      "fixture_sha256": "e16d400b1358e71aa78373cd17fe28bfe6801c6207485d9f258d5a6431870eee",
+      "fixture_spec": "fixtures/m0/decisions/boring-cdc-d-pg-protocol.json",
+      "id": "DEC-POSTGRESQL-VERSIONS-TRANSPORT-OPTIONS",
+      "owner_bead": "boring-cdc-d-pg-protocol",
+      "proposed_value": "PostgreSQL 17.6 linux/amd64; pg_walstream 0.8.1 rustls-tls pinned by crates.io checksum; pgoutput proto_version=1 with binary=false, messages=true, streaming=false, two_phase=false, origin=any; exact CopyData/XLogData/keepalive/standby-status layouts; 64 MiB logical_decoding_work_mem with PG17 spill/stream counters; separate creation floor and exhaustive shared-FailurePolicy capture mapping; admission-owned numeric limits are consumed, not duplicated.",
+      "status": "approved"
+    },
+    {
+      "approval": {
+        "approved_at": "2026-09-09T08:58:19Z",
         "approved_by": "Julien Hurault (repository owner), intention d3e8abc3-d2f4-4bc0-8aec-d6ffd7bf2e36",
         "value_digest": "8849285064e06878e7e6f7f35d4071f0d09589e2024229630092b4bd6048a46d"
       },

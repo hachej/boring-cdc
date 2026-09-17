@@ -1,0 +1,201 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": "transient_io",
+        "code": "BCDC_CAPTURE_COPYBOTH_IO",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "retry_same_boundary_after_persisted_schedule"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-01",
+      "input": {
+        "cause": "copyboth_io"
+      }
+    },
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": "transient_source",
+        "code": "BCDC_CAPTURE_SOURCE_TRANSIENT",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "retry_same_boundary_after_persisted_schedule"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-02",
+      "input": {
+        "cause": "source_shutdown_or_recovery"
+      }
+    },
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": "integrity",
+        "code": "BCDC_CAPTURE_PROTOCOL_INTEGRITY",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "reseed_new_capture_epoch"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-03",
+      "input": {
+        "cause": "malformed_frame_or_pgoutput"
+      }
+    },
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": "unsupported",
+        "code": "BCDC_CAPTURE_PROTOCOL_UNSUPPORTED",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "none"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-04",
+      "input": {
+        "cause": "unsupported_server_or_protocol"
+      }
+    },
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": "configuration",
+        "code": "BCDC_CAPTURE_SLOT_MISMATCH",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "validate_changed_relevant_configuration"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-05",
+      "input": {
+        "cause": "slot_identity_mismatch"
+      }
+    },
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": "integrity",
+        "code": "BCDC_CAPTURE_WAL_UNAVAILABLE",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "reseed_new_capture_epoch"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-06",
+      "input": {
+        "cause": "resume_wal_unavailable_or_slot_invalidated"
+      }
+    },
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": "configuration",
+        "code": "BCDC_CAPTURE_LIMIT_EXCEEDED",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "validate_changed_limit_fingerprint_and_retained_wal"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-07",
+      "input": {
+        "cause": "admission_or_commit_burst_limit"
+      }
+    },
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": "configuration",
+        "code": "BCDC_CAPTURE_SOURCE_CONFIGURATION",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "validate_changed_source_configuration"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-08",
+      "input": {
+        "cause": "logical_decoding_work_mem_or_counter_preflight"
+      }
+    },
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": "transient_source",
+        "code": "BCDC_CAPTURE_UNEXPECTED_LOSS",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "persist_then_supervisor_restart_under_ownership_fence"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-09",
+      "input": {
+        "cause": "unexpected_copyboth_eof"
+      }
+    },
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": "ownership_lost",
+        "code": "BCDC_CAPTURE_OWNERSHIP_LOST",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "new_generation_and_ownership_proof"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-10",
+      "input": {
+        "cause": "advisory_ownership_loss"
+      }
+    },
+    {
+      "expected": {
+        "checkpoint": "unchanged",
+        "class": null,
+        "code": "BCDC_CAPTURE_EXPECTED_CLOSE",
+        "exit_code": 0,
+        "feedback": "unchanged",
+        "hook": "match_run_generation_and_advisory_session_then_persist_then_close"
+      },
+      "fixture_id": "SCN-M0-PG-PROTOCOL-11",
+      "input": {
+        "cause": "matching_persisted_expected_close"
+      }
+    }
+  ],
+  "contract_path": "contracts/m0/postgres-protocol.json",
+  "contract_sha256": "1656e3586d9ae3fb4dc0acb5dc12a3bb357f62448b5901ce1d34070cdc6c5f89",
+  "decision_id": "DEC-POSTGRESQL-VERSIONS-TRANSPORT-OPTIONS",
+  "expected": {
+    "redaction": [
+      "no DSN",
+      "no credentials",
+      "no source identifiers"
+    ],
+    "runtime_observed": false
+  },
+  "fixed_seed": "0x424344435f50475f50524f544f5f5631",
+  "owner_bead": "boring-cdc-d-pg-protocol",
+  "schema_version": "postgres-protocol-fixtures/v1",
+  "wire_vectors": [
+    {
+      "expected_payload_hex": "770000000000000001000000000000000200000000000000034249",
+      "id": "xlog-data",
+      "input": {
+        "pgoutput_hex": "4249",
+        "server_time": 3,
+        "wal_end": 2,
+        "wal_start": 1
+      }
+    },
+    {
+      "expected_payload_hex": "6b0000000000000004000000000000000501",
+      "id": "primary-keepalive",
+      "input": {
+        "reply_requested": true,
+        "server_time": 5,
+        "wal_end": 4
+      }
+    },
+    {
+      "expected_payload_hex": "72000000000000000600000000000000060000000000000006000000000000000700",
+      "id": "standby-status",
+      "input": {
+        "client_time": 7,
+        "durable_safe_boundary": 6
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{"class":"transient_io","code":"BCDC_CAPTURE_COPYBOTH_IO","fixture_id":"SCN-M0-PG-PROTOCOL-01","status":"pass"}
+{"class":"transient_source","code":"BCDC_CAPTURE_SOURCE_TRANSIENT","fixture_id":"SCN-M0-PG-PROTOCOL-02","status":"pass"}
+{"class":"integrity","code":"BCDC_CAPTURE_PROTOCOL_INTEGRITY","fixture_id":"SCN-M0-PG-PROTOCOL-03","status":"pass"}
+{"class":"unsupported","code":"BCDC_CAPTURE_PROTOCOL_UNSUPPORTED","fixture_id":"SCN-M0-PG-PROTOCOL-04","status":"pass"}
+{"class":"configuration","code":"BCDC_CAPTURE_SLOT_MISMATCH","fixture_id":"SCN-M0-PG-PROTOCOL-05","status":"pass"}
+{"class":"integrity","code":"BCDC_CAPTURE_WAL_UNAVAILABLE","fixture_id":"SCN-M0-PG-PROTOCOL-06","status":"pass"}
+{"class":"configuration","code":"BCDC_CAPTURE_LIMIT_EXCEEDED","fixture_id":"SCN-M0-PG-PROTOCOL-07","status":"pass"}
+{"class":"configuration","code":"BCDC_CAPTURE_SOURCE_CONFIGURATION","fixture_id":"SCN-M0-PG-PROTOCOL-08","status":"pass"}
+{"class":"transient_source","code":"BCDC_CAPTURE_UNEXPECTED_LOSS","fixture_id":"SCN-M0-PG-PROTOCOL-09","status":"pass"}
+{"class":"ownership_lost","code":"BCDC_CAPTURE_OWNERSHIP_LOST","fixture_id":"SCN-M0-PG-PROTOCOL-10","status":"pass"}
+{"class":null,"code":"BCDC_CAPTURE_EXPECTED_CLOSE","fixture_id":"SCN-M0-PG-PROTOCOL-11","status":"pass"}
