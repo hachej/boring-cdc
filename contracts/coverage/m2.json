@@ -31,11 +31,11 @@
       ],
       "evidence": [
         {
-          "manifest": "artifacts/boring-cdc-m2-heartbeat/SCN-M2-HEARTBEAT-COMPONENT/heartbeat-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/c591897f04549f973ead2f6d7d445d5c5c314e836a4aeb3f6e193c65061faff9.json",
           "sha256": "c591897f04549f973ead2f6d7d445d5c5c314e836a4aeb3f6e193c65061faff9"
         },
         {
-          "manifest": "artifacts/boring-cdc-m2-heartbeat/SCN-M2-HEARTBEAT-FAULTS/heartbeat-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/0b315aba82f17a9e641f30ef82529df16120973177e6f44839eff16d4c14b457.json",
           "sha256": "0b315aba82f17a9e641f30ef82529df16120973177e6f44839eff16d4c14b457"
         }
       ],
@@ -77,21 +77,21 @@
         {
           "admission": "superseded",
           "bead": "boring-cdc-m2-journal",
-          "comment_id": 336,
+          "comment_id": 762,
           "target_sha": "23d1f6cb8a654a7f1e9df58e1ebfadc1d64e1ce7",
           "text_sha256": "8336d739c77ccb3999aa7c68a2532a72cb8f7cfa4189139dc0ca0acc44e0804a"
         },
         {
           "admission": "superseded",
           "bead": "boring-cdc-m2-journal.1",
-          "comment_id": 349,
+          "comment_id": 776,
           "target_sha": "10bb0b2da6038cca30b071077ab37d5aaf35bcf5",
           "text_sha256": "bff09e085aed48e17f305509ad01d04d809597e10bb5ee54faf7b7113fa1f60f"
         },
         {
           "admission": "approved",
           "bead": "boring-cdc-51p",
-          "comment_id": 352,
+          "comment_id": 696,
           "target_sha": "d11358c52c86491386e03efea7f14c84d26433fb",
           "text_sha256": "3fa78dababb7961da4029081f8909ba7b2a19a39f58b0bcc24657197ff071054"
         }
@@ -106,11 +106,11 @@
       ],
       "evidence": [
         {
-          "manifest": "artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-COMPONENT/journal-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/01e33283cc447bc802a30799d0ff93aff6bea2cb27ba01a86bebeca506ac488b.json",
           "sha256": "01e33283cc447bc802a30799d0ff93aff6bea2cb27ba01a86bebeca506ac488b"
         },
         {
-          "manifest": "artifacts/boring-cdc-m2-journal/SCN-M2-JOURNAL-CRASH-BOUNDARY/journal-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/f71c5a31eadd63706e930f7b89d6ce122adeb9dfb2dcb6be1114a36ed0cbb981.json",
           "sha256": "f71c5a31eadd63706e930f7b89d6ce122adeb9dfb2dcb6be1114a36ed0cbb981"
         }
       ],
@@ -193,11 +193,11 @@
       ],
       "evidence": [
         {
-          "manifest": "artifacts/boring-cdc-m2-jsonl/SCN-M2-JSONL-COMPONENT/jsonl-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/f35d6bd38f396cb6a643cd6b2ec0ae5b421bb58994231bef5eff79b60b265022.json",
           "sha256": "f35d6bd38f396cb6a643cd6b2ec0ae5b421bb58994231bef5eff79b60b265022"
         },
         {
-          "manifest": "artifacts/boring-cdc-m2-jsonl/SCN-M2-JSONL-FAULTS/jsonl-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/f5092fbd0f16f07b7db4b562ac6bbfd8d7cdc2883478110256d3d0732653fe2b.json",
           "sha256": "f5092fbd0f16f07b7db4b562ac6bbfd8d7cdc2883478110256d3d0732653fe2b"
         }
       ],
@@ -233,7 +233,7 @@
       ],
       "evidence": [
         {
-          "manifest": "artifacts/boring-cdc-m2-leases/SCN-M2-LEASE-MODEL/lease-model-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/134f1f7020bbbe977275037e2642fd0bf32c9b5df00b9cae5f48c52b9e8ae3d1.json",
           "sha256": "134f1f7020bbbe977275037e2642fd0bf32c9b5df00b9cae5f48c52b9e8ae3d1"
         }
       ],
@@ -249,21 +249,21 @@
         {
           "admission": "superseded",
           "bead": "boring-cdc-m2-ownership",
-          "comment_id": 311,
+          "comment_id": 787,
           "target_sha": "536bdfdf98b10dcaa8b85e342d839fd2c4bca21a",
           "text_sha256": "9d9975399a9b9367aa31ce4a8ae8e81c856f98e0f7945b7053acec5185e79d06"
         },
         {
           "admission": "superseded",
           "bead": "boring-cdc-m2-ownership.1",
-          "comment_id": 316,
+          "comment_id": 792,
           "target_sha": "f13c99c26aaa3956fba98b93f90ad7ec9679d3ee",
           "text_sha256": "6d60720f3cde9a08ae8b09aa42c73dec200d5db6277be63a504cae29d0dd5904"
         },
         {
           "admission": "approved",
           "bead": "boring-cdc-m2-ownership.1.1",
-          "comment_id": 325,
+          "comment_id": 796,
           "target_sha": "18e21eafc103101400a3b9ca6d1848d63fd3cffc",
           "text_sha256": "5bb3ebd7c98bbb45bfec1dfcef1e6d6ebdbf03c5d88839e1b1c790398e535e79"
         }
@@ -278,11 +278,11 @@
       ],
       "evidence": [
         {
-          "manifest": "artifacts/boring-cdc-m2-ownership/SCN-M2-OWN-COMPONENT/ownership-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/a78a6c96176450e9d6ad5c72e5707f94841e2d58f697221d2e59bb1b88034e1f.json",
           "sha256": "a78a6c96176450e9d6ad5c72e5707f94841e2d58f697221d2e59bb1b88034e1f"
         },
         {
-          "manifest": "artifacts/boring-cdc-m2-ownership/SCN-M2-OWN-CRASH-RECONCILE/ownership-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/0ab9015ab6dde0d12df0c3a4bc5ad18dc8b4b9e2c8038d2f5a0ebc1fdd1d7066.json",
           "sha256": "0ab9015ab6dde0d12df0c3a4bc5ad18dc8b4b9e2c8038d2f5a0ebc1fdd1d7066"
         }
       ],
@@ -315,7 +315,7 @@
         {
           "admission": "superseded",
           "bead": "boring-cdc-m2-pressure.2",
-          "comment_id": 703,
+          "comment_id": 802,
           "target_sha": "957dd653631dfae99b62b5515ecfe87a6aecd1bb",
           "text_sha256": "0950b9c74974b2e67b720146d643eca89e80bf0af65026823c092bbf1fadadd4"
         },
@@ -337,11 +337,11 @@
       ],
       "evidence": [
         {
-          "manifest": "artifacts/boring-cdc-m2-pressure/SCN-M2-PRESSURE-COMPONENT/pressure-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/74f4747568fbcfd109b54185ee901ac04f5b174109cfb788e94d6076c938479c.json",
           "sha256": "74f4747568fbcfd109b54185ee901ac04f5b174109cfb788e94d6076c938479c"
         },
         {
-          "manifest": "artifacts/boring-cdc-m2-pressure/SCN-M2-PRESSURE-READER-CONTENTION/pressure-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/7b0ee265fcc22c8dd57a82bbcf9d3516802f82f2d4e66b502f05e34668226f20.json",
           "sha256": "7b0ee265fcc22c8dd57a82bbcf9d3516802f82f2d4e66b502f05e34668226f20"
         }
       ],
@@ -392,14 +392,14 @@
         {
           "admission": "superseded",
           "bead": "boring-cdc-m2-schema",
-          "comment_id": 624,
+          "comment_id": 817,
           "target_sha": "9e62d5b002c9933a50a5695b7576cae6f0070c11",
           "text_sha256": "1a1a425ed58543186f4a99bd6475c166d6c2eed9c185de4964e20f115776f44d"
         },
         {
           "admission": "approved",
           "bead": "boring-cdc-m2-schema.1",
-          "comment_id": 630,
+          "comment_id": 823,
           "target_sha": "89ef00dc1108f36910c7ab7ae4e9bf6054f176b1",
           "text_sha256": "b3622904f93dafe45f161de2dc978f7bdf68d36eb0a2f1b74e10bb54d7c1feae"
         }
@@ -414,7 +414,7 @@
       ],
       "evidence": [
         {
-          "manifest": "artifacts/boring-cdc-m2-schema/SCN-M2-SCHEMA-LEAF/schema-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/519d14f4de8086b1150d1208676d766e6d39e43e569f547dfd5d6b6d3f140061.json",
           "sha256": "519d14f4de8086b1150d1208676d766e6d39e43e569f547dfd5d6b6d3f140061"
         }
       ],
@@ -430,14 +430,14 @@
         {
           "admission": "superseded",
           "bead": "boring-cdc-m2-spool",
-          "comment_id": 637,
+          "comment_id": 830,
           "target_sha": "ff54d225f5449fdfd020f1636c7a684c8b890b0c",
           "text_sha256": "4a33740cf49b083d3014d7d9bab3a6aba191524e002858ef662d6b61ce637ebd"
         },
         {
           "admission": "approved",
           "bead": "boring-cdc-m2-spool.1",
-          "comment_id": 644,
+          "comment_id": 833,
           "target_sha": "01dc3af268d59db2e531a91282d8d0f85d6b265f",
           "text_sha256": "42bb212774b686e23c21e50703af07b00052724266d30f7fd3cd21a53f262fa4"
         }
@@ -452,11 +452,11 @@
       ],
       "evidence": [
         {
-          "manifest": "artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-COMPONENT/spool-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/d6b8bc7d1666829b5cbc7ae10bd4bb09474f97559a2e95ba3e31602c35743d0f.json",
           "sha256": "d6b8bc7d1666829b5cbc7ae10bd4bb09474f97559a2e95ba3e31602c35743d0f"
         },
         {
-          "manifest": "artifacts/boring-cdc-m2-spool/SCN-M2-SPOOL-FAULTS/spool-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/dd9245ab6ff867908269211079e611a2eb2fa622608b3dd9cca1c246c2c5d8a3.json",
           "sha256": "dd9245ab6ff867908269211079e611a2eb2fa622608b3dd9cca1c246c2c5d8a3"
         }
       ],
@@ -472,14 +472,14 @@
         {
           "admission": "superseded",
           "bead": "boring-cdc-m2-capture-runtime",
-          "comment_id": 646,
+          "comment_id": 743,
           "target_sha": "264b7f9f3a39cdcca705b3332b770c955e9bcee9",
           "text_sha256": "5a034b80c86e69698f44568e316a04840dfadd69cc77c9a0bb1b53ab48891657"
         },
         {
           "admission": "review-cap-residual",
           "bead": "boring-cdc-m2-capture-runtime.1",
-          "comment_id": 652,
+          "comment_id": 749,
           "target_sha": "51998f09e38aa4d7ba474bd0c6788d25848b363e",
           "text_sha256": "51f71e7d5b3ae3a33def1c327f3fcd2371ba6f5d811b3e4853ee59219d17c42a"
         }
@@ -494,19 +494,19 @@
       ],
       "evidence": [
         {
-          "manifest": "artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-E2E/capture-runtime-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/ed6ff90ce31943952cd0f2fd9b935e03ce34cb2089bfb8bce787062691dcc467.json",
           "sha256": "ed6ff90ce31943952cd0f2fd9b935e03ce34cb2089bfb8bce787062691dcc467"
         },
         {
-          "manifest": "artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-E2E/capture-runtime-production-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/ac23fda1bea5e4c81cf8e107931c1b922b1fc48edc3e60ccb67a68301df5e3a3.json",
           "sha256": "ac23fda1bea5e4c81cf8e107931c1b922b1fc48edc3e60ccb67a68301df5e3a3"
         },
         {
-          "manifest": "artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-FAULTS/capture-runtime-component-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/a98ff1fc1c238f52f13629afd1f0325c56704b2b43fb5ca20c20e645df87702c.json",
           "sha256": "a98ff1fc1c238f52f13629afd1f0325c56704b2b43fb5ca20c20e645df87702c"
         },
         {
-          "manifest": "artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-RUNTIME-FAULTS/capture-runtime-production-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/1457fc725b52d11d83fccf4b875d9bb61221573fb20100b41014e25d57a65e63.json",
           "sha256": "1457fc725b52d11d83fccf4b875d9bb61221573fb20100b41014e25d57a65e63"
         }
       ],
@@ -525,14 +525,14 @@
         {
           "admission": "superseded",
           "bead": "boring-cdc-m2.1",
-          "comment_id": 298,
+          "comment_id": 840,
           "target_sha": "dd08533d2a53abd94d1a864b42cc04f54d5162d2",
           "text_sha256": "d165a9e8b6666fce51f9fc5e3b1dad0018aa551bfd0b103608e67221120826c4"
         },
         {
           "admission": "approved",
           "bead": "boring-cdc-m2.1.1",
-          "comment_id": 305,
+          "comment_id": 847,
           "target_sha": "a6d6359653222834c39e8ef7059e455f56db7248",
           "text_sha256": "48915724aa56a7df3f712d0328101f95b453195af25385b0f20baf411bc5f856"
         }
@@ -547,7 +547,7 @@
       ],
       "evidence": [
         {
-          "manifest": "artifacts/boring-cdc-m2.1/SCN-M2-FAILURE-POLICY-LEAF/failure-policy-v1/manifest.json",
+          "manifest": "artifacts/boring-cdc-m2-complete/pinned-manifests/fdba5476792576a814aeb787577a537f767e08c4a4a93888a4f289b286b7974e.json",
           "sha256": "fdba5476792576a814aeb787577a537f767e08c4a4a93888a4f289b286b7974e"
         }
       ],

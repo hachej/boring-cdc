@@ -53,7 +53,7 @@ def status_entries():
 def exempt(path):
  # The v6 integration host explicitly preserves the unrelated, untracked v4
  # planning packet; it is not an M2 implementation or certification input.
- return path=='.factory-sha' or path.startswith('.doctor/') or path.startswith('docs/issues/boring-cdc-m2-v4/') or path.startswith('target/') or path.startswith('artifacts/boring-cdc-m2-complete/gate/')
+ return path=='.factory-sha' or path.startswith('.doctor/') or path.startswith('docs/issues/boring-cdc-m2-v4/') or path.startswith('docs/issues/boring-cdc-m0-v4/') or path.startswith('docs/issues/boring-cdc-m0-v6/') or path.startswith('target/') or path.startswith('artifacts/boring-cdc-m2-complete/gate/')
 dirty=[]
 for xy,paths in status_entries():
  # A rename into an exempt directory is dirty when its tracked source is not exempt.
@@ -61,6 +61,8 @@ for xy,paths in status_entries():
 if dirty: fail('dirty certification inputs: '+', '.join(dirty))
 
 coverage=load(coverage_path)
+freeze=subprocess.run(['python3','scripts/lib/freeze_m2_completion_inputs.py','--verify'],text=True,capture_output=True)
+if freeze.returncode: fail(f'completion input pin verification failed: {freeze.stdout.strip()} {freeze.stderr.strip()}')
 if coverage.get('schema_version')!='m2-coverage/v1': fail('coverage schema_version mismatch')
 if coverage.get('completion_policy')!='factory-handoff/v1': fail('coverage completion policy mismatch')
 if coverage.get('owner_bead')!=barrier_id: fail('coverage owner mismatch')
