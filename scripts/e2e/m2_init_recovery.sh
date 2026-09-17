@@ -36,17 +36,20 @@ for p in sys.argv[1:]:
  x=json.load(open(p)); assert x['outcome']=='success' and x['data']['logical_slot_exists'] is False and x['data']['control_rows']==2 and x['mutation_trace'] and x['postcondition_evidence_digest']
  s=open(p).read(); assert 'postgresql://' not in s and 'm2-init-password' not in s
 PY
-# Existing excess privilege is detected, never silently repaired.
-psqlc -qc 'GRANT SELECT ON boring_cdc_control.heartbeat TO boring_cdc_control_writer'
+# An existing lookalike table with weak byte-length checks must not pass CREATE IF NOT EXISTS.
+psqlc -qc 'ALTER TABLE boring_cdc_control.capture_fences DROP CONSTRAINT capture_fences_table_set_fingerprint_check, DROP CONSTRAINT capture_fences_unique_nonce_check; ALTER TABLE boring_cdc_control.capture_fences ADD CONSTRAINT weak_table_length CHECK(octet_length(table_set_fingerprint)>=16), ADD CONSTRAINT weak_nonce_length CHECK(octet_length(unique_nonce)>=8)'
 (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --dry-run --json) >"$work/dry3.json"
 token3=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["confirm_token"])' "$work/dry3.json")
-if (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token3" --json) >"$work/drift.out" 2>"$work/drift.err"; then echo E_PRIVILEGE_DRIFT_ACCEPTED >&2; exit 1; fi
-grep -q M2_INIT_CONTROL_PRIVILEGE_EXCESS "$work/drift.err"; ! grep -q 'postgresql://' "$work/drift.err"
-# An existing lookalike table with weak byte-length checks must not pass CREATE IF NOT EXISTS.
-psqlc -qc 'REVOKE SELECT ON boring_cdc_control.heartbeat FROM boring_cdc_control_writer; ALTER TABLE boring_cdc_control.capture_fences DROP CONSTRAINT capture_fences_table_set_fingerprint_check, DROP CONSTRAINT capture_fences_unique_nonce_check; ALTER TABLE boring_cdc_control.capture_fences ADD CHECK(octet_length(table_set_fingerprint)>=16), ADD CHECK(octet_length(unique_nonce)>=8)'
+if (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token3" --json) >"$work/length-drift.out" 2>"$work/length-drift.err"; then echo E_LENGTH_DRIFT_ACCEPTED >&2; exit 1; fi
+grep -q M2_INIT_CONTROL_LENGTH_CONSTRAINT_INVALID "$work/length-drift.err"; ! grep -q 'postgresql://' "$work/length-drift.err"
+# Repair the source and resume the exact nonterminal plan before exercising the next independent drift.
+psqlc -qc 'ALTER TABLE boring_cdc_control.capture_fences DROP CONSTRAINT weak_table_length, DROP CONSTRAINT weak_nonce_length; ALTER TABLE boring_cdc_control.capture_fences ADD CONSTRAINT capture_fences_table_set_fingerprint_check CHECK(octet_length(table_set_fingerprint)=32), ADD CONSTRAINT capture_fences_unique_nonce_check CHECK(octet_length(unique_nonce)=16)'
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token3" --json) >"$work/recovered.json"
+# Existing excess privilege is detected, never silently repaired.
+psqlc -qc 'GRANT SELECT ON boring_cdc_control.heartbeat TO boring_cdc_control_writer'
 (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --dry-run --json) >"$work/dry4.json"
 token4=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["confirm_token"])' "$work/dry4.json")
-if (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token4" --json) >"$work/length-drift.out" 2>"$work/length-drift.err"; then echo E_LENGTH_DRIFT_ACCEPTED >&2; exit 1; fi
-grep -q M2_INIT_CONTROL_LENGTH_CONSTRAINT_INVALID "$work/length-drift.err"; ! grep -q 'postgresql://' "$work/length-drift.err"
+if (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" init --confirm --confirm-token "$token4" --json) >"$work/drift.out" 2>"$work/drift.err"; then echo E_PRIVILEGE_DRIFT_ACCEPTED >&2; exit 1; fi
+grep -q M2_INIT_CONTROL_PRIVILEGE_EXCESS "$work/drift.err"; ! grep -q 'postgresql://' "$work/drift.err"
 [[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot'")" == 0 ]]
 echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 idempotent=true replay=blocked privilege_drift=blocked exact_fence_lengths=true no_slot=true'
