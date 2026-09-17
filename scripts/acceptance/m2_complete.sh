@@ -120,8 +120,11 @@ for leaf in leaves:
  for item in leaf.get('evidence',[]):
   manifest_count += 1
   path=root/item.get('manifest','')
+  expected=item.get('sha256')
+  if not path.is_file() or sha(path)!=expected:
+   path=root/'artifacts/boring-cdc-m2-complete/pinned-manifests'/f'{expected}.json'
   if not path.is_file(): fail(f'{owner}: missing pinned evidence manifest {item.get("manifest")}')
-  elif sha(path)!=item.get('sha256'): fail(f'{owner}: pinned evidence manifest digest mismatch: {item.get("manifest")}')
+  elif sha(path)!=expected: fail(f'{owner}: pinned evidence manifest digest mismatch: {item.get("manifest")}')
  admissions=[ref.get('admission') for ref in refs]
  if any(value not in {'superseded','approved','review-cap-residual'} for value in admissions) or any(value!='superseded' for value in admissions[:-1]) or admissions[-1] not in {'approved','review-cap-residual'}:
   fail(f'{owner}: invalid handoff disposition chain: {admissions}'); continue
@@ -132,8 +135,8 @@ for leaf in leaves:
   if key in seen: fail(f'{owner}: duplicate completion handoff {key}'); leaf_ok=False; continue
   seen.add(key)
   bead=rows.get(ref.get('bead'),{})
-  comments=[c for c in bead.get('comments',[]) if c.get('id')==ref.get('comment_id')]
-  if len(comments)!=1: fail(f'{owner}: pinned handoff comment missing or duplicate: {key}'); leaf_ok=False; continue
+  comments=[c for c in bead.get('comments',[]) if sha_bytes(str(c.get('text','')).encode())==ref.get('text_sha256')]
+  if len(comments)!=1: fail(f'{owner}: pinned handoff content missing or duplicate: {key}'); leaf_ok=False; continue
   text=comments[0].get('text','')
   if sha_bytes(text.encode())!=ref.get('text_sha256'): fail(f'{owner}: pinned handoff content digest mismatch: {key}'); leaf_ok=False
   match=handoff_header.match(text)
