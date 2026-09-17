@@ -25,7 +25,7 @@
   ],
   "evidence_profile": "documentation",
   "evidence_tier": "milestone",
-  "git_commit": "68529429cb3d8b112581828e69ffb7b1fcbc32a4",
+  "git_commit": "82ce5de23601d02648ba167ebb6fcba408dddd62",
   "owner_bead": "boring-cdc-m0-complete",
   "redaction": {
     "checked": true,
@@ -38,7 +38,7 @@
       "contracts/m0/decisions.json",
       "artifacts/boring-cdc-m0-complete/gate/completion-summary.json"
     ],
-    "digest": "789e5373b8a16160aec25cd8dacbaffec02529505e7774cfe286af60acb671ef",
+    "digest": "79879d113abfb0b07b2ee4082526c5e46c742797f6160991392238cd4d14e512",
     "product_faults": "fault_not_applicable",
     "runtime_observed": false,
     "status": "pass"
@@ -47,8 +47,8 @@
   "schema_version": "evidence/v1",
   "seed": "m0-complete-v1",
   "source_preservation": {
-    "after_sha256": "93c30ac0c4d2fcf250caeb0dbaf7b307d83d31c727ec9ebfa6ab51ea9c4be722",
-    "before_sha256": "93c30ac0c4d2fcf250caeb0dbaf7b307d83d31c727ec9ebfa6ab51ea9c4be722",
+    "after_sha256": "dacf9bfd41582697ec2060b4038cfc171e7cf6eeb88fef0a2ed6745268612c17",
+    "before_sha256": "dacf9bfd41582697ec2060b4038cfc171e7cf6eeb88fef0a2ed6745268612c17",
     "preserved": true
   },
   "tier_proof": {
