@@ -14,11 +14,23 @@ use std::time::{Duration, Instant};
 
 pub const OWNER_BEAD: &str = "boring-cdc-m3-planner";
 const MAX_KEY_BYTES: usize = 4096;
+type BootstrapProofRow = (
+    i64,
+    String,
+    i64,
+    i64,
+    String,
+    String,
+    String,
+    Option<String>,
+    String,
+);
 
 const INSTALL_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS m3_planner_runs(
  run_id TEXT PRIMARY KEY REFERENCES backfill_runs(run_id), generation_id TEXT NOT NULL UNIQUE REFERENCES backfill_generations(generation_id),
- key_schema_digest TEXT NOT NULL, estimated_rows INTEGER NOT NULL CHECK(estimated_rows>=0), completed_rows INTEGER NOT NULL DEFAULT 0 CHECK(completed_rows>=0),
+ bootstrap_intent_id TEXT NOT NULL, importer_id TEXT NOT NULL, snapshot_schema_fingerprint TEXT NOT NULL,
+ key_schema BLOB NOT NULL, key_schema_digest TEXT NOT NULL, estimated_rows INTEGER NOT NULL CHECK(estimated_rows>=0), completed_rows INTEGER NOT NULL DEFAULT 0 CHECK(completed_rows>=0),
  completed_bytes INTEGER NOT NULL DEFAULT 0 CHECK(completed_bytes>=0), started_mono_ms INTEGER NOT NULL CHECK(started_mono_ms>=0), next_snapshot_seq INTEGER NOT NULL CHECK(next_snapshot_seq>=0),
  max_concurrency INTEGER NOT NULL CHECK(max_concurrency>0), revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0));
 CREATE TABLE IF NOT EXISTS m3_chunk_claims(
@@ -106,6 +118,40 @@ impl CanonicalKey {
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
+
+    pub fn decode(&self, schema: &[KeyPartType]) -> Result<Vec<KeyPart>, PlannerError> {
+        let mut offset = 0;
+        let mut parts = Vec::with_capacity(schema.len());
+        for kind in schema {
+            let width = match kind {
+                KeyPartType::I64 => 9,
+                KeyPartType::Uuid => 17,
+            };
+            if self.0.len().saturating_sub(offset) < width {
+                return Err(PlannerError::Conflict("M3_STORED_KEY_SCHEMA"));
+            }
+            let bytes = &self.0[offset..offset + width];
+            let part = match kind {
+                KeyPartType::I64 if bytes[0] == 1 => {
+                    let mut raw = [0u8; 8];
+                    raw.copy_from_slice(&bytes[1..]);
+                    KeyPart::I64((u64::from_be_bytes(raw) ^ (1 << 63)) as i64)
+                }
+                KeyPartType::Uuid if bytes[0] == 2 => {
+                    let mut raw = [0u8; 16];
+                    raw.copy_from_slice(&bytes[1..]);
+                    KeyPart::Uuid(raw)
+                }
+                _ => return Err(PlannerError::Conflict("M3_STORED_KEY_SCHEMA")),
+            };
+            parts.push(part);
+            offset += width;
+        }
+        if offset != self.0.len() {
+            return Err(PlannerError::Conflict("M3_STORED_KEY_SCHEMA"));
+        }
+        Ok(parts)
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -171,7 +217,10 @@ pub struct PlanInput {
     pub destination_id: String,
     pub capture_epoch: String,
     pub generation: u64,
-    pub key_schema_digest: String,
+    pub bootstrap_intent_id: String,
+    pub importer_id: String,
+    pub snapshot_schema_fingerprint: String,
+    pub key_schema: Vec<KeyPartType>,
     pub boundaries: Vec<CanonicalKey>,
     pub estimated_rows: u64,
     pub start_seq: u64,
@@ -189,11 +238,30 @@ pub struct SnapshotRow {
     pub key: CanonicalKey,
     pub payload: Vec<u8>,
 }
+#[derive(Clone, Copy, Debug)]
+pub struct ReadBudget {
+    pub max_rows: usize,
+    pub max_bytes: usize,
+    pub max_duration: Duration,
+    pub max_source_impact_bytes: usize,
+    pub max_rows_per_second: u64,
+}
+
+pub trait BoundedRangeSource {
+    /// Reads one complete preplanned range with the supplied hard bounds. Implementations must stop
+    /// before exceeding any bound and return `Limit` rather than an incomplete successful range.
+    fn read_range(
+        &mut self,
+        range: &KeyRange,
+        key_schema: &[KeyPartType],
+        budget: ReadBudget,
+    ) -> Result<Vec<SnapshotRow>, PlannerError>;
+}
+
 #[derive(Clone, Debug)]
-pub struct ChunkBatch {
-    pub rows: Vec<SnapshotRow>,
-    pub elapsed: Duration,
-    pub observed_source_bytes: usize,
+struct ChunkBatch {
+    rows: Vec<SnapshotRow>,
+    elapsed: Duration,
 }
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct Progress {
@@ -224,19 +292,65 @@ impl PlannerStore {
             || input.generation_id.is_empty()
             || input.destination_id.is_empty()
             || input.capture_epoch.is_empty()
-            || input.key_schema_digest.is_empty()
+            || input.bootstrap_intent_id.is_empty()
+            || input.importer_id.is_empty()
+            || input.snapshot_schema_fingerprint.is_empty()
+            || input.key_schema.is_empty()
             || input.generation == 0
         {
             return Err(PlannerError::Invalid("M3_PLAN_IDENTITY"));
         }
+        for boundary in &input.boundaries {
+            boundary.decode(&input.key_schema)?;
+        }
         let ranges = half_open_ranges(&input.boundaries)?;
+        let schema = input
+            .key_schema
+            .iter()
+            .map(|v| match v {
+                KeyPartType::I64 => 1u8,
+                KeyPartType::Uuid => 2u8,
+            })
+            .collect::<Vec<_>>();
+        let schema_digest = sha256(&schema);
+        let mut assigned = Vec::new();
+        for range in &ranges {
+            for bound in [&range.start, &range.end] {
+                let bytes = bound.as_ref().map_or(&[][..], |v| v.as_bytes());
+                assigned.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
+                assigned.extend_from_slice(bytes);
+            }
+        }
+        let assignment_digest = crate::m3_bootstrap::digest_assignment(&assigned);
         let tx = self
             .writer
             .connection_mut()
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let bootstrap:Option<BootstrapProofRow>=tx.query_row(
+            "SELECT r.generation,b.capture_epoch,r.start_seq,r.snapshot_promotable,r.guard_liveness,r.state,i.assigned_ranges_digest,i.snapshot_schema_fingerprint,i.state FROM m3_bootstrap_runtime r JOIN bootstrap_intents b USING(intent_id) JOIN m3_bootstrap_importers i USING(intent_id) WHERE r.intent_id=?1 AND i.importer_id=?2",
+            params![input.bootstrap_intent_id,input.importer_id],
+            |r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?))).optional()?;
+        let Some(bootstrap) = bootstrap else {
+            return Err(PlannerError::Conflict("M3_BOOTSTRAP_PROOF_MISSING"));
+        };
+        if bootstrap.0 != input.generation as i64
+            || bootstrap.1 != input.capture_epoch
+            || bootstrap.2 != input.start_seq as i64
+            || bootstrap.3 != 1
+            || bootstrap.4 != "held"
+            || !matches!(
+                bootstrap.5.as_str(),
+                "exporter_release_permitted" | "exporter_released"
+            )
+            || bootstrap.6 != assignment_digest
+            || bootstrap.7.as_deref() != Some(input.snapshot_schema_fingerprint.as_str())
+            || bootstrap.8 != "acknowledged"
+        {
+            return Err(PlannerError::Conflict("M3_BOOTSTRAP_PROOF_MISMATCH"));
+        }
         tx.execute("INSERT INTO backfill_runs(run_id,destination_id,capture_epoch,state,revision) VALUES(?1,?2,?3,'running',0)", params![input.run_id,input.destination_id,input.capture_epoch])?;
         tx.execute("INSERT INTO backfill_generations(generation_id,run_id,generation,state) VALUES(?1,?2,?3,'copying')", params![input.generation_id,input.run_id,input.generation])?;
-        tx.execute("INSERT INTO m3_planner_runs(run_id,generation_id,key_schema_digest,estimated_rows,started_mono_ms,next_snapshot_seq,max_concurrency) VALUES(?1,?2,?3,?4,?5,?6,?7)", params![input.run_id,input.generation_id,input.key_schema_digest,input.estimated_rows,input.started_mono_ms,input.start_seq,self.limits.concurrency])?;
+        tx.execute("INSERT INTO m3_planner_runs(run_id,generation_id,bootstrap_intent_id,importer_id,snapshot_schema_fingerprint,key_schema,key_schema_digest,estimated_rows,started_mono_ms,next_snapshot_seq,max_concurrency) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)", params![input.run_id,input.generation_id,input.bootstrap_intent_id,input.importer_id,input.snapshot_schema_fingerprint,schema,schema_digest,input.estimated_rows,input.started_mono_ms,input.start_seq,self.limits.concurrency])?;
         for (index, range) in ranges.iter().enumerate() {
             let start = range.start.as_ref().map_or_else(Vec::new, |v| v.0.clone());
             let end = range.end.as_ref().map_or_else(Vec::new, |v| v.0.clone());
@@ -323,9 +437,54 @@ impl PlannerStore {
         }))
     }
 
+    /// Performs the bounded source read with no SQLite reader alive, then commits its result.
+    pub fn execute_claim<S: BoundedRangeSource>(
+        &mut self,
+        claim: &ChunkClaim,
+        source: &mut S,
+        now_mono_ms: u64,
+    ) -> Result<u64, PlannerError> {
+        let encoded_schema: Vec<u8> = self.writer.connection().query_row(
+            "SELECT key_schema FROM m3_planner_runs WHERE generation_id=?1",
+            [&claim.generation_id],
+            |r| r.get(0),
+        )?;
+        let schema = encoded_schema
+            .into_iter()
+            .map(|v| match v {
+                1 => Ok(KeyPartType::I64),
+                2 => Ok(KeyPartType::Uuid),
+                _ => Err(PlannerError::Conflict("M3_STORED_KEY_SCHEMA")),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        claim
+            .range
+            .start
+            .as_ref()
+            .map(|v| v.decode(&schema))
+            .transpose()?;
+        claim
+            .range
+            .end
+            .as_ref()
+            .map(|v| v.decode(&schema))
+            .transpose()?;
+        let budget = ReadBudget {
+            max_rows: self.limits.chunk_rows,
+            max_bytes: self.limits.chunk_bytes,
+            max_duration: self.limits.chunk_duration,
+            max_source_impact_bytes: self.limits.source_impact_bytes,
+            max_rows_per_second: self.limits.max_rows_per_second,
+        };
+        let started = Instant::now();
+        let rows = source.read_range(&claim.range, &schema, budget)?;
+        let elapsed = started.elapsed();
+        self.commit_chunk_measured(claim, &ChunkBatch { rows, elapsed }, now_mono_ms)
+    }
+
     /// Commits all snapshot events and the chunk completion marker in one capture-priority writer
     /// transaction. A stale generation or claim cannot commit, including after invalidation.
-    pub fn commit_chunk(
+    fn commit_chunk_measured(
         &mut self,
         claim: &ChunkClaim,
         batch: &ChunkBatch,
@@ -337,15 +496,21 @@ impl PlannerStore {
         if batch.elapsed > self.limits.chunk_duration {
             return Err(PlannerError::Limit("M3_CHUNK_TIME"));
         }
-        if batch.observed_source_bytes > self.limits.source_impact_bytes {
-            return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
-        }
         let payload_bytes = batch.rows.iter().try_fold(0usize, |n, r| {
             n.checked_add(r.payload.len())
                 .ok_or(PlannerError::Limit("M3_CHUNK_BYTES"))
         })?;
         if payload_bytes > self.limits.chunk_bytes {
             return Err(PlannerError::Limit("M3_CHUNK_BYTES"));
+        }
+        let source_bytes = batch.rows.iter().try_fold(0usize, |n, r| {
+            n.checked_add(r.key.as_bytes().len())
+                .and_then(|v| v.checked_add(r.payload.len()))
+                .and_then(|v| v.checked_add(std::mem::size_of::<SnapshotRow>()))
+                .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))
+        })?;
+        if source_bytes > self.limits.source_impact_bytes {
+            return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
         }
         let allowed = self
             .limits
@@ -373,7 +538,7 @@ impl PlannerStore {
         let Some((state, expires, next)) = live else {
             return Err(PlannerError::StaleGeneration);
         };
-        if state != "copying" || expires < now_mono_ms as i64 {
+        if state != "copying" || expires <= now_mono_ms as i64 {
             return Err(PlannerError::StaleGeneration);
         }
         let mut checksum_material = Vec::new();
@@ -428,6 +593,9 @@ impl PlannerStore {
             return Err(PlannerError::Limit("M3_WRITER_HOLD"));
         }
         tx.commit()?;
+        if started.elapsed() > self.limits.writer_hold {
+            return Err(PlannerError::Limit("M3_WRITER_HOLD_AFTER_COMMIT"));
+        }
         Ok(completed as u64)
     }
 
@@ -609,28 +777,80 @@ mod tests {
     }
     fn store() -> (Temp, PlannerStore) {
         let p = Temp::new();
-        let w = open_writer(&p.0, "test", 1, 0).unwrap();
+        let w = open_writer(&p.0, "run", 1, 0).unwrap();
         w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('dest','archive','cfg','epoch',1)",[]).unwrap();
+        w.connection().execute_batch("CREATE TABLE m3_bootstrap_runtime(intent_id TEXT PRIMARY KEY,generation INTEGER, start_seq INTEGER,snapshot_promotable INTEGER,guard_liveness TEXT,state TEXT); CREATE TABLE m3_bootstrap_importers(intent_id TEXT,importer_id TEXT,assigned_ranges_digest TEXT,snapshot_schema_fingerprint TEXT,state TEXT,PRIMARY KEY(intent_id,importer_id));").unwrap();
         let s = PlannerStore::open(w, limits()).unwrap();
         (p, s)
     }
     fn key(v: i64) -> CanonicalKey {
         CanonicalKey::encode(&[KeyPartType::I64], &[KeyPart::I64(v)]).unwrap()
     }
-    fn plan(s: &mut PlannerStore, b: Vec<CanonicalKey>) {
+    fn plan_with_schema(s: &mut PlannerStore, b: Vec<CanonicalKey>, schema: Vec<KeyPartType>) {
+        let ranges = half_open_ranges(&b).unwrap();
+        let mut assigned = Vec::new();
+        for range in &ranges {
+            for bound in [&range.start, &range.end] {
+                let bytes = bound.as_ref().map_or(&[][..], |v| v.as_bytes());
+                assigned.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
+                assigned.extend_from_slice(bytes);
+            }
+        }
+        let digest = crate::m3_bootstrap::digest_assignment(&assigned);
+        s.writer.connection().execute("INSERT INTO bootstrap_intents(intent_id,capture_epoch,source_system_id,database_id,slot_name,creation_floor_lsn,state,revision,created_at) VALUES('intent','epoch','sys','db','slot','0000000000000001','slot_created',0,'now')",[]).unwrap();
+        s.writer.connection().execute("INSERT INTO m3_bootstrap_runtime VALUES('intent',1,10,1,'held','exporter_released')",[]).unwrap();
+        s.writer.connection().execute("INSERT INTO m3_bootstrap_importers VALUES('intent','worker',?1,'schema-fp','acknowledged')",[digest]).unwrap();
         s.persist_plan(&PlanInput {
             run_id: "run".into(),
             generation_id: "gen".into(),
             destination_id: "dest".into(),
             capture_epoch: "epoch".into(),
             generation: 1,
-            key_schema_digest: "schema".into(),
+            bootstrap_intent_id: "intent".into(),
+            importer_id: "worker".into(),
+            snapshot_schema_fingerprint: "schema-fp".into(),
+            key_schema: schema,
             boundaries: b,
             estimated_rows: 8,
             start_seq: 10,
             started_mono_ms: 100,
         })
         .unwrap();
+    }
+    fn plan(s: &mut PlannerStore, b: Vec<CanonicalKey>) {
+        plan_with_schema(s, b, vec![KeyPartType::I64]);
+    }
+    struct FixtureSource {
+        rows: Vec<SnapshotRow>,
+        delay: Duration,
+    }
+    impl BoundedRangeSource for FixtureSource {
+        fn read_range(
+            &mut self,
+            _: &KeyRange,
+            _: &[KeyPartType],
+            _: ReadBudget,
+        ) -> Result<Vec<SnapshotRow>, PlannerError> {
+            if !self.delay.is_zero() {
+                std::thread::sleep(self.delay)
+            }
+            Ok(std::mem::take(&mut self.rows))
+        }
+    }
+    fn execute(
+        s: &mut PlannerStore,
+        claim: &ChunkClaim,
+        rows: Vec<SnapshotRow>,
+        now: u64,
+    ) -> Result<u64, PlannerError> {
+        s.execute_claim(
+            claim,
+            &mut FixtureSource {
+                rows,
+                delay: Duration::ZERO,
+            },
+            now,
+        )
     }
 
     #[test]
@@ -691,19 +911,7 @@ mod tests {
             .claim_next("gen", "w1", 101, Duration::from_secs(2))
             .unwrap()
             .unwrap();
-        assert_eq!(
-            s.commit_chunk(
-                &c,
-                &ChunkBatch {
-                    rows: vec![],
-                    elapsed: Duration::from_millis(1),
-                    observed_source_bytes: 0
-                },
-                102
-            )
-            .unwrap(),
-            10
-        );
+        assert_eq!(execute(&mut s, &c, vec![], 102).unwrap(), 10);
         drop(s);
         let pending = read_pending_chunk_ids(&p.0, "gen", 10, Duration::from_secs(1)).unwrap();
         assert_eq!(pending.len(), 1);
@@ -732,28 +940,12 @@ mod tests {
             })
             .collect();
         assert!(matches!(
-            s.commit_chunk(
-                &a,
-                &ChunkBatch {
-                    rows: too_many,
-                    elapsed: Duration::from_millis(10),
-                    observed_source_bytes: 5
-                },
-                102
-            ),
+            execute(&mut s, &a, too_many, 102),
             Err(PlannerError::Limit("M3_CHUNK_ROWS"))
         ));
         s.invalidate_generation("gen").unwrap();
         assert!(matches!(
-            s.commit_chunk(
-                &a,
-                &ChunkBatch {
-                    rows: vec![],
-                    elapsed: Duration::from_millis(1),
-                    observed_source_bytes: 0
-                },
-                102
-            ),
+            execute(&mut s, &a, vec![], 102),
             Err(PlannerError::StaleGeneration)
         ));
     }
@@ -765,33 +957,46 @@ mod tests {
             .claim_next("gen", "w", 101, Duration::from_secs(2))
             .unwrap()
             .unwrap();
-        let one = |k, p| ChunkBatch {
-            rows: vec![SnapshotRow {
+        let one = |k, p| {
+            vec![SnapshotRow {
                 key: key(k),
                 payload: vec![0; p],
-            }],
-            elapsed: Duration::from_millis(1),
-            observed_source_bytes: p,
+            }]
         };
         assert!(matches!(
-            s.commit_chunk(&c, &one(11, 1), 102),
+            execute(&mut s, &c, one(11, 1), 102),
             Err(PlannerError::Invalid("M3_ROW_OUTSIDE_RANGE"))
         ));
         assert!(matches!(
-            s.commit_chunk(&c, &one(1, 1025), 102),
+            execute(&mut s, &c, one(1, 1025), 102),
             Err(PlannerError::Limit("M3_CHUNK_BYTES"))
         ));
-        let mut slow = one(1, 1);
-        slow.elapsed = Duration::from_secs(2);
+        let mut slow = FixtureSource {
+            rows: one(1, 1),
+            delay: Duration::from_millis(1100),
+        };
         assert!(matches!(
-            s.commit_chunk(&c, &slow, 102),
+            s.execute_claim(&c, &mut slow, 102),
             Err(PlannerError::Limit("M3_CHUNK_TIME"))
         ));
-        let mut impact = one(1, 1);
-        impact.observed_source_bytes = 2049;
+        s.limits.source_impact_bytes = 1050;
         assert!(matches!(
-            s.commit_chunk(&c, &impact, 102),
+            execute(&mut s, &c, one(1, 1024), 102),
             Err(PlannerError::Limit("M3_SOURCE_IMPACT"))
+        ));
+        let rate_rows = vec![
+            SnapshotRow {
+                key: key(1),
+                payload: vec![],
+            },
+            SnapshotRow {
+                key: key(2),
+                payload: vec![],
+            },
+        ];
+        assert!(matches!(
+            execute(&mut s, &c, rate_rows, 102),
+            Err(PlannerError::Limit("M3_RATE_LIMIT"))
         ));
     }
     #[test]
@@ -802,16 +1007,13 @@ mod tests {
             .claim_next("gen", "w", 101, Duration::from_secs(2))
             .unwrap()
             .unwrap();
-        s.commit_chunk(
+        execute(
+            &mut s,
             &c,
-            &ChunkBatch {
-                rows: vec![SnapshotRow {
-                    key: key(1),
-                    payload: vec![1, 2],
-                }],
-                elapsed: Duration::from_millis(10),
-                observed_source_bytes: 2,
-            },
+            vec![SnapshotRow {
+                key: key(1),
+                payload: vec![1, 2],
+            }],
             102,
         )
         .unwrap();
@@ -835,5 +1037,148 @@ mod tests {
             s.finish_copy("gen"),
             Err(PlannerError::Conflict("M3_CHUNKS_INCOMPLETE"))
         ));
+    }
+
+    struct PsqlRangeSource;
+    impl BoundedRangeSource for PsqlRangeSource {
+        fn read_range(
+            &mut self,
+            range: &KeyRange,
+            schema: &[KeyPartType],
+            budget: ReadBudget,
+        ) -> Result<Vec<SnapshotRow>, PlannerError> {
+            fn tuple(key: &CanonicalKey, schema: &[KeyPartType]) -> Result<String, PlannerError> {
+                let parts = key.decode(schema)?;
+                let mut rendered = Vec::new();
+                for part in parts {
+                    match part {
+                        KeyPart::I64(v) => rendered.push(v.to_string()),
+                        KeyPart::Uuid(v) => {
+                            let h = v.iter().map(|b| format!("{b:02x}")).collect::<String>();
+                            rendered.push(format!(
+                                "'{}-{}-{}-{}-{}'::uuid",
+                                &h[0..8],
+                                &h[8..12],
+                                &h[12..16],
+                                &h[16..20],
+                                &h[20..32]
+                            ));
+                        }
+                        KeyPart::Null => return Err(PlannerError::Invalid("M3_KEY_NULL")),
+                    }
+                }
+                Ok(format!("({})", rendered.join(",")))
+            }
+            let mut predicates = Vec::new();
+            if let Some(v) = &range.start {
+                predicates.push(format!("(tenant,id)>={}", tuple(v, schema)?));
+            }
+            if let Some(v) = &range.end {
+                predicates.push(format!("(tenant,id)<{}", tuple(v, schema)?));
+            }
+            let where_clause = if predicates.is_empty() {
+                String::new()
+            } else {
+                format!(" WHERE {}", predicates.join(" AND "))
+            };
+            let sql = format!(
+                "SELECT tenant,id,encode(convert_to(payload,'UTF8'),'hex') FROM m3_planner_fixture{where_clause} ORDER BY tenant,id LIMIT {}",
+                budget.max_rows + 1
+            );
+            let output = std::process::Command::new("psql")
+                .args(["-X", "-v", "ON_ERROR_STOP=1", "-At", "-F", "|", "-c", &sql])
+                .output()
+                .map_err(|_| PlannerError::Conflict("M3_SOURCE_UNAVAILABLE"))?;
+            if !output.status.success() {
+                return Err(PlannerError::Conflict("M3_SOURCE_QUERY_FAILED"));
+            }
+            let text = String::from_utf8(output.stdout)
+                .map_err(|_| PlannerError::Conflict("M3_SOURCE_ENCODING"))?;
+            let mut rows = Vec::new();
+            for line in text.lines() {
+                let fields = line.split('|').collect::<Vec<_>>();
+                if fields.len() != 3 {
+                    return Err(PlannerError::Conflict("M3_SOURCE_ROW"));
+                }
+                let tenant = fields[0]
+                    .parse::<i64>()
+                    .map_err(|_| PlannerError::Conflict("M3_SOURCE_ROW"))?;
+                let hex = fields[1].replace('-', "");
+                if hex.len() != 32 {
+                    return Err(PlannerError::Conflict("M3_SOURCE_ROW"));
+                }
+                let mut uuid = [0u8; 16];
+                for (i, b) in uuid.iter_mut().enumerate() {
+                    *b = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16)
+                        .map_err(|_| PlannerError::Conflict("M3_SOURCE_ROW"))?;
+                }
+                let payload = (0..fields[2].len())
+                    .step_by(2)
+                    .map(|i| {
+                        u8::from_str_radix(&fields[2][i..i + 2], 16)
+                            .map_err(|_| PlannerError::Conflict("M3_SOURCE_ROW"))
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                rows.push(SnapshotRow {
+                    key: CanonicalKey::encode(
+                        schema,
+                        &[KeyPart::I64(tenant), KeyPart::Uuid(uuid)],
+                    )?,
+                    payload,
+                });
+            }
+            if rows.len() > budget.max_rows {
+                return Err(PlannerError::Limit("M3_CHUNK_ROWS"));
+            }
+            Ok(rows)
+        }
+    }
+
+    #[test]
+    #[ignore = "requires pinned PostgreSQL 17.6 Compose"]
+    fn live_postgres_worker_executes_persisted_composite_ranges() {
+        let (_p, mut s) = store();
+        let uuid = |first: u8| {
+            let mut v = [0u8; 16];
+            v[0] = first;
+            v
+        };
+        let boundary1 = CanonicalKey::encode(
+            &[KeyPartType::I64, KeyPartType::Uuid],
+            &[KeyPart::I64(-7), KeyPart::Uuid(uuid(0x80))],
+        )
+        .unwrap();
+        let boundary2 = CanonicalKey::encode(
+            &[KeyPartType::I64, KeyPartType::Uuid],
+            &[KeyPart::I64(i64::MAX), KeyPart::Uuid([0xff; 16])],
+        )
+        .unwrap();
+        plan_with_schema(
+            &mut s,
+            vec![boundary1, boundary2],
+            vec![KeyPartType::I64, KeyPartType::Uuid],
+        );
+        let mut total = 0;
+        for worker in 0..3 {
+            let claim = s
+                .claim_next("gen", &format!("w{worker}"), 101, Duration::from_secs(5))
+                .unwrap()
+                .unwrap();
+            let before = Instant::now();
+            let completed = s.execute_claim(&claim, &mut PsqlRangeSource, 102).unwrap();
+            assert!(before.elapsed() <= Duration::from_secs(1));
+            assert!(completed >= 10);
+            total += s
+                .writer
+                .connection()
+                .query_row(
+                    "SELECT row_count FROM m3_chunk_commits WHERE chunk_id=?1",
+                    [claim.chunk_id],
+                    |r| r.get::<_, i64>(0),
+                )
+                .unwrap();
+        }
+        assert_eq!(total, 5);
+        s.finish_copy("gen").unwrap();
     }
 }
