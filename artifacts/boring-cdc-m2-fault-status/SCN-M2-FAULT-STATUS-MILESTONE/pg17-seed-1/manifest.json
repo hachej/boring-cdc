@@ -13,7 +13,7 @@
       "argv": "cargo clippy --locked --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stderr",
-      "stderr_sha256": "f591e097f22f91dd5c31fbbf7e587d80c0a4e0ed594f9c9012a544f38c52d926",
+      "stderr_sha256": "0b53209db424367e80c52cd8cde8b75e37af110438a0efde777104a1463956de",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stdout",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "version": "m2-fault-status/v5"
@@ -22,9 +22,9 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stderr",
-      "stderr_sha256": "cfa76b9e658604a71f5e10cff0d79e3e0ab4c37814e54e9d899184c5e0c084df",
+      "stderr_sha256": "e9debf9a693718e21724b83cb4ca48c803b7a5673d457678adbafed54ff3187a",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stdout",
-      "stdout_sha256": "9c88ca1ee31d6f2019207ceb23b20f8cc091c1177f8e81c213e7905426223f45",
+      "stdout_sha256": "8787653e2659dd963b2764dca537c8cb51b336669b9bfb26fb8b27414a04f999",
       "version": "m2-fault-status/v5"
     },
     {
@@ -33,14 +33,14 @@
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stderr",
       "stderr_sha256": "1c04827c9564f1d9ac740608e8ceffec2503bfcd223293cfafff68fd6b1419cd",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stdout",
-      "stdout_sha256": "6e99150b222a0e488aa043430086b5c8e64ac7dd42ca037ae06b322626db2609",
+      "stdout_sha256": "dce929a1b5199ad35d7d625171d2624a044ea13227f376f7d37ac5f6df61dd37",
       "version": "m2-fault-status/v5"
     },
     {
       "argv": "scripts/e2e/m2_fault_status.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stderr",
-      "stderr_sha256": "29f638d754de54a64f448d53c96bd86f6b95700def249d23153133dc0c2d3fc8",
+      "stderr_sha256": "282a5cf88b54032bb30b170b57fbac0d49801b68b57ddc1de80fcd2011fccda3",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stdout",
       "stdout_sha256": "2621186a88727c197c102348410e9b455abd637871a7908ea9b1744fec6079b4",
       "version": "m2-fault-status/v5"
@@ -49,15 +49,15 @@
       "argv": "scripts/faults/m2_fault_status.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stderr",
-      "stderr_sha256": "f3dfb6907564615b1f21530fcf1cfad0df2c6b2ffbb57db49384887f60435465",
+      "stderr_sha256": "0c0bef7a1ce0856080d441144b7c014fe8de0b64ac21a2e2fa259a66afc2bf84",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stdout",
       "stdout_sha256": "a6fd373db85dd03b0c97959133fd7f061ccff577e9ab42ce3f2de7a78d2e7a78",
       "version": "m2-fault-status/v5"
     }
   ],
-  "config_fingerprint": "sha256:050fdb073b2e959ed5cb75512d9b98a5af57390e496a55230799be0c0ad87ea0",
+  "config_fingerprint": "sha256:25808469d8388ae2c604b46514e4d767ce69055b580fa3e56be259aeaa194345",
   "failure_fingerprint": null,
-  "git_commit": "c968eb2792d298288f67fe6bd5325be832cdbb62",
+  "git_commit": "04e44ed63ef4dbce0ed86e5a4985517b17117f79",
   "outcome": "pass",
   "postgres_image": "docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929",
   "profile": "clean-compose",
@@ -66,6 +66,6 @@
   "schema_version": "m2-fault-status-manifest/v1",
   "seed": "pg17-seed-1",
   "source_fingerprint": "redacted-sha256",
-  "source_tree": "050fdb073b2e959ed5cb75512d9b98a5af57390e496a55230799be0c0ad87ea0",
+  "source_tree": "25808469d8388ae2c604b46514e4d767ce69055b580fa3e56be259aeaa194345",
   "table_set_fingerprint": "redacted-sha256"
 }
