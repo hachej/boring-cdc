@@ -771,7 +771,11 @@ pub fn keyset_select_sql(
             && v.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
             && v.as_bytes()[0].is_ascii_alphabetic()
     }
-    if !ident(table) || columns.is_empty() || columns.iter().any(|v| !ident(v)) {
+    let mut table_parts = table.split('.');
+    let first = table_parts.next().is_some_and(ident);
+    let second = table_parts.next();
+    let valid_table = first && second.is_none_or(ident) && table_parts.next().is_none();
+    if !valid_table || columns.is_empty() || columns.iter().any(|v| !ident(v)) {
         return Err(PlannerError::Invalid("M3_IDENTIFIER"));
     }
     let tuple = format!("({})", columns.join(","));
@@ -816,6 +820,8 @@ pub struct PostgresRangeSource {
     connection: PgReplicationConnection,
     table: String,
     key_columns: Vec<String>,
+    last_copy_peaks: Option<CopyPeaks>,
+    payload_queries: usize,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -837,15 +843,54 @@ fn checked_slots<T>(capacity: usize) -> Result<usize, PlannerError> {
         .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))
 }
 
-/// Computes the two logical allocation high-water marks before issuing the payload query.
-/// `metadata_result_bytes` and `key_text_bytes` are bytes simultaneously retained by libpq's
-/// result; payload hex is retained while all decoded payload vectors are built.
+// NativePgResult grows these vectors by Rust's doubling strategy. This is the conservative
+// capacity ceiling for a vector populated only with `push`; it is exact at the growth boundaries.
+fn pushed_vec_capacity_ceiling(len: usize) -> Result<usize, PlannerError> {
+    if len == 0 {
+        return Ok(0);
+    }
+    len.checked_next_power_of_two()
+        .map(|capacity| capacity.max(4))
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))
+}
+
+fn native_result_allocation(
+    rows: usize,
+    columns: usize,
+    value_bytes: usize,
+    column_name_bytes: usize,
+) -> Result<usize, PlannerError> {
+    let mut total = std::mem::size_of::<pg_walstream::PgResult>();
+    checked_add_peak(
+        &mut total,
+        checked_slots::<Vec<Option<Vec<u8>>>>(pushed_vec_capacity_ceiling(rows)?)?,
+    )?;
+    checked_add_peak(
+        &mut total,
+        checked_slots::<String>(pushed_vec_capacity_ceiling(columns)?)?,
+    )?;
+    checked_add_peak(&mut total, column_name_bytes)?;
+    checked_add_peak(
+        &mut total,
+        checked_slots::<Option<Vec<u8>>>(
+            rows.checked_mul(columns)
+                .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?,
+        )?,
+    )?;
+    checked_add_peak(&mut total, value_bytes)?;
+    Ok(total)
+}
+
+/// Computes the two allocation high-water marks before issuing the payload query. The native
+/// result's row/column vectors and value buffers are included; payload hex remains live while all
+/// decoded payload vectors are built.
 fn postgres_copy_peaks(
     expected: &Vec<CanonicalKey>,
     schema_parts: usize,
     payload_bytes: usize,
     metadata_result_bytes: usize,
     key_text_bytes: usize,
+    key_column_name_bytes: usize,
 ) -> Result<CopyPeaks, PlannerError> {
     let key_buffers = expected.iter().try_fold(0usize, |mut total, key| {
         checked_add_peak(&mut total, key.0.capacity())?;
@@ -859,7 +904,18 @@ fn postgres_copy_peaks(
     let rows_vector = checked_slots::<SnapshotRow>(expected.len())?;
     let transient_parts = checked_slots::<KeyPart>(schema_parts)?;
 
-    let mut metadata = metadata_result_bytes;
+    let metadata_columns = schema_parts
+        .checked_add(1)
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let metadata_column_names = key_column_name_bytes
+        .checked_add("payload_bytes".len())
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let mut metadata = native_result_allocation(
+        expected.len(),
+        metadata_columns,
+        metadata_result_bytes,
+        metadata_column_names,
+    )?;
     for value in [
         std::mem::size_of::<Vec<CanonicalKey>>(),
         expected_vector,
@@ -873,9 +929,20 @@ fn postgres_copy_peaks(
     let payload_hex = payload_bytes
         .checked_mul(2)
         .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
-    let mut payload = key_text_bytes;
+    let data_result_bytes = key_text_bytes
+        .checked_add(payload_hex)
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let data_column_names = key_column_name_bytes
+        .checked_add("payload_hex".len())
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let mut payload = native_result_allocation(
+        expected.len(),
+        metadata_columns,
+        data_result_bytes,
+        data_column_names,
+    )?;
+    // The native result already owns the payload hex and key text; add only application buffers.
     for value in [
-        payload_hex,
         std::mem::size_of::<Vec<CanonicalKey>>(),
         expected_vector,
         key_buffers,
@@ -901,14 +968,27 @@ fn hex_nibble(byte: u8) -> Option<u8> {
 impl PostgresRangeSource {
     pub fn from_imported(
         session: ImportedSnapshotSession,
+        importer_id: &str,
+        assigned_ranges_digest: &str,
+        schema_fingerprint: &str,
         table: &str,
         key_columns: &[&str],
     ) -> Result<Self, PlannerError> {
         keyset_select_sql(table, key_columns, false, false)?;
+        let connection = session
+            .into_planner_connection(
+                importer_id,
+                assigned_ranges_digest,
+                schema_fingerprint,
+                table,
+            )
+            .map_err(|_| PlannerError::Conflict("M3_IMPORTER_CAPABILITY_MISMATCH"))?;
         Ok(Self {
-            connection: session.into_connection(),
+            connection,
             table: table.to_owned(),
             key_columns: key_columns.iter().map(|v| (*v).to_owned()).collect(),
+            last_copy_peaks: None,
+            payload_queries: 0,
         })
     }
     pub fn into_inner(self) -> PgReplicationConnection {
@@ -971,7 +1051,7 @@ impl BoundedRangeSource for PostgresRangeSource {
             .map_err(|_| PlannerError::Conflict("M3_SOURCE_TIMEOUT_SETUP"))?;
         let keys = self.key_columns.join(",");
         let meta_sql = format!(
-            "SELECT {keys},octet_length(convert_to(to_jsonb(t)::text,'UTF8')) FROM {} t{where_clause} ORDER BY {keys} LIMIT {}",
+            "SELECT {keys},octet_length(convert_to(to_jsonb(t)::text,'UTF8')) AS payload_bytes FROM {} t{where_clause} ORDER BY {keys} LIMIT {}",
             self.table,
             budget.max_rows + 1
         );
@@ -992,9 +1072,11 @@ impl BoundedRangeSource for PostgresRangeSource {
             let mut parts = Vec::with_capacity(schema.len());
             let mut row_key_text_bytes = 0usize;
             for (column, kind) in schema.iter().enumerate() {
-                let v = meta
-                    .get_value(row, column as i32)
+                let value_bytes = meta
+                    .get_bytes(row, column as i32)
                     .ok_or(PlannerError::Conflict("M3_SOURCE_ROW"))?;
+                let v = std::str::from_utf8(value_bytes)
+                    .map_err(|_| PlannerError::Conflict("M3_SOURCE_ROW"))?;
                 metadata_result_bytes = metadata_result_bytes
                     .checked_add(v.len())
                     .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
@@ -1025,9 +1107,11 @@ impl BoundedRangeSource for PostgresRangeSource {
                 })
             }
             let key = CanonicalKey::encode(schema, &parts)?;
-            let bytes_text = meta
-                .get_value(row, schema.len() as i32)
+            let bytes_value = meta
+                .get_bytes(row, schema.len() as i32)
                 .ok_or(PlannerError::Conflict("M3_SOURCE_ROW"))?;
+            let bytes_text = std::str::from_utf8(bytes_value)
+                .map_err(|_| PlannerError::Conflict("M3_SOURCE_ROW"))?;
             metadata_result_bytes = metadata_result_bytes
                 .checked_add(bytes_text.len())
                 .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
@@ -1051,7 +1135,9 @@ impl BoundedRangeSource for PostgresRangeSource {
             payload_bytes,
             metadata_result_bytes,
             key_text_bytes,
+            self.key_columns.iter().map(String::len).sum(),
         )?;
+        self.last_copy_peaks = Some(peaks);
         if peaks.metadata > budget.max_source_impact_bytes
             || peaks.payload > budget.max_source_impact_bytes
         {
@@ -1064,9 +1150,13 @@ impl BoundedRangeSource for PostgresRangeSource {
         }
         drop(meta);
         let data_sql = format!(
-            "SELECT {keys},encode(convert_to(to_jsonb(t)::text,'UTF8'),'hex') FROM {} t{where_clause} ORDER BY {keys} LIMIT {}",
+            "SELECT {keys},encode(convert_to(to_jsonb(t)::text,'UTF8'),'hex') AS payload_hex FROM {} t{where_clause} ORDER BY {keys} LIMIT {}",
             self.table, budget.max_rows
         );
+        self.payload_queries = self
+            .payload_queries
+            .checked_add(1)
+            .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
         let data = self
             .connection
             .exec(&data_sql)
@@ -1077,13 +1167,13 @@ impl BoundedRangeSource for PostgresRangeSource {
         let mut rows = Vec::with_capacity(row_count);
         for row in 0..data.ntuples() {
             let hex = data
-                .get_value(row, schema.len() as i32)
+                .get_bytes(row, schema.len() as i32)
                 .ok_or(PlannerError::Conflict("M3_SOURCE_ROW"))?;
             if hex.len() % 2 != 0 {
                 return Err(PlannerError::Conflict("M3_SOURCE_ROW"));
             }
             let mut payload = Vec::with_capacity(hex.len() / 2);
-            for pair in hex.as_bytes().chunks_exact(2) {
+            for pair in hex.chunks_exact(2) {
                 let hi = hex_nibble(pair[0]).ok_or(PlannerError::Conflict("M3_SOURCE_ROW"))?;
                 let lo = hex_nibble(pair[1]).ok_or(PlannerError::Conflict("M3_SOURCE_ROW"))?;
                 payload.push((hi << 4) | lo);
@@ -1151,7 +1241,11 @@ mod tests {
     fn key(v: i64) -> CanonicalKey {
         CanonicalKey::encode(&[KeyPartType::I64], &[KeyPart::I64(v)]).unwrap()
     }
-    fn plan_with_schema(s: &mut PlannerStore, b: Vec<CanonicalKey>, schema: Vec<KeyPartType>) {
+    fn plan_with_schema(
+        s: &mut PlannerStore,
+        b: Vec<CanonicalKey>,
+        schema: Vec<KeyPartType>,
+    ) -> String {
         let ranges = half_open_ranges(&b).unwrap();
         let mut assigned = Vec::new();
         for range in &ranges {
@@ -1164,7 +1258,7 @@ mod tests {
         let digest = crate::m3_bootstrap::digest_assignment(&assigned);
         s.writer.connection().execute("INSERT INTO bootstrap_intents(intent_id,capture_epoch,source_system_id,database_id,slot_name,creation_floor_lsn,state,revision,created_at) VALUES('intent','epoch','sys','db','slot','0000000000000001','slot_created',0,'now')",[]).unwrap();
         s.writer.connection().execute("INSERT INTO m3_bootstrap_runtime VALUES('intent',1,10,1,'held','exporter_released')",[]).unwrap();
-        s.writer.connection().execute("INSERT INTO m3_bootstrap_importers VALUES('intent','worker',?1,'schema-fp','acknowledged')",[digest]).unwrap();
+        s.writer.connection().execute("INSERT INTO m3_bootstrap_importers VALUES('intent','worker',?1,'schema-fp','acknowledged')",[&digest]).unwrap();
         s.persist_plan(&PlanInput {
             run_id: "run".into(),
             generation_id: "gen".into(),
@@ -1181,6 +1275,7 @@ mod tests {
             started_mono_ms: 100,
         })
         .unwrap();
+        digest
     }
     fn plan(s: &mut PlannerStore, b: Vec<CanonicalKey>) {
         plan_with_schema(s, b, vec![KeyPartType::I64]);
@@ -1254,19 +1349,27 @@ mod tests {
         let payload_bytes = 100;
         let metadata_result_bytes = 17;
         let key_text_bytes = 6;
+        let key_column_name_bytes = 2;
         let peaks = postgres_copy_peaks(
             &expected,
             1,
             payload_bytes,
             metadata_result_bytes,
             key_text_bytes,
+            key_column_name_bytes,
         )
         .unwrap();
         let key_buffers = expected.iter().map(|key| key.0.capacity()).sum::<usize>();
         let cloned_keys = expected.iter().map(|key| key.0.len()).sum::<usize>();
         assert_eq!(
             peaks.metadata,
-            metadata_result_bytes
+            native_result_allocation(
+                expected.len(),
+                2,
+                metadata_result_bytes,
+                key_column_name_bytes + "payload_bytes".len(),
+            )
+            .unwrap()
                 + std::mem::size_of::<Vec<CanonicalKey>>()
                 + expected.capacity() * std::mem::size_of::<CanonicalKey>()
                 + key_buffers
@@ -1275,8 +1378,13 @@ mod tests {
         );
         assert_eq!(
             peaks.payload,
-            key_text_bytes
-                + payload_bytes * 2
+            native_result_allocation(
+                expected.len(),
+                2,
+                key_text_bytes + payload_bytes * 2,
+                key_column_name_bytes + "payload_hex".len(),
+            )
+            .unwrap()
                 + std::mem::size_of::<Vec<CanonicalKey>>()
                 + expected.capacity() * std::mem::size_of::<CanonicalKey>()
                 + key_buffers
@@ -1286,7 +1394,7 @@ mod tests {
                 + payload_bytes
         );
         assert!(peaks.payload > payload_bytes + 2 * key(1).as_bytes().len());
-        assert!(postgres_copy_peaks(&expected, 1, usize::MAX, 0, 0).is_err());
+        assert!(postgres_copy_peaks(&expected, 1, usize::MAX, 0, 0, 0).is_err());
     }
 
     #[test]
@@ -1583,7 +1691,7 @@ mod tests {
             &[KeyPart::I64(i64::MAX), KeyPart::Uuid([0xff; 16])],
         )
         .unwrap();
-        plan_with_schema(
+        let planner_digest = plan_with_schema(
             &mut s,
             vec![boundary1, boundary2],
             vec![KeyPartType::I64, KeyPartType::Uuid],
@@ -1613,11 +1721,15 @@ mod tests {
                 importers: vec![
                     crate::m3_bootstrap::ImporterAssignment {
                         importer_id: "worker".into(),
-                        assigned_ranges_digest: crate::m3_bootstrap::digest_assignment(b"planner"),
+                        assigned_ranges_digest: planner_digest.clone(),
                     },
                     crate::m3_bootstrap::ImporterAssignment {
                         importer_id: "memory-probe".into(),
-                        assigned_ranges_digest: crate::m3_bootstrap::digest_assignment(b"probe"),
+                        assigned_ranges_digest: planner_digest.clone(),
+                    },
+                    crate::m3_bootstrap::ImporterAssignment {
+                        importer_id: "binding-probe".into(),
+                        assigned_ranges_digest: planner_digest.clone(),
                     },
                 ],
                 created_at: "unix-ms:0".into(),
@@ -1632,11 +1744,30 @@ mod tests {
             0,
         )
         .unwrap();
+        let binding_probe = runtime.take_importer("binding-probe").unwrap();
+        let capability_mismatch_rejected = matches!(
+            PostgresRangeSource::from_imported(
+                binding_probe,
+                "wrong-worker",
+                &planner_digest,
+                "schema-fp",
+                "public.m3_planner_fixture",
+                &["tenant", "id"],
+            ),
+            Err(PlannerError::Conflict("M3_IMPORTER_CAPABILITY_MISMATCH"))
+        );
+        assert!(capability_mismatch_rejected);
         let imported = runtime.take_importer("worker").unwrap();
         assert!(runtime.take_importer("worker").is_err());
-        let mut source =
-            PostgresRangeSource::from_imported(imported, "m3_planner_fixture", &["tenant", "id"])
-                .unwrap();
+        let mut source = PostgresRangeSource::from_imported(
+            imported,
+            "worker",
+            &planner_digest,
+            "schema-fp",
+            "public.m3_planner_fixture",
+            &["tenant", "id"],
+        )
+        .unwrap();
         let pending_before = read_pending_chunk_ids(&p.0, "gen", 10, Duration::from_secs(1))
             .unwrap()
             .len();
@@ -1663,15 +1794,22 @@ mod tests {
         assert_eq!(total, 5);
         s.finish_copy("gen").unwrap();
         let probe = runtime.take_importer("memory-probe").unwrap();
-        let mut bounded_probe =
-            PostgresRangeSource::from_imported(probe, "m3_planner_fixture", &["tenant", "id"])
-                .unwrap();
+        let mut bounded_probe = PostgresRangeSource::from_imported(
+            probe,
+            "memory-probe",
+            &planner_digest,
+            "schema-fp",
+            "public.m3_planner_fixture",
+            &["tenant", "id"],
+        )
+        .unwrap();
+        let full_range = KeyRange {
+            start: None,
+            end: None,
+        };
         let memory_refused_before_payload = matches!(
             bounded_probe.read_range(
-                &KeyRange {
-                    start: None,
-                    end: None,
-                },
+                &full_range,
                 &[KeyPartType::I64, KeyPartType::Uuid],
                 ReadBudget {
                     max_rows: 10,
@@ -1684,6 +1822,43 @@ mod tests {
             Err(PlannerError::Limit("M3_SOURCE_IMPACT"))
         );
         assert!(memory_refused_before_payload);
+        assert_eq!(bounded_probe.payload_queries, 0);
+        let exact_peak = bounded_probe
+            .last_copy_peaks
+            .unwrap()
+            .metadata
+            .max(bounded_probe.last_copy_peaks.unwrap().payload);
+        assert!(matches!(
+            bounded_probe.read_range(
+                &full_range,
+                &[KeyPartType::I64, KeyPartType::Uuid],
+                ReadBudget {
+                    max_rows: 10,
+                    max_bytes: 4096,
+                    max_duration: Duration::from_secs(1),
+                    max_source_impact_bytes: exact_peak - 1,
+                    max_rows_per_second: 1_000,
+                },
+            ),
+            Err(PlannerError::Limit("M3_SOURCE_IMPACT"))
+        ));
+        assert_eq!(bounded_probe.payload_queries, 0);
+        let exact_limit_rows = bounded_probe
+            .read_range(
+                &full_range,
+                &[KeyPartType::I64, KeyPartType::Uuid],
+                ReadBudget {
+                    max_rows: 10,
+                    max_bytes: 4096,
+                    max_duration: Duration::from_secs(1),
+                    max_source_impact_bytes: exact_peak,
+                    max_rows_per_second: 1_000,
+                },
+            )
+            .unwrap();
+        assert_eq!(exact_limit_rows.len(), 5);
+        assert_eq!(bounded_probe.payload_queries, 1);
+        let exact_limit_payload_fetches = bounded_probe.payload_queries;
         drop(source);
         drop(bounded_probe);
         runtime.invalidate("importer").unwrap();
@@ -1723,7 +1898,7 @@ mod tests {
                 .connection()
                 .query_row("SELECT count(*) FROM m3_chunk_claims", [], |r| r.get(0))
                 .unwrap();
-            std::fs::write(path,serde_json::to_vec(&serde_json::json!({"generation_state":state,"snapshot_events":events,"complete_chunks":chunks,"remaining_claims":claims,"pending_before":pending_before,"atomic_chunk_event_commit":events==total,"exported_snapshot_importer_handoff":true,"memory_refused_before_payload":memory_refused_before_payload})).unwrap()).unwrap();
+            std::fs::write(path,serde_json::to_vec(&serde_json::json!({"generation_state":state,"snapshot_events":events,"complete_chunks":chunks,"remaining_claims":claims,"pending_before":pending_before,"atomic_chunk_event_commit":events==total,"exported_snapshot_importer_handoff":true,"capability_mismatch_rejected":capability_mismatch_rejected,"memory_refused_before_payload":memory_refused_before_payload,"near_limit_peak_bytes":exact_peak,"exact_limit_payload_fetches":exact_limit_payload_fetches})).unwrap()).unwrap();
         }
     }
 }

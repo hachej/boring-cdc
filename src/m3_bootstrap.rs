@@ -586,10 +586,29 @@ pub struct ImporterSession {
 /// constructor: only [`BootstrapRuntime`] can mint and transfer this capability.
 pub struct ImportedSnapshotSession {
     connection: pg_walstream::PgReplicationConnection,
+    importer_id: String,
+    assigned_ranges_digest: String,
+    table_set_fingerprint: String,
+    guarded_relations: Vec<String>,
 }
 impl ImportedSnapshotSession {
-    pub(crate) fn into_connection(self) -> pg_walstream::PgReplicationConnection {
-        self.connection
+    pub(crate) fn into_planner_connection(
+        self,
+        importer_id: &str,
+        assigned_ranges_digest: &str,
+        schema_fingerprint: &str,
+        relation: &str,
+    ) -> Result<pg_walstream::PgReplicationConnection, BootstrapError> {
+        if self.importer_id != importer_id
+            || self.assigned_ranges_digest != assigned_ranges_digest
+            || self.table_set_fingerprint != schema_fingerprint
+            || !self.guarded_relations.iter().any(|value| value == relation)
+        {
+            return Err(BootstrapError::Conflict(
+                "M3_IMPORTER_CAPABILITY_BINDING_MISMATCH",
+            ));
+        }
+        Ok(self.connection)
     }
 }
 
@@ -629,9 +648,19 @@ impl ImporterSession {
         Ok(())
     }
 
-    fn into_acknowledged(self) -> ImportedSnapshotSession {
+    fn into_acknowledged(
+        self,
+        importer_id: String,
+        assigned_ranges_digest: String,
+        table_set_fingerprint: String,
+        guarded_relations: Vec<String>,
+    ) -> ImportedSnapshotSession {
         ImportedSnapshotSession {
             connection: self.connection,
+            importer_id,
+            assigned_ranges_digest,
+            table_set_fingerprint,
+            guarded_relations,
         }
     }
 }
@@ -745,7 +774,15 @@ impl BootstrapRuntime {
                 &intent.table_set_fingerprint,
             )?;
             store.acknowledge_import(&intent.intent_id, &assignment.importer_id)?;
-            importers.push((assignment.importer_id.clone(), importer.into_acknowledged()));
+            importers.push((
+                assignment.importer_id.clone(),
+                importer.into_acknowledged(
+                    assignment.importer_id.clone(),
+                    assignment.assigned_ranges_digest.clone(),
+                    intent.table_set_fingerprint.clone(),
+                    relations.to_vec(),
+                ),
+            ));
         }
         store.release_exporter(&intent.intent_id)?;
         drop(exporter);

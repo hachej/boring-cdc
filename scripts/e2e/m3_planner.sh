@@ -53,7 +53,7 @@ python3 - "$work/result-1" "$work/rust-1.json" "$work/rust-2.json" >"$work/obser
 import hashlib,json,pathlib,sys
 b=pathlib.Path(sys.argv[1]).read_bytes(); runs=[json.loads(pathlib.Path(p).read_text()) for p in sys.argv[2:]]
 assert runs[0]==runs[1]
-o=runs[0];assert o=={'atomic_chunk_event_commit':True,'complete_chunks':3,'exported_snapshot_importer_handoff':True,'generation_state':'fencing','memory_refused_before_payload':True,'pending_before':3,'remaining_claims':0,'snapshot_events':5}
+o=runs[0];expected={'atomic_chunk_event_commit':True,'capability_mismatch_rejected':True,'complete_chunks':3,'exact_limit_payload_fetches':1,'exported_snapshot_importer_handoff':True,'generation_state':'fencing','memory_refused_before_payload':True,'pending_before':3,'remaining_claims':0,'snapshot_events':5};assert all(o.get(k)==v for k,v in expected.items());assert o['near_limit_peak_bytes']>1
 o.update(row_count=len(b.splitlines()),result_sha256=hashlib.sha256(b).hexdigest(),rust_worker_runs=len(runs),postgres_keyset_runs=2,bounded_reader_released=o['pending_before']==3 and o['complete_chunks']==3,limits_respected=o['snapshot_events']==5)
 print(json.dumps(o,sort_keys=True))
 PY
