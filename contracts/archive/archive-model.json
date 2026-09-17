@@ -113,7 +113,7 @@
     },
     "durability": {
       "approval_card": "59a63169",
-      "confirmed_projection_source": "contracts/storage/storage-model.json",
+      "confirmed_projection_source": "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
       "decision_id": "boring-cdc-d-archive-durability",
       "projection": "ext4/xfs local allowlist; descriptor-relative no-follow lifecycle; parent directory sync; owner-only modes",
       "source_sha256": "a9b387f549da61b42bd32ac31ea7a8a7d2e9f69bf99a000d5cb3e026065ba9e6"
