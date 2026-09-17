@@ -84,6 +84,7 @@ pub struct SemanticViewFragment<'a> {
     pub output_signature: &'a str,
     pub sql: &'a str,
     pub sha256: &'a str,
+    pub display_mapping_sha256: &'a str,
 }
 
 /// Non-correctness display metadata. Its digest is included in migration identity so a rename is
@@ -103,11 +104,28 @@ pub struct MigrationError {
 
 /// Narrow dispatch boundary implemented by the ClickHouse adapter. Driver errors never cross this
 /// interface (and therefore cannot accidentally expose a DSN, credential, or raw server error).
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct InstalledViewContract {
+    pub sql_sha256: String,
+    pub input_signature: String,
+    pub output_signature: String,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MaintenanceDispatchError;
 
 pub trait MaintenanceExecutor {
+    /// Resolve the candidate SQL and return its server-observed interface without mutating objects.
+    fn validate_view(
+        &mut self,
+        qualified_view_name: &str,
+        sql: &str,
+    ) -> Result<InstalledViewContract, MaintenanceDispatchError>;
     fn execute_batch(&mut self, sql: &str) -> Result<(), MaintenanceDispatchError>;
+    fn inspect_view(
+        &mut self,
+        qualified_view_name: &str,
+    ) -> Result<Option<InstalledViewContract>, MaintenanceDispatchError>;
 }
 
 /// The only production-facing way to obtain the accepted physical DDL text.
@@ -179,12 +197,42 @@ pub fn display_mapping_fingerprint(
     Ok(format!("{:x}", digest.finalize()))
 }
 
+/// Production hook for confirmed initial `init`; callers must complete it before discarding the
+/// request-scoped ClickHouse administration credential.
+pub fn execute_initial_init_migration(
+    principal: Principal,
+    fragment: &SemanticViewFragment<'_>,
+    executor: &mut impl MaintenanceExecutor,
+) -> Result<(), MigrationError> {
+    execute_maintenance_migration(
+        principal,
+        MigrationInvocation::InitialInit,
+        fragment,
+        executor,
+    )
+}
+
+/// Production hook for table-add re-seed step 3. It deliberately delegates to the same migration
+/// executor as initial `init`, so lifecycle-specific call sites cannot acquire divergent SQL.
+pub fn execute_added_table_reseed_step3_migration(
+    principal: Principal,
+    fragment: &SemanticViewFragment<'_>,
+    executor: &mut impl MaintenanceExecutor,
+) -> Result<(), MigrationError> {
+    execute_maintenance_migration(
+        principal,
+        MigrationInvocation::AddedTableReseedStep3,
+        fragment,
+        executor,
+    )
+}
+
 /// Execute the exact same physical migration for initial `init` and table-add re-seed step 3,
 /// followed by the typed, hash-pinned semantic fragment. The complete plan is validated before the
 /// first external effect, so a missing/wrong fragment cannot leave a partially accepted migration.
-pub fn execute_maintenance_migration(
+fn execute_maintenance_migration(
     principal: Principal,
-    _invocation: MigrationInvocation,
+    invocation: MigrationInvocation,
     fragment: &SemanticViewFragment<'_>,
     executor: &mut impl MaintenanceExecutor,
 ) -> Result<(), MigrationError> {
@@ -195,6 +243,24 @@ pub fn execute_maintenance_migration(
         });
     }
     validate_semantic_fragment(fragment)?;
+    let _migration_identity = migration_fingerprint(invocation, fragment)?;
+    let qualified = format!("{DATABASE}.{}", fragment.view_name);
+    let candidate =
+        executor
+            .validate_view(&qualified, fragment.sql)
+            .map_err(|MaintenanceDispatchError| MigrationError {
+                code: "M4_CH_SEMANTIC_VIEW_PREFLIGHT_FAILED",
+                boundary: "before_clickhouse_dispatch",
+            })?;
+    if candidate.sql_sha256 != fragment.sha256
+        || candidate.input_signature != CURRENT_VIEW_INPUT_SIGNATURE
+        || candidate.output_signature != CURRENT_VIEW_OUTPUT_SIGNATURE
+    {
+        return Err(MigrationError {
+            code: "M4_CH_SEMANTIC_VIEW_SIGNATURE_INVALID",
+            boundary: "before_clickhouse_dispatch",
+        });
+    }
     executor
         .execute_batch(DDL_SQL)
         .map_err(|MaintenanceDispatchError| MigrationError {
@@ -206,7 +272,27 @@ pub fn execute_maintenance_migration(
         .map_err(|MaintenanceDispatchError| MigrationError {
             code: "M4_CH_SEMANTIC_VIEW_MIGRATION_FAILED",
             boundary: "clickhouse_semantic_view_ddl",
-        })
+        })?;
+    let installed = executor
+        .inspect_view(&qualified)
+        .map_err(|MaintenanceDispatchError| MigrationError {
+            code: "M4_CH_SEMANTIC_VIEW_READBACK_FAILED",
+            boundary: "clickhouse_semantic_view_readback",
+        })?
+        .ok_or(MigrationError {
+            code: "M4_CH_SEMANTIC_VIEW_MISSING",
+            boundary: "clickhouse_semantic_view_readback",
+        })?;
+    if installed.sql_sha256 != fragment.sha256
+        || installed.input_signature != CURRENT_VIEW_INPUT_SIGNATURE
+        || installed.output_signature != CURRENT_VIEW_OUTPUT_SIGNATURE
+    {
+        return Err(MigrationError {
+            code: "M4_CH_SEMANTIC_VIEW_DRIFT",
+            boundary: "clickhouse_semantic_view_readback",
+        });
+    }
+    Ok(())
 }
 
 fn validate_semantic_fragment(fragment: &SemanticViewFragment<'_>) -> Result<(), MigrationError> {
@@ -217,6 +303,9 @@ fn validate_semantic_fragment(fragment: &SemanticViewFragment<'_>) -> Result<(),
         || fragment.output_signature != CURRENT_VIEW_OUTPUT_SIGNATURE
         || semantic_view_target(fragment.sql) != Some(expected_qualified.as_str())
         || has_additional_statement(fragment.sql)
+        || !fragment.sql.contains("{capture_epoch:UInt64}")
+        || !fragment.sql.contains("canonical_key")
+        || !fragment.sql.contains("explicit_cells")
     {
         return Err(MigrationError {
             code: "M4_CH_SEMANTIC_VIEW_SIGNATURE_INVALID",
@@ -230,7 +319,39 @@ fn validate_semantic_fragment(fragment: &SemanticViewFragment<'_>) -> Result<(),
             boundary: "before_clickhouse_dispatch",
         });
     }
+    let mapping = display_view_mapping(fragment.logical_table_id, fragment.display_name)?;
+    let mapping_hash = display_mapping_fingerprint(&[mapping])?;
+    if mapping_hash != fragment.display_mapping_sha256 {
+        return Err(MigrationError {
+            code: "M4_CH_DISPLAY_MAPPING_HASH_MISMATCH",
+            boundary: "before_clickhouse_dispatch",
+        });
+    }
     Ok(())
+}
+
+/// Hash the complete installed migration identity, including physical objects, semantic SQL, and
+/// display metadata. The invocation is domain-separated while both lifecycle paths use identical
+/// SQL bytes and validation.
+pub fn migration_fingerprint(
+    invocation: MigrationInvocation,
+    fragment: &SemanticViewFragment<'_>,
+) -> Result<String, MigrationError> {
+    validate_semantic_fragment(fragment)?;
+    let mut digest = Sha256::new();
+    hash_part(&mut digest, b"boring-cdc/clickhouse-migration/v1");
+    hash_part(&mut digest, object_fingerprint().as_bytes());
+    hash_part(
+        &mut digest,
+        match invocation {
+            MigrationInvocation::InitialInit => b"initial-init",
+            MigrationInvocation::AddedTableReseedStep3 => b"added-table-reseed-step-3",
+        },
+    );
+    hash_part(&mut digest, fragment.view_name.as_bytes());
+    hash_part(&mut digest, fragment.sha256.as_bytes());
+    hash_part(&mut digest, fragment.display_mapping_sha256.as_bytes());
+    Ok(format!("{:x}", digest.finalize()))
 }
 
 /// Fail closed before dispatch when a statement exceeds the principal's fixed capability set.
@@ -239,7 +360,7 @@ pub fn authorize(principal: Principal, sql: &str) -> Result<SqlClass, Authorizat
     let allowed = match principal {
         Principal::Maintenance => !matches!(class, SqlClass::Unknown),
         Principal::Runtime => match class {
-            SqlClass::Read => !has_additional_statement(sql),
+            SqlClass::Read => !has_additional_statement(sql) && runtime_read_allowed(sql),
             SqlClass::Insert => {
                 !has_additional_statement(sql)
                     && runtime_insert_target(sql)
@@ -287,6 +408,12 @@ fn leading_statement(mut sql: &str) -> &str {
     }
 }
 
+fn runtime_read_allowed(sql: &str) -> bool {
+    let statement =
+        leading_statement(sql).trim_end_matches(|c: char| c.is_ascii_whitespace() || c == ';');
+    statement == history_query() || statement == current_state_query().trim_end()
+}
+
 fn has_additional_statement(sql: &str) -> bool {
     leading_statement(sql)
         .trim_end_matches(|c: char| c.is_ascii_whitespace() || c == ';')
@@ -304,7 +431,7 @@ fn runtime_insert_target(sql: &str) -> Option<&str> {
 
 fn semantic_view_target(sql: &str) -> Option<&str> {
     let mut words = sql.trim_start().split_ascii_whitespace();
-    for expected in ["CREATE", "VIEW", "IF", "NOT", "EXISTS"] {
+    for expected in ["CREATE", "OR", "REPLACE", "VIEW"] {
         if !words.next()?.eq_ignore_ascii_case(expected) {
             return None;
         }
@@ -361,11 +488,70 @@ mod m4_ddl {
         use super::super::*;
 
         #[derive(Default)]
-        struct Recorder(Vec<String>);
+        struct Recorder {
+            calls: Vec<String>,
+            installed: Option<InstalledViewContract>,
+        }
         impl MaintenanceExecutor for Recorder {
+            fn validate_view(
+                &mut self,
+                _qualified_view_name: &str,
+                sql: &str,
+            ) -> Result<InstalledViewContract, MaintenanceDispatchError> {
+                Ok(InstalledViewContract {
+                    sql_sha256: format!("{:x}", Sha256::digest(sql.as_bytes())),
+                    input_signature: CURRENT_VIEW_INPUT_SIGNATURE.to_owned(),
+                    output_signature: CURRENT_VIEW_OUTPUT_SIGNATURE.to_owned(),
+                })
+            }
+
             fn execute_batch(&mut self, sql: &str) -> Result<(), MaintenanceDispatchError> {
-                self.0.push(sql.to_owned());
+                self.calls.push(sql.to_owned());
+                if sql.trim_start().starts_with("CREATE OR REPLACE VIEW") {
+                    self.installed = Some(InstalledViewContract {
+                        sql_sha256: format!("{:x}", Sha256::digest(sql.as_bytes())),
+                        input_signature: CURRENT_VIEW_INPUT_SIGNATURE.to_owned(),
+                        output_signature: CURRENT_VIEW_OUTPUT_SIGNATURE.to_owned(),
+                    });
+                }
                 Ok(())
+            }
+
+            fn inspect_view(
+                &mut self,
+                _qualified_view_name: &str,
+            ) -> Result<Option<InstalledViewContract>, MaintenanceDispatchError> {
+                Ok(self.installed.clone())
+            }
+        }
+
+        #[derive(Default)]
+        struct MissingReadback {
+            calls: Vec<String>,
+        }
+        impl MaintenanceExecutor for MissingReadback {
+            fn validate_view(
+                &mut self,
+                _qualified_view_name: &str,
+                sql: &str,
+            ) -> Result<InstalledViewContract, MaintenanceDispatchError> {
+                Ok(InstalledViewContract {
+                    sql_sha256: format!("{:x}", Sha256::digest(sql.as_bytes())),
+                    input_signature: CURRENT_VIEW_INPUT_SIGNATURE.to_owned(),
+                    output_signature: CURRENT_VIEW_OUTPUT_SIGNATURE.to_owned(),
+                })
+            }
+
+            fn execute_batch(&mut self, sql: &str) -> Result<(), MaintenanceDispatchError> {
+                self.calls.push(sql.to_owned());
+                Ok(())
+            }
+
+            fn inspect_view(
+                &mut self,
+                _qualified_view_name: &str,
+            ) -> Result<Option<InstalledViewContract>, MaintenanceDispatchError> {
+                Ok(None)
             }
         }
 
@@ -374,6 +560,7 @@ mod m4_ddl {
             name: &'a str,
             sql: &'a str,
             hash: &'a str,
+            mapping_hash: &'a str,
         ) -> SemanticViewFragment<'a> {
             SemanticViewFragment {
                 logical_table_id: logical,
@@ -383,6 +570,7 @@ mod m4_ddl {
                 output_signature: CURRENT_VIEW_OUTPUT_SIGNATURE,
                 sql,
                 sha256: hash,
+                display_mapping_sha256: mapping_hash,
             }
         }
 
@@ -399,6 +587,7 @@ mod m4_ddl {
                 "SYSTEM STOP MERGES boring_cdc.event_history_v1",
                 "INSERT INTO boring_cdc.generation_selectors_v1 VALUES (1,2,3,'a','b','c')",
                 "SELECT 1; DROP TABLE boring_cdc.event_history_v1",
+                "SELECT * FROM system.tables",
                 "INSERT INTO boring_cdc.event_history_v1 VALUES (); DROP TABLE boring_cdc.event_history_v1",
             ] {
                 assert!(
@@ -476,28 +665,23 @@ mod m4_ddl {
             let logical = "ab".repeat(32);
             let name = current_view_name(&logical).unwrap();
             let sql = format!(
-                "CREATE VIEW IF NOT EXISTS {DATABASE}.{name} AS SELECT canonical_key,[] AS explicit_cells FROM {EVENT_HISTORY}"
+                "CREATE OR REPLACE VIEW {DATABASE}.{name} AS SELECT canonical_key,CAST([],'Array(Tuple(UInt32,String,UInt32,Int32,String))') AS explicit_cells FROM {EVENT_HISTORY} WHERE capture_epoch={{capture_epoch:UInt64}}"
             );
             let hash = format!("{:x}", Sha256::digest(sql.as_bytes()));
-            let binding = fragment(&logical, &name, &sql, &hash);
+            let mapping_hash = display_mapping_fingerprint(&[display_view_mapping(
+                &logical,
+                "hostile `schema.table`; DROP TABLE x",
+            )
+            .unwrap()])
+            .unwrap();
+            let binding = fragment(&logical, &name, &sql, &hash, &mapping_hash);
             let mut init = Recorder::default();
             let mut add = Recorder::default();
-            execute_maintenance_migration(
-                Principal::Maintenance,
-                MigrationInvocation::InitialInit,
-                &binding,
-                &mut init,
-            )
-            .unwrap();
-            execute_maintenance_migration(
-                Principal::Maintenance,
-                MigrationInvocation::AddedTableReseedStep3,
-                &binding,
-                &mut add,
-            )
-            .unwrap();
-            assert_eq!(init.0, add.0);
-            assert_eq!(init.0, vec![DDL_SQL.to_owned(), sql]);
+            execute_initial_init_migration(Principal::Maintenance, &binding, &mut init).unwrap();
+            execute_added_table_reseed_step3_migration(Principal::Maintenance, &binding, &mut add)
+                .unwrap();
+            assert_eq!(init.calls, add.calls);
+            assert_eq!(init.calls, vec![DDL_SQL.to_owned(), sql]);
         }
 
         #[test]
@@ -505,11 +689,17 @@ mod m4_ddl {
             let logical = "cd".repeat(32);
             let name = current_view_name(&logical).unwrap();
             let sql = format!(
-                "CREATE VIEW IF NOT EXISTS {DATABASE}.{name} AS SELECT canonical_key,[] AS explicit_cells FROM {EVENT_HISTORY}"
+                "CREATE OR REPLACE VIEW {DATABASE}.{name} AS SELECT canonical_key,CAST([],'Array(Tuple(UInt32,String,UInt32,Int32,String))') AS explicit_cells FROM {EVENT_HISTORY} WHERE capture_epoch={{capture_epoch:UInt64}}"
             );
             let mut recorder = Recorder::default();
+            let mapping_hash = display_mapping_fingerprint(&[display_view_mapping(
+                &logical,
+                "hostile `schema.table`; DROP TABLE x",
+            )
+            .unwrap()])
+            .unwrap();
             let wrong_hash = "0".repeat(64);
-            let bad = fragment(&logical, &name, &sql, &wrong_hash);
+            let bad = fragment(&logical, &name, &sql, &wrong_hash, &mapping_hash);
             assert_eq!(
                 execute_maintenance_migration(
                     Principal::Maintenance,
@@ -521,12 +711,13 @@ mod m4_ddl {
                 .code,
                 "M4_CH_SEMANTIC_VIEW_HASH_MISMATCH"
             );
-            assert!(recorder.0.is_empty());
+            assert!(recorder.calls.is_empty());
             let wrong_sql = format!(
-                "CREATE VIEW IF NOT EXISTS {DATABASE}.unowned AS SELECT '{DATABASE}.{name}'"
+                "CREATE OR REPLACE VIEW {DATABASE}.unowned AS SELECT '{DATABASE}.{name}', {{capture_epoch:UInt64}} AS capture_epoch, 'canonical_key explicit_cells'"
             );
             let wrong_sql_hash = format!("{:x}", Sha256::digest(wrong_sql.as_bytes()));
-            let wrong_target = fragment(&logical, &name, &wrong_sql, &wrong_sql_hash);
+            let wrong_target =
+                fragment(&logical, &name, &wrong_sql, &wrong_sql_hash, &mapping_hash);
             assert_eq!(
                 execute_maintenance_migration(
                     Principal::Maintenance,
@@ -538,19 +729,39 @@ mod m4_ddl {
                 .code,
                 "M4_CH_SEMANTIC_VIEW_SIGNATURE_INVALID"
             );
-            assert!(recorder.0.is_empty());
+            assert!(recorder.calls.is_empty());
+            let valid_hash = format!("{:x}", Sha256::digest(sql.as_bytes()));
+            let wrong_mapping = "f".repeat(64);
+            let bad_mapping = fragment(&logical, &name, &sql, &valid_hash, &wrong_mapping);
             assert_eq!(
-                execute_maintenance_migration(
-                    Principal::Runtime,
-                    MigrationInvocation::InitialInit,
-                    &bad,
-                    &mut recorder
+                execute_initial_init_migration(
+                    Principal::Maintenance,
+                    &bad_mapping,
+                    &mut recorder,
                 )
                 .unwrap_err()
                 .code,
+                "M4_CH_DISPLAY_MAPPING_HASH_MISMATCH"
+            );
+            assert!(recorder.calls.is_empty());
+
+            let valid = fragment(&logical, &name, &sql, &valid_hash, &mapping_hash);
+            let mut missing = MissingReadback::default();
+            assert_eq!(
+                execute_initial_init_migration(Principal::Maintenance, &valid, &mut missing)
+                    .unwrap_err()
+                    .code,
+                "M4_CH_SEMANTIC_VIEW_MISSING"
+            );
+            assert_eq!(missing.calls.len(), 2);
+
+            assert_eq!(
+                execute_initial_init_migration(Principal::Runtime, &bad, &mut recorder)
+                    .unwrap_err()
+                    .code,
                 "M4_CH_DDL_FORBIDDEN"
             );
-            assert!(recorder.0.is_empty());
+            assert!(recorder.calls.is_empty());
         }
 
         #[test]
