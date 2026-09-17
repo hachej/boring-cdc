@@ -1,6 +1,6 @@
-use boring_cdc::article1_capture::CaptureConfig;
+use boring_cdc::article1_capture::{CaptureConfig, SLOT};
 use boring_cdc::m2_capture_runtime::{
-    CaptureRuntime, NoSnapshotGate, RuntimeError, RuntimeSpool, SLOT, capture_copyboth_until,
+    CaptureRuntime, NoSnapshotGate, RuntimeError, RuntimeSpool, capture_copyboth_until,
 };
 use boring_cdc::m2_journal::{CommitLimits, JournalStore, SourceIdentity};
 use boring_cdc::m2_schema::open_writer;
