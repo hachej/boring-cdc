@@ -115,6 +115,12 @@ pub struct InstalledViewContract {
 pub struct MaintenanceDispatchError;
 
 pub trait MaintenanceExecutor {
+    /// Resolve the candidate SQL and return its server-observed interface without mutating objects.
+    fn validate_view(
+        &mut self,
+        qualified_view_name: &str,
+        sql: &str,
+    ) -> Result<InstalledViewContract, MaintenanceDispatchError>;
     fn execute_batch(&mut self, sql: &str) -> Result<(), MaintenanceDispatchError>;
     fn inspect_view(
         &mut self,
@@ -238,6 +244,23 @@ fn execute_maintenance_migration(
     }
     validate_semantic_fragment(fragment)?;
     let _migration_identity = migration_fingerprint(invocation, fragment)?;
+    let qualified = format!("{DATABASE}.{}", fragment.view_name);
+    let candidate =
+        executor
+            .validate_view(&qualified, fragment.sql)
+            .map_err(|MaintenanceDispatchError| MigrationError {
+                code: "M4_CH_SEMANTIC_VIEW_PREFLIGHT_FAILED",
+                boundary: "before_clickhouse_dispatch",
+            })?;
+    if candidate.sql_sha256 != fragment.sha256
+        || candidate.input_signature != CURRENT_VIEW_INPUT_SIGNATURE
+        || candidate.output_signature != CURRENT_VIEW_OUTPUT_SIGNATURE
+    {
+        return Err(MigrationError {
+            code: "M4_CH_SEMANTIC_VIEW_SIGNATURE_INVALID",
+            boundary: "before_clickhouse_dispatch",
+        });
+    }
     executor
         .execute_batch(DDL_SQL)
         .map_err(|MaintenanceDispatchError| MigrationError {
@@ -250,7 +273,6 @@ fn execute_maintenance_migration(
             code: "M4_CH_SEMANTIC_VIEW_MIGRATION_FAILED",
             boundary: "clickhouse_semantic_view_ddl",
         })?;
-    let qualified = format!("{DATABASE}.{}", fragment.view_name);
     let installed = executor
         .inspect_view(&qualified)
         .map_err(|MaintenanceDispatchError| MigrationError {
@@ -338,7 +360,7 @@ pub fn authorize(principal: Principal, sql: &str) -> Result<SqlClass, Authorizat
     let allowed = match principal {
         Principal::Maintenance => !matches!(class, SqlClass::Unknown),
         Principal::Runtime => match class {
-            SqlClass::Read => !has_additional_statement(sql),
+            SqlClass::Read => !has_additional_statement(sql) && runtime_read_allowed(sql),
             SqlClass::Insert => {
                 !has_additional_statement(sql)
                     && runtime_insert_target(sql)
@@ -384,6 +406,12 @@ fn leading_statement(mut sql: &str) -> &str {
             return sql.trim_start_matches(|c: char| c.is_ascii_whitespace() || c == ';');
         }
     }
+}
+
+fn runtime_read_allowed(sql: &str) -> bool {
+    let statement =
+        leading_statement(sql).trim_end_matches(|c: char| c.is_ascii_whitespace() || c == ';');
+    statement == history_query() || statement == current_state_query().trim_end()
 }
 
 fn has_additional_statement(sql: &str) -> bool {
@@ -465,6 +493,18 @@ mod m4_ddl {
             installed: Option<InstalledViewContract>,
         }
         impl MaintenanceExecutor for Recorder {
+            fn validate_view(
+                &mut self,
+                _qualified_view_name: &str,
+                sql: &str,
+            ) -> Result<InstalledViewContract, MaintenanceDispatchError> {
+                Ok(InstalledViewContract {
+                    sql_sha256: format!("{:x}", Sha256::digest(sql.as_bytes())),
+                    input_signature: CURRENT_VIEW_INPUT_SIGNATURE.to_owned(),
+                    output_signature: CURRENT_VIEW_OUTPUT_SIGNATURE.to_owned(),
+                })
+            }
+
             fn execute_batch(&mut self, sql: &str) -> Result<(), MaintenanceDispatchError> {
                 self.calls.push(sql.to_owned());
                 if sql.trim_start().starts_with("CREATE OR REPLACE VIEW") {
@@ -490,6 +530,18 @@ mod m4_ddl {
             calls: Vec<String>,
         }
         impl MaintenanceExecutor for MissingReadback {
+            fn validate_view(
+                &mut self,
+                _qualified_view_name: &str,
+                sql: &str,
+            ) -> Result<InstalledViewContract, MaintenanceDispatchError> {
+                Ok(InstalledViewContract {
+                    sql_sha256: format!("{:x}", Sha256::digest(sql.as_bytes())),
+                    input_signature: CURRENT_VIEW_INPUT_SIGNATURE.to_owned(),
+                    output_signature: CURRENT_VIEW_OUTPUT_SIGNATURE.to_owned(),
+                })
+            }
+
             fn execute_batch(&mut self, sql: &str) -> Result<(), MaintenanceDispatchError> {
                 self.calls.push(sql.to_owned());
                 Ok(())
@@ -535,6 +587,7 @@ mod m4_ddl {
                 "SYSTEM STOP MERGES boring_cdc.event_history_v1",
                 "INSERT INTO boring_cdc.generation_selectors_v1 VALUES (1,2,3,'a','b','c')",
                 "SELECT 1; DROP TABLE boring_cdc.event_history_v1",
+                "SELECT * FROM system.tables",
                 "INSERT INTO boring_cdc.event_history_v1 VALUES (); DROP TABLE boring_cdc.event_history_v1",
             ] {
                 assert!(
