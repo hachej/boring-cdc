@@ -235,7 +235,7 @@
       "id": "ART-M0-COMPOSE-VALIDATION",
       "owner_bead": "boring-cdc-d-compose",
       "path": "artifacts/m0/decisions/boring-cdc-d-compose/evidence.json",
-      "sha256": "a882c38d9ec3e088029e435a7bdbdcbcbbce79ca5b6ddde005ad149806567da6",
+      "sha256": "1cafe667165a80e879841d3907db8b355929bf7525081ddca2991d8149ad8168",
       "status": "complete"
     },
     {
