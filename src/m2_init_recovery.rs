@@ -599,16 +599,60 @@ fn verify(
         .cloned()
         .collect::<Vec<_>>()
         .join(",");
-    let flags = scalar(
-        c,
-        &format!(
-            "SELECT r.rolname||':'||pubinsert::int||pubupdate::int||pubdelete::int||pubtruncate::int FROM pg_publication p JOIN pg_roles r ON r.oid=p.pubowner WHERE pubname='{}'",
+    if members != expected_members {
+        return Err(InitFailure::at(
+            "publication_relation_set",
+            "M2_INIT_PUBLICATION_RELATION_SET_MISMATCH",
+        ));
+    }
+    let definition = c
+        .exec(&format!(
+            "SELECT r.rolname,pubinsert::int::text,pubupdate::int::text,pubdelete::int::text,pubtruncate::int::text FROM pg_publication p JOIN pg_roles r ON r.oid=p.pubowner WHERE pubname='{}'",
             config.public().source.publication
+        ))
+        .map_err(|_| InitFailure::at("publication", "M2_INIT_SOURCE_QUERY_FAILED"))?;
+    if definition.ntuples() != 1 {
+        return Err(InitFailure::at(
+            "publication",
+            "M2_INIT_PUBLICATION_MISSING",
+        ));
+    }
+    let observed = |column| {
+        definition
+            .get_value(0, column)
+            .ok_or_else(|| InitFailure::at("publication", "M2_INIT_SOURCE_VALUE_MISSING"))
+    };
+    if observed(0)? != ADMIN_ROLE {
+        return Err(InitFailure::at(
+            "publication_owner",
+            "M2_INIT_PUBLICATION_OWNER_MISMATCH",
+        ));
+    }
+    for (column, operation, code) in [
+        (
+            1,
+            "publication_publish_insert",
+            "M2_INIT_PUBLICATION_PUBLISH_INSERT_MISMATCH",
         ),
-        "publication",
-    )?;
-    if members != expected_members || flags != format!("{ADMIN_ROLE}:1111") {
-        return Err(InitFailure::at("publication", "M2_INIT_PUBLICATION_DRIFT"));
+        (
+            2,
+            "publication_publish_update",
+            "M2_INIT_PUBLICATION_PUBLISH_UPDATE_MISMATCH",
+        ),
+        (
+            3,
+            "publication_publish_delete",
+            "M2_INIT_PUBLICATION_PUBLISH_DELETE_MISMATCH",
+        ),
+        (
+            4,
+            "publication_publish_truncate",
+            "M2_INIT_PUBLICATION_PUBLISH_TRUNCATE_MISMATCH",
+        ),
+    ] {
+        if observed(column)? != "1" {
+            return Err(InitFailure::at(operation, code));
+        }
     }
     let privilege = scalar(
         c,

@@ -26,6 +26,7 @@ The intended guarantee is **at-least-once capture with idempotent destination co
 - [Architecture and implementation roadmap](docs/PLAN.md)
 - [Agent-native control and knowledge architecture](docs/AGENT_SYSTEM.md)
 - [Series execution and evidence handoff](docs/SERIES_EXECUTION.md)
+- [Durable simple-stream operator path](docs/durable-simple-operator.md)
 
 ## For implementation agents
 
