@@ -15,10 +15,16 @@ h=hashlib.sha256()
 for n in files:
  b=(R/n).read_bytes();h.update(n.encode()+b)
 impl=h.hexdigest();git=os.popen(f'git -C {R} rev-parse HEAD').read().strip()
-obs_path=os.environ.get('BORING_CDC_M3_OBSERVATION');obs=pathlib.Path(obs_path).read_bytes() if obs_path else b'fault-tests-passed\n'
-oracle={'row_count':len(obs.splitlines()) if mode=='e2e' else None,'result_sha256':sha(obs),'deterministic_attempts':2,'canonical_values_retained':False}
+obs_path=os.environ.get('BORING_CDC_M3_OBSERVATION')
+if not obs_path: raise SystemExit('BORING_CDC_M3_OBSERVATION is required')
+obs_bytes=pathlib.Path(obs_path).read_bytes();observed=json.loads(obs_bytes)
+if mode=='e2e':
+ assert observed['generation_state']=='fencing' and observed['snapshot_events']==5 and observed['complete_chunks']==3 and observed['remaining_claims']==0 and observed['rust_worker_runs']==2 and observed['postgres_keyset_runs']==2
+else:
+ assert observed['generation_state']=='invalidated' and observed['remaining_claims']==0 and observed['stale_completion_rejected'] and observed['deterministic_attempts']==2
+oracle={'row_count':observed.get('row_count'),'result_sha256':observed.get('result_sha256',sha(obs_bytes)),'deterministic_attempts':observed.get('deterministic_attempts',observed.get('rust_worker_runs')),'canonical_values_retained':False,'rust_worker_runs':observed.get('rust_worker_runs')}
 cfg={'postgres_image':'17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929','secret_source':'compose-secret-file','tmpdir':'/var/tmp','seed':seed,'chunk_rows':4,'chunk_bytes':1024,'concurrency':2}
-fp=sha(canon(cfg));before={'generation_state':'copying','pending_chunks':3,'active_workers':0};after={'generation_state':'fencing' if mode=='e2e' else 'invalidated','keyset_only':True,'bounded_reader_released':True,'atomic_chunk_event_commit':True,'stale_completion_rejected':True,'limits_respected':True}
+fp=sha(canon(cfg));before={'generation_state':'copying','pending_chunks':3,'active_workers':0};after={'generation_state':observed['generation_state'],'keyset_only':observed.get('postgres_keyset_runs')==2,'bounded_reader_released':observed['bounded_reader_released'],'atomic_chunk_event_commit':observed['atomic_chunk_event_commit'],'stale_completion_rejected':observed.get('stale_completion_rejected',False),'limits_respected':observed['limits_respected']}
 wr(out/'stdout.txt',f'M3_PLANNER_{mode.upper()}_OK\n');wr(out/'stderr.txt',b'');wr(out/'config.json',canon(cfg));wr(out/'state/before.json',canon(before));wr(out/'state/after.json',canon(after));wr(out/'fault-timeline.json',canon(['claim_persisted','bounded_read','writer_transaction','generation_fenced']));wr(out/'oracle.json',canon(oracle))
 log={'schema_version':'m3-planner-event/v1','case_event_seq':1,'bead_id':'boring-cdc-m3-planner','scenario_id':scenario,'correlation_id':scenario.lower()+':run-v1','run_id':'m3-planner-run-v1','capture_epoch':'m3-planner-epoch-v1','component':'backfill_planner','phase':'verify','outcome':'pass','config_fingerprint':fp,'generation':1,'intent_id':None,'request_id':None,'xid':None,'commit_lsn':None,'end_lsn':None,'journal_range':None,'anchor':None,'fence':'generation-fenced' if mode=='faults' else None,'attempt':2,'fault_hook':'stale_worker_completion' if mode=='faults' else None,'failure_class':None,'failure_fingerprint':None,'metric_units':'rows_bytes_milliseconds','evidence_digest':None}
 wr(out/'logs/boring-cdc.jsonl',canon(log));cmd=f'scripts/{"e2e" if mode=="e2e" else "faults"}/m3_planner.sh';wr(out/'commands.txt',cmd+'\n');wr(out/'versions.json',canon({'git_commit':git,'implementation_sha256':impl,'postgres':'17.6','python':sys.version.split()[0]}))
