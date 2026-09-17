@@ -102,7 +102,7 @@
       "id": "ART-M0-CLICKHOUSE-DOC",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "docs/CLICKHOUSE_MODEL.md",
-      "sha256": "06fc289d50b06060ea975641d6a77fe375ee43de31cef72ee8d1cd6f5cf8f63c",
+      "sha256": "98041f56be1803cdac4888fac1d8603baab604b556bd63b9fd45536e68ba100d",
       "status": "complete"
     },
     {
@@ -130,7 +130,7 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "74962d321fafcb718cbc1d1db3963bbbd3995322c811535849e22fd20690568a",
+      "sha256": "87118dc77f012eec73f118e4bb547d1a08405a6a2bd0ff3228d2d2bf3a4bdf9a",
       "status": "complete"
     },
     {
@@ -158,7 +158,7 @@
       "id": "ART-M0-CLICKHOUSE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "scripts/validate/clickhouse_contract.py",
-      "sha256": "58bf73c5547d8b8787c624e6fbe0f787a71a0ea437cd02a87d187fb642d9d91c",
+      "sha256": "0d6605598cc27b29ac9decb855d7176f5a34d3d86d224fbf9dd522e010e5a595",
       "status": "complete"
     },
     {
@@ -214,14 +214,14 @@
       "id": "ART-M0-EVENT-FORMAT-CONTRACT",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "contracts/event/event-format.json",
-      "sha256": "2969282e59e61f442befdb888b86a3446535694581c6858a92dda100546786b8",
+      "sha256": "72dd2b42b79341aa584587d997413b5c05a48c813213bca453069242b1b5cfcb",
       "status": "complete"
     },
     {
       "id": "ART-M0-EVENT-FORMAT-DOC",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "docs/EVENT_FORMAT.md",
-      "sha256": "65252925cc76fccddba444d102ad394ab5f0cebf3a77cd3e3ab2d9bd2531da3a",
+      "sha256": "ee65fecd3c915c8c95967ae100cf0af1126ba903202c3fdcf8ce657136528d09",
       "status": "complete"
     },
     {
@@ -242,7 +242,7 @@
       "id": "ART-M0-EVENT-FORMAT-VALIDATOR",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "scripts/validate/event_format.py",
-      "sha256": "ee01e23e59d2127a6f559b0f153bef15c5ac1ca75c4074ee5002aec36c594ae5",
+      "sha256": "6162b5b5a1c20e0eb126a213c51452ba4ad35970e11f78990b2601fc1d7df9d1",
       "status": "complete"
     },
     {
@@ -508,7 +508,7 @@
       "id": "ART-M0-SUPPORTED-VALUES-FIXTURE",
       "owner_bead": "boring-cdc-d-values",
       "path": "fixtures/m0/decisions/boring-cdc-d-values.json",
-      "sha256": "4a03258299482e7602b7c059766d9c20c66fa5c99ac27fac8a744a63f6e333d7",
+      "sha256": "caffe1f7f01bd65500682a9c7f30dcc76c13453211e07c8571fc2524f8d6fcb3",
       "status": "complete"
     },
     {

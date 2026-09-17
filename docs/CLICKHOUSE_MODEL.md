@@ -1,12 +1,11 @@
 # ClickHouse model v1
 
-**Canonical artifact:** `contracts/clickhouse/model.json` (`ART-M0-CLICKHOUSE-MODEL`). The artifact materializes the accepted d-values literals from owner card `59a63169`; remaining recommendations stay provisional and it does not close decision Beads. This document is explanatory; JSON, SQL, schemas, fixtures, and their registered hashes are executable authority.
+**Canonical artifact:** `contracts/clickhouse/model.json` (`ART-M0-CLICKHOUSE-MODEL`). The artifact materializes the accepted d-values literals and corrected canonical-float spelling from owner card `59a63169`; remaining recommendations stay provisional and it does not close decision Beads. This document is explanatory; JSON, SQL, schemas, fixtures, and their registered hashes are executable authority.
 
 The still-unresolved directly consumed recommendations remain visibly provisional:
 
 - `// M0-PROVISIONAL: boring-cdc-d-compose` — pinned `linux/amd64` ClickHouse profile;
 - `// M0-PROVISIONAL: boring-cdc-d-keys` — canonical key types, encoding, component count, and decoded-byte cap;
-- `// M0-PROVISIONAL: boring-cdc-d-values.1` — shortest round-tripping float spelling and ties.
 
 `boring-cdc-d-wal-cap`, `boring-cdc-d-sqlite`, and `boring-cdc-d-archive-durability` are not ClickHouse-owned literals here. `boring-cdc-d-pg-protocol` and its `ARTICLE1-PROVISIONAL` candidates remain open and untouched.
 

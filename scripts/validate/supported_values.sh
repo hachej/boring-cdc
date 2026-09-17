@@ -9,8 +9,8 @@ root=Path(sys.argv[1]); selected_case=sys.argv[2]
 owner='boring-cdc-d-values'; decision_id='DEC-SUPPORTED-VALUES'
 fixture_rel='fixtures/m0/decisions/boring-cdc-d-values.json'
 executors=['boring-cdc-m1-decoder','boring-cdc-m0-event-format']
-markers=['// M0-PROVISIONAL: boring-cdc-d-values.1']
-proposed='Owner-card accepted envelope v1 type tags; distinct null, absent, and unchanged states; bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; non-float canonical bodies; destination mappings; and limits. Canonical shortest-round-trip float spelling remains separately provisional under boring-cdc-d-values.1.'
+markers=[]
+proposed='Owner-card accepted envelope v1 type tags; distinct null, absent, and unchanged states; bool, int2, int4, int8, numeric, float4, float8, date, timestamp, timestamptz, uuid, text, varchar, bpchar, bytea, and one-dimensional array OIDs; canonical bodies including corrected globally shortest round-trip float spelling; destination mappings; and limits.'
 SCALARS=[('bool',16,'boolean','Bool','BOOLEAN'),('int2',21,'signed_integer','Int16','INT32'),('int4',23,'signed_integer','Int32','INT32'),('int8',20,'signed_integer','Int64','INT64'),('numeric',1700,'arbitrary_precision_numeric','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('float4',700,'ieee754','Float32','FLOAT'),('float8',701,'ieee754','Float64','DOUBLE'),('date',1082,'date','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('timestamp',1114,'timestamp_without_time_zone','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('timestamptz',1184,'timestamp_with_time_zone','String(tagged canonical body)','BYTE_ARRAY(canonical tagged body)'),('uuid',2950,'uuid','UUID','FIXED_LEN_BYTE_ARRAY(16, UUID)'),('text',25,'utf8_text','String','BYTE_ARRAY(UTF8)'),('varchar',1043,'utf8_text','String','BYTE_ARRAY(UTF8)'),('bpchar',1042,'utf8_text','String','BYTE_ARRAY(UTF8)'),('bytea',17,'bytes','String(base64url unpadded)','BYTE_ARRAY')]
 ARRAY_OIDS=[1000,1005,1007,1016,1231,1021,1022,1182,1115,1185,2951,1009,1015,1014,1001]
 EXPECTED_MATRIX=[{'array_oid':a,'canonical_family':f,'clickhouse':ch,'clickhouse_array':'String(tagged canonical array body)','jsonl':'envelope_v1 tagged value','name':n,'oid':o,'parquet':pq+' plus value-state tag metadata','parquet_array':'BYTE_ARRAY(canonical tagged array body) plus value-state tag metadata'} for (n,o,f,ch,pq),a in zip(SCALARS,ARRAY_OIDS)]
@@ -20,8 +20,8 @@ def env(state,typ=None,value=None):
  if value is not None:d['value']=value
  return d
 EXPECTED_CANONICAL=[
- ('bool-false',env('value','bool','false')),('bool-true',env('value','bool','true')),('int2-min',env('value','int2','-32768')),('int4-zero',env('value','int4','0')),('int8-max',env('value','int8','9223372036854775807')),('numeric-trailing-zero-normalized',env('value','numeric','+12345e+2')),('numeric-negative-scale',env('value','numeric','+1e-3')),('numeric-negative-zero',env('value','numeric','-0e+0')),('float4-nan',env('value','float4','NaN')),('float4-shortest-point-one',env('value','float4','0.1')),('float4-min-subnormal',env('value','float4','1e-45')),('float4-max-finite',env('value','float4','34028235e31')),('float4-halfway-ties-even',env('value','float4','1')),('float8-positive-infinity',env('value','float8','+Infinity')),('float8-negative-infinity',env('value','float8','-Infinity')),('float8-negative-zero',env('value','float8','-0')),('float8-shortest-point-one',env('value','float8','0.1')),('float8-fixed-exponent-shorter',env('value','float8','1e-4')),('float8-negative-fixed-exponent-shorter',env('value','float8','-1e-4')),('float8-fixed-exponent-tie-small',env('value','float8','0.01')),('float8-fixed-exponent-tie-large',env('value','float8','100')),('float8-min-subnormal',env('value','float8','5e-324')),('float8-halfway-ties-even',env('value','float8','1')),('float8-shortest-exponent',env('value','float8','1e-9')),('float8-round-trip',env('value','float8','1.2345678901234567')),('date',env('value','date','2024-02-29')),('date-positive-infinity',env('value','date','+infinity')),('timestamp-naive',env('value','timestamp','2024-02-29T12:34:56.123456')),('timestamp-negative-infinity',env('value','timestamp','-infinity')),('timestamptz-utc',env('value','timestamptz','2024-02-29T12:34:56.123456Z')),('uuid',env('value','uuid','01234567-89ab-cdef-0123-456789abcdef')),('text-no-normalization',env('value','text','é')),('bpchar-preserve-space',env('value','bpchar','x  ')),('bytea',env('value','bytea','-_8A')),('null',env('null','text')),('absent',env('absent')),('unchanged',env('unchanged','text')),('array-lower-bound',env('value','int4[]',{'element_type':'int4','length':3,'lower_bound':-2,'values':[env('value','int4','1'),env('null','int4'),env('value','int4','3')]}))]
-EXPECTED_SOURCES={'bool-false':(16,'f'),'bool-true':(16,'t'),'int2-min':(21,'-32768'),'int4-zero':(23,'0'),'int8-max':(20,'9223372036854775807'),'numeric-trailing-zero-normalized':(1700,'123.4500'),'numeric-negative-scale':(1700,'1e3'),'numeric-negative-zero':(1700,'-0.000'),'float4-nan':(700,'NaN'),'float4-shortest-point-one':(700,'0.1'),'float4-min-subnormal':(700,'1.401298464324817e-45'),'float4-max-finite':(700,'3.4028234663852886e38'),'float4-halfway-ties-even':(700,'1.0000000596046448'),'float8-positive-infinity':(701,'Infinity'),'float8-negative-infinity':(701,'-Infinity'),'float8-negative-zero':(701,'-0'),'float8-shortest-point-one':(701,'0.1'),'float8-fixed-exponent-shorter':(701,'0.0001'),'float8-negative-fixed-exponent-shorter':(701,'-0.0001'),'float8-fixed-exponent-tie-small':(701,'0.01'),'float8-fixed-exponent-tie-large':(701,'100'),'float8-min-subnormal':(701,'4.9406564584124654e-324'),'float8-halfway-ties-even':(701,'1.00000000000000011102230246251565404236316680908203125'),'float8-shortest-exponent':(701,'1e-9'),'float8-round-trip':(701,'1.2345678901234567'),'date':(1082,'2024-02-29'),'date-positive-infinity':(1082,'infinity'),'timestamp-naive':(1114,'2024-02-29 12:34:56.123456'),'timestamp-negative-infinity':(1114,'-infinity'),'timestamptz-utc':(1184,'2024-02-29 12:34:56.123456+00'),'uuid':(2950,'01234567-89AB-CDEF-0123-456789ABCDEF'),'text-no-normalization':(25,'é'),'bpchar-preserve-space':(1042,'x  '),'bytea':(17,'\\xfbff00'),'array-lower-bound':(1007,'[-2:0]={1,NULL,3}')}
+ ('bool-false',env('value','bool','false')),('bool-true',env('value','bool','true')),('int2-min',env('value','int2','-32768')),('int4-zero',env('value','int4','0')),('int8-max',env('value','int8','9223372036854775807')),('numeric-trailing-zero-normalized',env('value','numeric','+12345e+2')),('numeric-negative-scale',env('value','numeric','+1e-3')),('numeric-negative-zero',env('value','numeric','-0e+0')),('float4-nan',env('value','float4','NaN')),('float4-shortest-point-one',env('value','float4','0.1')),('float4-min-subnormal',env('value','float4','1e-45')),('float4-max-finite',env('value','float4','34028234e31')),('float4-halfway-ties-even',env('value','float4','1')),('float4-significand-tie',env('value','float4','4.4240426e-4')),('float8-positive-infinity',env('value','float8','+Infinity')),('float8-negative-infinity',env('value','float8','-Infinity')),('float8-negative-zero',env('value','float8','-0')),('float8-shortest-point-one',env('value','float8','0.1')),('float8-fixed-exponent-shorter',env('value','float8','1e-4')),('float8-negative-fixed-exponent-shorter',env('value','float8','-1e-4')),('float8-fixed-exponent-tie-small',env('value','float8','0.01')),('float8-fixed-exponent-tie-large',env('value','float8','100')),('float8-min-subnormal',env('value','float8','3e-324')),('float8-halfway-ties-even',env('value','float8','1')),('float8-shortest-exponent',env('value','float8','1e-9')),('float8-significand-tie',env('value','float8','-29970921442555092e29')),('float8-round-trip',env('value','float8','1.2345678901234566')),('date',env('value','date','2024-02-29')),('date-positive-infinity',env('value','date','+infinity')),('timestamp-naive',env('value','timestamp','2024-02-29T12:34:56.123456')),('timestamp-negative-infinity',env('value','timestamp','-infinity')),('timestamptz-utc',env('value','timestamptz','2024-02-29T12:34:56.123456Z')),('uuid',env('value','uuid','01234567-89ab-cdef-0123-456789abcdef')),('text-no-normalization',env('value','text','é')),('bpchar-preserve-space',env('value','bpchar','x  ')),('bytea',env('value','bytea','-_8A')),('null',env('null','text')),('absent',env('absent')),('unchanged',env('unchanged','text')),('array-lower-bound',env('value','int4[]',{'element_type':'int4','length':3,'lower_bound':-2,'values':[env('value','int4','1'),env('null','int4'),env('value','int4','3')]}))]
+EXPECTED_SOURCES={'bool-false':(16,'f'),'bool-true':(16,'t'),'int2-min':(21,'-32768'),'int4-zero':(23,'0'),'int8-max':(20,'9223372036854775807'),'numeric-trailing-zero-normalized':(1700,'123.4500'),'numeric-negative-scale':(1700,'1e3'),'numeric-negative-zero':(1700,'-0.000'),'float4-nan':(700,'NaN'),'float4-shortest-point-one':(700,'0.1'),'float4-min-subnormal':(700,'1.401298464324817e-45'),'float4-max-finite':(700,'3.4028234663852886e38'),'float4-halfway-ties-even':(700,'1.0000000596046448'),'float4-significand-tie':(700,'0.00044240427087061107158660888671875'),'float8-positive-infinity':(701,'Infinity'),'float8-negative-infinity':(701,'-Infinity'),'float8-negative-zero':(701,'-0'),'float8-shortest-point-one':(701,'0.1'),'float8-fixed-exponent-shorter':(701,'0.0001'),'float8-negative-fixed-exponent-shorter':(701,'-0.0001'),'float8-fixed-exponent-tie-small':(701,'0.01'),'float8-fixed-exponent-tie-large':(701,'100'),'float8-min-subnormal':(701,'4.9406564584124654e-324'),'float8-halfway-ties-even':(701,'1.00000000000000011102230246251565404236316680908203125'),'float8-shortest-exponent':(701,'1e-9'),'float8-significand-tie':(701,'-2997092144255509473134279637768794682133839872'),'float8-round-trip':(701,'1.2345678901234567'),'date':(1082,'2024-02-29'),'date-positive-infinity':(1082,'infinity'),'timestamp-naive':(1114,'2024-02-29 12:34:56.123456'),'timestamp-negative-infinity':(1114,'-infinity'),'timestamptz-utc':(1184,'2024-02-29 12:34:56.123456+00'),'uuid':(2950,'01234567-89AB-CDEF-0123-456789ABCDEF'),'text-no-normalization':(25,'é'),'bpchar-preserve-space':(1042,'x  '),'bytea':(17,'\\xfbff00'),'array-lower-bound':(1007,'[-2:0]={1,NULL,3}')}
 EXPECTED_FAILURES=[{'case_id':'unsupported-oid','input':{'oid':114},'expected_code':'SUPPORTED_VALUES_UNSUPPORTED_TYPE'},{'case_id':'numeric-precision-over','input':{'precision':1001},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'numeric-scale-low','input':{'scale':-16384},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'numeric-scale-high','input':{'scale':16384},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'scalar-over','input':{'scalar_bytes':1048577},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'row-over','input':{'row_bytes':4194305},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'event-over','input':{'event_bytes':8388609},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'array-dimensions-over','input':{'array_dimensions':2},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'},{'case_id':'array-elements-over','input':{'array_elements':10001},'expected_code':'SUPPORTED_VALUES_LIMIT_EXCEEDED'}]
 def sha(path): return hashlib.sha256(path.read_bytes()).hexdigest()
 def canonical_bytes(value): return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()
@@ -43,36 +43,51 @@ def source_record(case_id):
  raise ValueError('unknown golden source')
 def shortest_float(text,width):
  import struct
- value=float(text); pack=lambda x: struct.pack('>f' if width==32 else '>d',x)
- target=pack(value); rounded=struct.unpack('>f',target)[0] if width==32 else value
- def equivalent_spellings(decimal):
-  sign=''
-  if decimal.startswith('-'): sign,decimal='-',decimal[1:]
-  mantissa,marker,exponent=decimal.partition('e')
-  decimal_exponent=int(exponent) if marker else 0
-  whole,dot,fraction=mantissa.partition('.')
-  digits=(whole+fraction).lstrip('0') or '0'
-  decimal_exponent-=len(fraction)
+ from fractions import Fraction
+ pack_code='>f' if width==32 else '>d'; int_code='>I' if width==32 else '>Q'
+ packed=struct.pack(pack_code,float(text)); bits=struct.unpack(int_code,packed)[0]
+ sign_bit=1<<(width-1); magnitude_bits=bits & (sign_bit-1); negative=bool(bits & sign_bit)
+ if magnitude_bits==0: return '-0' if negative else '0'
+ def magnitude(bit_pattern):
+  return Fraction.from_float(abs(struct.unpack(pack_code,struct.pack(int_code,bit_pattern))[0]))
+ target=magnitude(magnitude_bits)
+ previous=magnitude(magnitude_bits-1)
+ exponent_bits=8 if width==32 else 11
+ max_finite=((1<<exponent_bits)-2)<<(width-exponent_bits-1) | ((1<<(width-exponent_bits-1))-1)
+ if magnitude_bits==max_finite:
+  following=target+(target-previous)
+ else:
+  following=magnitude(magnitude_bits+1)
+ lower=(previous+target)/2; upper=(target+following)/2
+ def equivalent_spellings(digits,decimal_exponent):
   while len(digits)>1 and digits.endswith('0'):
    digits=digits[:-1]; decimal_exponent+=1
   point=len(digits)+decimal_exponent
-  if point<=0: fixed='0.'+'0'*(-point)+digits
-  elif point>=len(digits): fixed=digits+'0'*(point-len(digits))
-  else: fixed=digits[:point]+'.'+digits[point:]
-  yield sign+fixed
+  if point<=0: yield '0.'+'0'*(-point)+digits
+  elif point>=len(digits): yield digits+'0'*(point-len(digits))
+  else: yield digits[:point]+'.'+digits[point:]
   for split in range(1,len(digits)+1):
    mantissa=digits[:split]+(('.'+digits[split:]) if split<len(digits) else '')
-   yield sign+mantissa+'e'+str(decimal_exponent+len(digits)-split)
- candidates=set()
- for precision in range(1,10 if width==32 else 18):
-  rounded_decimal=format(rounded,f'.{precision}g').lower()
-  for candidate in equivalent_spellings(rounded_decimal):
-   try: matches=pack(float(candidate))==target
-   except OverflowError: matches=False
-   if matches: candidates.add(candidate)
+   yield mantissa+'e'+str(decimal_exponent+len(digits)-split)
+ def floor_fraction(value): return value.numerator//value.denominator
+ candidates=set(); max_digits=9 if width==32 else 17
+ for digits_count in range(1,max_digits+1):
+  digit_min=1 if digits_count==1 else 10**(digits_count-1)
+  digit_max=10**digits_count-1
+  for decimal_exponent in range(-400,401):
+   scale=Fraction(10**decimal_exponent,1) if decimal_exponent>=0 else Fraction(1,10**(-decimal_exponent))
+   scaled_lower=lower/scale; scaled_upper=upper/scale
+   first=max(digit_min,floor_fraction(scaled_lower)-1)
+   last=min(digit_max,floor_fraction(scaled_upper)+1)
+   if first>last: continue
+   significands=range(first,last+1) if last-first<=1000 else list(range(first,first+20))+list(range(last-19,last+1))
+   for significand in significands:
+    for unsigned in equivalent_spellings(str(significand),decimal_exponent):
+     candidate=('-' if negative else '')+unsigned
+     try: matches=struct.pack(pack_code,float(candidate))==packed
+     except OverflowError: matches=False
+     if matches: candidates.add(candidate)
  if not candidates: raise ValueError('no shortest round-trip float')
- # Global byte minimum; lexical UTF-8 order breaks equal-length ties and therefore
- # selects fixed notation over exponent notation for ties such as 0.01/1e-2.
  return min(candidates,key=lambda candidate:(len(candidate.encode()),candidate.encode()))
 def encode_source(case_id,source):
  if source!=source_record(case_id): raise ValueError('source drift')
@@ -144,7 +159,7 @@ try:
  expected_probe=[{'code':'SUPPORTED_VALUES_FIXTURE_VALID','golden_vectors':len(expected_vectors),'outcome':'pass','phase':'validate_spec','type_oids':30}]
  if probe!=expected_probe or spec['execution_probe']!={'expected_lines':expected_probe,'path':probe_rel,'sha256':sha(root/probe_rel)}: fail()
  decision=next(x for x in decisions['decisions'] if x['id']==decision_id)
- markers=['// M0-PROVISIONAL: boring-cdc-d-values.1']
+ markers=[]
  if decision!={'executor_beads':executors,'fixture_sha256':sha(root/fixture_rel),'fixture_spec':fixture_rel,'id':decision_id,'owner_bead':owner,'proposed_value':proposed,'status':'open','provisional_markers':markers}: fail()
  needed={'ART-M0-SUPPORTED-VALUES-FIXTURE':fixture_rel,'ART-M0-SUPPORTED-VALUES-PROBE':probe_rel,'ART-M0-SUPPORTED-VALUES-VALIDATION':'artifacts/m0/decisions/boring-cdc-d-values/evidence.json'}
  owned={x['id']:x for x in artifacts['artifacts'] if x.get('owner_bead')==owner}
@@ -156,7 +171,7 @@ try:
  evidence_sha=evidence['git_commit']; guarded=[fixture_rel,'scripts/validate/supported_values.sh','contracts/m0/decisions.json']
  if subprocess.run(['git','cat-file','-e',evidence_sha+'^{commit}'],cwd=root,capture_output=True).returncode or subprocess.run(['git','merge-base','--is-ancestor',evidence_sha,'HEAD'],cwd=root,capture_output=True).returncode or subprocess.run(['git','diff','--quiet',evidence_sha+'..HEAD','--',*guarded],cwd=root).returncode: fail()
 except (OSError,KeyError,ValueError,TypeError,StopIteration,json.JSONDecodeError): fail()
-if selected_case=='all': print('{"code":"SUPPORTED_VALUES_FIXTURE_VALID","golden_vectors":38,"outcome":"pass","phase":"validate_spec","type_oids":30}')
+if selected_case=='all': print('{"code":"SUPPORTED_VALUES_FIXTURE_VALID","golden_vectors":40,"outcome":"pass","phase":"validate_spec","type_oids":30}')
 else:
  failure=next((x for x in EXPECTED_FAILURES if x['case_id']==selected_case),None)
  print(json.dumps({'case_id':selected_case,'code':failure['expected_code'] if failure else 'SUPPORTED_VALUES_CASE_VALID','expected_outcome':'block_before_feedback' if failure else 'pass','outcome':'fail' if failure else 'pass','phase':'execute_fixture'},sort_keys=True,separators=(',',':')))

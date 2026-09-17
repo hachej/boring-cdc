@@ -75,7 +75,6 @@ PROVISIONAL = {
     "boring-cdc-d-compose",
     "boring-cdc-d-keys",
     "boring-cdc-d-sqlite",
-    "boring-cdc-d-values.1",
     "boring-cdc-d-wal-cap",
 }
 def provisional_marker(owner: str) -> str:
@@ -87,9 +86,6 @@ def provisional_marker(owner: str) -> str:
 OPEN_DECISIONS = {
     "boring-cdc-d-compose": {provisional_marker("boring-cdc-d-compose")},
     "boring-cdc-d-sqlite": {provisional_marker("boring-cdc-d-sqlite")},
-    "boring-cdc-d-values": {
-        provisional_marker("boring-cdc-d-values.1"),
-    },
     "boring-cdc-d-wal-cap": {provisional_marker("boring-cdc-d-wal-cap")},
 }
 REQUIRED_M0_OWNERS = {

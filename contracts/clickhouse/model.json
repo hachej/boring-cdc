@@ -41,7 +41,7 @@
     ],
     "owner_confirmation_date": "2026-09-10",
     "requirements": "docs/REQUIREMENTS.md \u00a76",
-    "status": "engineering artifact with accepted d-values literals; remaining decision recommendations stay provisional"
+    "status": "engineering artifact with accepted d-values and canonical-float literals; remaining decision recommendations stay provisional"
   },
   "consumes": {
     "compose": {
@@ -54,11 +54,11 @@
         "765bd3b2"
       ],
       "date": "2026-09-10",
-      "scope": "ClickHouse artifact design and d-values literals accepted; key/Compose and canonical-float recommendations remain provisional under owner card 59a63169"
+      "scope": "ClickHouse artifact design, d-values literals, and corrected canonical-float spelling accepted; key/Compose recommendations remain provisional under owner card 59a63169"
     },
     "event_contract": {
       "path": "contracts/event/event-format.json",
-      "sha256": "2969282e59e61f442befdb888b86a3446535694581c6858a92dda100546786b8"
+      "sha256": "72dd2b42b79341aa584587d997413b5c05a48c813213bca453069242b1b5cfcb"
     },
     "failure_policy": {
       "base_delay_ms": 250,
@@ -319,8 +319,7 @@
   },
   "provisional_markers": [
     "// M0-PROVISIONAL: boring-cdc-d-compose",
-    "// M0-PROVISIONAL: boring-cdc-d-keys",
-    "// M0-PROVISIONAL: boring-cdc-d-values.1"
+    "// M0-PROVISIONAL: boring-cdc-d-keys"
   ],
   "result_schema": "contracts/clickhouse/result.schema.json",
   "schema_evolution": {

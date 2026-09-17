@@ -40,7 +40,7 @@ class ClickHouseContractTests(unittest.TestCase):
  def test_fixture_scope(self):
   c=m.load(m.C); f=m.load(m.F); self.assertEqual(41,len(f['cases'])); self.assertEqual(c['fixture_ids'],[x['fixture_id'] for x in f['cases']])
  def test_exact_provisional_inventory(self):
-  self.assertEqual(['// M0-PROVISIONAL: boring-cdc-d-compose','// M0-PROVISIONAL: boring-cdc-d-keys','// M0-PROVISIONAL: boring-cdc-d-values.1'],m.load(m.C)['provisional_markers'])
+  self.assertEqual(['// M0-PROVISIONAL: boring-cdc-d-compose','// M0-PROVISIONAL: boring-cdc-d-keys'],m.load(m.C)['provisional_markers'])
  def test_capture_epoch_is_direct_u64(self):
   self.assertEqual(3,m.DDL.read_text().count('capture_epoch UInt64'))
   self.assertNotIn('capture_epoch FixedString',m.DDL.read_text())
