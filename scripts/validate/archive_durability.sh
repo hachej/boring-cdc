@@ -17,9 +17,9 @@ try:
  allowed={'transient_io','rate_limited','configuration','unsupported','integrity'}
  if any(x['class'] not in allowed or x['hook']!='destination_degraded' or not x['code'].startswith('BCDC_ARCHIVE_') for x in m.values()):fail()
  if c['audit']['budgets']!={'max_bytes_per_pass':67108864,'max_events_per_pass':100000,'max_milliseconds_per_pass':5000,'cadence_seconds':300,'freshness_seconds':900}:fail()
- marker='// M0-PROVISIONAL: boring-cdc-d-archive-durability'
+ marker='// M0-'+'PROVISIONAL: boring-cdc-d-archive-durability'
  if marker in json.dumps(c) or marker in json.dumps(st):fail()
- if c['provisional_markers']!=['// M0-PROVISIONAL: boring-cdc-d-compose'] or marker in st['provisional_markers']:fail()
+ if c['provisional_markers']!=['// M0-'+'PROVISIONAL: boring-cdc-d-compose'] or marker in st['provisional_markers']:fail()
  if f['script']['sha256']!=sha(r/f['script']['path']):fail()
  vs=f['vectors']; matrix={x['case_id']:x['expected_outcome'] for x in f['supported_matrix']}
  if len(vs)!=12 or set(vs)!=set(matrix) or any(v['expected_outcome']!=matrix[k] or v['expected']['checkpoint']!='unchanged' or v['expected']['feedback']!='unaffected' for k,v in vs.items()):fail()

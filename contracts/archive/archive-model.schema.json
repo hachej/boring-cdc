@@ -226,9 +226,6 @@
             "projection": {
               "type": "string"
             },
-            "provisional": {
-              "const": "// M0-PROVISIONAL: boring-cdc-d-archive-durability"
-            },
             "source_sha256": {
               "type": "string"
             }
@@ -1038,9 +1035,6 @@
             "type": "string"
           },
           "type": "array"
-        },
-        "provisional": {
-          "const": "// M0-PROVISIONAL: boring-cdc-d-archive-durability"
         },
         "remote_or_network_filesystems": {
           "type": "string"
