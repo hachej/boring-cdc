@@ -1,7 +1,7 @@
 \set ON_ERROR_STOP on
 
--- Run as a superuser, or as a database owner that also has CREATEROLE,
--- against a newly-created database.
+-- Run as a PostgreSQL superuser against a newly-created database.
+-- Database ownership or CREATEROLE alone is intentionally not supported.
 -- Required variables are supplied with psql -v; psql safely quotes every password.
 \if :{?admin_password}
 \else
