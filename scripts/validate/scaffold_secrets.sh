@@ -13,6 +13,7 @@ synthetic_line_sha256 = {
  ('vendor/pg_walstream/src/lib.rs','3ff4e303a30ae16c6e07ebc2db31714edbd94ae946e92eceb4f656cf280ed324'),
 }
 reviewed_vendor_paths = {
+ 'vendor/pg_walstream/.baseline-sha256',
  'vendor/pg_walstream/Cargo.toml',
  'vendor/pg_walstream/src/lib.rs',
  'vendor/pg_walstream/src/connection/mod.rs',
@@ -20,12 +21,20 @@ reviewed_vendor_paths = {
  'vendor/pg_walstream/src/connection/native/connection.rs',
  'vendor/pg_walstream/src/connection/native/query.rs',
 }
+vendor_root='vendor/pg_walstream/'
+baseline={}
+for line in pathlib.Path(vendor_root+'.baseline-sha256').read_text().splitlines():
+ digest,rel=line.split('  ',1);baseline[vendor_root+rel]=digest
+tracked_vendor={name for name in paths if name.startswith(vendor_root) and name not in reviewed_vendor_paths}
+assert tracked_vendor==set(baseline),('vendor baseline inventory drift',sorted(tracked_vendor^set(baseline)))
+for name,digest in baseline.items():
+ assert hashlib.sha256(pathlib.Path(name).read_bytes()).hexdigest()==digest,f'vendor baseline changed: {name}'
 hits=[]
 for name in paths:
  p=pathlib.Path(name)
  if not p.is_file() or name.startswith(('.beads/','artifacts/')): continue
- # Published dependency baseline contains synthetic credential fixtures; scan every locally
- # modified vendor surface instead of silently excluding the whole vendor tree.
+ # Published dependency baseline contains synthetic credential fixtures. Its complete pinned
+ # inventory is hash-verified above; every locally modified vendor surface is scanned here.
  if name.startswith('vendor/') and name not in reviewed_vendor_paths: continue
  try:text=p.read_text()
  except UnicodeDecodeError:continue

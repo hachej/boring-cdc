@@ -798,6 +798,7 @@ pub fn keyset_select_sql(
 ) -> Result<String, PlannerError> {
     fn ident(v: &str) -> bool {
         !v.is_empty()
+            && v.len() <= 63
             && v.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
             && v.as_bytes()[0].is_ascii_alphabetic()
     }
@@ -805,7 +806,8 @@ pub fn keyset_select_sql(
     let first = table_parts.next().is_some_and(ident);
     let second = table_parts.next();
     let valid_table = first && second.is_none_or(ident) && table_parts.next().is_none();
-    if !valid_table || columns.is_empty() || columns.iter().any(|v| !ident(v)) {
+    if !valid_table || columns.is_empty() || columns.len() > 32 || columns.iter().any(|v| !ident(v))
+    {
         return Err(PlannerError::Invalid("M3_IDENTIFIER"));
     }
     let tuple = format!("({})", columns.join(","));
@@ -926,6 +928,10 @@ struct ResultFootprint {
 }
 
 const NATIVE_RECEIVE_FLOOR: usize = 8192;
+// PostgreSQL limits identifiers to 63 bytes and indexes to 32 columns. Under those validated
+// limits, every simultaneously live SQL-rendering String/Vec (including two range predicates,
+// metadata/data commands, and transient literal joins) fits below this conservative reservation.
+const SQL_CONSTRUCTION_RESERVE: usize = 64 * 1024;
 
 fn wire_data_row_bytes(columns: usize, value_bytes: usize) -> Result<usize, PlannerError> {
     let mut total = 1 + 4 + 2;
@@ -951,24 +957,65 @@ fn add_receive_peak(peak: usize, receive: usize) -> Result<usize, PlannerError> 
 // The threaded native driver owns a clone of the SQL while the caller's String remains live.
 // During send, its framed query BytesMut is also live beside the fixed receive backing; the driver
 // explicitly drops that frame before reading results.
+fn sql_workspace_upper_bound(columns: usize) -> Result<usize, PlannerError> {
+    let identifiers = columns
+        .checked_mul(64)
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let tuple = identifiers
+        .checked_add(2)
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let rendered_key = columns
+        .checked_mul(45)
+        .and_then(|value| value.checked_add(2))
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let predicate = tuple
+        .checked_add(rendered_key)
+        .and_then(|value| value.checked_add(2))
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let where_clause = predicate
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(12))
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    let query = identifiers
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(where_clause))
+        .and_then(|value| value.checked_add(512))
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    [
+        tuple,
+        rendered_key * 2,
+        predicate * 2,
+        where_clause,
+        identifiers,
+        query * 2,
+        columns * std::mem::size_of::<String>(),
+    ]
+    .into_iter()
+    .try_fold(0usize, |mut total, value| {
+        checked_add_peak(&mut total, value)?;
+        Ok::<usize, PlannerError>(total)
+    })
+}
+
 fn bounded_query_peak(
     result_and_receive_peak: usize,
     receive: usize,
-    sql: &String,
+    sql: &str,
 ) -> Result<usize, PlannerError> {
-    let retained_sql = sql
-        .capacity()
-        .checked_add(sql.len())
-        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+    // The reservation covers every caller-side SQL workspace allocation, including `sql`.
+    // The worker clone and framed command are separate driver allocations.
+    let worker_sql = sql.len();
     let result_peak = result_and_receive_peak
-        .checked_add(retained_sql)
+        .checked_add(SQL_CONSTRUCTION_RESERVE)
+        .and_then(|value| value.checked_add(worker_sql))
         .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
     let query_frame = sql
         .len()
         .checked_add(6)
         .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
     let send_peak = receive
-        .checked_add(retained_sql)
+        .checked_add(SQL_CONSTRUCTION_RESERVE)
+        .and_then(|value| value.checked_add(worker_sql))
         .and_then(|value| value.checked_add(query_frame))
         .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
     Ok(result_peak.max(send_peak))
@@ -1196,8 +1243,14 @@ impl BoundedRangeSource for PostgresRangeSource {
         // The imported connection already owns an 8 KiB native receive backing. Refuse before
         // rendering SQL or issuing any command when the configured source-impact bound cannot
         // even cover that persistent allocation.
-        if budget.max_source_impact_bytes < NATIVE_RECEIVE_FLOOR {
-            self.required_source_impact_bytes = Some(NATIVE_RECEIVE_FLOOR);
+        if sql_workspace_upper_bound(schema.len())? > SQL_CONSTRUCTION_RESERVE {
+            return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
+        }
+        let render_floor = NATIVE_RECEIVE_FLOOR
+            .checked_add(SQL_CONSTRUCTION_RESERVE)
+            .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
+        if budget.max_source_impact_bytes < render_floor {
+            self.required_source_impact_bytes = Some(render_floor);
             return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
         }
         fn literal(part: KeyPart) -> Result<String, PlannerError> {
@@ -2098,7 +2151,7 @@ mod tests {
         assert!(capability_mismatch_rejected);
         let imported = runtime.take_importer("worker").unwrap();
         assert!(runtime.take_importer("worker").is_err());
-        s.limits.source_impact_bytes = 64 * 1024;
+        s.limits.source_impact_bytes = 128 * 1024;
         let mut source = PostgresRangeSource::from_imported(
             imported,
             "worker",
@@ -2171,7 +2224,7 @@ mod tests {
                     max_rows: 10,
                     max_bytes: 4096,
                     max_duration: Duration::from_secs(1),
-                    max_source_impact_bytes: 64 * 1024,
+                    max_source_impact_bytes: 128 * 1024,
                     max_rows_per_second: 1_000,
                 },
             )
