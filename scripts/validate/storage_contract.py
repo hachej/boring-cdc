@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import hashlib, importlib.util, json, sqlite3, subprocess, tempfile
+import hashlib, importlib.util, json, re, sqlite3, subprocess, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; OWNER='boring-cdc-m0-storage-model'
 C=ROOT/'contracts/storage/storage-model.json'; S=ROOT/'contracts/storage/storage-model.schema.json'; Q=ROOT/'contracts/storage/sqlite-schema.sql'; F=ROOT/'fixtures/m0/storage/scenarios.json'; FS=ROOT/'contracts/storage/storage-fixtures.schema.json'; R=ROOT/'contracts/storage/storage-result.schema.json'; E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence.json'; V=Path(__file__); M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
@@ -105,8 +105,20 @@ def validate():
   if secret in text:add(fs,'E_SECRET','inputs',f'forbidden token {secret}')
  inputs={str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in (C,S,Q,F,FS,R)}
  return fs,inputs
+def resolve_source_parent(prior,inputs,validator_sha256):
+ head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip()
+ if prior.get('inputs')!=inputs or prior.get('validator_sha256')!=validator_sha256:return head,None
+ candidate=prior.get('source_parent_git_commit')
+ if not isinstance(candidate,str) or re.fullmatch(r'[0-9a-f]{40}',candidate) is None:return candidate or '', 'stored source parent must be a canonical full lowercase commit OID'
+ try: resolved=subprocess.check_output(['git','rev-parse',candidate+'^{commit}'],cwd=ROOT,text=True,stderr=subprocess.DEVNULL).strip()
+ except subprocess.CalledProcessError:return candidate,'stored source parent is not an existing commit'
+ if resolved!=candidate:return candidate,'stored source parent does not resolve canonically'
+ if subprocess.run(['git','merge-base','--is-ancestor',candidate,head],cwd=ROOT).returncode:return candidate,'stored source parent is not an ancestor of HEAD'
+ return candidate,None
 def main():
- fs,inputs=validate(); prior=load(E) if E.exists() else {}; parent=prior.get('source_parent_git_commit') or subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(); material=''.join(k+'\0'+v+'\n' for k,v in sorted(inputs.items())).encode()
- ev={'schema_version':'m0-storage-contract-evidence/v1','owner_bead':OWNER,'status':'pass' if not fs else 'fail','validator':'scripts/validate/storage_contract.py','validator_sha256':hashlib.sha256(V.read_bytes()).hexdigest(),'source_parent_git_commit':parent,'input_tree_sha256':hashlib.sha256(material).hexdigest(),'inputs':inputs,'fixture_count':len(load(F)['cases']),'actual_connection_attestation':True,'runtime_observed':False,'product_faults':'fault_not_applicable','findings':fs}
+ fs,inputs=validate(); prior=load(E) if E.exists() else {}; validator_sha256=hashlib.sha256(V.read_bytes()).hexdigest(); parent,error=resolve_source_parent(prior,inputs,validator_sha256)
+ if error:add(fs,'E_EVIDENCE_PROVENANCE','evidence/source_parent_git_commit',error)
+ material=''.join(k+'\0'+v+'\n' for k,v in sorted(inputs.items())).encode()
+ ev={'schema_version':'m0-storage-contract-evidence/v1','owner_bead':OWNER,'status':'pass' if not fs else 'fail','validator':'scripts/validate/storage_contract.py','validator_sha256':validator_sha256,'source_parent_git_commit':parent,'input_tree_sha256':hashlib.sha256(material).hexdigest(),'inputs':inputs,'fixture_count':len(load(F)['cases']),'actual_connection_attestation':True,'runtime_observed':False,'product_faults':'fault_not_applicable','findings':fs}
  E.parent.mkdir(parents=True,exist_ok=True); E.write_text(json.dumps(ev,indent=2,sort_keys=True)+'\n'); print(json.dumps(ev,sort_keys=True,separators=(',',':'))); return 0 if not fs else 1
 if __name__=='__main__': raise SystemExit(main())

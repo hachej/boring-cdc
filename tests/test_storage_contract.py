@@ -32,6 +32,12 @@ class StorageContractTests(unittest.TestCase):
   self.assertEqual(m.EXPECTED_CONTRACT_SHA256,hashlib.sha256(m.C.read_bytes()).hexdigest())
   self.assertEqual(m.EXPECTED_FIXTURES_SHA256,hashlib.sha256(m.F.read_bytes()).hexdigest())
   self.assertFalse([x for x in m.validate()[0] if x['code'].startswith('E_MANIFEST') or x['code'].startswith('E_ARTIFACT')])
+ def test_evidence_parent_is_canonical_and_input_bound(self):
+  inputs=m.validate()[1]; validator_sha=m.hashlib.sha256(m.V.read_bytes()).hexdigest()
+  _,error=m.resolve_source_parent({'inputs':inputs,'validator_sha256':validator_sha,'source_parent_git_commit':'HEAD'},inputs,validator_sha)
+  self.assertIn('canonical full lowercase commit OID',error)
+  parent,error=m.resolve_source_parent({'inputs':{},'validator_sha256':validator_sha,'source_parent_git_commit':'0'*40},inputs,validator_sha)
+  self.assertIsNone(error); self.assertEqual(m.subprocess.check_output(['git','rev-parse','HEAD'],cwd=m.ROOT,text=True).strip(),parent)
  def test_provisional_inventory_is_card_bound(self):
   c=m.load(m.C); marker=lambda decision:f'// M0-PROVISIONAL: {decision}'
   self.assertEqual(c['authority']['owner_cards'],['59a63169'])

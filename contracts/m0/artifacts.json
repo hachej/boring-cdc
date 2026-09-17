@@ -501,7 +501,7 @@
       "id": "ART-M0-STORAGE-VALIDATOR",
       "owner_bead": "boring-cdc-m0-storage-model",
       "path": "scripts/validate/storage_contract.py",
-      "sha256": "4532cafebb6470ab38bd292d7118400c9be066c33dcc30ea18bf175cd1b545b4",
+      "sha256": "097f99126952fb96a4885557293e4d9d3158c62468731d7e1181be0733d54fba",
       "status": "complete"
     },
     {
