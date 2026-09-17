@@ -1,12 +1,18 @@
 {
-  "findings": [],
+  "findings": [
+    {
+      "code": "E_ARTIFACT_HASH",
+      "message": "artifact hash mismatch",
+      "path": "artifacts/boring-cdc-m0-ch-model/spec/evidence.json"
+    }
+  ],
   "fixture_count": 41,
-  "input_tree_sha256": "0f9189df12f2aa62ee2b809f8dd8842f3b4e069cc0f3fa4f700f245d86769851",
+  "input_tree_sha256": "d3f64bedfb6b66a2198b0377912cc6e57f0edd7d0a37bf0319ae0d13cb525297",
   "inputs": {
     "contracts/clickhouse/canonical-query.sql": "0c1a0008e94cc1104e2b6964d39cc9aae26cddb76ba1f38372dc7c5d5442c8df",
     "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
     "contracts/clickhouse/fixtures.schema.json": "894bed006fdc7b5b162024b68aed22e8d7e7b691b57a509bb33c2179b71bec81",
-    "contracts/clickhouse/model.json": "9dcfe845dcd8f70505620d3967208c87ef0a3c1cf39c397813a398e5fe188d8d",
+    "contracts/clickhouse/model.json": "83bc5438ef2e0fb1a8a799985e7f17ddbb2200e1853633f082e61a832197d5d4",
     "contracts/clickhouse/model.schema.json": "4ec898368ada9d0e64f77a05340e1155836b3320163e270a0462252a4e64de71",
     "contracts/clickhouse/result.schema.json": "80ad19fb794e6b6caba1dd45bbcfe63f75c83f6ae7c2d0b81b16da404b8ace8e",
     "contracts/clickhouse/retire-generation.sql": "0f18d6679a6b6bbf58fde38f6c35b09c3c8dca3e2b99a75f8623b0176fb9ae06",
@@ -17,8 +23,8 @@
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-clickhouse-contract-evidence/v1",
-  "source_parent_git_commit": "bd6fcdcd3167ee4269afc18ba565aaf567eb57bc",
-  "status": "pass",
+  "source_parent_git_commit": "bdd8c9e591e8e1dce7480b181af8ecb5f5260007",
+  "status": "fail",
   "validator": "scripts/validate/clickhouse_contract.py",
   "validator_sha256": "2972dbcef6c3911ea74a45340058c5febec120a3d0b2d9ecc023d91a95035343"
 }

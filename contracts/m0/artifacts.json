@@ -130,7 +130,7 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "9dcfe845dcd8f70505620d3967208c87ef0a3c1cf39c397813a398e5fe188d8d",
+      "sha256": "83bc5438ef2e0fb1a8a799985e7f17ddbb2200e1853633f082e61a832197d5d4",
       "status": "complete"
     },
     {
@@ -228,7 +228,7 @@
       "id": "ART-M0-EVENT-FORMAT-EVIDENCE",
       "owner_bead": "boring-cdc-m0-event-format",
       "path": "artifacts/boring-cdc-m0-event-format/spec/evidence.json",
-      "sha256": "fcc4d462756b798b76f4ac9e7a5751cb21499f6d66bf61cf5049af7b8ff35600",
+      "sha256": "3764acf747df7acd079f163386998ca9f9ce2750e60e6d2cf497bcbf47308cc7",
       "status": "complete"
     },
     {
@@ -522,7 +522,7 @@
       "id": "ART-M0-SUPPORTED-KEYS-VALIDATION",
       "owner_bead": "boring-cdc-d-keys",
       "path": "artifacts/m0/decisions/boring-cdc-d-keys/evidence.json",
-      "sha256": "b8f6dc94aa2e56f92d281c2c7d3d15f823ea1601836fb24a0feafc0e068e3612",
+      "sha256": "274fc3609be8540e45dd809b6747dbe8637766a16ed7694f50899bef062b9ff1",
       "status": "complete"
     },
     {
