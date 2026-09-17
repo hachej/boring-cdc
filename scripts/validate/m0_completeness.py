@@ -70,16 +70,22 @@ SPEC_INPUTS = {
     },
 }
 
-PROVISIONAL = set()
-
+PROVISIONAL = {
+    "boring-cdc-d-archive-durability",
+    "boring-cdc-d-keys",
+    "boring-cdc-d-sqlite",
+    "boring-cdc-d-wal-cap",
+}
 def provisional_marker(owner: str) -> str:
     # Split the sentinel so the repository scanner does not mistake validator
     # source for a consumer of an owner-controlled recommendation.
     return "// M0-" + "PROVISIONAL: " + owner
 
 
-OPEN_DECISIONS = {}
-
+OPEN_DECISIONS = {
+    "boring-cdc-d-sqlite": {provisional_marker("boring-cdc-d-sqlite")},
+    "boring-cdc-d-wal-cap": {provisional_marker("boring-cdc-d-wal-cap")},
+}
 REQUIRED_M0_OWNERS = {
     "boring-cdc-d-additive", "boring-cdc-d-admission", "boring-cdc-d-anchor",
     "boring-cdc-d-archive-durability", "boring-cdc-d-archive-scope",
@@ -217,6 +223,8 @@ def aggregate_findings(root: Path = ROOT) -> list[str]:
         if owner in OPEN_DECISIONS:
             if row.get("status") != "open" or set(row.get("provisional_markers", [])) != OPEN_DECISIONS[owner] or "approval" in row:
                 findings.append(f"{owner}: provisional decision state/marker mismatch")
+        elif row.get("provisional_markers"):
+            findings.append(f"{owner}: approved decision retains provisional marker")
         elif row.get("status") != "approved" or not isinstance(row.get("approval"), dict):
             findings.append(f"{owner}: approved decision lost approval authority")
         for executor in row.get("executor_beads", []):
@@ -276,7 +284,7 @@ def probe() -> dict:
         "decision_manifest_owners": sorted(DECISION_OWNERS),
         "required_m0_owners": sorted(REQUIRED_M0_OWNERS),
         "provisional_decisions": sorted(PROVISIONAL),
-        "supervisor_override": "owner card 59a63169 accepted all seven recommended literal sets; matching markers removed",
+        "supervisor_override": "open recommendations require exact " + "M0-" + "PROVISIONAL markers; no approval inferred",
         "article1_boundary": "raw pgoutput plus same-stream process-local non-durable teaching view; ClickHouse deferred to Article 4",
         "duplicate_bead_ids": 0 if not any(x.startswith("duplicate Bead IDs") for x in findings) else None,
         "checks": checks,

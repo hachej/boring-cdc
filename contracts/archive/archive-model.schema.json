@@ -214,6 +214,9 @@
         "durability": {
           "additionalProperties": false,
           "properties": {
+            "approval_card": {
+              "const": "59a63169"
+            },
             "confirmed_projection_source": {
               "type": "string"
             },
@@ -231,7 +234,8 @@
             "decision_id",
             "confirmed_projection_source",
             "source_sha256",
-            "projection"
+            "projection",
+            "approval_card"
           ],
           "type": "object"
         },
@@ -1128,13 +1132,8 @@
       "type": "object"
     },
     "provisional_markers": {
-      "items": {
-        "enum": []
-      },
-      "maxItems": 2,
-      "minItems": 2,
-      "type": "array",
-      "uniqueItems": true
+      "maxItems": 0,
+      "type": "array"
     },
     "reconciliation": {
       "additionalProperties": false,
@@ -1315,7 +1314,8 @@
     "segment_manifest",
     "generation_manifest",
     "fixture_schemas",
-    "golden_vectors"
+    "golden_vectors",
+    "provisional_markers"
   ],
   "title": "Closed archive format and commit protocol",
   "type": "object"

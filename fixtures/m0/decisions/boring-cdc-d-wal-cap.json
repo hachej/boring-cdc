@@ -1,4 +1,10 @@
 {
+  "approval": {
+    "approved_at": "2026-09-16T06:05:55.752Z",
+    "approved_by": "Julien Hurault (repository owner)",
+    "intention_id": "59a63169-9b07-4a00-bbfb-cbed02a7e4ac",
+    "selection": "Accept recommended defaults"
+  },
   "confirmed_boundary": {
     "headroom": {
       "raw_bytes": "max(0, min(68719476736 - retained_slot_bytes, source_free_bytes - 17179869184))",
@@ -122,11 +128,11 @@
         "code": "WAL_CAP_FIXTURE_VALID",
         "outcome": "pass",
         "phase": "validate_spec",
-        "vector_count": 30
+        "vector_count": 32
       }
     ],
     "path": "artifacts/m0/decisions/boring-cdc-d-wal-cap/fixture-run.jsonl",
-    "sha256": "04681c0e7933ba659f52e4c8c40f157ea4c014f85c356f64ecda0d3f4dfb5468"
+    "sha256": "9cafab983336ead8c10f9c03cb89003f2e92cb2792bdfaf1e147c087c419bafa"
   },
   "expected": {
     "checkpoint": "runtime_not_executed_in_m0",
@@ -138,7 +144,7 @@
     "metrics": {
       "fixture_vectors": {
         "unit": "case",
-        "value": 30
+        "value": 32
       },
       "later_executors": {
         "unit": "bead",
@@ -148,7 +154,7 @@
     "stable_log_codes": [
       "WAL_CAP_FIXTURE_VALID"
     ],
-    "state": "owner-accepted recommendation contract and all 30 fixture vectors resolve"
+    "state": "owner-accepted recommendation contract and all 32 fixture vectors resolve"
   },
   "expected_failure": {
     "checkpoint": "unchanged",
@@ -201,7 +207,7 @@
   "script": {
     "argv": "scripts/validate/wal_cap.sh [CASE_ID]",
     "path": "scripts/validate/wal_cap.sh",
-    "sha256": "2fb9764cf945eb95ace57876c387e3310acc0724e2ee50ca87418302b60639fc"
+    "sha256": "40326a782f21538f021795e6c6d3ab0a7ca6638c7dc4ac8eab63274833f887c4"
   },
   "supported_matrix": [
     {
@@ -247,6 +253,14 @@
     {
       "case_id": "local_override_expired_at_24h",
       "expected_outcome": "blocked_override_expired"
+    },
+    {
+      "case_id": "local_override_out_of_scope_forbidden",
+      "expected_outcome": "blocked_override_scope"
+    },
+    {
+      "case_id": "local_override_valid_backfill_before_expiry",
+      "expected_outcome": "unsafe_override_active"
     },
     {
       "case_id": "local_override_valid_before_expiry",
@@ -501,7 +515,7 @@
         "predicted_catch_up": true
       },
       "preconditions": [
-        "provisional WAL-cap recommendation and fixed seed are loaded"
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
       ]
     },
     "critical_equality_10m": {
@@ -833,10 +847,83 @@
         },
         "confirmation": "UNBOUNDED_WAL_LOCAL_ONLY",
         "flag": "--unsafe-unbounded-slot-wal",
+        "operation": "new_bootstrap",
         "origin": "local_process"
       },
       "preconditions": [
-        "provisional WAL-cap recommendation and fixed seed are loaded"
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
+      ]
+    },
+    "local_override_out_of_scope_forbidden": {
+      "case_id": "local_override_out_of_scope_forbidden",
+      "executor_bead": "boring-cdc-m6-safety-sm",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 2,
+        "external_effects": [
+          "no runtime effects; specification validation only"
+        ],
+        "feedback": "none",
+        "stable_log_codes": [
+          "WAL_HEADROOM_UNKNOWN"
+        ],
+        "state": "blocked_override_scope"
+      },
+      "expected_outcome": "blocked_override_scope",
+      "fault_hook": {
+        "phase": "source_wal_safety_action",
+        "trigger": "local_override_out_of_scope_forbidden"
+      },
+      "inputs": {
+        "age_seconds": 86399,
+        "audit": {
+          "activated_at": "2026-09-10T14:03:30.949Z",
+          "actor": "fixture-actor",
+          "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "confirmation": "UNBOUNDED_WAL_LOCAL_ONLY",
+        "flag": "--unsafe-unbounded-slot-wal",
+        "operation": "healthy_capture",
+        "origin": "local_process"
+      },
+      "preconditions": [
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
+      ]
+    },
+    "local_override_valid_backfill_before_expiry": {
+      "case_id": "local_override_valid_backfill_before_expiry",
+      "executor_bead": "boring-cdc-m6-safety-sm",
+      "expected": {
+        "checkpoint": "unchanged",
+        "exit_code": 0,
+        "external_effects": [
+          "no runtime effects; specification validation only"
+        ],
+        "feedback": "none",
+        "stable_log_codes": [
+          "WAL_CAP_DISABLED_UNSAFE"
+        ],
+        "state": "unsafe_override_active"
+      },
+      "expected_outcome": "unsafe_override_active",
+      "fault_hook": {
+        "phase": "source_wal_safety_action",
+        "trigger": "local_override_valid_backfill_before_expiry"
+      },
+      "inputs": {
+        "age_seconds": 86399,
+        "audit": {
+          "activated_at": "2026-09-10T14:03:30.949Z",
+          "actor": "fixture-actor",
+          "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "confirmation": "UNBOUNDED_WAL_LOCAL_ONLY",
+        "flag": "--unsafe-unbounded-slot-wal",
+        "operation": "new_backfill",
+        "origin": "local_process"
+      },
+      "preconditions": [
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
       ]
     },
     "local_override_valid_before_expiry": {
@@ -868,10 +955,11 @@
         },
         "confirmation": "UNBOUNDED_WAL_LOCAL_ONLY",
         "flag": "--unsafe-unbounded-slot-wal",
+        "operation": "new_bootstrap",
         "origin": "local_process"
       },
       "preconditions": [
-        "provisional WAL-cap recommendation and fixed seed are loaded"
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
       ]
     },
     "missing_free_unknown": {
@@ -1187,10 +1275,11 @@
         },
         "confirmation": "wrong",
         "flag": "--unsafe-unbounded-slot-wal",
+        "operation": "new_bootstrap",
         "origin": "local_process"
       },
       "preconditions": [
-        "provisional WAL-cap recommendation and fixed seed are loaded"
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
       ]
     },
     "remote_override_forbidden": {
@@ -1222,10 +1311,11 @@
         },
         "confirmation": "UNBOUNDED_WAL_LOCAL_ONLY",
         "flag": "--unsafe-unbounded-slot-wal",
+        "operation": "new_bootstrap",
         "origin": "remote"
       },
       "preconditions": [
-        "provisional WAL-cap recommendation and fixed seed are loaded"
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
       ]
     },
     "slot_invalidation_requires_reseed": {
@@ -1253,7 +1343,7 @@
         "slot_status": "wal_removed"
       },
       "preconditions": [
-        "provisional WAL-cap recommendation and fixed seed are loaded"
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
       ]
     },
     "stale_rate_unknown": {
@@ -1331,7 +1421,7 @@
         "operation": "new_backfill"
       },
       "preconditions": [
-        "provisional WAL-cap recommendation and fixed seed are loaded"
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
       ]
     },
     "unknown_blocks_new_work": {
@@ -1359,7 +1449,7 @@
         "operation": "new_bootstrap"
       },
       "preconditions": [
-        "provisional WAL-cap recommendation and fixed seed are loaded"
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
       ]
     },
     "unknown_healthy_capture_continues": {
@@ -1387,7 +1477,7 @@
         "operation": "healthy_capture"
       },
       "preconditions": [
-        "provisional WAL-cap recommendation and fixed seed are loaded"
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
       ]
     },
     "unsupported_origin_override_forbidden": {
@@ -1419,10 +1509,11 @@
         },
         "confirmation": "UNBOUNDED_WAL_LOCAL_ONLY",
         "flag": "--unsafe-unbounded-slot-wal",
+        "operation": "new_bootstrap",
         "origin": "local_api"
       },
       "preconditions": [
-        "provisional WAL-cap recommendation and fixed seed are loaded"
+        "owner-accepted WAL-cap boundary and fixed seed are loaded"
       ]
     },
     "unsupported_unbounded_cap_unknown": {

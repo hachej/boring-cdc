@@ -93,22 +93,23 @@
     "hex_rendering": "lowercase"
   },
   "identity_encodings": {
-    "canonical_key": "u32-be component count; each component is one-byte representation tag (bool=1,int64=2,uint64=3,bytes=4,text=5), u32-be PostgreSQL type OID (bool 16; int64 21/23/20; uint64 OID 26; bytes 17/2950; text 25/1043/1042/19), i32-be typmod, then bool as one byte, integers as eight-byte big-endian, or bytes/text as u64-be byte length plus raw unpadded-base64url-decoded/UTF-8 bytes",
+    "canonical_key": "u8 encoding version 1; u8 component count; each component in effective replica-identity index order is u32-be PostgreSQL type OID, u32-be canonical-payload byte length, and canonical payload bytes. Payloads are sign-bit-flipped big-endian int2/int4/int8; ASCII sign plus i16-be power-of-ten exponent plus u8 digit count plus minimal ASCII digits for numeric; RFC 4122 network UUID bytes; signed i32-be days or i64-be microseconds since 2000-01-01 with signed extrema for infinities; original C-collated UTF-8 for text/varchar/bpchar; or raw bytea.",
     "logical_table_id": "u64-be system_identifier, UTF-8 database_identity, UTF-8 schema name, UTF-8 table name; each field receives outer u64 length framing",
     "relation_component_hash": "SHA-256 over outer-length-framed domain boring-cdc/relation-component/v1, UTF-8 component kind, and canonical UTF-8 definition. Definitions are PostgreSQL catalog-deparsed expressions/index/partition/publication forms with identifiers UTF-8, keywords lower-case, one ASCII space between tokens, no comments, no trailing semicolon, and numeric literals in minimal decimal form.",
     "source_slot_identity": "u64-be system_identifier, u32-be timeline, UTF-8 database_identity, UTF-8 slot name, UTF-8 plugin; each field receives outer u64 length framing"
   },
   "key_types": [
-    "bool",
     "int2",
     "int4",
     "int8",
-    "oid",
+    "numeric",
     "uuid",
+    "date",
+    "timestamp",
+    "timestamptz",
     "text",
     "varchar",
     "bpchar",
-    "name",
     "bytea"
   ],
   "limits": {

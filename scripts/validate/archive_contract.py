@@ -15,7 +15,7 @@ FS = ROOT / "contracts/archive/archive-fixtures.schema.json"
 RS = ROOT / "contracts/archive/archive-result.schema.json"
 SMS = ROOT / "contracts/archive/segment-manifest.schema.json"
 GMS = ROOT / "contracts/archive/generation-manifest.schema.json"
-EXPECTED_CONTRACT_SHA256 = "d629b144e9e978885b92894e4a55593c1c5d9403985a04a571c3b971329cd9b3"
+EXPECTED_CONTRACT_SHA256='37ffd06e1fc53aec1ac3a12ffae0e2ebfcb2394528d77c85e5eec3c4cbd42077'
 EXPECTED_FIXTURES_SHA256 = "8b1f4f0561d9d06037f9985327064ec63c1c90afa1ab08705d3d6224bc0b8e69"
 E = ROOT / "artifacts/boring-cdc-m0-archive-model/spec/evidence.json"
 M = ROOT / "contracts/m0/manifest.json"
@@ -76,11 +76,15 @@ def validate():
         for item in failures:
             finding(out, code, item["pointer"], item["message"])
     text = "\n".join(path.read_text(errors="replace") for path in (C, S, F, FS, RS, SMS, GMS))
-    if contract.get("provisional_markers"):
-        finding(out, "E_PROVISIONAL", "provisional_markers", "accepted markers remain")
+    marker = lambda decision: f"// M0-PROVISIONAL: {decision}"
+    expected_markers = set()
+    if set(contract.get("provisional_markers", [])) != expected_markers:
+        finding(out, "E_PROVISIONAL", "provisional_markers", "exact provisional dependency inventory changed")
+    if "provisional" in contract["writer_profile"]:
+        finding(out, "E_PROVISIONAL", "writer_profile", "approved Compose literals must not retain their decision marker")
     authority = contract["authority"]
-    if authority.get("owner_cards") != ["59a63169"] or not authority.get("status", "").startswith("owner-accepted"):
-        finding(out, "E_PROVISIONAL", "authority", "owner card 59a63169 acceptance missing")
+    if authority.get("owner_cards") != ["59a63169"] or not authority.get("status", "").startswith("engineering artifact with accepted d-archive-durability and d-compose literals"):
+        finding(out, "E_PROVISIONAL", "authority", "accepted archive durability and Compose literals must remain bound to owner card 59a63169")
     profile = contract["writer_profile"]
     expected_profile = ("2.6", "parquet 57.0.0", "arrow 57.0.0", "zstd 1.5.7", 3, True, True, 0, 65536, 1048576, False)
     observed_profile = (profile["parquet_format_version"], profile["parquet_writer_crate"], profile["arrow_crate"], profile["zstd_library"], profile["zstd_level"], profile["zstd_checksum"], profile["zstd_content_size"], profile["zstd_workers"], profile["row_group_max_rows"], profile["data_page_max_bytes"], profile["dictionary_enabled"])
@@ -216,7 +220,7 @@ def validate():
     for secret in ("postgres" + "://", "password" + "=", "BEGIN PRIVATE" + " KEY", "AK" + "IA"):
         if secret in text:
             finding(out, "E_SECRET", "inputs", f"forbidden token {secret}")
-    inputs = {str(path.relative_to(ROOT)): digest(path) for path in (C, S, F, FS, RS, SMS, GMS)}
+    inputs = {str(path.relative_to(ROOT)): digest(path) for path in (C, S, F, FS, RS, SMS, GMS, ROOT / "fixtures/m0/decisions/boring-cdc-d-archive-durability.json", ROOT / "contracts/m0/failure-policy.json")}
     return out, inputs
 
 def resolve_source_parent(prior, inputs, validator_sha256):

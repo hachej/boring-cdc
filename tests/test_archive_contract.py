@@ -22,10 +22,10 @@ class ArchiveContractTests(unittest.TestCase):
   manifest=copy.deepcopy(m.load(m.C)['hashes']['golden_manifest']); manifest['files'][1]['format']='jsonl-zstd'
   self.assertTrue(m.validate_segment_manifest_semantics(manifest))
  def test_provisional_inventory_is_card_bound(self):
-  c=m.load(m.C)
+  c=m.load(m.C); marker=lambda decision:f'// M0-PROVISIONAL: {decision}'
   self.assertEqual(['59a63169'],c['authority']['owner_cards'])
-  self.assertNotIn('provisional_markers',c)
-  self.assertNotIn('provisional',c['consumes']['durability'])
+  self.assertEqual(set(),set(c['provisional_markers']))
+  self.assertEqual('59a63169',c['consumes']['durability']['approval_card'])
   self.assertNotIn('provisional',c['layout'])
   self.assertNotIn('provisional',c['writer_profile'])
  def test_consumed_digests_are_current(self):

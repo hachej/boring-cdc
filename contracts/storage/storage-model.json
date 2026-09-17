@@ -70,7 +70,7 @@
       "59a63169"
     ],
     "requirements": "docs/REQUIREMENTS.md",
-    "status": "owner-accepted engineering contract; decision literals confirmed by owner card 59a63169"
+    "status": "engineering artifact with accepted d-values, d-keys, d-wal-cap, d-sqlite, and d-compose literals; remaining decision recommendations stay provisional"
   },
   "executors": [
     "boring-cdc-m1-preflight",
@@ -119,7 +119,8 @@
       "spool_intents_manifests": "0600"
     },
     "ownership": "connector uid only; reject symlink, hardlink count != 1, type/uid/mode swaps",
-    "probe": "disposable child below each configured root; descriptor-relative no-follow operations; sync and remove then parent fsync"
+    "probe": "disposable child below each configured root; descriptor-relative no-follow operations; sync and remove then parent fsync",
+    "provisional": []
   },
   "fixture_ids": [
     "SCN-M0-STORAGE-FRESH-INIT",
@@ -297,6 +298,9 @@
         "auto_vacuum": 2,
         "foreign_keys": 1,
         "journal_mode": "wal",
+        "journal_size_limit": 268435456,
+        "mmap_size": 0,
+        "secure_delete": 2,
         "synchronous": 2,
         "temp_store": 1,
         "trusted_schema": 0,
@@ -310,12 +314,18 @@
         "foreign_keys",
         "trusted_schema",
         "wal_autocheckpoint",
-        "temp_store"
+        "temp_store",
+        "journal_size_limit",
+        "mmap_size",
+        "secure_delete"
       ]
     },
     "connection_pragmas": {
       "busy_timeout_ms": 5000,
       "foreign_keys": "ON",
+      "journal_size_limit_bytes": 268435456,
+      "mmap_size_bytes": 0,
+      "secure_delete": "FAST",
       "synchronous": "FULL",
       "temp_store": "FILE",
       "trusted_schema": "OFF",
@@ -342,6 +352,13 @@
       ],
       "feedback_boundary": "events, source transaction, and durable source checkpoint committed atomically before feedback"
     },
+    "filesystem_attestation": {
+      "invalidate_on": [
+        "mount_change",
+        "device_change"
+      ],
+      "validity_seconds": 86400
+    },
     "init_order": [
       "create parent 0700 and fsync parent",
       "exclusive state lock",
@@ -366,11 +383,11 @@
     "maintenance": {
       "automatic_full_vacuum": "forbidden",
       "checkpoint_busy_timeout_ms": 50,
-      "checkpoint_cadence_ms": 1000,
-      "checkpoint_max_wal_pages_per_attempt": 4096,
-      "checkpoint_mode": "RESTART",
+      "checkpoint_cadence_ms": 30000,
+      "checkpoint_mode": "PASSIVE",
+      "checkpoint_request_wal_pages": 1000,
       "incremental_vacuum_cadence_ms": 1000,
-      "incremental_vacuum_max_pages": 1024,
+      "incremental_vacuum_max_pages": 1000,
       "offline_full_vacuum": "stopped and backed-up store only",
       "owner": "single run-owned maintenance scheduler",
       "wal_autocheckpoint_pages": 0

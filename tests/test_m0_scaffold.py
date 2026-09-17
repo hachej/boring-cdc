@@ -131,6 +131,30 @@ class ScaffoldTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("compose.yaml", result.stderr)
 
+    def test_secret_scan_does_not_exempt_modified_synthetic_fixture_lines(self):
+        cases = (
+            ("tests/test_context.py", "postgres" + "://user:supersecret@example.invalid/db"),
+            ("tests/validate_knowledge.py", "postgresql" + "://user:pw@host/db"),
+        )
+        for relative, token in cases:
+            with self.subTest(path=relative):
+                path = ROOT / relative
+                original = path.read_bytes()
+                text = original.decode()
+                self.assertIn(token, text)
+                path.write_text(text.replace(token, token + " pass" + "word='credential'", 1))
+                try:
+                    result = subprocess.run(
+                        ["scripts/validate/scaffold_secrets.sh"],
+                        cwd=ROOT,
+                        text=True,
+                        capture_output=True,
+                    )
+                finally:
+                    path.write_bytes(original)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(relative, result.stderr)
+
     def test_package_excludes_internal_metadata_and_evidence(self):
         out = json.loads(run("scripts/validate/scaffold_package.sh").stdout)
         self.assertEqual(out["status"], "pass")

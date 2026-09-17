@@ -1,22 +1,24 @@
 {
   "findings": [],
   "fixture_count": 41,
-  "input_tree_sha256": "b91cedfa7ed3a79193e33ae2f181e1a282595acafbc8e648e8c90eb42367302d",
+  "input_tree_sha256": "4859fd94b5348fa262c9d27f36ac96d9d3bd1f520099042defa05719e2d64c0e",
   "inputs": {
     "contracts/archive/archive-fixtures.schema.json": "d30612ef3a4fddcc2e99aff383814610802c3966af49b1dbc413cc011f5e99a6",
-    "contracts/archive/archive-model.json": "d629b144e9e978885b92894e4a55593c1c5d9403985a04a571c3b971329cd9b3",
-    "contracts/archive/archive-model.schema.json": "fbf1309f110ddf973a5ecea0cb7ad3264dfd9b2123e6ce7b4592fc5f1e5ef61c",
+    "contracts/archive/archive-model.json": "37ffd06e1fc53aec1ac3a12ffae0e2ebfcb2394528d77c85e5eec3c4cbd42077",
+    "contracts/archive/archive-model.schema.json": "732aa16c9195bec011dc144c8a77e2af45180f068c20e07e665e96798dbc441a",
     "contracts/archive/archive-result.schema.json": "9760edf105c164adf49fee4b126c2d0a741630cf4a05ff7c966bfd678e881d71",
     "contracts/archive/generation-manifest.schema.json": "d17bfac2e0d3feb40958ed63e0f3d3b03eb04039995694c541d98cf821741a8c",
     "contracts/archive/segment-manifest.schema.json": "047aceed0b73ef36a1cfeb5f6746316caba917c7f16db020ded32e02af442dd0",
-    "fixtures/m0/archive/scenarios.json": "8b1f4f0561d9d06037f9985327064ec63c1c90afa1ab08705d3d6224bc0b8e69"
+    "contracts/m0/failure-policy.json": "d0e3e956bc79ddcde4fc77bb8804100a7d56cda6778059028d3b940f98fce831",
+    "fixtures/m0/archive/scenarios.json": "8b1f4f0561d9d06037f9985327064ec63c1c90afa1ab08705d3d6224bc0b8e69",
+    "fixtures/m0/decisions/boring-cdc-d-archive-durability.json": "a9b387f549da61b42bd32ac31ea7a8a7d2e9f69bf99a000d5cb3e026065ba9e6"
   },
   "owner_bead": "boring-cdc-m0-archive-model",
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-archive-contract-evidence/v1",
-  "source_parent_git_commit": "6de5b6c85423eae2c3b84967919602f66b79463d",
+  "source_parent_git_commit": "65cc964dda5a8ec2709bf4df99b63c6739544478",
   "status": "pass",
   "validator": "scripts/validate/archive_contract.py",
-  "validator_sha256": "05c1d56f7249cb61f508971b875dbf9db983a4feae81710461a51ceb4cfdfb9b"
+  "validator_sha256": "7a98290ad86a8fb205ecd733505759d54ace0bbbfbd33dfb42faea43ceada680"
 }

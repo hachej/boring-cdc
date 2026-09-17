@@ -42,6 +42,7 @@ def expected_operation(i):
   if i.get('origin')!='local_process': return ('blocked_nonlocal_override',2,'none',['WAL_HEADROOM_UNKNOWN'])
   if i.get('flag')!='--unsafe-unbounded-slot-wal' or i.get('confirmation')!='UNBOUNDED_WAL_LOCAL_ONLY' or not audit_ok: return ('blocked_confirmation',2,'none',['WAL_HEADROOM_UNKNOWN'])
   if i.get('age_seconds',86400)>=86400: return ('blocked_override_expired',2,'none',['WAL_HEADROOM_UNKNOWN'])
+  if op not in ('new_bootstrap','new_backfill'): return ('blocked_override_scope',2,'none',['WAL_HEADROOM_UNKNOWN'])
   return ('unsafe_override_active',0,'none',['WAL_CAP_DISABLED_UNSAFE'])
  if i.get('slot_status')=='wal_removed' and i.get('automatic_action')=='none': return ('require_reseed',2,'none',['WAL_HEADROOM_CRITICAL'])
  if i.get('headroom_state')=='action_required' and i.get('predicted_catch_up') is True: return ('action_required',0,'unchanged_durable_boundary',['WAL_HEADROOM_ACTION_REQUIRED'])
@@ -50,8 +51,9 @@ try:
  spec=json.loads((root/fixture_rel).read_text()); decisions=json.loads((root/'contracts/m0/decisions.json').read_text())
  artifacts=json.loads((root/'contracts/m0/artifacts.json').read_text()); registry=json.loads((root/'contracts/agent/stable-ids.json').read_text())
  coverage=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text()); graph=[json.loads(x) for x in (root/'.beads/issues.jsonl').read_text().splitlines()]
- required=('inputs','preconditions','supported_matrix','deterministic_phase','expected','expected_failure','result_contract','redaction_assertions','later_executors','vectors','confirmed_boundary')
+ required=('approval','inputs','preconditions','supported_matrix','deterministic_phase','expected','expected_failure','result_contract','redaction_assertions','later_executors','vectors','confirmed_boundary')
  if any(not spec.get(x) for x in required): fail()
+ if spec.get('approval')!={'approved_at':'2026-09-16T06:05:55.752Z','approved_by':'Julien Hurault (repository owner)','intention_id':'59a63169-9b07-4a00-bbfb-cbed02a7e4ac','selection':'Accept recommended defaults'}: fail()
  if spec.get('schema_version')!='m0-decision-fixture/v1' or spec.get('fixture_id')!=decision_id or spec.get('decision_id')!=decision_id or spec.get('owner_bead')!=owner or spec.get('later_executors')!=executors: fail()
  markers=[]
  if spec.get('provisional_markers',[])!=markers or spec.get('fixed_seed')!='0x424344435f57414c4341505f563031': fail()
@@ -70,7 +72,7 @@ try:
  if b.get('invalidation')!={'automatic_reseed':False,'forecast_is_conditional':True,'forecast_may_override_source_safety':False,'slot_invalidated_outcome':'require_reseed'}: fail()
  vectors=spec['vectors']; matrix=spec['supported_matrix']; cases={x['case_id']:x for x in matrix}
  numeric={'normal_above_warning','warning_equality_60m','warning_above_action','action_equality_30m','action_above_critical','critical_equality_10m','critical_floor_fraction','cap_headroom_clamped_zero','free_space_is_minimum','free_headroom_clamped_zero','fresh_zero_rate_infinite','zero_headroom_zero_rate','missing_free_unknown','missing_retained_unknown','missing_rate_unknown','stale_rate_unknown','unsupported_unbounded_cap_unknown','different_finite_cap_unknown','negative_retained_unknown','negative_free_unknown'}
- operational={'unknown_blocks_new_work','unknown_blocks_new_backfill','unknown_healthy_capture_continues','local_override_valid_before_expiry','local_override_expired_at_24h','remote_override_forbidden','override_confirmation_mismatch','unsupported_origin_override_forbidden','slot_invalidation_requires_reseed','conditional_forecast_cannot_override_action'}
+ operational={'unknown_blocks_new_work','unknown_blocks_new_backfill','unknown_healthy_capture_continues','local_override_valid_before_expiry','local_override_valid_backfill_before_expiry','local_override_out_of_scope_forbidden','local_override_expired_at_24h','remote_override_forbidden','override_confirmation_mismatch','unsupported_origin_override_forbidden','slot_invalidation_requires_reseed','conditional_forecast_cannot_override_action'}
  if set(vectors)!=numeric|operational or set(cases)!=set(vectors) or len(matrix)!=len(vectors): fail()
  for cid,v in vectors.items():
   if v.get('case_id')!=cid or cases[cid].get('expected_outcome')!=v.get('expected_outcome') or v.get('executor_bead') not in executors or not v.get('preconditions') or not v.get('fault_hook') or not v.get('expected'): fail()
@@ -93,10 +95,10 @@ try:
  if stable['owner_bead']!=owner or covered!={'evidence_status':'pending','id':decision_id,'owner_bead':owner,'source':'docs/PLAN.md','source_digest':stable['source_digest']}: fail()
  if subprocess.run([str(root/'scripts/validate/plan_coverage.sh')],cwd=root,capture_output=True).returncode: fail()
  probe_rel='artifacts/m0/decisions/boring-cdc-d-wal-cap/fixture-run.jsonl'; probe=[json.loads(x) for x in (root/probe_rel).read_text().splitlines()]
- expected_probe=[{'code':'WAL_CAP_FIXTURE_VALID','outcome':'pass','phase':'validate_spec','vector_count':30}]
+ expected_probe=[{'code':'WAL_CAP_FIXTURE_VALID','outcome':'pass','phase':'validate_spec','vector_count':32}]
  if probe!=expected_probe or spec['execution_probe']!={'expected_lines':expected_probe,'path':probe_rel,'sha256':sha(root/probe_rel)}: fail()
  decision=next(x for x in decisions['decisions'] if x['id']==decision_id)
- if not (decision['executor_beads']==executors and decision['fixture_sha256']==sha(root/fixture_rel) and decision['fixture_spec']==fixture_rel and decision['owner_bead']==owner and decision['proposed_value']==proposed and decision['status']=='approved' and not decision.get('provisional_markers') and decision.get('approval',{}).get('approved_by','').endswith('owner card 59a63169') and decision.get('approval',{}).get('value_digest')==hashlib.sha256(proposed.encode()).hexdigest()): fail()
+ if not (decision['executor_beads']==executors and decision['fixture_sha256']==sha(root/fixture_rel) and decision['fixture_spec']==fixture_rel and decision['owner_bead']==owner and decision['proposed_value']==proposed and decision['status']=='approved' and not decision.get('provisional_markers') and decision.get('approval')=={'approved_at':'2026-09-16T06:05:55.752Z','approved_by':'Julien Hurault (repository owner), answered owner card 59a63169','value_digest':hashlib.sha256(proposed.encode()).hexdigest()} and decision.get('approval',{}).get('value_digest')==hashlib.sha256(proposed.encode()).hexdigest()): fail()
  needed={'ART-M0-WAL-CAP-FIXTURE':fixture_rel,'ART-M0-WAL-CAP-PROBE':probe_rel,'ART-M0-WAL-CAP-VALIDATION':'artifacts/m0/decisions/boring-cdc-d-wal-cap/evidence.json'}
  owned={x['id']:x for x in artifacts['artifacts'] if x.get('owner_bead')==owner}
  if set(owned)!=set(needed): fail()

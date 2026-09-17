@@ -42,7 +42,7 @@
     ],
     "owner_confirmation_date": "2026-09-10",
     "requirements": "docs/REQUIREMENTS.md \u00a77",
-    "status": "owner-accepted engineering contract; decision literals confirmed by owner card 59a63169"
+    "status": "engineering artifact with accepted d-archive-durability and d-compose literals"
   },
   "commit_protocol": {
     "checkpoint_rule": "never beyond a complete transaction or before durable ready segment; selector promotion is separate and monotonic",
@@ -109,32 +109,33 @@
         "765bd3b2"
       ],
       "date": "2026-09-10",
-      "scope": "archive artifact design accepted; durability and Compose literals are accepted under owner card 59a63169"
+      "scope": "archive artifact design plus d-archive-durability and d-compose literals accepted under owner card 59a63169"
     },
     "durability": {
-      "confirmed_projection_source": "contracts/storage/storage-model.json",
-      "decision_id": "boring-cdc-d-archive-durability",
-      "projection": "ext4/xfs local allowlist; descriptor-relative no-follow lifecycle; parent directory sync; owner-only modes",
-      "source_sha256": "3205cfe18758f6bf5f4a719a4f66b1b23ee35766198e2425761066fc91276306"
+      "approval_card": "59a63169",
+      "confirmed_projection_source": "fixtures/m0/decisions/boring-cdc-d-archive-durability.json",
+      "decision_id": "DEC-ARCHIVE-DURABILITY-CONTINUITY",
+      "projection": "accepted filesystem admission, finite audit budgets/windows, bounded resume, identity restart, failure mapping, stable codes and metrics",
+      "source_sha256": "a9b387f549da61b42bd32ac31ea7a8a7d2e9f69bf99a000d5cb3e026065ba9e6"
     },
     "event_contract": {
       "path": "contracts/event/event-format.json",
-      "sha256": "7dee4435521916a1aff5ef6fd2bbcb75f7cf1429928debb91df55793c9799343"
+      "sha256": "9eca4905a8760b6ae940bb32941a69daa60cc09c6bc7076439e8936ac17e448d"
     },
     "failure_policy": {
       "base_delay_ms": 250,
       "cap_delay_ms": 30000,
-      "confirmed_projection_source": "contracts/scaffold/m0-scaffold.json",
+      "confirmed_projection_source": "contracts/m0/failure-policy.json",
       "decision_id": "boring-cdc-d-failure-policy",
       "maximum_attempts": 10,
-      "source_sha256": "a96ac9a4afcb2cbdfc708b731c0b7e96838b6dce77eb31ff6ca2d13e901d15fd",
+      "source_sha256": "d0e3e956bc79ddcde4fc77bb8804100a7d56cda6778059028d3b940f98fce831",
       "version": 1
     },
     "promotion": {
       "confirmed_projection_source": "contracts/storage/storage-model.json",
       "decision_id": "boring-cdc-d-promotion",
       "projection": "strictly increasing destination fence; lower no-op; same-fence conflict; external-ahead maintenance adoption",
-      "source_sha256": "3205cfe18758f6bf5f4a719a4f66b1b23ee35766198e2425761066fc91276306"
+      "source_sha256": "c27dae8e706f2f454665c5dcc98b85ea85a1f7bca0179affc97b8951b2cc5ef3"
     }
   },
   "executors": [
@@ -453,6 +454,7 @@
     "same_fence_same_state": "idempotent",
     "selector_resolution": "parse valid immutable generation selectors for epoch; unique greatest promotion_fence selects one complete GENERATION_READY generation"
   },
+  "provisional_markers": [],
   "reconciliation": {
     "final_without_ready": "validate intent, path, manifest and every file; resync and create marker, else quarantine and block",
     "orphan_without_intent": "quarantine; never adopt or delete automatically",

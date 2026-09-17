@@ -9,7 +9,12 @@ input=$1
 shift
 case "$input" in
   boring-cdc-*)
-    if ! grep -q "\"owner_bead\":\"$input\"" contracts/m0/decisions.json; then
+    if ! python3 - "$input" <<'PY'
+import json, sys
+rows = json.load(open("contracts/m0/decisions.json"))["decisions"]
+raise SystemExit(0 if any(row.get("owner_bead") == sys.argv[1] for row in rows) else 1)
+PY
+    then
       echo "Unknown or unmaterialized decision Bead: $input" >&2
       exit 2
     fi
