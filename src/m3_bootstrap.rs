@@ -557,6 +557,17 @@ impl GuardSession {
             backend_pid,
         })
     }
+    /// Verifies every guarded relation while the ACCESS SHARE locks are already held.
+    pub fn verify_relations(&mut self, relations: &[String]) -> Result<(), BootstrapError> {
+        for relation in relations {
+            let quoted = quote_relation(relation)?;
+            self.connection
+                .exec(&format!("SELECT * FROM {quoted} LIMIT 0"))
+                .map_err(|_| BootstrapError::Conflict("M3_GUARD_CONTRACT_FAILED"))?;
+        }
+        Ok(())
+    }
+
     pub fn keepalive(&mut self) -> Result<(), BootstrapError> {
         self.connection
             .exec("SELECT 1")
@@ -647,6 +658,88 @@ impl CaptureSession {
         self.connection.is_alive()
     }
 }
+/// Live intent-bound session bundle. Construction is the only production path that can create the
+/// permanent slot, so the type itself preserves intent -> guard -> export persistence -> CopyBoth.
+pub struct BootstrapRuntime {
+    store: BootstrapStore,
+    intent_id: String,
+    guard: GuardSession,
+    _capture: CaptureSession,
+    _importers: Vec<ImporterSession>,
+}
+impl BootstrapRuntime {
+    pub fn start(
+        writer: WriterConnection,
+        intent: PrepareIntent,
+        dsn: &str,
+        relations: &[String],
+        publication: &str,
+        statement_timeout_ms: u64,
+        idle_timeout_ms: u64,
+        start_seq: u64,
+    ) -> Result<Self, BootstrapError> {
+        let mut store = BootstrapStore::open(writer)?;
+        store.prepare(&intent)?;
+        let mut guard =
+            GuardSession::acquire(dsn, relations, statement_timeout_ms, idle_timeout_ms)?;
+        guard.verify_relations(relations)?;
+        store.record_guard_acquired(&intent.intent_id, guard.backend_pid)?;
+        let exporter = ExportedSlotSession::create(dsn, &intent.slot_name)?;
+        store.persist_export_response(
+            &intent.intent_id,
+            &ExportResponse {
+                consistent_lsn: exporter.consistent_lsn,
+                snapshot_token: exporter.snapshot_token().to_owned(),
+                start_seq,
+                exporter_backend_pid: exporter.backend_pid,
+            },
+        )?;
+        let capture =
+            CaptureSession::start(dsn, &intent.slot_name, exporter.consistent_lsn, publication)?;
+        store.record_capture_started(&intent.intent_id, capture.backend_pid)?;
+        let mut importers = Vec::with_capacity(intent.importers.len());
+        for assignment in &intent.importers {
+            let mut importer = ImporterSession::import(
+                dsn,
+                exporter.snapshot_token(),
+                statement_timeout_ms,
+                idle_timeout_ms,
+            )?;
+            store.snapshot_set_first(
+                &intent.intent_id,
+                &assignment.importer_id,
+                importer.backend_pid,
+            )?;
+            importer.verify_relations(relations)?;
+            store.bind_importer_contract(
+                &intent.intent_id,
+                &assignment.importer_id,
+                &intent.table_set_fingerprint,
+            )?;
+            store.acknowledge_import(&intent.intent_id, &assignment.importer_id)?;
+            importers.push(importer);
+        }
+        store.release_exporter(&intent.intent_id)?;
+        drop(exporter);
+        Ok(Self {
+            store,
+            intent_id: intent.intent_id,
+            guard,
+            _capture: capture,
+            _importers: importers,
+        })
+    }
+
+    pub fn keepalive(&mut self) -> Result<(), BootstrapError> {
+        self.guard.keepalive()
+    }
+
+    pub fn invalidate(mut self, lost_session: &str) -> Result<(), BootstrapError> {
+        self.store
+            .invalidate_generation(&self.intent_id, lost_session)
+    }
+}
+
 fn append_replication(dsn: &str) -> String {
     if dsn.contains('?') {
         format!("{dsn}&replication=database")
@@ -697,35 +790,70 @@ mod live_tests {
     #[test]
     #[ignore = "requires pinned PostgreSQL 17.6 Compose"]
     fn exported_snapshot_uses_distinct_command_idle_sessions() {
+        use crate::m2_schema::open_writer;
         let dsn = std::env::var("BORING_CDC_M3_DSN").expect("BORING_CDC_M3_DSN");
         let slot = std::env::var("BORING_CDC_M3_SLOT")
             .unwrap_or_else(|_| "boring_cdc_m3_bootstrap_test".into());
         let mut admin = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
         let _=admin.exec(&format!("SELECT pg_drop_replication_slot('{slot}') WHERE EXISTS(SELECT 1 FROM pg_replication_slots WHERE slot_name='{slot}')"));
         admin.exec("DROP PUBLICATION IF EXISTS boring_cdc_m3_pub; DROP TABLE IF EXISTS public.m3_bootstrap_fixture; CREATE TABLE public.m3_bootstrap_fixture(id bigint PRIMARY KEY,payload text); INSERT INTO public.m3_bootstrap_fixture VALUES(1,'before'); CREATE PUBLICATION boring_cdc_m3_pub FOR TABLE public.m3_bootstrap_fixture").unwrap();
+        let path =
+            std::env::temp_dir().join(format!("m3-live-{}-{}.sqlite", std::process::id(), slot));
+        let writer = open_writer(&path, "m3-live", 1, 0).unwrap();
+        writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch','system','1','database',?1,'pgoutput','publication','protocol')",[&slot]).unwrap();
         let relations = vec!["public.m3_bootstrap_fixture".to_string()];
-        let mut guard = GuardSession::acquire(&dsn, &relations, 10_000, 30_000).unwrap();
-        let exporter = ExportedSlotSession::create(&dsn, &slot).unwrap();
-        assert!(exporter.command_idle_alive());
-        guard.keepalive().unwrap();
-        let capture =
-            CaptureSession::start(&dsn, &slot, exporter.consistent_lsn, "boring_cdc_m3_pub")
-                .unwrap();
-        let mut importer =
-            ImporterSession::import(&dsn, exporter.snapshot_token(), 10_000, 30_000).unwrap();
-        importer.verify_relations(&relations).unwrap();
-        assert_ne!(guard.backend_pid, exporter.backend_pid);
-        assert_ne!(exporter.backend_pid, capture.backend_pid);
-        assert_ne!(importer.backend_pid, capture.backend_pid);
-        assert!(capture.alive());
-        drop(importer);
-        drop(exporter);
-        drop(capture);
-        drop(guard);
+        let intent = PrepareIntent {
+            intent_id: "live-intent".into(),
+            capture_epoch: "epoch".into(),
+            source_system_id: "system".into(),
+            database_id: "database".into(),
+            slot_name: slot.clone(),
+            generation: 1,
+            table_set_fingerprint: "live-schema".into(),
+            configuration_fingerprint: "live-config".into(),
+            importers: vec![ImporterAssignment {
+                importer_id: "worker-0".into(),
+                assigned_ranges_digest: digest_assignment(b"all"),
+            }],
+            created_at: "unix-ms:0".into(),
+        };
+        let runtime = BootstrapRuntime::start(
+            writer,
+            intent,
+            &dsn,
+            &relations,
+            "boring_cdc_m3_pub",
+            10_000,
+            30_000,
+            0,
+        )
+        .unwrap();
+        let (guard, exporter, capture, importer): (i32, i32, i32, i32) = runtime
+            .store
+            .writer
+            .connection()
+            .query_row(
+                "SELECT r.guard_backend_pid,r.exporter_backend_pid,r.capture_backend_pid,i.backend_pid FROM m3_bootstrap_runtime r JOIN m3_bootstrap_importers i USING(intent_id) WHERE r.intent_id='live-intent'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        let mut pids = vec![guard, exporter, capture, importer];
+        pids.sort_unstable();
+        pids.dedup();
+        assert_eq!(pids.len(), 4);
+        assert_eq!(
+            runtime.store.status("live-intent").unwrap().state,
+            "exporter_released"
+        );
+        runtime.invalidate("importer").unwrap();
         let mut cleanup = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
         cleanup
             .exec(&format!("SELECT pg_drop_replication_slot('{slot}')"))
             .unwrap();
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(format!("{}-wal", path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", path.display()));
     }
 }
 

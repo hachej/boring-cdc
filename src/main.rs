@@ -12,6 +12,10 @@ use boring_cdc::m2_fault_status::snapshot as status_snapshot;
 use boring_cdc::m2_init_recovery::{complete_plan, consume_plan, execute_confirmed, issue_plan};
 use boring_cdc::m2_journal::journal_inspect_event;
 use boring_cdc::m2_reconcile::{journal_report, recover_report};
+use boring_cdc::m2_schema::open_writer;
+use boring_cdc::m3_bootstrap::{
+    BootstrapError, BootstrapRuntime, ImporterAssignment, PrepareIntent, digest_assignment,
+};
 use pg_walstream::CancellationToken;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -229,6 +233,129 @@ fn run_m2() -> Result<(), ReaderFailure> {
     runtime
         .block_on(run_loaded_config(&config, &cancellation, &mut ownership))
         .map_err(|e| ReaderFailure::unavailable(e.code, "capture runtime failed"))
+}
+
+fn bootstrap_failure(error: BootstrapError) -> ReaderFailure {
+    let code = match error {
+        BootstrapError::Invalid(code) | BootstrapError::Conflict(code) => code,
+        BootstrapError::Sqlite(_) => "M3_BOOTSTRAP_STORE_FAILED",
+    };
+    ReaderFailure::unavailable(code, "bootstrap runtime failed closed")
+}
+
+fn run_m3_bootstrap() -> Result<(), ReaderFailure> {
+    let text = std::fs::read_to_string("boring-cdc.toml").map_err(|_| {
+        ReaderFailure::unavailable(
+            "M3_CONFIG_UNAVAILABLE",
+            "bootstrap configuration is unavailable",
+        )
+    })?;
+    let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Run)
+        .map_err(|e| ReaderFailure::unavailable(e.code, "bootstrap configuration is invalid"))?;
+    let _ownership = acquire_production_ownership(&config, "bootstrap-run")
+        .map_err(|e| ReaderFailure::unavailable(e.code, "bootstrap ownership unavailable"))?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|_| {
+            ReaderFailure::unavailable("M3_CLOCK_INVALID", "bootstrap clock is invalid")
+        })?;
+    let writer = open_writer(
+        std::path::Path::new(&config.public().storage.sqlite_path),
+        "bootstrap-run",
+        1,
+        now.as_millis() as i64,
+    )
+    .map_err(|_| {
+        ReaderFailure::unavailable(
+            "M3_BOOTSTRAP_STORE_FAILED",
+            "bootstrap state is unavailable",
+        )
+    })?;
+    let (capture_epoch, source_system_id, database_id, slot_name, start_seq): (
+        String,
+        String,
+        String,
+        String,
+        Option<i64>,
+    ) = writer
+        .connection()
+        .query_row(
+            "SELECT capture_epoch,source_system_id,database_id,slot_name,durable_journal_seq FROM source_state WHERE singleton=1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+        )
+        .map_err(|_| {
+            ReaderFailure::unavailable(
+                "M3_SOURCE_STATE_UNAVAILABLE",
+                "initialized source state is required",
+            )
+        })?;
+    if slot_name != config.public().source.slot {
+        return Err(ReaderFailure::unavailable(
+            "M3_SLOT_IDENTITY_MISMATCH",
+            "configured slot does not match initialized source state",
+        ));
+    }
+    let intent_id = format!(
+        "bootstrap-{:x}",
+        Sha256::digest(
+            format!(
+                "{}:{}:{}",
+                config.fingerprints().runtime,
+                capture_epoch,
+                now.as_nanos()
+            )
+            .as_bytes()
+        )
+    );
+    let relations = config
+        .public()
+        .tables
+        .iter()
+        .map(|table| table.source_relation.clone())
+        .collect::<Vec<_>>();
+    let intent = PrepareIntent {
+        intent_id,
+        capture_epoch,
+        source_system_id,
+        database_id,
+        slot_name,
+        generation: 1,
+        table_set_fingerprint: config.fingerprints().table_set.clone(),
+        configuration_fingerprint: config.fingerprints().runtime.clone(),
+        importers: vec![ImporterAssignment {
+            importer_id: "bootstrap-worker-0".into(),
+            assigned_ranges_digest: digest_assignment(b"all-configured-relations"),
+        }],
+        created_at: format!("unix-ms:{}", now.as_millis()),
+    };
+    let dsn = config.runtime_dsn().ok_or_else(|| {
+        ReaderFailure::unavailable(
+            "M3_RUNTIME_DSN_UNAVAILABLE",
+            "bootstrap credential is unavailable",
+        )
+    })?;
+    let timeout = config.public().backfill.session_timeout_ms.0;
+    let mut runtime = BootstrapRuntime::start(
+        writer,
+        intent,
+        dsn,
+        &relations,
+        &config.public().source.publication,
+        timeout,
+        timeout,
+        start_seq.unwrap_or(0) as u64,
+    )
+    .map_err(bootstrap_failure)?;
+    let cancellation = cancellation_for_signals();
+    while !signal_received() {
+        thread::sleep(Duration::from_millis(
+            config.public().backfill.guard_keepalive_ms.0,
+        ));
+        runtime.keepalive().map_err(bootstrap_failure)?;
+    }
+    cancellation.cancel();
+    runtime.invalidate("importer").map_err(bootstrap_failure)
 }
 
 fn run_article1() -> Result<(), ReaderFailure> {
@@ -708,6 +835,15 @@ fn main() {
                         }
                         return;
                     }
+                    Err(error) => {
+                        eprintln!("{}: {}", error.code, error.message);
+                        std::process::exit(error.exit as i32);
+                    }
+                }
+            }
+            if parsed.spec.id == "CMD-RUN-BOOTSTRAP" {
+                match run_m3_bootstrap() {
+                    Ok(()) => return,
                     Err(error) => {
                         eprintln!("{}: {}", error.code, error.message);
                         std::process::exit(error.exit as i32);

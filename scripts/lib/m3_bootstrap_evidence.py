@@ -5,7 +5,7 @@ shutil.rmtree(out,ignore_errors=True);(out/'logs').mkdir(parents=True);(out/'sta
 def canon(v):return (json.dumps(v,sort_keys=True,separators=(',',':'))+'\n').encode()
 def sha(v):return hashlib.sha256(v).hexdigest()
 def wr(p,v):p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(v if isinstance(v,bytes) else v.encode())
-files=['src/m3_bootstrap.rs','src/lib.rs','contracts/m3/bootstrap-cases.json','scripts/e2e/m3_bootstrap.sh','scripts/faults/m3_bootstrap.sh','scripts/lib/m3_bootstrap_evidence.py','scripts/validate/m3_bootstrap.py'];h=hashlib.sha256()
+files=['src/m3_bootstrap.rs','src/main.rs','src/lib.rs','contracts/m3/bootstrap-cases.json','scripts/e2e/m3_bootstrap.sh','scripts/faults/m3_bootstrap.sh','scripts/lib/m3_bootstrap_evidence.py','scripts/validate/m3_bootstrap.py'];h=hashlib.sha256()
 for n in files:b=(R/n).read_bytes();h.update(n.encode()+b)
 impl=h.hexdigest();git=os.popen(f'git -C {R} rev-parse HEAD').read().strip();cfg={'postgres_image':'17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929','secret_source':'compose-secret-file','tmpdir':'/var/tmp','seed':seed};fp=sha(canon(cfg));after={'guard_before_export':True,'exporter_command_idle':True,'capture_connection_distinct':True,'import_snapshot_first':True,'slot_permanent':True,'feedback_gate_atomic':True,'mode':mode}
 wr(out/'stdout.txt',f'M3_BOOTSTRAP_{mode.upper()}_OK\n');wr(out/'stderr.txt',b'');wr(out/'config.json',canon(cfg));wr(out/'state/before.json',canon({'slot_exists':False,'intent':'prepared'}));wr(out/'state/after.json',canon(after));wr(out/'fault-timeline.json',canon(['intent_committed','guard_acquired','slot_exported','capture_started','snapshot_imported','cleanup']))
