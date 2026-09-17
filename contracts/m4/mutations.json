@@ -1,0 +1,12 @@
+{
+  "schema_version": "m4-mutations/v1",
+  "owner_bead": "boring-cdc-m4-mutations",
+  "consumes": ["contracts/clickhouse/ddl.sql", "contracts/m4/durability.json"],
+  "identity_rule": "deduplicate by connector_event_id before complete source-version ordering; an ID with more than one canonical payload blocks",
+  "key_change_rule": "emit complete old-key tombstone then complete new-key upsert; unchanged TOAST blocks before output",
+  "checkpoint_rule": "logical replay convergence is independent from contiguous complete-range checkpoint adoption",
+  "scenario_ids": [
+    "SCN-M4-MUTATION-UPDATE-DELETE-KEY-CHANGE",
+    "SCN-M4-MUTATION-REPLAY-CONFLICT"
+  ]
+}

@@ -35,5 +35,6 @@ pub mod m4_clickhouse_adapter;
 pub mod m4_clickhouse_audit;
 pub mod m4_clickhouse_durability;
 pub mod m4_clickhouse_schema;
+pub mod m4_mutations;
 
 pub mod failure_policy;
