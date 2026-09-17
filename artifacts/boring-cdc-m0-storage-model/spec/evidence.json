@@ -15,8 +15,8 @@
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-storage-contract-evidence/v1",
-  "source_parent_git_commit": "9fdabb74b127f3c1fb297f1a4dc762a5d955709f",
+  "source_parent_git_commit": "b51c3f069722646ac2e5dc04480b2f922aa593b3",
   "status": "pass",
   "validator": "scripts/validate/storage_contract.py",
-  "validator_sha256": "e608d53f0b8325a55ae45bee0a62fc16457e92b6e9c1aa4bd41530e3c0b2662d"
+  "validator_sha256": "fc7aaf851e1939963eefb4c6105072c1dfac3e97a1e766536d408a2d4cc717e7"
 }
