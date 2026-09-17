@@ -157,11 +157,15 @@ class ScaffoldTests(unittest.TestCase):
 
     def test_clean_pull_verifies_raw_manifests_before_build(self):
         source = (ROOT / "scripts/lib/m0_scaffold.py").read_text()
-        verify = source.index('["python3","scripts/validate/compose_manifests.py"]')
+        invocation = 'run_record(["python3","scripts/validate/compose_manifests.py"],proof,clean_env)'
+        verify = source.index(invocation)
         build = source.index('["docker","buildx","create"')
         start = source.index('["docker","compose","-f","compose.yaml","up"')
         self.assertLess(verify, build)
         self.assertLess(verify, start)
+        self.assertNotIn(invocation[:-1] + ',78)', source)
+        self.assertIn('clean_env={"DOCKER_CONFIG":str(cli_config),"HOME":str(proof_root),"LC_ALL":"C","PATH":"/usr/bin:/bin","SOURCE_DATE_EPOCH":"0","TZ":"UTC"}', source)
+        self.assertNotIn('clean_env=os.environ', source)
 
     def test_package_excludes_internal_metadata_and_evidence(self):
         out = json.loads(run("scripts/validate/scaffold_package.sh").stdout)
