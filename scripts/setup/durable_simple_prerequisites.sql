@@ -1,6 +1,7 @@
 \set ON_ERROR_STOP on
 
--- Run as the database owner (or a superuser) against a newly-created database.
+-- Run as a superuser, or as a database owner that also has CREATEROLE,
+-- against a newly-created database.
 -- Required variables are supplied with psql -v; psql safely quotes every password.
 \if :{?admin_password}
 \else
@@ -54,8 +55,10 @@ WHERE granted.rolname IN ('boring_cdc_admin','boring_cdc_runtime','boring_cdc_co
 REVOKE ALL PRIVILEGES ON DATABASE :"DBNAME" FROM boring_cdc_admin, boring_cdc_runtime, boring_cdc_control_writer, boring_cdc_app;
 GRANT CONNECT, CREATE ON DATABASE :"DBNAME" TO boring_cdc_admin;
 GRANT CONNECT ON DATABASE :"DBNAME" TO boring_cdc_runtime, boring_cdc_control_writer, boring_cdc_app;
-REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM boring_cdc_runtime, boring_cdc_control_writer, boring_cdc_app;
-REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM boring_cdc_runtime, boring_cdc_control_writer, boring_cdc_app;
+REVOKE ALL PRIVILEGES ON SCHEMA public FROM boring_cdc_admin, boring_cdc_runtime, boring_cdc_control_writer, boring_cdc_app;
+REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM boring_cdc_admin, boring_cdc_runtime, boring_cdc_control_writer, boring_cdc_app;
+REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM boring_cdc_admin, boring_cdc_runtime, boring_cdc_control_writer, boring_cdc_app;
+GRANT USAGE ON SCHEMA public TO boring_cdc_admin, boring_cdc_runtime, boring_cdc_app;
 
 CREATE TABLE IF NOT EXISTS public.orders (
     id bigint PRIMARY KEY,

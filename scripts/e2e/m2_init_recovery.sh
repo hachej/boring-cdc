@@ -17,8 +17,10 @@ psqlc(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" ex
 admin_credential='admin-local-only'; runtime_credential='runtime-local-only'; control_credential='control-local-only'; application_credential='application-local-only'
 psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_credential" -v "control_password=$control_credential" -v "application_password=$application_credential" \
   < scripts/setup/durable_simple_prerequisites.sql >/dev/null
+psqlc -qc 'GRANT CREATE ON SCHEMA public TO boring_cdc_app; GRANT UPDATE ON public.orders TO boring_cdc_runtime; GRANT boring_cdc_app TO boring_cdc_runtime'
 psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_credential" -v "control_password=$control_credential" -v "application_password=$application_credential" \
   < scripts/setup/durable_simple_prerequisites.sql >/dev/null
+[[ "$(psqlc -Atqc "select has_schema_privilege('boring_cdc_app','public','CREATE')::int,has_table_privilege('boring_cdc_runtime','public.orders','UPDATE')::int,(select count(*) from pg_auth_members where member='boring_cdc_runtime'::regrole)::int")" == '0|0|0' ]]
 cargo build --quiet --locked --bin boring-cdc
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 admin_dsn=postgresql:"//boring_cdc_admin:${admin_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"

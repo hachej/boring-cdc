@@ -21,7 +21,7 @@ The script creates four non-superuser login roles and the selected `public.order
 Place `boring-cdc.toml` in the working directory. Its selected relation must be `public.orders`, and its publication and slot must match the DSNs below. Create the state and spool directories with owner-only permissions:
 
 ```sh
-install -d -m 0700 state state/spool
+install -d -m 0700 state state/spool state/tmp archive archive/root
 PG_ADMIN_DSN=postgresql:"//boring_cdc_admin:${BORING_CDC_ADMIN_PASSWORD}@127.0.0.1:5432/boring_cdc?sslmode=disable"
 unset PG_ADMIN PG_RUNTIME PG_CONTROL
 ```
