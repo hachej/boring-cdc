@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write   # required for the OIDC token exchange
+      contents: write   # required by gh release create
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Verify tag is on main branch
+      id: verify_main
+      run: |
+        git fetch origin main
+        if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+          echo "Tag commit is on main branch. Proceeding with publish."
+          echo "on_main=true" >> $GITHUB_OUTPUT
+        else
+          echo "Tag is NOT on the main branch. Skipping publish (not an error)."
+          echo "on_main=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libpq-dev pkg-config libssl-dev
+
+    - name: Extract version from tag
+      id: get_version
+      run: |
+        TAG=${GITHUB_REF#refs/tags/}
+        VERSION=${TAG#v}
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
+        echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+    - name: Authenticate to crates.io
+      id: auth
+      if: steps.verify_main.outputs.on_main == 'true'
+      uses: rust-lang/crates-io-auth-action@v1
+
+    # The lib depends on the macro crate (=version), so the macro crate must be
+    # published and indexed FIRST or the lib publish fails to resolve it.
+    - name: Publish pg-walstream-macros to crates.io
+      if: steps.verify_main.outputs.on_main == 'true'
+      uses: ./.github/actions/publish-crate
+      with:
+        crate: pg-walstream-macros
+        index-path: pg/-w/pg-walstream-macros
+        version: ${{ steps.get_version.outputs.version }}
+        token: ${{ steps.auth.outputs.token }}
+
+    - name: Wait for pg-walstream-macros to appear on the crates.io index
+      if: steps.verify_main.outputs.on_main == 'true'
+      run: |
+        VER="${{ steps.get_version.outputs.version }}"
+        for i in $(seq 1 30); do
+          if curl -sf "https://index.crates.io/pg/-w/pg-walstream-macros" | grep -q "\"vers\":\"$VER\""; then
+            echo "pg-walstream-macros $VER is indexed."
+            exit 0
+          fi
+          echo "Waiting for crates.io to index pg-walstream-macros $VER ($i/30)..."
+          sleep 10
+        done
+        echo "Timed out waiting for pg-walstream-macros $VER on the crates.io index."
+        exit 1
+
+    - name: Publish pg_walstream to crates.io
+      if: steps.verify_main.outputs.on_main == 'true'
+      uses: ./.github/actions/publish-crate
+      with:
+        crate: pg_walstream
+        index-path: pg/_w/pg_walstream
+        version: ${{ steps.get_version.outputs.version }}
+        token: ${{ steps.auth.outputs.token }}
+
+    - name: Create GitHub Release
+      if: steps.verify_main.outputs.on_main == 'true'
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        gh release create "${GITHUB_REF_NAME}" \
+          --title "Release ${GITHUB_REF_NAME}" \
+          --generate-notes
