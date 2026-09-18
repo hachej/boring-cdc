@@ -6,6 +6,34 @@ This is the bounded one-source, one-publication, one-slot, one-binary, one-SQLit
 
 The PostgreSQL server must use `wal_level=logical`, PostgreSQL 17.6, and a finite `max_slot_wal_keep_size`. Create an empty database, then execute the checked-in prerequisite SQL as a PostgreSQL superuser. This is the only supported and exercised provisioning route; database ownership or `CREATEROLE` alone is not sufficient:
 
+### Choosing `max_slot_wal_keep_size`
+
+This setting bounds how much WAL the *source* database is willing to retain on behalf of `boring_slot` while the connector is not consuming it fast enough to let PostgreSQL recycle WAL segments. That situation is not exotic: it is the normal shape of an ordinary outage or maintenance window, and it is also what happens when the connector hits the live schema-change boundary below and enters capture-safe-stop. In that state the connector stays attached to the slot — `active` stays `true` — but stops advancing it, so `restart_lsn` freezes and every subsequent WAL byte on the source accrues against this limit until someone intervenes.
+
+The trade-off runs in both directions, and there is no value that is safe by default:
+
+- **Too small**, and an ordinary outage or maintenance window — anything that keeps the connector down or stalled longer than the source needed to fill the budget — gets PostgreSQL to invalidate the slot outright. An invalidated slot cannot be resumed; capture must reseed into a new empty database per the recovery procedure below, which is far more disruptive than the retained WAL the limit was protecting against.
+- **Too large**, and the source's own disk can fill before any human or alert reacts, because (see the warning below) the ordinary inactive-slot alert does not fire for this failure mode. A full disk on the source is an outage for every database on that instance, not just this one.
+
+Choose a value from your own operating constraints, not from this document: the disk headroom you are willing to dedicate to retained WAL on the source, and the longest outage or maintenance window you need capture to survive without reseeding. Set alerts (below) well inside that budget so you have time to act before either failure mode is reached.
+
+**Observe it directly.** Query `pg_replication_slots` on the source:
+
+```sql
+select slot_name,
+       active,
+       restart_lsn,
+       pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) as retained_bytes
+from pg_replication_slots
+where slot_name = 'boring_slot';
+```
+
+`retained_bytes` is how much WAL is currently pinned by this slot and counts directly against `max_slot_wal_keep_size`. Sample `restart_lsn` over time: in healthy operation it advances (not necessarily on every commit — PostgreSQL moves it at checkpoints — but it must not sit frozen indefinitely under sustained write volume).
+
+**`active = true` is not evidence of progress.** A connector in capture-safe-stop remains connected to the slot, so `active` stays `true` for as long as the process is running, even though it has stopped consuming entirely. A conventional replication-slot alert that only watches for `active = false` will never fire in this failure mode. Alert instead on `retained_bytes` crossing a threshold well below `max_slot_wal_keep_size`, and on `restart_lsn` failing to advance over a window sized to your write volume. `boring-cdc status` also reports this condition directly as `capture_safe_stopped` with severity `blocked`; wire that into monitoring rather than relying on PostgreSQL-side signals alone.
+
+The `max_slot_wal_keep_size=65536MB` (64GB) used in this repository's `compose.yaml` is a fixture value exercised by the acceptance scripts, not a recommendation — it was chosen to make the test scenarios practical to run, not to reflect any production disk budget or outage tolerance.
+
 ```sh
 export PGHOST=127.0.0.1 PGPORT=5432 PGDATABASE=boring_cdc PGUSER=boring_cdc
 psql -X -v ON_ERROR_STOP=1 \
