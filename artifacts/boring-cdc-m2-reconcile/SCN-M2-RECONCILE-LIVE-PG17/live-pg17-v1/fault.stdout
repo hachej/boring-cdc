@@ -3,7 +3,7 @@
 running 1 test
 test m2_reconcile::tests::creation_floor_compound_safety_precedes_floor_resume ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 349 filtered out; finished in 0.28s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 365 filtered out; finished in 0.31s
 
 
 running 0 tests
@@ -19,7 +19,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; fini
 running 1 test
 test m2_reconcile::tests::fresh_journal_with_preexisting_slot_is_ambiguous_without_provenance ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 349 filtered out; finished in 0.13s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 365 filtered out; finished in 0.10s
 
 
 running 0 tests
@@ -35,7 +35,7 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; fini
 running 1 test
 test m2_reconcile::tests::invalid_slot_and_missing_wal_require_reseed ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 349 filtered out; finished in 0.28s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 365 filtered out; finished in 0.22s
 
 
 running 0 tests

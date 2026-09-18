@@ -4,7 +4,35 @@ cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/var/tmp}"; [[ "$TMPDIR" ==
 cargo test --locked --workspace --all-targets
 cargo test --locked m2_capture_runtime::tests
 work=$(mktemp -d /var/tmp/m2-capture-e2e.XXXXXX); project="m2-capture-$RANDOM-$$"; port=$((56000 + $$ % 2000)); bootstrap_pid=; pid=
-cleanup(){ [[ -z "$bootstrap_pid" ]] || kill -KILL "$bootstrap_pid" >/dev/null 2>&1 || true; [[ -z "$pid" ]] || kill -KILL "$pid" >/dev/null 2>&1 || true; docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
+cleanup_child() {
+  local child=$1 rc state
+  state=$(ps -o stat= -p "$child" 2>/dev/null || true)
+  if [[ -n "$state" && "$state" != Z* ]]; then
+    kill -KILL "$child" >/dev/null 2>&1 || true
+  fi
+  set +e
+  wait "$child" 2>/dev/null
+  rc=$?
+  set -e
+  [[ $rc -eq 134 ]] && echo "Aborted runtime child $child" >&2
+  return 0
+}
+cleanup(){ [[ -z "$bootstrap_pid" ]] || cleanup_child "$bootstrap_pid"; [[ -z "$pid" ]] || cleanup_child "$pid"; docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
+stop_bounded() {
+  local child=$1 signal=$2 label=$3 deadline
+  kill -"$signal" "$child"
+  deadline=$((SECONDS+10))
+  while kill -0 "$child" 2>/dev/null; do
+    if (( SECONDS >= deadline )); then
+      kill -KILL "$child" >/dev/null 2>&1 || true
+      wait "$child" 2>/dev/null || true
+      echo "E_PROCESS_SHUTDOWN_TIMEOUT $label" >&2
+      return 1
+    fi
+    sleep .1
+  done
+  wait "$child"
+}
 printf 'm2-component-password-%s\n' "$project" >"$work/postgres_password"; chmod 600 "$work/postgres_password"; export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"; export PGPASSWORD; PGPASSWORD=$(cat "$BORING_CDC_POSTGRES_PASSWORD_FILE")
 cat >"$work/override.yml" <<YAML
 services:
@@ -36,7 +64,7 @@ deadline=$((SECONDS+30)); until [[ "$(psqlc -Atqc "SELECT count(*) FROM pg_repli
   kill -0 "$bootstrap_pid" 2>/dev/null || { wait "$bootstrap_pid"; exit 1; }
   sleep .1
 done
-sleep 1; kill -INT "$bootstrap_pid"; wait "$bootstrap_pid"; bootstrap_pid=
+sleep 1; stop_bounded "$bootstrap_pid" INT bootstrap; bootstrap_pid=
 (
   cd "$work/run"
   exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/runtime.out" 2>"$work/runtime.err"
@@ -63,7 +91,6 @@ try: print(sqlite3.connect(sys.argv[1]).execute('select count(*) from source_tra
 except Exception: print(0)
 PY2
 )" == 1 ]]; do (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }; sleep .1; done
-feedback=$(psqlc -Atqc "SELECT coalesce(write_lsn::text,'')||','||coalesce(flush_lsn::text,'')||','||coalesce(replay_lsn::text,'') FROM pg_stat_replication ORDER BY pid LIMIT 1")
 durable_hex=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
 import sqlite3,sys
 print(sqlite3.connect(sys.argv[1]).execute('select durable_transaction_end_lsn from source_state where singleton=1').fetchone()[0])
@@ -74,8 +101,29 @@ import sys
 v=int(sys.argv[1],16); print(f'{v>>32:X}/{v&0xffffffff:X}')
 PY2
 )
-[[ "$feedback" == "$durable_lsn,$durable_lsn,$durable_lsn" ]]
-kill -TERM "$pid"; wait "$pid"; pid=; [[ ! -s "$work/runtime.err" ]]
+deadline=$((SECONDS+10))
+while true; do
+  feedback=$(psqlc -Atqc "SELECT coalesce(write_lsn::text,'')||','||coalesce(flush_lsn::text,'')||','||coalesce(replay_lsn::text,'') FROM pg_stat_replication ORDER BY pid LIMIT 1")
+  [[ "$feedback" == "$durable_lsn,$durable_lsn,$durable_lsn" ]] && break
+  state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
+  if [[ -z "$state" || "$state" == Z* ]]; then
+    set +e; wait "$pid" 2>/dev/null; rc=$?; set -e; pid=
+    [[ $rc -eq 134 ]] && echo "Aborted runtime before feedback" >&2
+    cat "$work/runtime.err" >&2
+    exit 1
+  fi
+  (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }
+  sleep .05
+done
+sleep .1
+state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
+if [[ -z "$state" || "$state" == Z* ]]; then
+  set +e; wait "$pid" 2>/dev/null; rc=$?; set -e; pid=
+  [[ $rc -eq 134 ]] && echo "Aborted runtime after feedback" >&2
+  cat "$work/runtime.err" >&2
+  exit 1
+fi
+stop_bounded "$pid" TERM runtime; pid=; [[ ! -s "$work/runtime.err" ]]
 python3 - "$work/run/state/journal.sqlite" "$feedback" <<'PY2'
 import sqlite3,sys
 c=sqlite3.connect(sys.argv[1]); tx=c.execute('select count(*),max(end_lsn) from source_transactions').fetchone(); ev=c.execute('select count(*) from journal_events').fetchone()[0]
