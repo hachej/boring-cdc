@@ -1164,14 +1164,18 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         admission.validate(frame.len())?;
         if let Err(error) = runtime.receive(&frame) {
             let (class, code, supervisor_retry) = classify_runtime_failure(&error);
-            if let RuntimeError::SchemaChange(detail) = &error {
+            let schema_change_detail = match &error {
+                RuntimeError::SchemaChange(detail) => Some(*detail),
+                _ => None,
+            };
+            runtime
+                .persist_if_enabled(class, code)
+                .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
+            if let Some(detail) = schema_change_detail {
                 eprintln!(
                     "M2_RELATION_SCHEMA_CHANGE_UNSUPPORTED detail={detail} recovery=confirmed_reseed"
                 );
             }
-            runtime
-                .persist_if_enabled(class, code)
-                .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
             if supervisor_retry {
                 return Err(CaptureFailure::at("runtime", "M2_CAPTURE_FAILED"));
             }
