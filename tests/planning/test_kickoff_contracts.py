@@ -257,16 +257,48 @@ class KickoffContracts(unittest.TestCase):
             self.assertEqual(len(rows), 1, article)
             row = rows[0]
             self.assertEqual(len(row.split("|")), 7, article)
-            for phrase in required + ("Agent-story owner", "current bundle **unavailable**",
+            story_state = ("restricted contemporaneous provenance recovered"
+                           if article == 1 else "current bundle **unavailable**")
+            for phrase in required + ("Agent-story owner", story_state,
                                       "single command-capture owner", "boring-cdc-m7-estuary",
                                       "**unavailable**"):
                 self.assertIn(phrase, row, (article, phrase))
             for phrase in ("disclosure", "publication approval"):
                 self.assertIn(phrase, row.lower(), (article, phrase))
         self.assertIn("python3 scripts/validate/article1_transcript.py", self.series)
-        self.assertIn("current-master refresh", self.series)
-        self.assertIn("`origin/master` `f86e395`", self.series)
+        self.assertIn("current-master and provenance refresh", self.series)
+        self.assertIn("`origin/master` `8782ae5`", self.series)
         self.assertIn("M7 consumes only measurements", self.series)
+
+    def test_article_one_recovery_binds_authentic_sessions_without_publishing_raw_content(self):
+        for bead, session, sha in (
+            ("boring-cdc-pci.1", "1595a1a0-6bf2-4cde-8397-e77fab858ecf",
+             "0aaf87846c40d14f94c54cb7585a46f037c003fe"),
+            ("boring-cdc-pci.1.1", "664a61c7-6d9b-47a3-9eca-b9f987249a84",
+             "411ee95db38969a144dbdd97d16c08b1ef9b784f"),
+            ("boring-cdc-pci.1.1.1", "beac1b09-e095-43f5-81c2-b173c819251b",
+             "39625f8b992a795d1597359acd9ffe6e465a7d40"),
+            ("boring-cdc-pci.2", "ca68a5cd-862d-4979-a60d-f0403a0b453e",
+             "974a2b02f2adbd13405208637c3e834eba66382e"),
+            ("boring-cdc-pci.3", "5c6891cf-9b6c-4282-8d58-624cec18ac17",
+             "94854205b556a85e26304299d7595f8b3828cccd"),
+            ("boring-cdc-pci.4", "30c7e3ab-a33e-4d78-8eb7-7a72c021c597",
+             "5d3792c8cd853fd3f34e3baef744b2ba2adedd1c"),
+            ("boring-cdc-pci.5", "59853991-0e93-4d9b-8e91-2fcedc5fbf73",
+             "b420456f1a1350857c07b330943250543055224a"),
+            ("boring-cdc-pci.6", "0b7e681c-8c45-406a-9a6f-6172f115ec40",
+             "bd93cbea964f623ba82e40adc43451bd30fff184"),
+            ("boring-cdc-pci.7", "c8fa8e9f-4fa9-401a-836c-6c5622e4621b",
+             "726cd7ef58e6f8545e560d62cea5568bc15babc8"),
+        ):
+            for value in (bead, session, sha):
+                self.assertIn(value, self.series)
+        for phrase in ("BORING_AGENT_SESSION_ROOT", "Raw locations remain restricted",
+                       "do **not** establish a separate human-chat correction chronology",
+                       "Publication limitation requiring owner decision before 2026-09-24",
+                       "no validator-approved, repository-local redacted `agent-story/` bundle",
+                       "must not be copied, paraphrased as dialogue"):
+            self.assertIn(phrase, self.series)
 
     def test_series_separates_baseline_event_delivery_and_convergence(self):
         for phrase in ("Source baseline/current state", "Ledger delivery",
