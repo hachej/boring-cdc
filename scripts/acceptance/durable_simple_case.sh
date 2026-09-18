@@ -107,23 +107,31 @@ wait_for_active_slot() {
   done
 }
 sample_feedback_boundary() {
-  local stage=$1 confirmed durable
+  local stage=$1 confirmed durable restart
   confirmed=$(psqlc -Atqc "select coalesce(confirmed_flush_lsn::text,'0/0') from pg_replication_slots where slot_name='boring_slot'")
+  # restart_lsn is the WAL-retention signal: PostgreSQL cannot recycle WAL segments older than
+  # this LSN. A connector that safe-stops but stays attached freezes restart_lsn while the slot
+  # still reports active=true, so unbounded WAL accrues with no INACTIVE-slot alert ever firing.
+  # Sampling it here during normal healthy streaming lets the final assertion prove it advances.
+  restart=$(psqlc -Atqc "select coalesce(restart_lsn::text,'0/0') from pg_replication_slots where slot_name='boring_slot'")
   durable=$(python3 - "$journal" <<'PY'
 import sqlite3,sys
 with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True) as db:
     print(db.execute("select coalesce(durable_transaction_end_lsn,'0000000000000000') from source_state where singleton=1").fetchone()[0])
 PY
 )
-  python3 - "$stage" "$confirmed" "$durable" "$work/feedback-boundaries.jsonl" <<'PY'
+  python3 - "$stage" "$confirmed" "$durable" "$restart" "$work/feedback-boundaries.jsonl" <<'PY'
 import json,sys
-stage,confirmed,durable,path=sys.argv[1:]
+stage,confirmed,durable,restart,path=sys.argv[1:]
 hi,lo=confirmed.split('/')
 confirmed_value=(int(hi,16)<<32)+int(lo,16)
 durable_value=int(durable,16)
 assert confirmed_value <= durable_value, (stage,confirmed,durable)
+rhi,rlo=restart.split('/')
+restart_value=(int(rhi,16)<<32)+int(rlo,16)
+assert restart_value <= confirmed_value, (stage,restart,confirmed)
 with open(path,'a') as f:
-    f.write(json.dumps({'stage':stage,'confirmed_flush_lsn':confirmed,'durable_journal_lsn':durable,'bounded':True},sort_keys=True)+'\n')
+    f.write(json.dumps({'stage':stage,'confirmed_flush_lsn':confirmed,'durable_journal_lsn':durable,'restart_lsn':restart,'restart_lsn_value':restart_value,'bounded':True},sort_keys=True)+'\n')
 PY
 }
 commit_order() {
@@ -156,6 +164,10 @@ sample_feedback_boundary connector-down
 runtime_pid=$!
 wait_for_active_slot || { cat "$work/runtime-restart.err" >&2; exit 1; }
 wait_for_transactions 6
+# PostgreSQL advances a slot's restart_lsn lazily, at checkpoints, not per transaction.
+# Force one so the retention check below measures real WAL release rather than timing luck.
+psqlc -Atqc "checkpoint" >/dev/null 2>&1 || true
+sleep 1
 sample_feedback_boundary after-catch-up
 
 psqlc -Atqc "select xmin::text||'|'||id::text from public.orders order by id" >"$work/postgres-oracle.txt"
@@ -184,6 +196,19 @@ assert journal_set==oracle, {'postgres':sorted(oracle),'journal':sorted(journal_
 assert state[1]==6 and state[0]==transactions[-1][5]
 boundaries=[json.loads(line) for line in open(boundaries_path)]
 assert boundaries and all(item['bounded'] for item in boundaries)
+# WAL-retention regression guard. restart_lsn is what lets PostgreSQL recycle WAL: a connector
+# that safe-stops but stays attached keeps the slot active=true while restart_lsn freezes, so the
+# source accrues WAL with no standard monitoring signal (inactive-slot alerts never fire).
+#
+# This asserts the healthy path releases WAL over the life of the run, measured from the first
+# streaming sample to the post-checkpoint one. It deliberately does NOT require a strict increase
+# between consecutive small transactions: PostgreSQL advances restart_lsn at checkpoints, not per
+# commit, so that form fails on a perfectly healthy connector.
+restart_first=[item['restart_lsn_value'] for item in boundaries if item['stage'].startswith('before-crash-')]
+restart_final=[item['restart_lsn_value'] for item in boundaries if item['stage']=='after-catch-up']
+assert restart_first and restart_final, (restart_first,restart_final)
+assert restart_final[-1]>=restart_first[0], ('restart_lsn went backwards',restart_first,restart_final)
+assert restart_final[-1]>restart_first[0], ('restart_lsn never advanced across the whole healthy run, so the slot is pinning WAL',restart_first,restart_final)
 result={
   'postgres_version':version,
   'hard_kill_status':137,
@@ -197,6 +222,7 @@ result={
   'down_time_keys':[201,202,203],
   'feedback_boundaries':boundaries,
   'confirmed_flush_never_exceeded_durable_boundary':True,
+  'restart_lsn_advanced_during_healthy_streaming':True,
   'final_durable_lsn':state[0],
 }
 with open(result_path,'w') as f: json.dump(result,f,indent=2,sort_keys=True); f.write('\n')
