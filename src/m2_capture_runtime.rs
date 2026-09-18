@@ -366,6 +366,7 @@ pub enum RuntimeState {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RuntimeError {
     Decode(&'static str),
+    SchemaChange(&'static str),
     Spool(String),
     JournalTransient(String),
     JournalIntegrity(String),
@@ -599,7 +600,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
                     .get(&relation.id)
                     .filter(|c| c.relation == relation)
                     .cloned()
-                    .ok_or(RuntimeError::Protocol("relation_contract_mismatch"))?;
+                    .ok_or(RuntimeError::SchemaChange("relation_contract_mismatch"))?;
                 self.decoder
                     .admit_relation(contract)
                     .map_err(|failure| RuntimeError::Decode(failure.fingerprint))
@@ -901,6 +902,9 @@ fn classify_runtime_failure(
             (Class::OwnershipLost, Code::TransportUnavailable, false)
         }
         RuntimeError::Spool(_) => (Class::Integrity, Code::ResourceLimit, false),
+        RuntimeError::SchemaChange(_) => {
+            (Class::Unsupported, Code::UnsupportedConfiguration, false)
+        }
         RuntimeError::Decode(_)
         | RuntimeError::Protocol(_)
         | RuntimeError::ReconciliationRequired => (Class::Integrity, Code::InvalidRecord, false),
@@ -1160,6 +1164,11 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         admission.validate(frame.len())?;
         if let Err(error) = runtime.receive(&frame) {
             let (class, code, supervisor_retry) = classify_runtime_failure(&error);
+            if let RuntimeError::SchemaChange(detail) = &error {
+                eprintln!(
+                    "M2_RELATION_SCHEMA_CHANGE_UNSUPPORTED detail={detail} recovery=confirmed_reseed"
+                );
+            }
             runtime
                 .persist_if_enabled(class, code)
                 .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
@@ -2078,6 +2087,43 @@ pub mod tests {
                 .was_duplicate()
         );
     }
+    #[test]
+    fn changed_relation_is_named_unsupported_failure_before_feedback() {
+        let (p, mut runtime) = runtime(FeedbackPermit::AllowSafeBoundary { lsn: u64::MAX });
+        let (initial, _) = relation();
+        runtime.receive(&initial).unwrap();
+
+        let mut changed = Vec::new();
+        changed.extend_from_slice(&7u32.to_be_bytes());
+        changed.extend_from_slice(b"public\0items\0");
+        changed.push(b'd');
+        changed.extend_from_slice(&2u16.to_be_bytes());
+        changed.push(1);
+        changed.extend_from_slice(b"id\0");
+        changed.extend_from_slice(&20u32.to_be_bytes());
+        changed.extend_from_slice(&(-1i32).to_be_bytes());
+        changed.push(0);
+        changed.extend_from_slice(b"extra\0");
+        changed.extend_from_slice(&25u32.to_be_bytes());
+        changed.extend_from_slice(&(-1i32).to_be_bytes());
+
+        assert_eq!(
+            runtime.receive(&frame(b'R', &changed)),
+            Err(RuntimeError::SchemaChange("relation_contract_mismatch"))
+        );
+        assert_eq!(runtime.state(), RuntimeState::CaptureSafeStopped);
+        assert!(runtime.take_feedback().is_empty());
+        assert_eq!(
+            classify_runtime_failure(&RuntimeError::SchemaChange("relation_contract_mismatch")),
+            (
+                crate::failure_policy::FailureClass::Unsupported,
+                crate::failure_policy::StableErrorCode::UnsupportedConfiguration,
+                false
+            )
+        );
+        let _ = std::fs::remove_file(p);
+    }
+
     #[test]
     fn deterministic_safe_stop_shutdown_and_no_in_process_reopen() {
         let (p, mut r) = runtime(FeedbackPermit::AllowSafeBoundary { lsn: u64::MAX });

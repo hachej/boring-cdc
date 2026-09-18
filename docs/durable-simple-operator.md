@@ -59,3 +59,15 @@ boring-cdc run
 - `run` requires `PG_RUNTIME`, the initialized identity, and the configured publication and permanent slot. It reads the configured publication through that slot, commits each complete source transaction to SQLite, and only then sends PostgreSQL feedback. `PG_ADMIN` is neither required nor retained. `PG_CONTROL` is reserved for bounded heartbeat/fence updates and has no publication or slot authority.
 
 Each stage fails closed. Publication errors name the failed check: relation set, owner, or the individual `insert`, `update`, `delete`, or `truncate` publish flag. Control-role errors distinguish excess privileges and role membership (and retain a separate missing-privilege diagnostic for nonstandard pre-provisioned control objects). Correct the named prerequisite; do not alter a live publication to work around a mismatch.
+
+## Live schema-change boundary
+
+The simple capture-only stream intentionally rejects every live change to a selected relation's pgoutput shape, including an `ADD COLUMN ... NULL`. The first row transaction emitted under changed relation metadata is not written to the journal and is not acknowledged. The runtime remains alive but capture-safe-stopped, persists an `unsupported` / `deterministic` capture failure, and writes this stable diagnostic to stderr:
+
+```text
+M2_RELATION_SCHEMA_CHANGE_UNSUPPORTED detail=relation_contract_mismatch recovery=confirmed_reseed
+```
+
+A restart with the same journal is deliberately blocked; it cannot turn an unsupported relation shape into continuity. This simple path has no backfill, so its only recovery is a **confirmed reseed into a new empty source database**: stop the runtime, retain the old database and SQLite journal for incident evidence, restore the originally configured table definition in the new empty PostgreSQL 17.6 database, choose a new empty state directory and a new slot, then repeat sections 1 and 2. Do not delete the old slot or journal until retention/incident owners confirm that they are no longer needed. Do not resume this capture-only path against a source containing rows that require backfill.
+
+Run `TMPDIR=/var/tmp scripts/acceptance/schema_change_live.sh` to exercise both the nullable-column and incompatible-type changes. The script uses PostgreSQL transaction IDs and keys as its independent oracle, opens SQLite read-only, and checks that `confirmed_flush_lsn` never passes the durable journal boundary.
