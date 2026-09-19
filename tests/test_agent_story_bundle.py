@@ -72,12 +72,20 @@ class RedactTextTests(unittest.TestCase):
             self.assertNotIn("hunter2", redacted, case)
             self.assertNotIn("sk-abcdefghijklmnop", redacted, case)
 
-    def test_absolute_paths_are_removed(self):
-        text = "see /home/alice/projects/secret/notes.txt and /var/tmp/a1bundle.xyz/scratch"
-        redacted = redactor.redact_text(text)
-        self.assertNotIn("/home/alice", redacted)
-        self.assertNotIn("/var/tmp/a1bundle.xyz", redacted)
-        self.assertIn("<ABS-PATH>", redacted)
+    def test_absolute_paths_are_removed_across_arbitrary_roots(self):
+        paths = (
+            "/home/alice/projects/secret/notes.txt",
+            "/workspace/project/private.txt",
+            "/Users/alice/Library/private.txt",
+            "/private/var/folders/cache.txt",
+            "/Volumes/custom-mount/session.jsonl",
+            "/arbitrary-root/tenant/data.txt",
+        )
+        for private_path in paths:
+            with self.subTest(root=private_path.split("/", 2)[1]):
+                redacted = redactor.redact_text(f"see {private_path} now")
+                self.assertNotIn(private_path, redacted)
+                self.assertIn("<ABS-PATH>", redacted)
 
     def test_relative_repo_paths_survive(self):
         text = "run scripts/validate/scaffold_secrets.sh"
@@ -145,7 +153,7 @@ class RedactorExtractionTests(unittest.TestCase):
         )
         record = redactor.build_record("demo.1", session)
         bundle = {"bundle_kind": "candidate-agent-story-bundle", "bundle_version": 1, "records": [record]}
-        findings = validator.validate_bundle(bundle, "test")
+        findings = validator.validate_bundle(bundle, "test", {"demo.1": (redactor.sha256_bytes(session.read_bytes()), session)})
         self.assertEqual(findings, [])
         self.assertTrue(record["dispatch_prompt"]["present"])
         self.assertTrue(record["first_agent_turn"]["turn_found"])
@@ -168,7 +176,7 @@ class RedactorExtractionTests(unittest.TestCase):
         record = redactor.build_record("demo.2", session)
         self.assertNotIn("supersecretvalue", record["dispatch_prompt"]["text"])
         bundle = {"bundle_kind": "candidate-agent-story-bundle", "bundle_version": 1, "records": [record]}
-        self.assertEqual(validator.validate_bundle(bundle, "test"), [])
+        self.assertEqual(validator.validate_bundle(bundle, "test", {"demo.2": (redactor.sha256_bytes(session.read_bytes()), session)}), [])
 
     def test_hostile_absolute_path_in_tool_result_is_redacted_and_passes(self):
         session = self.tmp / "session.jsonl"
@@ -187,7 +195,36 @@ class RedactorExtractionTests(unittest.TestCase):
         outcome_text = " ".join(o["summary"] for o in record["tool_outcomes"])
         self.assertNotIn("/home/ubuntu", outcome_text)
         bundle = {"bundle_kind": "candidate-agent-story-bundle", "bundle_version": 1, "records": [record]}
-        self.assertEqual(validator.validate_bundle(bundle, "test"), [])
+        self.assertEqual(validator.validate_bundle(bundle, "test", {"demo.3": (redactor.sha256_bytes(session.read_bytes()), session)}), [])
+
+    def test_hostile_absolute_paths_across_roots_are_redacted_and_provenance_bound(self):
+        private_paths = (
+            "/workspace/project/session.jsonl",
+            "/Users/alice/Library/session.jsonl",
+            "/private/var/folders/session.jsonl",
+            "/unlisted-root/tenant/session.jsonl",
+        )
+        for index, private_path in enumerate(private_paths):
+            with self.subTest(index=index):
+                session = self.tmp / f"root-{index}.jsonl"
+                write_session(
+                    session,
+                    user_content=[{"type": "text", "text": f"Inspect {private_path} safely."}],
+                    assistant_turns=[([{"type": "text", "text": "done"}], [])],
+                )
+                bead_id = f"demo.root.{index}"
+                record = redactor.build_record(bead_id, session)
+                self.assertNotIn(private_path, record["dispatch_prompt"]["text"])
+                bundle = {
+                    "bundle_kind": "candidate-agent-story-bundle",
+                    "bundle_version": 1,
+                    "records": [record],
+                }
+                digest = redactor.sha256_bytes(session.read_bytes())
+                self.assertEqual(
+                    validator.validate_bundle(bundle, "test", {bead_id: (digest, session)}),
+                    [],
+                )
 
     def test_non_signal_content_dump_is_filtered_out_of_tool_outcomes(self):
         session = self.tmp / "session.jsonl"
@@ -245,105 +282,132 @@ class RedactorExtractionTests(unittest.TestCase):
 
 
 class ValidatorFailClosedTests(unittest.TestCase):
-    def minimal_record(self, bead_id="demo.x"):
-        record_hash = "a" * 64
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="a1bundle.", dir="/var/tmp"))
+        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
+        self.session = self.tmp / "retained.jsonl"
+        write_session(
+            self.session,
+            user_content=[{"type": "text", "text": "Target Bead: demo.x. Fix the thing."}],
+            assistant_turns=[
+                (
+                    [{"type": "text", "text": "I will inspect the bounded code."}],
+                    [("bash", False, "tests passed: 5/5")],
+                ),
+                ([{"type": "text", "text": "Implemented and pushed. Checks passed."}], []),
+            ],
+        )
+        self.record = redactor.build_record("demo.x", self.session)
+        self.source_sha256 = redactor.sha256_bytes(self.session.read_bytes())
+        self.sources = {"demo.x": (self.source_sha256, self.session)}
+
+    def bundle_of(self, record=None):
         return {
-            "bead_id": bead_id,
-            "source_record_sha256": record_hash,
-            "dispatch_prompt": {"present": True, "text": "hi", "source_sha256": "b" * 64},
-            "first_agent_turn": {
-                "turn_found": True, "has_text_content": True,
-                "text": "ok", "source_sha256": "c" * 64,
-            },
-            "tool_outcomes": [],
-            "review_feedback": {"present": False, "text": None, "source_sha256": None, "note": "n/a"},
-            "fix_forward": {"present": True, "text": "pushed", "source_line_sha256": "d" * 64},
+            "bundle_kind": "candidate-agent-story-bundle",
+            "bundle_version": 1,
+            "records": [record or self.record],
         }
 
-    def bundle_of(self, record):
-        return {"bundle_kind": "candidate-agent-story-bundle", "bundle_version": 1, "records": [record]}
+    def test_clean_record_passes_with_retained_source(self):
+        self.assertEqual(validator.validate_bundle(self.bundle_of(), "t", self.sources), [])
 
-    def test_clean_record_passes(self):
-        self.assertEqual(validator.validate_bundle(self.bundle_of(self.minimal_record()), "t"), [])
+    def test_retained_source_is_mandatory(self):
+        findings = validator.validate_bundle(self.bundle_of(), "t")
+        self.assertTrue(any("retained source not supplied" in f for f in findings))
 
-    def test_missing_source_hash_fails(self):
-        record = self.minimal_record()
-        record["dispatch_prompt"]["source_sha256"] = None
-        findings = validator.validate_bundle(self.bundle_of(record), "t")
-        self.assertTrue(any("source_sha256" in f for f in findings))
+    def test_fabricated_narrative_with_dummy_hashes_fails(self):
+        record = json.loads(json.dumps(self.record))
+        record["dispatch_prompt"]["text"] = "A plausible but fabricated clean narrative."
+        record["dispatch_prompt"]["source_sha256"] = "b" * 64
+        record["first_agent_turn"]["text"] = "More invented publication copy."
+        record["first_agent_turn"]["source_sha256"] = "c" * 64
+        record["fix_forward"]["text"] = "Invented success report."
+        record["fix_forward"]["source_line_sha256"] = "d" * 64
+        findings = validator.validate_bundle(self.bundle_of(record), "t", self.sources)
+        self.assertTrue(any("does not exactly match independent retained-byte derivation" in f
+                            for f in findings))
 
-    def test_missing_tool_outcome_hash_fails(self):
-        record = self.minimal_record()
-        record["tool_outcomes"] = [{"index": 0, "tool_name": "bash", "is_error": False, "summary": "ok"}]
-        findings = validator.validate_bundle(self.bundle_of(record), "t")
-        self.assertTrue(any("source_line_sha256" in f for f in findings))
+    def test_whole_file_dummy_hash_fails(self):
+        record = json.loads(json.dumps(self.record))
+        record["source_record_sha256"] = "a" * 64
+        findings = validator.validate_bundle(self.bundle_of(record), "t", self.sources)
+        self.assertTrue(any("independent retained-byte derivation" in f for f in findings))
 
-    def test_surviving_credential_fails(self):
-        record = self.minimal_record()
-        record["dispatch_prompt"]["text"] = 'password=' + '"realsecretvalue"'
-        findings = validator.validate_bundle(self.bundle_of(record), "t")
+    def test_untrusted_retained_bytes_fail_expected_digest(self):
+        findings = validator.validate_bundle(
+            self.bundle_of(), "t", {"demo.x": ("0" * 64, self.session)}
+        )
+        self.assertTrue(any("independently supplied expected digest" in f for f in findings))
+
+    def test_omitted_or_extra_narrative_fails_exact_derivation(self):
+        omitted = json.loads(json.dumps(self.record))
+        omitted["tool_outcomes"] = []
+        self.assertTrue(validator.validate_bundle(self.bundle_of(omitted), "t", self.sources))
+        extra = json.loads(json.dumps(self.record))
+        extra["editorial_summary"] = "clean but not retained"
+        self.assertTrue(validator.validate_bundle(self.bundle_of(extra), "t", self.sources))
+
+    def test_surviving_private_paths_at_any_root_fail_without_echoing_value(self):
+        roots = (
+            "/workspace/project/private.txt",
+            "/Users/alice/Library/private.txt",
+            "/private/var/folders/cache.txt",
+            "/Volumes/custom-mount/session.jsonl",
+            "/unlisted-root/tenant/data.txt",
+        )
+        for private_path in roots:
+            with self.subTest(root=private_path.split("/", 2)[1]):
+                record = json.loads(json.dumps(self.record))
+                record["fix_forward"]["text"] = f"pushed from {private_path}"
+                findings = validator.validate_bundle(self.bundle_of(record), "t", self.sources)
+                self.assertTrue(any("absolute-path" in finding for finding in findings))
+                self.assertFalse(any(private_path in finding for finding in findings))
+
+    def test_surviving_credential_fails_without_echoing_value(self):
+        record = json.loads(json.dumps(self.record))
+        secret_shape = 'password=' + '"syntheticsecretvalue"'
+        record["dispatch_prompt"]["text"] = secret_shape
+        findings = validator.validate_bundle(self.bundle_of(record), "t", self.sources)
         self.assertTrue(any("credential" in f for f in findings))
+        self.assertFalse(any("syntheticsecretvalue" in f for f in findings))
 
-    def test_surviving_absolute_path_fails(self):
-        record = self.minimal_record()
-        record["fix_forward"]["text"] = "pushed from /home/ubuntu/projects/boring-cdc/.worktrees/x"
-        findings = validator.validate_bundle(self.bundle_of(record), "t")
-        self.assertTrue(any("absolute-path" in f for f in findings))
+    def test_surviving_email_ip_and_dsn_fail(self):
+        cases = (
+            ("notify person@example.test", "email"),
+            ("connect to 192.0.2.12", "ipv4"),
+            ("use redis://cache:6379/0", "dsn"),
+        )
+        for text, kind in cases:
+            with self.subTest(kind=kind):
+                record = json.loads(json.dumps(self.record))
+                record["dispatch_prompt"]["text"] = text
+                findings = validator.validate_bundle(self.bundle_of(record), "t", self.sources)
+                self.assertTrue(any(kind in finding for finding in findings))
 
-    def test_surviving_email_fails(self):
-        record = self.minimal_record()
-        record["first_agent_turn"]["text"] = "notify julien.hurault@sumeo.io"
-        findings = validator.validate_bundle(self.bundle_of(record), "t")
-        self.assertTrue(any("email" in f for f in findings))
+    def test_malformed_retained_source_fails_without_path_or_content(self):
+        malformed = self.tmp / "malformed.jsonl"
+        malformed.write_text("not json and private text")
+        findings = validator.validate_bundle(self.bundle_of(), "t", {"demo.x": (self.source_sha256, malformed)})
+        self.assertTrue(any("could not be parsed" in finding for finding in findings))
+        self.assertFalse(any(str(malformed) in finding or "private text" in finding
+                             for finding in findings))
 
-    def test_surviving_ip_fails(self):
-        record = self.minimal_record()
-        record["dispatch_prompt"]["text"] = "connect to 192.168.1.50 now"
-        findings = validator.validate_bundle(self.bundle_of(record), "t")
-        self.assertTrue(any("ipv4" in f for f in findings))
+    def test_cli_requires_sources_and_rejects_fabrication(self):
+        bundle_path = self.tmp / "candidate.json"
+        bundle_path.write_text(json.dumps(self.bundle_of()))
+        self.assertEqual(validator.main([str(bundle_path)]), 1)
 
-    def test_surviving_dsn_fails(self):
-        record = self.minimal_record()
-        record["dispatch_prompt"]["text"] = "use redis://cache:6379/0"
-        findings = validator.validate_bundle(self.bundle_of(record), "t")
-        self.assertTrue(any("dsn" in f for f in findings))
+        self.assertEqual(validator.main([
+            "--record", f"demo.x={self.source_sha256}={self.session}", str(bundle_path),
+        ]), 0)
 
-    def test_fabricated_text_alongside_absent_flag_fails(self):
-        record = self.minimal_record()
-        record["review_feedback"] = {
-            "present": False, "text": "this should not be here",
-            "source_sha256": None, "note": "n/a",
-        }
-        findings = validator.validate_bundle(self.bundle_of(record), "t")
-        self.assertTrue(any("marked absent but" in f for f in findings))
-
-    def test_field_hash_copied_from_record_hash_fails(self):
-        record = self.minimal_record()
-        record["dispatch_prompt"]["source_sha256"] = record["source_record_sha256"]
-        findings = validator.validate_bundle(self.bundle_of(record), "t")
-        self.assertTrue(any("not traceable to this specific field" in f for f in findings))
-
-    def test_cli_exits_nonzero_on_failure(self):
-        tmp = Path(tempfile.mkdtemp(prefix="a1bundle.", dir="/var/tmp"))
-        try:
-            bad = tmp / "bad.json"
-            record = self.minimal_record()
-            record["dispatch_prompt"]["source_sha256"] = None
-            bad.write_text(json.dumps(self.bundle_of(record)))
-            rc = validator.main([str(bad)])
-            self.assertEqual(rc, 1)
-        finally:
-            shutil.rmtree(tmp, ignore_errors=True)
-
-    def test_cli_exits_zero_on_pass(self):
-        tmp = Path(tempfile.mkdtemp(prefix="a1bundle.", dir="/var/tmp"))
-        try:
-            good = tmp / "good.json"
-            good.write_text(json.dumps(self.bundle_of(self.minimal_record())))
-            rc = validator.main([str(good)])
-            self.assertEqual(rc, 0)
-        finally:
-            shutil.rmtree(tmp, ignore_errors=True)
+        fabricated = json.loads(json.dumps(self.bundle_of()))
+        fabricated["records"][0]["dispatch_prompt"]["text"] = "fabricated"
+        fabricated["records"][0]["dispatch_prompt"]["source_sha256"] = "f" * 64
+        bundle_path.write_text(json.dumps(fabricated))
+        self.assertEqual(validator.main([
+            "--record", f"demo.x={self.source_sha256}={self.session}", str(bundle_path),
+        ]), 1)
 
 
 class RedactorCliTests(unittest.TestCase):

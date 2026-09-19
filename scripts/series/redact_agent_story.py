@@ -14,8 +14,10 @@ This tool extracts ONLY:
     from the first turn)
 
 Every extracted item carries the SHA-256 of the *raw* source bytes it was
-derived from, so provenance stays checkable without republishing raw
-session content. The record-level hash, the dispatch-prompt hash and the
+derived from. Provenance is established only when the independent validator
+is also given the retained sources and exactly re-derives every candidate
+field without printing those private bytes. The record-level hash, the
+dispatch-prompt hash and the
 first-agent-turn hash use the canonical-JSON convention documented in
 docs/SERIES_EXECUTION.md ("Article 1 retained-session recovery"): the
 whole raw file's SHA-256 for the record, and
@@ -26,9 +28,11 @@ This tool NEVER paraphrases, summarizes, or reconstructs. A missing field
 is emitted as explicitly absent (present: false) rather than invented.
 
 Nothing this tool writes is publication-ready by itself: run
-scripts/validate/agent_story_bundle.py over its output, and it still
-requires explicit owner sign-off before anything is copied anywhere
-public.
+scripts/validate/agent_story_bundle.py with one
+`--record BEAD_ID=TRUSTED_SOURCE_SHA256=SESSION_PATH` for every candidate
+record. The trusted digest comes from the ratified provenance table, not from
+the candidate. A passing provenance/leak check still requires
+explicit owner sign-off before anything is copied anywhere public.
 """
 from __future__ import annotations
 
@@ -74,11 +78,13 @@ _CREDENTIAL_RE = re.compile(
 # (quotes/parens included), not just "non-punctuation".
 _DSN_RE = re.compile(r'\b[a-zA-Z][a-zA-Z0-9+.\-]{1,15}://\S+')
 
-# Absolute filesystem paths rooted at locations that can carry a private
-# username, workspace, or session-root segment.
+# Treat every Unix-style absolute path as private, regardless of its root.
+# A root allowlist is unsafe: common workspaces also live below /workspace,
+# /Users, /private/var, and arbitrary mount points.  URI double slashes are
+# excluded so the DSN pass above remains responsible for URI-shaped values.
 _ABS_PATH_RE = re.compile(
-    r'(?<![:/\w])/(?:home|var|tmp|root|run|etc|opt|usr|data|mnt|srv)'
-    r'(?:/[^\s"\'`)>,;:]+)+'
+    r'(?<![:/\w])/(?!/)[A-Za-z0-9._~+@%=-]+'
+    r'(?:/[A-Za-z0-9._~+@%=-]+)*'
 )
 
 _EMAIL_RE = re.compile(r'[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}')
