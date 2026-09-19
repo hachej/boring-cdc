@@ -123,6 +123,26 @@ PY
     sleep .1
   done
 }
+capture_feedback_boundary() {
+  local scenario=$1 deadline=$((SECONDS+30)) confirmed durable
+  while true; do
+    confirmed=$(psqlc -Atqc "select confirmed_flush_lsn::text from pg_replication_slots where slot_name='boring_slot'")
+    durable=$(python3 - "$journal" <<'PY'
+import sqlite3,sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True) as db:
+    print(db.execute("select durable_transaction_end_lsn from source_state where singleton=1").fetchone()[0])
+PY
+)
+    python3 - "$confirmed" "$durable" <<'PY' && break
+import sys
+hi,lo=sys.argv[1].split('/')
+raise SystemExit(0 if (int(hi,16)<<32)+int(lo,16) == int(sys.argv[2],16) else 1)
+PY
+    (( SECONDS < deadline )) || { echo "E_FEEDBACK_DID_NOT_REACH_DURABLE_BOUNDARY $scenario confirmed=$confirmed durable=$durable" >&2; exit 1; }
+    sleep .1
+  done
+  printf '%s|%s\n' "$confirmed" "$durable" >"$work/${scenario}-accepted-boundary.txt"
+}
 wait_for_schema_stop() {
   local scenario=$1 deadline=$((SECONDS+30))
   until grep -q '^M2_RELATION_SCHEMA_CHANGE_UNSUPPORTED detail=relation_contract_mismatch recovery=confirmed_reseed$' "$work/${scenario}-runtime.err"; do
@@ -134,10 +154,13 @@ wait_for_schema_stop() {
 verify_fail_closed() {
   local scenario=$1 rejected_key=$2
   confirmed=$(psqlc -Atqc "select confirmed_flush_lsn::text from pg_replication_slots where slot_name='boring_slot'")
-  python3 - "$journal" "$work/${scenario}-oracle.txt" "$confirmed" "$rejected_key" "$work/${scenario}-result.json" "$version" "$scenario" <<'PY'
+  psqlc -Atqc "select xmin::text||'|'||id::text from public.orders order by id" >"$work/${scenario}-full-oracle.txt"
+  python3 - "$journal" "$work/${scenario}-accepted-oracle.txt" "$work/${scenario}-full-oracle.txt" "$work/${scenario}-accepted-boundary.txt" "$confirmed" "$rejected_key" "$work/${scenario}-result.json" "$version" "$scenario" <<'PY'
 import json,sqlite3,sys
-journal,oracle_path,confirmed,rejected_key,result_path,version,scenario=sys.argv[1:]
-oracle={tuple(line.strip().split('|')) for line in open(oracle_path) if line.strip()}
+journal,accepted_oracle_path,full_oracle_path,boundary_path,confirmed,rejected_key,result_path,version,scenario=sys.argv[1:]
+accepted_oracle={tuple(line.strip().split('|')) for line in open(accepted_oracle_path) if line.strip()}
+full_oracle={tuple(line.strip().split('|')) for line in open(full_oracle_path) if line.strip()}
+accepted_confirmed,accepted_durable=open(boundary_path).read().strip().split('|')
 with sqlite3.connect(f"file:{journal}?mode=ro", uri=True) as db:
     transactions=db.execute("select transaction_id,xid,end_lsn from source_transactions where state='committed'").fetchall()
     events=db.execute("select transaction_id,cast(payload as text) from journal_events order by journal_seq").fetchall()
@@ -151,15 +174,37 @@ for transaction_id,text in events:
     if payload.get('kind')=='insert' and payload.get('new'):
         key=str(int(bytes(payload['new'][0]['bytes']).decode()))
         keys.append(int(key)); journal_set.add((xids[transaction_id],key))
-assert journal_set==oracle, {'postgres':sorted(oracle),'journal':sorted(journal_set)}
+assert journal_set==accepted_oracle, {'accepted_postgres':sorted(accepted_oracle),'journal':sorted(journal_set)}
+full_keys={int(key) for _,key in full_oracle}
+accepted_keys={int(key) for _,key in accepted_oracle}
+# ALTER TYPE may rewrite pre-existing rows and therefore change their xmin. Keys remain
+# the stable source-owned identity for proving that exactly the rejected row committed.
+assert full_keys==accepted_keys|{int(rejected_key)}, {'accepted':sorted(accepted_oracle),'full':sorted(full_oracle)}
 assert int(rejected_key) not in keys
 assert failure==('unsupported','deterministic',1), failure
+assert confirmed==accepted_confirmed, (confirmed,accepted_confirmed)
+assert durable==accepted_durable, (durable,accepted_durable)
 hi,lo=confirmed.split('/')
-assert (int(hi,16)<<32)+int(lo,16) <= int(durable,16), (confirmed,durable)
-result={'scenario':scenario,'postgres_version':version,'postgres_oracle_equals_read_only_journal':True,'rejected_key_absent_from_journal':True,'named_error':'M2_RELATION_SCHEMA_CHANGE_UNSUPPORTED','recovery':'confirmed_reseed','failure_class':failure[0],'retry_class':failure[1],'confirmed_flush_lsn':confirmed,'durable_journal_lsn':durable,'feedback_bounded':True}
+assert (int(hi,16)<<32)+int(lo,16) == int(durable,16), (confirmed,durable)
+result={'scenario':scenario,'postgres_version':version,'accepted_postgres_oracle_equals_read_only_journal':True,'rejected_postgres_key_committed':int(rejected_key),'rejected_key_absent_from_journal':True,'named_error':'M2_RELATION_SCHEMA_CHANGE_UNSUPPORTED','recovery':'confirmed_reseed','failure_class':failure[0],'retry_class':failure[1],'confirmed_flush_lsn':confirmed,'durable_journal_lsn':durable,'feedback_did_not_advance_past_accepted_boundary':True}
 with open(result_path,'w') as f: json.dump(result,f,sort_keys=True); f.write('\n')
 print(json.dumps(result,sort_keys=True))
 PY
+}
+verify_restart_blocked() {
+  local scenario=$1 stopped_status restart_status
+  set +e
+  stop_bounded "$runtime_pid" TERM "$scenario-runtime"
+  stopped_status=$?
+  set -e
+  runtime_pid=
+  [[ "$stopped_status" == 4 ]]
+  set +e
+  (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/${scenario}-restart.out" 2>"$work/${scenario}-restart.err")
+  restart_status=$?
+  set -e
+  [[ "$restart_status" != 0 ]]
+  grep -q '^M2_EXPLICIT_REARM_REQUIRED: capture ownership unavailable$' "$work/${scenario}-restart.err"
 }
 
 run_nullable() {
@@ -167,31 +212,29 @@ run_nullable() {
   start_runtime nullable
   commit_order 101 101.25
   wait_for_journal_key 101
-  psqlc -Atqc "select xmin::text||'|'||id::text from public.orders order by id" >"$work/nullable-oracle.txt"
+  capture_feedback_boundary nullable
+  psqlc -Atqc "select xmin::text||'|'||id::text from public.orders order by id" >"$work/nullable-accepted-oracle.txt"
   psqlc -qc 'set role boring_cdc_admin; alter table public.orders add column note text null'
   commit_order 102 102.25 "'nullable-value'"
   wait_for_schema_stop nullable
   verify_fail_closed nullable 102
+  verify_restart_blocked nullable
 }
 run_incompatible() {
   reset_source incompatible
   start_runtime incompatible
   commit_order 201 201.25
   wait_for_journal_key 201
-  psqlc -Atqc "select xmin::text||'|'||id::text from public.orders order by id" >"$work/incompatible-oracle.txt"
+  capture_feedback_boundary incompatible
+  psqlc -Atqc "select xmin::text||'|'||id::text from public.orders order by id" >"$work/incompatible-accepted-oracle.txt"
   psqlc -qc 'set role boring_cdc_admin; alter table public.orders alter column total type text using total::text'
   commit_order 202 "'incompatible-value'"
   wait_for_schema_stop incompatible
   verify_fail_closed incompatible 202
+  verify_restart_blocked incompatible
 }
 
 run_nullable
 run_incompatible
-set +e
-stop_bounded "$runtime_pid" TERM incompatible-runtime
-stopped_status=$?
-set -e
-runtime_pid=
-[[ "$stopped_status" == 4 ]]
 elapsed=$((SECONDS-started))
-echo "SCHEMA_CHANGE_LIVE_OK postgres=$version nullable=fail-closed incompatible=fail-closed error=M2_RELATION_SCHEMA_CHANGE_UNSUPPORTED recovery=confirmed-reseed feedback=bounded oracle=set-equality elapsed_seconds=$elapsed"
+echo "SCHEMA_CHANGE_LIVE_OK postgres=$version nullable=fail-closed incompatible=fail-closed error=M2_RELATION_SCHEMA_CHANGE_UNSUPPORTED recovery=confirmed-reseed feedback=frozen-at-accepted-boundary restart=M2_EXPLICIT_REARM_REQUIRED oracle=accepted-set-equality elapsed_seconds=$elapsed"
