@@ -234,6 +234,147 @@ class KickoffContracts(unittest.TestCase):
             "available; otherwise clearly label unavailable visibility. Debezium explanation only |",
         )
 
+    def test_series_preparation_record_has_per_article_boundaries(self):
+        checkpoints = {
+            1: ("boring-cdc-m1-raw-demo", "boring-cdc-pci.6", "verified local demo",
+                "scripts/acceptance/article1.sh", "evidence/article1/manifest.json",
+                "fixtures/article1/compose.yml", "derives `PGPASSWORD`"),
+            2: ("boring-cdc-m2-fault-status", "docs/durable-simple-operator.md",
+                "bounded local command available", "scripts/acceptance/durable_simple_case.sh",
+                "six-transaction source-to-durable-SQLite simple case", "article composite unavailable"),
+            3: ("boring-cdc-m3-faults", "boring-cdc-m3-oracle",
+                "component routes exist, article result unavailable", "scripts/e2e/m3_bootstrap.sh",
+                "scripts/e2e/m3_planner.sh", "scripts/e2e/m3_oracle.sh"),
+            4: ("boring-cdc-m4-bench", "boring-cdc-m5-table-add",
+                "component routes exist, article result unavailable", "scripts/e2e/m4_clickhouse_ddl.sh",
+                "scripts/e2e/m4_durability.sh", "scripts/e2e/m4_bench.sh"),
+            5: ("boring-cdc-m5-faults", "canonical M5 owners", "**unavailable:**",
+                "scripts/acceptance/m5.sh", "scripts/e2e/m5_faults.sh", "reconstruct/verify"),
+        }
+        for article, required in checkpoints.items():
+            rows = [line for line in self.series.splitlines()
+                    if line.startswith(f"| {article} | `boring-cdc-")]
+            self.assertEqual(len(rows), 1, article)
+            row = rows[0]
+            self.assertEqual(len(row.split("|")), 7, article)
+            story_state = ("restricted contemporaneous provenance recovered"
+                           if article == 1 else "current bundle **unavailable**")
+            for phrase in required + ("Agent-story owner", story_state,
+                                      "single command-capture owner", "boring-cdc-m7-estuary",
+                                      "**unavailable**"):
+                self.assertIn(phrase, row, (article, phrase))
+            for phrase in ("disclosure", "publication approval"):
+                self.assertIn(phrase, row.lower(), (article, phrase))
+        self.assertIn("python3 scripts/validate/article1_transcript.py", self.series)
+        self.assertIn("current-master and provenance refresh", self.series)
+        self.assertIn("`origin/master` `8782ae5`", self.series)
+        self.assertIn("M7 consumes only measurements", self.series)
+
+    def test_article_one_recovery_binds_authentic_sessions_without_publishing_raw_content(self):
+        recovered = {
+            "1595a1a0-6bf2-4cde-8397-e77fab858ecf": (
+                "boring-cdc-pci.1", "16:15:56–16:31:58",
+                "0aaf87846c40d14f94c54cb7585a46f037c003fe",
+                "e4a7654e50cd3cc481efcfb9e634caf1c4a572e52eaf0f47f608857b9819e9db",
+                "6ff0a855d4ae0aa8c709a592d58e17d0695a641a5458f9fcf0078ebb9936106f",
+                "7da438832294bfbb927f04e5210a789ec5d1f12540b43beb4a6522b858e4bc18"),
+            "ca68a5cd-862d-4979-a60d-f0403a0b453e": (
+                "boring-cdc-pci.2", "16:15:56–16:30:55",
+                "974a2b02f2adbd13405208637c3e834eba66382e",
+                "59e8ab80c5dbdf40e808788c1fee1f748c6e34ca30886ede14179861c51300d7",
+                "dddfa4b2b6c993a574d9c8aa22d52d1f50aac44c8d3a0cbc13431f57ed2b6dc3",
+                "cf247ff6fc88f56e6861e90b2b8131b70bb54bb099d8f2f0801448fd37588e48"),
+            "664a61c7-6d9b-47a3-9eca-b9f987249a84": (
+                "boring-cdc-pci.1.1", "16:44:08–17:37:56",
+                "411ee95db38969a144dbdd97d16c08b1ef9b784f",
+                "f029560bc05507fde78aacc815734a9f55243b1578bd42b2ed987493ce081148",
+                "f65fdf52bdb734672d75510555ce02dc002d4ae6b3b7975155f1c1342748de21",
+                "18bc85f3a53b9c884842edc5a3885313eaccd289ff3a2a7d2a223f9350558411"),
+            "beac1b09-e095-43f5-81c2-b173c819251b": (
+                "boring-cdc-pci.1.1.1", "17:40:15–18:11:18",
+                "39625f8b992a795d1597359acd9ffe6e465a7d40",
+                "2d0d15b1d7aa6b56bb4aaa12676461b0c89740de0be0a715a92dd9449dd03b9f",
+                "78d65270c79127fb5ff2123e5a6b28683f5118784b2c91ee566629467ad79049",
+                "870bc0775e8e379c1558ef1866749d93300d75c82adfebf00cb1d1c2fc5286ef"),
+            "5c6891cf-9b6c-4282-8d58-624cec18ac17": (
+                "boring-cdc-pci.3", "18:12:13–18:54:06",
+                "94854205b556a85e26304299d7595f8b3828cccd",
+                "7bf3ff89fcd6521bb0c162a487672017b68efd686d368a7538a4c7d04d2c95bb",
+                "6d18055bc9b1969000ce9915dabc0740d34c0f73ef7be77a24a8ebbc00471da2",
+                "81a93b40f4ced809abc22b81fe981a55136def71e134911703c72b7bec3e2d85"),
+            "30c7e3ab-a33e-4d78-8eb7-7a72c021c597": (
+                "boring-cdc-pci.4", "18:56:09–19:33:21",
+                "5d3792c8cd853fd3f34e3baef744b2ba2adedd1c",
+                "f23683ce2d6dc4c3110783a688712466ab33b734bfdf180acd9e5c24bde604f6",
+                "703c9a2074237ec4dee28846565cd50c8cd84c8d0bec2ac66de71b0cdd7a919f",
+                "d4321b0d8c0963808ac5316d6e25cb18c05434dc327547c5ecfb9159b3ad1662"),
+            "0b7e681c-8c45-406a-9a6f-6172f115ec40": (
+                "boring-cdc-pci.6", "19:34:16–20:01:18",
+                "bd93cbea964f623ba82e40adc43451bd30fff184",
+                "cd10a72534328811d588c022c365fc66122b174bf226517216003f9400736f89",
+                "99ff79feb7ce91d69bdcce530853aebfa3b2c53b7c0695fb377b069962b4fd00",
+                "abe9360dd3c880e6f242295ac6244073e5ea50d3f0f22580d79a973bf9a5a102"),
+            "59853991-0e93-4d9b-8e91-2fcedc5fbf73": (
+                "boring-cdc-pci.5", "20:02:05–20:26:22",
+                "b420456f1a1350857c07b330943250543055224a",
+                "eb180bd21b5e7c1bde5c1e6458c17601582f2c39aa10f3336069be6fa52102ca",
+                "fbf44d6be61ac61f5d0fd0634ecd8f47c8d83f4c8c59b6a50a1e05f194016056",
+                "4274deb886c623aa05b1c453534820788de46ee0f14a6ebb8514e938f563d67c"),
+            "c8fa8e9f-4fa9-401a-836c-6c5622e4621b": (
+                "boring-cdc-pci.7", "20:27:41–20:31:29",
+                "726cd7ef58e6f8545e560d62cea5568bc15babc8",
+                "d81281afcc0b3a556f2ccdbc4aba8a3747aceb09bf15ac3f0ff55fa7d1967726",
+                "3b448721024569f4b558daa10eded03422c5e42729be5a3a9ed55f0a27ef0530",
+                "6359b42ddb1192239232c4802881fdacdc3797507be8ef77b94690ca156fe8d5"),
+        }
+        self.assertEqual(len(recovered), 9)
+        for session, values in recovered.items():
+            for value in (session,) + values:
+                self.assertIn(value, self.series)
+        for phrase in ("canonical JSON (`sort_keys=true`, compact separators)",
+                       "9 orchestrator, 48 reviewer and 52 worker records",
+                       "window contained 1, 18 and 10 respectively",
+                       "blocked transport attempt and authority escalation; no runtime implementation",
+                       "tracker-only handoff", "BORING_AGENT_SESSION_ROOT",
+                       "Raw locations remain restricted",
+                       "do **not** establish a separate human-chat correction chronology",
+                       "Publication limitation requiring owner decision before 2026-09-24",
+                       "no validator-approved, repository-local redacted `agent-story/` bundle",
+                       "must not be copied, paraphrased as dialogue"):
+            self.assertIn(phrase, self.series)
+
+    def test_series_separates_baseline_event_delivery_and_convergence(self):
+        for phrase in ("Source baseline/current state", "Ledger delivery",
+                       "Independently observed business-event delivery",
+                       "Final-state convergence", "business-only loss",
+                       "event delivery as **unavailable**"):
+            self.assertIn(phrase, self.series)
+        self.assertIn("Never downgrade the local oracle", self.series)
+
+    def test_series_retains_redacted_story_without_reconstruction(self):
+        for artifact in ("originating-prompt.redacted", "first-output.redacted",
+                         "failures.jsonl", "human-corrections.jsonl",
+                         "interventions.jsonl"):
+            self.assertIn(artifact, self.series)
+        self.assertIn("record it as unavailable—do not reconstruct", self.series)
+        self.assertIn("no secrets", self.series.lower())
+
+    def test_series_access_and_editorial_states_fail_closed(self):
+        self.assertIn("1c99e72d-3878-4f3b-9cdc-663f97657b3e", self.series)
+        for phrase in ("every field is **unverified**", "`verified`, `manual`, or `unavailable`",
+                       "None is currently publication-ready", "no approval is automatic",
+                       "no predetermined winner"):
+            self.assertIn(phrase, self.series)
+        self.assertIn("No managed resource", self.series)
+
+    def test_series_records_unsafe_content_checkout_blocker(self):
+        self.assertIn("335ada9", self.series)
+        self.assertIn("62c02e13110820d3289fc36932c80dc42ced774c721ce237a868df1b3d872ff4",
+                      self.series)
+        self.assertIn("checkout was therefore unsafe and was left untouched", self.series)
+        self.assertIn("keeps `boring-cdc-v01.5` open", self.series)
+        self.assertIn("no comparison may be commissioned", self.series)
+
     def test_document_bead_links_resolve(self):
         for name in ["docs/PLAN.md", "docs/AGENT_SYSTEM.md", "docs/SERIES_EXECUTION.md"]:
             text = (ROOT / name).read_text()
