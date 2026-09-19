@@ -329,14 +329,18 @@ class KickoffContracts(unittest.TestCase):
         }
         self.assertEqual(len(recovered), 9)
         for session, values in recovered.items():
+            rows = [line for line in self.series.splitlines()
+                    if line.startswith("| `boring-cdc-pci.") and f"`{session}`" in line]
+            self.assertEqual(len(rows), 1, session)
             for value in (session,) + values:
-                self.assertIn(value, self.series)
-        for phrase in ("canonical JSON (`sort_keys=true`, compact separators)",
+                self.assertIn(value, rows[0], (session, value))
+        for phrase in ("UTF-8 bytes of canonical JSON", "`ensure_ascii=true`",
                        "9 orchestrator, 48 reviewer and 52 worker records",
                        "window contained 1, 18 and 10 respectively",
                        "blocked transport attempt and authority escalation; no runtime implementation",
-                       "tracker-only handoff", "BORING_AGENT_SESSION_ROOT",
-                       "Raw locations remain restricted",
+                       "tracker-only handoff", "no Bead handoff by owner override",
+                       "owner override forbade a metadata/handoff commit",
+                       "BORING_AGENT_SESSION_ROOT", "Raw locations remain restricted",
                        "do **not** establish a separate human-chat correction chronology",
                        "Publication limitation requiring owner decision before 2026-09-24",
                        "no validator-approved, repository-local redacted `agent-story/` bundle",
