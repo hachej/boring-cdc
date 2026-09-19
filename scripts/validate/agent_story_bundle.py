@@ -32,7 +32,7 @@ _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 # Root-agnostic by design. URI double slashes are excluded; URI-shaped values
 # are handled separately by _DSN_RE.
 _ABS_PATH_RE = re.compile(
-    r"(?<![:/\w])/(?!/)[^\r\n\"'`<>]+"
+    r"(?<![/\w])/(?!/)[^\r\n\"'`<>]+"
 )
 _CREDENTIAL_RE = re.compile(
     r"(?i)(postgres(?:ql)?://[^\s:@]+:[^\s@]+@"

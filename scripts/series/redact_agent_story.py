@@ -83,7 +83,7 @@ _DSN_RE = re.compile(r'\b[a-zA-Z][a-zA-Z0-9+.\-]{1,15}://\S+')
 # /Users, /private/var, and arbitrary mount points.  URI double slashes are
 # excluded so the DSN pass above remains responsible for URI-shaped values.
 _ABS_PATH_RE = re.compile(
-    r'(?<![:/\w])/(?!/)[^\r\n"\'`<>]+'
+    r'(?<![/\w])/(?!/)[^\r\n"\'`<>]+'
 )
 
 _EMAIL_RE = re.compile(r'[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}')

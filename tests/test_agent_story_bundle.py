@@ -83,6 +83,7 @@ class RedactTextTests(unittest.TestCase):
             "/Users/Alice Smith/Library/private.txt",
             "/private/var/a:b/secret",
             "/秘密/tenant/session.jsonl",
+            "path:/Users/Alice Smith/Library/private.txt",
         )
         for private_path in paths:
             with self.subTest(root=private_path.split("/", 2)[1]):
@@ -209,6 +210,7 @@ class RedactorExtractionTests(unittest.TestCase):
             "/Users/Alice Smith/Library/session.jsonl",
             "/private/var/a:b/session.jsonl",
             "/秘密/tenant/session.jsonl",
+            "path:/Users/Alice Smith/Library/session.jsonl",
         )
         for index, private_path in enumerate(private_paths):
             with self.subTest(index=index):
@@ -363,6 +365,7 @@ class ValidatorFailClosedTests(unittest.TestCase):
             "/Users/Alice Smith/Library/private.txt",
             "/private/var/a:b/secret",
             "/秘密/tenant/session.jsonl",
+            "path:/Users/Alice Smith/Library/session.jsonl",
         )
         for private_path in roots:
             with self.subTest(root=private_path.split("/", 2)[1]):
