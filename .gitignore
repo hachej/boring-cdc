@@ -25,3 +25,10 @@ results/raw/
 artifacts/boring-cdc-m0-scaffold/
 # br doctor per-run artifacts
 .doctor/
+
+# Candidate agent-story bundles are UNREVIEWED extracts of real agent session
+# transcripts. docs/PLAN.md states this is a public project, so committing one
+# would publish the owner's own prompts and tool output permanently, before any
+# editorial review. Generate them locally with scripts/series/redact_agent_story.py,
+# review, and publish only what the owner has explicitly approved.
+artifacts/series/**/*.candidate.json
