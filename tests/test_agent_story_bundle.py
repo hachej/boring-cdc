@@ -80,6 +80,9 @@ class RedactTextTests(unittest.TestCase):
             "/private/var/folders/cache.txt",
             "/Volumes/custom-mount/session.jsonl",
             "/arbitrary-root/tenant/data.txt",
+            "/Users/Alice Smith/Library/private.txt",
+            "/private/var/a:b/secret",
+            "/秘密/tenant/session.jsonl",
         )
         for private_path in paths:
             with self.subTest(root=private_path.split("/", 2)[1]):
@@ -203,6 +206,9 @@ class RedactorExtractionTests(unittest.TestCase):
             "/Users/alice/Library/session.jsonl",
             "/private/var/folders/session.jsonl",
             "/unlisted-root/tenant/session.jsonl",
+            "/Users/Alice Smith/Library/session.jsonl",
+            "/private/var/a:b/session.jsonl",
+            "/秘密/tenant/session.jsonl",
         )
         for index, private_path in enumerate(private_paths):
             with self.subTest(index=index):
@@ -354,6 +360,9 @@ class ValidatorFailClosedTests(unittest.TestCase):
             "/private/var/folders/cache.txt",
             "/Volumes/custom-mount/session.jsonl",
             "/unlisted-root/tenant/data.txt",
+            "/Users/Alice Smith/Library/private.txt",
+            "/private/var/a:b/secret",
+            "/秘密/tenant/session.jsonl",
         )
         for private_path in roots:
             with self.subTest(root=private_path.split("/", 2)[1]):
@@ -362,6 +371,18 @@ class ValidatorFailClosedTests(unittest.TestCase):
                 findings = validator.validate_bundle(self.bundle_of(record), "t", self.sources)
                 self.assertTrue(any("absolute-path" in finding for finding in findings))
                 self.assertFalse(any(private_path in finding for finding in findings))
+
+    def test_top_level_fabrication_and_private_keys_fail_without_echo(self):
+        bundle = self.bundle_of()
+        bundle["editorial_summary"] = "fabricated but syntactically clean narrative"
+        findings = validator.validate_bundle(bundle, "t", self.sources)
+        self.assertTrue(any("top-level fields" in finding for finding in findings))
+
+        private_key = "/Users/Alice Smith/Library/private.txt"
+        bundle[private_key] = "192.0.2.44"
+        findings = validator.validate_bundle(bundle, "t", self.sources)
+        self.assertTrue(any("absolute-path" in finding for finding in findings))
+        self.assertFalse(any(private_key in finding for finding in findings))
 
     def test_surviving_credential_fails_without_echoing_value(self):
         record = json.loads(json.dumps(self.record))

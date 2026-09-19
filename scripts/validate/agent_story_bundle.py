@@ -32,8 +32,7 @@ _HEX64_RE = re.compile(r"^[0-9a-f]{64}$")
 # Root-agnostic by design. URI double slashes are excluded; URI-shaped values
 # are handled separately by _DSN_RE.
 _ABS_PATH_RE = re.compile(
-    r"(?<![:/\w])/(?!/)[A-Za-z0-9._~+@%=-]+"
-    r"(?:/[A-Za-z0-9._~+@%=-]+)*"
+    r"(?<![:/\w])/(?!/)[^\r\n\"'`<>]+"
 )
 _CREDENTIAL_RE = re.compile(
     r"(?i)(postgres(?:ql)?://[^\s:@]+:[^\s@]+@"
@@ -90,8 +89,13 @@ def scan_text_for_leaks(text: str, where: str, findings: list[str]) -> None:
 
 def walk_all_strings(node, path: str, findings: list[str]) -> None:
     if isinstance(node, dict):
-        for key, value in node.items():
-            walk_all_strings(value, f"{path}.{key}", findings)
+        for index, (key, value) in enumerate(node.items()):
+            # Keys are untrusted candidate content too. Scan them, but use only
+            # an opaque index in findings so a malicious/private key is never
+            # reflected into validator output.
+            if isinstance(key, str):
+                scan_text_for_leaks(key, f"{path}.key[{index}]", findings)
+            walk_all_strings(value, f"{path}.value[{index}]", findings)
     elif isinstance(node, list):
         for index, value in enumerate(node):
             walk_all_strings(value, f"{path}[{index}]", findings)
@@ -281,6 +285,8 @@ def validate_bundle(
         findings.append(f"{source_desc}: unexpected or missing bundle_kind")
     if bundle.get("bundle_version") != 1:
         findings.append(f"{source_desc}: unexpected or missing bundle_version")
+    if set(bundle) != {"bundle_kind", "bundle_version", "records"}:
+        findings.append(f"{source_desc}: unexpected or missing top-level fields")
 
     records = bundle.get("records")
     if not isinstance(records, list) or not records:
