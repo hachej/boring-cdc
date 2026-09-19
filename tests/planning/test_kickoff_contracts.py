@@ -267,7 +267,7 @@ class KickoffContracts(unittest.TestCase):
                 self.assertIn(phrase, row.lower(), (article, phrase))
         self.assertIn("python3 scripts/validate/article1_transcript.py", self.series)
         self.assertIn("current-master and provenance refresh", self.series)
-        self.assertIn("`origin/master` `8782ae5`", self.series)
+        self.assertIn("`origin/master` `bc892f0`", self.series)
         self.assertIn("M7 consumes only measurements", self.series)
 
     def test_article_one_recovery_binds_authentic_sessions_without_publishing_raw_content(self):
@@ -343,6 +343,8 @@ class KickoffContracts(unittest.TestCase):
                        "BORING_AGENT_SESSION_ROOT", "Raw locations remain restricted",
                        "do **not** establish a separate human-chat correction chronology",
                        "Publication limitation requiring owner decision before 2026-09-24",
+                       "Repository-local extraction and validation tooling now exists",
+                       "no redacted bundle has been generated",
                        "no validator-approved, repository-local redacted `agent-story/` bundle",
                        "must not be copied, paraphrased as dialogue"):
             self.assertIn(phrase, self.series)
