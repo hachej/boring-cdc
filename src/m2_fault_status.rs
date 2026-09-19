@@ -617,6 +617,27 @@ pub mod tests {
         );
     }
     #[test]
+    fn deterministic_unsupported_capture_failure_reports_capture_safe_stopped() {
+        // Regression guard for the WAL-retention operator-visibility gap: a capture safe-stop
+        // caused by an unsupported (deterministic, non-retryable) schema change must still be
+        // surfaced as a non-healthy condition, since PostgreSQL keeps the replication slot
+        // `active = true` and `restart_lsn` pinned the entire time, so nothing else warns the
+        // operator that WAL is accruing.
+        let (p, w) = fixture();
+        w.connection().execute("INSERT INTO processing_failures(failure_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES('f','capture','unsupported','sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',2,3,'deterministic',1,NULL,1,'unix:1','unix:2')",[]).unwrap();
+        drop(w);
+        let s = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        assert!(
+            s.conditions
+                .iter()
+                .any(|c| c.condition == "capture_safe_stopped" && c.severity == "blocked"),
+            "deterministic capture safe-stop must produce a blocked capture_safe_stopped condition, got: {:?}",
+            s.conditions
+        );
+        assert_ne!(s.overall_health, "healthy");
+        assert!(s.failures[0].retry_armed);
+    }
+    #[test]
     fn inventories_are_exact() {
         assert_eq!(
             CONDITION_NAMES.into_iter().collect::<BTreeSet<_>>().len(),
