@@ -343,8 +343,11 @@ class KickoffContracts(unittest.TestCase):
                        "BORING_AGENT_SESSION_ROOT", "Raw locations remain restricted",
                        "do **not** establish a separate human-chat correction chronology",
                        "Publication limitation requiring owner decision before 2026-09-24",
-                       "Repository-local extraction and validation tooling now exists",
-                       "no redacted bundle has been generated",
+                       "Repository-local extraction and structural/leak-check tooling now exists",
+                       "does not independently bind candidate text to retained source bytes",
+                       "absolute-path detector does not cover every root",
+                       "cannot yet qualify as provenance-verified or publication-safe",
+                       "No redacted bundle has been generated",
                        "no validator-approved, repository-local redacted `agent-story/` bundle",
                        "must not be copied, paraphrased as dialogue"):
             self.assertIn(phrase, self.series)
