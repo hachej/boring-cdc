@@ -346,11 +346,25 @@ class KickoffContracts(unittest.TestCase):
                        "Repository-local extraction and structural/leak-check tooling now exists",
                        "does not independently bind candidate text to retained source bytes",
                        "absolute-path detector does not cover every root",
-                       "cannot yet qualify as provenance-verified or publication-safe",
-                       "No redacted bundle has been generated",
-                       "no validator-approved, repository-local redacted `agent-story/` bundle",
+                       "tool output alone cannot qualify a derivative as publication-safe",
+                       "no reviewed, approved, publication-safe repository `agent-story/` bundle",
                        "must not be copied, paraphrased as dialogue"):
             self.assertIn(phrase, self.series)
+
+    def test_article_one_candidate_custody_does_not_imply_publication_readiness(self):
+        for phrase in ("gitignored, repository-local candidate bundle",
+                       "9 unreviewed extracts of owner prompts",
+                       "Every record carries a source SHA-256",
+                       "all 9 source hashes match whole retained session files",
+                       "all 9 entries match the ratified table",
+                       "independent scan found zero leaks",
+                       "did not inspect the candidate path or raw private content",
+                       "must not be committed, published, exposed or copied"):
+            self.assertIn(phrase, self.series)
+        self.assertIn("The publication verdict is therefore **not ready**", self.series)
+        self.assertIn("Managed Estuary access and results are unavailable", self.series)
+        self.assertIn("exact PostgreSQL protocol literals remain pending", self.series)
+        self.assertIn("Negative, failed and unfavorable results must remain", self.series)
 
     def test_series_separates_baseline_event_delivery_and_convergence(self):
         for phrase in ("Source baseline/current state", "Ledger delivery",
@@ -370,7 +384,8 @@ class KickoffContracts(unittest.TestCase):
 
     def test_series_access_and_editorial_states_fail_closed(self):
         self.assertIn("1c99e72d-3878-4f3b-9cdc-663f97657b3e", self.series)
-        for phrase in ("every field is **unverified**", "`verified`, `manual`, or `unavailable`",
+        for phrase in ("single pending request", "managed access and every managed result are **unavailable**",
+                       "requested details remain **unverified**", "`verified`, `manual`, or `unavailable`",
                        "None is currently publication-ready", "no approval is automatic",
                        "no predetermined winner"):
             self.assertIn(phrase, self.series)
