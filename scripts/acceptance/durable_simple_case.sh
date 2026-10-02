@@ -108,15 +108,16 @@ wait_for_transactions() {
     sleep .1
   done
 }
-wait_for_heartbeat() {
+wait_for_control_event() {
+  local kind=$1
   deadline=$((SECONDS+15))
-  until [[ "$(python3 - "$journal" <<'PY'
+  until [[ "$(python3 - "$journal" "$kind" <<'PY'
 import sqlite3,sys
 with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
-    print(db.execute("select count(*) from journal_events where control_kind='heartbeat'").fetchone()[0])
+    print(db.execute("select count(*) from journal_events where control_kind=?",(sys.argv[2],)).fetchone()[0])
 PY
 )" != 0 ]]; do
-    (( SECONDS < deadline )) || { echo E_HEARTBEAT_NOT_CLASSIFIED >&2; cat "$work/runtime-first.err" >&2; exit 1; }
+    (( SECONDS < deadline )) || { echo "E_CONTROL_EVENT_NOT_CLASSIFIED kind=$kind" >&2; cat "$work/runtime-first.err" >&2; exit 1; }
     kill -0 "$runtime_pid" 2>/dev/null || { cat "$work/runtime-first.err" >&2; exit 1; }
     sleep .1
   done
@@ -170,7 +171,10 @@ for key in 101 102 103; do
   wait_for_transactions "$((key-100))"
   sample_feedback_boundary "before-crash-$key"
 done
-wait_for_heartbeat
+wait_for_control_event heartbeat
+fence_updates=$(psqlc -Atqc "begin; set local role boring_cdc_control_writer; with updated as (update boring_cdc_control.capture_fences set capture_epoch=1,generation=1,table_set_fingerprint=repeat('f',64),unique_nonce=1 where id='singleton' returning 1) select count(*) from updated; commit")
+[[ "$fence_updates" == 1 ]]
+wait_for_control_event capture_fence
 
 kill -KILL "$runtime_pid"
 set +e
@@ -211,6 +215,7 @@ assert len({row[1] for row in events})==len(events)
 xid_by_transaction={row[0]:row[1] for row in transactions}
 journal_set=set()
 control_events=0
+control_kinds=set()
 for _,transaction_id,control_kind,payload_text in events:
     payload=json.loads(payload_text)
     if control_kind is not None:
@@ -218,12 +223,13 @@ for _,transaction_id,control_kind,payload_text in events:
         assert payload['kind']=='update' and payload['new']
         assert bytes(payload['new'][0]['bytes'])==b'singleton'
         control_events+=1
+        control_kinds.add(control_kind)
         continue
     assert payload['kind']=='insert' and payload['new']
     key=str(int(bytes(payload['new'][0]['bytes']).decode('ascii')))
     journal_set.add((xid_by_transaction[transaction_id],key))
 assert len(journal_set)==6
-assert control_events>=1
+assert control_kinds=={'heartbeat','capture_fence'}, control_kinds
 assert journal_set==oracle, {'postgres':sorted(oracle),'journal':sorted(journal_set)}
 assert state[1]==len(events) and state[0]==transactions[-1][5]
 boundaries=[json.loads(line) for line in open(boundaries_path)]
@@ -254,6 +260,7 @@ result={
   'journal_transactions':len(transactions),
   'user_transactions':len(journal_set),
   'control_events':control_events,
+  'control_kinds':sorted(control_kinds),
   'journal_events':len(events),
   'unique_transaction_ids':True,
   'unique_source_xids':True,
@@ -272,4 +279,4 @@ PY
 stop_bounded "$runtime_pid" TERM runtime-restart
 runtime_pid=
 [[ ! -s "$work/runtime-restart.err" ]]
-echo "DURABLE_SIMPLE_CASE_OK postgres=$version user_transactions=6 control_events=classified crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"
+echo "DURABLE_SIMPLE_CASE_OK postgres=$version user_transactions=6 heartbeat_and_fence=classified crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"
