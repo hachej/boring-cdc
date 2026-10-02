@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Diagnostic for boring-cdc-ckoi.6. This succeeds when the current recovery gap is
-# reproduced; it is not the volume acceptance or a convergence claim.
+# PostgreSQL 17.6 source-to-journal spool-limit recovery acceptance.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 export TMPDIR=/var/tmp
@@ -100,10 +99,29 @@ PY
 }
 wait_for_transactions() {
   local expected=$1
-  deadline=$((SECONDS+30))
+  deadline=$((SECONDS+90))
   until [[ "$(journal_transactions)" == "$expected" ]]; do
-    (( SECONDS < deadline )) || { cat "$work/runtime-restart.err" "$work/runtime-first.err" 2>/dev/null >&2 || true; exit 1; }
+    (( SECONDS < deadline )) || { echo "E_JOURNAL_CATCH_UP expected=$expected observed=$(journal_transactions)" >&2; cat "$work/runtime-restart.err" "$work/runtime-first.err" 2>/dev/null >&2 || true; exit 1; }
     sleep .1
+  done
+}
+wait_for_key() {
+  local key=$1 deadline=$((SECONDS+180))
+  until python3 - "$journal" "$key" <<'PY'
+import json,sqlite3,sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    events=db.execute("select cast(payload as text) from journal_events where control_kind is null").fetchall()
+for (text,) in events:
+    payload=json.loads(text)
+    if payload.get('kind')=='insert' and payload.get('new'):
+        if int(bytes(payload['new'][0]['bytes']).decode())==int(sys.argv[2]):
+            raise SystemExit(0)
+raise SystemExit(1)
+PY
+  do
+    (( SECONDS < deadline )) || { echo "E_JOURNAL_KEY_TIMEOUT key=$key" >&2; cat "$work/runtime-restart.err" 2>/dev/null >&2 || true; exit 1; }
+    kill -0 "$runtime_pid" 2>/dev/null || { cat "$work/runtime-restart.err" >&2; exit 1; }
+    sleep .2
   done
 }
 wait_for_active_slot() {
@@ -170,13 +188,14 @@ until python3 - "$journal" <<'PYC'
 import sqlite3,sys
 with sqlite3.connect(f'file:{sys.argv[1]}?mode=ro',uri=True) as db:
     failure=db.execute("select failure_class,retry_class,armed from processing_failures where component='capture'").fetchone()
-raise SystemExit(0 if failure==('integrity','integrity_mismatch',1) else 1)
+raise SystemExit(0 if failure==('configuration','deterministic',1) else 1)
 PYC
 do
     (( SECONDS < deadline )) || { cat "$work/runtime-first.err" >&2; exit 1; }
     sleep .2
 done
 sample_feedback_boundary after-limit
+grep -q '^M2_CAPTURE_RESOURCE_LIMIT kind=spool_disk_reserve recovery=changed_limit_required$' "$work/runtime-first.err"
 [[ "$(journal_transactions)" == 1 ]]
 read -r active restart confirmed < <(psqlc -Atqc "select active::int||' '||restart_lsn::text||' '||confirmed_flush_lsn::text from pg_replication_slots where slot_name='boring_slot'")
 [[ "$active" == 1 ]]
@@ -185,15 +204,109 @@ rss_kb=$(awk '/^VmHWM:/ {print $2}' "/proc/$runtime_pid/status")
 (( rss_kb * 1024 <= 268435456 ))
 stop_bounded "$runtime_pid" TERM first || true
 runtime_pid=
+# Neither an unchanged configuration nor an unrelated edit may re-arm the stopped stream.
+set +e
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/unchanged.out" 2>"$work/unchanged.err")
+unchanged_status=$?
+set -e
+[[ "$unchanged_status" != 0 ]]
+grep -q 'M2_EXPLICIT_REARM_REQUIRED' "$work/unchanged.err"
 python3 - "$work/run/boring-cdc.toml" <<'PYC'
 from pathlib import Path
 import sys
-p=Path(sys.argv[1]); s=p.read_text().replace('capture_spool_bytes = 2000000','capture_spool_bytes = 20000000'); p.write_text(s)
+p=Path(sys.argv[1]); s=p.read_text().replace('schedule_ms = 60000','schedule_ms = 60001',1); p.write_text(s)
 PYC
 set +e
-(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/runtime-restart.out" 2>"$work/runtime-restart.err")
-restart_status=$?
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/unrelated.out" 2>"$work/unrelated.err")
+unrelated_status=$?
 set -e
-[[ "$restart_status" != 0 ]]
-grep -q 'M2_EXPLICIT_REARM_REQUIRED' "$work/runtime-restart.err"
-printf 'VOLUME_BOUND_RECOVERY_GAP_REPRODUCED postgres=%s committed_before_limit=1 post_limit_journal_commits=%s failure=integrity/resource-limit changed_budget_restart=M2_EXPLICIT_REARM_REQUIRED slot_active_before_shutdown=%s restart_lsn=%s confirmed_flush_lsn=%s rss_high_water_kb=%s process_memory_budget_bytes=268435456 elapsed_seconds=%s\n' "$version" "$(journal_transactions)" "$active" "$restart" "$confirmed" "$rss_kb" "$((SECONDS-started))"
+[[ "$unrelated_status" != 0 ]]
+grep -q 'M2_RECOVERY_UNRELATED_CONFIG_CHANGE' "$work/unrelated.err"
+python3 - "$work/run/boring-cdc.toml" <<'PYC'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]); s=p.read_text().replace('schedule_ms = 60001','schedule_ms = 60000',1).replace('capture_spool_bytes = 2000000','capture_spool_bytes = 100000000'); p.write_text(s)
+PYC
+(cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/runtime-restart.out" 2>"$work/runtime-restart.err") &
+runtime_pid=$!
+wait_for_active_slot || { cat "$work/runtime-restart.err" >&2; exit 1; }
+wait_for_key 800
+sample_feedback_boundary after-recovery
+
+python3 - "$work/bulk.sql" <<'PY'
+import random,sys
+r=random.Random(1730)
+with open(sys.argv[1],'w') as f:
+    for key in range(1001,4001):
+        digits=''.join(r.choices('0123456789',k=12000))
+        f.write(f'begin; set local role boring_cdc_app; insert into public.orders(id,total) values ({key}, {key}.{digits}); commit;\n')
+PY
+psqlc < "$work/bulk.sql" > "$work/bulk.out"
+wait_for_key 4000
+psqlc -Atqc 'checkpoint' >/dev/null
+
+source_restart=$restart
+deadline=$((SECONDS+120))
+while true; do
+  confirmed_now=$(psqlc -Atqc "select confirmed_flush_lsn::text from pg_replication_slots where slot_name='boring_slot'")
+  restart_now=$(psqlc -Atqc "select restart_lsn::text from pg_replication_slots where slot_name='boring_slot'")
+  ready=$(python3 - "$journal" "$confirmed_now" "$restart_now" "$source_restart" <<'PY'
+import json,sqlite3,sys
+journal,confirmed,restart,baseline=sys.argv[1:]
+def lsn(text):
+    hi,lo=text.split('/')
+    return (int(hi,16)<<32)+int(lo,16)
+with sqlite3.connect(f'file:{journal}?mode=ro',uri=True) as db:
+    rows=db.execute("select e.transaction_id,cast(e.payload as text) from journal_events e where e.control_kind is null order by e.journal_seq desc limit 100").fetchall()
+    target=None
+    for transaction_id,text in rows:
+        row=json.loads(text)
+        if row.get('kind')=='insert' and row.get('new') and int(bytes(row['new'][0]['bytes']).decode())==4000:
+            target=db.execute('select end_lsn from source_transactions where transaction_id=?',(transaction_id,)).fetchone()[0]
+            break
+assert target is not None
+print(int(lsn(confirmed)>=int(target,16) and lsn(restart)>lsn(baseline)))
+PY
+)
+  [[ "$ready" == 1 ]] && break
+  (( SECONDS < deadline )) || { echo "E_WAL_RELEASE_TIMEOUT confirmed=$confirmed_now restart=$restart_now baseline=$source_restart" >&2; exit 1; }
+  psqlc -Atqc 'checkpoint' >/dev/null
+  sleep 1
+done
+sample_feedback_boundary after-wal-release
+rss_recovery_kb=$(awk '/^VmHWM:/ {print $2}' "/proc/$runtime_pid/status")
+(( rss_recovery_kb * 1024 <= 268435456 ))
+psqlc -Atqc "select xmin::text||'|'||id::text from public.orders order by id" >"$work/source-oracle.txt"
+python3 - "$journal" "$work/source-oracle.txt" "$work/result.json" "$version" "$rss_kb" "$rss_recovery_kb" "$((SECONDS-started))" "$confirmed" "$confirmed_now" "$restart" "$restart_now" <<'PY'
+import json,sqlite3,sys
+journal,oracle_path,result_path,version,rss_first,rss_recovery,elapsed,confirmed_before,confirmed_after,restart_before,restart_after=sys.argv[1:]
+oracle={tuple(line.strip().split('|')) for line in open(oracle_path) if line.strip()}
+with sqlite3.connect(f'file:{journal}?mode=ro',uri=True) as db:
+    transactions=db.execute("select transaction_id,xid from source_transactions where state='committed'").fetchall()
+    events=db.execute("select journal_seq,transaction_id,cast(payload as text) from journal_events order by journal_seq").fetchall()
+    capture_epoch,durable=db.execute("select capture_epoch,durable_transaction_end_lsn from source_state where singleton=1").fetchone()
+    receipt=db.execute("select capture_epoch,runtime_fingerprint from capture_configuration_receipts where singleton=1").fetchone()
+assert len({row[0] for row in transactions})==len(transactions)
+assert len({row[1] for row in transactions})==len(transactions)
+assert [row[0] for row in events]==list(range(1,len(events)+1))
+assert receipt[0]==capture_epoch and receipt[1]!=capture_epoch
+xids=dict(transactions)
+journal_rows=set()
+for _,transaction_id,text in events:
+    row=json.loads(text)
+    if row.get('kind')=='insert' and row.get('new'):
+        journal_rows.add((xids[transaction_id],str(int(bytes(row['new'][0]['bytes']).decode()))))
+assert len(journal_rows)==3601, len(journal_rows)
+assert journal_rows==oracle, {'missing':sorted(oracle-journal_rows)[:5],'extra':sorted(journal_rows-oracle)[:5]}
+def lsn(text):
+    hi,lo=text.split('/')
+    return (int(hi,16)<<32)+int(lo,16)
+assert lsn(confirmed_before)<lsn(confirmed_after)<=int(durable,16)
+assert lsn(restart_before)<lsn(restart_after)<=lsn(confirmed_after)
+result={'postgres_version':version,'source_oracle_equals_read_only_journal':True,'user_rows':len(journal_rows),'journal_sequence_gap_free':True,'unique_transaction_ids':True,'unique_source_xids':True,'capture_epoch_preserved':True,'unchanged_and_unrelated_configs_rejected':True,'durable_end_lsn':durable,'confirmed_flush_lsn_before':confirmed_before,'confirmed_flush_lsn_after':confirmed_after,'restart_lsn_before':restart_before,'restart_lsn_after':restart_after,'rss_high_water_first_kb':int(rss_first),'rss_high_water_recovery_kb':int(rss_recovery),'elapsed_seconds':int(elapsed)}
+with open(result_path,'w') as f: json.dump(result,f,sort_keys=True);f.write('\n')
+print(json.dumps(result,sort_keys=True))
+PY
+stop_bounded "$runtime_pid" TERM recovery-runtime
+runtime_pid=
+printf 'VOLUME_BOUND_RECOVERY_OK postgres=%s user_rows=3601 named_error=M2_CAPTURE_RESOURCE_LIMIT oracle=set-equality feedback=bounded restart_lsn=advanced elapsed_seconds=%s\n' "$version" "$((SECONDS-started))"
