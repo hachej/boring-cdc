@@ -269,16 +269,31 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             PolicyEvent::Observe(observation),
             &mut context,
         );
-        let operation = PreparedFailureOperation::from_policy_action(
+        let mut operation = PreparedFailureOperation::from_policy_action(
             action,
             current.as_ref().map(|record| record.failure_id.clone()),
         )
         .ok_or_else(|| {
             RuntimeError::JournalTransient("failure policy suppressed persistence".into())
         })?;
+        if let Some(previous) = self.active_failure.as_ref()
+            && previous.failure_id != candidate_record.failure_id
+            && previous.last_rearm_token_digest.is_some()
+        {
+            operation = PreparedFailureOperation::supersede_rearmed_capture(previous, operation)
+                .ok_or_else(|| {
+                    RuntimeError::JournalTransient("capture failure supersession invalid".into())
+                })?;
+        }
         let persisted = match &operation {
             PreparedFailureOperation::StoreAndArm { record, .. }
             | PreparedFailureOperation::Rearm { record, .. } => Some(record.clone()),
+            PreparedFailureOperation::SupersedeRearmedCapture { replacement, .. } => {
+                match replacement.as_ref() {
+                    PreparedFailureOperation::StoreAndArm { record, .. } => Some(record.clone()),
+                    _ => None,
+                }
+            }
             PreparedFailureOperation::Clear { .. } => None,
         };
         self.journal

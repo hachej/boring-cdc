@@ -106,11 +106,11 @@ wait_for_transactions() {
   done
 }
 wait_for_key() {
-  local key=$1 deadline=$((SECONDS+180))
+  local key=$1 deadline=$((SECONDS+${2:-180}))
   until python3 - "$journal" "$key" <<'PY'
 import json,sqlite3,sys
 with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
-    events=db.execute("select cast(payload as text) from journal_events where control_kind is null").fetchall()
+    events=db.execute("select cast(payload as text) from journal_events where control_kind is null order by journal_seq desc limit 100").fetchall()
 for (text,) in events:
     payload=json.loads(text)
     if payload.get('kind')=='insert' and payload.get('new'):
@@ -225,7 +225,35 @@ grep -q 'M2_RECOVERY_UNRELATED_CONFIG_CHANGE' "$work/unrelated.err"
 python3 - "$work/run/boring-cdc.toml" <<'PYC'
 from pathlib import Path
 import sys
-p=Path(sys.argv[1]); s=p.read_text().replace('schedule_ms = 60001','schedule_ms = 60000',1).replace('capture_spool_bytes = 2000000','capture_spool_bytes = 100000000'); p.write_text(s)
+p=Path(sys.argv[1]); s=p.read_text().replace('schedule_ms = 60001','schedule_ms = 60000',1).replace('capture_spool_bytes = 2000000','capture_spool_bytes = 3000000'); p.write_text(s)
+PYC
+(cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/runtime-insufficient.out" 2>"$work/runtime-insufficient.err") &
+runtime_pid=$!
+wait_for_active_slot || { cat "$work/runtime-insufficient.err" >&2; exit 1; }
+deadline=$((SECONDS+45))
+until python3 - "$journal" <<'PYC'
+import sqlite3,sys
+with sqlite3.connect(f'file:{sys.argv[1]}?mode=ro',uri=True) as db:
+    rows=db.execute("select armed,last_failed_at from processing_failures where component='capture' order by armed").fetchall()
+marker=rows[0][1].split(';',1)[-1] if rows else ''
+ready=len(rows)==2 and rows[0][0]==0 and marker.startswith('rearm-') and rows[1][0]==1
+raise SystemExit(0 if ready else 1)
+PYC
+do
+  (( SECONDS < deadline )) || { cat "$work/runtime-insufficient.err" >&2; exit 1; }
+  sleep .2
+done
+grep -q '^M2_CAPTURE_RESOURCE_LIMIT kind=spool_disk_reserve recovery=changed_limit_required$' "$work/runtime-insufficient.err"
+[[ "$(journal_transactions)" == 1 ]]
+sample_feedback_boundary after-insufficient-limit
+rss_insufficient_kb=$(awk '/^VmHWM:/ {print $2}' "/proc/$runtime_pid/status")
+(( rss_insufficient_kb * 1024 <= 268435456 ))
+stop_bounded "$runtime_pid" TERM insufficient || true
+runtime_pid=
+python3 - "$work/run/boring-cdc.toml" <<'PYC'
+from pathlib import Path
+import sys
+p=Path(sys.argv[1]); s=p.read_text().replace('capture_spool_bytes = 3000000','capture_spool_bytes = 100000000'); p.write_text(s)
 PYC
 (cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/runtime-restart.out" 2>"$work/runtime-restart.err") &
 runtime_pid=$!
@@ -242,7 +270,7 @@ with open(sys.argv[1],'w') as f:
         f.write(f'begin; set local role boring_cdc_app; insert into public.orders(id,total) values ({key}, {key}.{digits}); commit;\n')
 PY
 psqlc < "$work/bulk.sql" > "$work/bulk.out"
-wait_for_key 4000
+wait_for_key 4000 360
 psqlc -Atqc 'checkpoint' >/dev/null
 
 source_restart=$restart
@@ -277,19 +305,19 @@ sample_feedback_boundary after-wal-release
 rss_recovery_kb=$(awk '/^VmHWM:/ {print $2}' "/proc/$runtime_pid/status")
 (( rss_recovery_kb * 1024 <= 268435456 ))
 psqlc -Atqc "select xmin::text||'|'||id::text from public.orders order by id" >"$work/source-oracle.txt"
-python3 - "$journal" "$work/source-oracle.txt" "$work/result.json" "$version" "$rss_kb" "$rss_recovery_kb" "$((SECONDS-started))" "$confirmed" "$confirmed_now" "$restart" "$restart_now" <<'PY'
+python3 - "$journal" "$work/source-oracle.txt" "$work/result.json" "$version" "$rss_kb" "$rss_insufficient_kb" "$rss_recovery_kb" "$((SECONDS-started))" "$confirmed" "$confirmed_now" "$restart" "$restart_now" <<'PY'
 import json,sqlite3,sys
-journal,oracle_path,result_path,version,rss_first,rss_recovery,elapsed,confirmed_before,confirmed_after,restart_before,restart_after=sys.argv[1:]
+journal,oracle_path,result_path,version,rss_first,rss_insufficient,rss_recovery,elapsed,confirmed_before,confirmed_after,restart_before,restart_after=sys.argv[1:]
 oracle={tuple(line.strip().split('|')) for line in open(oracle_path) if line.strip()}
 with sqlite3.connect(f'file:{journal}?mode=ro',uri=True) as db:
     transactions=db.execute("select transaction_id,xid from source_transactions where state='committed'").fetchall()
     events=db.execute("select journal_seq,transaction_id,cast(payload as text) from journal_events order by journal_seq").fetchall()
     capture_epoch,durable=db.execute("select capture_epoch,durable_transaction_end_lsn from source_state where singleton=1").fetchone()
-    receipt=db.execute("select capture_epoch,runtime_fingerprint from capture_configuration_receipts where singleton=1").fetchone()
+    receipt=db.execute("select capture_epoch,runtime_fingerprint,revision from capture_configuration_receipts where singleton=1").fetchone()
 assert len({row[0] for row in transactions})==len(transactions)
 assert len({row[1] for row in transactions})==len(transactions)
 assert [row[0] for row in events]==list(range(1,len(events)+1))
-assert receipt[0]==capture_epoch and receipt[1]!=capture_epoch
+assert receipt[0]==capture_epoch and receipt[1]!=capture_epoch and receipt[2]==2
 xids=dict(transactions)
 journal_rows=set()
 for _,transaction_id,text in events:
@@ -303,7 +331,7 @@ def lsn(text):
     return (int(hi,16)<<32)+int(lo,16)
 assert lsn(confirmed_before)<lsn(confirmed_after)<=int(durable,16)
 assert lsn(restart_before)<lsn(restart_after)<=lsn(confirmed_after)
-result={'postgres_version':version,'source_oracle_equals_read_only_journal':True,'user_rows':len(journal_rows),'journal_sequence_gap_free':True,'unique_transaction_ids':True,'unique_source_xids':True,'capture_epoch_preserved':True,'unchanged_and_unrelated_configs_rejected':True,'durable_end_lsn':durable,'confirmed_flush_lsn_before':confirmed_before,'confirmed_flush_lsn_after':confirmed_after,'restart_lsn_before':restart_before,'restart_lsn_after':restart_after,'rss_high_water_first_kb':int(rss_first),'rss_high_water_recovery_kb':int(rss_recovery),'elapsed_seconds':int(elapsed)}
+result={'postgres_version':version,'source_oracle_equals_read_only_journal':True,'user_rows':len(journal_rows),'journal_sequence_gap_free':True,'unique_transaction_ids':True,'unique_source_xids':True,'capture_epoch_preserved':True,'unchanged_and_unrelated_configs_rejected':True,'insufficient_limit_superseded_atomically':True,'limit_rearm_revisions':receipt[2],'durable_end_lsn':durable,'confirmed_flush_lsn_before':confirmed_before,'confirmed_flush_lsn_after':confirmed_after,'restart_lsn_before':restart_before,'restart_lsn_after':restart_after,'rss_high_water_first_kb':int(rss_first),'rss_high_water_insufficient_kb':int(rss_insufficient),'rss_high_water_recovery_kb':int(rss_recovery),'elapsed_seconds':int(elapsed)}
 with open(result_path,'w') as f: json.dump(result,f,sort_keys=True);f.write('\n')
 print(json.dumps(result,sort_keys=True))
 PY
