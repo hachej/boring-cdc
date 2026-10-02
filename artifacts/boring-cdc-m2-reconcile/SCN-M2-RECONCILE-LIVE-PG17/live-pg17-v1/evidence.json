@@ -8,7 +8,7 @@
       "argv": "cargo clippy --locked --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/clippy.stderr",
-      "stderr_sha256": "820b741c87fe20c4169000e4856e41e3107caf7a1b18e445e6196ae9357371a9",
+      "stderr_sha256": "f591e097f22f91dd5c31fbbf7e587d80c0a4e0ed594f9c9012a544f38c52d926",
       "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/clippy.stdout",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "version": "m2-reconcile-live/v3"
@@ -17,16 +17,16 @@
       "argv": "cargo test --locked m2_reconcile::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/targeted.stderr",
-      "stderr_sha256": "0dc8ecf9d2b61b3f618539dfef36032eade4dec9f1d3268229a941f9f7d0a7f8",
+      "stderr_sha256": "c396e10933cb5b16db23c0c2422b4a482336d6bbda26fb1668204d5cc203a2a3",
       "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/targeted.stdout",
-      "stdout_sha256": "ad4e98521edbcde3d636dbd475aef9dd84c45df25343980bf7206a6cd558a3d1",
+      "stdout_sha256": "c991b8cbbc73a22dc3a31736c515e1e0a9393d795d389ba7d23808ae519c2bdf",
       "version": "m2-reconcile-live/v3"
     },
     {
       "argv": "scripts/e2e/m2_reconcile.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/e2e.stderr",
-      "stderr_sha256": "22b91e2b970bbcb602a5ae2b0b0ac6aabfe2d928221052f2f6514be97f96c2c5",
+      "stderr_sha256": "0254eb4279ade227c44affbddcec9ed371316b34d058096ccf799ecd8617c9d3",
       "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/e2e.stdout",
       "stdout_sha256": "d2bc9a5a868760c7956f74df7cb0766e5c10802916c1fe393bd517d63d54f3f4",
       "version": "m2-reconcile-live/v3"
@@ -35,24 +35,24 @@
       "argv": "scripts/faults/m2_reconcile.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/fault.stderr",
-      "stderr_sha256": "31f001d54c2eb4ba8e5ab3efd6a78065a5bbd545099d7a3d44db468483755b87",
+      "stderr_sha256": "694b655c2e795c6010000362143718aba8131db7dba7667764832f043efd5df1",
       "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/fault.stdout",
-      "stdout_sha256": "39123ea766321086955bf4e2b1ba12305cb2c4db098159f2612d2e873a64e887",
+      "stdout_sha256": "d66f3aef0d7a50781839db66a075966119de29aa134d129972cc517bea819e5b",
       "version": "m2-reconcile-live/v3"
     },
     {
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/workspace.stderr",
-      "stderr_sha256": "1ef8bfa46aebf98aca5a7c170cc9d22ff0aac937f7d4b04e3724a1d7ef94ac96",
+      "stderr_sha256": "1b47515d60506f175c70cce5c392c5319da80c492aaa286a0f1e8c4b46763834",
       "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/workspace.stdout",
-      "stdout_sha256": "44739cfedb328dc1e0e970bce9f93ac2fc2461932dad9cfedfc57f68e0563559",
+      "stdout_sha256": "00bb73e7509377df73e374f2e6f54019245a1d45ef05e8fc658a28f2d327c5ab",
       "version": "m2-reconcile-live/v3"
     }
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "473622ad276761f6175b49f41c7894dde3801c57",
+  "git_commit": "a7d375b6e5cdee9e4564ad0973732c8fbc02f6ca",
   "owner_bead": "boring-cdc-m2-reconcile.1",
   "redaction": {
     "checked": true,
@@ -71,7 +71,7 @@
       "e2e-run-1",
       "fault-wrapper-e2e-run-2"
     ],
-    "digest": "127f945bb3605eac4d009502d679270b86299f9bf45932170d84de39b63c4b63",
+    "digest": "39b242a04e4b48b3fe1d1319b49b9e3d2a8a87b875dac9cb115b6f640e339a1e",
     "product_faults": "exact-PID SIGKILL before source receipt; corrupt payload; missing, unreserved, and lost PostgreSQL 17.6 slot states",
     "runtime_observed": true,
     "status": "pass"
