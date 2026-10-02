@@ -3,7 +3,7 @@
     "argv": "cargo clippy --locked --all-targets",
     "exit_code": 0,
     "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/clippy.stderr",
-    "stderr_sha256": "91f8ae545dba380bb399f145da28cdc01138b5cfe3f8743e8a81c6af7ba594ed",
+    "stderr_sha256": "3044b8cbfe32adf01066f151e763abaf6743f1a8fe2b5953bba39d94ba6d4fc2",
     "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/clippy.stdout",
     "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "version": "m2-reconcile-live/v3"
@@ -12,16 +12,16 @@
     "argv": "cargo test --locked m2_reconcile::tests",
     "exit_code": 0,
     "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/targeted.stderr",
-    "stderr_sha256": "c396e10933cb5b16db23c0c2422b4a482336d6bbda26fb1668204d5cc203a2a3",
+    "stderr_sha256": "5f0e2d94bdf2c9133adecbd18c1ff3c30b3c91dabf09407fbc4850398c2a9f45",
     "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/targeted.stdout",
-    "stdout_sha256": "c75cece39b7963c471841b0c931f2d26e862cb77a1475dc71d738b1173b4b33a",
+    "stdout_sha256": "4d414a09356e6db4f8f16b90741fc9c5cb1e1d3bcfa372c983cedb91774a20d2",
     "version": "m2-reconcile-live/v3"
   },
   {
     "argv": "scripts/e2e/m2_reconcile.sh",
     "exit_code": 0,
     "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/e2e.stderr",
-    "stderr_sha256": "8f5bf67ff00eb9aefa6c166eb82d5f92068355bf6d4d9aa868c4df3200cadade",
+    "stderr_sha256": "0844544601d6e2fdc92d306063a53ba3724ea52c22ff45dfe7f2daa48763f5d0",
     "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/e2e.stdout",
     "stdout_sha256": "d2bc9a5a868760c7956f74df7cb0766e5c10802916c1fe393bd517d63d54f3f4",
     "version": "m2-reconcile-live/v3"
@@ -30,18 +30,18 @@
     "argv": "scripts/faults/m2_reconcile.sh",
     "exit_code": 0,
     "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/fault.stderr",
-    "stderr_sha256": "bcdfed602e6b3c7227625231beaa534b99a78b258d05c8c19b3f2a2b3e1aeb1b",
+    "stderr_sha256": "d4c51df21f80bd5a9c04f4d670cc3d57c25bfd52d72eb54e015eb4a34df0795c",
     "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/fault.stdout",
-    "stdout_sha256": "f055f1dc316295c02b8e8ecc0474ef11d546b40129724a579fbe349c53ee5b25",
+    "stdout_sha256": "d8f3d8c8eb7b7c9bc5d280a9e6f35c8e8751321b32ddf5f56603a553ec678742",
     "version": "m2-reconcile-live/v3"
   },
   {
     "argv": "cargo test --locked --workspace --all-targets",
     "exit_code": 0,
     "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/workspace.stderr",
-    "stderr_sha256": "634566b9c136d9ed828fdd67dc180cd02c7d681f232e79c453ae6974c6c0eb1a",
+    "stderr_sha256": "12c5d8059bfd8272ff17e43efa9339caff26f0ee426daf7484af7a5a2cf916f6",
     "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/workspace.stdout",
-    "stdout_sha256": "56144f8a9a74248b1d949ddd37f86e9502d1ae081b051d9aff38366a9e9bab63",
+    "stdout_sha256": "c3c490188a513e73b5f99ea721fb1e047ea546ad25010be917c1de5ddb8eb333",
     "version": "m2-reconcile-live/v3"
   }
 ]

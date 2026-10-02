@@ -1,12 +1,13 @@
 
-running 5 tests
+running 6 tests
 test m2_fault_status::tests::inventories_are_exact ... ok
 test m2_fault_status::tests::domain_alerts_project_declared_conditions_and_revisions ... ok
 test m2_fault_status::tests::freshness_expires_and_causal_records_exclude_payloads ... ok
-test m2_fault_status::tests::stable_restart_projection_redacts ... ok
+test m2_fault_status::tests::deterministic_unsupported_capture_failure_reports_capture_safe_stopped ... ok
 test m2_fault_status::tests::failure_and_reseed_are_concurrent ... ok
+test m2_fault_status::tests::stable_restart_projection_redacts ... ok
 
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 361 filtered out; finished in 0.27s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 364 filtered out; finished in 0.33s
 
 
 running 0 tests

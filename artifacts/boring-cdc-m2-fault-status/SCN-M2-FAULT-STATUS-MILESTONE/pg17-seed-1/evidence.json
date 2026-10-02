@@ -8,7 +8,7 @@
       "argv": "cargo clippy --locked --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stderr",
-      "stderr_sha256": "9a30d54c8b16d7e49510b182028079bca120aeebb7d662e88f8566e6196a49f6",
+      "stderr_sha256": "8a2933ae25e59188be988ea6218274cb341f13d8bc4b533f57b12ececd4be8b3",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stdout",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "version": "m2-fault-status/v5"
@@ -17,9 +17,9 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stderr",
-      "stderr_sha256": "138f3dcd2b0eea3463b12a162ff15847bac38df594925e6e4145b3f6731a0b1c",
+      "stderr_sha256": "ebc57fe540501bebf8137ec47a20ab1ec0283ea0765dacacb675ecef3ef37e82",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stdout",
-      "stdout_sha256": "e72e9c9741de6b26b85d96128fcb625bae6968eff3d168dac15cc883766bc80a",
+      "stdout_sha256": "8e457c7205fdea507cf3c0da9a81c2706ed81f379bd2027c8a4300eec560a579",
       "version": "m2-fault-status/v5"
     },
     {
@@ -28,14 +28,14 @@
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stderr",
       "stderr_sha256": "eb373deec04b1554cf9cca206b4820f6a1d0f0d4f43dda0ad6888f5ebab4e95f",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stdout",
-      "stdout_sha256": "accdf7f933d385e7c7c610b6634c628f47722d8aa82ad591b25b2959a103634a",
+      "stdout_sha256": "8800719bb62cdb037e562a3ca8f0db249f70bf15ba076f27c205d4965d7ca0ae",
       "version": "m2-fault-status/v5"
     },
     {
       "argv": "scripts/e2e/m2_fault_status.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stderr",
-      "stderr_sha256": "9de720c5922e4aa24d4b22c701dbde0ee7dca5992aa9292cc36955b93dafba9c",
+      "stderr_sha256": "a213a32093b50f6cbc41aae6da36c08518675bf3e3334fb26b1afaca70b7e93d",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stdout",
       "stdout_sha256": "2621186a88727c197c102348410e9b455abd637871a7908ea9b1744fec6079b4",
       "version": "m2-fault-status/v5"
@@ -44,15 +44,15 @@
       "argv": "scripts/faults/m2_fault_status.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stderr",
-      "stderr_sha256": "3b5312f7ea8aaa1222e43b4cb92c656a51415d705433545ee42e0a6c36236871",
+      "stderr_sha256": "bf4e75eb6c973163f8ba2e15c89aa6b957eadb2f603c8f1205c5306ee348e221",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stdout",
-      "stdout_sha256": "6735e6ae827eebb69f08848edce6d13377fdfb681b1b6954183247f1be9af20f",
+      "stdout_sha256": "37c75854876ef14d86aa05e625daf172c9d27627dfc317e0041229c5120fe1c1",
       "version": "m2-fault-status/v5"
     }
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "milestone",
-  "git_commit": "7347a72b61a39da037d11205de146592784fb077",
+  "git_commit": "901032440c3f1090c375058eadf5f2fcfdda57ae",
   "owner_bead": "boring-cdc-m2-fault-status",
   "redaction": {
     "checked": true,
@@ -71,7 +71,7 @@
       "e2e-pg17-run-1",
       "fault-wrapper-pg17-run-2"
     ],
-    "digest": "8f4fe7e1e692cc337e5f2f21a106e9de731650b88ccc9bc69f76731dd6be50a5",
+    "digest": "aaecd86440975ddc6ce4ebcdfd36ee30c1766593677ec992f9f1a9cffcec54b7",
     "product_faults": "16 wired product boundaries aborted; exact-PID PostgreSQL 17.6 recovery and slot-state separation",
     "runtime_observed": true,
     "status": "pass"
@@ -80,8 +80,8 @@
   "schema_version": "evidence/v1",
   "seed": "pg17-seed-1",
   "source_preservation": {
-    "after_sha256": "35f8500d653c35a9ad7f741db2d9ed18d0b86817b633d3a32991a6c4ff6bbfb8",
-    "before_sha256": "35f8500d653c35a9ad7f741db2d9ed18d0b86817b633d3a32991a6c4ff6bbfb8",
+    "after_sha256": "b53c30a6e2210fb61a9d56ba93e17c857e54092569e1eb6931eaba22a0e3573b",
+    "before_sha256": "b53c30a6e2210fb61a9d56ba93e17c857e54092569e1eb6931eaba22a0e3573b",
     "preserved": true
   },
   "tier_proof": {
