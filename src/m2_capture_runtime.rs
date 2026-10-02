@@ -7,7 +7,8 @@
 
 use crate::article1_capture::{CaptureConfig, CaptureFailure, setup_runtime};
 use crate::m1_decoder::{
-    CopyBothEvent, Decoder, PgoutputEvent, RelationContract, RowChange, TupleValue, WireLimits,
+    ControlContract, CopyBothEvent, Decoder, PgoutputEvent, RelationContract, RowChange,
+    TupleValue, WireLimits,
 };
 use crate::m2_journal::{
     CommitFault, DurableCommit, JournalError, JournalEvent, JournalStore, JournalWriterService,
@@ -173,6 +174,9 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             .and_then(|id| self.journal.load_failure(&id, boundary).ok().flatten());
         self.failure_policy_identity = Some((capture_epoch, config_fingerprint));
     }
+    pub fn enable_capture_limit_fingerprint(&mut self, fingerprint: String) {
+        self.limit_failure_fingerprint = Some(fingerprint);
+    }
     fn persist_if_enabled(
         &mut self,
         class: crate::failure_policy::FailureClass,
@@ -190,10 +194,17 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         code: crate::failure_policy::StableErrorCode,
     ) -> Result<(), RuntimeError> {
         use std::time::{SystemTime, UNIX_EPOCH};
-        let (capture_epoch, config_fingerprint) =
+        let (capture_epoch, mut config_fingerprint) =
             self.failure_policy_identity.clone().ok_or_else(|| {
                 RuntimeError::JournalTransient("failure policy identity unavailable".into())
             })?;
+        if class == crate::failure_policy::FailureClass::Configuration
+            && code == crate::failure_policy::StableErrorCode::ResourceLimit
+        {
+            config_fingerprint = self.limit_failure_fingerprint.clone().ok_or_else(|| {
+                RuntimeError::JournalTransient("capture limit fingerprint unavailable".into())
+            })?;
+        }
         let now_ms = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| RuntimeError::JournalTransient("failure policy clock invalid".into()))?
@@ -259,16 +270,31 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             PolicyEvent::Observe(observation),
             &mut context,
         );
-        let operation = PreparedFailureOperation::from_policy_action(
+        let mut operation = PreparedFailureOperation::from_policy_action(
             action,
             current.as_ref().map(|record| record.failure_id.clone()),
         )
         .ok_or_else(|| {
             RuntimeError::JournalTransient("failure policy suppressed persistence".into())
         })?;
+        if let Some(previous) = self.active_failure.as_ref()
+            && previous.failure_id != candidate_record.failure_id
+            && previous.last_rearm_token_digest.is_some()
+        {
+            operation = PreparedFailureOperation::supersede_rearmed_capture(previous, operation)
+                .ok_or_else(|| {
+                    RuntimeError::JournalTransient("capture failure supersession invalid".into())
+                })?;
+        }
         let persisted = match &operation {
             PreparedFailureOperation::StoreAndArm { record, .. }
             | PreparedFailureOperation::Rearm { record, .. } => Some(record.clone()),
+            PreparedFailureOperation::SupersedeRearmedCapture { replacement, .. } => {
+                match replacement.as_ref() {
+                    PreparedFailureOperation::StoreAndArm { record, .. } => Some(record.clone()),
+                    _ => None,
+                }
+            }
             PreparedFailureOperation::Clear { .. } => None,
         };
         self.journal
@@ -368,6 +394,7 @@ pub enum RuntimeError {
     Decode(&'static str),
     SchemaChange(&'static str),
     Spool(String),
+    SpoolLimit { kind: &'static str },
     JournalTransient(String),
     JournalIntegrity(String),
     Protocol(&'static str),
@@ -416,6 +443,7 @@ pub struct CaptureRuntime<J, S, G> {
     feedback: Vec<FeedbackPacket>,
     committed_transactions: u64,
     failure_policy_identity: Option<(String, String)>,
+    limit_failure_fingerprint: Option<String>,
     active_failure: Option<crate::failure_policy::FailureRecord>,
     pressure: Option<RuntimePressureConfig>,
 }
@@ -440,6 +468,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             feedback: Vec::new(),
             committed_transactions: 0,
             failure_policy_identity: None,
+            limit_failure_fingerprint: None,
             active_failure: None,
             pressure: None,
         }
@@ -641,7 +670,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
                     .push(&staged)
                     .map_err(|e| {
                         self.state = RuntimeState::CaptureSafeStopped;
-                        RuntimeError::Spool(e.to_string())
+                        spool_runtime_error(e)
                     })
             }
             PgoutputEvent::Commit {
@@ -663,10 +692,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             .active
             .take()
             .ok_or(RuntimeError::Protocol("commit_without_spool"))?;
-        let payloads = active
-            .spool
-            .drain()
-            .map_err(|e| RuntimeError::Spool(e.to_string()))?;
+        let payloads = active.spool.drain().map_err(spool_runtime_error)?;
         if payloads.len() as u64 != row_count {
             return self.safe_stop(RuntimeError::Protocol("row_count_mismatch"));
         }
@@ -714,10 +740,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         if durable_lsn != end_lsn || commit_lsn > end_lsn {
             return self.safe_stop(RuntimeError::Protocol("durable_boundary_mismatch"));
         }
-        active
-            .spool
-            .finish()
-            .map_err(|e| RuntimeError::Spool(e.to_string()))?;
+        active.spool.finish().map_err(spool_runtime_error)?;
         self.committed_transactions = self.committed_transactions.saturating_add(1);
         self.durable_end_lsn = Some(
             self.durable_end_lsn
@@ -881,9 +904,32 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
         stop_after_commits,
         std::time::Duration::from_millis(250),
         || true,
+        || Ok(()),
     )
     .await
 }
+fn spool_runtime_error(error: SpoolError) -> RuntimeError {
+    match error {
+        SpoolError::DiskReserve { .. } => RuntimeError::SpoolLimit {
+            kind: "spool_disk_reserve",
+        },
+        SpoolError::MemoryLimit(_) => RuntimeError::SpoolLimit {
+            kind: "process_memory",
+        },
+        SpoolError::FrameLimit { .. } => RuntimeError::SpoolLimit { kind: "wire_frame" },
+        SpoolError::EventLimit { .. } => RuntimeError::SpoolLimit {
+            kind: "event_bytes",
+        },
+        SpoolError::TransactionBytesLimit { .. } => RuntimeError::SpoolLimit {
+            kind: "transaction_bytes",
+        },
+        SpoolError::TransactionEventsLimit { .. } => RuntimeError::SpoolLimit {
+            kind: "transaction_events",
+        },
+        other => RuntimeError::Spool(other.to_string()),
+    }
+}
+
 fn classify_runtime_failure(
     error: &RuntimeError,
 ) -> (
@@ -901,6 +947,7 @@ fn classify_runtime_failure(
         RuntimeError::OwnershipLost | RuntimeError::UnexpectedCopyBothLoss => {
             (Class::OwnershipLost, Code::TransportUnavailable, false)
         }
+        RuntimeError::SpoolLimit { .. } => (Class::Configuration, Code::ResourceLimit, false),
         RuntimeError::Spool(_) => (Class::Integrity, Code::ResourceLimit, false),
         RuntimeError::SchemaChange(_) => {
             (Class::Unsupported, Code::UnsupportedConfiguration, false)
@@ -1083,6 +1130,80 @@ impl TransportReceiveLane {
         }
     }
 }
+fn bind_production_control_contracts(
+    contracts: &mut BTreeMap<u32, RelationContract>,
+) -> Result<(), CaptureFailure> {
+    type ControlColumns = &'static [(&'static str, u32, bool)];
+    let mut seen = [false; 2];
+    for contract in contracts.values_mut() {
+        if contract.relation.namespace != "boring_cdc_control" {
+            continue;
+        }
+        let (index, columns, mutable_columns): (usize, ControlColumns, Vec<usize>) =
+            match contract.relation.name.as_str() {
+                "heartbeat" => (
+                    0,
+                    &[
+                        ("id", 25, true),
+                        ("nonce", 20, false),
+                        ("updated_at", 1184, false),
+                    ],
+                    vec![1, 2],
+                ),
+                "capture_fences" => (
+                    1,
+                    &[
+                        ("id", 25, true),
+                        ("capture_epoch", 20, false),
+                        ("generation", 20, false),
+                        ("table_set_fingerprint", 25, false),
+                        ("unique_nonce", 20, false),
+                    ],
+                    vec![1, 2, 3, 4],
+                ),
+                _ => {
+                    return Err(CaptureFailure::at(
+                        "control_relation",
+                        "M2_CONTROL_RELATION_SCHEMA_MISMATCH",
+                    ));
+                }
+            };
+        if seen[index]
+            || contract.relation.replica_identity != b'd'
+            || contract.key_columns != [0]
+            || contract.relation.columns.len() != columns.len()
+            || !contract
+                .relation
+                .columns
+                .iter()
+                .zip(columns)
+                .all(|(actual, expected)| {
+                    actual.name == expected.0
+                        && actual.type_oid == expected.1
+                        && actual.key == expected.2
+                        && actual.type_modifier == -1
+                })
+        {
+            return Err(CaptureFailure::at(
+                "control_relation",
+                "M2_CONTROL_RELATION_SCHEMA_MISMATCH",
+            ));
+        }
+        seen[index] = true;
+        contract.control = Some(ControlContract {
+            immutable_key: vec![b"singleton".to_vec()],
+            mutable_columns,
+        });
+    }
+    if !seen.into_iter().all(|present| present) {
+        return Err(CaptureFailure::at(
+            "control_relation",
+            "M2_CONTROL_RELATION_SCHEMA_MISMATCH",
+        ));
+    }
+    Ok(())
+}
+
 async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G: FeedbackGate>(
     config: &CaptureConfig,
     cancellation: &CancellationToken,
@@ -1090,9 +1211,12 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     stop_after_commits: u64,
     control_cadence: std::time::Duration,
     mut ownership_probe: impl FnMut() -> bool,
+    on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
 ) -> Result<(), CaptureFailure> {
-    let (mut connection, contracts) = setup_runtime(config)?;
+    let (mut connection, mut contracts) = setup_runtime(config)?;
+    bind_production_control_contracts(&mut contracts)?;
     runtime.contracts = contracts;
+    let mut on_ready = Some(on_ready);
     loop {
         runtime
             .service_pressure()
@@ -1116,6 +1240,9 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         // Admit a maximum-sized CopyData allocation before transport receive. The read future is
         // cancelled (not dropped) at every control tick, so a quiet source cannot starve ownership.
         let admission = TransportReceiveLane::admit(WireLimits::default().max_copy_data_bytes)?;
+        if let Some(start) = on_ready.take() {
+            start()?;
+        }
         let read_cancellation = cancellation.child_token();
         let mut read = Box::pin(connection.get_copy_data_async(&read_cancellation));
         let control_tick = tokio::time::sleep(control_cadence);
@@ -1168,6 +1295,10 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                 RuntimeError::SchemaChange(detail) => Some(*detail),
                 _ => None,
             };
+            let spool_limit_kind = match &error {
+                RuntimeError::SpoolLimit { kind } => Some(*kind),
+                _ => None,
+            };
             runtime
                 .persist_if_enabled(class, code)
                 .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
@@ -1175,6 +1306,9 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                 eprintln!(
                     "M2_RELATION_SCHEMA_CHANGE_UNSUPPORTED detail={detail} recovery=confirmed_reseed"
                 );
+            }
+            if let Some(kind) = spool_limit_kind {
+                eprintln!("M2_CAPTURE_RESOURCE_LIMIT kind={kind} recovery=changed_limit_required");
             }
             if supervisor_retry {
                 return Err(CaptureFailure::at("runtime", "M2_CAPTURE_FAILED"));
@@ -1279,18 +1413,21 @@ pub fn acquire_production_ownership(
         )
         .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
         let gate = connection.query_row(
-            "SELECT retry_class,next_retry_at FROM processing_failures WHERE component='capture' AND armed=1",
+            "SELECT failure_class,CASE WHEN instr(last_failed_at,';rearm-' || char(116,111,107,101,110,61))>0 THEN 'rearmed' ELSE retry_class END,next_retry_at FROM processing_failures WHERE component='capture' AND armed=1",
             [],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?)),
         ).optional().map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
-        if let Some((class, next)) = gate {
-            if class != "transient" && class != "rearmed" {
+        if let Some((failure_class, retry_class, next)) = gate {
+            if retry_class != "transient"
+                && retry_class != "rearmed"
+                && failure_class != "configuration"
+            {
                 return Err(CaptureFailure::at(
                     "failure_policy",
                     "M2_EXPLICIT_REARM_REQUIRED",
                 ));
             }
-            let deadline = if class == "transient" {
+            let deadline = if retry_class == "transient" {
                 Some(
                     next.and_then(|value| value.strip_prefix("unix-ms:")?.parse::<u64>().ok())
                         .ok_or_else(|| {
@@ -1542,6 +1679,269 @@ impl crate::m2_reconcile::ArchiveReconciler for ProductionArchiveInspection {
     }
 }
 
+struct CaptureRecoveryFingerprints {
+    non_limit: String,
+    limits: String,
+}
+
+fn capture_recovery_fingerprints(
+    public: &crate::m1_config::PublicConfig,
+) -> Result<CaptureRecoveryFingerprints, CaptureFailure> {
+    let mut stable = serde_json::to_value(public)
+        .map_err(|_| CaptureFailure::at("configuration", "M2_RECOVERY_CONFIG_INVALID"))?;
+    let root = stable
+        .as_object_mut()
+        .ok_or_else(|| CaptureFailure::at("configuration", "M2_RECOVERY_CONFIG_INVALID"))?;
+    let limits = root
+        .remove("limits")
+        .ok_or_else(|| CaptureFailure::at("configuration", "M2_RECOVERY_CONFIG_INVALID"))?;
+    let budgets = root
+        .get_mut("budgets")
+        .and_then(serde_json::Value::as_array_mut)
+        .ok_or_else(|| CaptureFailure::at("configuration", "M2_RECOVERY_CONFIG_INVALID"))?;
+    let mut admission_budgets = Vec::with_capacity(budgets.len());
+    for budget in budgets {
+        let budget = budget
+            .as_object_mut()
+            .ok_or_else(|| CaptureFailure::at("configuration", "M2_RECOVERY_CONFIG_INVALID"))?;
+        let name = budget
+            .get("name")
+            .cloned()
+            .ok_or_else(|| CaptureFailure::at("configuration", "M2_RECOVERY_CONFIG_INVALID"))?;
+        let mut admission = serde_json::Map::new();
+        admission.insert("name".into(), name);
+        for field in ["total_bytes", "reserved_free_bytes", "capture_spool_bytes"] {
+            admission.insert(
+                field.into(),
+                budget.remove(field).ok_or_else(|| {
+                    CaptureFailure::at("configuration", "M2_RECOVERY_CONFIG_INVALID")
+                })?,
+            );
+        }
+        admission_budgets.push(serde_json::Value::Object(admission));
+    }
+    let limits = serde_json::json!({"limits":limits,"admission_budgets":admission_budgets});
+    let bytes = serde_json::to_vec(&stable)
+        .map_err(|_| CaptureFailure::at("configuration", "M2_RECOVERY_CONFIG_INVALID"))?;
+    let non_limit = format!("{:x}", Sha256::digest(bytes));
+    let bytes = serde_json::to_vec(&limits)
+        .map_err(|_| CaptureFailure::at("configuration", "M2_RECOVERY_CONFIG_INVALID"))?;
+    let limits = format!("{:x}", Sha256::digest(bytes));
+    Ok(CaptureRecoveryFingerprints { non_limit, limits })
+}
+
+struct CaptureConfigurationReceipt {
+    capture_epoch: String,
+    runtime_fingerprint: String,
+    non_limit_fingerprint: String,
+    limit_fingerprint: String,
+    revision: i64,
+}
+
+fn load_capture_configuration_receipt(
+    writer: &mut crate::m2_schema::WriterConnection,
+    capture_epoch: &str,
+    runtime_fingerprint: &str,
+    fingerprints: &CaptureRecoveryFingerprints,
+) -> Result<CaptureConfigurationReceipt, CaptureFailure> {
+    use rusqlite::OptionalExtension;
+    let read = |connection: &rusqlite::Connection| {
+        connection
+            .query_row(
+                "SELECT capture_epoch,runtime_fingerprint,non_limit_fingerprint,limit_fingerprint,revision FROM capture_configuration_receipts WHERE singleton=1",
+                [],
+                |row| {
+                    Ok(CaptureConfigurationReceipt {
+                        capture_epoch: row.get(0)?,
+                        runtime_fingerprint: row.get(1)?,
+                        non_limit_fingerprint: row.get(2)?,
+                        limit_fingerprint: row.get(3)?,
+                        revision: row.get(4)?,
+                    })
+                },
+            )
+            .optional()
+    };
+    let receipt = read(writer.connection())
+        .map_err(|_| CaptureFailure::at("journal", "M2_RECOVERY_RECEIPT_INVALID"))?;
+    let receipt = match receipt {
+        Some(receipt) => receipt,
+        None if capture_epoch == runtime_fingerprint => {
+            writer
+                .connection()
+                .execute(
+                    "INSERT INTO capture_configuration_receipts(singleton,capture_epoch,runtime_fingerprint,non_limit_fingerprint,limit_fingerprint) VALUES(1,?1,?2,?3,?4)",
+                    rusqlite::params![capture_epoch,runtime_fingerprint,fingerprints.non_limit,fingerprints.limits],
+                )
+                .map_err(|_| CaptureFailure::at("journal", "M2_RECOVERY_RECEIPT_CREATE_FAILED"))?;
+            read(writer.connection())
+                .map_err(|_| CaptureFailure::at("journal", "M2_RECOVERY_RECEIPT_INVALID"))?
+                .ok_or_else(|| CaptureFailure::at("journal", "M2_RECOVERY_RECEIPT_INVALID"))?
+        }
+        None => return Err(CaptureFailure::at("journal", "M2_RECOVERY_RECEIPT_MISSING")),
+    };
+    if receipt.capture_epoch != capture_epoch {
+        return Err(CaptureFailure::at("journal", "M2_RECOVERY_EPOCH_MISMATCH"));
+    }
+    Ok(receipt)
+}
+
+fn rearm_changed_capture_limit(
+    journal_path: &std::path::Path,
+    run_id: &str,
+    now_ms: i64,
+    receipt: &CaptureConfigurationReceipt,
+    replacement_runtime_fingerprint: &str,
+    replacement_limit_fingerprint: &str,
+    live: &crate::m2_reconcile::LiveSourceObservation,
+) -> Result<(), CaptureFailure> {
+    use crate::failure_policy::{
+        Component, FailedBoundary, FailureClass, FingerprintInput, PolicyAction, PolicyEvent,
+        PreparedFailureOperation, RearmAuthorizationToken, RearmRequest,
+        RelevantConfigurationChange, SafeContextKey, SafeContextValue, StableErrorCode,
+    };
+    use crate::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
+    use crate::m2_schema::open_writer;
+    use rusqlite::OptionalExtension;
+
+    let mut writer = open_writer(journal_path, run_id, 1, now_ms)
+        .map_err(|_| CaptureFailure::at("journal", "M2_LIMIT_REARM_STORE_UNAVAILABLE"))?;
+    let (durable, floor): (Option<String>, Option<String>) = writer
+        .connection()
+        .query_row(
+            "SELECT durable_transaction_end_lsn,slot_creation_floor_lsn FROM source_state WHERE singleton=1 AND capture_epoch=?1",
+            [&receipt.capture_epoch],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .map_err(|_| CaptureFailure::at("journal", "M2_LIMIT_REARM_STATE_UNAVAILABLE"))?;
+    let boundary_lsn = durable.as_deref().or(floor.as_deref()).ok_or_else(|| {
+        CaptureFailure::at("reconciliation", "M2_LIMIT_REARM_BOUNDARY_UNAVAILABLE")
+    })?;
+    let boundary_value = parse_lsn(boundary_lsn)
+        .map_err(|_| CaptureFailure::at("journal", "M2_LIMIT_REARM_BOUNDARY_INVALID"))?;
+    let retained_restart = live
+        .restart_lsn
+        .as_deref()
+        .ok_or_else(|| CaptureFailure::at("reconciliation", "M2_LIMIT_REARM_WAL_UNAVAILABLE"))?;
+    let retained_restart = parse_lsn(retained_restart)
+        .map_err(|_| CaptureFailure::at("reconciliation", "M2_LIMIT_REARM_WAL_UNAVAILABLE"))?;
+    let confirmed = live
+        .confirmed_flush_lsn
+        .as_deref()
+        .ok_or_else(|| CaptureFailure::at("reconciliation", "M2_LIMIT_REARM_WAL_UNAVAILABLE"))?;
+    let confirmed = parse_lsn(confirmed)
+        .map_err(|_| CaptureFailure::at("reconciliation", "M2_LIMIT_REARM_WAL_UNAVAILABLE"))?;
+    if !live.slot_exists
+        || !live.slot_valid
+        || !live.resume_wal_available
+        || retained_restart > boundary_value
+        || confirmed > boundary_value
+    {
+        return Err(CaptureFailure::at(
+            "reconciliation",
+            "M2_LIMIT_REARM_WAL_UNAVAILABLE",
+        ));
+    }
+    let failure_id: String = writer
+        .connection()
+        .query_row(
+            "SELECT failure_id FROM processing_failures WHERE component='capture' AND failure_class='configuration' AND retry_class='deterministic' AND armed=1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| CaptureFailure::at("failure_policy", "M2_LIMIT_REARM_FAILURE_INVALID"))?
+        .ok_or_else(|| {
+            CaptureFailure::at("failure_policy", "M2_LIMIT_REARM_FAILURE_MISSING")
+        })?;
+    let boundary = FailedBoundary::Capture {
+        capture_epoch: receipt.capture_epoch.clone(),
+        end_lsn: format!(
+            "{durable:016X}",
+            durable = durable.map_or(0, |_| boundary_value)
+        ),
+    };
+    let record =
+        crate::failure_policy::load_failure(writer.connection(), &failure_id, boundary.clone())
+            .map_err(|_| CaptureFailure::at("failure_policy", "M2_LIMIT_REARM_FAILURE_INVALID"))?
+            .ok_or_else(|| {
+                CaptureFailure::at("failure_policy", "M2_LIMIT_REARM_FAILURE_MISSING")
+            })?;
+    let input = |limit_fingerprint: &str| FingerprintInput {
+        component: Component::Capture,
+        class: FailureClass::Configuration,
+        code: StableErrorCode::ResourceLimit,
+        boundary: boundary.clone(),
+        relevant_configuration_fingerprint: limit_fingerprint.into(),
+        context: BTreeMap::from([(SafeContextKey::Operation, SafeContextValue::Capture)]),
+    };
+    struct Zero;
+    impl Randomness for Zero {
+        fn next_u64(&mut self) -> u64 {
+            0
+        }
+    }
+    let clock = VirtualClock::new((now_ms as u64).max(record.last_failed_at_ms.saturating_add(1)));
+    let mut randomness = Zero;
+    let mut context = TransitionContext {
+        clock: &clock,
+        randomness: &mut randomness,
+    };
+    let action = crate::failure_policy::transition(
+        Some(&record),
+        PolicyEvent::Rearm(RearmRequest {
+            expected_failure_id: record.failure_id.clone(),
+            expected_fingerprint: record.fingerprint.clone(),
+            authorization_token: RearmAuthorizationToken {
+                token_id: format!(
+                    "capture-limit:{}:{}:{}",
+                    receipt.revision, receipt.limit_fingerprint, replacement_limit_fingerprint
+                ),
+                expected_last_rearm_token_digest: record.last_rearm_token_digest.clone(),
+            },
+            relevant_configuration_change: Some(RelevantConfigurationChange {
+                previous: input(&receipt.limit_fingerprint),
+                replacement: input(replacement_limit_fingerprint),
+            }),
+            retained_wal_proven: true,
+            integrity_recovery_proven: false,
+            continuity_recovery_proven: false,
+            explicit_operator_authorization: false,
+        }),
+        &mut context,
+    );
+    if !matches!(action, PolicyAction::Rearmed { .. }) {
+        return Err(CaptureFailure::at(
+            "failure_policy",
+            "M2_LIMIT_REARM_REJECTED",
+        ));
+    }
+    let operation = PreparedFailureOperation::from_policy_action(action, None)
+        .ok_or_else(|| CaptureFailure::at("failure_policy", "M2_LIMIT_REARM_REJECTED"))?;
+    let tx = writer
+        .connection_mut()
+        .transaction()
+        .map_err(|_| CaptureFailure::at("journal", "M2_LIMIT_REARM_WRITE_FAILED"))?;
+    operation
+        .execute(&tx)
+        .map_err(|_| CaptureFailure::at("journal", "M2_LIMIT_REARM_WRITE_FAILED"))?;
+    let changed = tx
+        .execute(
+            "UPDATE capture_configuration_receipts SET runtime_fingerprint=?1,limit_fingerprint=?2,revision=revision+1 WHERE singleton=1 AND capture_epoch=?3 AND runtime_fingerprint=?4 AND limit_fingerprint=?5 AND revision=?6",
+            rusqlite::params![replacement_runtime_fingerprint,replacement_limit_fingerprint,receipt.capture_epoch,receipt.runtime_fingerprint,receipt.limit_fingerprint,receipt.revision],
+        )
+        .map_err(|_| CaptureFailure::at("journal", "M2_LIMIT_REARM_WRITE_FAILED"))?;
+    if changed != 1 {
+        return Err(CaptureFailure::at(
+            "journal",
+            "M2_LIMIT_REARM_STALE_RECEIPT",
+        ));
+    }
+    tx.commit()
+        .map_err(|_| CaptureFailure::at("journal", "M2_LIMIT_REARM_WRITE_FAILED"))?;
+    Ok(())
+}
+
 /// Builds the bounded durable runtime from the canonical loaded configuration. The caller owns
 /// process supervision and the source advisory-lock guard for the full future lifetime.
 pub async fn run_loaded_config(
@@ -1590,6 +1990,9 @@ pub async fn run_loaded_config(
     let now = elapsed.as_millis() as i64;
     let startup_run_id = format!("production-startup-{}", elapsed.as_nanos());
     let live_source = observe_live_source(&dsn, &public.source.publication, &public.source.slot)?;
+    let recovery_fingerprints = capture_recovery_fingerprints(public)?;
+    let capture_epoch;
+    let recovery_receipt;
     // Initialization is keyed by durable schema/source state, never by path existence. A crash
     // after migrations but before this transaction leaves no partial identity receipt; retrying
     // observes zero rows and atomically writes the full live identity.
@@ -1626,6 +2029,39 @@ pub async fn run_loaded_config(
                 "M2_SOURCE_STATE_CARDINALITY_INVALID",
             ));
         }
+        capture_epoch = initial
+            .connection()
+            .query_row(
+                "SELECT capture_epoch FROM source_state WHERE singleton=1",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_READ_FAILED"))?;
+        recovery_receipt = load_capture_configuration_receipt(
+            &mut initial,
+            &capture_epoch,
+            &config.fingerprints().runtime,
+            &recovery_fingerprints,
+        )?;
+    }
+    let changed_limit = recovery_receipt.runtime_fingerprint != config.fingerprints().runtime;
+    if changed_limit
+        && (recovery_receipt.non_limit_fingerprint != recovery_fingerprints.non_limit
+            || recovery_receipt.limit_fingerprint == recovery_fingerprints.limits)
+    {
+        return Err(CaptureFailure::at(
+            "configuration",
+            "M2_RECOVERY_UNRELATED_CONFIG_CHANGE",
+        ));
+    }
+    if !changed_limit
+        && (recovery_receipt.non_limit_fingerprint != recovery_fingerprints.non_limit
+            || recovery_receipt.limit_fingerprint != recovery_fingerprints.limits)
+    {
+        return Err(CaptureFailure::at(
+            "configuration",
+            "M2_RECOVERY_RECEIPT_MISMATCH",
+        ));
     }
     let receipt = crate::m2_reconcile::reconcile_startup(
         &journal_path,
@@ -1643,26 +2079,20 @@ pub async fn run_loaded_config(
     ) {
         return Err(CaptureFailure::at("reconciliation", "M2_STARTUP_BLOCKED"));
     }
-    let cadence_ms = public.source.heartbeat_cadence_ms.0;
-    let initial_retry_ms = (cadence_ms / 10).max(1);
-    let heartbeat_lane = crate::m2_heartbeat::PublishedHeartbeatLane::start(
-        heartbeat_dsn,
-        crate::m2_heartbeat::HeartbeatPolicy {
-            cadence_ms,
-            initial_retry_ms,
-            max_retry_ms: (cadence_ms / 2).max(initial_retry_ms),
-        },
-        now as u64,
-        Duration::from_millis(public.source.maximum_operation_ms.0),
-        crate::m2_heartbeat::HeartbeatLogContext {
-            scenario_id: "SCN-HEARTBEAT-PERMISSION-OUTAGE".into(),
-            correlation_id: format!("heartbeat:{startup_run_id}"),
-            run_id: startup_run_id.clone(),
-            capture_epoch: config.fingerprints().runtime.clone(),
-            config_fingerprint: config.fingerprints().runtime.clone(),
-        },
-    )
-    .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?;
+    if changed_limit {
+        ownership
+            .probe(Duration::from_millis(public.source.ownership_deadline_ms.0))
+            .map_err(|_| CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"))?;
+        rearm_changed_capture_limit(
+            &journal_path,
+            &startup_run_id,
+            now,
+            &recovery_receipt,
+            &config.fingerprints().runtime,
+            &recovery_fingerprints.limits,
+            &live_source,
+        )?;
+    }
     let writer = open_writer(&journal_path, "production-run", 1, now)
         .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_OPEN_FAILED"))?;
     let durable = writer
@@ -1689,8 +2119,8 @@ pub async fn run_loaded_config(
         ownership.state_lock(),
         &journal_path,
         &spool_path,
-        config.fingerprints().runtime.as_str(),
-        "production-run",
+        capture_epoch.as_str(),
+        &startup_run_id,
         public.limits.max_event_bytes.0 as usize,
         public.limits.max_transaction_bytes.0,
         public.limits.max_transaction_events,
@@ -1718,7 +2148,7 @@ pub async fn run_loaded_config(
     let store = JournalStore::new(
         writer,
         SourceIdentity {
-            capture_epoch: config.fingerprints().runtime.clone(),
+            capture_epoch: capture_epoch.clone(),
             source_system_id: live_source.source_system_id,
             timeline_id: live_source.timeline_id,
             database_id: live_source.database_id,
@@ -1754,7 +2184,8 @@ pub async fn run_loaded_config(
     let limits = public.limits.clone();
     let make_disk = disk.clone();
     let make_path = spool_path.clone();
-    let epoch = config.fingerprints().runtime.clone();
+    let epoch = capture_epoch.clone();
+    let spool_run_id = startup_run_id.clone();
     let factory = move |xid: u32| -> Result<Box<dyn RuntimeSpool>, RuntimeError> {
         let memory = MemoryBudget::new(MemoryLimits {
             process_limit: limits.process_memory_bytes.0 as usize,
@@ -1763,12 +2194,12 @@ pub async fn run_loaded_config(
             decoder: limits.max_event_bytes.0 as usize,
             staging: limits.max_transaction_bytes.0 as usize,
         })
-        .map_err(|e| RuntimeError::Spool(e.to_string()))?;
+        .map_err(spool_runtime_error)?;
         TxnBuffer::new(
             make_path.clone(),
             epoch.clone(),
             xid.to_string(),
-            "production-run".into(),
+            spool_run_id.clone(),
             SpoolLimits {
                 max_frame_bytes: limits.max_wire_frame_bytes.0 as usize,
                 max_event_bytes: limits.max_event_bytes.0 as usize,
@@ -1782,7 +2213,7 @@ pub async fn run_loaded_config(
             Box::new(PosixAllocation),
         )
         .map(|v| Box::new(v) as Box<dyn RuntimeSpool>)
-        .map_err(|e| RuntimeError::Spool(e.to_string()))
+        .map_err(spool_runtime_error)
     };
     // M0-PROVISIONAL: boring-cdc-m2-capture-runtime.1 (writer queue caps and capture burst).
     let writer_service = JournalWriterService::new(store, [8, 4, 2, 1], 4)
@@ -1810,13 +2241,11 @@ pub async fn run_loaded_config(
         Default::default(),
         durable,
     );
-    runtime.enable_failure_policy(
-        config.fingerprints().runtime.clone(),
-        config.fingerprints().runtime.clone(),
-    );
+    runtime.enable_failure_policy(capture_epoch.clone(), config.fingerprints().runtime.clone());
+    runtime.enable_capture_limit_fingerprint(recovery_fingerprints.limits.clone());
     runtime.enable_pressure_filesystems(
         configured_pressure_filesystems(public)?,
-        config.fingerprints().runtime.clone(),
+        capture_epoch.clone(),
         public.retention.replay_window_ms.0,
     );
     let control_lane = ProductionControlLane::start(
@@ -1824,6 +2253,7 @@ pub async fn run_loaded_config(
         ownership.backend_pid(),
         Duration::from_millis(public.source.lock_probe_interval_ms.0),
     )?;
+    let mut heartbeat_lane = None;
     let result = capture_copyboth_until_with_probe(
         &capture_config,
         cancellation,
@@ -1838,12 +2268,37 @@ pub async fn run_loaded_config(
                     ))
                     .is_ok()
         },
+        || {
+            let cadence_ms = public.source.heartbeat_cadence_ms.0;
+            let initial_retry_ms = (cadence_ms / 10).max(1);
+            heartbeat_lane = Some(
+                crate::m2_heartbeat::PublishedHeartbeatLane::start(
+                    heartbeat_dsn,
+                    crate::m2_heartbeat::HeartbeatPolicy {
+                        cadence_ms,
+                        initial_retry_ms,
+                        max_retry_ms: (cadence_ms / 2).max(initial_retry_ms),
+                    },
+                    now as u64,
+                    Duration::from_millis(public.source.maximum_operation_ms.0),
+                    crate::m2_heartbeat::HeartbeatLogContext {
+                        scenario_id: "SCN-HEARTBEAT-PERMISSION-OUTAGE".into(),
+                        correlation_id: format!("heartbeat:{startup_run_id}"),
+                        run_id: startup_run_id.clone(),
+                        capture_epoch: capture_epoch.clone(),
+                        config_fingerprint: config.fingerprints().runtime.clone(),
+                    },
+                )
+                .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?,
+            );
+            Ok(())
+        },
     )
     .await;
+    drop(heartbeat_lane);
     if result.is_err() {
         let _ = ownership.unexpected_transport_loss();
     }
-    drop(heartbeat_lane);
     result
 }
 
@@ -1856,6 +2311,96 @@ pub mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::Duration;
     static NEXT: AtomicU64 = AtomicU64::new(1);
+
+    #[test]
+    fn production_control_contracts_require_exact_published_shapes() {
+        use crate::m1_decoder::{Column, Relation};
+        let make = |id, name: &str, fields: &[(&str, u32)]| RelationContract {
+            relation: Relation {
+                id,
+                namespace: "boring_cdc_control".into(),
+                name: name.into(),
+                replica_identity: b'd',
+                columns: fields
+                    .iter()
+                    .enumerate()
+                    .map(|(index, (name, type_oid))| Column {
+                        key: index == 0,
+                        name: (*name).into(),
+                        type_oid: *type_oid,
+                        type_modifier: -1,
+                    })
+                    .collect(),
+            },
+            key_columns: vec![0],
+            control: None,
+        };
+        let heartbeat = make(
+            1,
+            "heartbeat",
+            &[("id", 25), ("nonce", 20), ("updated_at", 1184)],
+        );
+        let fence = make(
+            2,
+            "capture_fences",
+            &[
+                ("id", 25),
+                ("capture_epoch", 20),
+                ("generation", 20),
+                ("table_set_fingerprint", 25),
+                ("unique_nonce", 20),
+            ],
+        );
+        let mut contracts = BTreeMap::from([(1, heartbeat), (2, fence)]);
+        bind_production_control_contracts(&mut contracts).unwrap();
+        assert_eq!(
+            contracts[&1].control.as_ref().unwrap().immutable_key,
+            [b"singleton".to_vec()]
+        );
+        assert_eq!(
+            contracts[&1].control.as_ref().unwrap().mutable_columns,
+            [1, 2]
+        );
+        assert_eq!(
+            contracts[&2].control.as_ref().unwrap().mutable_columns,
+            [1, 2, 3, 4]
+        );
+
+        for mut bad in [
+            {
+                let mut c = contracts.clone();
+                c.remove(&2);
+                c
+            },
+            {
+                let mut c = contracts.clone();
+                c.get_mut(&1).unwrap().relation.columns[1].type_oid = 25;
+                c
+            },
+            {
+                let mut c = contracts.clone();
+                c.get_mut(&2).unwrap().relation.replica_identity = b'f';
+                c
+            },
+            {
+                let mut c = contracts.clone();
+                c.get_mut(&1).unwrap().key_columns = vec![1];
+                c
+            },
+            {
+                let mut c = contracts.clone();
+                c.get_mut(&2).unwrap().relation.name = "other".into();
+                c
+            },
+        ] {
+            assert_eq!(
+                bind_production_control_contracts(&mut bad)
+                    .unwrap_err()
+                    .code,
+                "M2_CONTROL_RELATION_SCHEMA_MISMATCH"
+            );
+        }
+    }
 
     #[test]
     fn postgresql_and_canonical_lsn_text_parse_identically() {
@@ -1999,6 +2544,44 @@ pub mod tests {
             p,
             CaptureRuntime::new(s, MemorySpools, Gate(gate), BTreeMap::from([(7, c)]), None),
         )
+    }
+
+    #[test]
+    fn failed_copyboth_setup_never_starts_published_heartbeat() {
+        let (path, mut capture) = runtime(FeedbackPermit::Hold);
+        let config = CaptureConfig::production(
+            "postgresql://127.0.0.1:1/postgres",
+            "boring_publication",
+            "boring_slot",
+            ["public.orders".to_owned()],
+        )
+        .unwrap();
+        let started = std::cell::Cell::new(false);
+        let executor = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let failure = executor.block_on(capture_copyboth_until_with_probe(
+            &config,
+            &CancellationToken::new(),
+            &mut capture,
+            1,
+            Duration::from_millis(10),
+            || true,
+            || {
+                started.set(true);
+                Ok(())
+            },
+        ));
+        assert!(failure.is_err());
+        assert!(
+            !started.get(),
+            "publisher must not start before CopyBoth preflight"
+        );
+        drop(capture);
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(path.with_extension("sqlite-wal"));
+        let _ = std::fs::remove_file(path.with_extension("sqlite-shm"));
     }
 
     #[test]
