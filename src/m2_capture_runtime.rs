@@ -7,7 +7,8 @@
 
 use crate::article1_capture::{CaptureConfig, CaptureFailure, setup_runtime};
 use crate::m1_decoder::{
-    CopyBothEvent, Decoder, PgoutputEvent, RelationContract, RowChange, TupleValue, WireLimits,
+    ControlContract, CopyBothEvent, Decoder, PgoutputEvent, RelationContract, RowChange,
+    TupleValue, WireLimits,
 };
 use crate::m2_journal::{
     CommitFault, DurableCommit, JournalError, JournalEvent, JournalStore, JournalWriterService,
@@ -1128,6 +1129,80 @@ impl TransportReceiveLane {
         }
     }
 }
+fn bind_production_control_contracts(
+    contracts: &mut BTreeMap<u32, RelationContract>,
+) -> Result<(), CaptureFailure> {
+    type ControlColumns = &'static [(&'static str, u32, bool)];
+    let mut seen = [false; 2];
+    for contract in contracts.values_mut() {
+        if contract.relation.namespace != "boring_cdc_control" {
+            continue;
+        }
+        let (index, columns, mutable_columns): (usize, ControlColumns, Vec<usize>) =
+            match contract.relation.name.as_str() {
+                "heartbeat" => (
+                    0,
+                    &[
+                        ("id", 25, true),
+                        ("nonce", 20, false),
+                        ("updated_at", 1184, false),
+                    ],
+                    vec![1, 2],
+                ),
+                "capture_fences" => (
+                    1,
+                    &[
+                        ("id", 25, true),
+                        ("capture_epoch", 20, false),
+                        ("generation", 20, false),
+                        ("table_set_fingerprint", 25, false),
+                        ("unique_nonce", 20, false),
+                    ],
+                    vec![1, 2, 3, 4],
+                ),
+                _ => {
+                    return Err(CaptureFailure::at(
+                        "control_relation",
+                        "M2_CONTROL_RELATION_SCHEMA_MISMATCH",
+                    ));
+                }
+            };
+        if seen[index]
+            || contract.relation.replica_identity != b'd'
+            || contract.key_columns != [0]
+            || contract.relation.columns.len() != columns.len()
+            || !contract
+                .relation
+                .columns
+                .iter()
+                .zip(columns)
+                .all(|(actual, expected)| {
+                    actual.name == expected.0
+                        && actual.type_oid == expected.1
+                        && actual.key == expected.2
+                        && actual.type_modifier == -1
+                })
+        {
+            return Err(CaptureFailure::at(
+                "control_relation",
+                "M2_CONTROL_RELATION_SCHEMA_MISMATCH",
+            ));
+        }
+        seen[index] = true;
+        contract.control = Some(ControlContract {
+            immutable_key: vec![b"singleton".to_vec()],
+            mutable_columns,
+        });
+    }
+    if !seen.into_iter().all(|present| present) {
+        return Err(CaptureFailure::at(
+            "control_relation",
+            "M2_CONTROL_RELATION_SCHEMA_MISMATCH",
+        ));
+    }
+    Ok(())
+}
+
 async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G: FeedbackGate>(
     config: &CaptureConfig,
     cancellation: &CancellationToken,
@@ -1136,7 +1211,8 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     control_cadence: std::time::Duration,
     mut ownership_probe: impl FnMut() -> bool,
 ) -> Result<(), CaptureFailure> {
-    let (mut connection, contracts) = setup_runtime(config)?;
+    let (mut connection, mut contracts) = setup_runtime(config)?;
+    bind_production_control_contracts(&mut contracts)?;
     runtime.contracts = contracts;
     loop {
         runtime
@@ -2223,6 +2299,96 @@ pub mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::Duration;
     static NEXT: AtomicU64 = AtomicU64::new(1);
+
+    #[test]
+    fn production_control_contracts_require_exact_published_shapes() {
+        use crate::m1_decoder::{Column, Relation};
+        let make = |id, name: &str, fields: &[(&str, u32)]| RelationContract {
+            relation: Relation {
+                id,
+                namespace: "boring_cdc_control".into(),
+                name: name.into(),
+                replica_identity: b'd',
+                columns: fields
+                    .iter()
+                    .enumerate()
+                    .map(|(index, (name, type_oid))| Column {
+                        key: index == 0,
+                        name: (*name).into(),
+                        type_oid: *type_oid,
+                        type_modifier: -1,
+                    })
+                    .collect(),
+            },
+            key_columns: vec![0],
+            control: None,
+        };
+        let heartbeat = make(
+            1,
+            "heartbeat",
+            &[("id", 25), ("nonce", 20), ("updated_at", 1184)],
+        );
+        let fence = make(
+            2,
+            "capture_fences",
+            &[
+                ("id", 25),
+                ("capture_epoch", 20),
+                ("generation", 20),
+                ("table_set_fingerprint", 25),
+                ("unique_nonce", 20),
+            ],
+        );
+        let mut contracts = BTreeMap::from([(1, heartbeat), (2, fence)]);
+        bind_production_control_contracts(&mut contracts).unwrap();
+        assert_eq!(
+            contracts[&1].control.as_ref().unwrap().immutable_key,
+            [b"singleton".to_vec()]
+        );
+        assert_eq!(
+            contracts[&1].control.as_ref().unwrap().mutable_columns,
+            [1, 2]
+        );
+        assert_eq!(
+            contracts[&2].control.as_ref().unwrap().mutable_columns,
+            [1, 2, 3, 4]
+        );
+
+        for mut bad in [
+            {
+                let mut c = contracts.clone();
+                c.remove(&2);
+                c
+            },
+            {
+                let mut c = contracts.clone();
+                c.get_mut(&1).unwrap().relation.columns[1].type_oid = 25;
+                c
+            },
+            {
+                let mut c = contracts.clone();
+                c.get_mut(&2).unwrap().relation.replica_identity = b'f';
+                c
+            },
+            {
+                let mut c = contracts.clone();
+                c.get_mut(&1).unwrap().key_columns = vec![1];
+                c
+            },
+            {
+                let mut c = contracts.clone();
+                c.get_mut(&2).unwrap().relation.name = "other".into();
+                c
+            },
+        ] {
+            assert_eq!(
+                bind_production_control_contracts(&mut bad)
+                    .unwrap_err()
+                    .code,
+                "M2_CONTROL_RELATION_SCHEMA_MISMATCH"
+            );
+        }
+    }
 
     #[test]
     fn postgresql_and_canonical_lsn_text_parse_identically() {

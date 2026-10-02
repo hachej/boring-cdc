@@ -42,3 +42,8 @@ jobs:
         env:
           TMPDIR: /var/tmp
         run: scripts/acceptance/durable_simple_case.sh
+      - name: Live schema-change boundary
+        timeout-minutes: 5
+        env:
+          TMPDIR: /var/tmp
+        run: scripts/acceptance/schema_change_live.sh

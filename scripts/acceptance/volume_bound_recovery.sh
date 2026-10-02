@@ -94,7 +94,7 @@ journal_transactions() {
   python3 - "$journal" <<'PY'
 import sqlite3,sys
 with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True) as db:
-    print(db.execute("select count(*) from source_transactions where state='committed'").fetchone()[0])
+    print(db.execute("select count(distinct t.transaction_id) from source_transactions t join journal_events e on e.transaction_id=t.transaction_id where t.state='committed' and e.control_kind is null").fetchone()[0])
 PY
 }
 wait_for_transactions() {
@@ -311,7 +311,7 @@ journal,oracle_path,result_path,version,rss_first,rss_insufficient,rss_recovery,
 oracle={tuple(line.strip().split('|')) for line in open(oracle_path) if line.strip()}
 with sqlite3.connect(f'file:{journal}?mode=ro',uri=True) as db:
     transactions=db.execute("select transaction_id,xid from source_transactions where state='committed'").fetchall()
-    events=db.execute("select journal_seq,transaction_id,cast(payload as text) from journal_events order by journal_seq").fetchall()
+    events=db.execute("select journal_seq,transaction_id,control_kind,cast(payload as text) from journal_events order by journal_seq").fetchall()
     capture_epoch,durable=db.execute("select capture_epoch,durable_transaction_end_lsn from source_state where singleton=1").fetchone()
     receipt=db.execute("select capture_epoch,runtime_fingerprint,revision from capture_configuration_receipts where singleton=1").fetchone()
 assert len({row[0] for row in transactions})==len(transactions)
@@ -320,8 +320,14 @@ assert [row[0] for row in events]==list(range(1,len(events)+1))
 assert receipt[0]==capture_epoch and receipt[1]!=capture_epoch and receipt[2]==2
 xids=dict(transactions)
 journal_rows=set()
-for _,transaction_id,text in events:
+control_events=0
+for _,transaction_id,control_kind,text in events:
     row=json.loads(text)
+    if control_kind is not None:
+        assert control_kind in ('heartbeat','capture_fence')
+        assert row.get('kind')=='update'
+        control_events+=1
+        continue
     if row.get('kind')=='insert' and row.get('new'):
         journal_rows.add((xids[transaction_id],str(int(bytes(row['new'][0]['bytes']).decode()))))
 assert len(journal_rows)==3601, len(journal_rows)
@@ -331,10 +337,20 @@ def lsn(text):
     return (int(hi,16)<<32)+int(lo,16)
 assert lsn(confirmed_before)<lsn(confirmed_after)<=int(durable,16)
 assert lsn(restart_before)<lsn(restart_after)<=lsn(confirmed_after)
-result={'postgres_version':version,'source_oracle_equals_read_only_journal':True,'user_rows':len(journal_rows),'journal_sequence_gap_free':True,'unique_transaction_ids':True,'unique_source_xids':True,'capture_epoch_preserved':True,'unchanged_and_unrelated_configs_rejected':True,'insufficient_limit_superseded_atomically':True,'limit_rearm_revisions':receipt[2],'durable_end_lsn':durable,'confirmed_flush_lsn_before':confirmed_before,'confirmed_flush_lsn_after':confirmed_after,'restart_lsn_before':restart_before,'restart_lsn_after':restart_after,'rss_high_water_first_kb':int(rss_first),'rss_high_water_insufficient_kb':int(rss_insufficient),'rss_high_water_recovery_kb':int(rss_recovery),'elapsed_seconds':int(elapsed)}
+result={'postgres_version':version,'source_oracle_equals_read_only_journal':True,'user_rows':len(journal_rows),'control_events':control_events,'journal_sequence_gap_free':True,'unique_transaction_ids':True,'unique_source_xids':True,'capture_epoch_preserved':True,'unchanged_and_unrelated_configs_rejected':True,'insufficient_limit_superseded_atomically':True,'limit_rearm_revisions':receipt[2],'durable_end_lsn':durable,'confirmed_flush_lsn_before':confirmed_before,'confirmed_flush_lsn_after':confirmed_after,'restart_lsn_before':restart_before,'restart_lsn_after':restart_after,'rss_high_water_first_kb':int(rss_first),'rss_high_water_insufficient_kb':int(rss_insufficient),'rss_high_water_recovery_kb':int(rss_recovery),'elapsed_seconds':int(elapsed)}
 with open(result_path,'w') as f: json.dump(result,f,sort_keys=True);f.write('\n')
 print(json.dumps(result,sort_keys=True))
 PY
+set +e
 stop_bounded "$runtime_pid" TERM recovery-runtime
+shutdown_status=$?
+set -e
+if (( shutdown_status != 0 )); then
+  if (( shutdown_status != 4 )) || ! grep -q 'M2_SHUTDOWN_RECONCILIATION_REQUIRED' "$work/runtime-restart.err"; then
+    cat "$work/runtime-restart.err" >&2
+    exit 1
+  fi
+  sample_feedback_boundary after-fail-closed-shutdown
+fi
 runtime_pid=
-printf 'VOLUME_BOUND_RECOVERY_OK postgres=%s user_rows=3601 named_error=M2_CAPTURE_RESOURCE_LIMIT oracle=set-equality feedback=bounded restart_lsn=advanced elapsed_seconds=%s\n' "$version" "$((SECONDS-started))"
+printf 'VOLUME_BOUND_RECOVERY_OK postgres=%s user_rows=3601 named_error=M2_CAPTURE_RESOURCE_LIMIT oracle=set-equality feedback=bounded restart_lsn=advanced shutdown_status=%s elapsed_seconds=%s\n' "$version" "$shutdown_status" "$((SECONDS-started))"
