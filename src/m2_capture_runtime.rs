@@ -2295,10 +2295,10 @@ pub async fn run_loaded_config(
         },
     )
     .await;
+    drop(heartbeat_lane);
     if result.is_err() {
         let _ = ownership.unexpected_transport_loss();
     }
-    drop(heartbeat_lane);
     result
 }
 
