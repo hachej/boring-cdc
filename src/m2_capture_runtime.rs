@@ -904,6 +904,7 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
         stop_after_commits,
         std::time::Duration::from_millis(250),
         || true,
+        || Ok(()),
     )
     .await
 }
@@ -1210,10 +1211,12 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     stop_after_commits: u64,
     control_cadence: std::time::Duration,
     mut ownership_probe: impl FnMut() -> bool,
+    on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
 ) -> Result<(), CaptureFailure> {
     let (mut connection, mut contracts) = setup_runtime(config)?;
     bind_production_control_contracts(&mut contracts)?;
     runtime.contracts = contracts;
+    let mut on_ready = Some(on_ready);
     loop {
         runtime
             .service_pressure()
@@ -1237,6 +1240,9 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         // Admit a maximum-sized CopyData allocation before transport receive. The read future is
         // cancelled (not dropped) at every control tick, so a quiet source cannot starve ownership.
         let admission = TransportReceiveLane::admit(WireLimits::default().max_copy_data_bytes)?;
+        if let Some(start) = on_ready.take() {
+            start()?;
+        }
         let read_cancellation = cancellation.child_token();
         let mut read = Box::pin(connection.get_copy_data_async(&read_cancellation));
         let control_tick = tokio::time::sleep(control_cadence);
@@ -2087,26 +2093,6 @@ pub async fn run_loaded_config(
             &live_source,
         )?;
     }
-    let cadence_ms = public.source.heartbeat_cadence_ms.0;
-    let initial_retry_ms = (cadence_ms / 10).max(1);
-    let heartbeat_lane = crate::m2_heartbeat::PublishedHeartbeatLane::start(
-        heartbeat_dsn,
-        crate::m2_heartbeat::HeartbeatPolicy {
-            cadence_ms,
-            initial_retry_ms,
-            max_retry_ms: (cadence_ms / 2).max(initial_retry_ms),
-        },
-        now as u64,
-        Duration::from_millis(public.source.maximum_operation_ms.0),
-        crate::m2_heartbeat::HeartbeatLogContext {
-            scenario_id: "SCN-HEARTBEAT-PERMISSION-OUTAGE".into(),
-            correlation_id: format!("heartbeat:{startup_run_id}"),
-            run_id: startup_run_id.clone(),
-            capture_epoch: capture_epoch.clone(),
-            config_fingerprint: config.fingerprints().runtime.clone(),
-        },
-    )
-    .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?;
     let writer = open_writer(&journal_path, "production-run", 1, now)
         .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_OPEN_FAILED"))?;
     let durable = writer
@@ -2267,6 +2253,7 @@ pub async fn run_loaded_config(
         ownership.backend_pid(),
         Duration::from_millis(public.source.lock_probe_interval_ms.0),
     )?;
+    let mut heartbeat_lane = None;
     let result = capture_copyboth_until_with_probe(
         &capture_config,
         cancellation,
@@ -2280,6 +2267,31 @@ pub async fn run_loaded_config(
                         public.source.ownership_deadline_ms.0,
                     ))
                     .is_ok()
+        },
+        || {
+            let cadence_ms = public.source.heartbeat_cadence_ms.0;
+            let initial_retry_ms = (cadence_ms / 10).max(1);
+            heartbeat_lane = Some(
+                crate::m2_heartbeat::PublishedHeartbeatLane::start(
+                    heartbeat_dsn,
+                    crate::m2_heartbeat::HeartbeatPolicy {
+                        cadence_ms,
+                        initial_retry_ms,
+                        max_retry_ms: (cadence_ms / 2).max(initial_retry_ms),
+                    },
+                    now as u64,
+                    Duration::from_millis(public.source.maximum_operation_ms.0),
+                    crate::m2_heartbeat::HeartbeatLogContext {
+                        scenario_id: "SCN-HEARTBEAT-PERMISSION-OUTAGE".into(),
+                        correlation_id: format!("heartbeat:{startup_run_id}"),
+                        run_id: startup_run_id.clone(),
+                        capture_epoch: capture_epoch.clone(),
+                        config_fingerprint: config.fingerprints().runtime.clone(),
+                    },
+                )
+                .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?,
+            );
+            Ok(())
         },
     )
     .await;
@@ -2532,6 +2544,44 @@ pub mod tests {
             p,
             CaptureRuntime::new(s, MemorySpools, Gate(gate), BTreeMap::from([(7, c)]), None),
         )
+    }
+
+    #[test]
+    fn failed_copyboth_setup_never_starts_published_heartbeat() {
+        let (path, mut capture) = runtime(FeedbackPermit::Hold);
+        let config = CaptureConfig::production(
+            "postgresql://127.0.0.1:1/postgres",
+            "boring_publication",
+            "boring_slot",
+            ["public.orders".to_owned()],
+        )
+        .unwrap();
+        let started = std::cell::Cell::new(false);
+        let executor = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let failure = executor.block_on(capture_copyboth_until_with_probe(
+            &config,
+            &CancellationToken::new(),
+            &mut capture,
+            1,
+            Duration::from_millis(10),
+            || true,
+            || {
+                started.set(true);
+                Ok(())
+            },
+        ));
+        assert!(failure.is_err());
+        assert!(
+            !started.get(),
+            "publisher must not start before CopyBoth preflight"
+        );
+        drop(capture);
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(path.with_extension("sqlite-wal"));
+        let _ = std::fs::remove_file(path.with_extension("sqlite-shm"));
     }
 
     #[test]
