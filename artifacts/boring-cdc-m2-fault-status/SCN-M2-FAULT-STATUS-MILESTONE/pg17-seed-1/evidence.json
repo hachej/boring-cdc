@@ -8,7 +8,7 @@
       "argv": "cargo clippy --locked --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stderr",
-      "stderr_sha256": "8a2933ae25e59188be988ea6218274cb341f13d8bc4b533f57b12ececd4be8b3",
+      "stderr_sha256": "2461b00c8697c4189b2de92ca6fb05b5d72273c78a0a47b1ce4e83ccca077b70",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/clippy.stdout",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "version": "m2-fault-status/v5"
@@ -17,25 +17,25 @@
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stderr",
-      "stderr_sha256": "ebc57fe540501bebf8137ec47a20ab1ec0283ea0765dacacb675ecef3ef37e82",
+      "stderr_sha256": "72b639b8d1c3a0d8182012d5fd5e476b48f800f535451eebe5d20c512273348d",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/workspace.stdout",
-      "stdout_sha256": "8e457c7205fdea507cf3c0da9a81c2706ed81f379bd2027c8a4300eec560a579",
+      "stdout_sha256": "28f1524f921350713ddce5d495a215003f99c3ed3e3ef26dedc4efbdfcd0359f",
       "version": "m2-fault-status/v5"
     },
     {
       "argv": "cargo test --locked m2_fault_status::tests",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stderr",
-      "stderr_sha256": "eb373deec04b1554cf9cca206b4820f6a1d0f0d4f43dda0ad6888f5ebab4e95f",
+      "stderr_sha256": "5fd8dbdbd1aab7a073807811e91f1e295de671c7cab947b9a9266341f7b80690",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/targeted.stdout",
-      "stdout_sha256": "8800719bb62cdb037e562a3ca8f0db249f70bf15ba076f27c205d4965d7ca0ae",
+      "stdout_sha256": "28208922299789b08e7886ed5e91cd4e5388ab8ee69dcc04122f917791f96899",
       "version": "m2-fault-status/v5"
     },
     {
       "argv": "scripts/e2e/m2_fault_status.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stderr",
-      "stderr_sha256": "a213a32093b50f6cbc41aae6da36c08518675bf3e3334fb26b1afaca70b7e93d",
+      "stderr_sha256": "49709611a3968f720dc0affc78c2436def533a9086bd33f898ee25f01523ff00",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/e2e.stdout",
       "stdout_sha256": "2621186a88727c197c102348410e9b455abd637871a7908ea9b1744fec6079b4",
       "version": "m2-fault-status/v5"
@@ -44,15 +44,15 @@
       "argv": "scripts/faults/m2_fault_status.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stderr",
-      "stderr_sha256": "bf4e75eb6c973163f8ba2e15c89aa6b957eadb2f603c8f1205c5306ee348e221",
+      "stderr_sha256": "59cc52ce73dee54afbf10ec79fcf04a716e03a7df95d6d97114bfbc25ca37879",
       "stdout_path": "artifacts/boring-cdc-m2-fault-status/SCN-M2-FAULT-STATUS-MILESTONE/pg17-seed-1/fault.stdout",
-      "stdout_sha256": "37c75854876ef14d86aa05e625daf172c9d27627dfc317e0041229c5120fe1c1",
+      "stdout_sha256": "f366a91110336f238027fb1f54e016a396ffbf5f51bbaa43df134902121db24c",
       "version": "m2-fault-status/v5"
     }
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "milestone",
-  "git_commit": "901032440c3f1090c375058eadf5f2fcfdda57ae",
+  "git_commit": "473622ad276761f6175b49f41c7894dde3801c57",
   "owner_bead": "boring-cdc-m2-fault-status",
   "redaction": {
     "checked": true,
@@ -71,7 +71,7 @@
       "e2e-pg17-run-1",
       "fault-wrapper-pg17-run-2"
     ],
-    "digest": "aaecd86440975ddc6ce4ebcdfd36ee30c1766593677ec992f9f1a9cffcec54b7",
+    "digest": "d87de97d844e04b4881b487e105e44832d2cf9cd7903f21ae30b6e708124d00d",
     "product_faults": "16 wired product boundaries aborted; exact-PID PostgreSQL 17.6 recovery and slot-state separation",
     "runtime_observed": true,
     "status": "pass"
