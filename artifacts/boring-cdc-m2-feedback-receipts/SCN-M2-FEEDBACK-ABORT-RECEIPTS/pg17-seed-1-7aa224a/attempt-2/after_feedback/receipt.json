@@ -1,0 +1,18 @@
+{
+  "child_command": [
+    "target/debug/boring-cdc",
+    "run"
+  ],
+  "child_exit_code": 134,
+  "child_pid": 595745,
+  "durable_lsn": "0/19566B0",
+  "durable_transaction_count": 1,
+  "elapsed_since_runtime_start_ms": 4669,
+  "feedback_match_observed": true,
+  "hook": "after_feedback",
+  "postgres_version": "17.6 (Debian 17.6-2.pgdg13+1)",
+  "schema_version": "m2-feedback-fault-receipt/v1",
+  "server_feedback_positions_observed": "0/19566B0,0/19566B0,0/19566B0",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}
