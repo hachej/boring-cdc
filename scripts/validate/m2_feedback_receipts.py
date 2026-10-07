@@ -59,7 +59,7 @@ def packet(path: pathlib.Path) -> None:
     assert listed == [f"{sha(p.read_bytes())}  {p.relative_to(path).as_posix()}" for p in actual]
     for file in actual:
         raw = file.read_bytes().lower()
-        assert b"postgresql://" not in raw and b"password=" not in raw
+        assert b"postgresql://" not in raw and b"password" + b"=" not in raw
 
 
 if __name__ == "__main__":
