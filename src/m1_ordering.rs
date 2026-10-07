@@ -265,7 +265,7 @@ pub struct MutationPayload {
     pub columns: Vec<ColumnState>,
 }
 impl MutationPayload {
-    pub fn hash(&self, version: MutationVersion) -> Result<Hash32, OrderingFailure> {
+    pub fn hash(&self, version: &MutationVersion) -> Result<Hash32, OrderingFailure> {
         if (version.origin_rank == SNAPSHOT_ORIGIN_RANK)
             != (self.operation == SourceOperation::Snapshot)
         {
@@ -281,9 +281,8 @@ impl MutationPayload {
             .transpose()
             .map_err(|_| OrderingFailure::contract("BEFORE_KEY_INVALID"))?
             .unwrap_or_default();
-        if let Some(binding) = version.snapshot_binding
-            && (binding.logical_table_id != self.relation.logical_table
-                || binding.key_hash != key_hash)
+        if let Some(binding) = &version.snapshot_binding
+            && (binding.logical_table_id != self.relation.logical_table || binding.key != self.key)
         {
             return Err(OrderingFailure::contract(
                 "SNAPSHOT_PAYLOAD_IDENTITY_MISMATCH",
@@ -335,13 +334,13 @@ pub fn source_version_for_row(
 }
 
 /// Total version for expanded mutations. SourceVersion is reused rather than represented again.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct SnapshotPayloadBinding {
     logical_table_id: LogicalTableIdentity,
-    key_hash: PhysicalKeyHash,
+    key: CanonicalKey,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MutationVersion {
     source: SourceVersion,
     origin_rank: u8,
@@ -382,7 +381,6 @@ impl MutationVersion {
             return Err(OrderingFailure::contract("SNAPSHOT_ORDINAL_INVALID"));
         }
         let connector_event_id = snapshot_connector_event_id(&position)?;
-        let key_hash = canonical_key_hash(&position.key)?;
         Ok(Self {
             source,
             origin_rank: SNAPSHOT_ORIGIN_RANK,
@@ -390,24 +388,24 @@ impl MutationVersion {
             connector_event_id,
             snapshot_binding: Some(SnapshotPayloadBinding {
                 logical_table_id: position.logical_table_id,
-                key_hash,
+                key: position.key,
             }),
         })
     }
     #[must_use]
-    pub const fn source(self) -> SourceVersion {
+    pub fn source(&self) -> SourceVersion {
         self.source
     }
     #[must_use]
-    pub const fn origin_rank(self) -> u8 {
+    pub const fn origin_rank(&self) -> u8 {
         self.origin_rank
     }
     #[must_use]
-    pub const fn mutation_ordinal(self) -> u8 {
+    pub const fn mutation_ordinal(&self) -> u8 {
         self.mutation_ordinal
     }
     #[must_use]
-    pub const fn connector_event_id(self) -> Hash32 {
+    pub const fn connector_event_id(&self) -> Hash32 {
         self.connector_event_id
     }
 }
@@ -419,11 +417,11 @@ pub enum VersionComparison {
     DifferentCaptureEpoch,
 }
 #[must_use]
-pub fn compare_versions(left: MutationVersion, right: MutationVersion) -> VersionComparison {
+pub fn compare_versions(left: &MutationVersion, right: &MutationVersion) -> VersionComparison {
     if left.source.capture_epoch() != right.source.capture_epoch() {
         return VersionComparison::DifferentCaptureEpoch;
     }
-    let tuple = |v: MutationVersion| {
+    let tuple = |v: &MutationVersion| {
         (
             v.source.commit_lsn().get(),
             v.origin_rank,
@@ -452,8 +450,8 @@ impl CanonicalMutation {
         self.connector_event_id
     }
     #[must_use]
-    pub const fn version(&self) -> MutationVersion {
-        self.version
+    pub const fn version(&self) -> &MutationVersion {
+        &self.version
     }
     #[must_use]
     pub const fn payload(&self) -> &MutationPayload {
@@ -507,7 +505,7 @@ pub fn expand_key_change(
             kind,
             columns,
         };
-        let payload_hash = payload.hash(version)?;
+        let payload_hash = payload.hash(&version)?;
         Ok(CanonicalMutation {
             connector_event_id: event_id,
             version,
@@ -528,7 +526,7 @@ pub enum DuplicateDecision {
     BlockConflict,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ImmutableMutationRecord {
     event_id: Hash32,
     position: MutationVersion,
@@ -546,8 +544,8 @@ impl ImmutableMutationRecord {
 }
 #[must_use]
 pub fn classify_replay(
-    existing: ImmutableMutationRecord,
-    replay: ImmutableMutationRecord,
+    existing: &ImmutableMutationRecord,
+    replay: &ImmutableMutationRecord,
 ) -> DuplicateDecision {
     if existing.event_id != replay.event_id {
         DuplicateDecision::DifferentIdentity
@@ -723,7 +721,7 @@ mod tests {
                 kind: MutationKind::Upsert,
                 columns: vec![state],
             }
-            .hash(version())
+            .hash(&version())
             .unwrap()
         })
         .collect::<std::collections::BTreeSet<_>>();
@@ -740,25 +738,25 @@ mod tests {
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Null],
         };
-        let baseline = payload.hash(version()).unwrap();
+        let baseline = payload.hash(&version()).unwrap();
         let mut changed = payload.clone();
         changed.operation = SourceOperation::Insert;
-        assert_ne!(baseline, changed.hash(version()).unwrap());
+        assert_ne!(baseline, changed.hash(&version()).unwrap());
         changed = payload.clone();
         changed.before_key = Some(key(b"old"));
-        assert_ne!(baseline, changed.hash(version()).unwrap());
+        assert_ne!(baseline, changed.hash(&version()).unwrap());
         changed.before_key = Some(Vec::new());
         assert_eq!(
-            changed.hash(version()).unwrap_err().fingerprint,
+            changed.hash(&version()).unwrap_err().fingerprint,
             "BEFORE_KEY_INVALID"
         );
         changed = payload.clone();
         changed.operation = SourceOperation::Snapshot;
         assert_eq!(
-            changed.hash(version()).unwrap_err().fingerprint,
+            changed.hash(&version()).unwrap_err().fingerprint,
             "OPERATION_ORIGIN_MISMATCH"
         );
-        assert_eq!(baseline, payload.hash(version()).unwrap());
+        assert_eq!(baseline, payload.hash(&version()).unwrap());
     }
 
     #[test]
@@ -851,7 +849,7 @@ mod tests {
                 kind: MutationKind::Upsert,
                 columns: vec![ColumnState::Value(value(20, &42i64.to_be_bytes()))],
             };
-            assert_eq!(payload.hash(version).unwrap().hex(), event["payload_hash"]);
+            assert_eq!(payload.hash(&version).unwrap().hex(), event["payload_hash"]);
         }
     }
 
@@ -866,7 +864,7 @@ mod tests {
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Value(value(25, b"a"))],
         }
-        .hash(version())
+        .hash(&version())
         .unwrap();
         let b = MutationPayload {
             relation: relation(),
@@ -876,7 +874,7 @@ mod tests {
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Value(value(25, b"b"))],
         }
-        .hash(version())
+        .hash(&version())
         .unwrap();
         assert_ne!(a, b);
         assert_eq!(id, wal_connector_event_id(wal(0)));
@@ -990,7 +988,7 @@ mod tests {
         };
         assert!(
             payload
-                .hash(snapshot_version(relation().logical_table, key(b"k")))
+                .hash(&snapshot_version(relation().logical_table, key(b"k")))
                 .is_ok()
         );
         for mismatched in [
@@ -998,7 +996,7 @@ mod tests {
             snapshot_version(relation().logical_table, key(b"other")),
         ] {
             assert_eq!(
-                payload.hash(mismatched).unwrap_err().fingerprint,
+                payload.hash(&mismatched).unwrap_err().fingerprint,
                 "SNAPSHOT_PAYLOAD_IDENTITY_MISMATCH"
             );
         }
@@ -1015,7 +1013,7 @@ mod tests {
                 kind: MutationKind::Upsert,
                 columns: vec![ColumnState::Null],
             }
-            .hash(version())
+            .hash(&version())
             .unwrap()
         };
         assert_ne!(
@@ -1088,17 +1086,17 @@ mod tests {
     fn repeated_same_key_has_total_source_order() {
         let versions = [ordered_version(100, 9, 1), ordered_version(101, 1, 0)];
         assert_eq!(
-            compare_versions(versions[0], versions[1]),
+            compare_versions(&versions[0], &versions[1]),
             VersionComparison::Less
         );
         let same_position_other_xid = ordered_version(100, 99, 1);
         assert_eq!(
-            compare_versions(versions[0], same_position_other_xid),
+            compare_versions(&versions[0], &same_position_other_xid),
             VersionComparison::Equal
         );
         let next_transaction_ordinal = ordered_version(100, 1, 2);
         assert_eq!(
-            compare_versions(versions[0], next_transaction_ordinal),
+            compare_versions(&versions[0], &next_transaction_ordinal),
             VersionComparison::Less
         );
         let other_source =
@@ -1111,7 +1109,7 @@ mod tests {
         };
         let other = MutationVersion::from_wal(other_source, other_position).unwrap();
         assert_eq!(
-            compare_versions(versions[0], other),
+            compare_versions(&versions[0], &other),
             VersionComparison::DifferentCaptureEpoch
         );
     }
@@ -1121,18 +1119,24 @@ mod tests {
         let a = hash_fields(b"fixture", &[b"a"]);
         let b = hash_fields(b"fixture", &[b"b"]);
         let position = version();
-        let same = ImmutableMutationRecord::from_parts(position, a);
+        let same = ImmutableMutationRecord::from_parts(position.clone(), a);
         assert_eq!(
-            classify_replay(same, same),
+            classify_replay(&same, &same),
             DuplicateDecision::AcceptDuplicate
         );
         assert_eq!(
-            classify_replay(same, ImmutableMutationRecord::from_parts(position, b)),
+            classify_replay(
+                &same,
+                &ImmutableMutationRecord::from_parts(position.clone(), b)
+            ),
             DuplicateDecision::BlockConflict
         );
         let other_position = MutationVersion::from_wal(source(113, 8, 3), wal(1)).unwrap();
         assert_eq!(
-            classify_replay(same, ImmutableMutationRecord::from_parts(other_position, b)),
+            classify_replay(
+                &same,
+                &ImmutableMutationRecord::from_parts(other_position, b)
+            ),
             DuplicateDecision::DifferentIdentity
         );
         let corrupted_position = MutationVersion {
@@ -1145,7 +1149,7 @@ mod tests {
             payload_hash: a,
         };
         assert_eq!(
-            classify_replay(same, corrupted),
+            classify_replay(&same, &corrupted),
             DuplicateDecision::BlockConflict
         );
         for seed in 0_u64..64 {
@@ -1156,15 +1160,15 @@ mod tests {
                 connector_event_id: id,
                 ..version()
             };
-            let record = ImmutableMutationRecord::from_parts(position, payload);
+            let record = ImmutableMutationRecord::from_parts(position.clone(), payload);
             assert_eq!(
-                classify_replay(record, record),
+                classify_replay(&record, &record),
                 DuplicateDecision::AcceptDuplicate
             );
             assert_eq!(
                 classify_replay(
-                    record,
-                    ImmutableMutationRecord::from_parts(position, changed)
+                    &record,
+                    &ImmutableMutationRecord::from_parts(position, changed)
                 ),
                 DuplicateDecision::BlockConflict
             );
@@ -1209,7 +1213,7 @@ mod tests {
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Null],
         };
-        assert!(payload.hash(version()).is_ok());
+        assert!(payload.hash(&version()).is_ok());
     }
 
     #[test]
