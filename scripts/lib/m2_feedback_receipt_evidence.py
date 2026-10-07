@@ -29,7 +29,7 @@ def main(stage: pathlib.Path, artifact: pathlib.Path, source_digest: str) -> Non
         rel = f"attempt-{attempt}"
         stdout = stage / rel / "suite.stdout"
         stderr = stage / rel / "suite.stderr"
-        commands.append({"argv": "M2_FAULT_STATUS_FEEDBACK_ONLY=1 scripts/faults/m2_fault_status.sh",
+        commands.append({"argv": "scripts/faults/m2_fault_status.sh",
                          "version": "m2-feedback-receipts/v1", "exit_code": 0,
                          "stdout_path": (dest / rel / "suite.stdout").relative_to(ROOT).as_posix(),
                          "stdout_sha256": sha(stdout.read_bytes()),
@@ -42,7 +42,7 @@ def main(stage: pathlib.Path, artifact: pathlib.Path, source_digest: str) -> Non
             "consumed_contract_vectors", "workspace_tests", "integration", "clean_environment",
             "exit_assertions", "endurance", "full_failure_matrix", "clean_clone")}
     tier.update(targeted_checks=True, boundary_e2e=True, fault_suite=True, deterministic_rerun=True,
-                workspace_tests=True, clean_environment=True, exit_assertions=True)
+                consumed_contract_vectors=True, workspace_tests=True, clean_environment=True, exit_assertions=True)
     evidence = {"schema_version": "evidence/v1", "owner_bead": "boring-cdc-m2-fault-status.1",
                 "scenario_id": "SCN-M2-FEEDBACK-ABORT-RECEIPTS", "evidence_profile": "runtime",
                 "evidence_tier": "component", "seed": "pg17-seed-1", "git_commit": git,

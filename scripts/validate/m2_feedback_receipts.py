@@ -37,6 +37,11 @@ def single(path: pathlib.Path, hook: str) -> dict:
 
 
 def packet(path: pathlib.Path) -> None:
+    root = pathlib.Path(__file__).resolve().parents[2]
+    cases = json.loads((root / "contracts/m2/fault-status-cases.json").read_text())
+    crash_case = next(case for case in cases["scenarios"] if case["id"] == "SCN-M2-FAULT-STATUS-CRASH-MATRIX")
+    assert "PostgreSQL 17.6 capture crash evidence is executed" in crash_case["assertions"]
+    assert "durable position never trails feedback" in crash_case["assertions"]
     seen = []
     for attempt in (1, 2):
         for hook in ("before_feedback", "after_feedback"):
