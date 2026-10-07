@@ -1,0 +1,1 @@
+{"durable_heartbeat_per_run":true,"freshness":"fresh","restart_requires_new_heartbeat":true,"stale_on_missing_heartbeat":true,"startup_older_than_freshness_window":true}

@@ -241,8 +241,29 @@ pub fn snapshot(
     c.execute_batch("PRAGMA query_only=ON;PRAGMA foreign_keys=ON;")?;
     let s:Source=c.query_row("SELECT capture_epoch,source_system_id,database_id,slot_name,publication_fingerprint,durable_transaction_end_lsn,durable_journal_seq,last_feedback_lsn,slot_creation_floor_lsn,control_revision,observed_confirmed_flush_lsn,observed_restart_lsn FROM source_state WHERE singleton=1",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?,r.get(10)?,r.get(11)?))).optional()?.ok_or(StatusError::MissingState)?;
     let owner:Option<Owner>=c.query_row("SELECT run_id,state,connection_generation,revision FROM runtime_ownership ORDER BY revision DESC,run_id DESC LIMIT 1",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional()?;
-    let latest:Option<(String,String,String,Option<u64>)>=c.query_row("SELECT outcome,reason_code,created_at,unixepoch(created_at) FROM startup_reconciliations ORDER BY reconciliation_id DESC LIMIT 1",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional()?;
-    let fact_seconds = latest.as_ref().and_then(|v| v.3).unwrap_or(0).min(now);
+    let latest:Option<(String,String,String,String,Option<u64>)>=c.query_row("SELECT run_id,outcome,reason_code,created_at,unixepoch(created_at) FROM startup_reconciliations ORDER BY reconciliation_id DESC LIMIT 1",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).optional()?;
+    let heartbeat: Option<(u64, u64, String)> = if let Some((run_id, outcome, _, _, _)) = &latest {
+        if matches!(
+            outcome.as_str(),
+            "ready" | "duplicate_replay_expected" | "creation_floor_only"
+        ) {
+            c.query_row("SELECT observed_at_unix_seconds,last_heartbeat_seq,last_heartbeat_end_lsn FROM capture_health_observations WHERE run_id=?1 AND capture_epoch=?2",rusqlite::params![run_id,&s.0],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+    let fact_seconds = heartbeat
+        .as_ref()
+        .map(|v| v.0)
+        .filter(|seconds| *seconds <= now)
+        .unwrap_or(0);
+    let startup_seconds = latest
+        .as_ref()
+        .and_then(|v| v.4)
+        .filter(|seconds| *seconds <= now)
+        .unwrap_or(0);
     let observed = if fact_seconds == 0 {
         "unknown".into()
     } else {
@@ -254,7 +275,11 @@ pub fn snapshot(
         ts(fact_seconds.saturating_add(FRESHNESS_SECONDS))
     };
     let freshness = if fact_seconds == 0 {
-        "unknown"
+        if startup_seconds > 0 && now > startup_seconds.saturating_add(FRESHNESS_SECONDS) {
+            "stale"
+        } else {
+            "unknown"
+        }
     } else if now <= fact_seconds.saturating_add(FRESHNESS_SECONDS) {
         "fresh"
     } else {
@@ -330,7 +355,7 @@ pub fn snapshot(
             None,
         );
     }
-    if let Some((o, r, _, _)) = &latest {
+    if let Some((_, o, r, _, _)) = &latest {
         if r.starts_with("SCHEMA_") {
             add(&mut raw, "schema_blocked", "blocked", r, None);
         }
@@ -509,7 +534,7 @@ pub fn snapshot(
         .iter()
         .map(|c| (&c.condition, &c.severity, &c.reason, &c.evidence_digest))
         .collect::<Vec<_>>();
-    let canon = json!({"source":[&s.0,&s.4,&s.5,&s.6,&s.7,&s.8,s.9,&s.10,&s.11],"ownership":&owner,"latest":&latest,"destinations":&dest,"failures":&failures,"conditions":stable_conditions,"control_revisions":&control_revisions,"action_causality":&action_causality,"config":config});
+    let canon = json!({"source":[&s.0,&s.4,&s.5,&s.6,&s.7,&s.8,s.9,&s.10,&s.11],"ownership":&owner,"latest":&latest,"heartbeat":&heartbeat,"destinations":&dest,"failures":&failures,"conditions":stable_conditions,"control_revisions":&control_revisions,"action_causality":&action_causality,"config":config});
     let evidence = format!(
         "sha256:{:x}",
         Sha256::digest(serde_json::to_vec(&canon).unwrap())

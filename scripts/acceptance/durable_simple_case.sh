@@ -192,6 +192,25 @@ sample_feedback_boundary connector-down
 runtime_pid=$!
 wait_for_active_slot || { cat "$work/runtime-restart.err" >&2; exit 1; }
 wait_for_transactions 6
+if [[ -n "${M2_STATUS_FRESHNESS_PROOF_OUT:-}" ]]; then
+  sleep 35
+  (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u M2_STATUS_FRESHNESS_PROOF_OUT "$binary" status --json) >"$work/status-freshness.json"
+  python3 - "$journal" "$work/status-freshness.json" "$M2_STATUS_FRESHNESS_PROOF_OUT" <<'PY'
+import datetime,json,sqlite3,sys
+journal,status_path,proof_path=sys.argv[1:]
+status=json.load(open(status_path))['data']
+with sqlite3.connect(f'file:{journal}?mode=ro',uri=True) as db:
+    startup=db.execute("SELECT unixepoch(created_at) FROM startup_reconciliations ORDER BY reconciliation_id DESC LIMIT 1").fetchone()[0]
+    proof=db.execute("SELECT observed_at_unix_seconds,last_heartbeat_seq FROM capture_health_observations ORDER BY observed_at_unix_seconds DESC LIMIT 1").fetchone()
+now=int(datetime.datetime.now(datetime.timezone.utc).timestamp())
+assert now-startup>30 and proof is not None
+assert status['freshness']=='fresh' and not any(c['condition']=='heartbeat_degraded' for c in status['condition_details'])
+assert 0<=now-proof[0]<=30 and proof[0]>startup and proof[1]>0
+with open(proof_path,'w') as out:
+    json.dump({'startup_age_seconds':now-startup,'heartbeat_age_seconds':now-proof[0],'last_heartbeat_seq':proof[1],'freshness':status['freshness'],'postgres_version':'17.6'},out,sort_keys=True)
+    out.write('\n')
+PY
+fi
 # PostgreSQL advances a slot's restart_lsn lazily, at checkpoints, not per transaction. Request one
 # so the recorded restart_lsn reflects a post-checkpoint value where permissions allow it.
 psqlc -Atqc "checkpoint" >/dev/null 2>&1 || true
