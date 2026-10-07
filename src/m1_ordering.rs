@@ -108,7 +108,8 @@ pub enum ColumnState {
     Value(CanonicalValue),
 }
 impl ColumnState {
-    fn encode_into(&self, out: &mut Vec<u8>) {
+    fn encode_into(&self, column_id: u32, out: &mut Vec<u8>) {
+        out.extend(column_id.to_be_bytes());
         match self {
             Self::Absent => out.push(COLUMN_ABSENT_TAG),
             Self::Null => out.push(COLUMN_NULL_TAG),
@@ -234,17 +235,52 @@ impl MutationKind {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SourceOperation {
+    Snapshot,
+    Insert,
+    Update,
+    Delete,
+}
+
+impl SourceOperation {
+    const fn tag(self) -> u8 {
+        match self {
+            Self::Snapshot => 0,
+            Self::Insert => 1,
+            Self::Update => 2,
+            Self::Delete => 3,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MutationPayload {
     /// Lowercase SHA-256 emitted by the admitted DDL relation contract.
     pub relation: RelationSchemaVersion,
     pub key: CanonicalKey,
+    pub operation: SourceOperation,
+    pub before_key: Option<CanonicalKey>,
     pub kind: MutationKind,
     pub columns: Vec<ColumnState>,
 }
 impl MutationPayload {
     pub fn hash(&self, version: MutationVersion) -> Result<Hash32, OrderingFailure> {
+        if (version.origin_rank == SNAPSHOT_ORIGIN_RANK)
+            != (self.operation == SourceOperation::Snapshot)
+        {
+            return Err(OrderingFailure::contract("OPERATION_ORIGIN_MISMATCH"));
+        }
         let key_hash = canonical_key_hash(&self.key)?;
+        let key = canonical_key_encoding(&self.key)
+            .map_err(|_| OrderingFailure::contract("CANONICAL_KEY_INVALID"))?;
+        let before_key = self
+            .before_key
+            .as_ref()
+            .map(|key| canonical_key_encoding(key))
+            .transpose()
+            .map_err(|_| OrderingFailure::contract("BEFORE_KEY_INVALID"))?
+            .unwrap_or_default();
         if let Some(binding) = version.snapshot_binding
             && (binding.logical_table_id != self.relation.logical_table
                 || binding.key_hash != key_hash)
@@ -255,8 +291,10 @@ impl MutationPayload {
         }
         let mut columns = Vec::new();
         columns.extend(canonical_length_bytes(self.columns.len()));
-        for state in &self.columns {
-            state.encode_into(&mut columns);
+        for (index, state) in self.columns.iter().enumerate() {
+            let column_id = u32::try_from(index)
+                .map_err(|_| OrderingFailure::contract("COLUMN_ID_OUT_OF_RANGE"))?;
+            state.encode_into(column_id, &mut columns);
         }
         Ok(hash_fields(
             PAYLOAD_HASH_DOMAIN,
@@ -264,12 +302,14 @@ impl MutationPayload {
                 &version.source.capture_epoch().get().to_be_bytes(),
                 &version.source.commit_lsn().get().to_be_bytes(),
                 &[version.origin_rank],
-                &version.source.transaction_id().to_be_bytes(),
                 &version.source.ordinal().to_be_bytes(),
                 &[version.mutation_ordinal],
                 &version.connector_event_id.bytes(),
                 &self.relation.fingerprint().bytes(),
+                &key,
                 &key_hash.bytes(),
+                &[self.operation.tag()],
+                &before_key,
                 &[self.kind.tag()],
                 &columns,
             ],
@@ -452,7 +492,7 @@ pub fn expand_key_change(
     {
         return Err(OrderingFailure::contract("KEY_CHANGE_NEW_TUPLE_INCOMPLETE"));
     }
-    let build = |mutation_ordinal, key, kind, columns| {
+    let build = |mutation_ordinal, key, before_key, kind, columns| {
         let input = WalIdentityInput {
             mutation_ordinal,
             ..positional
@@ -462,6 +502,8 @@ pub fn expand_key_change(
         let payload = MutationPayload {
             relation,
             key,
+            operation: SourceOperation::Update,
+            before_key,
             kind,
             columns,
         };
@@ -474,8 +516,8 @@ pub fn expand_key_change(
         })
     };
     Ok([
-        build(0, old_key, MutationKind::Delete, Vec::new())?,
-        build(1, new_key, MutationKind::Upsert, new_columns)?,
+        build(0, old_key.clone(), None, MutationKind::Delete, Vec::new())?,
+        build(1, new_key, Some(old_key), MutationKind::Upsert, new_columns)?,
     ])
 }
 
@@ -676,6 +718,8 @@ mod tests {
             MutationPayload {
                 relation: relation(),
                 key: key(b"k"),
+                operation: SourceOperation::Update,
+                before_key: None,
                 kind: MutationKind::Upsert,
                 columns: vec![state],
             }
@@ -687,11 +731,138 @@ mod tests {
     }
 
     #[test]
+    fn operation_and_before_key_are_part_of_payload_hash() {
+        let payload = MutationPayload {
+            relation: relation(),
+            key: key(b"new"),
+            operation: SourceOperation::Update,
+            before_key: None,
+            kind: MutationKind::Upsert,
+            columns: vec![ColumnState::Null],
+        };
+        let baseline = payload.hash(version()).unwrap();
+        let mut changed = payload.clone();
+        changed.operation = SourceOperation::Insert;
+        assert_ne!(baseline, changed.hash(version()).unwrap());
+        changed = payload.clone();
+        changed.before_key = Some(key(b"old"));
+        assert_ne!(baseline, changed.hash(version()).unwrap());
+        changed.before_key = Some(Vec::new());
+        assert_eq!(
+            changed.hash(version()).unwrap_err().fingerprint,
+            "BEFORE_KEY_INVALID"
+        );
+        changed = payload.clone();
+        changed.operation = SourceOperation::Snapshot;
+        assert_eq!(
+            changed.hash(version()).unwrap_err().fingerprint,
+            "OPERATION_ORIGIN_MISMATCH"
+        );
+        assert_eq!(baseline, payload.hash(version()).unwrap());
+    }
+
+    #[test]
+    fn payload_hash_matches_m0_wal_and_snapshot_vectors() {
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/m0/event-format/golden-vectors.json"
+        ))
+        .unwrap();
+        let mut source = source_identity();
+        source.system_identifier =
+            vectors["identity_primitives"]["logical_table"]["input"]["system_identifier"]
+                .as_u64()
+                .unwrap();
+        let table = LogicalTableIdentity::derive(&source, "public", "orders");
+        for fixture_id in [
+            "SCN-M0-EVENT-WAL-IDENTITY",
+            "SCN-M0-EVENT-SNAPSHOT-IDENTITY",
+        ] {
+            let case = vectors["vectors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|case| case["fixture_id"] == fixture_id)
+                .unwrap();
+            let event = &case["event"];
+            let input = &case["identity_input"];
+            let relation_hex = event["relation_fingerprint"].as_str().unwrap();
+            let relation_bytes: [u8; 32] = std::array::from_fn(|index| {
+                u8::from_str_radix(&relation_hex[index * 2..index * 2 + 2], 16).unwrap()
+            });
+            let relation = RelationSchemaVersion {
+                logical_table: table,
+                relation_id: 42,
+                schema_fingerprint: serde_json::from_value(serde_json::json!(relation_bytes))
+                    .unwrap(),
+            };
+            let key = vec![int8_key(42)];
+            let source_version = source_version_for_row(
+                CaptureEpoch::from_store(event["capture_epoch"].as_u64().unwrap()),
+                ReceivedLsn::from_wire(event["source_version"]["lsn_u64"].as_u64().unwrap()),
+                0,
+                event["source_version"]["transaction_ordinal"]
+                    .as_u64()
+                    .unwrap(),
+            )
+            .unwrap();
+            let is_snapshot = case["identity_kind"] == "snapshot";
+            let version = if is_snapshot {
+                MutationVersion::from_snapshot(
+                    source_version,
+                    SnapshotIdentityInput {
+                        capture_epoch: source_version.capture_epoch(),
+                        generation: DestinationGeneration::from_store(
+                            input["generation"].as_u64().unwrap(),
+                        ),
+                        logical_table_id: table,
+                        chunk_id: input["chunk_id"].as_u64().unwrap(),
+                        key: key.clone(),
+                    },
+                )
+                .unwrap()
+            } else {
+                MutationVersion::from_wal(
+                    source_version,
+                    WalIdentityInput {
+                        capture_epoch: source_version.capture_epoch(),
+                        source_slot_identity: SourceSlotIdentity::derive(&source),
+                        transaction_end_lsn: ReceivedLsn::from_wire(
+                            input["transaction_end_lsn"].as_u64().unwrap(),
+                        ),
+                        row_ordinal: input["row_ordinal"].as_u64().unwrap(),
+                        mutation_ordinal: input["mutation_ordinal"].as_u64().unwrap() as u8,
+                    },
+                )
+                .unwrap()
+            };
+            assert_eq!(
+                version.connector_event_id().hex(),
+                event["connector_event_id"]
+            );
+            let payload = MutationPayload {
+                relation,
+                key,
+                operation: if is_snapshot {
+                    SourceOperation::Snapshot
+                } else {
+                    SourceOperation::Insert
+                },
+                before_key: None,
+                kind: MutationKind::Upsert,
+                columns: vec![ColumnState::Value(value(20, &42i64.to_be_bytes()))],
+            };
+            assert_eq!(payload.hash(version).unwrap().hex(), event["payload_hash"]);
+        }
+    }
+
+    #[test]
     fn positional_event_id_excludes_payload_and_volatile_fields() {
         let id = wal_connector_event_id(wal(0));
         let a = MutationPayload {
             relation: relation(),
             key: key(b"k"),
+            operation: SourceOperation::Update,
+            before_key: None,
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Value(value(25, b"a"))],
         }
@@ -700,6 +871,8 @@ mod tests {
         let b = MutationPayload {
             relation: relation(),
             key: key(b"k"),
+            operation: SourceOperation::Update,
+            before_key: None,
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Value(value(25, b"b"))],
         }
@@ -795,6 +968,8 @@ mod tests {
         let payload = MutationPayload {
             relation: relation(),
             key: key(b"k"),
+            operation: SourceOperation::Snapshot,
+            before_key: None,
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Null],
         };
@@ -835,6 +1010,8 @@ mod tests {
             MutationPayload {
                 relation,
                 key: key(b"k"),
+                operation: SourceOperation::Update,
+                before_key: None,
                 kind: MutationKind::Upsert,
                 columns: vec![ColumnState::Null],
             }
@@ -860,6 +1037,10 @@ mod tests {
         .unwrap();
         assert_eq!(mutations[0].payload().kind, MutationKind::Delete);
         assert_eq!(mutations[1].payload().kind, MutationKind::Upsert);
+        assert_eq!(mutations[0].payload().operation, SourceOperation::Update);
+        assert_eq!(mutations[1].payload().operation, SourceOperation::Update);
+        assert_eq!(mutations[0].payload().before_key, None);
+        assert_eq!(mutations[1].payload().before_key, Some(key(b"old")));
         assert_eq!(mutations[0].version().mutation_ordinal(), 0);
         assert_eq!(
             compare_versions(mutations[0].version(), mutations[1].version()),
@@ -1023,6 +1204,8 @@ mod tests {
         let payload = MutationPayload {
             relation: relation(),
             key: key(b"golden"),
+            operation: SourceOperation::Update,
+            before_key: None,
             kind: MutationKind::Upsert,
             columns: vec![ColumnState::Null],
         };
