@@ -15,4 +15,4 @@ cat >"$work/result.json" <<'JSON'
 {"anchor_before_durable_pair":false,"delayed_copy_blocked":true,"deterministic_attempts":2,"duplicate_audit_only":true,"restart_without_pair_blocked":true,"sampled_lsn_rejected":true}
 JSON
 BORING_CDC_M3_FENCE_OBSERVATION="$work/result.json" python3 scripts/lib/m3_fence_evidence.py faults
-scripts/validate/evidence.sh artifacts/boring-cdc-m3-fence/SCN-M3-FENCE-FAULTS/fence-pg17-v1/evidence.json
+scripts/validate/evidence.sh "artifacts/boring-cdc-m3-fence/SCN-M3-FENCE-FAULTS/${BORING_CDC_M3_FENCE_EVIDENCE_SEED:-fence-pg17-v1}/evidence.json"
