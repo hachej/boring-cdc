@@ -16,4 +16,5 @@ o=runs[0];a=atomic[0];assert o['generation_state']=='invalidated' and o['remaini
 print(json.dumps(o,sort_keys=True))
 PY
 BORING_CDC_M3_OBSERVATION="$work/observation.json" python3 scripts/lib/m3_planner_evidence.py faults
-scripts/validate/evidence.sh artifacts/boring-cdc-m3-planner/SCN-M3-PLANNER-FAULTS/planner-pg17-v1/evidence.json
+seed=${BORING_CDC_M3_EVIDENCE_SEED:-planner-pg17-v1}
+scripts/validate/evidence.sh "artifacts/boring-cdc-m3-planner/SCN-M3-PLANNER-FAULTS/$seed/evidence.json"

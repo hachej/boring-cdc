@@ -1,0 +1,3982 @@
+//! Unified PostgreSQL logical replication protocol implementation
+//!
+//! This module consolidates message types, parsing logic, and protocol definitions
+//! for PostgreSQL logical replication as documented at:
+//! - <https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html>
+//! - <https://www.postgresql.org/docs/current/protocol-logical-replication.html>
+
+use crate::buffer::BufferReader;
+#[cfg(feature = "std")]
+use crate::buffer::BufferWriter;
+use crate::column_value::{ColumnValue, RowData};
+use crate::error::{ReplicationError, Result};
+use crate::prelude::*;
+#[cfg(feature = "std")]
+use crate::types::system_time_to_postgres_timestamp;
+use crate::types::{
+    format_lsn, postgres_timestamp_to_chrono, ChangeEvent, EventType, Lsn, Oid, RelationColumn,
+    ReplicaIdentity, TimestampTz, XLogRecPtr, Xid,
+};
+use bytes::Bytes;
+use serde::{Deserialize, Serialize};
+use smallvec::SmallVec;
+#[cfg(feature = "std")]
+use std::time::SystemTime;
+use tracing::{debug, info, warn};
+
+/// Map of relations keyed by `Oid`.
+pub type RelationMap = BTreeMap<Oid, RelationInfo>;
+
+/// Message type constants for logical replication protocol
+pub mod message_types {
+    // Protocol version 1 messages
+    pub const BEGIN: u8 = b'B';
+    pub const COMMIT: u8 = b'C';
+    pub const ORIGIN: u8 = b'O';
+    pub const RELATION: u8 = b'R';
+    pub const TYPE: u8 = b'Y';
+    pub const INSERT: u8 = b'I';
+    pub const UPDATE: u8 = b'U';
+    pub const DELETE: u8 = b'D';
+    pub const TRUNCATE: u8 = b'T';
+    pub const MESSAGE: u8 = b'M';
+
+    // Protocol version 2 messages (streaming)
+    pub const STREAM_START: u8 = b'S';
+    pub const STREAM_STOP: u8 = b'E';
+    pub const STREAM_COMMIT: u8 = b'c';
+    pub const STREAM_ABORT: u8 = b'A';
+
+    // Protocol version 3 messages (two-phase commit)
+    pub const BEGIN_PREPARE: u8 = b'b';
+    pub const PREPARE: u8 = b'P';
+    pub const COMMIT_PREPARED: u8 = b'K';
+    pub const ROLLBACK_PREPARED: u8 = b'r';
+    pub const STREAM_PREPARE: u8 = b'p';
+
+    pub const HOT_STANDBY_FEEDBACK: u8 = b'h';
+}
+
+/// PostgreSQL logical replication message types enum
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MessageType {
+    // Protocol version 1
+    Begin = message_types::BEGIN,
+    Commit = message_types::COMMIT,
+    Origin = message_types::ORIGIN,
+    Relation = message_types::RELATION,
+    Type = message_types::TYPE,
+    Insert = message_types::INSERT,
+    Update = message_types::UPDATE,
+    Delete = message_types::DELETE,
+    Truncate = message_types::TRUNCATE,
+    Message = message_types::MESSAGE,
+    // Protocol version 2 (streaming)
+    StreamStart = message_types::STREAM_START,
+    StreamStop = message_types::STREAM_STOP,
+    StreamCommit = message_types::STREAM_COMMIT,
+    StreamAbort = message_types::STREAM_ABORT,
+    // Protocol version 3 (two-phase commit)
+    BeginPrepare = message_types::BEGIN_PREPARE,
+    Prepare = message_types::PREPARE,
+    CommitPrepared = message_types::COMMIT_PREPARED,
+    RollbackPrepared = message_types::ROLLBACK_PREPARED,
+    StreamPrepare = message_types::STREAM_PREPARE,
+}
+
+/// Unified logical replication message enum
+#[derive(Debug, Clone, PartialEq, Eq)]
+// Parsed once per message on the hot path. Boxing the tuple variants to satisfy
+// large_enum_variant would add a per-message heap allocation, so the size gap is
+// an intentional tradeoff for the zero-copy path.
+#[allow(clippy::large_enum_variant)]
+pub enum LogicalReplicationMessage {
+    /// Begin transaction
+    Begin {
+        final_lsn: XLogRecPtr,
+        timestamp: TimestampTz,
+        xid: Xid,
+    },
+
+    /// Commit transaction
+    Commit {
+        flags: u8,
+        commit_lsn: XLogRecPtr,
+        end_lsn: XLogRecPtr,
+        timestamp: TimestampTz,
+    },
+
+    /// Relation information (table schema)
+    Relation {
+        relation_id: Oid,
+        namespace: Arc<str>,
+        relation_name: Arc<str>,
+        replica_identity: u8,
+        columns: Vec<ColumnInfo>,
+    },
+
+    /// Insert operation
+    Insert { relation_id: Oid, tuple: TupleData },
+
+    /// Update operation
+    Update {
+        relation_id: Oid,
+        old_tuple: Option<TupleData>,
+        new_tuple: TupleData,
+        key_type: Option<char>,
+    },
+
+    /// Delete operation
+    Delete {
+        relation_id: Oid,
+        old_tuple: TupleData,
+        key_type: char,
+    },
+
+    /// Truncate operation
+    Truncate { relation_ids: Vec<Oid>, flags: u8 },
+
+    /// Type information
+    Type {
+        type_id: Oid,
+        namespace: String,
+        type_name: String,
+    },
+
+    /// Origin information
+    Origin {
+        origin_lsn: XLogRecPtr,
+        origin_name: String,
+    },
+
+    /// Message (used for keepalive and custom messages)
+    Message {
+        flags: u8,
+        lsn: XLogRecPtr,
+        prefix: String,
+        content: Bytes,
+    },
+
+    /// Streaming transaction start
+    StreamStart { xid: Xid, first_segment: bool },
+
+    /// Streaming transaction stop
+    StreamStop,
+
+    /// Streaming transaction commit
+    StreamCommit {
+        xid: Xid,
+        flags: u8,
+        commit_lsn: XLogRecPtr,
+        end_lsn: XLogRecPtr,
+        timestamp: TimestampTz,
+    },
+
+    /// Streaming transaction abort
+    /// In protocol version 4 with parallel streaming, includes abort_lsn and abort_timestamp
+    StreamAbort {
+        xid: Xid,
+        subtransaction_xid: Xid,
+        /// Abort LSN (only present in protocol v4 with parallel streaming)
+        abort_lsn: Option<XLogRecPtr>,
+        /// Abort timestamp (only present in protocol v4 with parallel streaming)
+        abort_timestamp: Option<TimestampTz>,
+    },
+
+    // Protocol version 3 messages (two-phase commit)
+    /// Begin prepare message (protocol v3+)
+    BeginPrepare {
+        prepare_lsn: XLogRecPtr,
+        end_lsn: XLogRecPtr,
+        timestamp: TimestampTz,
+        xid: Xid,
+        gid: String,
+    },
+
+    /// Prepare message (protocol v3+)
+    Prepare {
+        flags: u8,
+        prepare_lsn: XLogRecPtr,
+        end_lsn: XLogRecPtr,
+        timestamp: TimestampTz,
+        xid: Xid,
+        gid: String,
+    },
+
+    /// Commit prepared message (protocol v3+)
+    CommitPrepared {
+        flags: u8,
+        commit_lsn: XLogRecPtr,
+        end_lsn: XLogRecPtr,
+        timestamp: TimestampTz,
+        xid: Xid,
+        gid: String,
+    },
+
+    /// Rollback prepared message (protocol v3+)
+    RollbackPrepared {
+        flags: u8,
+        prepare_end_lsn: XLogRecPtr,
+        rollback_end_lsn: XLogRecPtr,
+        prepare_timestamp: TimestampTz,
+        rollback_timestamp: TimestampTz,
+        xid: Xid,
+        gid: String,
+    },
+
+    /// Stream prepare message (protocol v3+)
+    StreamPrepare {
+        flags: u8,
+        prepare_lsn: XLogRecPtr,
+        end_lsn: XLogRecPtr,
+        timestamp: TimestampTz,
+        xid: Xid,
+        gid: String,
+    },
+}
+
+/// Column information in a relation
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ColumnInfo {
+    /// Column flags (bit 0 = key column)
+    pub flags: u8,
+    /// Column name
+    pub name: Arc<str>,
+    /// PostgreSQL type OID
+    pub type_id: Oid,
+    /// Type modifier
+    pub type_modifier: i32,
+}
+
+impl ColumnInfo {
+    #[inline(always)]
+    pub fn new(flags: u8, name: String, type_id: Oid, type_modifier: i32) -> Self {
+        Self {
+            flags,
+            name: Arc::from(name),
+            type_id,
+            type_modifier,
+        }
+    }
+
+    /// Check if this column is part of the primary/replica key
+    #[inline(always)]
+    pub fn is_key(&self) -> bool {
+        self.flags & 0x01 != 0
+    }
+}
+
+/// Tuple (row) data
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TupleData {
+    pub columns: SmallVec<[ColumnData; 16]>,
+}
+
+impl TupleData {
+    #[inline(always)]
+    pub fn new(columns: Vec<ColumnData>) -> Self {
+        Self {
+            columns: SmallVec::from_vec(columns),
+        }
+    }
+
+    #[inline(always)]
+    pub fn from_smallvec(columns: SmallVec<[ColumnData; 16]>) -> Self {
+        Self { columns }
+    }
+
+    /// Get column data by index
+    #[inline(always)]
+    pub fn get_column(&self, index: usize) -> Option<&ColumnData> {
+        self.columns.get(index)
+    }
+
+    /// Get the number of columns
+    #[inline(always)]
+    pub fn column_count(&self) -> usize {
+        self.columns.len()
+    }
+
+    /// Convert to a [`RowData`] with column names from the relation.
+    ///
+    /// Consumes the tuple so each column's `Bytes` handle is moved (not cloned),
+    /// saving one atomic refcount bump per non-null column.
+    ///
+    /// Text columns are stored as [`ColumnValue::Text`] with zero-copy `Bytes`,
+    /// binary columns as [`ColumnValue::Binary`], and null / unknown as
+    /// [`ColumnValue::Null`]. Unchanged TOAST columns are skipped.
+    #[inline]
+    pub fn into_row_data(self, relation: &RelationInfo) -> RowData {
+        let mut data = RowData::with_capacity(self.columns.len());
+
+        for (i, col_data) in self.columns.into_iter().enumerate() {
+            let Some(column_info) = relation.get_column_by_index(i) else {
+                continue;
+            };
+            let value = match col_data.data_type {
+                b'u' => continue, // Skip unchanged TOAST values
+                b'n' => ColumnValue::Null,
+                b't' => ColumnValue::text_bytes(col_data.into_bytes()),
+                b'b' => ColumnValue::binary_bytes(col_data.into_bytes()),
+                _ => ColumnValue::Null,
+            };
+            data.push(Arc::clone(&column_info.name), value);
+        }
+
+        data
+    }
+}
+
+/// Data for a single column
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ColumnData {
+    pub data_type: u8, // b'n' = null, b't' = text, b'b' = binary, b'u' = unchanged toast
+    data: bytes::Bytes,
+}
+
+impl ColumnData {
+    #[inline(always)]
+    pub const fn null() -> Self {
+        Self {
+            data_type: b'n',
+            data: bytes::Bytes::from_static(b""),
+        }
+    }
+
+    #[inline(always)]
+    pub fn text_bytes(data: bytes::Bytes) -> Self {
+        Self {
+            data_type: b't',
+            data,
+        }
+    }
+
+    #[inline(always)]
+    pub fn text(data: Vec<u8>) -> Self {
+        Self {
+            data_type: b't',
+            data: bytes::Bytes::from(data),
+        }
+    }
+
+    #[inline(always)]
+    pub fn binary_bytes(data: bytes::Bytes) -> Self {
+        Self {
+            data_type: b'b',
+            data,
+        }
+    }
+
+    #[inline(always)]
+    pub fn binary(data: Vec<u8>) -> Self {
+        Self {
+            data_type: b'b',
+            data: bytes::Bytes::from(data),
+        }
+    }
+
+    #[inline(always)]
+    pub const fn unchanged() -> Self {
+        Self {
+            data_type: b'u',
+            data: bytes::Bytes::from_static(b""),
+        }
+    }
+
+    #[inline(always)]
+    pub fn is_null(&self) -> bool {
+        self.data_type == b'n'
+    }
+
+    #[inline(always)]
+    pub fn is_unchanged(&self) -> bool {
+        self.data_type == b'u'
+    }
+
+    #[inline(always)]
+    pub fn is_binary(&self) -> bool {
+        self.data_type == b'b'
+    }
+
+    #[inline(always)]
+    pub fn is_text(&self) -> bool {
+        self.data_type == b't'
+    }
+
+    /// Convert to string, returning a Cow to avoid allocation when possible
+    /// If the data is valid UTF-8, returns a borrowed reference
+    /// Works for both text ('t') and binary ('b') format columns
+    #[inline]
+    pub fn as_str(&self) -> Option<Cow<'_, str>> {
+        if self.data.is_empty() || (self.data_type != b't' && self.data_type != b'b') {
+            return None;
+        }
+
+        match core::str::from_utf8(&self.data) {
+            Ok(s) => Some(Cow::Borrowed(s)),
+            Err(_) => {
+                // Fallback: Use lossy conversion (rare case)
+                Some(Cow::Owned(String::from_utf8_lossy(&self.data).into_owned()))
+            }
+        }
+    }
+
+    #[inline]
+    pub fn as_string(&self) -> Option<String> {
+        self.as_str().map(|cow| cow.into_owned())
+    }
+
+    /// Get raw bytes data (zero-copy reference)
+    #[inline(always)]
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.data
+    }
+
+    /// Get the underlying `Bytes` handle (cheap ref-counted clone).
+    #[inline(always)]
+    pub fn raw_bytes(&self) -> bytes::Bytes {
+        self.data.clone()
+    }
+
+    #[inline(always)]
+    pub fn into_bytes(self) -> bytes::Bytes {
+        self.data
+    }
+}
+
+/// Information about a relation (table)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RelationInfo {
+    pub relation_id: Oid,
+    pub namespace: Arc<str>,
+    pub relation_name: Arc<str>,
+    pub replica_identity: u8,
+    pub columns: Vec<ColumnInfo>,
+}
+
+impl RelationInfo {
+    #[inline]
+    pub fn new(
+        relation_id: Oid,
+        namespace: impl Into<Arc<str>>,
+        relation_name: impl Into<Arc<str>>,
+        replica_identity: u8,
+        columns: Vec<ColumnInfo>,
+    ) -> Self {
+        Self {
+            relation_id,
+            namespace: namespace.into(),
+            relation_name: relation_name.into(),
+            replica_identity,
+            columns,
+        }
+    }
+
+    /// Get the full table name (namespace.relation_name)
+    #[inline]
+    pub fn full_name(&self) -> String {
+        format!("{}.{}", self.namespace, self.relation_name)
+    }
+
+    /// Get column by name
+    #[inline]
+    pub fn get_column_by_name(&self, name: &str) -> Option<&ColumnInfo> {
+        self.columns.iter().find(|col| &*col.name == name)
+    }
+
+    /// Get column by index
+    #[inline(always)]
+    pub fn get_column_by_index(&self, index: usize) -> Option<&ColumnInfo> {
+        self.columns.get(index)
+    }
+
+    /// Get key columns
+    #[inline]
+    pub fn get_key_columns(&self) -> Vec<&ColumnInfo> {
+        self.columns.iter().filter(|col| col.is_key()).collect()
+    }
+
+    /// Iterate over the names of key columns (replica-identity columns).
+    ///
+    /// Zero-allocation: returns an iterator of cheap `Arc<str>` clones so
+    /// callers can `.collect()` directly into a `Vec<Arc<str>>` without the
+    /// intermediate `Vec<&ColumnInfo>` that `get_key_columns` produces.
+    #[inline]
+    pub fn key_column_names(&self) -> impl Iterator<Item = Arc<str>> + '_ {
+        self.columns
+            .iter()
+            .filter(|c| c.is_key())
+            .map(|c| Arc::clone(&c.name))
+    }
+}
+
+/// Replication message with streaming context
+#[derive(Debug, Clone)]
+pub struct StreamingReplicationMessage {
+    pub message: LogicalReplicationMessage,
+    pub is_streaming: bool,
+    pub xid: Option<Xid>,
+}
+
+impl StreamingReplicationMessage {
+    pub fn new(message: LogicalReplicationMessage) -> Self {
+        Self {
+            message,
+            is_streaming: false,
+            xid: None,
+        }
+    }
+
+    pub fn new_streaming(message: LogicalReplicationMessage, xid: Xid) -> Self {
+        Self {
+            message,
+            is_streaming: true,
+            xid: Some(xid),
+        }
+    }
+}
+
+/// State for managing replication relations and tracking
+///
+/// # LSN Tracking
+///
+/// This struct tracks three different LSN values according to PostgreSQL protocol:
+///
+/// - `last_received_lsn` (write_lsn): The location of the last WAL byte + 1 received
+///   from the PostgreSQL replication stream. Updated by the producer when data is received.
+///
+/// - `last_flushed_lsn` (flush_lsn): The location of the last WAL byte + 1 that has been
+///   successfully written/flushed to the destination. Updated when data is written to destination.
+///
+/// - `last_applied_lsn` (replay_lsn): The location of the last WAL byte + 1 that has been
+///   fully applied (committed) to the destination. Updated after transaction commit on destination.
+///
+/// The PostgreSQL server uses these values to:
+/// 1. Know which WAL can be recycled (based on replay_lsn)
+/// 2. Calculate replication lag (sent_lsn - replay_lsn)
+/// 3. Decide when to send keepalive messages
+#[derive(Debug)]
+pub struct ReplicationState {
+    /// Relations by OID
+    pub relations: RelationMap,
+    /// Last received LSN (write_lsn in pg_stat_replication)
+    pub last_received_lsn: XLogRecPtr,
+    /// Last flushed LSN
+    pub last_flushed_lsn: XLogRecPtr,
+    /// Last applied LSN
+    pub last_applied_lsn: XLogRecPtr,
+    /// Last feedback time
+    #[cfg(feature = "std")]
+    pub last_feedback_time: std::time::Instant,
+    /// Last LSN values sent in feedback (for throttling)
+    last_sent_flush_lsn: XLogRecPtr,
+    last_sent_applied_lsn: XLogRecPtr,
+}
+
+impl ReplicationState {
+    #[inline]
+    pub fn new() -> Self {
+        Self {
+            relations: RelationMap::new(),
+            last_received_lsn: 0,
+            last_flushed_lsn: 0,
+            last_applied_lsn: 0,
+            #[cfg(feature = "std")]
+            last_feedback_time: std::time::Instant::now(),
+            last_sent_flush_lsn: 0,
+            last_sent_applied_lsn: 0,
+        }
+    }
+
+    /// Add or update relation information
+    #[inline]
+    pub fn add_relation(&mut self, relation: RelationInfo) {
+        self.relations.insert(relation.relation_id, relation);
+    }
+
+    /// Get relation by OID
+    #[inline(always)]
+    pub fn get_relation(&self, relation_id: Oid) -> Option<&RelationInfo> {
+        self.relations.get(&relation_id)
+    }
+
+    /// Update received (write) LSN when data is received from PostgreSQL
+    #[inline(always)]
+    pub fn update_received_lsn(&mut self, lsn: XLogRecPtr) {
+        if lsn > self.last_received_lsn {
+            self.last_received_lsn = lsn;
+        }
+    }
+
+    /// Update flushed LSN when data is written to destination (before commit)
+    #[inline(always)]
+    pub fn update_flushed_lsn(&mut self, lsn: XLogRecPtr) {
+        if lsn > self.last_flushed_lsn {
+            self.last_flushed_lsn = lsn;
+        }
+    }
+
+    /// Update applied LSN when transaction is committed to destination
+    #[inline(always)]
+    pub fn update_applied_lsn(&mut self, lsn: XLogRecPtr) {
+        if lsn > self.last_applied_lsn {
+            self.last_applied_lsn = lsn;
+            if lsn > self.last_flushed_lsn {
+                self.last_flushed_lsn = lsn;
+            }
+        }
+    }
+
+    #[cfg(feature = "std")]
+    /// Check if the configured feedback interval has elapsed since the last feedback was sent.
+    #[inline]
+    pub fn should_send_feedback(&self, interval: std::time::Duration) -> bool {
+        self.last_feedback_time.elapsed() >= interval
+    }
+
+    /// Check if LSN values have changed since last feedback, this helps avoid sending redundant status updates
+    #[inline]
+    pub fn lsn_has_changed(&self, flush_lsn: XLogRecPtr, applied_lsn: XLogRecPtr) -> bool {
+        flush_lsn != self.last_sent_flush_lsn || applied_lsn != self.last_sent_applied_lsn
+    }
+
+    /// Record the LSN values reported in the last status update. Available in
+    /// `no_std` so a consumer with its own transport can drive `lsn_has_changed`.
+    #[inline]
+    pub fn record_sent_lsns(&mut self, flush_lsn: XLogRecPtr, applied_lsn: XLogRecPtr) {
+        self.last_sent_flush_lsn = flush_lsn;
+        self.last_sent_applied_lsn = applied_lsn;
+    }
+
+    /// Mark feedback as sent and record the LSN values sent.
+    #[cfg(feature = "std")]
+    pub fn mark_feedback_sent_with_lsn(&mut self, flush_lsn: XLogRecPtr, applied_lsn: XLogRecPtr) {
+        self.mark_feedback_sent();
+        self.record_sent_lsns(flush_lsn, applied_lsn);
+    }
+
+    /// Mark feedback as sent without updating recorded LSNs.
+    #[cfg(feature = "std")]
+    #[inline]
+    pub fn mark_feedback_sent(&mut self) {
+        self.last_feedback_time = std::time::Instant::now();
+    }
+}
+
+impl Default for ReplicationState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Unified logical replication parser
+pub struct LogicalReplicationParser {
+    streaming_context: Option<Xid>,
+    /// Protocol version (1, 2, 3, or 4)
+    protocol_version: u32,
+}
+
+impl LogicalReplicationParser {
+    /// Create a new parser with specified protocol version
+    #[inline]
+    pub fn with_protocol_version(protocol_version: u32) -> Self {
+        Self {
+            streaming_context: None,
+            protocol_version,
+        }
+    }
+
+    /// Check if we're currently inside a streaming transaction context
+    #[inline(always)]
+    fn is_streaming(&self) -> bool {
+        self.streaming_context.is_some()
+    }
+
+    /// Parse a WAL data message from the replication stream
+    #[inline]
+    pub fn parse_wal_message(&mut self, data: &[u8]) -> Result<StreamingReplicationMessage> {
+        if data.is_empty() {
+            return Err(ReplicationError::protocol("Empty WAL message".to_string()));
+        }
+
+        let mut reader = BufferReader::new(data);
+        self.parse_wal_message_from_reader(&mut reader)
+    }
+
+    /// Parse a WAL data message from pre-existing Bytes (zero-copy)
+    ///
+    /// This avoids the copy that `parse_wal_message(&[u8])` performs when
+    /// constructing the internal `BufferReader`. Use this when you already
+    /// have a `Bytes` handle (e.g. from `BufferReader::read_bytes_buf`).
+    #[inline]
+    pub fn parse_wal_message_bytes(
+        &mut self,
+        data: bytes::Bytes,
+    ) -> Result<StreamingReplicationMessage> {
+        if data.is_empty() {
+            return Err(ReplicationError::protocol("Empty WAL message".to_string()));
+        }
+
+        let mut reader = BufferReader::from_bytes(data);
+        self.parse_wal_message_from_reader(&mut reader)
+    }
+
+    /// Shared implementation for both `parse_wal_message` and `parse_wal_message_bytes`.
+    #[inline]
+    fn parse_wal_message_from_reader(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<StreamingReplicationMessage> {
+        let message_type = reader.read_u8()?;
+
+        let message = match message_type {
+            message_types::BEGIN => self.parse_begin_message(reader)?,
+            message_types::COMMIT => self.parse_commit_message(reader)?,
+            message_types::RELATION => self.parse_relation_message(reader)?,
+            message_types::INSERT => self.parse_insert_message(reader)?,
+            message_types::UPDATE => self.parse_update_message(reader)?,
+            message_types::DELETE => self.parse_delete_message(reader)?,
+            message_types::TRUNCATE => self.parse_truncate_message(reader)?,
+            message_types::TYPE => self.parse_type_message(reader)?,
+            message_types::ORIGIN => self.parse_origin_message(reader)?,
+            message_types::MESSAGE => self.parse_message(reader)?,
+            message_types::STREAM_START => {
+                let msg = self.parse_stream_start_message(reader)?;
+                self.streaming_context =
+                    if let LogicalReplicationMessage::StreamStart { xid, .. } = &msg {
+                        Some(*xid)
+                    } else {
+                        None
+                    };
+                msg
+            }
+            message_types::STREAM_STOP => {
+                let msg = self.parse_stream_stop_message(reader)?;
+                self.streaming_context = None;
+                msg
+            }
+            message_types::STREAM_COMMIT => self.parse_stream_commit_message(reader)?,
+            message_types::STREAM_ABORT => self.parse_stream_abort_message(reader)?,
+            message_types::BEGIN_PREPARE => self.parse_begin_prepare_message(reader)?,
+            message_types::PREPARE => self.parse_prepare_message(reader)?,
+            message_types::COMMIT_PREPARED => self.parse_commit_prepared_message(reader)?,
+            message_types::ROLLBACK_PREPARED => self.parse_rollback_prepared_message(reader)?,
+            message_types::STREAM_PREPARE => self.parse_stream_prepare_message(reader)?,
+            _ => {
+                return Err(ReplicationError::protocol(format!(
+                    "Unknown message type: {} ('{}')",
+                    message_type, message_type as char
+                )));
+            }
+        };
+
+        let streaming_message = match self.streaming_context {
+            Some(xid) => StreamingReplicationMessage::new_streaming(message, xid),
+            None => StreamingReplicationMessage::new(message),
+        };
+
+        Ok(streaming_message)
+    }
+
+    /// Parse BEGIN message
+    #[inline]
+    fn parse_begin_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let final_lsn = reader.read_u64()?;
+        let timestamp = reader.read_i64()?;
+        let xid = reader.read_u32()?;
+
+        Ok(LogicalReplicationMessage::Begin {
+            final_lsn,
+            timestamp,
+            xid,
+        })
+    }
+
+    /// Parse COMMIT message
+    fn parse_commit_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let flags = reader.read_u8()?;
+        let commit_lsn = reader.read_u64()?;
+        let end_lsn = reader.read_u64()?;
+        let timestamp = reader.read_i64()?;
+
+        Ok(LogicalReplicationMessage::Commit {
+            flags,
+            commit_lsn,
+            end_lsn,
+            timestamp,
+        })
+    }
+
+    /// Parse RELATION message
+    fn parse_relation_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        if self.protocol_version >= 2 && self.is_streaming() {
+            let _xid = reader.read_u32()?;
+        }
+
+        let relation_id = reader.read_u32()?;
+        let namespace = reader.read_cstring_arc()?;
+        let relation_name = reader.read_cstring_arc()?;
+        let replica_identity = reader.read_u8()?;
+        let column_count = reader.read_u16()?;
+
+        debug!(
+            "RELATION: id={}, {}.{}, replica_identity={}, columns={}",
+            relation_id, namespace, relation_name, replica_identity, column_count
+        );
+
+        // Cap pre-alloc to buffer size (>= 10 bytes/column) against a bogus count.
+        let mut columns = Vec::with_capacity((column_count as usize).min(reader.remaining() / 10));
+        for i in 0..column_count {
+            let flags = reader.read_u8()?;
+            let name = reader.read_cstring()?;
+            let type_id = reader.read_u32()?;
+            let type_modifier = reader.read_i32()?;
+
+            debug!(
+                "  Column {}: {} (type={}, mod={}, flags={})",
+                i, name, type_id, type_modifier, flags
+            );
+
+            columns.push(ColumnInfo::new(flags, name, type_id, type_modifier));
+        }
+
+        Ok(LogicalReplicationMessage::Relation {
+            relation_id,
+            namespace,
+            relation_name,
+            replica_identity,
+            columns,
+        })
+    }
+
+    /// Parse INSERT message
+    #[inline]
+    fn parse_insert_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        if self.protocol_version >= 2 && self.is_streaming() {
+            let _xid = reader.read_u32()?;
+        }
+
+        let relation_id = reader.read_u32()?;
+        let tuple_type = reader.read_u8()?;
+
+        if tuple_type != b'N' {
+            return Err(ReplicationError::protocol(format!(
+                "Unexpected tuple type in INSERT: '{}' (0x{:02x}) (expected 'N'), streaming={}, protocol_version={}",
+                tuple_type as char, tuple_type, self.is_streaming(), self.protocol_version
+            )));
+        }
+
+        let tuple = self.parse_tuple_data(reader)?;
+
+        Ok(LogicalReplicationMessage::Insert { relation_id, tuple })
+    }
+
+    /// Parse UPDATE message
+    #[inline]
+    fn parse_update_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        if self.protocol_version >= 2 && self.is_streaming() {
+            let _xid = reader.read_u32()?;
+        }
+
+        let relation_id = reader.read_u32()?;
+
+        let mut old_tuple = None;
+        let mut key_type = None;
+
+        if reader.remaining() > 0 {
+            let tuple_type = reader.peek_u8()?;
+            if tuple_type == b'K' || tuple_type == b'O' {
+                reader.read_u8()?;
+                key_type = Some(tuple_type as char);
+                old_tuple = Some(self.parse_tuple_data(reader)?);
+            }
+        }
+
+        let new_tuple_type = reader.read_u8()?;
+        if new_tuple_type != b'N' {
+            return Err(ReplicationError::protocol(format!(
+                "Unexpected new tuple type in UPDATE: '{}' (0x{:02x}) (expected 'N'), streaming={}",
+                new_tuple_type as char,
+                new_tuple_type,
+                self.is_streaming()
+            )));
+        }
+
+        let new_tuple = self.parse_tuple_data(reader)?;
+
+        Ok(LogicalReplicationMessage::Update {
+            relation_id,
+            old_tuple,
+            new_tuple,
+            key_type,
+        })
+    }
+
+    /// Parse DELETE message
+    #[inline]
+    fn parse_delete_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        if self.protocol_version >= 2 && self.is_streaming() {
+            let _xid = reader.read_u32()?;
+        }
+
+        let relation_id = reader.read_u32()?;
+        let key_type = reader.read_u8()? as char;
+
+        let old_tuple = self.parse_tuple_data(reader)?;
+
+        Ok(LogicalReplicationMessage::Delete {
+            relation_id,
+            old_tuple,
+            key_type,
+        })
+    }
+
+    /// Parse TRUNCATE message
+    fn parse_truncate_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        if self.protocol_version >= 2 && self.is_streaming() {
+            let _xid = reader.read_u32()?;
+        }
+
+        let relation_count = reader.read_u32()?;
+        let flags = reader.read_u8()?;
+
+        debug!(
+            "TRUNCATE: relation_count={}, flags={}",
+            relation_count, flags
+        );
+
+        // Cap pre-alloc to buffer size (4 bytes/id) against a bogus count (DoS).
+        let mut relation_ids =
+            Vec::with_capacity((relation_count as usize).min(reader.remaining() / 4));
+        for _ in 0..relation_count {
+            let relation_id = reader.read_u32()?;
+            relation_ids.push(relation_id);
+        }
+
+        Ok(LogicalReplicationMessage::Truncate {
+            relation_ids,
+            flags,
+        })
+    }
+
+    /// Parse TYPE message
+    fn parse_type_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        if self.protocol_version >= 2 && self.is_streaming() {
+            let _xid = reader.read_u32()?;
+        }
+
+        let type_id = reader.read_u32()?;
+        let namespace = reader.read_cstring()?;
+        let type_name = reader.read_cstring()?;
+
+        debug!("TYPE: id={}, {}.{}", type_id, namespace, type_name);
+
+        Ok(LogicalReplicationMessage::Type {
+            type_id,
+            namespace,
+            type_name,
+        })
+    }
+
+    /// Parse ORIGIN message
+    fn parse_origin_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let origin_lsn = reader.read_u64()?;
+        let origin_name = reader.read_cstring()?;
+
+        debug!(
+            "ORIGIN: lsn={}, name={}",
+            format_lsn(origin_lsn),
+            origin_name
+        );
+
+        Ok(LogicalReplicationMessage::Origin {
+            origin_lsn,
+            origin_name,
+        })
+    }
+
+    /// Parse MESSAGE (logical decoding message)
+    fn parse_message(&mut self, reader: &mut BufferReader) -> Result<LogicalReplicationMessage> {
+        if self.protocol_version >= 2 && self.is_streaming() {
+            let _xid = reader.read_u32()?;
+        }
+
+        let flags = reader.read_u8()?;
+        let lsn = reader.read_u64()?;
+        let prefix = reader.read_cstring()?;
+        let content_length = reader.read_u32()?;
+        let content = reader.read_bytes_buf(content_length as usize)?;
+
+        debug!(
+            "MESSAGE: flags={}, lsn={}, prefix={}, content_length={}",
+            flags,
+            format_lsn(lsn),
+            prefix,
+            content_length
+        );
+
+        Ok(LogicalReplicationMessage::Message {
+            flags,
+            lsn,
+            prefix,
+            content,
+        })
+    }
+
+    /// Parse STREAM START message
+    fn parse_stream_start_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let xid = reader.read_u32()?;
+        let first_segment = reader.read_u8()? != 0;
+
+        debug!("STREAM START: xid={}, first_segment={}", xid, first_segment);
+
+        Ok(LogicalReplicationMessage::StreamStart { xid, first_segment })
+    }
+
+    /// Parse STREAM STOP message
+    fn parse_stream_stop_message(
+        &mut self,
+        _reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        debug!("STREAM STOP");
+        Ok(LogicalReplicationMessage::StreamStop)
+    }
+
+    /// Parse STREAM COMMIT message
+    fn parse_stream_commit_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let xid = reader.read_u32()?;
+        let flags = reader.read_u8()?;
+        let commit_lsn = reader.read_u64()?;
+        let end_lsn = reader.read_u64()?;
+        let timestamp = reader.read_i64()?;
+
+        debug!(
+            "STREAM COMMIT: xid={}, flags={}, commit_lsn={}, end_lsn={}",
+            xid,
+            flags,
+            format_lsn(commit_lsn),
+            format_lsn(end_lsn)
+        );
+
+        Ok(LogicalReplicationMessage::StreamCommit {
+            xid,
+            flags,
+            commit_lsn,
+            end_lsn,
+            timestamp,
+        })
+    }
+
+    /// Parse STREAM ABORT message
+    fn parse_stream_abort_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let xid = reader.read_u32()?;
+        let subtransaction_xid = reader.read_u32()?;
+
+        let (abort_lsn, abort_timestamp) = if self.protocol_version >= 4 && reader.remaining() >= 16
+        {
+            let lsn = reader.read_u64()?;
+            let timestamp = reader.read_i64()?;
+            (Some(lsn), Some(timestamp))
+        } else {
+            (None, None)
+        };
+
+        debug!(
+            "STREAM ABORT: xid={}, subtxn_xid={}, abort_lsn={:?}, abort_timestamp={:?}",
+            xid, subtransaction_xid, abort_lsn, abort_timestamp
+        );
+
+        Ok(LogicalReplicationMessage::StreamAbort {
+            xid,
+            subtransaction_xid,
+            abort_lsn,
+            abort_timestamp,
+        })
+    }
+
+    /// Parse BEGIN PREPARE message (protocol v3+)
+    fn parse_begin_prepare_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let prepare_lsn = reader.read_u64()?;
+        let end_lsn = reader.read_u64()?;
+        let timestamp = reader.read_i64()?;
+        let xid = reader.read_u32()?;
+        let gid = reader.read_cstring()?;
+
+        debug!(
+            "BEGIN PREPARE: prepare_lsn={}, end_lsn={}, timestamp={}, xid={}, gid={}",
+            format_lsn(prepare_lsn),
+            format_lsn(end_lsn),
+            timestamp,
+            xid,
+            gid
+        );
+
+        Ok(LogicalReplicationMessage::BeginPrepare {
+            prepare_lsn,
+            end_lsn,
+            timestamp,
+            xid,
+            gid,
+        })
+    }
+
+    /// Parse PREPARE message (protocol v3+)
+    fn parse_prepare_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let flags = reader.read_u8()?;
+        let prepare_lsn = reader.read_u64()?;
+        let end_lsn = reader.read_u64()?;
+        let timestamp = reader.read_i64()?;
+        let xid = reader.read_u32()?;
+        let gid = reader.read_cstring()?;
+
+        debug!(
+            "PREPARE: flags={}, prepare_lsn={}, end_lsn={}, timestamp={}, xid={}, gid={}",
+            flags,
+            format_lsn(prepare_lsn),
+            format_lsn(end_lsn),
+            timestamp,
+            xid,
+            gid
+        );
+
+        Ok(LogicalReplicationMessage::Prepare {
+            flags,
+            prepare_lsn,
+            end_lsn,
+            timestamp,
+            xid,
+            gid,
+        })
+    }
+
+    /// Parse COMMIT PREPARED message (protocol v3+)
+    fn parse_commit_prepared_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let flags = reader.read_u8()?;
+        let commit_lsn = reader.read_u64()?;
+        let end_lsn = reader.read_u64()?;
+        let timestamp = reader.read_i64()?;
+        let xid = reader.read_u32()?;
+        let gid = reader.read_cstring()?;
+
+        debug!(
+            "COMMIT PREPARED: flags={}, commit_lsn={}, end_lsn={}, timestamp={}, xid={}, gid={}",
+            flags,
+            format_lsn(commit_lsn),
+            format_lsn(end_lsn),
+            timestamp,
+            xid,
+            gid
+        );
+
+        Ok(LogicalReplicationMessage::CommitPrepared {
+            flags,
+            commit_lsn,
+            end_lsn,
+            timestamp,
+            xid,
+            gid,
+        })
+    }
+
+    /// Parse ROLLBACK PREPARED message (protocol v3+)
+    fn parse_rollback_prepared_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let flags = reader.read_u8()?;
+        let prepare_end_lsn = reader.read_u64()?;
+        let rollback_end_lsn = reader.read_u64()?;
+        let prepare_timestamp = reader.read_i64()?;
+        let rollback_timestamp = reader.read_i64()?;
+        let xid = reader.read_u32()?;
+        let gid = reader.read_cstring()?;
+
+        debug!(
+            "ROLLBACK PREPARED: flags={}, prepare_end_lsn={}, rollback_end_lsn={}, xid={}, gid={}",
+            flags,
+            format_lsn(prepare_end_lsn),
+            format_lsn(rollback_end_lsn),
+            xid,
+            gid
+        );
+
+        Ok(LogicalReplicationMessage::RollbackPrepared {
+            flags,
+            prepare_end_lsn,
+            rollback_end_lsn,
+            prepare_timestamp,
+            rollback_timestamp,
+            xid,
+            gid,
+        })
+    }
+
+    /// Parse STREAM PREPARE message (protocol v3+)
+    fn parse_stream_prepare_message(
+        &mut self,
+        reader: &mut BufferReader,
+    ) -> Result<LogicalReplicationMessage> {
+        let flags = reader.read_u8()?;
+        let prepare_lsn = reader.read_u64()?;
+        let end_lsn = reader.read_u64()?;
+        let timestamp = reader.read_i64()?;
+        let xid = reader.read_u32()?;
+        let gid = reader.read_cstring()?;
+
+        debug!(
+            "STREAM PREPARE: flags={}, prepare_lsn={}, end_lsn={}, timestamp={}, xid={}, gid={}",
+            flags,
+            format_lsn(prepare_lsn),
+            format_lsn(end_lsn),
+            timestamp,
+            xid,
+            gid
+        );
+
+        Ok(LogicalReplicationMessage::StreamPrepare {
+            flags,
+            prepare_lsn,
+            end_lsn,
+            timestamp,
+            xid,
+            gid,
+        })
+    }
+
+    /// Parse tuple data (column values)
+    #[inline]
+    fn parse_tuple_data(&mut self, reader: &mut BufferReader) -> Result<TupleData> {
+        let column_count = reader.read_u16()? as usize;
+        // Cap pre-alloc to remaining bytes (>= 1 byte/column) against a bogus count.
+        let mut columns: SmallVec<[ColumnData; 16]> =
+            SmallVec::with_capacity(column_count.min(reader.remaining()));
+
+        for _ in 0..column_count {
+            let column_type = reader.read_u8()?;
+
+            let column_data = match column_type {
+                b'n' => ColumnData::null(),
+                b'u' => ColumnData::unchanged(),
+                b't' => {
+                    let length = reader.read_u32()?;
+                    let data = reader.read_bytes_buf(length as usize)?;
+                    ColumnData::text_bytes(data)
+                }
+                b'b' => {
+                    let length = reader.read_u32()?;
+                    let data = reader.read_bytes_buf(length as usize)?;
+                    ColumnData::binary_bytes(data)
+                }
+                _ => {
+                    return Self::unknown_column_type_err(column_type);
+                }
+            };
+
+            columns.push(column_data);
+        }
+
+        Ok(TupleData::from_smallvec(columns))
+    }
+
+    #[cold]
+    #[inline(never)]
+    fn unknown_column_type_err(column_type: u8) -> Result<TupleData> {
+        Err(ReplicationError::protocol(format!(
+            "Unknown column data type: '{}'",
+            column_type as char
+        )))
+    }
+}
+
+/// Extract key columns from relation info based on `key_type` from the protocol.
+pub(crate) fn key_columns_for_relation(
+    relation: &RelationInfo,
+    key_type: Option<char>,
+) -> Vec<Arc<str>> {
+    // Get key columns based on the relation's replica identity and key_type from protocol
+    match key_type {
+        Some('K') => {
+            // Key tuple - replica-identity/primary-key columns.
+            relation.key_column_names().collect()
+        }
+        Some('O') => {
+            // Old tuple - means REPLICA IDENTITY FULL, use all columns
+            relation
+                .columns
+                .iter()
+                .map(|col| Arc::clone(&col.name))
+                .collect()
+        }
+        None => {
+            // No old tuple data - means REPLICA IDENTITY NOTHING or DEFAULT
+            // without changes to key columns. Fall back to key columns.
+            relation.key_column_names().collect()
+        }
+        _ => {
+            // Unknown key type, fall back to key columns.
+            relation.key_column_names().collect()
+        }
+    }
+}
+
+/// Schema/table name, replica identity, and key columns for a relation, plus a borrow of the cached [`RelationInfo`] to decode tuple data against. Resolved from the cache in `state` for an INSERT/UPDATE/DELETE.
+pub(crate) struct RelationMetadata<'a> {
+    pub(crate) schema: Arc<str>,
+    pub(crate) table: Arc<str>,
+    pub(crate) replica_identity: ReplicaIdentity,
+    pub(crate) key_columns: Vec<Arc<str>>,
+    pub(crate) relation: &'a RelationInfo,
+}
+
+/// Look up [`RelationMetadata`] for `relation_id` in `state`, or `None` if the
+/// relation has not been seen.
+pub(crate) fn relation_metadata(
+    state: &ReplicationState,
+    relation_id: u32,
+    key_type: Option<char>,
+) -> Option<RelationMetadata<'_>> {
+    let relation = state.get_relation(relation_id)?;
+
+    Some(RelationMetadata {
+        schema: Arc::clone(&relation.namespace),
+        table: Arc::clone(&relation.relation_name),
+        replica_identity: ReplicaIdentity::from_byte(relation.replica_identity)
+            .unwrap_or(ReplicaIdentity::Default),
+        key_columns: key_columns_for_relation(relation, key_type),
+        relation,
+    })
+}
+
+/// Convert a parsed logical replication message into a [`ChangeEvent`], reading
+/// and updating the relation cache in `state`.
+///
+/// This is the connection-independent core of the decode path. Both the network
+/// `EventStream` and [`PgOutputDecoder`] delegate to it, so every consumer gets
+/// identical results whether or not a connection is held.
+///
+/// `Ok(None)` covers two distinct cases the caller cannot tell apart:
+/// - a first-seen `Relation` message (cache is populated, no event emitted), and
+/// - a data message for a relation not yet in `state` (dropped, logged at WARN).
+///
+/// A `Relation` whose schema differs from the cached one emits a `Relation`
+/// event before the cache is updated. `lsn` stamps every emitted event.
+///
+/// Kept `pub(crate)`: the public entry point is [`PgOutputDecoder`]. This lives
+/// in the unconditional `protocol` module (not the network-gated `stream`
+/// module), so the ChangeEvent assembly it performs also compiles into the
+/// `no_std`/parser-only build — a deliberate size cost for that target in
+/// exchange for connection-free decoding.
+pub(crate) fn message_to_change_event(
+    state: &mut ReplicationState,
+    message: StreamingReplicationMessage,
+    lsn: XLogRecPtr,
+) -> Result<Option<ChangeEvent>> {
+    let event = match message.message {
+        LogicalReplicationMessage::Relation {
+            relation_id,
+            namespace,
+            relation_name,
+            replica_identity,
+            columns,
+        } => {
+            // Detect schema changes: if we already have this relation cached
+            // and the schema differs, emit a Relation event before updating.
+            let schema_changed = if let Some(existing) = state.get_relation(relation_id) {
+                existing.namespace.as_ref() != namespace.as_ref()
+                    || existing.relation_name.as_ref() != relation_name.as_ref()
+                    || existing.replica_identity != replica_identity
+                    || existing.columns.len() != columns.len()
+                    || existing.columns.iter().zip(columns.iter()).any(|(a, b)| {
+                        a.name.as_ref() != b.name.as_ref()
+                            || a.type_id != b.type_id
+                            || a.type_modifier != b.type_modifier
+                            || a.is_key() != b.is_key()
+                    })
+            } else {
+                false
+            };
+
+            if schema_changed {
+                let ri = ReplicaIdentity::from_byte(replica_identity)
+                    .unwrap_or(ReplicaIdentity::Default);
+                let relation_columns = columns
+                    .iter()
+                    .map(|c| RelationColumn {
+                        name: Arc::clone(&c.name),
+                        type_id: c.type_id,
+                        type_modifier: c.type_modifier,
+                        is_key: c.is_key(),
+                    })
+                    .collect();
+                let relation_info = RelationInfo::new(
+                    relation_id,
+                    namespace.clone(),
+                    relation_name.clone(),
+                    replica_identity,
+                    columns,
+                );
+                state.add_relation(relation_info);
+                ChangeEvent::relation(
+                    relation_id,
+                    namespace,
+                    relation_name,
+                    ri,
+                    relation_columns,
+                    Lsn::new(lsn),
+                )
+            } else {
+                let relation_info = RelationInfo::new(
+                    relation_id,
+                    namespace,
+                    relation_name,
+                    replica_identity,
+                    columns,
+                );
+                state.add_relation(relation_info);
+                return Ok(None);
+            }
+        }
+
+        LogicalReplicationMessage::Insert { relation_id, tuple } => {
+            if let Some(relation) = state.get_relation(relation_id) {
+                let schema_name = Arc::clone(&relation.namespace);
+                let table_name = Arc::clone(&relation.relation_name);
+                let data = tuple.into_row_data(relation);
+
+                ChangeEvent {
+                    event_type: EventType::Insert {
+                        schema: schema_name,
+                        table: table_name,
+                        relation_oid: relation_id,
+                        data,
+                    },
+                    lsn: Lsn::new(lsn),
+                    metadata: None,
+                }
+            } else {
+                warn!("Received INSERT for unknown relation: {}", relation_id);
+                return Ok(None);
+            }
+        }
+
+        LogicalReplicationMessage::Update {
+            relation_id,
+            old_tuple,
+            new_tuple,
+            key_type,
+        } => {
+            if let Some(meta) = relation_metadata(state, relation_id, key_type) {
+                let old_data = old_tuple.map(|t| t.into_row_data(meta.relation));
+                let new_data = new_tuple.into_row_data(meta.relation);
+
+                ChangeEvent {
+                    event_type: EventType::Update {
+                        schema: meta.schema,
+                        table: meta.table,
+                        relation_oid: relation_id,
+                        old_data,
+                        new_data,
+                        replica_identity: meta.replica_identity,
+                        key_columns: meta.key_columns,
+                    },
+                    lsn: Lsn::new(lsn),
+                    metadata: None,
+                }
+            } else {
+                warn!("Received UPDATE for unknown relation: {}", relation_id);
+                return Ok(None);
+            }
+        }
+
+        LogicalReplicationMessage::Delete {
+            relation_id,
+            old_tuple,
+            key_type,
+        } => {
+            if let Some(meta) = relation_metadata(state, relation_id, Some(key_type)) {
+                let old_data = old_tuple.into_row_data(meta.relation);
+
+                ChangeEvent {
+                    event_type: EventType::Delete {
+                        schema: meta.schema,
+                        table: meta.table,
+                        relation_oid: relation_id,
+                        old_data,
+                        replica_identity: meta.replica_identity,
+                        key_columns: meta.key_columns,
+                    },
+                    lsn: Lsn::new(lsn),
+                    metadata: None,
+                }
+            } else {
+                warn!("Received DELETE for unknown relation: {}", relation_id);
+                return Ok(None);
+            }
+        }
+
+        LogicalReplicationMessage::Begin {
+            final_lsn,
+            xid,
+            timestamp,
+        } => {
+            debug!(
+                "Transaction begin: xid={}, final_lsn={}",
+                xid,
+                format_lsn(final_lsn)
+            );
+            ChangeEvent {
+                event_type: EventType::Begin {
+                    transaction_id: xid,
+                    final_lsn: Lsn::new(final_lsn),
+                    commit_timestamp: postgres_timestamp_to_chrono(timestamp),
+                },
+                lsn: Lsn::new(lsn),
+                metadata: None,
+            }
+        }
+
+        LogicalReplicationMessage::Commit {
+            flags,
+            timestamp,
+            commit_lsn,
+            end_lsn,
+        } => {
+            debug!(
+                "Transaction commit, flags={}, commit_lsn:{}, end_lsn:{}",
+                flags,
+                format_lsn(commit_lsn),
+                format_lsn(end_lsn)
+            );
+            ChangeEvent {
+                event_type: EventType::Commit {
+                    commit_timestamp: postgres_timestamp_to_chrono(timestamp),
+                    commit_lsn: Lsn::new(commit_lsn),
+                    end_lsn: Lsn::new(end_lsn),
+                },
+                lsn: Lsn::new(lsn),
+                metadata: None,
+            }
+        }
+
+        LogicalReplicationMessage::Truncate {
+            relation_ids,
+            flags,
+        } => {
+            let mut truncate_tables = Vec::with_capacity(relation_ids.len());
+            for relation_id in relation_ids {
+                if let Some(relation) = state.get_relation(relation_id) {
+                    info!(
+                        "Table truncated: {} (flags={})",
+                        relation.full_name(),
+                        flags
+                    );
+                    truncate_tables.push(Arc::<str>::from(relation.full_name()));
+                }
+            }
+
+            ChangeEvent {
+                event_type: EventType::Truncate(truncate_tables),
+                lsn: Lsn::new(lsn),
+                metadata: None,
+            }
+        }
+
+        // Streaming transaction messages (protocol v2+)
+        LogicalReplicationMessage::StreamStart { xid, first_segment } => {
+            debug!("Stream start: xid={}, first_segment={}", xid, first_segment);
+            ChangeEvent {
+                event_type: EventType::StreamStart {
+                    transaction_id: xid,
+                    first_segment,
+                },
+                lsn: Lsn::new(lsn),
+                metadata: None,
+            }
+        }
+
+        LogicalReplicationMessage::StreamStop => {
+            debug!("Stream stop");
+            ChangeEvent {
+                event_type: EventType::StreamStop,
+                lsn: Lsn::new(lsn),
+                metadata: None,
+            }
+        }
+
+        LogicalReplicationMessage::StreamCommit {
+            xid,
+            flags,
+            timestamp,
+            commit_lsn,
+            end_lsn,
+        } => {
+            debug!(
+                "Stream commit: xid={}, flags={}, commit_lsn={}, end_lsn={}",
+                xid,
+                flags,
+                format_lsn(commit_lsn),
+                format_lsn(end_lsn)
+            );
+            ChangeEvent {
+                event_type: EventType::StreamCommit {
+                    transaction_id: xid,
+                    commit_lsn: Lsn::new(commit_lsn),
+                    end_lsn: Lsn::new(end_lsn),
+                    commit_timestamp: postgres_timestamp_to_chrono(timestamp),
+                },
+                lsn: Lsn::new(lsn),
+                metadata: None,
+            }
+        }
+
+        LogicalReplicationMessage::StreamAbort {
+            xid,
+            subtransaction_xid,
+            abort_lsn,
+            abort_timestamp,
+        } => {
+            debug!(
+                "Stream abort: xid={}, subtransaction_xid={}, abort_lsn={:?}, abort_timestamp={:?}",
+                xid,
+                subtransaction_xid,
+                abort_lsn.map(format_lsn),
+                abort_timestamp
+            );
+            ChangeEvent {
+                event_type: EventType::StreamAbort {
+                    transaction_id: xid,
+                    subtransaction_xid,
+                    abort_lsn: abort_lsn.map(Lsn::new),
+                    abort_timestamp: abort_timestamp.map(postgres_timestamp_to_chrono),
+                },
+                lsn: Lsn::new(lsn),
+                metadata: None,
+            }
+        }
+
+        // Origin, Type, and Message events (previously dropped)
+        LogicalReplicationMessage::Origin {
+            origin_lsn,
+            origin_name,
+        } => {
+            debug!(
+                "Origin: lsn={}, name={}",
+                format_lsn(origin_lsn),
+                origin_name
+            );
+            ChangeEvent::origin(Lsn::new(origin_lsn), origin_name, Lsn::new(lsn))
+        }
+
+        LogicalReplicationMessage::Type {
+            type_id,
+            namespace,
+            type_name,
+        } => {
+            debug!("Type: id={}, {}.{}", type_id, namespace, type_name);
+            ChangeEvent::type_event(type_id, namespace, type_name, Lsn::new(lsn))
+        }
+
+        LogicalReplicationMessage::Message {
+            flags,
+            lsn: msg_lsn,
+            prefix,
+            content,
+        } => {
+            debug!(
+                "Message: flags={}, lsn={}, prefix={}, content_len={}",
+                flags,
+                format_lsn(msg_lsn),
+                prefix,
+                content.len()
+            );
+            ChangeEvent::message(flags, Lsn::new(msg_lsn), prefix, content, Lsn::new(lsn))
+        }
+
+        // Two-phase commit events (protocol v3+)
+        LogicalReplicationMessage::BeginPrepare {
+            prepare_lsn,
+            end_lsn: end,
+            timestamp,
+            xid,
+            gid,
+        } => {
+            debug!(
+                "Begin prepare: xid={}, gid={}, prepare_lsn={}",
+                xid,
+                gid,
+                format_lsn(prepare_lsn)
+            );
+            ChangeEvent::begin_prepare(
+                xid,
+                Lsn::new(prepare_lsn),
+                Lsn::new(end),
+                postgres_timestamp_to_chrono(timestamp),
+                gid,
+                Lsn::new(lsn),
+            )
+        }
+
+        LogicalReplicationMessage::Prepare {
+            flags,
+            prepare_lsn,
+            end_lsn: end,
+            timestamp,
+            xid,
+            gid,
+        } => {
+            debug!(
+                "Prepare: xid={}, gid={}, prepare_lsn={}",
+                xid,
+                gid,
+                format_lsn(prepare_lsn)
+            );
+            ChangeEvent::prepare(
+                flags,
+                xid,
+                Lsn::new(prepare_lsn),
+                Lsn::new(end),
+                postgres_timestamp_to_chrono(timestamp),
+                gid,
+                Lsn::new(lsn),
+            )
+        }
+
+        LogicalReplicationMessage::CommitPrepared {
+            flags,
+            commit_lsn,
+            end_lsn: end,
+            timestamp,
+            xid,
+            gid,
+        } => {
+            debug!(
+                "Commit prepared: xid={}, gid={}, commit_lsn={}",
+                xid,
+                gid,
+                format_lsn(commit_lsn)
+            );
+            ChangeEvent::commit_prepared(
+                flags,
+                xid,
+                Lsn::new(commit_lsn),
+                Lsn::new(end),
+                postgres_timestamp_to_chrono(timestamp),
+                gid,
+                Lsn::new(lsn),
+            )
+        }
+
+        LogicalReplicationMessage::RollbackPrepared {
+            flags,
+            prepare_end_lsn,
+            rollback_end_lsn,
+            prepare_timestamp,
+            rollback_timestamp,
+            xid,
+            gid,
+        } => {
+            debug!(
+                "Rollback prepared: xid={}, gid={}, rollback_lsn={}",
+                xid,
+                gid,
+                format_lsn(rollback_end_lsn)
+            );
+            ChangeEvent::rollback_prepared(
+                flags,
+                xid,
+                Lsn::new(prepare_end_lsn),
+                Lsn::new(rollback_end_lsn),
+                postgres_timestamp_to_chrono(prepare_timestamp),
+                postgres_timestamp_to_chrono(rollback_timestamp),
+                gid,
+                Lsn::new(lsn),
+            )
+        }
+
+        LogicalReplicationMessage::StreamPrepare {
+            flags,
+            prepare_lsn,
+            end_lsn: end,
+            timestamp,
+            xid,
+            gid,
+        } => {
+            debug!(
+                "Stream prepare: xid={}, gid={}, prepare_lsn={}",
+                xid,
+                gid,
+                format_lsn(prepare_lsn)
+            );
+            ChangeEvent::stream_prepare(
+                flags,
+                xid,
+                Lsn::new(prepare_lsn),
+                Lsn::new(end),
+                postgres_timestamp_to_chrono(timestamp),
+                gid,
+                Lsn::new(lsn),
+            )
+        }
+    };
+
+    Ok(Some(event))
+}
+
+/// Connection-independent pgoutput decoder.
+///
+/// Bundles a [`LogicalReplicationParser`] with a [`ReplicationState`] relation
+/// cache so a caller holding only pgoutput message bytes (a SQL slot drain, an
+/// offline byte stream, a fuzz harness) can produce [`ChangeEvent`]s without
+/// opening a replication connection. A pgoutput stream is self-describing: a
+/// `Relation` message precedes the first data message for each table and repeats
+/// on schema change, so a decoder that starts empty and is fed a complete stream
+/// builds its own cache exactly as the network stream does.
+pub struct PgOutputDecoder {
+    parser: LogicalReplicationParser,
+    state: ReplicationState,
+}
+
+impl PgOutputDecoder {
+    /// Create a decoder for the given pgoutput protocol version. Matches the
+    /// `proto_version` passed to `START_REPLICATION`.
+    #[inline]
+    pub fn with_protocol_version(protocol_version: u32) -> Self {
+        Self {
+            parser: LogicalReplicationParser::with_protocol_version(protocol_version),
+            state: ReplicationState::new(),
+        }
+    }
+
+    /// Decode one pgoutput logical-replication message body.
+    ///
+    /// `body` is the message after any transport framing has been stripped (no
+    /// `'w'` XLogData header, no CopyData wrapper), the same contract as
+    /// [`LogicalReplicationParser::parse_wal_message`]. Returns `Ok(None)` for a
+    /// first-seen `Relation` (cache update only) or a data message referencing an
+    /// unknown relation, and `Ok(Some(event))` otherwise.
+    ///
+    /// `lsn` stamps the emitted event; pass the WAL start position of this
+    /// message (the network path uses `XLogData.wal_start`). When draining a slot
+    /// over SQL, pass the `lsn` column returned alongside `data` by
+    /// `pg_logical_slot_peek_binary_changes` / `pg_logical_slot_get_binary_changes`.
+    ///
+    /// # Precondition
+    /// Feed a *complete* stream from a `START_REPLICATION` (or slot-drain)
+    /// boundary. pgoutput is self-describing — a `Relation` precedes the first
+    /// data row for each table and repeats on schema change — so a decoder that
+    /// starts empty builds its own cache. A data message whose `Relation` has not
+    /// yet been seen is **silently dropped** (logged at WARN, returns `Ok(None)`);
+    /// do not resume mid-stream without replaying the preceding `Relation`
+    /// messages.
+    #[inline]
+    pub fn decode_message(
+        &mut self,
+        body: impl Into<Bytes>,
+        lsn: Lsn,
+    ) -> Result<Option<ChangeEvent>> {
+        let message = self.parser.parse_wal_message_bytes(body.into())?;
+        message_to_change_event(&mut self.state, message, lsn.value())
+    }
+
+    /// Read-only access to the accumulated relation cache.
+    #[inline]
+    pub fn state(&self) -> &ReplicationState {
+        &self.state
+    }
+}
+
+/// Parse keepalive message from the replication stream
+///
+/// Keepalives are tiny fixed-layout messages (18 bytes). We decode them
+/// directly from the slice instead of constructing a `BufferReader`, which
+/// would otherwise allocate a `Bytes` copy per keepalive.
+#[inline]
+pub fn parse_keepalive_message(data: &[u8]) -> Result<KeepaliveMessage> {
+    if data.len() < 18 {
+        return Err(ReplicationError::protocol(
+            "Keepalive message too short".to_string(),
+        ));
+    }
+
+    // Layout: 'k' (1) + wal_end (8) + timestamp (8) + reply_requested (1)
+    let wal_end = u64::from_be_bytes(data[1..9].try_into().unwrap());
+    let timestamp = i64::from_be_bytes(data[9..17].try_into().unwrap());
+    let reply_requested = data[17] != 0;
+
+    Ok(KeepaliveMessage {
+        wal_end,
+        timestamp,
+        reply_requested,
+    })
+}
+
+/// Keepalive message from the server
+#[derive(Debug, Clone)]
+pub struct KeepaliveMessage {
+    pub wal_end: XLogRecPtr,
+    pub timestamp: TimestampTz,
+    pub reply_requested: bool,
+}
+
+/// Build a hot standby feedback message for physical replication
+///
+/// This function creates a properly formatted hot standby feedback message
+/// according to the PostgreSQL streaming replication protocol.
+///
+/// # Arguments
+///
+/// * `xmin` - Oldest transaction ID still considered active
+/// * `xmin_epoch` - Epoch for xmin
+/// * `catalog_xmin` - Oldest transaction ID affecting catalog still considered active  
+/// * `catalog_xmin_epoch` - Epoch for catalog_xmin
+///
+/// # Returns
+///
+/// Returns a Bytes buffer containing the properly formatted hot standby feedback message.
+///
+/// # Protocol Format
+///
+/// The message format is:
+/// - Byte1('h'): Message type identifier
+/// - Int64: Current timestamp
+/// - Int32: xmin
+/// - Int32: xmin epoch
+/// - Int32: catalog_xmin
+/// - Int32: catalog_xmin epoch
+#[cfg(feature = "std")]
+pub fn build_hot_standby_feedback_message(
+    xmin: u32,
+    xmin_epoch: u32,
+    catalog_xmin: u32,
+    catalog_xmin_epoch: u32,
+) -> Result<Bytes> {
+    let timestamp = system_time_to_postgres_timestamp(SystemTime::now());
+    let mut buffer = BufferWriter::with_capacity(25);
+
+    buffer.write_u8(message_types::HOT_STANDBY_FEEDBACK);
+    buffer.write_i64(timestamp);
+    buffer.write_u32(xmin);
+    buffer.write_u32(xmin_epoch);
+    buffer.write_u32(catalog_xmin);
+    buffer.write_u32(catalog_xmin_epoch);
+
+    Ok(buffer.freeze())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::column_value::ColumnValue;
+
+    #[test]
+    fn pgoutput_decoder_decodes_bytes_like_network_path() {
+        use crate::pgoutput_encode::encode_message_to_bytes;
+
+        const VERSION: u32 = 2;
+
+        let relation = LogicalReplicationMessage::Relation {
+            relation_id: 42,
+            namespace: Arc::from("public"),
+            relation_name: Arc::from("users"),
+            replica_identity: b'd',
+            columns: vec![
+                ColumnInfo::new(1, "id".to_string(), 23, -1),
+                ColumnInfo::new(0, "name".to_string(), 25, -1),
+            ],
+        };
+        let insert = LogicalReplicationMessage::Insert {
+            relation_id: 42,
+            tuple: TupleData::new(vec![
+                ColumnData::text(b"1".to_vec()),
+                ColumnData::text(b"alice".to_vec()),
+            ]),
+        };
+        let update = LogicalReplicationMessage::Update {
+            relation_id: 42,
+            old_tuple: None,
+            new_tuple: TupleData::new(vec![
+                ColumnData::text(b"1".to_vec()),
+                ColumnData::text(b"bob".to_vec()),
+            ]),
+            key_type: None,
+        };
+        let delete = LogicalReplicationMessage::Delete {
+            relation_id: 42,
+            old_tuple: TupleData::new(vec![ColumnData::text(b"1".to_vec()), ColumnData::null()]),
+            key_type: 'K',
+        };
+        let truncate = LogicalReplicationMessage::Truncate {
+            relation_ids: vec![42],
+            flags: 0,
+        };
+
+        let messages = [
+            (relation, 0x10u64),
+            (insert, 0x20),
+            (update, 0x30),
+            (delete, 0x40),
+            (truncate, 0x50),
+        ];
+
+        // Independent reference for the network path: a bare parser plus state
+        // driven through `message_to_change_event`, exactly what
+        // `LogicalReplicationStream` now delegates to.
+        let mut ref_parser = LogicalReplicationParser::with_protocol_version(VERSION);
+        let mut ref_state = ReplicationState::new();
+        let mut decoder = PgOutputDecoder::with_protocol_version(VERSION);
+
+        for (msg, lsn) in &messages {
+            let body = encode_message_to_bytes(msg, VERSION as u8).freeze();
+
+            let ref_msg = ref_parser.parse_wal_message_bytes(body.clone()).unwrap();
+            let expected = message_to_change_event(&mut ref_state, ref_msg, *lsn).unwrap();
+
+            let got = decoder.decode_message(body, Lsn::new(*lsn)).unwrap();
+
+            match (&expected, &got) {
+                (None, None) => {}
+                (Some(a), Some(b)) => {
+                    assert_eq!(a.event_type, b.event_type, "event mismatch for {msg:?}");
+                    assert_eq!(a.lsn, b.lsn);
+                }
+                _ => panic!("decoder and network path disagree for {msg:?}"),
+            }
+        }
+
+        // The leading Relation only populated the cache; data messages that
+        // followed produced events, so the relation must be cached.
+        assert!(decoder.state().get_relation(42).is_some());
+
+        // Concrete decode of the Insert, independent of the reference path.
+        let mut d = PgOutputDecoder::with_protocol_version(VERSION);
+        assert!(
+            d.decode_message(
+                encode_message_to_bytes(&messages[0].0, VERSION as u8).freeze(),
+                Lsn::new(0x10),
+            )
+            .unwrap()
+            .is_none(),
+            "first Relation is a cache update, not an event"
+        );
+        let ev = d
+            .decode_message(
+                encode_message_to_bytes(&messages[1].0, VERSION as u8).freeze(),
+                Lsn::new(0x20),
+            )
+            .unwrap()
+            .expect("insert yields an event");
+        assert_eq!(ev.lsn, Lsn::new(0x20));
+        match ev.event_type {
+            EventType::Insert {
+                ref schema,
+                ref table,
+                relation_oid,
+                ref data,
+            } => {
+                assert_eq!(&**schema, "public");
+                assert_eq!(&**table, "users");
+                assert_eq!(relation_oid, 42);
+                assert_eq!(data.get("id").unwrap(), "1");
+                assert_eq!(data.get("name").unwrap(), "alice");
+            }
+            ref other => panic!("expected Insert, got {other:?}"),
+        }
+
+        // Concrete decode of Update/Delete/Truncate on the same warm decoder
+        // (its cache holds relation 42 from the leading Relation at 0x10),
+        // asserting golden field values instead of re-deriving them through the
+        // function under test — this removes the reference-oracle circularity.
+        let ev = d
+            .decode_message(
+                encode_message_to_bytes(&messages[2].0, VERSION as u8).freeze(),
+                Lsn::new(0x30),
+            )
+            .unwrap()
+            .expect("update yields an event");
+        assert_eq!(ev.lsn, Lsn::new(0x30));
+        match ev.event_type {
+            EventType::Update {
+                ref schema,
+                ref table,
+                relation_oid,
+                ref old_data,
+                ref new_data,
+                ref key_columns,
+                ..
+            } => {
+                assert_eq!(&**schema, "public");
+                assert_eq!(&**table, "users");
+                assert_eq!(relation_oid, 42);
+                assert!(old_data.is_none(), "this UPDATE carried no old tuple");
+                assert_eq!(new_data.get("id").unwrap(), "1");
+                assert_eq!(new_data.get("name").unwrap(), "bob");
+                // key_type None on UPDATE falls back to the relation's key columns.
+                assert_eq!(key_columns, &vec![Arc::from("id")]);
+            }
+            ref other => panic!("expected Update, got {other:?}"),
+        }
+
+        let ev = d
+            .decode_message(
+                encode_message_to_bytes(&messages[3].0, VERSION as u8).freeze(),
+                Lsn::new(0x40),
+            )
+            .unwrap()
+            .expect("delete yields an event");
+        assert_eq!(ev.lsn, Lsn::new(0x40));
+        match ev.event_type {
+            EventType::Delete {
+                ref schema,
+                ref table,
+                relation_oid,
+                ref old_data,
+                ref key_columns,
+                ..
+            } => {
+                assert_eq!(&**schema, "public");
+                assert_eq!(&**table, "users");
+                assert_eq!(relation_oid, 42);
+                assert_eq!(old_data.get("id").unwrap(), "1");
+                assert!(old_data.get("name").unwrap().is_null(), "name was NULL");
+                // key_type 'K' → replica-identity / key columns.
+                assert_eq!(key_columns, &vec![Arc::from("id")]);
+            }
+            ref other => panic!("expected Delete, got {other:?}"),
+        }
+
+        let ev = d
+            .decode_message(
+                encode_message_to_bytes(&messages[4].0, VERSION as u8).freeze(),
+                Lsn::new(0x50),
+            )
+            .unwrap()
+            .expect("truncate yields an event");
+        assert_eq!(ev.lsn, Lsn::new(0x50));
+        match ev.event_type {
+            EventType::Truncate(ref tables) => {
+                assert_eq!(tables, &vec![Arc::from("public.users")]);
+            }
+            ref other => panic!("expected Truncate, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_column_data_creation() {
+        let null_col = ColumnData::null();
+        assert!(null_col.is_null());
+        assert_eq!(null_col.data_type, b'n');
+
+        let text_col = ColumnData::text(b"test".to_vec());
+        assert!(!text_col.is_null());
+        assert_eq!(text_col.data_type, b't');
+        assert_eq!(text_col.as_string(), Some("test".to_string()));
+
+        let unchanged_col = ColumnData::unchanged();
+        assert!(unchanged_col.is_unchanged());
+        assert_eq!(unchanged_col.data_type, b'u');
+    }
+
+    #[test]
+    fn test_relation_info() {
+        let columns = vec![
+            ColumnInfo::new(1, "id".to_string(), 23, -1),
+            ColumnInfo::new(0, "name".to_string(), 25, -1),
+        ];
+
+        let relation = RelationInfo::new(12345, "public", "users", 1, columns);
+
+        assert_eq!(relation.full_name(), "public.users");
+        assert_eq!(relation.get_key_columns().len(), 1);
+        assert_eq!(&*relation.get_key_columns()[0].name, "id");
+    }
+
+    #[test]
+    fn test_replication_state() {
+        let mut state = ReplicationState::new();
+
+        state.update_received_lsn(100);
+        assert_eq!(state.last_received_lsn, 100);
+        assert_eq!(state.last_flushed_lsn, 0);
+        assert_eq!(state.last_applied_lsn, 0);
+
+        state.update_received_lsn(50);
+        assert_eq!(state.last_received_lsn, 100);
+
+        state.update_flushed_lsn(80);
+        assert_eq!(state.last_flushed_lsn, 80);
+
+        state.update_flushed_lsn(50);
+        assert_eq!(state.last_flushed_lsn, 80);
+
+        state.update_applied_lsn(70);
+        assert_eq!(state.last_applied_lsn, 70);
+
+        state.update_applied_lsn(30);
+        assert_eq!(state.last_applied_lsn, 70);
+    }
+
+    fn write_u32_be(val: u32) -> [u8; 4] {
+        val.to_be_bytes()
+    }
+
+    fn write_u64_be(val: u64) -> [u8; 8] {
+        val.to_be_bytes()
+    }
+
+    fn write_i64_be(val: i64) -> [u8; 8] {
+        val.to_be_bytes()
+    }
+
+    fn write_cstring(s: &str) -> Vec<u8> {
+        let mut v = s.as_bytes().to_vec();
+        v.push(0);
+        v
+    }
+
+    #[test]
+    fn test_column_data_binary() {
+        let binary_col = ColumnData::binary(vec![0x00, 0x01, 0x02, 0xFF]);
+        assert!(binary_col.is_binary());
+        assert!(!binary_col.is_text());
+        assert_eq!(binary_col.data_type, b'b');
+        assert_eq!(binary_col.as_bytes(), &[0x00, 0x01, 0x02, 0xFF]);
+    }
+
+    #[test]
+    fn test_parse_begin_prepare_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(3);
+
+        let mut data = vec![message_types::BEGIN_PREPARE];
+        data.extend_from_slice(&write_u64_be(0x12345678));
+        data.extend_from_slice(&write_u64_be(0x87654321));
+        data.extend_from_slice(&write_i64_be(1234567890));
+        data.extend_from_slice(&write_u32_be(42));
+        data.extend_from_slice(&write_cstring("my_transaction"));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::BeginPrepare {
+                prepare_lsn,
+                end_lsn,
+                timestamp,
+                xid,
+                gid,
+            } => {
+                assert_eq!(prepare_lsn, 0x12345678);
+                assert_eq!(end_lsn, 0x87654321);
+                assert_eq!(timestamp, 1234567890);
+                assert_eq!(xid, 42);
+                assert_eq!(gid, "my_transaction");
+            }
+            _ => panic!("Expected BeginPrepare message"),
+        }
+    }
+
+    #[test]
+    fn test_protocol_version_message_types() {
+        assert_eq!(message_types::BEGIN, b'B');
+        assert_eq!(message_types::COMMIT, b'C');
+        assert_eq!(message_types::ORIGIN, b'O');
+        assert_eq!(message_types::RELATION, b'R');
+        assert_eq!(message_types::TYPE, b'Y');
+        assert_eq!(message_types::INSERT, b'I');
+        assert_eq!(message_types::UPDATE, b'U');
+        assert_eq!(message_types::DELETE, b'D');
+        assert_eq!(message_types::TRUNCATE, b'T');
+        assert_eq!(message_types::MESSAGE, b'M');
+        assert_eq!(message_types::STREAM_START, b'S');
+        assert_eq!(message_types::STREAM_STOP, b'E');
+        assert_eq!(message_types::STREAM_COMMIT, b'c');
+        assert_eq!(message_types::STREAM_ABORT, b'A');
+        assert_eq!(message_types::BEGIN_PREPARE, b'b');
+        assert_eq!(message_types::PREPARE, b'P');
+        assert_eq!(message_types::COMMIT_PREPARED, b'K');
+        assert_eq!(message_types::ROLLBACK_PREPARED, b'r');
+        assert_eq!(message_types::STREAM_PREPARE, b'p');
+    }
+
+    #[test]
+    fn test_parse_begin_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::BEGIN];
+        data.extend_from_slice(&write_u64_be(0x1000));
+        data.extend_from_slice(&write_i64_be(1234567890));
+        data.extend_from_slice(&write_u32_be(42));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Begin {
+                final_lsn,
+                timestamp,
+                xid,
+            } => {
+                assert_eq!(final_lsn, 0x1000);
+                assert_eq!(timestamp, 1234567890);
+                assert_eq!(xid, 42);
+            }
+            _ => panic!("Expected Begin message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_commit_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::COMMIT];
+        data.push(0x01); // flags
+        data.extend_from_slice(&write_u64_be(0x2000));
+        data.extend_from_slice(&write_u64_be(0x2100));
+        data.extend_from_slice(&write_i64_be(9876543210));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Commit {
+                flags,
+                commit_lsn,
+                end_lsn,
+                timestamp,
+            } => {
+                assert_eq!(flags, 0x01);
+                assert_eq!(commit_lsn, 0x2000);
+                assert_eq!(end_lsn, 0x2100);
+                assert_eq!(timestamp, 9876543210);
+            }
+            _ => panic!("Expected Commit message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_relation_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::RELATION];
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+        data.extend_from_slice(&write_cstring("public"));
+        data.extend_from_slice(&write_cstring("users"));
+        data.push(b'd'); // replica_identity (default)
+        data.extend_from_slice(&[0x00, 0x02]); // 2 columns
+
+        // Column 1: id
+        data.push(0x01); // flags (key column)
+        data.extend_from_slice(&write_cstring("id"));
+        data.extend_from_slice(&write_u32_be(23)); // type_id (int4)
+        data.extend_from_slice(write_u32_be(0xFFFFFFFF).as_slice()); // type_modifier
+
+        // Column 2: name
+        data.push(0x00); // flags (not a key)
+        data.extend_from_slice(&write_cstring("name"));
+        data.extend_from_slice(&write_u32_be(25)); // type_id (text)
+        data.extend_from_slice(write_u32_be(0xFFFFFFFF).as_slice()); // type_modifier
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Relation {
+                relation_id,
+                namespace,
+                relation_name,
+                replica_identity,
+                columns,
+            } => {
+                assert_eq!(relation_id, 12345);
+                assert_eq!(&*namespace, "public");
+                assert_eq!(&*relation_name, "users");
+                assert_eq!(replica_identity, b'd');
+                assert_eq!(columns.len(), 2);
+                assert_eq!(&*columns[0].name, "id");
+                assert!(columns[0].is_key());
+                assert_eq!(&*columns[1].name, "name");
+                assert!(!columns[1].is_key());
+            }
+            _ => panic!("Expected Relation message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_insert_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::INSERT];
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+        data.push(b'N'); // new tuple
+
+        // Number of columns
+        data.extend_from_slice(&[0x00, 0x02]);
+
+        // Column 1: text data
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(4));
+        data.extend_from_slice(b"test");
+
+        // Column 2: null
+        data.push(b'n');
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Insert { relation_id, tuple } => {
+                assert_eq!(relation_id, 12345);
+                assert_eq!(tuple.columns.len(), 2);
+                assert!(tuple.columns[0].is_text());
+                assert_eq!(tuple.columns[0].as_string(), Some("test".to_string()));
+                assert!(tuple.columns[1].is_null());
+            }
+            _ => panic!("Expected Insert message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_update_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::UPDATE];
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+
+        // Old tuple (key)
+        data.push(b'K');
+        data.extend_from_slice(&[0x00, 0x01]); // 1 column
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(3));
+        data.extend_from_slice(b"old");
+
+        // New tuple
+        data.push(b'N');
+        data.extend_from_slice(&[0x00, 0x01]);
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(3));
+        data.extend_from_slice(b"new");
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Update {
+                relation_id,
+                old_tuple,
+                new_tuple,
+                key_type,
+            } => {
+                assert_eq!(relation_id, 12345);
+                assert!(old_tuple.is_some());
+                assert_eq!(key_type, Some('K'));
+                assert_eq!(
+                    old_tuple.unwrap().columns[0].as_string(),
+                    Some("old".to_string())
+                );
+                assert_eq!(new_tuple.columns[0].as_string(), Some("new".to_string()));
+            }
+            _ => panic!("Expected Update message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_delete_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::DELETE];
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+        data.push(b'K'); // key type
+
+        // Old tuple
+        data.extend_from_slice(&[0x00, 0x01]);
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(7));
+        data.extend_from_slice(b"deleted");
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Delete {
+                relation_id,
+                old_tuple,
+                key_type,
+            } => {
+                assert_eq!(relation_id, 12345);
+                assert_eq!(key_type, 'K');
+                assert_eq!(
+                    old_tuple.columns[0].as_string(),
+                    Some("deleted".to_string())
+                );
+            }
+            _ => panic!("Expected Delete message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_truncate_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::TRUNCATE];
+        data.extend_from_slice(&write_u32_be(2)); // 2 relations
+        data.push(0x01); // flags
+        data.extend_from_slice(&write_u32_be(100));
+        data.extend_from_slice(&write_u32_be(200));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Truncate {
+                relation_ids,
+                flags,
+            } => {
+                assert_eq!(flags, 0x01);
+                assert_eq!(relation_ids.len(), 2);
+                assert_eq!(relation_ids[0], 100);
+                assert_eq!(relation_ids[1], 200);
+            }
+            _ => panic!("Expected Truncate message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_stream_start_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        let mut data = vec![message_types::STREAM_START];
+        data.extend_from_slice(&write_u32_be(42)); // xid
+        data.push(0x01); // first_segment = true
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::StreamStart { xid, first_segment } => {
+                assert_eq!(xid, 42);
+                assert!(first_segment);
+            }
+            _ => panic!("Expected StreamStart message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_stream_stop_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        let data = vec![message_types::STREAM_STOP];
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::StreamStop => {}
+            _ => panic!("Expected StreamStop message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_stream_commit_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        let mut data = vec![message_types::STREAM_COMMIT];
+        data.extend_from_slice(&write_u32_be(42)); // xid
+        data.push(0x00); // flags
+        data.extend_from_slice(&write_u64_be(0x3000));
+        data.extend_from_slice(&write_u64_be(0x3100));
+        data.extend_from_slice(&write_i64_be(1234567890));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::StreamCommit {
+                xid,
+                flags,
+                commit_lsn,
+                end_lsn,
+                timestamp,
+            } => {
+                assert_eq!(xid, 42);
+                assert_eq!(flags, 0x00);
+                assert_eq!(commit_lsn, 0x3000);
+                assert_eq!(end_lsn, 0x3100);
+                assert_eq!(timestamp, 1234567890);
+            }
+            _ => panic!("Expected StreamCommit message"),
+        }
+    }
+
+    #[test]
+    fn test_tuple_data_to_hashmap() {
+        let columns = vec![
+            ColumnInfo::new(0, "id".to_string(), 23, -1),
+            ColumnInfo::new(0, "name".to_string(), 25, -1),
+        ];
+        let relation = RelationInfo::new(12345, "public", "users", 1, columns);
+
+        let tuple = TupleData::new(vec![
+            ColumnData::text(b"42".to_vec()),
+            ColumnData::text(b"Alice".to_vec()),
+        ]);
+
+        let row = tuple.into_row_data(&relation);
+        assert_eq!(row.len(), 2);
+        assert_eq!(row.get("id").unwrap(), "42");
+        assert_eq!(row.get("name").unwrap(), "Alice");
+    }
+
+    #[test]
+    fn test_column_data_as_str_zero_copy() {
+        let col = ColumnData::text(b"hello".to_vec());
+        let str_ref = col.as_str().unwrap();
+        assert_eq!(str_ref, "hello");
+    }
+
+    #[test]
+    fn test_replication_state_lsn_updates() {
+        let mut state = ReplicationState::new();
+
+        // Test received LSN
+        state.update_received_lsn(100);
+        assert_eq!(state.last_received_lsn, 100);
+
+        // Test flushed LSN
+        state.update_flushed_lsn(80);
+        assert_eq!(state.last_flushed_lsn, 80);
+
+        // Test applied LSN (should also update flushed)
+        state.update_applied_lsn(90);
+        assert_eq!(state.last_applied_lsn, 90);
+        assert_eq!(state.last_flushed_lsn, 90);
+    }
+
+    #[test]
+    fn test_parser_protocol_versions() {
+        let parser1 = LogicalReplicationParser::with_protocol_version(1);
+        assert_eq!(parser1.protocol_version, 1);
+
+        let parser2 = LogicalReplicationParser::with_protocol_version(2);
+        assert_eq!(parser2.protocol_version, 2);
+
+        let parser3 = LogicalReplicationParser::with_protocol_version(3);
+        assert_eq!(parser3.protocol_version, 3);
+
+        let parser4 = LogicalReplicationParser::with_protocol_version(4);
+        assert_eq!(parser4.protocol_version, 4);
+    }
+
+    #[test]
+    fn test_invalid_message_type() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let data = vec![0xFF]; // Invalid message type
+
+        let result = parser.parse_wal_message(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_empty_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let data = vec![];
+
+        let result = parser.parse_wal_message(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_keepalive_message() {
+        // Build a keepalive message: 1 byte type + 8 bytes wal_end + 8 bytes timestamp + 1 byte reply
+        let mut data = vec![b'k']; // message type
+        data.extend_from_slice(&write_u64_be(0x5000)); // wal_end
+        data.extend_from_slice(&write_i64_be(1234567890)); // timestamp
+        data.push(0x01); // reply_requested = true
+
+        let keepalive = parse_keepalive_message(&data).unwrap();
+        assert_eq!(keepalive.wal_end, 0x5000);
+        assert_eq!(keepalive.timestamp, 1234567890);
+        assert!(keepalive.reply_requested);
+    }
+
+    #[test]
+    fn test_parse_keepalive_message_no_reply() {
+        let mut data = vec![b'k'];
+        data.extend_from_slice(&write_u64_be(0x6000));
+        data.extend_from_slice(&write_i64_be(9876543210));
+        data.push(0x00); // reply_requested = false
+
+        let keepalive = parse_keepalive_message(&data).unwrap();
+        assert_eq!(keepalive.wal_end, 0x6000);
+        assert!(!keepalive.reply_requested);
+    }
+
+    #[test]
+    fn test_parse_keepalive_message_too_short() {
+        let data = vec![b'k', 0x00, 0x01]; // Only 3 bytes, need at least 18
+        let result = parse_keepalive_message(&data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_hot_standby_feedback_message() {
+        let message = build_hot_standby_feedback_message(100, 1, 200, 2).unwrap();
+
+        let mut reader = BufferReader::new(&message);
+        let msg_type = reader.read_u8().unwrap();
+        assert_eq!(msg_type, message_types::HOT_STANDBY_FEEDBACK);
+
+        let _timestamp = reader.read_i64().unwrap(); // Timestamp is current time, just verify readable
+        let xmin = reader.read_u32().unwrap();
+        assert_eq!(xmin, 100);
+        let xmin_epoch = reader.read_u32().unwrap();
+        assert_eq!(xmin_epoch, 1);
+        let catalog_xmin = reader.read_u32().unwrap();
+        assert_eq!(catalog_xmin, 200);
+        let catalog_xmin_epoch = reader.read_u32().unwrap();
+        assert_eq!(catalog_xmin_epoch, 2);
+    }
+
+    #[test]
+    fn test_column_data_binary_bytes() {
+        let data = Bytes::from_static(&[0xDE, 0xAD, 0xBE, 0xEF]);
+        let col = ColumnData::binary_bytes(data);
+        assert!(col.is_binary());
+        assert!(!col.is_text());
+        assert!(!col.is_null());
+        assert!(!col.is_unchanged());
+        assert_eq!(col.as_bytes(), &[0xDE, 0xAD, 0xBE, 0xEF]);
+    }
+
+    #[test]
+    fn test_column_data_text_bytes() {
+        let data = Bytes::from_static(b"hello");
+        let col = ColumnData::text_bytes(data);
+        assert!(col.is_text());
+        assert_eq!(col.as_str().unwrap().as_ref(), "hello");
+    }
+
+    #[test]
+    fn test_column_data_as_bytes() {
+        let col = ColumnData::text(b"test data".to_vec());
+        assert_eq!(col.as_bytes(), b"test data");
+
+        let null_col = ColumnData::null();
+        assert_eq!(null_col.as_bytes(), b"");
+
+        let unchanged = ColumnData::unchanged();
+        assert_eq!(unchanged.as_bytes(), b"");
+    }
+
+    #[test]
+    fn test_column_data_into_bytes() {
+        let col = ColumnData::text(b"hello world".to_vec());
+        let bytes = col.into_bytes();
+        assert_eq!(&bytes[..], b"hello world");
+    }
+
+    #[test]
+    fn test_column_data_as_str_binary_valid_utf8() {
+        // Binary data that is valid UTF-8
+        let col = ColumnData::binary(b"valid utf8".to_vec());
+        assert_eq!(col.as_str().unwrap().as_ref(), "valid utf8");
+    }
+
+    #[test]
+    fn test_column_data_as_str_binary_invalid_utf8() {
+        // Binary data with invalid UTF-8 should use lossy conversion
+        let col = ColumnData::binary(vec![0xFF, 0xFE, 0x41]);
+        let s = col.as_str().unwrap();
+        assert!(s.contains('A')); // Valid byte 0x41 = 'A'
+    }
+
+    #[test]
+    fn test_column_data_as_str_null() {
+        let col = ColumnData::null();
+        assert!(col.as_str().is_none());
+    }
+
+    #[test]
+    fn test_column_data_as_str_unchanged() {
+        let col = ColumnData::unchanged();
+        assert!(col.as_str().is_none());
+    }
+
+    #[test]
+    fn test_column_data_as_str_empty_text() {
+        let col = ColumnData::text(Vec::new());
+        // Empty text data should return None since data.is_empty()
+        assert!(col.as_str().is_none());
+    }
+
+    #[test]
+    fn test_column_data_as_string() {
+        let col = ColumnData::text(b"hello".to_vec());
+        assert_eq!(col.as_string(), Some("hello".to_string()));
+
+        let null_col = ColumnData::null();
+        assert_eq!(null_col.as_string(), None);
+    }
+
+    #[test]
+    fn test_tuple_data_get_column() {
+        let tuple = TupleData::new(vec![
+            ColumnData::text(b"col1".to_vec()),
+            ColumnData::null(),
+            ColumnData::unchanged(),
+        ]);
+        assert_eq!(tuple.column_count(), 3);
+        assert!(tuple.get_column(0).unwrap().is_text());
+        assert!(tuple.get_column(1).unwrap().is_null());
+        assert!(tuple.get_column(2).unwrap().is_unchanged());
+        assert!(tuple.get_column(3).is_none());
+    }
+
+    #[test]
+    fn test_tuple_data_to_hash_map_with_null() {
+        let columns = vec![
+            ColumnInfo::new(0, "id".to_string(), 23, -1),
+            ColumnInfo::new(0, "name".to_string(), 25, -1),
+        ];
+        let relation = RelationInfo::new(1, "public", "t", b'd', columns);
+
+        let tuple = TupleData::new(vec![ColumnData::text(b"42".to_vec()), ColumnData::null()]);
+
+        let row = tuple.into_row_data(&relation);
+        assert_eq!(row.get("id").unwrap(), "42");
+        assert_eq!(row.get("name").unwrap(), &ColumnValue::Null);
+    }
+
+    #[test]
+    fn test_tuple_data_to_hash_map_with_unchanged() {
+        let columns = vec![
+            ColumnInfo::new(0, "id".to_string(), 23, -1),
+            ColumnInfo::new(0, "name".to_string(), 25, -1),
+        ];
+        let relation = RelationInfo::new(1, "public", "t", b'd', columns);
+
+        let tuple = TupleData::new(vec![
+            ColumnData::text(b"42".to_vec()),
+            ColumnData::unchanged(), // unchanged TOAST should be skipped
+        ]);
+
+        let row = tuple.into_row_data(&relation);
+        assert_eq!(row.len(), 1);
+        assert_eq!(row.get("id").unwrap(), "42");
+        assert!(row.get("name").is_none());
+    }
+
+    #[test]
+    fn test_tuple_data_to_hash_map_with_binary() {
+        let columns = vec![
+            ColumnInfo::new(0, "data".to_string(), 17, -1), // bytea
+        ];
+        let relation = RelationInfo::new(1, "public", "t", b'd', columns);
+
+        let tuple = TupleData::new(vec![ColumnData::binary(b"binary data".to_vec())]);
+
+        let row = tuple.into_row_data(&relation);
+        let val = row.get("data").unwrap();
+        assert!(matches!(val, ColumnValue::Binary(_)));
+    }
+
+    #[test]
+    fn test_tuple_data_to_hash_map_text_empty_data() {
+        // Text column with empty data
+        let columns = vec![ColumnInfo::new(0, "col".to_string(), 25, -1)];
+        let relation = RelationInfo::new(1, "public", "t", b'd', columns);
+
+        let col = ColumnData {
+            data_type: b't',
+            data: bytes::Bytes::new(),
+        };
+        let tuple = TupleData::new(vec![col]);
+        let row = tuple.into_row_data(&relation);
+        // Empty text data yields Text(empty Bytes)
+        let val = row.get("col").unwrap();
+        assert!(matches!(val, ColumnValue::Text(_)));
+    }
+
+    #[test]
+    fn test_tuple_data_to_hash_map_unknown_data_type() {
+        // Unknown data type (e.g., 'x') hits the catch-all arm
+        let columns = vec![ColumnInfo::new(0, "col".to_string(), 25, -1)];
+        let relation = RelationInfo::new(1, "public", "t", b'd', columns);
+
+        let col = ColumnData {
+            data_type: b'x',
+            data: bytes::Bytes::from_static(&[1, 2, 3]),
+        };
+        let tuple = TupleData::new(vec![col]);
+        let row = tuple.into_row_data(&relation);
+        assert!(row.get("col").unwrap().is_null());
+    }
+
+    #[test]
+    fn test_tuple_data_to_hash_map_more_columns_than_relation() {
+        // Tuple has more columns than the relation definition
+        let columns = vec![ColumnInfo::new(0, "col1".to_string(), 25, -1)];
+        let relation = RelationInfo::new(1, "public", "t", b'd', columns);
+
+        // 2 tuple columns but only 1 relation column
+        let tuple = TupleData::new(vec![
+            ColumnData::text(b"val1".to_vec()),
+            ColumnData::text(b"val2".to_vec()),
+        ]);
+        let row = tuple.into_row_data(&relation);
+        assert_eq!(row.len(), 1); // Only the first column maps
+        assert_eq!(row.get("col1").unwrap(), "val1");
+    }
+
+    #[test]
+    fn test_replication_state_should_send_feedback() {
+        let mut state = ReplicationState::new();
+        let interval = Duration::from_millis(50);
+
+        // Initially should send after a short sleep
+        std::thread::sleep(Duration::from_millis(60));
+        assert!(state.should_send_feedback(interval));
+
+        state.mark_feedback_sent();
+        // Just sent, should not send immediately
+        assert!(!state.should_send_feedback(interval));
+
+        std::thread::sleep(Duration::from_millis(60));
+        assert!(state.should_send_feedback(interval));
+    }
+
+    #[test]
+    fn test_replication_state_lsn_has_changed() {
+        let state = ReplicationState::new();
+
+        // Initially last_sent values are 0
+        assert!(!state.lsn_has_changed(0, 0)); // No change from default
+        assert!(state.lsn_has_changed(100, 0)); // flush changed
+        assert!(state.lsn_has_changed(0, 100)); // applied changed
+        assert!(state.lsn_has_changed(100, 100)); // both changed
+    }
+
+    #[test]
+    fn test_replication_state_mark_feedback_sent_with_lsn() {
+        let mut state = ReplicationState::new();
+
+        state.mark_feedback_sent_with_lsn(500, 300);
+
+        // Now those values should not be considered "changed"
+        assert!(!state.lsn_has_changed(500, 300));
+
+        // But different values should
+        assert!(state.lsn_has_changed(600, 300));
+        assert!(state.lsn_has_changed(500, 400));
+    }
+
+    #[test]
+    fn test_replication_state_record_sent_lsns_dedup() {
+        // The no_std dedup flow: lsn_has_changed plus record_sent_lsns, no clock.
+        let mut state = ReplicationState::new();
+        assert!(state.lsn_has_changed(700, 400));
+        state.record_sent_lsns(700, 400);
+        assert!(!state.lsn_has_changed(700, 400));
+        assert!(state.lsn_has_changed(800, 400));
+    }
+
+    #[test]
+    fn test_replication_state_default() {
+        let state = ReplicationState::default();
+        assert_eq!(state.last_received_lsn, 0);
+        assert_eq!(state.last_flushed_lsn, 0);
+        assert_eq!(state.last_applied_lsn, 0);
+        assert!(state.relations.is_empty());
+    }
+
+    #[test]
+    fn test_replication_state_applied_updates_flushed() {
+        let mut state = ReplicationState::new();
+        state.update_flushed_lsn(50);
+        assert_eq!(state.last_flushed_lsn, 50);
+
+        // Applied > flushed should update flushed too
+        state.update_applied_lsn(100);
+        assert_eq!(state.last_applied_lsn, 100);
+        assert_eq!(state.last_flushed_lsn, 100);
+
+        // Applied < current flushed should not downgrade flushed
+        state.update_flushed_lsn(200);
+        state.update_applied_lsn(150);
+        assert_eq!(state.last_flushed_lsn, 200); // flushed stays at 200
+        assert_eq!(state.last_applied_lsn, 150);
+    }
+
+    #[test]
+    fn test_replication_state_add_get_relation() {
+        let mut state = ReplicationState::new();
+        let relation = RelationInfo::new(
+            12345,
+            Arc::from("public"),
+            Arc::from("users"),
+            b'd',
+            vec![ColumnInfo::new(1, "id".to_string(), 23, -1)],
+        );
+
+        state.add_relation(relation);
+        let r = state.get_relation(12345).unwrap();
+        assert_eq!(&*r.relation_name, "users");
+
+        assert!(state.get_relation(99999).is_none());
+    }
+
+    #[test]
+    fn test_column_info_is_key() {
+        let key_col = ColumnInfo::new(1, "id".to_string(), 23, -1);
+        assert!(key_col.is_key());
+
+        let non_key_col = ColumnInfo::new(0, "name".to_string(), 25, -1);
+        assert!(!non_key_col.is_key());
+
+        // Flag with bit 0 set among other bits
+        let mixed_flags = ColumnInfo::new(0x03, "mixed".to_string(), 23, -1);
+        assert!(mixed_flags.is_key());
+    }
+
+    #[test]
+    fn test_relation_info_get_column_by_name() {
+        let columns = vec![
+            ColumnInfo::new(1, "id".to_string(), 23, -1),
+            ColumnInfo::new(0, "name".to_string(), 25, -1),
+            ColumnInfo::new(0, "email".to_string(), 25, -1),
+        ];
+        let relation = RelationInfo::new(1, "public", "users", b'd', columns);
+
+        assert_eq!(relation.get_column_by_name("id").unwrap().type_id, 23);
+        assert_eq!(relation.get_column_by_name("name").unwrap().type_id, 25);
+        assert!(relation.get_column_by_name("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_streaming_replication_message() {
+        let msg = LogicalReplicationMessage::Begin {
+            final_lsn: 0x1000,
+            timestamp: 12345,
+            xid: 42,
+        };
+
+        let srm = StreamingReplicationMessage::new(msg.clone());
+        assert!(!srm.is_streaming);
+        assert!(srm.xid.is_none());
+
+        let srm_streaming = StreamingReplicationMessage::new_streaming(msg, 42);
+        assert!(srm_streaming.is_streaming);
+        assert_eq!(srm_streaming.xid, Some(42));
+    }
+
+    #[test]
+    fn test_parse_stream_abort_no_v4() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        let mut data = vec![message_types::STREAM_ABORT];
+        data.extend_from_slice(&write_u32_be(42)); // xid
+        data.extend_from_slice(&write_u32_be(43)); // subtransaction_xid
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::StreamAbort {
+                xid,
+                subtransaction_xid,
+                abort_lsn,
+                abort_timestamp,
+            } => {
+                assert_eq!(xid, 42);
+                assert_eq!(subtransaction_xid, 43);
+                assert!(abort_lsn.is_none());
+                assert!(abort_timestamp.is_none());
+            }
+            _ => panic!("Expected StreamAbort"),
+        }
+    }
+
+    #[test]
+    fn test_parse_stream_abort_v4() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(4);
+
+        let mut data = vec![message_types::STREAM_ABORT];
+        data.extend_from_slice(&write_u32_be(42)); // xid
+        data.extend_from_slice(&write_u32_be(43)); // subtransaction_xid
+        data.extend_from_slice(&write_u64_be(0x9000)); // abort_lsn
+        data.extend_from_slice(&write_i64_be(1234567890)); // abort_timestamp
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::StreamAbort {
+                xid,
+                subtransaction_xid,
+                abort_lsn,
+                abort_timestamp,
+            } => {
+                assert_eq!(xid, 42);
+                assert_eq!(subtransaction_xid, 43);
+                assert_eq!(abort_lsn, Some(0x9000));
+                assert_eq!(abort_timestamp, Some(1234567890));
+            }
+            _ => panic!("Expected StreamAbort"),
+        }
+    }
+
+    #[test]
+    fn test_parse_prepare_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(3);
+
+        let mut data = vec![message_types::PREPARE];
+        data.push(0x01); // flags
+        data.extend_from_slice(&write_u64_be(0xA000));
+        data.extend_from_slice(&write_u64_be(0xA100));
+        data.extend_from_slice(&write_i64_be(1234567890));
+        data.extend_from_slice(&write_u32_be(50));
+        data.extend_from_slice(&write_cstring("my_prepare"));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Prepare {
+                flags,
+                prepare_lsn,
+                end_lsn,
+                timestamp,
+                xid,
+                gid,
+            } => {
+                assert_eq!(flags, 0x01);
+                assert_eq!(prepare_lsn, 0xA000);
+                assert_eq!(end_lsn, 0xA100);
+                assert_eq!(timestamp, 1234567890);
+                assert_eq!(xid, 50);
+                assert_eq!(gid, "my_prepare");
+            }
+            _ => panic!("Expected Prepare"),
+        }
+    }
+
+    #[test]
+    fn test_parse_commit_prepared_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(3);
+
+        let mut data = vec![message_types::COMMIT_PREPARED];
+        data.push(0x00); // flags
+        data.extend_from_slice(&write_u64_be(0xB000));
+        data.extend_from_slice(&write_u64_be(0xB100));
+        data.extend_from_slice(&write_i64_be(9876543210));
+        data.extend_from_slice(&write_u32_be(60));
+        data.extend_from_slice(&write_cstring("commit_prepared_gid"));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::CommitPrepared {
+                flags,
+                commit_lsn,
+                end_lsn,
+                timestamp,
+                xid,
+                gid,
+            } => {
+                assert_eq!(flags, 0x00);
+                assert_eq!(commit_lsn, 0xB000);
+                assert_eq!(end_lsn, 0xB100);
+                assert_eq!(timestamp, 9876543210);
+                assert_eq!(xid, 60);
+                assert_eq!(gid, "commit_prepared_gid");
+            }
+            _ => panic!("Expected CommitPrepared"),
+        }
+    }
+
+    #[test]
+    fn test_parse_rollback_prepared_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(3);
+
+        let mut data = vec![message_types::ROLLBACK_PREPARED];
+        data.push(0x02); // flags
+        data.extend_from_slice(&write_u64_be(0xC000)); // prepare_end_lsn
+        data.extend_from_slice(&write_u64_be(0xC100)); // rollback_end_lsn
+        data.extend_from_slice(&write_i64_be(111111)); // prepare_timestamp
+        data.extend_from_slice(&write_i64_be(222222)); // rollback_timestamp
+        data.extend_from_slice(&write_u32_be(70)); // xid
+        data.extend_from_slice(&write_cstring("rollback_gid"));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::RollbackPrepared {
+                flags,
+                prepare_end_lsn,
+                rollback_end_lsn,
+                prepare_timestamp,
+                rollback_timestamp,
+                xid,
+                gid,
+            } => {
+                assert_eq!(flags, 0x02);
+                assert_eq!(prepare_end_lsn, 0xC000);
+                assert_eq!(rollback_end_lsn, 0xC100);
+                assert_eq!(prepare_timestamp, 111111);
+                assert_eq!(rollback_timestamp, 222222);
+                assert_eq!(xid, 70);
+                assert_eq!(gid, "rollback_gid");
+            }
+            _ => panic!("Expected RollbackPrepared"),
+        }
+    }
+
+    #[test]
+    fn test_parse_stream_prepare_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(3);
+
+        let mut data = vec![message_types::STREAM_PREPARE];
+        data.push(0x00); // flags
+        data.extend_from_slice(&write_u64_be(0xD000));
+        data.extend_from_slice(&write_u64_be(0xD100));
+        data.extend_from_slice(&write_i64_be(333333));
+        data.extend_from_slice(&write_u32_be(80));
+        data.extend_from_slice(&write_cstring("stream_prepare_gid"));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::StreamPrepare {
+                flags,
+                prepare_lsn,
+                end_lsn,
+                timestamp,
+                xid,
+                gid,
+            } => {
+                assert_eq!(flags, 0x00);
+                assert_eq!(prepare_lsn, 0xD000);
+                assert_eq!(end_lsn, 0xD100);
+                assert_eq!(timestamp, 333333);
+                assert_eq!(xid, 80);
+                assert_eq!(gid, "stream_prepare_gid");
+            }
+            _ => panic!("Expected StreamPrepare"),
+        }
+    }
+
+    #[test]
+    fn test_parse_type_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::TYPE];
+        data.extend_from_slice(&write_u32_be(12345)); // type_id
+        data.extend_from_slice(&write_cstring("public"));
+        data.extend_from_slice(&write_cstring("my_type"));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Type {
+                type_id,
+                namespace,
+                type_name,
+            } => {
+                assert_eq!(type_id, 12345);
+                assert_eq!(&*namespace, "public");
+                assert_eq!(type_name, "my_type");
+            }
+            _ => panic!("Expected Type message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_origin_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::ORIGIN];
+        data.extend_from_slice(&write_u64_be(0xE000)); // origin_lsn
+        data.extend_from_slice(&write_cstring("origin_name"));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Origin {
+                origin_lsn,
+                origin_name,
+            } => {
+                assert_eq!(origin_lsn, 0xE000);
+                assert_eq!(origin_name, "origin_name");
+            }
+            _ => panic!("Expected Origin message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_logical_message() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::MESSAGE];
+        data.push(0x01); // flags (transactional)
+        data.extend_from_slice(&write_u64_be(0xF000)); // lsn
+        data.extend_from_slice(&write_cstring("my_prefix"));
+        data.extend_from_slice(&write_u32_be(5)); // content_length
+        data.extend_from_slice(b"hello"); // content
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Message {
+                flags,
+                lsn,
+                prefix,
+                content,
+            } => {
+                assert_eq!(flags, 0x01);
+                assert_eq!(lsn, 0xF000);
+                assert_eq!(prefix, "my_prefix");
+                assert_eq!(content.as_ref(), b"hello");
+            }
+            _ => panic!("Expected Message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_insert_in_streaming_context() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // First, start a streaming context
+        let mut stream_start = vec![message_types::STREAM_START];
+        stream_start.extend_from_slice(&write_u32_be(42)); // xid
+        stream_start.push(0x01); // first_segment
+        let _ = parser.parse_wal_message(&stream_start).unwrap();
+
+        // Now parse an INSERT in streaming context (v2+ requires xid prefix)
+        let mut data = vec![message_types::INSERT];
+        data.extend_from_slice(&write_u32_be(42)); // streaming xid
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+        data.push(b'N'); // new tuple
+        data.extend_from_slice(&[0x00, 0x01]); // 1 column
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(4));
+        data.extend_from_slice(b"test");
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        assert!(result.is_streaming);
+        assert_eq!(result.xid, Some(42));
+        match result.message {
+            LogicalReplicationMessage::Insert { relation_id, .. } => {
+                assert_eq!(relation_id, 12345);
+            }
+            _ => panic!("Expected Insert"),
+        }
+    }
+
+    #[test]
+    fn test_parse_update_in_streaming_context() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // Start streaming
+        let mut stream_start = vec![message_types::STREAM_START];
+        stream_start.extend_from_slice(&write_u32_be(42));
+        stream_start.push(0x01);
+        let _ = parser.parse_wal_message(&stream_start).unwrap();
+
+        // UPDATE in streaming context
+        let mut data = vec![message_types::UPDATE];
+        data.extend_from_slice(&write_u32_be(42)); // streaming xid
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+        data.push(b'N'); // new tuple (no old tuple)
+        data.extend_from_slice(&[0x00, 0x01]);
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(3));
+        data.extend_from_slice(b"new");
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        assert!(result.is_streaming);
+        match result.message {
+            LogicalReplicationMessage::Update {
+                relation_id,
+                old_tuple,
+                ..
+            } => {
+                assert_eq!(relation_id, 12345);
+                assert!(old_tuple.is_none());
+            }
+            _ => panic!("Expected Update"),
+        }
+    }
+
+    #[test]
+    fn test_parse_delete_in_streaming_context() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // Start streaming
+        let mut stream_start = vec![message_types::STREAM_START];
+        stream_start.extend_from_slice(&write_u32_be(42));
+        stream_start.push(0x01);
+        let _ = parser.parse_wal_message(&stream_start).unwrap();
+
+        // DELETE in streaming context
+        let mut data = vec![message_types::DELETE];
+        data.extend_from_slice(&write_u32_be(42)); // streaming xid
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+        data.push(b'K'); // key type
+        data.extend_from_slice(&[0x00, 0x01]);
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(5));
+        data.extend_from_slice(b"value");
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        assert!(result.is_streaming);
+        match result.message {
+            LogicalReplicationMessage::Delete {
+                relation_id,
+                key_type,
+                ..
+            } => {
+                assert_eq!(relation_id, 12345);
+                assert_eq!(key_type, 'K');
+            }
+            _ => panic!("Expected Delete"),
+        }
+    }
+
+    #[test]
+    fn test_parse_truncate_in_streaming_context() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // Start streaming
+        let mut stream_start = vec![message_types::STREAM_START];
+        stream_start.extend_from_slice(&write_u32_be(42));
+        stream_start.push(0x01);
+        let _ = parser.parse_wal_message(&stream_start).unwrap();
+
+        // TRUNCATE in streaming context
+        let mut data = vec![message_types::TRUNCATE];
+        data.extend_from_slice(&write_u32_be(42)); // streaming xid
+        data.extend_from_slice(&write_u32_be(1)); // 1 relation
+        data.push(0x00); // flags
+        data.extend_from_slice(&write_u32_be(100));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        assert!(result.is_streaming);
+        match result.message {
+            LogicalReplicationMessage::Truncate { relation_ids, .. } => {
+                assert_eq!(relation_ids, vec![100]);
+            }
+            _ => panic!("Expected Truncate"),
+        }
+    }
+
+    #[test]
+    fn test_parse_relation_in_streaming_context() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // Start streaming
+        let mut stream_start = vec![message_types::STREAM_START];
+        stream_start.extend_from_slice(&write_u32_be(42));
+        stream_start.push(0x01);
+        let _ = parser.parse_wal_message(&stream_start).unwrap();
+
+        // RELATION in streaming context
+        let mut data = vec![message_types::RELATION];
+        data.extend_from_slice(&write_u32_be(42)); // streaming xid
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+        data.extend_from_slice(&write_cstring("public"));
+        data.extend_from_slice(&write_cstring("users"));
+        data.push(b'd'); // replica_identity
+        data.extend_from_slice(&[0x00, 0x01]); // 1 column
+        data.push(0x01); // flags
+        data.extend_from_slice(&write_cstring("id"));
+        data.extend_from_slice(&write_u32_be(23));
+        data.extend_from_slice(&write_u32_be(0xFFFFFFFF));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        assert!(result.is_streaming);
+        match result.message {
+            LogicalReplicationMessage::Relation { relation_id, .. } => {
+                assert_eq!(relation_id, 12345);
+            }
+            _ => panic!("Expected Relation"),
+        }
+    }
+
+    #[test]
+    fn test_parse_type_in_streaming_context() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // Start streaming
+        let mut stream_start = vec![message_types::STREAM_START];
+        stream_start.extend_from_slice(&write_u32_be(42));
+        stream_start.push(0x01);
+        let _ = parser.parse_wal_message(&stream_start).unwrap();
+
+        // TYPE in streaming context
+        let mut data = vec![message_types::TYPE];
+        data.extend_from_slice(&write_u32_be(42)); // streaming xid
+        data.extend_from_slice(&write_u32_be(99999)); // type_id
+        data.extend_from_slice(&write_cstring("pg_catalog"));
+        data.extend_from_slice(&write_cstring("custom_type"));
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        assert!(result.is_streaming);
+    }
+
+    #[test]
+    fn test_parse_message_in_streaming_context() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // Start streaming
+        let mut stream_start = vec![message_types::STREAM_START];
+        stream_start.extend_from_slice(&write_u32_be(42));
+        stream_start.push(0x01);
+        let _ = parser.parse_wal_message(&stream_start).unwrap();
+
+        // MESSAGE in streaming context
+        let mut data = vec![message_types::MESSAGE];
+        data.extend_from_slice(&write_u32_be(42)); // streaming xid
+        data.push(0x00); // flags
+        data.extend_from_slice(&write_u64_be(0x1000)); // lsn
+        data.extend_from_slice(&write_cstring("prefix"));
+        data.extend_from_slice(&write_u32_be(3)); // content_length
+        data.extend_from_slice(b"msg"); // content
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        assert!(result.is_streaming);
+    }
+
+    #[test]
+    fn test_stream_stop_clears_context() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // Start streaming
+        let mut stream_start = vec![message_types::STREAM_START];
+        stream_start.extend_from_slice(&write_u32_be(42));
+        stream_start.push(0x01);
+        let _start_result = parser.parse_wal_message(&stream_start).unwrap();
+
+        // We're now in streaming context
+        assert!(parser.is_streaming());
+
+        // Stop streaming
+        let data = vec![message_types::STREAM_STOP];
+        let _ = parser.parse_wal_message(&data).unwrap();
+        assert!(!parser.is_streaming());
+    }
+
+    #[test]
+    fn test_parse_update_with_old_tuple_o_type() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::UPDATE];
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+
+        // Old tuple with 'O' type (full old row)
+        data.push(b'O');
+        data.extend_from_slice(&[0x00, 0x01]); // 1 column
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(3));
+        data.extend_from_slice(b"old");
+
+        // New tuple
+        data.push(b'N');
+        data.extend_from_slice(&[0x00, 0x01]);
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(3));
+        data.extend_from_slice(b"new");
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Update {
+                key_type,
+                old_tuple,
+                ..
+            } => {
+                assert_eq!(key_type, Some('O'));
+                assert!(old_tuple.is_some());
+            }
+            _ => panic!("Expected Update"),
+        }
+    }
+
+    #[test]
+    fn test_parse_update_without_old_tuple() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::UPDATE];
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+
+        // No old tuple, directly new tuple
+        data.push(b'N');
+        data.extend_from_slice(&[0x00, 0x01]);
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(6));
+        data.extend_from_slice(b"direct");
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Update {
+                key_type,
+                old_tuple,
+                ..
+            } => {
+                assert!(key_type.is_none());
+                assert!(old_tuple.is_none());
+            }
+            _ => panic!("Expected Update"),
+        }
+    }
+
+    #[test]
+    fn test_parse_tuple_with_binary_column() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        let mut data = vec![message_types::INSERT];
+        data.extend_from_slice(&write_u32_be(12345)); // relation_id
+        data.push(b'N'); // new tuple
+
+        data.extend_from_slice(&[0x00, 0x03]); // 3 columns
+
+        // Column 1: text
+        data.push(b't');
+        data.extend_from_slice(&write_u32_be(4));
+        data.extend_from_slice(b"text");
+
+        // Column 2: binary
+        data.push(b'b');
+        data.extend_from_slice(&write_u32_be(4));
+        data.extend_from_slice(&[0xDE, 0xAD, 0xBE, 0xEF]);
+
+        // Column 3: null
+        data.push(b'n');
+
+        let result = parser.parse_wal_message(&data).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Insert { tuple, .. } => {
+                assert_eq!(tuple.column_count(), 3);
+                assert!(tuple.columns[0].is_text());
+                assert!(tuple.columns[1].is_binary());
+                assert!(tuple.columns[2].is_null());
+            }
+            _ => panic!("Expected Insert"),
+        }
+    }
+
+    use std::time::Duration;
+
+    #[test]
+    fn test_replication_state_feedback_workflow() {
+        let mut state = ReplicationState::new();
+        let interval = Duration::from_millis(50);
+
+        state.update_received_lsn(1000);
+
+        // Wait for interval
+        std::thread::sleep(Duration::from_millis(60));
+        assert!(state.should_send_feedback(interval));
+
+        // Mark sent with LSNs
+        state.mark_feedback_sent_with_lsn(500, 300);
+
+        // Check if values are tracked
+        assert!(!state.lsn_has_changed(500, 300));
+        assert!(state.lsn_has_changed(600, 300));
+    }
+
+    // ========================================
+    // parse_wal_message_bytes tests (zero-copy Bytes path)
+    // ========================================
+
+    #[test]
+    fn test_parse_wal_message_bytes_empty() {
+        use bytes::Bytes;
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+        let result = parser.parse_wal_message_bytes(Bytes::new());
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Empty WAL message"));
+    }
+
+    #[test]
+    fn test_parse_wal_message_bytes_begin() {
+        use bytes::Bytes;
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // Build a Begin message: 'B' + final_lsn(8) + timestamp(8) + xid(4)
+        let mut payload = Vec::new();
+        payload.push(b'B');
+        payload.extend_from_slice(&0x2000u64.to_be_bytes());
+        payload.extend_from_slice(&0i64.to_be_bytes()); // timestamp
+        payload.extend_from_slice(&42u32.to_be_bytes()); // xid
+
+        let bytes = Bytes::from(payload);
+        let result = parser.parse_wal_message_bytes(bytes).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Begin { xid, .. } => {
+                assert_eq!(xid, 42);
+            }
+            _ => panic!("Expected Begin message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_wal_message_bytes_commit() {
+        use bytes::Bytes;
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // Build a Commit message: 'C' + flags(1) + commit_lsn(8) + end_lsn(8) + timestamp(8)
+        let mut payload = Vec::new();
+        payload.push(b'C');
+        payload.push(0u8); // flags
+        payload.extend_from_slice(&0x3000u64.to_be_bytes()); // commit_lsn
+        payload.extend_from_slice(&0x3100u64.to_be_bytes()); // end_lsn
+        payload.extend_from_slice(&0i64.to_be_bytes()); // timestamp
+
+        let bytes = Bytes::from(payload);
+        let result = parser.parse_wal_message_bytes(bytes).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Commit {
+                commit_lsn,
+                end_lsn,
+                ..
+            } => {
+                assert_eq!(commit_lsn, 0x3000);
+                assert_eq!(end_lsn, 0x3100);
+            }
+            _ => panic!("Expected Commit message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_wal_message_bytes_insert() {
+        use bytes::Bytes;
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // First register a relation
+        let mut rel = Vec::new();
+        rel.push(b'R');
+        rel.extend_from_slice(&100u32.to_be_bytes());
+        rel.extend_from_slice(b"public\0");
+        rel.extend_from_slice(b"users\0");
+        rel.push(b'd'); // replica identity
+        rel.extend_from_slice(&1u16.to_be_bytes()); // 1 column
+        rel.push(1u8); // is_key
+        rel.extend_from_slice(b"id\0");
+        rel.extend_from_slice(&23u32.to_be_bytes()); // int4
+        rel.extend_from_slice(&(-1i32).to_be_bytes());
+
+        parser.parse_wal_message(&rel).unwrap();
+
+        // Now build an Insert: 'I' + relation_id(4) + 'N' + ncols(2) + column data
+        let mut ins = Vec::new();
+        ins.push(b'I');
+        ins.extend_from_slice(&100u32.to_be_bytes());
+        ins.push(b'N'); // new tuple
+        ins.extend_from_slice(&1u16.to_be_bytes()); // 1 column
+        ins.push(b't'); // text format
+        ins.extend_from_slice(&3u32.to_be_bytes()); // length
+        ins.extend_from_slice(b"123"); // value
+
+        let bytes = Bytes::from(ins);
+        let result = parser.parse_wal_message_bytes(bytes).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Insert { relation_id, .. } => {
+                assert_eq!(relation_id, 100);
+            }
+            _ => panic!("Expected Insert message"),
+        }
+    }
+
+    #[test]
+    fn test_parse_wal_message_bytes_unknown_type() {
+        use bytes::Bytes;
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        // Use an invalid message type byte
+        let bytes = Bytes::from(vec![0xFF, 0, 0, 0, 0]);
+        let result = parser.parse_wal_message_bytes(bytes);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Unknown message type"));
+    }
+
+    #[test]
+    fn test_parse_wal_message_bytes_matches_slice_path() {
+        use bytes::Bytes;
+        let mut parser_bytes = LogicalReplicationParser::with_protocol_version(2);
+        let mut parser_slice = LogicalReplicationParser::with_protocol_version(2);
+
+        // Build a Begin message
+        let mut payload = Vec::new();
+        payload.push(b'B');
+        payload.extend_from_slice(&0x5000u64.to_be_bytes());
+        payload.extend_from_slice(&0i64.to_be_bytes());
+        payload.extend_from_slice(&99u32.to_be_bytes());
+
+        // Parse with both paths — results should match
+        let result_bytes = parser_bytes
+            .parse_wal_message_bytes(Bytes::from(payload.clone()))
+            .unwrap();
+        let result_slice = parser_slice.parse_wal_message(&payload).unwrap();
+
+        // Compare message types
+        match (&result_bytes.message, &result_slice.message) {
+            (
+                LogicalReplicationMessage::Begin {
+                    xid: xid_b,
+                    final_lsn: lsn_b,
+                    ..
+                },
+                LogicalReplicationMessage::Begin {
+                    xid: xid_s,
+                    final_lsn: lsn_s,
+                    ..
+                },
+            ) => {
+                assert_eq!(xid_b, xid_s);
+                assert_eq!(lsn_b, lsn_s);
+            }
+            _ => panic!("Both paths should return Begin"),
+        }
+    }
+
+    #[test]
+    fn test_parse_wal_message_bytes_relation() {
+        use bytes::Bytes;
+        let mut parser = LogicalReplicationParser::with_protocol_version(2);
+
+        let mut rel = Vec::new();
+        rel.push(b'R');
+        rel.extend_from_slice(&200u32.to_be_bytes());
+        rel.extend_from_slice(b"myschema\0");
+        rel.extend_from_slice(b"mytable\0");
+        rel.push(b'f'); // full replica identity
+        rel.extend_from_slice(&2u16.to_be_bytes()); // 2 columns
+                                                    // col 1
+        rel.push(1u8);
+        rel.extend_from_slice(b"col1\0");
+        rel.extend_from_slice(&23u32.to_be_bytes());
+        rel.extend_from_slice(&(-1i32).to_be_bytes());
+        // col 2
+        rel.push(0u8);
+        rel.extend_from_slice(b"col2\0");
+        rel.extend_from_slice(&25u32.to_be_bytes());
+        rel.extend_from_slice(&(-1i32).to_be_bytes());
+
+        let bytes = Bytes::from(rel);
+        let result = parser.parse_wal_message_bytes(bytes).unwrap();
+        match result.message {
+            LogicalReplicationMessage::Relation {
+                relation_id,
+                namespace,
+                relation_name,
+                columns,
+                ..
+            } => {
+                assert_eq!(relation_id, 200);
+                assert_eq!(&*namespace, "myschema");
+                assert_eq!(&*relation_name, "mytable");
+                assert_eq!(columns.len(), 2);
+            }
+            _ => panic!("Expected Relation message"),
+        }
+    }
+
+    /// Covers the cold error path `LogicalReplicationParser::unknown_column_type_err`.
+    ///
+    /// Crafts a synthetic `INSERT` WAL message whose tuple contains a column
+    /// with an unrecognised type byte (`b'x'`). `parse_tuple_data` must reject
+    /// it via the `#[cold]` helper.
+    #[test]
+    fn test_parse_tuple_data_unknown_column_type() {
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+
+        // INSERT message: 'I' + relation_id (u32) + 'N' + tuple_data
+        // tuple_data: column_count (u16) + per-column { type (u8) [+ length + payload] }
+        let mut msg = Vec::new();
+        msg.push(b'I');
+        msg.extend_from_slice(&42u32.to_be_bytes()); // relation_id
+        msg.push(b'N'); // new tuple marker
+        msg.extend_from_slice(&1u16.to_be_bytes()); // 1 column
+        msg.push(b'x'); // unknown column type → triggers the cold helper
+
+        let err = parser.parse_wal_message(&msg).unwrap_err();
+        let msg_str = err.to_string();
+        assert!(
+            msg_str.contains("Unknown column data type"),
+            "expected 'Unknown column data type' in error, got: {msg_str}"
+        );
+        assert!(
+            msg_str.contains("'x'"),
+            "expected the offending byte to be reported, got: {msg_str}"
+        );
+    }
+
+    /// Direct unit test for the cold error helper itself, so it is reachable
+    /// without parser-level setup. Pins the message format that callers may
+    /// rely on for log-grep diagnostics.
+    #[test]
+    fn test_unknown_column_type_err_message_format() {
+        let err = LogicalReplicationParser::unknown_column_type_err(b'?').unwrap_err();
+        let s = err.to_string();
+        assert!(s.contains("Unknown column data type"));
+        assert!(s.contains("'?'"));
+    }
+
+    /// Regression (fuzz-found): a huge `relation_count` must not pre-allocate.
+    #[test]
+    fn truncate_with_bogus_count_does_not_overallocate() {
+        let mut bytes = vec![message_types::TRUNCATE];
+        bytes.extend_from_slice(&u32::MAX.to_be_bytes());
+        bytes.push(0); // flags, no relation_ids follow
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+        assert!(parser.parse_wal_message(&bytes).is_err());
+    }
+
+    /// A well-formed TRUNCATE still parses correctly after the allocation cap.
+    #[test]
+    fn truncate_well_formed_still_parses() {
+        let mut bytes = vec![message_types::TRUNCATE];
+        bytes.extend_from_slice(&2u32.to_be_bytes());
+        bytes.push(0b11);
+        bytes.extend_from_slice(&10u32.to_be_bytes());
+        bytes.extend_from_slice(&20u32.to_be_bytes());
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+        let msg = parser.parse_wal_message(&bytes).unwrap().message;
+        assert_eq!(
+            msg,
+            LogicalReplicationMessage::Truncate {
+                relation_ids: vec![10, 20],
+                flags: 0b11,
+            }
+        );
+    }
+
+    /// Regression (fuzz-found): a huge tuple column count must not pre-allocate.
+    #[test]
+    fn insert_with_bogus_column_count_does_not_overallocate() {
+        let mut bytes = vec![message_types::INSERT];
+        bytes.extend_from_slice(&1u32.to_be_bytes()); // relation_id
+        bytes.push(b'N');
+        bytes.extend_from_slice(&u16::MAX.to_be_bytes()); // column_count, no columns follow
+        let mut parser = LogicalReplicationParser::with_protocol_version(1);
+        assert!(parser.parse_wal_message(&bytes).is_err());
+    }
+}

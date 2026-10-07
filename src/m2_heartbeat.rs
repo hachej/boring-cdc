@@ -11,9 +11,9 @@ use crate::m2_journal::{
 use std::fmt;
 
 pub const OWNER_BEAD: &str = "boring-cdc-m2-heartbeat";
-pub const HEARTBEAT_UPDATE_SQL: &str = "UPDATE boring_cdc_control.heartbeat SET nonce = $1, updated_at = clock_timestamp() WHERE id = 'singleton'";
+pub const HEARTBEAT_UPDATE_SQL: &str = "UPDATE boring_cdc_control.heartbeat SET nonce = $1, updated_at = clock_timestamp() WHERE id = 1";
 pub const HEARTBEAT_KEY_CHECK_SQL: &str =
-    "SELECT id FROM boring_cdc_control.heartbeat WHERE id = 'singleton'";
+    "SELECT id FROM boring_cdc_control.heartbeat WHERE id = 1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct HeartbeatPolicy {
@@ -183,7 +183,7 @@ pub fn publish_once(dsn: &str, nonce: u64) -> Result<(u64, u64), HeartbeatError>
         .map_err(|_| HeartbeatError::SourceUnavailable)?;
     let update = connection
         .exec(&format!(
-            "WITH changed AS (UPDATE boring_cdc_control.heartbeat SET nonce = {nonce}, updated_at = clock_timestamp() WHERE id = 'singleton' RETURNING id) SELECT id FROM changed"
+            "WITH changed AS (UPDATE boring_cdc_control.heartbeat SET nonce = {nonce}, updated_at = clock_timestamp() WHERE id = 1 RETURNING id) SELECT id FROM changed"
         ))
         .map_err(|_| HeartbeatError::SourceUnavailable)?;
     let selected = connection
