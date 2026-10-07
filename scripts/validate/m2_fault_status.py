@@ -7,6 +7,13 @@ expected=set(cases['conditions']); rows=index['runbooks']; found={r['condition_i
 assert cases['owner_bead']=='boring-cdc-m2-fault-status' and len(expected)==14 and found==expected
 assert len({r['id'] for r in rows})==14 and len({r['condition_id'] for r in rows})==14
 assert all(r['condition_owner']=='boring-cdc-m2-fault-status' and r['procedure_owner']=='boring-cdc-m6-runbooks' and r['procedure'] is None for r in rows)
+status_actions=[r for r in rows if r['action_id']=='CMD-STATUS']
+assert len(status_actions)==1 and status_actions[0]['action_owner']=='boring-cdc-m2-fault-status'
+registry=json.loads((root/'contracts/agent/stable-ids.json').read_text())['entries']
+coverage=json.loads((root/'contracts/coverage/plan-to-beads.json').read_text())['assignments']
+for assignments in (registry,coverage):
+    matches=[r for r in assignments if r['id']=='CMD-STATUS']
+    assert len(matches)==1 and matches[0]['owner_bead']=='boring-cdc-m2-fault-status'
 src=(root/'src/m2_fault_status.rs').read_text(); assert 'BORING_CDC_M2_FAULT_HOOK' in src and 'SQLITE_OPEN_READ_ONLY' in src
 hook_names=re.findall(r'Self::([A-Z][A-Za-z]+) =>',src)
 product='\n'.join(p.read_text() for p in (root/'src').glob('*.rs') if p.name!='m2_fault_status.rs')
