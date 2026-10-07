@@ -95,7 +95,7 @@ def fault_status() -> None:
     second = dict(env); second["M2_FAULT_STATUS_PROOF_OUT"] = str(out / "reconcile-crash-proof-rerun.json")
     commands.append(capture(out, ["scripts/faults/m2_fault_status.sh"], "fault", "m2-fault-status/v5", second))
     head = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
-    sources = ["src/m2_fault_status.rs", "src/main.rs", "contracts/m2/fault-status-cases.json", "contracts/runbooks/index.json", "scripts/e2e/m2_fault_status.sh", "scripts/faults/m2_fault_status.sh", "scripts/validate/m2_fault_status.py", "scripts/validate/reseal_runtime_evidence.py"]
+    sources = ["src/m2_fault_status.rs", "src/main.rs", "contracts/m2/fault-status-cases.json", "contracts/runbooks/index.json", "scripts/e2e/m2_fault_status.sh", "scripts/e2e/m2_capture_runtime.sh", "scripts/faults/m2_fault_status.sh", "scripts/validate/m2_feedback_receipts.py", "scripts/validate/m2_fault_status.py", "scripts/validate/reseal_runtime_evidence.py"]
     bound = source_digest(sources)
     event = {"schema_version":"fault-status-event/v1","case_event_seq":1,"bead_id":"boring-cdc-m2-fault-status","scenario_id":"SCN-M2-FAULT-STATUS-MILESTONE","correlation_id":"pg17-seed-1:1","run_id":"fault-status-rerun-v1","capture_epoch":"fault-status-epoch-v1","component":"status","phase":"verify","outcome":"pass","config_fingerprint":bound,"evidence_digest":None}
     write(out / "logs/boring-cdc.jsonl", json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n")
