@@ -4,8 +4,8 @@
 //! `m1_ddl_fixtures`. This module performs no journal or destination I/O.
 
 use crate::m1_source_identity::{
-    canonical_key_encoding, CanonicalKeyComponent, LogicalTableIdentity, PhysicalKeyHash,
-    RelationSchemaVersion, SourceIdentity,
+    CanonicalKeyComponent, LogicalTableIdentity, PhysicalKeyHash, RelationSchemaVersion,
+    SourceIdentity, canonical_key_encoding,
 };
 use crate::m1_transition_kernel::{
     CaptureEpoch, DestinationGeneration, ReceivedLsn, SourceVersion,
