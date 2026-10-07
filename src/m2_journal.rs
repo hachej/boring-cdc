@@ -332,6 +332,32 @@ impl JournalStore {
                 transaction.execute("UPDATE source_state SET durable_transaction_end_lsn=?1,durable_transaction_id=?2,durable_journal_seq=?3,control_revision=control_revision+1 WHERE singleton=1", params![commit.end_lsn,commit.transaction_id,last])?;
             }
         }
+        if let Some((offset, _)) = commit
+            .events
+            .iter()
+            .enumerate()
+            .rfind(|(_, event)| event.control_kind.as_deref() == Some("heartbeat"))
+        {
+            let receipt: Option<(String, String)> = transaction
+                .query_row(
+                    "SELECT run_id,outcome FROM startup_reconciliations WHERE capture_epoch=?1 ORDER BY reconciliation_id DESC LIMIT 1",
+                    [&identity.capture_epoch],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .optional()?;
+            if let Some((run_id, _)) = receipt.filter(|(_, outcome)| {
+                matches!(
+                    outcome.as_str(),
+                    "ready" | "duplicate_replay_expected" | "creation_floor_only"
+                )
+            }) {
+                let heartbeat_seq = next + offset as i64;
+                transaction.execute(
+                    "INSERT INTO capture_health_observations(run_id,capture_epoch,last_heartbeat_seq,last_heartbeat_end_lsn,observed_at_unix_seconds) VALUES(?1,?2,?3,?4,unixepoch('now')) ON CONFLICT(run_id) DO UPDATE SET last_heartbeat_seq=excluded.last_heartbeat_seq,last_heartbeat_end_lsn=excluded.last_heartbeat_end_lsn,observed_at_unix_seconds=excluded.observed_at_unix_seconds WHERE capture_health_observations.capture_epoch=excluded.capture_epoch AND capture_health_observations.last_heartbeat_seq<excluded.last_heartbeat_seq",
+                    params![run_id, identity.capture_epoch, heartbeat_seq, commit.end_lsn],
+                )?;
+            }
+        }
         if started.elapsed() > self.limits.max_writer_hold && fault != CommitFault::SlowSqliteCommit
         {
             return Err(JournalError::BusyBoundExceeded);
@@ -1302,6 +1328,94 @@ pub mod tests {
             )
             .unwrap();
         assert_eq!(row, (2, c.end_lsn));
+    }
+    #[test]
+    fn status_freshness_requires_a_heartbeat_committed_by_the_current_run() {
+        let (path, mut store) = store("heartbeat-freshness");
+        store.writer.connection().execute(
+            "INSERT INTO startup_reconciliations(run_id,capture_epoch,outcome,reason_code,created_at) VALUES('run-a','epoch','ready','READY',datetime('now','-45 seconds'))",
+            [],
+        ).unwrap();
+        let mut first_event = event("heartbeat-a", 0, b"heartbeat-a");
+        first_event.control_kind = Some("heartbeat".into());
+        let first = commit("tx-a", "0000000000000010", vec![first_event]);
+        assert_eq!(
+            store.commit_atomic(&first, CommitFault::BeforeSqliteCommit),
+            Err(JournalError::FaultBeforeCommit)
+        );
+        let count: i64 = store
+            .writer
+            .connection()
+            .query_row(
+                "SELECT count(*) FROM capture_health_observations",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+        store.commit_atomic(&first, CommitFault::None).unwrap();
+        let observed: u64 = store.writer.connection().query_row(
+            "SELECT observed_at_unix_seconds FROM capture_health_observations WHERE run_id='run-a'",
+            [], |row| row.get(0)
+        ).unwrap();
+        let at = |seconds| std::time::UNIX_EPOCH + Duration::from_secs(seconds);
+        assert_eq!(
+            crate::m2_fault_status::snapshot(&path, "cfg", at(observed + 1))
+                .unwrap()
+                .freshness,
+            "fresh"
+        );
+        assert_eq!(
+            crate::m2_fault_status::snapshot(&path, "cfg", at(observed + 31))
+                .unwrap()
+                .freshness,
+            "stale"
+        );
+
+        store.writer.connection().execute(
+            "INSERT INTO startup_reconciliations(run_id,capture_epoch,outcome,reason_code,created_at) VALUES('run-b','epoch','ready','READY',datetime('now'))",
+            [],
+        ).unwrap();
+        assert_eq!(
+            crate::m2_fault_status::snapshot(&path, "cfg", at(observed + 1))
+                .unwrap()
+                .freshness,
+            "unknown"
+        );
+        let mut second_event = event("heartbeat-b", 0, b"heartbeat-b");
+        second_event.control_kind = Some("heartbeat".into());
+        let second = commit("tx-b", "0000000000000020", vec![second_event]);
+        assert_eq!(
+            store.commit_atomic(&second, CommitFault::BeforeSqliteCommit),
+            Err(JournalError::FaultBeforeCommit)
+        );
+        assert_eq!(
+            crate::m2_fault_status::snapshot(&path, "cfg", at(observed + 1))
+                .unwrap()
+                .freshness,
+            "unknown"
+        );
+        store.commit_atomic(&second, CommitFault::None).unwrap();
+        assert_eq!(
+            crate::m2_fault_status::snapshot(&path, "cfg", at(observed + 1))
+                .unwrap()
+                .freshness,
+            "fresh"
+        );
+        if let Ok(proof_path) = std::env::var("M2_STATUS_FRESHNESS_FAULT_PROOF_OUT") {
+            std::fs::write(
+                proof_path,
+                serde_json::to_vec(&serde_json::json!({
+                    "precommit_observation_visible": false,
+                    "fresh_after_durable_heartbeat": true,
+                    "stale_after_31_seconds": true,
+                    "restart_without_new_heartbeat": "unknown",
+                    "fresh_after_restart_heartbeat": true
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+        }
     }
     #[test]
     fn crash_before_and_after_commit_is_absent_or_complete() {

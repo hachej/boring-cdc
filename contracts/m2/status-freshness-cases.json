@@ -1,0 +1,17 @@
+{
+  "schema_version": "m2-status-freshness-cases/v1",
+  "owner_bead": "boring-cdc-m2-fault-status.4",
+  "scenario_id": "SCN-M2-STATUS-FRESHNESS-COMPONENT",
+  "live": {
+    "minimum_startup_age_seconds": 31,
+    "maximum_heartbeat_age_seconds": 30,
+    "freshness": "fresh"
+  },
+  "faults": {
+    "precommit_observation_visible": false,
+    "fresh_after_durable_heartbeat": true,
+    "stale_after_31_seconds": true,
+    "restart_without_new_heartbeat": "unknown",
+    "fresh_after_restart_heartbeat": true
+  }
+}
