@@ -146,6 +146,13 @@ while true; do
   sleep .05
 done
 sleep .1
+if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback && -n ${M2_FEEDBACK_RECEIPT_DIR:-} ]]; then
+  deadline=$((SECONDS+5))
+  while kill -0 "$pid" 2>/dev/null && [[ "$(ps -o stat= -p "$pid" 2>/dev/null || true)" != Z* ]]; do
+    (( SECONDS < deadline )) || { echo 'E_AFTER_FEEDBACK_ABORT_NOT_REACHED' >&2; exit 1; }
+    sleep .05
+  done
+fi
 state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
 if [[ -z "$state" || "$state" == Z* ]]; then
   child=$pid; set +e; wait "$pid" 2>/dev/null; rc=$?; set -e; pid=
