@@ -610,14 +610,91 @@ impl RelationSchemaVersion {
     }
 }
 
+/// A validated key component contains the PostgreSQL type OID and its contract-canonical bytes.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum CanonicalKeyComponent {
-    Null,
-    Bool(bool),
-    I64(i64),
-    U64(u64),
-    Bytes(Vec<u8>),
-    Utf8(String),
+pub struct CanonicalKeyComponent {
+    type_oid: u32,
+    bytes: Vec<u8>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum KeyEncodingError {
+    Arity,
+    UnsupportedType,
+    PayloadWidth,
+    PayloadTooLarge,
+    InvalidText,
+    NonCanonicalNumeric,
+}
+
+impl CanonicalKeyComponent {
+    pub fn from_canonical(type_oid: u32, bytes: Vec<u8>) -> Result<Self, KeyEncodingError> {
+        if bytes.len() > 1024 {
+            return Err(KeyEncodingError::PayloadTooLarge);
+        }
+        match type_oid {
+            21 if bytes.len() == 2 => {}
+            23 | 1082 if bytes.len() == 4 => {}
+            20 | 1114 | 1184 if bytes.len() == 8 => {}
+            2950 if bytes.len() == 16 => {}
+            1700 if canonical_numeric_key(&bytes) => {}
+            17 => {}
+            25 | 1042 | 1043 => {
+                std::str::from_utf8(&bytes).map_err(|_| KeyEncodingError::InvalidText)?;
+            }
+            21 | 23 | 20 | 1082 | 1114 | 1184 | 2950 => {
+                return Err(KeyEncodingError::PayloadWidth);
+            }
+            1700 => return Err(KeyEncodingError::NonCanonicalNumeric),
+            _ => return Err(KeyEncodingError::UnsupportedType),
+        }
+        Ok(Self { type_oid, bytes })
+    }
+
+    #[must_use]
+    pub const fn type_oid(&self) -> u32 {
+        self.type_oid
+    }
+
+    #[must_use]
+    pub fn canonical_bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+}
+
+fn canonical_numeric_key(bytes: &[u8]) -> bool {
+    if bytes.len() < 5 || !matches!(bytes[0], b'+' | b'-') {
+        return false;
+    }
+    let exponent = i16::from_be_bytes([bytes[1], bytes[2]]);
+    let digits = &bytes[4..];
+    if digits.len() != usize::from(bytes[3])
+        || digits.is_empty()
+        || digits.len() > 100
+        || !digits.iter().all(u8::is_ascii_digit)
+    {
+        return false;
+    }
+    if digits == b"0" {
+        bytes[0] == b'+' && exponent == 0
+    } else {
+        digits[0] != b'0' && digits[digits.len() - 1] != b'0' && (-18..=18).contains(&exponent)
+    }
+}
+
+pub fn canonical_key_encoding(
+    components: &[CanonicalKeyComponent],
+) -> Result<Vec<u8>, KeyEncodingError> {
+    if !(1..=8).contains(&components.len()) {
+        return Err(KeyEncodingError::Arity);
+    }
+    let mut encoded = vec![1, components.len() as u8];
+    for component in components {
+        encoded.extend(component.type_oid.to_be_bytes());
+        encoded.extend((component.bytes.len() as u32).to_be_bytes());
+        encoded.extend(&component.bytes);
+    }
+    Ok(encoded)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -629,36 +706,12 @@ impl PhysicalKeyHash {
         self.0.bytes()
     }
 
-    #[must_use]
-    pub fn derive(components: &[CanonicalKeyComponent]) -> Self {
-        let mut encoded = Vec::new();
-        for component in components {
-            match component {
-                CanonicalKeyComponent::Null => encoded.push(0),
-                CanonicalKeyComponent::Bool(value) => {
-                    encoded.extend([1, u8::from(*value)]);
-                }
-                CanonicalKeyComponent::I64(value) => {
-                    encoded.push(2);
-                    encoded.extend(value.to_be_bytes());
-                }
-                CanonicalKeyComponent::U64(value) => {
-                    encoded.push(3);
-                    encoded.extend(value.to_be_bytes());
-                }
-                CanonicalKeyComponent::Bytes(value) => {
-                    encoded.push(4);
-                    encoded.extend((value.len() as u64).to_be_bytes());
-                    encoded.extend(value);
-                }
-                CanonicalKeyComponent::Utf8(value) => {
-                    encoded.push(5);
-                    encoded.extend((value.len() as u64).to_be_bytes());
-                    encoded.extend(value.as_bytes());
-                }
-            }
-        }
-        Self(Fingerprint::canonical(PHYSICAL_KEY_DOMAIN, &[&encoded]))
+    pub fn derive(components: &[CanonicalKeyComponent]) -> Result<Self, KeyEncodingError> {
+        let encoded = canonical_key_encoding(components)?;
+        Ok(Self(Fingerprint::canonical(
+            PHYSICAL_KEY_DOMAIN,
+            &[&encoded],
+        )))
     }
 }
 
@@ -687,6 +740,16 @@ mod tests {
     use crate::m1_transition_kernel::{JournalCursor, synthetic_durable_boundary};
 
     const EPOCH: CaptureEpoch = CaptureEpoch::from_store(7);
+
+    fn int8_key(value: i64) -> CanonicalKeyComponent {
+        let mut bytes = value.to_be_bytes();
+        bytes[0] ^= 0x80;
+        CanonicalKeyComponent::from_canonical(20, bytes.to_vec()).unwrap()
+    }
+
+    fn text_key(value: &str) -> CanonicalKeyComponent {
+        CanonicalKeyComponent::from_canonical(25, value.as_bytes().to_vec()).unwrap()
+    }
 
     fn identity() -> SourceIdentity {
         SourceIdentity {
@@ -1070,19 +1133,107 @@ mod tests {
         let table = LogicalTableIdentity::derive(&identity(), "public", "accounts");
         let schema_v1 = RelationSchemaVersion::derive(table, 12, b"id:int8,name:text");
         let schema_v2 = RelationSchemaVersion::derive(table, 13, b"id:int8,name:text,email:text");
-        let key = PhysicalKeyHash::derive(&[
-            CanonicalKeyComponent::I64(42),
-            CanonicalKeyComponent::Utf8("tenant-a".into()),
-        ]);
+        let key = PhysicalKeyHash::derive(&[int8_key(42), text_key("tenant-a")]).unwrap();
         let row = CanonicalRowIdentity::derive(table, key);
         assert_ne!(schema_v1, schema_v2);
         assert_eq!(row.logical_table, schema_v2.logical_table);
         assert_ne!(
             key,
-            PhysicalKeyHash::derive(&[
-                CanonicalKeyComponent::Utf8("tenant-a".into()),
-                CanonicalKeyComponent::I64(42),
-            ])
+            PhysicalKeyHash::derive(&[text_key("tenant-a"), int8_key(42)]).unwrap()
+        );
+    }
+
+    #[test]
+    fn physical_key_matches_m0_key_change_vector() {
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/m0/event-format/golden-vectors.json"
+        ))
+        .unwrap();
+        let case = vectors["vectors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["fixture_id"] == "SCN-M0-EVENT-KEY-CHANGE-ORDER")
+            .unwrap();
+        let event = &case["events"][0];
+        assert_eq!(event["canonical_key"][0]["kind"], "int64");
+        assert_eq!(event["canonical_key"][0]["type_oid"], 20);
+        let value = event["canonical_key"][0]["value"].as_i64().unwrap();
+        let component = int8_key(value);
+        let encoded = canonical_key_encoding(std::slice::from_ref(&component)).unwrap();
+        assert_eq!(&encoded[..10], &[1, 1, 0, 0, 0, 20, 0, 0, 0, 8]);
+        assert_eq!(encoded[10], value.to_be_bytes()[0] ^ 0x80);
+        let actual: String = PhysicalKeyHash::derive(&[component])
+            .unwrap()
+            .bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert_eq!(actual, event["key_hash"].as_str().unwrap());
+    }
+
+    #[test]
+    fn every_admitted_key_type_uses_the_same_oid_length_payload_frame() {
+        let cases: [(u32, &[u8]); 12] = [
+            (21, &[0x80, 0x01]),
+            (23, &[0x80, 0, 0, 1]),
+            (20, &[0x80, 0, 0, 0, 0, 0, 0, 1]),
+            (1700, b"+\0\0\x01\x31"),
+            (2950, &[1; 16]),
+            (1082, &[0; 4]),
+            (1114, &[0; 8]),
+            (1184, &[0; 8]),
+            (25, b"text"),
+            (1043, b"varchar"),
+            (1042, b"bpchar "),
+            (17, &[0, 255]),
+        ];
+        for (oid, payload) in cases {
+            let key = CanonicalKeyComponent::from_canonical(oid, payload.to_vec()).unwrap();
+            let mut expected = vec![1, 1];
+            expected.extend(oid.to_be_bytes());
+            expected.extend((payload.len() as u32).to_be_bytes());
+            expected.extend(payload);
+            assert_eq!(canonical_key_encoding(&[key]).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn key_component_validation_rejects_noncanonical_values() {
+        for (oid, width) in [
+            (21, 2),
+            (23, 4),
+            (20, 8),
+            (1082, 4),
+            (1114, 8),
+            (1184, 8),
+            (2950, 16),
+        ] {
+            assert!(CanonicalKeyComponent::from_canonical(oid, vec![0; width]).is_ok());
+            assert_eq!(
+                CanonicalKeyComponent::from_canonical(oid, vec![0; width - 1]),
+                Err(KeyEncodingError::PayloadWidth)
+            );
+        }
+        for oid in [17, 25, 1042, 1043] {
+            assert!(CanonicalKeyComponent::from_canonical(oid, Vec::new()).is_ok());
+        }
+        assert_eq!(
+            CanonicalKeyComponent::from_canonical(16, vec![1]),
+            Err(KeyEncodingError::UnsupportedType)
+        );
+        assert_eq!(
+            CanonicalKeyComponent::from_canonical(25, vec![0xff]),
+            Err(KeyEncodingError::InvalidText)
+        );
+        assert_eq!(
+            CanonicalKeyComponent::from_canonical(17, vec![0; 1025]),
+            Err(KeyEncodingError::PayloadTooLarge)
+        );
+        assert!(CanonicalKeyComponent::from_canonical(1700, b"+\0\0\x01\x30".to_vec()).is_ok());
+        assert_eq!(
+            CanonicalKeyComponent::from_canonical(1700, b"-\0\0\x01\x30".to_vec()),
+            Err(KeyEncodingError::NonCanonicalNumeric)
         );
     }
 
