@@ -5,7 +5,7 @@
 
 use crate::m1_source_identity::{
     CanonicalKeyComponent, LogicalTableIdentity, PhysicalKeyHash, RelationSchemaVersion,
-    SourceIdentity,
+    SourceIdentity, canonical_key_encoding,
 };
 use crate::m1_transition_kernel::{
     CaptureEpoch, DestinationGeneration, ReceivedLsn, SourceVersion,
@@ -177,24 +177,43 @@ pub fn wal_connector_event_id(input: WalIdentityInput) -> Hash32 {
     )
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SnapshotIdentityInput {
     pub capture_epoch: CaptureEpoch,
     pub generation: DestinationGeneration,
     pub logical_table_id: LogicalTableIdentity,
     pub chunk_id: u64,
-    pub key_hash: PhysicalKeyHash,
+    pub key: CanonicalKey,
 }
-#[must_use]
-pub fn snapshot_connector_event_id(input: SnapshotIdentityInput) -> Hash32 {
+pub fn snapshot_connector_event_id(
+    input: &SnapshotIdentityInput,
+) -> Result<Hash32, OrderingFailure> {
+    let key = canonical_key_encoding(&input.key)
+        .map_err(|_| OrderingFailure::contract("CANONICAL_KEY_INVALID"))?;
+    Ok(snapshot_event_id_fields(
+        input.capture_epoch,
+        input.generation,
+        input.logical_table_id.fingerprint().bytes(),
+        input.chunk_id,
+        &key,
+    ))
+}
+
+fn snapshot_event_id_fields(
+    capture_epoch: CaptureEpoch,
+    generation: DestinationGeneration,
+    logical_table_id: [u8; 32],
+    chunk_id: u64,
+    key: &[u8],
+) -> Hash32 {
     hash_fields(
         SNAPSHOT_EVENT_DOMAIN,
         &[
-            &input.capture_epoch.get().to_be_bytes(),
-            &input.generation.get().to_be_bytes(),
-            &input.logical_table_id.fingerprint().bytes(),
-            &input.chunk_id.to_be_bytes(),
-            &input.key_hash.bytes(),
+            &capture_epoch.get().to_be_bytes(),
+            &generation.get().to_be_bytes(),
+            &logical_table_id,
+            &chunk_id.to_be_bytes(),
+            key,
         ],
     )
 }
@@ -320,14 +339,16 @@ impl MutationVersion {
         if source.transaction_id() != 0 || source.ordinal() != 0 {
             return Err(OrderingFailure::contract("SNAPSHOT_ORDINAL_INVALID"));
         }
+        let connector_event_id = snapshot_connector_event_id(&position)?;
+        let key_hash = canonical_key_hash(&position.key)?;
         Ok(Self {
             source,
             origin_rank: SNAPSHOT_ORIGIN_RANK,
             mutation_ordinal: 0,
-            connector_event_id: snapshot_connector_event_id(position),
+            connector_event_id,
             snapshot_binding: Some(SnapshotPayloadBinding {
                 logical_table_id: position.logical_table_id,
-                key_hash: position.key_hash,
+                key_hash,
             }),
         })
     }
@@ -640,7 +661,7 @@ mod tests {
     #[test]
     fn wal_and_snapshot_identities_are_namespaced_and_stable() {
         let wal_id = wal_connector_event_id(wal(0));
-        let snapshot_id = snapshot_connector_event_id(SnapshotIdentityInput {
+        let snapshot_id = snapshot_connector_event_id(&SnapshotIdentityInput {
             capture_epoch: EPOCH,
             generation: DestinationGeneration::from_store(2),
             logical_table_id: LogicalTableIdentity::derive(
@@ -649,8 +670,9 @@ mod tests {
                 "accounts",
             ),
             chunk_id: 4,
-            key_hash: canonical_key_hash(&key(b"k")).unwrap(),
-        });
+            key: key(b"k"),
+        })
+        .unwrap();
         assert_ne!(wal_id, snapshot_id);
         assert_eq!(
             wal_id.hex(),
@@ -667,13 +689,57 @@ mod tests {
                 "accounts",
             ),
             chunk_id: 4,
-            key_hash: canonical_key_hash(&key(b"k")).unwrap(),
+            key: key(b"k"),
         };
         assert_eq!(
             MutationVersion::from_snapshot(snapshot_source, snapshot_position)
                 .unwrap()
                 .connector_event_id(),
             snapshot_id
+        );
+    }
+
+    #[test]
+    fn snapshot_id_matches_m0_canonical_key_vector() {
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/m0/event-format/golden-vectors.json"
+        ))
+        .unwrap();
+        let case = vectors["vectors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["fixture_id"] == "SCN-M0-EVENT-SNAPSHOT-IDENTITY")
+            .unwrap();
+        let input = &case["identity_input"];
+        let table_hex = input["logical_table_id"].as_str().unwrap();
+        let table: [u8; 32] = std::array::from_fn(|index| {
+            u8::from_str_radix(&table_hex[index * 2..index * 2 + 2], 16).unwrap()
+        });
+        let value = input["canonical_key"][0]["value"].as_i64().unwrap();
+        let key = canonical_key_encoding(&[int8_key(value)]).unwrap();
+        let actual = snapshot_event_id_fields(
+            CaptureEpoch::from_store(input["capture_epoch"].as_u64().unwrap()),
+            DestinationGeneration::from_store(input["generation"].as_u64().unwrap()),
+            table,
+            input["chunk_id"].as_u64().unwrap(),
+            &key,
+        );
+        assert_eq!(actual.hex(), case["event"]["connector_event_id"]);
+    }
+
+    #[test]
+    fn snapshot_id_rejects_empty_key_before_hashing() {
+        let input = SnapshotIdentityInput {
+            capture_epoch: EPOCH,
+            generation: DestinationGeneration::from_store(2),
+            logical_table_id: relation().logical_table,
+            chunk_id: 4,
+            key: vec![],
+        };
+        assert_eq!(
+            snapshot_connector_event_id(&input).unwrap_err().fingerprint,
+            "CANONICAL_KEY_INVALID"
         );
     }
 
@@ -687,7 +753,7 @@ mod tests {
         };
         let snapshot_source =
             source_version_for_row(EPOCH, ReceivedLsn::from_wire(80), 0, 0).unwrap();
-        let snapshot_version = |logical_table_id, key_hash| {
+        let snapshot_version = |logical_table_id, key| {
             MutationVersion::from_snapshot(
                 snapshot_source,
                 SnapshotIdentityInput {
@@ -695,28 +761,19 @@ mod tests {
                     generation: DestinationGeneration::from_store(2),
                     logical_table_id,
                     chunk_id: 4,
-                    key_hash,
+                    key,
                 },
             )
             .unwrap()
         };
         assert!(
             payload
-                .hash(snapshot_version(
-                    relation().logical_table,
-                    canonical_key_hash(&key(b"k")).unwrap()
-                ))
+                .hash(snapshot_version(relation().logical_table, key(b"k")))
                 .is_ok()
         );
         for mismatched in [
-            snapshot_version(
-                relation_for("other").logical_table,
-                canonical_key_hash(&key(b"k")).unwrap(),
-            ),
-            snapshot_version(
-                relation().logical_table,
-                canonical_key_hash(&key(b"other")).unwrap(),
-            ),
+            snapshot_version(relation_for("other").logical_table, key(b"k")),
+            snapshot_version(relation().logical_table, key(b"other")),
         ] {
             assert_eq!(
                 payload.hash(mismatched).unwrap_err().fingerprint,
@@ -980,7 +1037,7 @@ mod tests {
             generation: DestinationGeneration::from_store(2),
             logical_table_id: relation().logical_table,
             chunk_id: 4,
-            key_hash: canonical_key_hash(&key(b"k")).unwrap(),
+            key: key(b"k"),
         };
         assert_eq!(
             MutationVersion::from_snapshot(
