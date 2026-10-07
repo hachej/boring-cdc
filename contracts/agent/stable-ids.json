@@ -302,9 +302,9 @@
     },
     {
       "evidence_status": "pending",
-      "id": "CMD-STATUS-JSON",
+      "id": "CMD-STATUS",
       "namespace": "CMD",
-      "owner_bead": "boring-cdc-m5-ops-cli",
+      "owner_bead": "boring-cdc-m2-fault-status",
       "source": "docs/PLAN.md",
       "source_anchor": "boring-cdc run --bootstrap\nboring-cdc status [--json]\n",
       "source_digest": "8edf2c7f686c09f438d253afcd36a744d7eca8d2cb9fe0b5ac00b1f11c319ec5",
@@ -5029,7 +5029,7 @@
       "summary": "publication_drift_requires_reseed"
     }
   ],
-  "inventory_digest": "45f66c59261e3489c38d211400cab66218e14060e524ae746bdb31b94793bc2c",
+  "inventory_digest": "ca29dea1f1d859a8c83cf884585ea664fd6a0ec94cdc0c7803c7314df71b6ff5",
   "schema_version": "stable-registry/v1",
   "source_files": {
     "docs/PLAN.md": "0e4ebaa072453ea24f0dfc3f22a025b919970fe556eb0d90f026235e8029af4d",

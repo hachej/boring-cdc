@@ -177,8 +177,8 @@
     },
     {
       "evidence_status": "pending",
-      "id": "CMD-STATUS-JSON",
-      "owner_bead": "boring-cdc-m5-ops-cli",
+      "id": "CMD-STATUS",
+      "owner_bead": "boring-cdc-m2-fault-status",
       "source": "docs/PLAN.md",
       "source_digest": "8edf2c7f686c09f438d253afcd36a744d7eca8d2cb9fe0b5ac00b1f11c319ec5"
     },
