@@ -4,6 +4,34 @@ cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/var/tmp}"; [[ "$TMPDIR" ==
 cargo test --locked --workspace --all-targets
 cargo test --locked m2_capture_runtime::tests
 work=$(mktemp -d /var/tmp/m2-capture-e2e.XXXXXX); project="m2-capture-$RANDOM-$$"; port=$((56000 + $$ % 2000)); bootstrap_pid=; pid=
+record_feedback_abort() {
+  local phase=$1 child=$2 rc=$3 observed_feedback=$4 elapsed_ms
+  [[ -n ${M2_FEEDBACK_RECEIPT_DIR:-} ]] || return 0
+  if [[ ${BORING_CDC_M2_FAULT_HOOK:-} != "$phase" || $rc -ne 134 ]]; then
+    echo "E_FEEDBACK_FAULT_NOT_REACHED $phase" >&2
+    return 1
+  fi
+  elapsed_ms=$(( $(date +%s%3N) - runtime_started_ms ))
+  mkdir -p "$M2_FEEDBACK_RECEIPT_DIR"
+  cp -f "$work/runtime.out" "$M2_FEEDBACK_RECEIPT_DIR/runtime.stdout"
+  cp -f "$work/runtime.err" "$M2_FEEDBACK_RECEIPT_DIR/runtime.stderr"
+  python3 - "$M2_FEEDBACK_RECEIPT_DIR" "$phase" "$child" "$rc" "$version" "$durable_lsn" "$observed_feedback" "$elapsed_ms" <<'PY2'
+import hashlib,json,pathlib,sys
+out=pathlib.Path(sys.argv[1]); phase=sys.argv[2]
+assert phase in ('before_feedback','after_feedback')
+stdout=(out/'runtime.stdout').read_bytes(); stderr=(out/'runtime.stderr').read_bytes()
+receipt={'schema_version':'m2-feedback-fault-receipt/v1','hook':phase,
+         'child_command':['target/debug/boring-cdc','run'],'child_pid':int(sys.argv[3]),
+         'child_exit_code':int(sys.argv[4]),'postgres_version':sys.argv[5],
+         'durable_transaction_count':1,'durable_lsn':sys.argv[6],
+         'server_feedback_positions_observed':sys.argv[7],
+         'feedback_match_observed':phase=='after_feedback',
+         'elapsed_since_runtime_start_ms':int(sys.argv[8]),
+         'stdout_sha256':hashlib.sha256(stdout).hexdigest(),
+         'stderr_sha256':hashlib.sha256(stderr).hexdigest()}
+(out/'receipt.json').write_text(json.dumps(receipt,sort_keys=True,indent=2)+'\n')
+PY2
+}
 cleanup_child() {
   local child=$1 rc state
   state=$(ps -o stat= -p "$child" 2>/dev/null || true)
@@ -69,6 +97,7 @@ sleep 1; stop_bounded "$bootstrap_pid" INT bootstrap; bootstrap_pid=
   cd "$work/run"
   exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/runtime.out" 2>"$work/runtime.err"
 ) & pid=$!
+runtime_started_ms=$(date +%s%3N)
 deadline=$((SECONDS+30)); until [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='runtime_slot'")" == 1 ]]; do (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }; sleep .1; done
 python3 - "$work/run/state/journal.sqlite" "$work/sqlite-locked" <<'PY2' & lock_pid=$!
 import pathlib,sqlite3,sys,time
@@ -107,7 +136,8 @@ while true; do
   [[ "$feedback" == "$durable_lsn,$durable_lsn,$durable_lsn" ]] && break
   state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
   if [[ -z "$state" || "$state" == Z* ]]; then
-    set +e; wait "$pid" 2>/dev/null; rc=$?; set -e; pid=
+    child=$pid; set +e; wait "$pid" 2>/dev/null; rc=$?; set -e; pid=
+    record_feedback_abort before_feedback "$child" "$rc" "$feedback"
     [[ $rc -eq 134 ]] && echo "Aborted runtime before feedback" >&2
     cat "$work/runtime.err" >&2
     exit 1
@@ -116,9 +146,17 @@ while true; do
   sleep .05
 done
 sleep .1
+if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback && -n ${M2_FEEDBACK_RECEIPT_DIR:-} ]]; then
+  deadline=$((SECONDS+5))
+  while kill -0 "$pid" 2>/dev/null && [[ "$(ps -o stat= -p "$pid" 2>/dev/null || true)" != Z* ]]; do
+    (( SECONDS < deadline )) || { echo 'E_AFTER_FEEDBACK_ABORT_NOT_REACHED' >&2; exit 1; }
+    sleep .05
+  done
+fi
 state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
 if [[ -z "$state" || "$state" == Z* ]]; then
-  set +e; wait "$pid" 2>/dev/null; rc=$?; set -e; pid=
+  child=$pid; set +e; wait "$pid" 2>/dev/null; rc=$?; set -e; pid=
+  record_feedback_abort after_feedback "$child" "$rc" "$feedback"
   [[ $rc -eq 134 ]] && echo "Aborted runtime after feedback" >&2
   cat "$work/runtime.err" >&2
   exit 1

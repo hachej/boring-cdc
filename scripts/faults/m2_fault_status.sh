@@ -3,7 +3,27 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp; ulimit -c 0
 work=$(mktemp -d /var/tmp/m2-fault-hooks.XXXXXX); trap 'rm -rf "$work"' EXIT INT TERM
 expect_test_abort(){ local hook=$1 test=$2; set +e; BORING_CDC_M2_FAULT_HOOK="$hook" cargo test --quiet --locked "$test" -- --exact >"$work/$hook.out" 2>"$work/$hook.err"; local rc=$?; set -e; [[ $rc -eq 101 ]]; grep -q 'SIGABRT' "$work/$hook.err"; }
-expect_live_abort(){ local hook=$1; set +e; BORING_CDC_M2_FAULT_HOOK="$hook" timeout 240 scripts/e2e/m2_capture_runtime.sh >"$work/$hook.out" 2>"$work/$hook.err"; local rc=$?; set -e; [[ $rc -ne 0 ]]; grep -q 'Aborted' "$work/$hook.err"; }
+expect_live_abort(){
+  local hook=$1 receipt="$work/$1.receipt" rc
+  set +e
+  BORING_CDC_M2_FAULT_HOOK="$hook" M2_FEEDBACK_RECEIPT_DIR="$receipt" timeout 240 scripts/e2e/m2_capture_runtime.sh >"$work/$hook.out" 2>"$work/$hook.err"
+  rc=$?
+  set -e
+  [[ $rc -ne 0 && $rc -ne 124 ]]
+  grep -q 'Aborted runtime' "$work/$hook.err"
+  python3 scripts/validate/m2_feedback_receipts.py single "$receipt" "$hook"
+  if [[ -n ${M2_FEEDBACK_RECEIPT_OUT:-} ]]; then
+    mkdir -p "$M2_FEEDBACK_RECEIPT_OUT/$hook"
+    cp -f "$receipt/receipt.json" "$receipt/runtime.stdout" "$receipt/runtime.stderr" "$M2_FEEDBACK_RECEIPT_OUT/$hook/"
+    cp -f "$work/$hook.out" "$M2_FEEDBACK_RECEIPT_OUT/$hook/harness.stdout"
+    cp -f "$work/$hook.err" "$M2_FEEDBACK_RECEIPT_OUT/$hook/harness.stderr"
+  fi
+}
+if [[ ${M2_FAULT_STATUS_FEEDBACK_ONLY:-0} == 1 ]]; then
+  expect_live_abort before_feedback
+  expect_live_abort after_feedback
+  exit 0
+fi
 expect_test_abort before_source_commit m2_journal::tests::atomic_commit_publishes_complete_transaction_and_durable_end
 expect_test_abort after_source_commit_before_feedback m2_journal::tests::atomic_commit_publishes_complete_transaction_and_durable_end
 expect_live_abort before_feedback
