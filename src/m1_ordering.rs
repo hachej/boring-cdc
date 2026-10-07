@@ -142,11 +142,13 @@ pub struct SourceSlotIdentity(Hash32);
 impl SourceSlotIdentity {
     #[must_use]
     pub fn derive(source: &SourceIdentity) -> Self {
+        let database_identity = source.event_database_identity();
         Self(hash_fields(
             SOURCE_SLOT_DOMAIN,
             &[
                 &source.system_identifier.to_be_bytes(),
-                &source.database_identity.to_be_bytes(),
+                &source.timeline.to_be_bytes(),
+                database_identity.as_bytes(),
                 source.slot_name.as_bytes(),
                 source.plugin.as_bytes(),
             ],
@@ -592,6 +594,55 @@ mod tests {
             protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
         }
     }
+
+    #[test]
+    fn source_and_wal_identities_match_m0_vectors() {
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/m0/event-format/golden-vectors.json"
+        ))
+        .unwrap();
+        let primitives = &vectors["identity_primitives"];
+        let mut source = source_identity();
+        source.system_identifier = primitives["logical_table"]["input"]["system_identifier"]
+            .as_u64()
+            .unwrap();
+        source.timeline = primitives["source_slot"]["input"]["timeline"]
+            .as_u64()
+            .unwrap() as u32;
+        assert_eq!(
+            source.event_database_identity(),
+            primitives["logical_table"]["input"]["database_identity"]
+        );
+        let table = LogicalTableIdentity::derive(&source, "public", "orders");
+        let table_hex: String = table
+            .fingerprint()
+            .bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert_eq!(table_hex, primitives["logical_table"]["expected_sha256"]);
+        let slot = SourceSlotIdentity::derive(&source);
+        assert_eq!(slot.0.hex(), primitives["source_slot"]["expected_sha256"]);
+        let wal = vectors["vectors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["fixture_id"] == "SCN-M0-EVENT-WAL-IDENTITY")
+            .unwrap();
+        let input = &wal["identity_input"];
+        assert_eq!(slot.0.hex(), input["source_slot_identity"]);
+        let wal_id = wal_connector_event_id(WalIdentityInput {
+            capture_epoch: CaptureEpoch::from_store(input["capture_epoch"].as_u64().unwrap()),
+            source_slot_identity: slot,
+            transaction_end_lsn: ReceivedLsn::from_wire(
+                input["transaction_end_lsn"].as_u64().unwrap(),
+            ),
+            row_ordinal: input["row_ordinal"].as_u64().unwrap(),
+            mutation_ordinal: input["mutation_ordinal"].as_u64().unwrap() as u8,
+        });
+        assert_eq!(wal_id.hex(), wal["event"]["connector_event_id"]);
+    }
+
     fn version() -> MutationVersion {
         MutationVersion::from_wal(source(112, 8, 3), wal(0)).unwrap()
     }
@@ -674,10 +725,6 @@ mod tests {
         })
         .unwrap();
         assert_ne!(wal_id, snapshot_id);
-        assert_eq!(
-            wal_id.hex(),
-            "06004c4a0b18bedd87c4fabd9102bbaf009e50ffecfea740528edeb68485d548"
-        );
         let snapshot_source =
             source_version_for_row(EPOCH, ReceivedLsn::from_wire(80), 0, 0).unwrap();
         let snapshot_position = SnapshotIdentityInput {

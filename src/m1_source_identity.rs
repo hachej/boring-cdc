@@ -94,6 +94,12 @@ pub enum IdentityValidationError {
 }
 
 impl SourceIdentity {
+    /// M0's UTF-8 catalog identity for a PostgreSQL database OID.
+    #[must_use]
+    pub fn event_database_identity(&self) -> String {
+        format!("database-oid:{}", self.database_identity)
+    }
+
     pub fn validate(&self) -> Result<(), IdentityValidationError> {
         if self.system_identifier == 0 {
             return Err(IdentityValidationError::ZeroSystemIdentifier);
@@ -564,11 +570,12 @@ impl LogicalTableIdentity {
 
     #[must_use]
     pub fn derive(source: &SourceIdentity, schema: &str, table: &str) -> Self {
+        let database_identity = source.event_database_identity();
         Self(Fingerprint::canonical(
             LOGICAL_TABLE_DOMAIN,
             &[
                 &source.system_identifier.to_be_bytes(),
-                &source.database_identity.to_be_bytes(),
+                database_identity.as_bytes(),
                 schema.as_bytes(),
                 table.as_bytes(),
             ],
