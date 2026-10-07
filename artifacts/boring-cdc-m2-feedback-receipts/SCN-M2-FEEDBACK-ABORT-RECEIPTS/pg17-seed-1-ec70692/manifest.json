@@ -1,0 +1,72 @@
+{
+  "cleanup": {
+    "complete": true,
+    "remaining_paths": []
+  },
+  "commands": [
+    {
+      "argv": "scripts/faults/m2_fault_status.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-feedback-receipts/SCN-M2-FEEDBACK-ABORT-RECEIPTS/pg17-seed-1-ec70692/attempt-1/suite.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-feedback-receipts/SCN-M2-FEEDBACK-ABORT-RECEIPTS/pg17-seed-1-ec70692/attempt-1/suite.stdout",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "m2-feedback-receipts/v1"
+    },
+    {
+      "argv": "scripts/faults/m2_fault_status.sh",
+      "exit_code": 0,
+      "stderr_path": "artifacts/boring-cdc-m2-feedback-receipts/SCN-M2-FEEDBACK-ABORT-RECEIPTS/pg17-seed-1-ec70692/attempt-2/suite.stderr",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_path": "artifacts/boring-cdc-m2-feedback-receipts/SCN-M2-FEEDBACK-ABORT-RECEIPTS/pg17-seed-1-ec70692/attempt-2/suite.stdout",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "version": "m2-feedback-receipts/v1"
+    }
+  ],
+  "evidence_profile": "runtime",
+  "evidence_tier": "component",
+  "git_commit": "ec7069225ed535fc00f62234fe32cf25d21ce5c8",
+  "owner_bead": "boring-cdc-m2-fault-status.1",
+  "redaction": {
+    "checked": true,
+    "secrets_found": 0
+  },
+  "result": {
+    "artifacts": [
+      "artifacts/boring-cdc-m2-feedback-receipts/SCN-M2-FEEDBACK-ABORT-RECEIPTS/pg17-seed-1-ec70692/attempt-1/before_feedback/receipt.json",
+      "artifacts/boring-cdc-m2-feedback-receipts/SCN-M2-FEEDBACK-ABORT-RECEIPTS/pg17-seed-1-ec70692/attempt-1/after_feedback/receipt.json",
+      "artifacts/boring-cdc-m2-feedback-receipts/SCN-M2-FEEDBACK-ABORT-RECEIPTS/pg17-seed-1-ec70692/attempt-2/before_feedback/receipt.json",
+      "artifacts/boring-cdc-m2-feedback-receipts/SCN-M2-FEEDBACK-ABORT-RECEIPTS/pg17-seed-1-ec70692/attempt-2/after_feedback/receipt.json"
+    ],
+    "attempts": [
+      "attempt-1",
+      "attempt-2"
+    ],
+    "digest": "92741984e3c517d5d0e8cbd28525430c4ce4e03b6a50b473fe2411cb6f1a7087",
+    "product_faults": "live PostgreSQL 17.6 feedback abort before and after durable feedback",
+    "runtime_observed": true,
+    "status": "pass"
+  },
+  "scenario_id": "SCN-M2-FEEDBACK-ABORT-RECEIPTS",
+  "schema_version": "evidence/v1",
+  "seed": "pg17-seed-1",
+  "source_preservation": {
+    "after_sha256": "954c79c7b1b5dd52ee420514d640576d2f73fe5f14deb8f2fe8392c6f408e667",
+    "before_sha256": "954c79c7b1b5dd52ee420514d640576d2f73fe5f14deb8f2fe8392c6f408e667",
+    "preserved": true
+  },
+  "tier_proof": {
+    "boundary_e2e": true,
+    "clean_clone": false,
+    "clean_environment": true,
+    "consumed_contract_vectors": true,
+    "deterministic_rerun": true,
+    "endurance": false,
+    "exit_assertions": true,
+    "fault_suite": true,
+    "full_failure_matrix": false,
+    "integration": false,
+    "targeted_checks": true,
+    "workspace_tests": true
+  }
+}
