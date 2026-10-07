@@ -8,7 +8,7 @@
       "argv": "cargo clippy --locked --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/clippy.stderr",
-      "stderr_sha256": "91f8ae545dba380bb399f145da28cdc01138b5cfe3f8743e8a81c6af7ba594ed",
+      "stderr_sha256": "f591e097f22f91dd5c31fbbf7e587d80c0a4e0ed594f9c9012a544f38c52d926",
       "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/clippy.stdout",
       "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
       "version": "m2-reconcile-live/v3"
@@ -19,14 +19,14 @@
       "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/targeted.stderr",
       "stderr_sha256": "c396e10933cb5b16db23c0c2422b4a482336d6bbda26fb1668204d5cc203a2a3",
       "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/targeted.stdout",
-      "stdout_sha256": "c75cece39b7963c471841b0c931f2d26e862cb77a1475dc71d738b1173b4b33a",
+      "stdout_sha256": "c991b8cbbc73a22dc3a31736c515e1e0a9393d795d389ba7d23808ae519c2bdf",
       "version": "m2-reconcile-live/v3"
     },
     {
       "argv": "scripts/e2e/m2_reconcile.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/e2e.stderr",
-      "stderr_sha256": "8f5bf67ff00eb9aefa6c166eb82d5f92068355bf6d4d9aa868c4df3200cadade",
+      "stderr_sha256": "0254eb4279ade227c44affbddcec9ed371316b34d058096ccf799ecd8617c9d3",
       "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/e2e.stdout",
       "stdout_sha256": "d2bc9a5a868760c7956f74df7cb0766e5c10802916c1fe393bd517d63d54f3f4",
       "version": "m2-reconcile-live/v3"
@@ -35,24 +35,24 @@
       "argv": "scripts/faults/m2_reconcile.sh",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/fault.stderr",
-      "stderr_sha256": "bcdfed602e6b3c7227625231beaa534b99a78b258d05c8c19b3f2a2b3e1aeb1b",
+      "stderr_sha256": "694b655c2e795c6010000362143718aba8131db7dba7667764832f043efd5df1",
       "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/fault.stdout",
-      "stdout_sha256": "f055f1dc316295c02b8e8ecc0474ef11d546b40129724a579fbe349c53ee5b25",
+      "stdout_sha256": "d66f3aef0d7a50781839db66a075966119de29aa134d129972cc517bea819e5b",
       "version": "m2-reconcile-live/v3"
     },
     {
       "argv": "cargo test --locked --workspace --all-targets",
       "exit_code": 0,
       "stderr_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/workspace.stderr",
-      "stderr_sha256": "634566b9c136d9ed828fdd67dc180cd02c7d681f232e79c453ae6974c6c0eb1a",
+      "stderr_sha256": "1b47515d60506f175c70cce5c392c5319da80c492aaa286a0f1e8c4b46763834",
       "stdout_path": "artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/live-pg17-v1/workspace.stdout",
-      "stdout_sha256": "56144f8a9a74248b1d949ddd37f86e9502d1ae081b051d9aff38366a9e9bab63",
+      "stdout_sha256": "00bb73e7509377df73e374f2e6f54019245a1d45ef05e8fc658a28f2d327c5ab",
       "version": "m2-reconcile-live/v3"
     }
   ],
   "evidence_profile": "runtime",
   "evidence_tier": "component",
-  "git_commit": "7347a72b61a39da037d11205de146592784fb077",
+  "git_commit": "a7d375b6e5cdee9e4564ad0973732c8fbc02f6ca",
   "owner_bead": "boring-cdc-m2-reconcile.1",
   "redaction": {
     "checked": true,
@@ -71,7 +71,7 @@
       "e2e-run-1",
       "fault-wrapper-e2e-run-2"
     ],
-    "digest": "99be093722ab494d1978e88d3dfa6941d4af73d35fde8c445182964b69357852",
+    "digest": "39b242a04e4b48b3fe1d1319b49b9e3d2a8a87b875dac9cb115b6f640e339a1e",
     "product_faults": "exact-PID SIGKILL before source receipt; corrupt payload; missing, unreserved, and lost PostgreSQL 17.6 slot states",
     "runtime_observed": true,
     "status": "pass"

@@ -746,9 +746,37 @@ pub enum PreparedFailureOperation {
         capture_epoch: String,
         generation: Option<u64>,
     },
+    SupersedeRearmedCapture {
+        previous: FailureRecord,
+        replacement: Box<PreparedFailureOperation>,
+    },
 }
 
 impl PreparedFailureOperation {
+    /// A failed, explicitly re-armed capture attempt replaces its old alarm in the same
+    /// journal transaction that arms the new limit failure. It must not be recorded as a
+    /// successful completion of the old failed boundary.
+    pub fn supersede_rearmed_capture(previous: &FailureRecord, replacement: Self) -> Option<Self> {
+        let Self::StoreAndArm { record, .. } = &replacement else {
+            return None;
+        };
+        if previous.component != Component::Capture.as_str()
+            || previous.destination_id.is_some()
+            || !previous.armed
+            || previous.last_rearm_token_digest.is_none()
+            || record.component != Component::Capture.as_str()
+            || record.destination_id.is_some()
+            || record.failure_id == previous.failure_id
+            || record.boundary.capture_epoch() != previous.boundary.capture_epoch()
+        {
+            return None;
+        }
+        Some(Self::SupersedeRearmedCapture {
+            previous: previous.clone(),
+            replacement: Box::new(replacement),
+        })
+    }
+
     /// Project a pure policy action into a sole-writer operation without dropping any CAS fence.
     pub fn from_policy_action(
         action: PolicyAction,
@@ -794,6 +822,19 @@ impl PreparedFailureOperation {
     /// Execute only inside the transaction supplied by the capture-priority sole writer.
     pub fn execute(&self, transaction: &Transaction<'_>) -> rusqlite::Result<()> {
         match self {
+            Self::SupersedeRearmedCapture {
+                previous,
+                replacement,
+            } => {
+                transaction.execute(
+                    "UPDATE processing_failures SET armed=0,next_retry_at=NULL WHERE failure_id=?1 AND fingerprint=?2 AND attempt=?3 AND component='capture' AND destination_id IS NULL AND armed=1 AND last_failed_at=?4",
+                    params![previous.failure_id, previous.fingerprint, previous.attempt, persisted_last_failed_at(previous.last_failed_at_ms, previous.last_rearm_token_digest.as_deref())],
+                )?;
+                if transaction.changes() != 1 {
+                    return Err(rusqlite::Error::QueryReturnedNoRows);
+                }
+                replacement.execute(transaction)?;
+            }
             Self::StoreAndArm {
                 record,
                 expected_current_failure_id,
@@ -2208,6 +2249,114 @@ pub mod tests {
         tx.rollback().unwrap();
         drop(writer);
         let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn rearmed_capture_failure_is_superseded_atomically_on_another_limit_failure() {
+        let path = temp_path();
+        let mut writer = open_writer(&path, "capture-run", 1, 0).unwrap();
+        let previous = FailureRecord {
+            failure_id: "capture-limit-old".into(),
+            destination_id: None,
+            component: "capture".into(),
+            class: FailureClass::Configuration,
+            fingerprint: "fingerprint-old".into(),
+            boundary: FailedBoundary::Capture {
+                capture_epoch: "epoch-a".into(),
+                end_lsn: "0000000000000010".into(),
+            },
+            attempt: 1,
+            next_retry_at_ms: None,
+            armed: true,
+            first_failed_at_ms: 100,
+            last_failed_at_ms: 200,
+            last_rearm_token_digest: Some("consumed-token".into()),
+        };
+        let replacement = FailureRecord {
+            failure_id: "capture-limit-new".into(),
+            fingerprint: "fingerprint-new".into(),
+            last_rearm_token_digest: None,
+            ..previous.clone()
+        };
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: previous.clone(),
+            expected_current_failure_id: None,
+        }
+        .execute(&tx)
+        .unwrap();
+        tx.commit().unwrap();
+
+        let mut collision = replacement.clone();
+        collision.fingerprint = "unrelated-existing-fingerprint".into();
+        collision.armed = false;
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: collision,
+            expected_current_failure_id: None,
+        }
+        .execute(&tx)
+        .unwrap();
+        tx.commit().unwrap();
+
+        let operation = PreparedFailureOperation::supersede_rearmed_capture(
+            &previous,
+            PreparedFailureOperation::StoreAndArm {
+                record: replacement,
+                expected_current_failure_id: None,
+            },
+        )
+        .unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        assert!(operation.execute(&tx).is_err());
+        tx.rollback().unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT armed FROM processing_failures WHERE failure_id='capture-limit-old'",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            1
+        );
+        writer
+            .connection()
+            .execute(
+                "DELETE FROM processing_failures WHERE failure_id='capture-limit-new'",
+                [],
+            )
+            .unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        operation.execute(&tx).unwrap();
+        tx.commit().unwrap();
+        let rows: Vec<(String, i64)> = writer
+            .connection()
+            .prepare("SELECT failure_id,armed FROM processing_failures WHERE component='capture' ORDER BY failure_id")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            rows,
+            [
+                ("capture-limit-new".into(), 1),
+                ("capture-limit-old".into(), 0)
+            ]
+        );
+        let tx = writer.connection_mut().transaction().unwrap();
+        assert!(
+            operation.execute(&tx).is_err(),
+            "stale supersession must reject"
+        );
+        tx.rollback().unwrap();
+        assert_eq!(writer.connection().query_row("SELECT count(*) FROM processing_failures WHERE component='capture' AND armed=1", [], |row| row.get::<_, i64>(0)).unwrap(), 1);
+        drop(writer);
+        let _ = fs::remove_file(&path);
+        let _ = fs::remove_file(path.with_extension("sqlite-wal"));
+        let _ = fs::remove_file(path.with_extension("sqlite-shm"));
     }
 
     #[test]

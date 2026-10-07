@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 11;
+pub const SCHEMA_VERSION: i64 = 12;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -427,6 +427,23 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_11_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v12: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=12)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v12 {
+            connection.execute_batch(MIGRATION_12)?;
+            connection.execute("INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(12,'capture-limit-recovery-receipt',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[MIGRATION_12_CHECKSUM])?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=12",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_12_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -809,6 +826,16 @@ WHERE owner_kind='audit' AND state='release_pending'
 AND NOT EXISTS(SELECT 1 FROM destination_audits a WHERE a.audit_id=logical_range_pins.owner_id);
 DELETE FROM terminal_metadata_retention WHERE category='destination_audit'
 AND NOT EXISTS(SELECT 1 FROM destination_audits a WHERE a.audit_id=terminal_metadata_retention.object_id);
+"#;
+
+const MIGRATION_12_CHECKSUM: &str =
+    "sha256:7528b752e48fae3edd50b03a5f23ca2cbb905e9177eded850ba12127f0cade09";
+const MIGRATION_12: &str = r#"
+CREATE TABLE capture_configuration_receipts(
+ singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+ capture_epoch TEXT NOT NULL, runtime_fingerprint TEXT NOT NULL,
+ non_limit_fingerprint TEXT NOT NULL, limit_fingerprint TEXT NOT NULL,
+ revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0));
 "#;
 
 #[cfg(test)]

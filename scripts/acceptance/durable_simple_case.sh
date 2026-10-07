@@ -9,6 +9,16 @@ port=$((54000 + $$ % 1000))
 runtime_pid=
 bootstrap_pid=
 cleanup() {
+  local status=$?
+  if (( status != 0 )) && [[ -f "$work/run/state/boring.db" ]]; then
+    python3 - "$work/run/state/boring.db" <<'PY' >&2 || true
+import json,sqlite3,sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    print('E_DURABLE_SIMPLE_STATE',dict(db.execute("select coalesce(control_kind,'user'),count(*) from journal_events group by coalesce(control_kind,'user')").fetchall()),'transactions',db.execute("select count(*) from source_transactions where state='committed'").fetchone()[0])
+    print('E_DURABLE_SIMPLE_CONTROL_EVENTS',db.execute("select control_kind,count(*) from journal_events group by control_kind").fetchall())
+PY
+    cat "$work/runtime-first.err" "$work/runtime-restart.err" 2>/dev/null >&2 || true
+  fi
   [[ -z "$runtime_pid" ]] || kill -KILL "$runtime_pid" >/dev/null 2>&1 || true
   [[ -z "$bootstrap_pid" ]] || kill -KILL "$bootstrap_pid" >/dev/null 2>&1 || true
   docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true
@@ -87,7 +97,7 @@ journal_transactions() {
   python3 - "$journal" <<'PY'
 import sqlite3,sys
 with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True) as db:
-    print(db.execute("select count(*) from source_transactions where state='committed'").fetchone()[0])
+    print(db.execute("select count(distinct t.transaction_id) from source_transactions t join journal_events e on e.transaction_id=t.transaction_id where t.state='committed' and e.control_kind is null").fetchone()[0])
 PY
 }
 wait_for_transactions() {
@@ -95,6 +105,20 @@ wait_for_transactions() {
   deadline=$((SECONDS+30))
   until [[ "$(journal_transactions)" == "$expected" ]]; do
     (( SECONDS < deadline )) || { cat "$work/runtime-restart.err" "$work/runtime-first.err" 2>/dev/null >&2 || true; exit 1; }
+    sleep .1
+  done
+}
+wait_for_control_event() {
+  local kind=$1
+  deadline=$((SECONDS+15))
+  until [[ "$(python3 - "$journal" "$kind" <<'PY'
+import sqlite3,sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    print(db.execute("select count(*) from journal_events where control_kind=?",(sys.argv[2],)).fetchone()[0])
+PY
+)" != 0 ]]; do
+    (( SECONDS < deadline )) || { echo "E_CONTROL_EVENT_NOT_CLASSIFIED kind=$kind" >&2; cat "$work/runtime-first.err" >&2; exit 1; }
+    kill -0 "$runtime_pid" 2>/dev/null || { cat "$work/runtime-first.err" >&2; exit 1; }
     sleep .1
   done
 }
@@ -147,6 +171,10 @@ for key in 101 102 103; do
   wait_for_transactions "$((key-100))"
   sample_feedback_boundary "before-crash-$key"
 done
+wait_for_control_event heartbeat
+fence_updates=$(psqlc -Atqc "begin; set local role boring_cdc_control_writer; with updated as (update boring_cdc_control.capture_fences set capture_epoch=1,generation=1,table_set_fingerprint=repeat('f',64),unique_nonce=1 where id='singleton' returning 1) select count(*) from updated; commit")
+[[ "$fence_updates" == 1 ]]
+wait_for_control_event capture_fence
 
 kill -KILL "$runtime_pid"
 set +e
@@ -177,23 +205,33 @@ journal,oracle_path,boundaries_path,result_path,version=sys.argv[1:]
 oracle={tuple(line.strip().split('|')) for line in open(oracle_path) if line.strip()}
 with sqlite3.connect(f"file:{journal}?mode=ro", uri=True) as db:
     transactions=db.execute("select transaction_id,xid,first_seq,last_seq,event_count,end_lsn from source_transactions where state='committed' order by first_seq").fetchall()
-    events=db.execute("select journal_seq,transaction_id,cast(payload as text) from journal_events order by journal_seq").fetchall()
+    events=db.execute("select journal_seq,transaction_id,control_kind,cast(payload as text) from journal_events order by journal_seq").fetchall()
     state=db.execute("select durable_transaction_end_lsn,durable_journal_seq from source_state where singleton=1").fetchone()
-assert len(transactions)==6
-assert len({row[0] for row in transactions})==6
-assert len({row[1] for row in transactions})==6
+assert len({row[0] for row in transactions})==len(transactions)
+assert len({row[1] for row in transactions})==len(transactions)
 assert all(row[4]==1 and row[2]==row[3] for row in transactions)
-assert [row[0] for row in events]==list(range(1,7))
-assert len({row[1] for row in events})==6
+assert [row[0] for row in events]==list(range(1,len(events)+1))
+assert len({row[1] for row in events})==len(events)
 xid_by_transaction={row[0]:row[1] for row in transactions}
 journal_set=set()
-for _,transaction_id,payload_text in events:
+control_events=0
+control_kinds=set()
+for _,transaction_id,control_kind,payload_text in events:
     payload=json.loads(payload_text)
+    if control_kind is not None:
+        assert control_kind in ('heartbeat','capture_fence')
+        assert payload['kind']=='update' and payload['new']
+        assert bytes(payload['new'][0]['bytes'])==b'singleton'
+        control_events+=1
+        control_kinds.add(control_kind)
+        continue
     assert payload['kind']=='insert' and payload['new']
     key=str(int(bytes(payload['new'][0]['bytes']).decode('ascii')))
     journal_set.add((xid_by_transaction[transaction_id],key))
+assert len(journal_set)==6
+assert control_kinds=={'heartbeat','capture_fence'}, control_kinds
 assert journal_set==oracle, {'postgres':sorted(oracle),'journal':sorted(journal_set)}
-assert state[1]==6 and state[0]==transactions[-1][5]
+assert state[1]==len(events) and state[0]==transactions[-1][5]
 boundaries=[json.loads(line) for line in open(boundaries_path)]
 assert boundaries and all(item['bounded'] for item in boundaries)
 # WAL-retention regression guard. restart_lsn is what lets PostgreSQL recycle WAL: a connector
@@ -220,6 +258,9 @@ result={
   'hard_kill_status':137,
   'committed_oracle':sorted([{'xid':xid,'key':int(key)} for xid,key in oracle],key=lambda row:row['key']),
   'journal_transactions':len(transactions),
+  'user_transactions':len(journal_set),
+  'control_events':control_events,
+  'control_kinds':sorted(control_kinds),
   'journal_events':len(events),
   'unique_transaction_ids':True,
   'unique_source_xids':True,
@@ -238,4 +279,4 @@ PY
 stop_bounded "$runtime_pid" TERM runtime-restart
 runtime_pid=
 [[ ! -s "$work/runtime-restart.err" ]]
-echo "DURABLE_SIMPLE_CASE_OK postgres=$version transactions=6 crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"
+echo "DURABLE_SIMPLE_CASE_OK postgres=$version user_transactions=6 heartbeat_and_fence=classified crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"
