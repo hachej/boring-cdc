@@ -172,7 +172,7 @@ for key in 101 102 103; do
   sample_feedback_boundary "before-crash-$key"
 done
 wait_for_control_event heartbeat
-fence_updates=$(psqlc -Atqc "begin; set local role boring_cdc_control_writer; with updated as (update boring_cdc_control.capture_fences set capture_epoch=1,generation=1,table_set_fingerprint=repeat('f',64),unique_nonce=1 where id='singleton' returning 1) select count(*) from updated; commit")
+fence_updates=$(psqlc -Atqc "begin; set local role boring_cdc_control_writer; with updated as (update boring_cdc_control.capture_fences set capture_epoch=1,generation=1,table_set_fingerprint=decode(repeat('ff',32),'hex'),unique_nonce=decode('0102030405060708090a0b0c0d0e0f10','hex') where id=1 returning 1) select count(*) from updated; commit")
 [[ "$fence_updates" == 1 ]]
 wait_for_control_event capture_fence
 
@@ -221,7 +221,7 @@ for _,transaction_id,control_kind,payload_text in events:
     if control_kind is not None:
         assert control_kind in ('heartbeat','capture_fence')
         assert payload['kind']=='update' and payload['new']
-        assert bytes(payload['new'][0]['bytes'])==b'singleton'
+        assert bytes(payload['new'][0]['bytes'])==b'1'
         control_events+=1
         control_kinds.add(control_kind)
         continue
