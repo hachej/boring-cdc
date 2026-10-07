@@ -1,0 +1,1 @@
+{"assertions":{"anchor_before_durable_pair":false,"delayed_copy_blocked":true,"deterministic_attempts":2,"duplicate_audit_only":true,"restart_without_pair_blocked":true,"sampled_lsn_rejected":true},"deterministic_attempts":2,"raw_nonce_retained":false,"sampled_lsn_accepted":false}
