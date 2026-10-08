@@ -47,6 +47,12 @@ fn crypto_provider() -> Arc<rustls::crypto::CryptoProvider> {
 /// Exposed `pub(crate)` so `copy.rs` can pin its read-headroom invariant
 /// (`MIN_HEADROOM > TLS_BUF_SIZE`) to this value at compile time, guaranteeing tokio's `BufReader` always bypasses its buffer on the CopyData hot path.
 pub(crate) const TLS_BUF_SIZE: usize = 65_536;
+// The pinned rustls 0.23 connection also retains a record deframer (up to 64 KiB during
+// handshake), decrypted plaintext chunks, and bounded send queues beneath the Tokio reader.
+// Reserve 512 KiB for that complete TLS transport envelope, including TLS_BUF_SIZE, before a
+// bounded source query is admitted. Keep this conservative reservation tied to the pinned
+// rustls implementation and revisit it when the dependency changes.
+const TLS_TRANSPORT_RESERVE: usize = 512 * 1024;
 
 /// The transport layer — either plain TCP or TLS-wrapped TCP.
 ///
@@ -65,7 +71,7 @@ impl Transport {
     pub(crate) fn retained_receive_capacity(&self) -> usize {
         match self {
             Self::Plain(_) => 0,
-            Self::Tls(_) => TLS_BUF_SIZE,
+            Self::Tls(_) => TLS_TRANSPORT_RESERVE,
         }
     }
 

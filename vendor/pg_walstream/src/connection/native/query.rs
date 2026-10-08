@@ -22,6 +22,16 @@ pub struct ReceiveBufferStats {
     pub complete_frames_high_water: usize,
 }
 
+/// Limits the result allocations made while consuming a bounded SQL response.
+#[derive(Clone, Copy, Debug)]
+pub struct BoundedQueryLimits {
+    pub receive_capacity: usize,
+    pub columns: usize,
+    pub rows: usize,
+    pub column_name_bytes: usize,
+    pub value_bytes: usize,
+}
+
 fn complete_frames(buf: &[u8]) -> usize {
     let mut offset = 0usize;
     let mut frames = 0usize;
@@ -54,8 +64,9 @@ pub async fn bounded_simple_query<S: AsyncRead + AsyncWrite + Unpin>(
     stream: &mut S,
     buf: &mut BytesMut,
     sql: &str,
-    receive_capacity: usize,
+    limits: BoundedQueryLimits,
 ) -> Result<(NativePgResult, ReceiveBufferStats), ReplicationError> {
+    let receive_capacity = limits.receive_capacity;
     if !buf.is_empty() {
         return Err(ReplicationError::buffer(
             "bounded query requires an empty receive buffer",
@@ -82,6 +93,7 @@ pub async fn bounded_simple_query<S: AsyncRead + AsyncWrite + Unpin>(
     // simultaneous send peak (receive backing + command strings + this frame) before admission.
     drop(query_msg);
     let mut result = NativePgResult::new();
+    let mut value_bytes = 0usize;
 
     loop {
         let total_len = loop {
@@ -129,8 +141,26 @@ pub async fn bounded_simple_query<S: AsyncRead + AsyncWrite + Unpin>(
         {
             let payload = &buf[5..total_len];
             match tag {
-                b'T' => result.parse_row_description(payload),
-                b'D' => result.parse_data_row_bounded(payload)?,
+                b'T' => {
+                    if result.status == NativeResultStatus::TuplesOk {
+                        return Err(ReplicationError::protocol(
+                            "bounded query received a second RowDescription",
+                        ));
+                    }
+                    result.parse_row_description_bounded(
+                        payload,
+                        limits.columns,
+                        limits.column_name_bytes,
+                    )?;
+                }
+                b'D' => {
+                    if result.rows.len() >= limits.rows {
+                        return Err(ReplicationError::buffer("bounded query row limit exceeded"));
+                    }
+                    let remaining = limits.value_bytes.saturating_sub(value_bytes);
+                    let used = result.parse_data_row_bounded(payload, remaining)?;
+                    value_bytes += used;
+                }
                 b'C' => {
                     if result.status == NativeResultStatus::Empty {
                         result.status = NativeResultStatus::CommandOk;
@@ -245,6 +275,16 @@ pub async fn simple_query<S: AsyncRead + AsyncWrite + Unpin>(
 mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    fn value_limits(rows: usize, value_bytes: usize) -> BoundedQueryLimits {
+        BoundedQueryLimits {
+            receive_capacity: 8192,
+            columns: 1,
+            rows,
+            column_name_bytes: "value".len(),
+            value_bytes,
+        }
+    }
 
     #[test]
     fn test_result_status_variants() {
@@ -492,9 +532,10 @@ mod tests {
         });
 
         let mut buf = BytesMut::with_capacity(32);
-        let (result, stats) = bounded_simple_query(&mut client, &mut buf, "SELECT value", 8192)
-            .await
-            .unwrap();
+        let (result, stats) =
+            bounded_simple_query(&mut client, &mut buf, "SELECT value", value_limits(2, 6))
+                .await
+                .unwrap();
         assert_eq!(result.ntuples(), 2);
         assert_eq!(stats.allocated_bytes, 8192);
         assert!(stats.buffered_high_water_bytes > 0);
@@ -517,9 +558,14 @@ mod tests {
         });
 
         let mut buf = BytesMut::new();
-        let (result, stats) = bounded_simple_query(&mut client, &mut buf, "SELECT value", 8192)
-            .await
-            .unwrap();
+        let (result, stats) = bounded_simple_query(
+            &mut client,
+            &mut buf,
+            "SELECT value",
+            value_limits(1, 8192 - 11),
+        )
+        .await
+        .unwrap();
         assert_eq!(result.ntuples(), 1);
         assert_eq!(result.get_bytes(0, 0).unwrap().len(), 8192 - 11);
         assert_eq!(stats.allocated_bytes, 8192);
@@ -538,10 +584,67 @@ mod tests {
         });
 
         let mut buf = BytesMut::new();
-        let error = bounded_simple_query(&mut client, &mut buf, "SELECT value", 8192)
+        let error = bounded_simple_query(&mut client, &mut buf, "SELECT value", value_limits(1, 1))
             .await
             .unwrap_err();
         assert!(matches!(error, ReplicationError::Protocol(_)));
+    }
+
+    #[tokio::test]
+    async fn bounded_query_rejects_an_unexpected_result_width() {
+        let (mut client, mut server) = tokio::io::duplex(8192);
+        tokio::spawn(async move {
+            let mut discard = vec![0u8; 1024];
+            let _ = server.read(&mut discard).await;
+            let fields = vec!["v"; 400];
+            server
+                .write_all(&build_row_description(&fields))
+                .await
+                .unwrap();
+        });
+
+        let mut buf = BytesMut::new();
+        let error = bounded_simple_query(&mut client, &mut buf, "SELECT value", value_limits(1, 1))
+            .await
+            .unwrap_err();
+        assert!(matches!(error, ReplicationError::Protocol(_)));
+    }
+
+    #[tokio::test]
+    async fn bounded_query_rejects_excess_rows_before_allocating_them() {
+        let (mut client, mut server) = tokio::io::duplex(8192);
+        tokio::spawn(async move {
+            let mut discard = vec![0u8; 1024];
+            let _ = server.read(&mut discard).await;
+            let mut response = build_row_description(&["value"]);
+            response.extend(build_data_row(&["one"]));
+            response.extend(build_data_row(&["two"]));
+            server.write_all(&response).await.unwrap();
+        });
+
+        let mut buf = BytesMut::new();
+        let error = bounded_simple_query(&mut client, &mut buf, "SELECT value", value_limits(1, 6))
+            .await
+            .unwrap_err();
+        assert!(matches!(error, ReplicationError::Buffer(_)));
+    }
+
+    #[tokio::test]
+    async fn bounded_query_rejects_value_bytes_before_copying_them() {
+        let (mut client, mut server) = tokio::io::duplex(8192);
+        tokio::spawn(async move {
+            let mut discard = vec![0u8; 1024];
+            let _ = server.read(&mut discard).await;
+            let mut response = build_row_description(&["value"]);
+            response.extend(build_data_row(&["four"]));
+            server.write_all(&response).await.unwrap();
+        });
+
+        let mut buf = BytesMut::new();
+        let error = bounded_simple_query(&mut client, &mut buf, "SELECT value", value_limits(1, 3))
+            .await
+            .unwrap_err();
+        assert!(matches!(error, ReplicationError::Buffer(_)));
     }
 
     #[tokio::test]

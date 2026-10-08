@@ -249,7 +249,7 @@ pub use tokio_util::sync::CancellationToken;
 
 // Re-export libpq-specific types
 #[cfg(any(feature = "libpq", feature = "rustls-tls"))]
-pub use connection::{PgReplicationConnection, PgResult, ReceiveBufferStats};
+pub use connection::{BoundedQueryLimits, PgReplicationConnection, PgResult, ReceiveBufferStats};
 
 // Re-export retry types
 #[cfg(any(feature = "libpq", feature = "rustls-tls"))]

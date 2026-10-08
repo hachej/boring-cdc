@@ -31,5 +31,6 @@ pub(crate) mod native;
 
 #[cfg(feature = "rustls-tls")]
 pub use native::{
-    NativeConnection as PgReplicationConnection, NativePgResult as PgResult, ReceiveBufferStats,
+    BoundedQueryLimits, NativeConnection as PgReplicationConnection, NativePgResult as PgResult,
+    ReceiveBufferStats,
 };

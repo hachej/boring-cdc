@@ -45,7 +45,7 @@ enum Command {
     /// Run a simple query using one fixed-capacity receive allocation.
     BoundedQuery {
         sql: String,
-        receive_capacity: usize,
+        limits: query::BoundedQueryLimits,
         reply: std_mpsc::Sender<Result<(NativePgResult, ReceiveBufferStats)>>,
     },
     /// Enter the streaming push loop: the worker continuously reads CopyData
@@ -100,15 +100,9 @@ impl Worker {
     async fn bounded_query(
         &mut self,
         sql: &str,
-        receive_capacity: usize,
+        limits: query::BoundedQueryLimits,
     ) -> Result<(NativePgResult, ReceiveBufferStats)> {
-        query::bounded_simple_query(
-            &mut self.transport,
-            &mut self.read_buf,
-            sql,
-            receive_capacity,
-        )
-        .await
+        query::bounded_simple_query(&mut self.transport, &mut self.read_buf, sql, limits).await
     }
 
     /// Streaming push loop. Continuously reads CopyData batches and pushes them to `batch_tx`, while still servicing interleaved commands (feedback `PutCopyData`, `Close`) on `cmd_rx`. Returns `true` if a `Close` was  handled (the worker should stop), `false` if streaming ended for any other reason (cancel, read error, or the consumer dropped the receiver).
@@ -181,12 +175,8 @@ impl Worker {
                 let _ = reply.send(self.query(&sql).await);
                 StreamCmd::Continue
             }
-            Some(Command::BoundedQuery {
-                sql,
-                receive_capacity,
-                reply,
-            }) => {
-                let _ = reply.send(self.bounded_query(&sql, receive_capacity).await);
+            Some(Command::BoundedQuery { sql, limits, reply }) => {
+                let _ = reply.send(self.bounded_query(&sql, limits).await);
                 StreamCmd::Continue
             }
             Some(Command::Close {
@@ -329,12 +319,8 @@ fn run_worker(
                 Command::Query { sql, reply } => {
                     let _ = reply.send(worker.query(&sql).await);
                 }
-                Command::BoundedQuery {
-                    sql,
-                    receive_capacity,
-                    reply,
-                } => {
-                    let _ = reply.send(worker.bounded_query(&sql, receive_capacity).await);
+                Command::BoundedQuery { sql, limits, reply } => {
+                    let _ = reply.send(worker.bounded_query(&sql, limits).await);
                 }
                 Command::StreamCopy { token, batch_tx } => {
                     // Runs its own loop, servicing interleaved commands, until
@@ -569,18 +555,18 @@ impl NativeConnection {
     pub fn exec_bounded(
         &mut self,
         sql: &str,
-        receive_capacity: usize,
+        limits: query::BoundedQueryLimits,
     ) -> Result<(NativePgResult, ReceiveBufferStats)> {
         let bounded = match &mut self.driver {
             Driver::Inline { worker, handle, .. } => {
-                run_sync(handle, worker.bounded_query(sql, receive_capacity))
+                run_sync(handle, worker.bounded_query(sql, limits))
             }
             Driver::Threaded { cmd_tx, .. } => {
                 let (reply_tx, reply_rx) = std_mpsc::channel();
                 cmd_tx
                     .send(Command::BoundedQuery {
                         sql: sql.to_string(),
-                        receive_capacity,
+                        limits,
                         reply: reply_tx,
                     })
                     .map_err(|_| Self::worker_gone())?;

@@ -7,7 +7,7 @@
 use crate::m2_journal::sha256;
 use crate::m2_schema::{WriterConnection, open_reader_with_limits};
 use crate::m3_bootstrap::ImportedSnapshotSession;
-use pg_walstream::PgReplicationConnection;
+use pg_walstream::{BoundedQueryLimits, PgReplicationConnection};
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
 use std::fmt;
@@ -1160,7 +1160,7 @@ fn metadata_preflight_peak(
     max_rows: usize,
     max_payload_bytes: usize,
     key_column_name_bytes: usize,
-) -> Result<(usize, usize), PlannerError> {
+) -> Result<(usize, usize, usize), PlannerError> {
     let columns = schema
         .len()
         .checked_add(1)
@@ -1216,7 +1216,7 @@ fn metadata_preflight_peak(
         checked_add_peak(&mut peak, value)?;
     }
     let receive = receive_capacity(columns, metadata_row_bytes)?;
-    Ok((add_receive_peak(peak, receive)?, receive))
+    Ok((add_receive_peak(peak, receive)?, receive, result_values))
 }
 
 fn bounded_query_error(error: pg_walstream::ReplicationError) -> PlannerError {
@@ -1352,12 +1352,13 @@ impl BoundedRangeSource for PostgresRangeSource {
             self.table
         );
         let key_column_name_bytes = self.key_columns.iter().map(String::len).sum();
-        let (metadata_preflight, metadata_receive_capacity) = metadata_preflight_peak(
-            schema,
-            budget.max_rows,
-            budget.max_bytes,
-            key_column_name_bytes,
-        )?;
+        let (metadata_preflight, metadata_receive_capacity, metadata_value_bytes) =
+            metadata_preflight_peak(
+                schema,
+                budget.max_rows,
+                budget.max_bytes,
+                key_column_name_bytes,
+            )?;
         let metadata_preflight = bounded_query_peak(
             metadata_preflight,
             metadata_receive_capacity,
@@ -1376,7 +1377,16 @@ impl BoundedRangeSource for PostgresRangeSource {
             return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
         }
         self.connection
-            .exec_bounded(&set_timeout_sql, NATIVE_RECEIVE_FLOOR)
+            .exec_bounded(
+                &set_timeout_sql,
+                BoundedQueryLimits {
+                    receive_capacity: NATIVE_RECEIVE_FLOOR,
+                    columns: 0,
+                    rows: 0,
+                    column_name_bytes: 0,
+                    value_bytes: 0,
+                },
+            )
             .map_err(|error| match error {
                 pg_walstream::ReplicationError::Buffer(_) => {
                     PlannerError::Limit("M3_SOURCE_IMPACT")
@@ -1386,7 +1396,16 @@ impl BoundedRangeSource for PostgresRangeSource {
         let started = Instant::now();
         let (meta, metadata_receive_stats) = self
             .connection
-            .exec_bounded(&meta_sql, metadata_receive_capacity)
+            .exec_bounded(
+                &meta_sql,
+                BoundedQueryLimits {
+                    receive_capacity: metadata_receive_capacity,
+                    columns: schema.len() + 1,
+                    rows: metadata_limit,
+                    column_name_bytes: key_column_name_bytes + "payload_bytes".len(),
+                    value_bytes: metadata_value_bytes,
+                },
+            )
             .map_err(bounded_query_error)?;
         self.last_receive_stats = Some(metadata_receive_stats);
         if meta.ntuples() as usize > budget.max_rows {
@@ -1534,7 +1553,16 @@ impl BoundedRangeSource for PostgresRangeSource {
             .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
         let (data, payload_receive_stats) = self
             .connection
-            .exec_bounded(&data_sql, payload_receive_capacity)
+            .exec_bounded(
+                &data_sql,
+                BoundedQueryLimits {
+                    receive_capacity: payload_receive_capacity,
+                    columns: schema.len() + 1,
+                    rows: expected.len(),
+                    column_name_bytes: key_column_name_bytes + "payload_hex".len(),
+                    value_bytes: key_text_bytes + payload_bytes * 2,
+                },
+            )
             .map_err(bounded_query_error)?;
         self.last_receive_stats = Some(payload_receive_stats);
         if data.ntuples() as usize != expected.len() {
@@ -1838,8 +1866,8 @@ mod tests {
     #[test]
     fn bounded_query_peak_charges_retained_tls_receive_storage() {
         let plain = bounded_query_peak(12_000, 8_192, "SELECT 1", 0).unwrap();
-        let tls = bounded_query_peak(12_000, 8_192, "SELECT 1", 65_536).unwrap();
-        assert_eq!(tls - plain, 65_536);
+        let tls = bounded_query_peak(12_000, 8_192, "SELECT 1", 512 * 1024).unwrap();
+        assert_eq!(tls - plain, 512 * 1024);
         assert!(bounded_query_peak(12_000, 8_192, "SELECT 1", usize::MAX).is_err());
     }
 

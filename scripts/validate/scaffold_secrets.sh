@@ -20,6 +20,9 @@ reviewed_vendor_paths = {
  'vendor/pg_walstream/src/connection/native/mod.rs',
  'vendor/pg_walstream/src/connection/native/connection.rs',
  'vendor/pg_walstream/src/connection/native/query.rs',
+ 'vendor/pg_walstream/src/connection/native/result.rs',
+ 'vendor/pg_walstream/src/connection/native/startup.rs',
+ 'vendor/pg_walstream/load-tests/fixtures/test_ca.pem',
 }
 vendor_root='vendor/pg_walstream/'
 baseline={}
