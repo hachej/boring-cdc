@@ -53,8 +53,10 @@ objects=$(ch --query "SELECT count() FROM system.tables WHERE database='boring_c
 commit=$(git rev-parse HEAD); mkdir -p artifacts/boring-cdc-m4-ddl/SCN-M4-CH-MERGE-INVARIANT
 python3 - "$commit" "$pg_version" "$ch_version" "$fingerprint" "$before_digest" "$during_digest" "$after_digest" "$parts_after" > artifacts/boring-cdc-m4-ddl/SCN-M4-CH-MERGE-INVARIANT/evidence.json <<'PY'
 import json,sys
+sys.path.insert(0,'scripts/validate')
+from m4_clickhouse_ddl import input_hashes
 commit,pg,ch,fp,before,during,after,parts=sys.argv[1:]
-print(json.dumps({'schema_version':'m4-clickhouse-ddl-evidence/v1','git_commit':commit,'images':{'postgres':'17.6','clickhouse':'25.8.2.29'},'observed_versions':{'postgres':pg,'clickhouse':ch},'object_fingerprint':fp,'objects_verified':6,'ordinary_runtime':{'ddl_denied':True,'alter_denied':True,'canonical_select_allowed':True},'history_interface':{'rows':4,'ordered_without_final':True},'merge_invariant':{'system_merges_observed':True,'before_sha256':before,'stopped_sha256':before,'during_sha256':during,'after_sha256':after,'active_parts_after':int(parts)},'credentials_recorded':False,'status':'pass'},sort_keys=True,indent=2)+'\n')
+print(json.dumps({'schema_version':'m4-clickhouse-ddl-evidence/v1','git_commit':commit,'input_sha256':input_hashes(),'images':{'postgres':'17.6','clickhouse':'25.8.2.29'},'observed_versions':{'postgres':pg,'clickhouse':ch},'object_fingerprint':fp,'objects_verified':6,'ordinary_runtime':{'ddl_denied':True,'alter_denied':True,'canonical_select_allowed':True},'history_interface':{'rows':4,'ordered_without_final':True},'merge_invariant':{'system_merges_observed':True,'before_sha256':before,'stopped_sha256':before,'during_sha256':during,'after_sha256':after,'active_parts_after':int(parts)},'credentials_recorded':False,'status':'pass'},sort_keys=True,indent=2)+'\n')
 PY
 python3 scripts/validate/m4_clickhouse_ddl.py
 printf 'M4_CLICKHOUSE_DDL_E2E_OK postgres=%s clickhouse=%s fingerprint=%s merge_observed=true\n' "$pg_version" "$ch_version" "$fingerprint"
