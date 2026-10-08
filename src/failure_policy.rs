@@ -750,9 +750,47 @@ pub enum PreparedFailureOperation {
         previous: FailureRecord,
         replacement: Box<PreparedFailureOperation>,
     },
+    WithCaptureTelemetry {
+        operation: Box<PreparedFailureOperation>,
+        failure_id: String,
+        telemetry: CaptureFailureTelemetry,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CaptureFailureTelemetry {
+    pub capture_epoch: String,
+    pub xid: Option<String>,
+    pub final_lsn: Option<String>,
+    pub observed_bytes: Option<u64>,
+    pub observed_events: Option<u64>,
+    pub limit_bytes: Option<u64>,
+    pub limit_events: Option<u64>,
 }
 
 impl PreparedFailureOperation {
+    pub fn with_capture_telemetry(self, telemetry: CaptureFailureTelemetry) -> Option<Self> {
+        let record = match &self {
+            Self::StoreAndArm { record, .. } => record,
+            Self::SupersedeRearmedCapture { replacement, .. } => match replacement.as_ref() {
+                Self::StoreAndArm { record, .. } => record,
+                _ => return None,
+            },
+            _ => return None,
+        };
+        if record.component != Component::Capture.as_str()
+            || record.destination_id.is_some()
+            || record.boundary.capture_epoch() != telemetry.capture_epoch
+            || matches!((&record.boundary, &telemetry.final_lsn), (FailedBoundary::Capture { end_lsn, .. }, Some(observed)) if end_lsn != observed)
+        {
+            return None;
+        }
+        Some(Self::WithCaptureTelemetry {
+            failure_id: record.failure_id.clone(),
+            operation: Box::new(self),
+            telemetry,
+        })
+    }
     /// A failed, explicitly re-armed capture attempt replaces its old alarm in the same
     /// journal transaction that arms the new limit failure. It must not be recorded as a
     /// successful completion of the old failed boundary.
@@ -822,6 +860,20 @@ impl PreparedFailureOperation {
     /// Execute only inside the transaction supplied by the capture-priority sole writer.
     pub fn execute(&self, transaction: &Transaction<'_>) -> rusqlite::Result<()> {
         match self {
+            Self::WithCaptureTelemetry {
+                operation,
+                failure_id,
+                telemetry,
+            } => {
+                operation.execute(transaction)?;
+                let changed = transaction.execute(
+                    "UPDATE processing_failures SET failed_capture_epoch=?1,failed_xid=?2,failed_final_lsn=?3,observed_transaction_bytes=?4,observed_transaction_events=?5,limit_bytes=?6,limit_events=?7 WHERE failure_id=?8 AND component='capture' AND destination_id IS NULL",
+                    params![telemetry.capture_epoch,telemetry.xid,telemetry.final_lsn,telemetry.observed_bytes,telemetry.observed_events,telemetry.limit_bytes,telemetry.limit_events,failure_id],
+                )?;
+                if changed != 1 {
+                    return Err(rusqlite::Error::QueryReturnedNoRows);
+                }
+            }
             Self::SupersedeRearmedCapture {
                 previous,
                 replacement,
@@ -963,7 +1015,7 @@ pub fn load_failure(
 ) -> rusqlite::Result<Option<FailureRecord>> {
     let row = connection
         .query_row(
-            "SELECT destination_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,attempt,next_retry_at,armed,first_failed_at,last_failed_at FROM processing_failures WHERE failure_id=?1",
+            "SELECT destination_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,attempt,next_retry_at,armed,first_failed_at,last_failed_at,failed_capture_epoch,failed_final_lsn FROM processing_failures WHERE failure_id=?1",
             [failure_id],
             |row| {
                 Ok((
@@ -978,6 +1030,8 @@ pub fn load_failure(
                     row.get::<_, i64>(8)?,
                     row.get::<_, String>(9)?,
                     row.get::<_, String>(10)?,
+                    row.get::<_, Option<String>>(11)?,
+                    row.get::<_, Option<String>>(12)?,
                 ))
             },
         )
@@ -994,9 +1048,26 @@ pub fn load_failure(
         armed,
         first,
         last,
+        stored_epoch,
+        stored_final_lsn,
     )) = row
     else {
         return Ok(None);
+    };
+    let boundary = match (boundary, stored_epoch, stored_final_lsn) {
+        (FailedBoundary::Capture { capture_epoch, .. }, Some(epoch), Some(end_lsn))
+            if component == Component::Capture.as_str() && capture_epoch == epoch =>
+        {
+            FailedBoundary::Capture {
+                capture_epoch,
+                end_lsn,
+            }
+        }
+        (_, Some(_), Some(_)) if component != Component::Capture.as_str() => {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
+        (_, _, Some(_)) => return Err(rusqlite::Error::InvalidQuery),
+        (boundary, _, None) => boundary,
     };
     let boundary_digest = format!("{:x}", Sha256::digest(boundary.canonical()));
     let expected_failure_id = format!("failure-{boundary_digest}-{}", &fingerprint[7..]);

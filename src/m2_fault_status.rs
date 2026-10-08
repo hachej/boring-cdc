@@ -352,7 +352,7 @@ pub fn snapshot(
         "stale"
     };
     let mut failures = Vec::new();
-    let mut q=c.prepare("SELECT component,failure_class,fingerprint,first_failed_at,last_failed_at,attempt,next_retry_at,armed,failed_boundary_start_seq,failed_boundary_end_seq,retry_class FROM processing_failures ORDER BY component,fingerprint LIMIT 100")?;
+    let mut q=c.prepare("SELECT component,failure_class,fingerprint,first_failed_at,last_failed_at,attempt,next_retry_at,armed,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,failed_xid,failed_final_lsn,observed_transaction_bytes,observed_transaction_events,limit_bytes,limit_events FROM processing_failures ORDER BY component,fingerprint LIMIT 100")?;
     for row in q.query_map([], |r| {
         Ok((
             r.get::<_, String>(0)?,
@@ -366,6 +366,12 @@ pub fn snapshot(
             r.get::<_, Option<u64>>(8)?,
             r.get::<_, Option<u64>>(9)?,
             r.get::<_, String>(10)?,
+            r.get::<_, Option<String>>(11)?,
+            r.get::<_, Option<String>>(12)?,
+            r.get::<_, Option<u64>>(13)?,
+            r.get::<_, Option<u64>>(14)?,
+            r.get::<_, Option<u64>>(15)?,
+            r.get::<_, Option<u64>>(16)?,
         ))
     })? {
         let x = row?;
@@ -379,12 +385,14 @@ pub fn snapshot(
             next_retry_at: x.6,
             retry_armed: x.7 == 1,
             failed_journal_range: x.8.zip(x.9).map(|(a, b)| [a, b]),
-            failed_xid: None,
-            failed_final_lsn: None,
-            observed_transaction_bytes: None,
-            observed_transaction_events: None,
-            limit_bytes: None,
-            limit_events: None,
+            failed_xid: x
+                .11
+                .filter(|x| !x.is_empty() && x.bytes().all(|b| b.is_ascii_digit())),
+            failed_final_lsn: x.12,
+            observed_transaction_bytes: x.13,
+            observed_transaction_events: x.14,
+            limit_bytes: x.15,
+            limit_events: x.16,
             wal_headroom_consequence: if x.7 == 0 {
                 "resolved historical failure; no current action".into()
             } else if x.10 == "transient" {
@@ -558,8 +566,8 @@ pub fn snapshot(
     let mut dq=c.prepare("SELECT d.destination_id,d.kind,d.generation,d.highest_external_fence,coalesce(cp.journal_seq,0),coalesce(cp.revision,0) FROM destinations d LEFT JOIN destination_checkpoints cp USING(destination_id) ORDER BY d.destination_id LIMIT 100")?;
     for row in dq.query_map([],|r|{let id:String=r.get(0)?;Ok(json!({"destination_fingerprint":hash(&[&id]),"kind":r.get::<_,String>(1)?,"generation":r.get::<_,u64>(2)?,"highest_external_fence":r.get::<_,u64>(3)?,"checkpoint_seq":r.get::<_,u64>(4)?,"checkpoint_revision":r.get::<_,u64>(5)?}))})?{dest.push(row?)}
     let mut action_causality = Vec::new();
-    let mut aq = c.prepare("SELECT request_id,payload_digest,run_id,state,observation_revision,control_revision FROM operator_command_requests ORDER BY request_id LIMIT 100")?;
-    for row in aq.query_map([], |r| Ok(json!({"request_id":r.get::<_,String>(0)?,"canonical_payload_digest":r.get::<_,String>(1)?,"plan_digest":Value::Null,"immutable_intent_id":Value::Null,"external_effect_evidence_digest":Value::Null,"postcondition_evidence_digest":Value::Null,"run_id":r.get::<_,String>(2)?,"terminal_state":r.get::<_,String>(3)?,"before_state_revision":r.get::<_,u64>(4)?,"bound_control_revision":r.get::<_,u64>(5)?})))? { action_causality.push(row?); }
+    let mut aq = c.prepare("SELECT request_id,payload_digest,run_id,state,observation_revision,control_revision,plan_digest,immutable_intent_id,external_effect_evidence_digest,postcondition_evidence_digest FROM operator_command_requests ORDER BY request_id LIMIT 100")?;
+    for row in aq.query_map([], |r| Ok(json!({"request_id":r.get::<_,String>(0)?,"canonical_payload_digest":r.get::<_,String>(1)?,"plan_digest":r.get::<_,Option<String>>(6)?,"immutable_intent_id":r.get::<_,Option<String>>(7)?,"external_effect_evidence_digest":r.get::<_,Option<String>>(8)?,"postcondition_evidence_digest":r.get::<_,Option<String>>(9)?,"run_id":r.get::<_,String>(2)?,"terminal_state":r.get::<_,String>(3)?,"before_state_revision":r.get::<_,u64>(4)?,"bound_control_revision":r.get::<_,u64>(5)?})))? { action_causality.push(row?); }
     let mut control_revisions = BTreeMap::from([
         ("source".into(), s.9),
         ("ownership".into(), owner.as_ref().map(|x| x.3).unwrap_or(0)),
@@ -636,6 +644,7 @@ pub mod tests {
     #[test]
     fn stable_restart_projection_redacts() {
         let (p, w) = fixture();
+        w.connection().execute("INSERT INTO processing_failures(failure_id,component,failure_class,fingerprint,retry_class,attempt,armed,first_failed_at,last_failed_at,failed_xid) VALUES('bad','capture','unsupported','fingerprint','deterministic',1,0,'old','old','secret-xid')",[]).unwrap();
         drop(w);
         let a = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
         let b = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(20)).unwrap();
@@ -643,7 +652,10 @@ pub mod tests {
         assert_eq!(a.state_revision, b.state_revision);
         let t = serde_json::to_string(&a).unwrap();
         assert!(
-            !t.contains("secret-system") && !t.contains("secret-db") && !t.contains("secret-slot")
+            !t.contains("secret-system")
+                && !t.contains("secret-db")
+                && !t.contains("secret-slot")
+                && !t.contains("secret-xid")
         );
         assert!(
             a.conditions
@@ -657,6 +669,7 @@ pub mod tests {
         let (p, w) = fixture();
         w.connection().execute("INSERT INTO startup_reconciliations(run_id,capture_epoch,outcome,reason_code,created_at) VALUES('r','epoch','requires_reseed','JOURNAL_INTEGRITY_FAILED','now')",[]).unwrap();
         w.connection().execute("INSERT INTO processing_failures(failure_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES('f','capture','transient_source','sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',2,3,'transient',2,'unix:99',1,'unix:1','unix:2')",[]).unwrap();
+        w.connection().execute("UPDATE processing_failures SET failed_capture_epoch='epoch',failed_xid='42',failed_final_lsn='000000000000002A',observed_transaction_bytes=101,observed_transaction_events=3,limit_bytes=100,limit_events=2 WHERE failure_id='f'",[]).unwrap();
         drop(w);
         let s = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
         assert!(
@@ -671,16 +684,36 @@ pub mod tests {
         );
         assert_eq!(s.failures[0].attempt, 2);
         assert_eq!(s.failures[0].failed_journal_range, Some([2, 3]));
+        assert_eq!(s.failures[0].failed_xid.as_deref(), Some("42"));
+        assert_eq!(
+            s.failures[0].failed_final_lsn.as_deref(),
+            Some("000000000000002A")
+        );
+        assert_eq!(s.failures[0].observed_transaction_bytes, Some(101));
+        assert_eq!(s.failures[0].observed_transaction_events, Some(3));
+        assert_eq!(s.failures[0].limit_bytes, Some(100));
+        assert_eq!(s.failures[0].limit_events, Some(2));
     }
     #[test]
     fn freshness_expires_and_causal_records_exclude_payloads() {
         let (p, w) = fixture();
         w.connection().execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at) VALUES('request-safe','nonce-secret',x'0102','sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','run-safe','peer-safe','completed',x'03',7,2,'unix:99')",[]).unwrap();
+        w.connection().execute("UPDATE operator_command_requests SET plan_digest='plan-safe',immutable_intent_id='intent-safe',external_effect_evidence_digest='effect-safe',postcondition_evidence_digest='postcondition-safe',request_revision=request_revision+1 WHERE request_id='request-safe'",[]).unwrap();
         w.connection().execute("INSERT INTO startup_reconciliations(run_id,capture_epoch,outcome,reason_code,created_at) VALUES('old-run','epoch','ready','READY','2000-01-01T00:00:00Z')",[]).unwrap();
         drop(w);
         let s = snapshot(&p, "cfg", SystemTime::now() + Duration::from_secs(60)).unwrap();
         assert_eq!(s.freshness, "stale");
         assert_eq!(s.action_causality[0]["request_id"], "request-safe");
+        assert_eq!(s.action_causality[0]["plan_digest"], "plan-safe");
+        assert_eq!(s.action_causality[0]["immutable_intent_id"], "intent-safe");
+        assert_eq!(
+            s.action_causality[0]["external_effect_evidence_digest"],
+            "effect-safe"
+        );
+        assert_eq!(
+            s.action_causality[0]["postcondition_evidence_digest"],
+            "postcondition-safe"
+        );
         let text = serde_json::to_string(&s).unwrap();
         assert!(!text.contains("nonce-secret") && !text.contains("0102"));
     }

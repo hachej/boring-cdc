@@ -174,8 +174,9 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             .and_then(|id| self.journal.load_failure(&id, boundary).ok().flatten());
         self.failure_policy_identity = Some((capture_epoch, config_fingerprint));
     }
-    pub fn enable_capture_limit_fingerprint(&mut self, fingerprint: String) {
+    pub fn enable_capture_limits(&mut self, fingerprint: String, bytes: u64, events: u64) {
         self.limit_failure_fingerprint = Some(fingerprint);
+        self.capture_limits = Some((bytes, events));
     }
     fn persist_if_enabled(
         &mut self,
@@ -217,8 +218,8 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             })?;
         let random_sample = u64::from_be_bytes(random_bytes);
         use crate::failure_policy::{
-            Component, FailedBoundary, FailureObservation, FingerprintInput, PolicyAction,
-            PolicyEvent, PreparedFailureOperation,
+            CaptureFailureTelemetry, Component, FailedBoundary, FailureObservation,
+            FingerprintInput, PolicyAction, PolicyEvent, PreparedFailureOperation,
         };
         use crate::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
         struct One(u64);
@@ -229,7 +230,11 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         }
         let boundary = FailedBoundary::Capture {
             capture_epoch: capture_epoch.clone(),
-            end_lsn: format!("{:016X}", self.durable_end_lsn.unwrap_or(0)),
+            end_lsn: self
+                .last_failure_telemetry
+                .as_ref()
+                .and_then(|t| t.final_lsn.clone())
+                .unwrap_or_else(|| format!("{:016X}", self.durable_end_lsn.unwrap_or(0))),
         };
         let observation = FailureObservation {
             destination_id: None,
@@ -296,7 +301,31 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
                 }
             }
             PreparedFailureOperation::Clear { .. } => None,
+            PreparedFailureOperation::WithCaptureTelemetry { .. } => {
+                unreachable!("policy transition does not attach runtime telemetry")
+            }
         };
+        let telemetry = self
+            .last_failure_telemetry
+            .take()
+            .unwrap_or(CaptureFailureTelemetry {
+                capture_epoch,
+                xid: None,
+                final_lsn: None,
+                observed_bytes: None,
+                observed_events: None,
+                limit_bytes: self.capture_limits.map(|limits| limits.0),
+                limit_events: self.capture_limits.map(|limits| limits.1),
+            });
+        if matches!(
+            operation,
+            PreparedFailureOperation::StoreAndArm { .. }
+                | PreparedFailureOperation::SupersedeRearmedCapture { .. }
+        ) {
+            operation = operation.with_capture_telemetry(telemetry).ok_or_else(|| {
+                RuntimeError::JournalTransient("capture telemetry identity mismatch".into())
+            })?;
+        }
         self.journal
             .persist_failure(operation)
             .map_err(|e| RuntimeError::JournalTransient(e.to_string()))?;
@@ -394,14 +423,19 @@ pub enum RuntimeError {
     Decode(&'static str),
     SchemaChange(&'static str),
     Spool(String),
-    SpoolLimit { kind: &'static str },
+    SpoolLimit {
+        kind: &'static str,
+        observed: Option<u64>,
+    },
     JournalTransient(String),
     JournalIntegrity(String),
     Protocol(&'static str),
     Feedback,
     UnexpectedCopyBothLoss,
     OwnershipLost,
-    RetryNotDue { next_retry_at_ms: u64 },
+    RetryNotDue {
+        next_retry_at_ms: u64,
+    },
     ReconciliationRequired,
 }
 impl fmt::Display for RuntimeError {
@@ -413,6 +447,9 @@ impl std::error::Error for RuntimeError {}
 
 struct ActiveTransaction {
     xid: u32,
+    final_lsn: u64,
+    observed_bytes: u64,
+    observed_events: u64,
     origin: Option<(u64, String)>,
     spool: Box<dyn RuntimeSpool>,
 }
@@ -444,6 +481,8 @@ pub struct CaptureRuntime<J, S, G> {
     committed_transactions: u64,
     failure_policy_identity: Option<(String, String)>,
     limit_failure_fingerprint: Option<String>,
+    capture_limits: Option<(u64, u64)>,
+    last_failure_telemetry: Option<crate::failure_policy::CaptureFailureTelemetry>,
     active_failure: Option<crate::failure_policy::FailureRecord>,
     pressure: Option<RuntimePressureConfig>,
 }
@@ -469,6 +508,8 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             committed_transactions: 0,
             failure_policy_identity: None,
             limit_failure_fingerprint: None,
+            capture_limits: None,
+            last_failure_telemetry: None,
             active_failure: None,
             pressure: None,
         }
@@ -579,20 +620,80 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             return Err(RuntimeError::Protocol("runtime_not_receiving"));
         }
         self.state = RuntimeState::Capturing;
+        self.last_failure_telemetry = None;
         if frame.len() > WireLimits::default().max_copy_data_bytes {
-            return self.safe_stop(RuntimeError::Spool(
-                "transport frame exceeds admitted limit".into(),
-            ));
+            let error = RuntimeError::Spool("transport frame exceeds admitted limit".into());
+            self.record_capture_failure(None, &error);
+            return self.safe_stop(error);
         }
-        let decoded = self.decoder.decode_copy_data(frame).map_err(|failure| {
-            self.state = RuntimeState::CaptureSafeStopped;
-            RuntimeError::Decode(failure.fingerprint)
-        })?;
+        let decoded = match self.decoder.decode_copy_data(frame) {
+            Ok(decoded) => decoded,
+            Err(failure) => {
+                let error = RuntimeError::Decode(failure.fingerprint);
+                self.record_capture_failure(None, &error);
+                self.state = RuntimeState::CaptureSafeStopped;
+                return Err(error);
+            }
+        };
+        let prior_transaction = self.active.as_ref().map(|active| {
+            (
+                active.xid,
+                active.final_lsn,
+                active.observed_bytes,
+                active.observed_events,
+            )
+        });
         let result = self.route(decoded);
+        if let Err(error) = &result {
+            self.record_capture_failure(prior_transaction, error);
+        }
         if result.is_err() && self.state == RuntimeState::Capturing {
             self.state = RuntimeState::CaptureSafeStopped;
         }
         result
+    }
+
+    fn record_capture_failure(
+        &mut self,
+        prior: Option<(u32, u64, u64, u64)>,
+        error: &RuntimeError,
+    ) {
+        let Some((capture_epoch, _)) = &self.failure_policy_identity else {
+            return;
+        };
+        let transaction = self
+            .active
+            .as_ref()
+            .map(|active| {
+                (
+                    active.xid,
+                    active.final_lsn,
+                    active.observed_bytes,
+                    active.observed_events,
+                )
+            })
+            .or(prior);
+        self.last_failure_telemetry = Some(crate::failure_policy::CaptureFailureTelemetry {
+            capture_epoch: capture_epoch.clone(),
+            xid: transaction.map(|x| x.0.to_string()),
+            final_lsn: transaction.map(|x| format!("{:016X}", x.1)),
+            observed_bytes: match error {
+                RuntimeError::SpoolLimit {
+                    kind: "transaction_bytes",
+                    observed: Some(value),
+                } => Some(*value),
+                _ => transaction.map(|x| x.2),
+            },
+            observed_events: match error {
+                RuntimeError::SpoolLimit {
+                    kind: "transaction_events",
+                    observed: Some(value),
+                } => Some(*value),
+                _ => transaction.map(|x| x.3),
+            },
+            limit_bytes: self.capture_limits.map(|limits| limits.0),
+            limit_events: self.capture_limits.map(|limits| limits.1),
+        });
     }
 
     fn route(&mut self, decoded: CopyBothEvent) -> Result<(), RuntimeError> {
@@ -611,13 +712,16 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
 
     fn route_pgoutput(&mut self, event: PgoutputEvent) -> Result<(), RuntimeError> {
         match event {
-            PgoutputEvent::Begin { xid, .. } => {
+            PgoutputEvent::Begin { xid, final_lsn, .. } => {
                 if self.active.is_some() {
                     return self.safe_stop(RuntimeError::Protocol("nested_transaction"));
                 }
                 let spool = self.spools.begin(xid)?;
                 self.active = Some(ActiveTransaction {
                     xid,
+                    final_lsn,
+                    observed_bytes: 0,
+                    observed_events: 0,
                     origin: None,
                     spool,
                 });
@@ -663,15 +767,16 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
                     payload,
                 })
                 .map_err(|_| RuntimeError::Protocol("event_encoding"))?;
-                self.active
+                let active = self
+                    .active
                     .as_mut()
-                    .ok_or(RuntimeError::Protocol("row_without_transaction"))?
-                    .spool
-                    .push(&staged)
-                    .map_err(|e| {
-                        self.state = RuntimeState::CaptureSafeStopped;
-                        spool_runtime_error(e)
-                    })
+                    .ok_or(RuntimeError::Protocol("row_without_transaction"))?;
+                active.observed_bytes = active.observed_bytes.saturating_add(staged.len() as u64);
+                active.observed_events = active.observed_events.saturating_add(1);
+                active.spool.push(&staged).map_err(|e| {
+                    self.state = RuntimeState::CaptureSafeStopped;
+                    spool_runtime_error(e)
+                })
             }
             PgoutputEvent::Commit {
                 commit_lsn,
@@ -915,19 +1020,27 @@ fn spool_runtime_error(error: SpoolError) -> RuntimeError {
     match error {
         SpoolError::DiskReserve { .. } => RuntimeError::SpoolLimit {
             kind: "spool_disk_reserve",
+            observed: None,
         },
         SpoolError::MemoryLimit(_) => RuntimeError::SpoolLimit {
             kind: "process_memory",
+            observed: None,
         },
-        SpoolError::FrameLimit { .. } => RuntimeError::SpoolLimit { kind: "wire_frame" },
+        SpoolError::FrameLimit { .. } => RuntimeError::SpoolLimit {
+            kind: "wire_frame",
+            observed: None,
+        },
         SpoolError::EventLimit { .. } => RuntimeError::SpoolLimit {
             kind: "event_bytes",
+            observed: None,
         },
-        SpoolError::TransactionBytesLimit { .. } => RuntimeError::SpoolLimit {
+        SpoolError::TransactionBytesLimit { observed, .. } => RuntimeError::SpoolLimit {
             kind: "transaction_bytes",
+            observed: Some(observed),
         },
-        SpoolError::TransactionEventsLimit { .. } => RuntimeError::SpoolLimit {
+        SpoolError::TransactionEventsLimit { observed, .. } => RuntimeError::SpoolLimit {
             kind: "transaction_events",
+            observed: Some(observed),
         },
         other => RuntimeError::Spool(other.to_string()),
     }
@@ -1299,7 +1412,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                 _ => None,
             };
             let spool_limit_kind = match &error {
-                RuntimeError::SpoolLimit { kind } => Some(*kind),
+                RuntimeError::SpoolLimit { kind, .. } => Some(*kind),
                 _ => None,
             };
             runtime
@@ -2245,7 +2358,11 @@ pub async fn run_loaded_config(
         durable,
     );
     runtime.enable_failure_policy(capture_epoch.clone(), config.fingerprints().runtime.clone());
-    runtime.enable_capture_limit_fingerprint(recovery_fingerprints.limits.clone());
+    runtime.enable_capture_limits(
+        recovery_fingerprints.limits.clone(),
+        public.limits.max_transaction_bytes.0,
+        public.limits.max_transaction_events,
+    );
     runtime.enable_pressure_filesystems(
         configured_pressure_filesystems(public)?,
         capture_epoch.clone(),
@@ -2430,6 +2547,27 @@ pub mod tests {
     impl SpoolFactory for MemorySpools {
         fn begin(&mut self, _: u32) -> Result<Box<dyn RuntimeSpool>, RuntimeError> {
             Ok(Box::new(MemorySpool(Vec::new())))
+        }
+    }
+    struct LimitSpools;
+    struct LimitSpool;
+    impl RuntimeSpool for LimitSpool {
+        fn push(&mut self, _: &[u8]) -> Result<(), SpoolError> {
+            Err(SpoolError::TransactionBytesLimit {
+                limit: 100,
+                observed: 101,
+            })
+        }
+        fn drain(&mut self) -> Result<Vec<Vec<u8>>, SpoolError> {
+            Ok(Vec::new())
+        }
+        fn finish(self: Box<Self>) -> Result<(), SpoolError> {
+            Ok(())
+        }
+    }
+    impl SpoolFactory for LimitSpools {
+        fn begin(&mut self, _: u32) -> Result<Box<dyn RuntimeSpool>, RuntimeError> {
+            Ok(Box::new(LimitSpool))
         }
     }
     struct Gate(FeedbackPermit);
@@ -2778,6 +2916,85 @@ pub mod tests {
             .unwrap();
         assert_eq!(armed, 0);
         drop(runtime);
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn capture_limit_failure_retains_known_transaction_telemetry_after_restart() {
+        let (p, store) = store("failure-telemetry");
+        let service = JournalWriterService::new(store, [2, 2, 1, 1], 1).unwrap();
+        let (rel, contract) = relation();
+        let mut runtime = CaptureRuntime::new(
+            service,
+            LimitSpools,
+            Gate(FeedbackPermit::Hold),
+            BTreeMap::from([(7, contract)]),
+            None,
+        );
+        runtime.enable_failure_policy("epoch-a".into(), "config-a".into());
+        runtime.enable_capture_limits("limits-a".into(), 100, 2);
+        runtime.receive(&rel).unwrap();
+        runtime.receive(&begin(42, 0x10)).unwrap();
+        let failure = runtime.receive(&insert(42, 7, b"value"));
+        assert!(
+            matches!(
+                failure,
+                Err(RuntimeError::SpoolLimit {
+                    kind: "transaction_bytes",
+                    observed: Some(101)
+                })
+            ),
+            "{failure:?}"
+        );
+        runtime
+            .persist_if_enabled(
+                crate::failure_policy::FailureClass::Configuration,
+                crate::failure_policy::StableErrorCode::ResourceLimit,
+            )
+            .unwrap();
+        drop(runtime);
+        let c = rusqlite::Connection::open(&p).unwrap();
+        let telemetry: (String, String, String, u64, u64, u64, u64) = c.query_row(
+            "SELECT failed_capture_epoch,failed_xid,failed_final_lsn,observed_transaction_bytes,observed_transaction_events,limit_bytes,limit_events FROM processing_failures WHERE component='capture' AND armed=1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?)),
+        ).unwrap();
+        assert_eq!(
+            telemetry,
+            (
+                "epoch-a".into(),
+                "42".into(),
+                "0000000000000010".into(),
+                101,
+                1,
+                100,
+                2
+            )
+        );
+        let failure_id: String = c
+            .query_row(
+                "SELECT failure_id FROM processing_failures WHERE component='capture' AND armed=1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let loaded = crate::failure_policy::load_failure(
+            &c,
+            &failure_id,
+            crate::failure_policy::FailedBoundary::Capture {
+                capture_epoch: "epoch-a".into(),
+                end_lsn: "0000000000000000".into(),
+            },
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            loaded.boundary,
+            crate::failure_policy::FailedBoundary::Capture {
+                capture_epoch: "epoch-a".into(),
+                end_lsn: "0000000000000010".into()
+            }
+        );
+        drop(c);
         let _ = std::fs::remove_file(p);
     }
     #[test]
