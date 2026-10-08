@@ -7,7 +7,7 @@
 use crate::m2_journal::sha256;
 use crate::m2_schema::{WriterConnection, open_reader_with_limits};
 use crate::m3_bootstrap::ImportedSnapshotSession;
-use pg_walstream::PgReplicationConnection;
+use pg_walstream::{BoundedQueryLimits, PgReplicationConnection};
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
 use std::fmt;
@@ -1043,6 +1043,7 @@ fn bounded_query_peak(
     result_and_receive_peak: usize,
     receive: usize,
     sql: &str,
+    transport_receive: usize,
 ) -> Result<usize, PlannerError> {
     // The reservation covers every caller-side SQL workspace allocation, including `sql`.
     // The worker clone and framed command are separate driver allocations.
@@ -1060,7 +1061,10 @@ fn bounded_query_peak(
         .and_then(|value| value.checked_add(worker_sql))
         .and_then(|value| value.checked_add(query_frame))
         .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
-    Ok(result_peak.max(send_peak))
+    result_peak
+        .max(send_peak)
+        .checked_add(transport_receive)
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))
 }
 
 fn postgres_copy_peaks(
@@ -1156,7 +1160,7 @@ fn metadata_preflight_peak(
     max_rows: usize,
     max_payload_bytes: usize,
     key_column_name_bytes: usize,
-) -> Result<(usize, usize), PlannerError> {
+) -> Result<(usize, usize, usize), PlannerError> {
     let columns = schema
         .len()
         .checked_add(1)
@@ -1212,7 +1216,7 @@ fn metadata_preflight_peak(
         checked_add_peak(&mut peak, value)?;
     }
     let receive = receive_capacity(columns, metadata_row_bytes)?;
-    Ok((add_receive_peak(peak, receive)?, receive))
+    Ok((add_receive_peak(peak, receive)?, receive, result_values))
 }
 
 fn bounded_query_error(error: pg_walstream::ReplicationError) -> PlannerError {
@@ -1282,14 +1286,15 @@ impl BoundedRangeSource for PostgresRangeSource {
         if schema.len() != self.key_columns.len() {
             return Err(PlannerError::Conflict("M3_KEY_SCHEMA_COLUMNS"));
         }
-        // The imported connection already owns an 8 KiB native receive backing. Refuse before
-        // rendering SQL or issuing any command when the configured source-impact bound cannot
-        // even cover that persistent allocation.
+        // The imported connection owns transport receive storage as well as the native frame
+        // buffer. Charge both before rendering SQL or issuing a command.
+        let transport_receive = self.connection.transport_receive_capacity();
         if sql_workspace_upper_bound(schema.len())? > SQL_CONSTRUCTION_RESERVE {
             return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
         }
         let render_floor = NATIVE_RECEIVE_FLOOR
             .checked_add(SQL_CONSTRUCTION_RESERVE)
+            .and_then(|value| value.checked_add(transport_receive))
             .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
         if budget.max_source_impact_bytes < render_floor {
             self.required_source_impact_bytes = Some(render_floor);
@@ -1347,23 +1352,41 @@ impl BoundedRangeSource for PostgresRangeSource {
             self.table
         );
         let key_column_name_bytes = self.key_columns.iter().map(String::len).sum();
-        let (metadata_preflight, metadata_receive_capacity) = metadata_preflight_peak(
-            schema,
-            budget.max_rows,
-            budget.max_bytes,
-            key_column_name_bytes,
+        let (metadata_preflight, metadata_receive_capacity, metadata_value_bytes) =
+            metadata_preflight_peak(
+                schema,
+                budget.max_rows,
+                budget.max_bytes,
+                key_column_name_bytes,
+            )?;
+        let metadata_preflight = bounded_query_peak(
+            metadata_preflight,
+            metadata_receive_capacity,
+            &meta_sql,
+            transport_receive,
         )?;
-        let metadata_preflight =
-            bounded_query_peak(metadata_preflight, metadata_receive_capacity, &meta_sql)?;
-        let timeout_peak =
-            bounded_query_peak(NATIVE_RECEIVE_FLOOR, NATIVE_RECEIVE_FLOOR, &set_timeout_sql)?;
+        let timeout_peak = bounded_query_peak(
+            NATIVE_RECEIVE_FLOOR,
+            NATIVE_RECEIVE_FLOOR,
+            &set_timeout_sql,
+            transport_receive,
+        )?;
         let preflight = metadata_preflight.max(timeout_peak);
         self.required_source_impact_bytes = Some(preflight);
         if preflight > budget.max_source_impact_bytes {
             return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
         }
         self.connection
-            .exec_bounded(&set_timeout_sql, NATIVE_RECEIVE_FLOOR)
+            .exec_bounded(
+                &set_timeout_sql,
+                BoundedQueryLimits {
+                    receive_capacity: NATIVE_RECEIVE_FLOOR,
+                    columns: 0,
+                    rows: 0,
+                    column_name_bytes: 0,
+                    value_bytes: 0,
+                },
+            )
             .map_err(|error| match error {
                 pg_walstream::ReplicationError::Buffer(_) => {
                     PlannerError::Limit("M3_SOURCE_IMPACT")
@@ -1373,7 +1396,16 @@ impl BoundedRangeSource for PostgresRangeSource {
         let started = Instant::now();
         let (meta, metadata_receive_stats) = self
             .connection
-            .exec_bounded(&meta_sql, metadata_receive_capacity)
+            .exec_bounded(
+                &meta_sql,
+                BoundedQueryLimits {
+                    receive_capacity: metadata_receive_capacity,
+                    columns: schema.len() + 1,
+                    rows: metadata_limit,
+                    column_name_bytes: key_column_name_bytes + "payload_bytes".len(),
+                    value_bytes: metadata_value_bytes,
+                },
+            )
             .map_err(bounded_query_error)?;
         self.last_receive_stats = Some(metadata_receive_stats);
         if meta.ntuples() as usize > budget.max_rows {
@@ -1484,6 +1516,7 @@ impl BoundedRangeSource for PostgresRangeSource {
             add_receive_peak(peaks.metadata, metadata_receive_stats.allocated_bytes)?,
             metadata_receive_stats.allocated_bytes,
             &meta_sql,
+            transport_receive,
         )?;
         let payload_receive_capacity =
             receive_capacity(schema.len() + 1, max_data_row_value_bytes)?;
@@ -1495,6 +1528,7 @@ impl BoundedRangeSource for PostgresRangeSource {
             add_receive_peak(peaks.payload, payload_receive_capacity)?,
             payload_receive_capacity,
             &data_sql,
+            transport_receive,
         )?;
         let peaks = CopyPeaks {
             metadata: metadata_peak,
@@ -1519,7 +1553,16 @@ impl BoundedRangeSource for PostgresRangeSource {
             .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
         let (data, payload_receive_stats) = self
             .connection
-            .exec_bounded(&data_sql, payload_receive_capacity)
+            .exec_bounded(
+                &data_sql,
+                BoundedQueryLimits {
+                    receive_capacity: payload_receive_capacity,
+                    columns: schema.len() + 1,
+                    rows: expected.len(),
+                    column_name_bytes: key_column_name_bytes + "payload_hex".len(),
+                    value_bytes: key_text_bytes + payload_bytes * 2,
+                },
+            )
             .map_err(bounded_query_error)?;
         self.last_receive_stats = Some(payload_receive_stats);
         if data.ntuples() as usize != expected.len() {
@@ -1818,6 +1861,14 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn bounded_query_peak_charges_retained_tls_receive_storage() {
+        let plain = bounded_query_peak(12_000, 8_192, "SELECT 1", 0).unwrap();
+        let tls = bounded_query_peak(12_000, 8_192, "SELECT 1", 512 * 1024).unwrap();
+        assert_eq!(tls - plain, 512 * 1024);
+        assert!(bounded_query_peak(12_000, 8_192, "SELECT 1", usize::MAX).is_err());
     }
 
     #[test]

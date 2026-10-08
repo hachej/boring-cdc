@@ -1,0 +1,59 @@
+name: M3 receive boundary
+on:
+  pull_request:
+    paths:
+      - .github/workflows/m3-receive.yml
+      - src/m3_planner.rs
+      - vendor/pg_walstream/**
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/m3-receive.yml
+      - src/m3_planner.rs
+      - vendor/pg_walstream/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  receive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TMPDIR: /var/tmp
+      BORING_CDC_M3_EVIDENCE_SEED: receive-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update
+      - name: Vendored bounded receive regressions
+        run: cargo test --manifest-path vendor/pg_walstream/Cargo.toml bounded_query
+      - name: PostgreSQL 17.6 planner component
+        run: scripts/e2e/m3_planner.sh
+      - name: Planner fault boundaries
+        run: scripts/faults/m3_planner.sh
+      - name: Summarize validated receive evidence
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          seed = os.environ['BORING_CDC_M3_EVIDENCE_SEED']
+          root = pathlib.Path('artifacts/boring-cdc-m3-planner')
+          for scenario in ('SCN-M3-PLANNER-POSTGRES', 'SCN-M3-PLANNER-FAULTS'):
+              packet = root / scenario / seed
+              evidence = packet / 'evidence.json'
+              state = json.loads((packet / 'state' / 'after.json').read_text())
+              print(json.dumps({
+                  'scenario': scenario,
+                  'git_commit': json.loads(evidence.read_text())['git_commit'],
+                  'evidence_sha256': hashlib.sha256(evidence.read_bytes()).hexdigest(),
+                  'receive_allocated_bytes': state.get('receive_allocated_bytes'),
+                  'receive_buffered_high_water_bytes': state.get('receive_buffered_high_water_bytes'),
+                  'receive_complete_frames_high_water': state.get('receive_complete_frames_high_water'),
+              }, sort_keys=True))
+          PY
+      - name: Preserve validated M3 evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m3-receive-${{ github.sha }}
+          path: artifacts/boring-cdc-m3-planner/**/receive-${{ github.sha }}/**
+          if-no-files-found: warn

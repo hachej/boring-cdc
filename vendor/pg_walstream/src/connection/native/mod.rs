@@ -15,5 +15,5 @@ pub(crate) mod startup;
 pub(crate) mod wire;
 
 pub use connection::NativeConnection;
-pub use query::ReceiveBufferStats;
+pub use query::{BoundedQueryLimits, ReceiveBufferStats};
 pub use result::{NativePgResult, NativeResultStatus};

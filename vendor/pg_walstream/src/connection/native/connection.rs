@@ -45,7 +45,7 @@ enum Command {
     /// Run a simple query using one fixed-capacity receive allocation.
     BoundedQuery {
         sql: String,
-        receive_capacity: usize,
+        limits: query::BoundedQueryLimits,
         reply: std_mpsc::Sender<Result<(NativePgResult, ReceiveBufferStats)>>,
     },
     /// Enter the streaming push loop: the worker continuously reads CopyData
@@ -100,15 +100,9 @@ impl Worker {
     async fn bounded_query(
         &mut self,
         sql: &str,
-        receive_capacity: usize,
+        limits: query::BoundedQueryLimits,
     ) -> Result<(NativePgResult, ReceiveBufferStats)> {
-        query::bounded_simple_query(
-            &mut self.transport,
-            &mut self.read_buf,
-            sql,
-            receive_capacity,
-        )
-        .await
+        query::bounded_simple_query(&mut self.transport, &mut self.read_buf, sql, limits).await
     }
 
     /// Streaming push loop. Continuously reads CopyData batches and pushes them to `batch_tx`, while still servicing interleaved commands (feedback `PutCopyData`, `Close`) on `cmd_rx`. Returns `true` if a `Close` was  handled (the worker should stop), `false` if streaming ended for any other reason (cancel, read error, or the consumer dropped the receiver).
@@ -181,12 +175,8 @@ impl Worker {
                 let _ = reply.send(self.query(&sql).await);
                 StreamCmd::Continue
             }
-            Some(Command::BoundedQuery {
-                sql,
-                receive_capacity,
-                reply,
-            }) => {
-                let _ = reply.send(self.bounded_query(&sql, receive_capacity).await);
+            Some(Command::BoundedQuery { sql, limits, reply }) => {
+                let _ = reply.send(self.bounded_query(&sql, limits).await);
                 StreamCmd::Continue
             }
             Some(Command::Close {
@@ -279,11 +269,14 @@ impl WorkerInit {
 /// Consumes `ready_tx`, which is dropped when this returns (on either path), so the worker command loop never has to thread it through or drop it by hand.
 async fn build_and_report(
     init: WorkerInit,
-    ready_tx: std_mpsc::Sender<Result<i32>>,
+    ready_tx: std_mpsc::Sender<Result<(i32, usize)>>,
 ) -> Option<Worker> {
     match init.build().await {
         Ok(worker) => {
-            let _ = ready_tx.send(Ok(worker.server_ver));
+            let _ = ready_tx.send(Ok((
+                worker.server_ver,
+                worker.transport.retained_receive_capacity(),
+            )));
             Some(worker)
         }
         Err(e) => {
@@ -301,7 +294,7 @@ async fn build_and_report(
 fn run_worker(
     init: WorkerInit,
     mut cmd_rx: mpsc::UnboundedReceiver<Command>,
-    ready_tx: std_mpsc::Sender<Result<i32>>,
+    ready_tx: std_mpsc::Sender<Result<(i32, usize)>>,
 ) {
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -326,12 +319,8 @@ fn run_worker(
                 Command::Query { sql, reply } => {
                     let _ = reply.send(worker.query(&sql).await);
                 }
-                Command::BoundedQuery {
-                    sql,
-                    receive_capacity,
-                    reply,
-                } => {
-                    let _ = reply.send(worker.bounded_query(&sql, receive_capacity).await);
+                Command::BoundedQuery { sql, limits, reply } => {
+                    let _ = reply.send(worker.bounded_query(&sql, limits).await);
                 }
                 Command::StreamCopy { token, batch_tx } => {
                     // Runs its own loop, servicing interleaved commands, until
@@ -400,6 +389,8 @@ pub struct NativeConnection {
     driver: Driver,
     /// Server version number (e.g. 160001 for PG 16.1), cached at connect time.
     server_ver: i32,
+    /// Retained transport receive storage, separate from the bounded protocol-frame buffer.
+    transport_receive_capacity: usize,
     /// Whether we are in COPY (replication) mode. Gates the streaming methods and tells the worker whether to send CopyDone on shutdown.
     in_copy_mode: bool,
     /// Liveness flag shared with the worker, which clears it on a transient read error.
@@ -453,6 +444,7 @@ impl NativeConnection {
         )?;
         alive.store(true, Ordering::Relaxed);
         let server_ver = worker.server_ver;
+        let transport_receive_capacity = worker.transport.retained_receive_capacity();
         debug!(
             "Connected to PostgreSQL {} via native rustls (inline)",
             server_ver
@@ -464,6 +456,7 @@ impl NativeConnection {
                 handle,
             },
             server_ver,
+            transport_receive_capacity,
             in_copy_mode: false,
             alive,
         })
@@ -494,7 +487,7 @@ impl NativeConnection {
             })?;
 
         match ready_rx.recv() {
-            Ok(Ok(server_ver)) => {
+            Ok(Ok((server_ver, transport_receive_capacity))) => {
                 alive.store(true, Ordering::Relaxed);
                 debug!("Connected to PostgreSQL {} via native rustls", server_ver);
                 Ok(Self {
@@ -505,6 +498,7 @@ impl NativeConnection {
                         batch_rx: None,
                     },
                     server_ver,
+                    transport_receive_capacity,
                     in_copy_mode: false,
                     alive,
                 })
@@ -551,23 +545,28 @@ impl NativeConnection {
         ReplicationError::backend("native worker thread dropped the reply")
     }
 
+    /// Retained receive storage owned by the transport beneath the protocol-frame buffer.
+    pub fn transport_receive_capacity(&self) -> usize {
+        self.transport_receive_capacity
+    }
+
     /// Execute a query with a fixed physical receive-buffer allocation and return its high-water.
     /// No PostgreSQL frame is frozen or allowed to share that allocation.
     pub fn exec_bounded(
         &mut self,
         sql: &str,
-        receive_capacity: usize,
+        limits: query::BoundedQueryLimits,
     ) -> Result<(NativePgResult, ReceiveBufferStats)> {
         let bounded = match &mut self.driver {
             Driver::Inline { worker, handle, .. } => {
-                run_sync(handle, worker.bounded_query(sql, receive_capacity))
+                run_sync(handle, worker.bounded_query(sql, limits))
             }
             Driver::Threaded { cmd_tx, .. } => {
                 let (reply_tx, reply_rx) = std_mpsc::channel();
                 cmd_tx
                     .send(Command::BoundedQuery {
                         sql: sql.to_string(),
-                        receive_capacity,
+                        limits,
                         reply: reply_tx,
                     })
                     .map_err(|_| Self::worker_gone())?;
@@ -1128,7 +1127,7 @@ impl NativeConnection {
             .unwrap();
 
         // The worker adopts the socket on its own reactor and reports back.
-        let server_ver = ready_rx
+        let (server_ver, transport_receive_capacity) = ready_rx
             .recv()
             .expect("null worker exited before init")
             .expect("null worker failed to adopt the test socket");
@@ -1142,6 +1141,7 @@ impl NativeConnection {
                 batch_rx: None,
             },
             server_ver,
+            transport_receive_capacity,
             in_copy_mode: false,
             alive,
         }
@@ -1170,6 +1170,7 @@ impl NativeConnection {
         )
         .expect("null worker failed to adopt the test socket");
         let server_ver = worker.server_ver;
+        let transport_receive_capacity = worker.transport.retained_receive_capacity();
 
         Self {
             driver: Driver::Inline {
@@ -1178,6 +1179,7 @@ impl NativeConnection {
                 handle,
             },
             server_ver,
+            transport_receive_capacity,
             in_copy_mode: false,
             alive,
         }
@@ -1591,6 +1593,7 @@ mod tests {
     async fn test_inline_get_copy_data_drains_pending() {
         use tokio::io::AsyncWriteExt;
         let (worker, mut server) = worker_with_loopback().await;
+        let transport_receive_capacity = worker.transport.retained_receive_capacity();
         let mut conn = NativeConnection {
             driver: Driver::Inline {
                 worker,
@@ -1598,6 +1601,7 @@ mod tests {
                 handle: tokio::runtime::Handle::current(),
             },
             server_ver: 160000,
+            transport_receive_capacity,
             in_copy_mode: true, // skip the replication-mode gate
             alive: Arc::new(AtomicBool::new(true)),
         };

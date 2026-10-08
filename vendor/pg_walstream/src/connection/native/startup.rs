@@ -47,6 +47,12 @@ fn crypto_provider() -> Arc<rustls::crypto::CryptoProvider> {
 /// Exposed `pub(crate)` so `copy.rs` can pin its read-headroom invariant
 /// (`MIN_HEADROOM > TLS_BUF_SIZE`) to this value at compile time, guaranteeing tokio's `BufReader` always bypasses its buffer on the CopyData hot path.
 pub(crate) const TLS_BUF_SIZE: usize = 65_536;
+// The pinned rustls 0.23 connection also retains a record deframer (up to 64 KiB during
+// handshake), decrypted plaintext chunks, and bounded send queues beneath the Tokio reader.
+// Reserve 512 KiB for that complete TLS transport envelope, including TLS_BUF_SIZE, before a
+// bounded source query is admitted. Keep this conservative reservation tied to the pinned
+// rustls implementation and revisit it when the dependency changes.
+const TLS_TRANSPORT_RESERVE: usize = 512 * 1024;
 
 /// The transport layer — either plain TCP or TLS-wrapped TCP.
 ///
@@ -62,6 +68,13 @@ pub enum Transport {
 }
 
 impl Transport {
+    pub(crate) fn retained_receive_capacity(&self) -> usize {
+        match self {
+            Self::Plain(_) => 0,
+            Self::Tls(_) => TLS_TRANSPORT_RESERVE,
+        }
+    }
+
     /// Get the TLS `tls-server-end-point` channel binding data, if this is a TLS connection.
     ///
     /// Per RFC 5929: hash the server's DER-encoded end-entity certificate.
@@ -337,7 +350,10 @@ async fn negotiate_tls_standard(
     match response {
         b'S' => {
             // Server supports SSL — do the handshake
-            let tls_config = build_tls_config(info)?;
+            let mut tls_config = build_tls_config(info)?;
+            // These connections do not share a TLS session cache. Disable tickets so a server
+            // cannot grow rustls's in-memory resumption store during a bounded source query.
+            tls_config.resumption = rustls::client::Resumption::disabled();
             let connector = TlsConnector::from(Arc::new(tls_config));
 
             let server_name = rustls::pki_types::ServerName::try_from(info.host.as_str())
@@ -391,6 +407,7 @@ async fn negotiate_tls_direct(
     info: &ConnInfo,
 ) -> Result<Transport, ReplicationError> {
     let mut tls_config = build_tls_config(info)?;
+    tls_config.resumption = rustls::client::Resumption::disabled();
 
     // Set ALPN to "postgresql" — this is how the server distinguishes a direct
     // TLS PostgreSQL connection from other protocols.

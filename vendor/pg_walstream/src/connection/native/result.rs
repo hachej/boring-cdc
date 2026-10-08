@@ -4,6 +4,7 @@
 //! `stream.rs` works unchanged regardless of backend.
 
 use super::wire;
+use crate::error::ReplicationError;
 
 /// Result status matching the libpq `ExecStatusType` values used by callers.
 #[derive(Debug, Clone, PartialEq)]
@@ -114,6 +115,54 @@ impl NativePgResult {
         }
     }
 
+    pub(crate) fn parse_row_description_bounded(
+        &mut self,
+        payload: &[u8],
+        expected_columns: usize,
+        max_name_bytes: usize,
+    ) -> Result<(), ReplicationError> {
+        if payload.len() < 2 {
+            return Err(ReplicationError::protocol("RowDescription is truncated"));
+        }
+        let declared = i16::from_be_bytes([payload[0], payload[1]]);
+        if declared < 0 || declared as usize != expected_columns {
+            return Err(ReplicationError::protocol(
+                "RowDescription column count differs from bounded query shape",
+            ));
+        }
+        let mut pos = 2usize;
+        let mut names = Vec::with_capacity(expected_columns);
+        let mut name_bytes = 0usize;
+        for _ in 0..expected_columns {
+            let end = payload[pos..]
+                .iter()
+                .position(|byte| *byte == 0)
+                .and_then(|offset| pos.checked_add(offset))
+                .ok_or_else(|| ReplicationError::protocol("RowDescription name is truncated"))?;
+            name_bytes = name_bytes
+                .checked_add(end - pos)
+                .filter(|used| *used <= max_name_bytes)
+                .ok_or_else(|| ReplicationError::buffer("bounded column names exceed limit"))?;
+            let name = std::str::from_utf8(&payload[pos..end])
+                .map_err(|_| ReplicationError::protocol("RowDescription name is not UTF-8"))?;
+            names.push(name.to_string());
+            pos = end
+                .checked_add(19)
+                .filter(|next| *next <= payload.len())
+                .ok_or_else(|| ReplicationError::protocol("RowDescription field is truncated"))?;
+        }
+        if pos != payload.len() {
+            return Err(ReplicationError::protocol(
+                "RowDescription has trailing bytes",
+            ));
+        }
+        self.columns = names;
+        if self.status == NativeResultStatus::Empty {
+            self.status = NativeResultStatus::TuplesOk;
+        }
+        Ok(())
+    }
+
     /// Parse a DataRow ('D') message payload (after the 5-byte header).
     pub(crate) fn parse_data_row(&mut self, payload: &[u8]) {
         if payload.len() < 2 {
@@ -150,6 +199,77 @@ impl NativePgResult {
         }
 
         self.rows.push(row);
+    }
+
+    /// Parse a bounded query row only after its full shape has been checked. The ordinary query
+    /// parser keeps its historical tolerant behavior; a bounded query cannot allocate from a
+    /// column count or value length that the received frame does not contain.
+    pub(crate) fn parse_data_row_bounded(
+        &mut self,
+        payload: &[u8],
+        max_value_bytes: usize,
+    ) -> Result<usize, ReplicationError> {
+        if payload.len() < 2 {
+            return Err(ReplicationError::protocol(
+                "DataRow is missing its column count",
+            ));
+        }
+        let declared = i16::from_be_bytes([payload[0], payload[1]]);
+        if declared < 0 || declared as usize != self.columns.len() {
+            return Err(ReplicationError::protocol(
+                "DataRow column count differs from RowDescription",
+            ));
+        }
+        let columns = declared as usize;
+        if columns > (payload.len() - 2) / 4 {
+            return Err(ReplicationError::protocol(
+                "DataRow column lengths are truncated",
+            ));
+        }
+        let mut pos = 2usize;
+        let mut value_bytes = 0usize;
+        for _ in 0..columns {
+            let end = pos
+                .checked_add(4)
+                .filter(|end| *end <= payload.len())
+                .ok_or_else(|| ReplicationError::protocol("DataRow column length is truncated"))?;
+            let length = i32::from_be_bytes(payload[pos..end].try_into().unwrap());
+            pos = end;
+            if length < -1 {
+                return Err(ReplicationError::protocol(
+                    "DataRow has an invalid column length",
+                ));
+            }
+            if length >= 0 {
+                value_bytes = value_bytes
+                    .checked_add(length as usize)
+                    .filter(|used| *used <= max_value_bytes)
+                    .ok_or_else(|| ReplicationError::buffer("bounded query values exceed limit"))?;
+                pos = pos
+                    .checked_add(length as usize)
+                    .filter(|end| *end <= payload.len())
+                    .ok_or_else(|| ReplicationError::protocol("DataRow value is truncated"))?;
+            }
+        }
+        if pos != payload.len() {
+            return Err(ReplicationError::protocol("DataRow has trailing bytes"));
+        }
+
+        let mut row = Vec::with_capacity(columns);
+        let mut pos = 2usize;
+        for _ in 0..columns {
+            let length = i32::from_be_bytes(payload[pos..pos + 4].try_into().unwrap());
+            pos += 4;
+            if length == -1 {
+                row.push(None);
+            } else {
+                let end = pos + length as usize;
+                row.push(Some(payload[pos..end].to_vec()));
+                pos = end;
+            }
+        }
+        self.rows.push(row);
+        Ok(value_bytes)
     }
 }
 
