@@ -43,8 +43,14 @@ def validate():
     errors = []
     if evidence.get('schema_version') != 'm4-clickhouse-ddl-evidence/v1' or evidence.get('status') != 'pass':
         errors.append('E_EVIDENCE_SCHEMA')
-    if not re.fullmatch(r'[0-9a-f]{40}', evidence.get('git_commit', '')):
+    source_commit = evidence.get('git_commit', '')
+    if not re.fullmatch(r'[0-9a-f]{40}', source_commit):
         errors.append('E_SOURCE_COMMIT')
+    elif subprocess.run(
+        ['git', 'merge-base', '--is-ancestor', source_commit, 'HEAD'],
+        cwd=ROOT, capture_output=True, check=False,
+    ).returncode:
+        errors.append('E_SOURCE_COMMIT_STALE')
     if evidence.get('input_sha256') != input_hashes():
         errors.append('E_INPUTS_STALE')
     expected_fingerprint = current_object_fingerprint()

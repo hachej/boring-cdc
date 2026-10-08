@@ -38,6 +38,12 @@ class M4ClickHouseDdlEvidenceTests(unittest.TestCase):
             'E_INPUTS_STALE',
         )
 
+    def test_validator_rejects_unrelated_commit(self):
+        self.assert_rejected_change(
+            lambda evidence: evidence.update(git_commit='0' * 40),
+            'E_SOURCE_COMMIT_STALE',
+        )
+
     def test_validator_rejects_unrelated_fingerprint(self):
         self.assert_rejected_change(
             lambda evidence: evidence.update(object_fingerprint='0' * 64),
