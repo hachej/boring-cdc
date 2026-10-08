@@ -1,0 +1,72 @@
+name: M3 fence and anchor
+on:
+  pull_request:
+    paths:
+      - .github/workflows/m3-fence.yml
+      - src/m2_init_recovery.rs
+      - src/m3_bootstrap.rs
+      - src/m3_fence.rs
+      - src/m3_planner.rs
+      - scripts/e2e/m2_init_recovery.sh
+      - scripts/faults/m2_init_recovery.sh
+      - scripts/e2e/m3_fence.sh
+      - scripts/faults/m3_fence.sh
+      - scripts/lib/m3_fence_evidence.py
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/m3-fence.yml
+      - src/m2_init_recovery.rs
+      - src/m3_bootstrap.rs
+      - src/m3_fence.rs
+      - src/m3_planner.rs
+      - scripts/e2e/m2_init_recovery.sh
+      - scripts/faults/m2_init_recovery.sh
+      - scripts/e2e/m3_fence.sh
+      - scripts/faults/m3_fence.sh
+      - scripts/lib/m3_fence_evidence.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TMPDIR: /var/tmp
+      BORING_CDC_M3_FENCE_EVIDENCE_SEED: fence-${{ github.sha }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update
+      - name: PostgreSQL 17.6 fixed-row schema
+        run: scripts/e2e/m2_init_recovery.sh
+      - name: Fixed-row schema fault boundaries
+        run: scripts/faults/m2_init_recovery.sh
+      - name: PostgreSQL 17.6 fence and anchor
+        run: scripts/e2e/m3_fence.sh
+      - name: Fence fault boundaries
+        run: scripts/faults/m3_fence.sh
+      - name: Summarize validated fence evidence
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib
+          seed = os.environ['BORING_CDC_M3_FENCE_EVIDENCE_SEED']
+          root = pathlib.Path('artifacts/boring-cdc-m3-fence')
+          for scenario in ('SCN-M3-FENCE-PGOUTPUT', 'SCN-M3-FENCE-FAULTS'):
+              evidence = root / scenario / seed / 'evidence.json'
+              manifest = json.loads(evidence.read_text())
+              print(json.dumps({
+                  'scenario': scenario,
+                  'git_commit': manifest['git_commit'],
+                  'evidence_sha256': hashlib.sha256(evidence.read_bytes()).hexdigest(),
+                  'outcome': manifest['result']['status'],
+              }, sort_keys=True))
+          PY
+      - name: Preserve validated M3 fence evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m3-fence-${{ github.sha }}
+          path: artifacts/boring-cdc-m3-fence/**/fence-${{ github.sha }}/**
+          if-no-files-found: warn
