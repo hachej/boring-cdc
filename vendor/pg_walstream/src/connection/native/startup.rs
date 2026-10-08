@@ -350,7 +350,10 @@ async fn negotiate_tls_standard(
     match response {
         b'S' => {
             // Server supports SSL — do the handshake
-            let tls_config = build_tls_config(info)?;
+            let mut tls_config = build_tls_config(info)?;
+            // These connections do not share a TLS session cache. Disable tickets so a server
+            // cannot grow rustls's in-memory resumption store during a bounded source query.
+            tls_config.resumption = rustls::client::Resumption::disabled();
             let connector = TlsConnector::from(Arc::new(tls_config));
 
             let server_name = rustls::pki_types::ServerName::try_from(info.host.as_str())
@@ -404,6 +407,7 @@ async fn negotiate_tls_direct(
     info: &ConnInfo,
 ) -> Result<Transport, ReplicationError> {
     let mut tls_config = build_tls_config(info)?;
+    tls_config.resumption = rustls::client::Resumption::disabled();
 
     // Set ALPN to "postgresql" — this is how the server distinguishes a direct
     // TLS PostgreSQL connection from other protocols.
