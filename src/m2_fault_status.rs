@@ -10,6 +10,7 @@ use std::{
 };
 pub const SNAPSHOT_SCHEMA: &str = "system-snapshot/v1";
 pub const FRESHNESS_SECONDS: u64 = 30;
+const MAX_CONTROL_OBJECTS_PER_KIND: usize = 1000;
 pub const CONDITION_NAMES: [&str; 14] = [
     "healthy",
     "degraded",
@@ -158,6 +159,7 @@ pub enum StatusError {
     Sqlite(rusqlite::Error),
     Clock,
     MissingState,
+    TooManyControlObjects,
 }
 impl From<rusqlite::Error> for StatusError {
     fn from(v: rusqlite::Error) -> Self {
@@ -174,6 +176,70 @@ fn hash(parts: &[&str]) -> String {
         h.update(p.as_bytes())
     }
     format!("sha256:{:x}", h.finalize())
+}
+
+fn add_object_revisions(
+    connection: &Connection,
+    revisions: &mut BTreeMap<String, u64>,
+    namespace: &str,
+    query: &str,
+) -> Result<(), StatusError> {
+    let mut statement = connection.prepare(query)?;
+    for (index, row) in statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?))
+        })?
+        .enumerate()
+    {
+        if index == MAX_CONTROL_OBJECTS_PER_KIND {
+            return Err(StatusError::TooManyControlObjects);
+        }
+        let (id, revision) = row?;
+        revisions.insert(format!("{namespace}:{}", hash(&[&id])), revision);
+    }
+    Ok(())
+}
+
+fn add_current_audit_revisions(
+    connection: &Connection,
+    revisions: &mut BTreeMap<String, u64>,
+) -> Result<(), StatusError> {
+    let mut statement = connection.prepare(
+        "SELECT a.audit_id,a.incarnation,a.revision \
+         FROM destination_current_audits current \
+         JOIN destination_audits a ON a.audit_id=current.audit_id \
+           AND a.destination_id=current.destination_id AND a.incarnation=current.incarnation \
+         JOIN destinations d ON d.destination_id=current.destination_id \
+           AND d.configuration_fingerprint=a.configuration_fingerprint \
+           AND d.capture_epoch=a.capture_epoch AND d.generation=a.generation \
+         LEFT JOIN destination_checkpoints cp ON cp.destination_id=d.destination_id \
+         WHERE a.incarnation>0 AND a.round_target_seq=coalesce(cp.journal_seq,0) \
+           AND (cp.destination_id IS NULL OR (cp.configuration_fingerprint=d.configuration_fingerprint \
+             AND cp.capture_epoch=d.capture_epoch AND cp.generation=d.generation))",
+    )?;
+    for (index, row) in statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, i64>(1)?,
+                row.get::<_, u64>(2)?,
+            ))
+        })?
+        .enumerate()
+    {
+        if index == MAX_CONTROL_OBJECTS_PER_KIND {
+            return Err(StatusError::TooManyControlObjects);
+        }
+        let (id, incarnation, revision) = row?;
+        revisions.insert(
+            format!(
+                "destination_audit:{}",
+                hash(&[&id, &incarnation.to_string()])
+            ),
+            revision,
+        );
+    }
+    Ok(())
 }
 fn cid(n: &str) -> String {
     format!("COND-{}", n.replace('_', "-").to_ascii_uppercase())
@@ -238,7 +304,7 @@ pub fn snapshot(
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
     c.busy_timeout(Duration::from_millis(250))?;
-    c.execute_batch("PRAGMA query_only=ON;PRAGMA foreign_keys=ON;")?;
+    c.execute_batch("PRAGMA query_only=ON;PRAGMA foreign_keys=ON;BEGIN;")?;
     let s:Source=c.query_row("SELECT capture_epoch,source_system_id,database_id,slot_name,publication_fingerprint,durable_transaction_end_lsn,durable_journal_seq,last_feedback_lsn,slot_creation_floor_lsn,control_revision,observed_confirmed_flush_lsn,observed_restart_lsn FROM source_state WHERE singleton=1",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?,r.get(8)?,r.get(9)?,r.get(10)?,r.get(11)?))).optional()?.ok_or(StatusError::MissingState)?;
     let owner:Option<Owner>=c.query_row("SELECT run_id,state,connection_generation,revision FROM runtime_ownership ORDER BY revision DESC,run_id DESC LIMIT 1",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional()?;
     let latest:Option<(String,String,String,String,Option<u64>)>=c.query_row("SELECT run_id,outcome,reason_code,created_at,unixepoch(created_at) FROM startup_reconciliations ORDER BY reconciliation_id DESC LIMIT 1",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).optional()?;
@@ -497,31 +563,28 @@ pub fn snapshot(
     let mut control_revisions = BTreeMap::from([
         ("source".into(), s.9),
         ("ownership".into(), owner.as_ref().map(|x| x.3).unwrap_or(0)),
-        (
-            "bootstrap".into(),
-            c.query_row(
-                "SELECT coalesce(max(revision),0) FROM bootstrap_intents",
-                [],
-                |r| r.get::<_, u64>(0),
-            )?,
-        ),
-        (
-            "lease".into(),
-            c.query_row(
-                "SELECT coalesce(max(revision),0) FROM destination_generation_leases",
-                [],
-                |r| r.get::<_, u64>(0),
-            )?,
-        ),
-        (
-            "promotion".into(),
-            c.query_row(
-                "SELECT coalesce(max(revision),0) FROM destination_promotion_intents",
-                [],
-                |r| r.get::<_, u64>(0),
-            )?,
-        ),
     ]);
+    for (namespace, query) in [
+        (
+            "bootstrap_intent",
+            "SELECT intent_id,revision FROM bootstrap_intents WHERE state NOT IN ('complete','invalidated','aborted')",
+        ),
+        (
+            "destination_lease",
+            "SELECT l.lease_id,l.revision FROM destination_generation_leases l JOIN destinations d ON d.destination_id=l.destination_id AND d.capture_epoch=l.capture_epoch AND d.generation=l.generation WHERE l.state='held'",
+        ),
+        (
+            "destination_promotion",
+            "SELECT intent_id,revision FROM destination_promotion_intents WHERE state NOT IN ('verified','retirement_eligible','retired')",
+        ),
+        (
+            "destination",
+            "SELECT destination_id,revision FROM destinations",
+        ),
+    ] {
+        add_object_revisions(&c, &mut control_revisions, namespace, query)?;
+    }
+    add_current_audit_revisions(&c, &mut control_revisions)?;
     for item in &dest {
         if let (Some(id), Some(rev)) = (
             item["destination_fingerprint"].as_str(),
@@ -635,11 +698,138 @@ pub mod tests {
         for name in ["schema_blocked", "heartbeat_degraded", "unsafe_durability"] {
             assert!(s.conditions.iter().any(|c| c.condition == name));
         }
+        assert!(s.control_revisions.contains_key("source"));
+        assert!(s.control_revisions.contains_key("ownership"));
+        assert!(!s.control_revisions.contains_key("bootstrap"));
+        assert!(!s.control_revisions.contains_key("lease"));
+        assert!(!s.control_revisions.contains_key("promotion"));
+    }
+    #[test]
+    fn revisions_bind_independent_objects_across_restart_and_concurrent_reads() {
+        let (p, w) = fixture();
+        for id in ["boot-a", "boot-b"] {
+            w.connection().execute("INSERT INTO bootstrap_intents(intent_id,capture_epoch,source_system_id,database_id,slot_name,state,created_at) VALUES(?1,'epoch','system','database','slot','prepared','unix:1')",[id]).unwrap();
+        }
+        for id in ["dest-a", "dest-b"] {
+            w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES(?1,'clickhouse','cfg','epoch',1)",[id]).unwrap();
+        }
+        w.connection().execute("INSERT INTO bootstrap_anchors(anchor_id,capture_epoch,generation,start_seq,snapshot_boundary_lsn,table_set_fingerprint,snapshot_schema_fingerprints,state,expires_at) VALUES('anchor','epoch',1,0,'0000000000000000','set','[\"schema\"]','building','unix:99')",[]).unwrap();
+        for (destination, lease, promotion) in [
+            ("dest-a", "lease-a", "promotion-a"),
+            ("dest-b", "lease-b", "promotion-b"),
+        ] {
+            w.connection().execute("INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES(?1,?2,'epoch',1,'cfg','run',99,'held')",rusqlite::params![lease,destination]).unwrap();
+            w.connection().execute("INSERT INTO destination_promotion_intents(intent_id,destination_id,capture_epoch,candidate_generation,anchor_id,configuration_fingerprint,promotion_fence,expected_selector_digest,state) VALUES(?1,?2,'epoch',1,'anchor','cfg',1,'selector','prepared')",rusqlite::params![promotion,destination]).unwrap();
+        }
+        for (audit, destination, incarnation) in
+            [("audit-a", "dest-a", 1), ("audit-b", "dest-b", 2)]
+        {
+            w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest,incarnation) VALUES(?1,?2,'cfg','epoch',1,0,'round',0,0,'unix:1','unix:2','contract',?3)",rusqlite::params![audit,destination,incarnation]).unwrap();
+            w.connection().execute("INSERT INTO destination_current_audits(destination_id,audit_id,incarnation) VALUES(?1,?2,?3)",rusqlite::params![destination,audit,incarnation]).unwrap();
+        }
+        let before = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        let key = |namespace: &str, id: &str| {
+            let identity = if namespace == "destination_audit" {
+                hash(&[id, if id == "audit-a" { "1" } else { "2" }])
+            } else {
+                hash(&[id])
+            };
+            format!("{namespace}:{identity}")
+        };
+        for (namespace, id) in [
+            ("bootstrap_intent", "boot-a"),
+            ("bootstrap_intent", "boot-b"),
+            ("destination", "dest-a"),
+            ("destination", "dest-b"),
+            ("destination_lease", "lease-a"),
+            ("destination_lease", "lease-b"),
+            ("destination_promotion", "promotion-a"),
+            ("destination_promotion", "promotion-b"),
+            ("destination_audit", "audit-a"),
+            ("destination_audit", "audit-b"),
+        ] {
+            let expected = u64::from(namespace == "destination");
+            assert_eq!(
+                before.control_revisions.get(&key(namespace, id)),
+                Some(&expected)
+            );
+        }
+        w.connection().execute_batch("BEGIN IMMEDIATE; UPDATE bootstrap_intents SET revision=revision+1 WHERE intent_id='boot-a'; UPDATE destinations SET revision=revision+1 WHERE destination_id='dest-b'; UPDATE destination_generation_leases SET revision=revision+1 WHERE lease_id='lease-a'; UPDATE destination_promotion_intents SET revision=revision+1 WHERE intent_id='promotion-b'; UPDATE destination_audits SET revision=revision+1 WHERE audit_id='audit-a';").unwrap();
+        let during = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        assert_eq!(during.control_revisions, before.control_revisions);
+        w.connection().execute_batch("COMMIT;").unwrap();
+        let after = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        for (namespace, id, expected) in [
+            ("bootstrap_intent", "boot-a", 1),
+            ("bootstrap_intent", "boot-b", 0),
+            ("destination", "dest-a", 1),
+            ("destination", "dest-b", 2),
+            ("destination_lease", "lease-a", 1),
+            ("destination_lease", "lease-b", 0),
+            ("destination_promotion", "promotion-a", 0),
+            ("destination_promotion", "promotion-b", 1),
+            ("destination_audit", "audit-a", 1),
+            ("destination_audit", "audit-b", 0),
+        ] {
+            assert_eq!(
+                after.control_revisions.get(&key(namespace, id)),
+                Some(&expected)
+            );
+        }
+        assert_ne!(before.snapshot_id, after.snapshot_id);
+        w.connection()
+            .execute(
+                "DELETE FROM destination_audits WHERE audit_id='audit-b'",
+                [],
+            )
+            .unwrap();
+        w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest,incarnation) VALUES('audit-b','dest-b','cfg','epoch',1,0,'round',0,0,'unix:1','unix:2','contract',3)",[]).unwrap();
+        w.connection().execute("INSERT INTO destination_current_audits(destination_id,audit_id,incarnation) VALUES('dest-b','audit-b',3)",[]).unwrap();
+        let replaced = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
         assert!(
-            s.control_revisions.contains_key("bootstrap")
-                && s.control_revisions.contains_key("lease")
-                && s.control_revisions.contains_key("promotion")
+            !replaced
+                .control_revisions
+                .contains_key(&key("destination_audit", "audit-b"))
         );
+        assert_eq!(
+            replaced
+                .control_revisions
+                .get(&format!("destination_audit:{}", hash(&["audit-b", "3"]))),
+            Some(&0)
+        );
+        drop(w);
+        let restarted = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        assert_eq!(restarted.control_revisions, replaced.control_revisions);
+        let redacted = serde_json::to_string(&restarted).unwrap();
+        assert!(!redacted.contains("boot-a") && !redacted.contains("audit-a"));
+    }
+    #[test]
+    fn status_fails_closed_when_object_revision_projection_exceeds_its_bound() {
+        let (p, w) = fixture();
+        w.connection().execute_batch("WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM ids WHERE n<1001) INSERT INTO bootstrap_intents(intent_id,capture_epoch,source_system_id,database_id,slot_name,state,created_at) SELECT printf('boot-%04d',n),'epoch','system','database','slot','prepared','unix:1' FROM ids;").unwrap();
+        assert!(matches!(
+            snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)),
+            Err(StatusError::TooManyControlObjects)
+        ));
+    }
+    #[test]
+    fn retained_audit_history_does_not_hide_current_status() {
+        let (p, w) = fixture();
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('dest','clickhouse','cfg','epoch',1)",[]).unwrap();
+        w.connection().execute_batch("WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM ids WHERE n<1001) INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest,incarnation) SELECT printf('audit-%04d',n),'dest','cfg','epoch',1,0,printf('round-%04d',n),0,0,printf('unix:%d',n),'unix:zzzz','contract',n FROM ids; INSERT INTO destination_current_audits(destination_id,audit_id,incarnation) VALUES('dest','audit-1001',1001);").unwrap();
+        let status = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        assert_eq!(
+            status
+                .control_revisions
+                .iter()
+                .filter(|(key, _)| key.starts_with("destination_audit:"))
+                .count(),
+            1
+        );
+        assert!(status.control_revisions.contains_key(&format!(
+            "destination_audit:{}",
+            hash(&["audit-1001", "1001"])
+        )));
     }
     #[test]
     fn deterministic_unsupported_capture_failure_reports_capture_safe_stopped() {

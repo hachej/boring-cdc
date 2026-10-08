@@ -8,13 +8,13 @@ tables={'journal_events','source_transactions','source_state','runtime_ownership
 found=set(re.findall(r'CREATE TABLE(?: IF NOT EXISTS)? ([a-z_]+)',src))
 found.discard('forbidden')
 errors=[]
-auxiliary={'audit_coverage_subranges','capture_configuration_receipts'}
+auxiliary={'audit_coverage_subranges','capture_configuration_receipts','audit_incarnation_counter','destination_current_audits'}
 if not tables.issubset(found) or found-tables!=auxiliary: errors.append(f'table inventory mismatch missing={sorted(tables-found)} extra={sorted(found-tables)}')
 ids=[c['id'] for c in contract['cases']]
 if len(ids)!=len(set(ids)): errors.append('duplicate scenario IDs')
 for case in contract['cases']:
  if not re.search(r'fn\s+'+re.escape(case['test'])+r'\s*\(',src): errors.append(f"missing test {case['test']}")
-for version in (1,2,3,4,6,7,8,9,10,11,13):
+for version in (1,2,3,4,6,7,8,9,10,11,13,14):
  migration=re.search(rf'(?:pub )?const MIGRATION_{version}: &str = r#"(.*?)"#;',src,re.S).group(1)
  declared=re.search(rf'const MIGRATION_{version}_CHECKSUM: &str\s*=\s*"sha256:([0-9a-f]{{64}})";',src).group(1)
  import hashlib

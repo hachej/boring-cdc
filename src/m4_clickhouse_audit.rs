@@ -37,6 +37,8 @@ pub struct AuditIdentity {
     pub freshness_started_at: String,
     pub freshness_expires_at: String,
     pub retained_history_start_seq: u64,
+    /// Required when deliberately replacing a still-current round.
+    pub expected_current_incarnation: Option<i64>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -167,14 +169,33 @@ pub fn freeze_round(
         return Err(AuditError::IdentityConflict);
     }
     let digest = round_identity_digest(identity);
-    let old: Option<String> = tx
+    let old: Option<(String, String, String, i64)> = tx
         .query_row(
-            "SELECT round_identity_digest FROM destination_audits WHERE audit_id=?1",
+            "SELECT round_identity_digest,freshness_window_started_at,freshness_expires_at,incarnation FROM destination_audits WHERE audit_id=?1",
             [&identity.audit_id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .optional()?;
-    if old.as_deref().is_some_and(|old| old != digest) {
+    let current: Option<(String, i64)> = tx
+        .query_row(
+            "SELECT audit_id,incarnation FROM destination_current_audits WHERE destination_id=?1",
+            [&identity.destination_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?;
+    let new_round = old
+        .as_ref()
+        .is_none_or(|(old_digest, started, expires, incarnation)| {
+            old_digest != &digest
+                || started != &identity.freshness_started_at
+                || expires != &identity.freshness_expires_at
+                || *incarnation == 0
+                || current.as_ref() != Some(&(identity.audit_id.clone(), *incarnation))
+        });
+    if new_round && identity.expected_current_incarnation != current.as_ref().map(|(_, n)| *n) {
+        return Err(AuditError::IdentityConflict);
+    }
+    if old.is_some() && new_round {
         tx.execute(
             "DELETE FROM audit_coverage_subranges WHERE audit_id=?1",
             [&identity.audit_id],
@@ -184,9 +205,35 @@ pub fn freeze_round(
             params![identity.audit_id, identity.retained_history_start_seq],
         )?;
     }
+    let incarnation = if new_round {
+        let changed = tx.execute(
+            "UPDATE audit_incarnation_counter SET last_incarnation=last_incarnation+1 WHERE singleton=1 AND last_incarnation<?1",
+            [i64::MAX],
+        )?;
+        if changed != 1 {
+            return Err(AuditError::Invalid("audit incarnation exhausted"));
+        }
+        tx.query_row(
+            "SELECT last_incarnation FROM audit_incarnation_counter WHERE singleton=1",
+            [],
+            |row| row.get::<_, i64>(0),
+        )?
+    } else {
+        old.as_ref()
+            .map(|(_, _, _, incarnation)| *incarnation)
+            .unwrap_or_default()
+    };
     tx.execute(
-        "INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,budget_bytes_used,budget_events_used,budget_ms_used,freshness_window_started_at,freshness_expires_at,contract_digest,retained_history_start_seq,unverifiable_before_seq) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?8,0,0,0,?9,?10,?11,?8,?8) ON CONFLICT(audit_id) DO UPDATE SET destination_id=excluded.destination_id,configuration_fingerprint=excluded.configuration_fingerprint,capture_epoch=excluded.capture_epoch,generation=excluded.generation,round_target_seq=excluded.round_target_seq,round_identity_digest=excluded.round_identity_digest,freshness_window_started_at=excluded.freshness_window_started_at,freshness_expires_at=excluded.freshness_expires_at,contract_digest=excluded.contract_digest,retained_history_start_seq=excluded.retained_history_start_seq,unverifiable_before_seq=excluded.unverifiable_before_seq,revision=destination_audits.revision+1",
-        params![identity.audit_id, identity.destination_id, identity.configuration_fingerprint, identity.capture_epoch, identity.generation, identity.target_checkpoint, digest, identity.retained_history_start_seq, identity.freshness_started_at, identity.freshness_expires_at, identity.contract_digest],
+        "INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,budget_bytes_used,budget_events_used,budget_ms_used,freshness_window_started_at,freshness_expires_at,contract_digest,retained_history_start_seq,unverifiable_before_seq,incarnation) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?8,0,0,0,?9,?10,?11,?8,?8,?12) ON CONFLICT(audit_id) DO UPDATE SET destination_id=excluded.destination_id,configuration_fingerprint=excluded.configuration_fingerprint,capture_epoch=excluded.capture_epoch,generation=excluded.generation,round_target_seq=excluded.round_target_seq,round_identity_digest=excluded.round_identity_digest,freshness_window_started_at=excluded.freshness_window_started_at,freshness_expires_at=excluded.freshness_expires_at,contract_digest=excluded.contract_digest,retained_history_start_seq=excluded.retained_history_start_seq,unverifiable_before_seq=excluded.unverifiable_before_seq,incarnation=excluded.incarnation,revision=destination_audits.revision+1",
+        params![identity.audit_id, identity.destination_id, identity.configuration_fingerprint, identity.capture_epoch, identity.generation, identity.target_checkpoint, digest, identity.retained_history_start_seq, identity.freshness_started_at, identity.freshness_expires_at, identity.contract_digest, incarnation],
+    )?;
+    tx.execute(
+        "DELETE FROM destination_current_audits WHERE audit_id=?1",
+        [&identity.audit_id],
+    )?;
+    tx.execute(
+        "INSERT INTO destination_current_audits(destination_id,audit_id,incarnation) VALUES(?1,?2,?3) ON CONFLICT(destination_id) DO UPDATE SET audit_id=excluded.audit_id,incarnation=excluded.incarnation",
+        params![identity.destination_id, identity.audit_id, incarnation],
     )?;
     tx.commit()?;
     Ok(())
@@ -444,6 +491,9 @@ fn validate_identity(identity: &AuditIdentity) -> Result<(), AuditError> {
         || identity.contract_digest.is_empty()
         || identity.retained_history_start_seq > identity.target_checkpoint
         || identity.freshness_expires_at <= identity.freshness_started_at
+        || identity
+            .expected_current_incarnation
+            .is_some_and(|n| n <= 0)
     {
         return Err(AuditError::Invalid("incomplete audit identity"));
     }
@@ -569,6 +619,7 @@ mod tests {
             freshness_started_at: "2026-01-01".into(),
             freshness_expires_at: "2026-01-02".into(),
             retained_history_start_seq: 0,
+            expected_current_incarnation: None,
         };
         (path, writer, identity)
     }
@@ -675,6 +726,17 @@ mod tests {
             )
             .unwrap();
         writer.connection_mut().execute("UPDATE destination_checkpoints SET configuration_fingerprint='cfg2',revision=revision+1", []).unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT count(*) FROM destination_current_audits",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
         identity.configuration_fingerprint = "cfg2".into();
         freeze_round(&mut writer, &identity).unwrap();
         assert_eq!(
@@ -686,6 +748,175 @@ mod tests {
                 ))
                 .unwrap(),
             0
+        );
+    }
+    #[test]
+    fn deleted_audit_id_gets_new_incarnation_even_with_identical_round() {
+        let (path, mut writer, mut identity) = fixture("incarnation");
+        freeze_round(&mut writer, &identity).unwrap();
+        let first: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT incarnation FROM destination_audits WHERE audit_id='audit'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let first_status =
+            crate::m2_fault_status::snapshot(&path, "cfg", UNIX_EPOCH + Duration::from_secs(10))
+                .unwrap();
+        let first_key = first_status
+            .control_revisions
+            .keys()
+            .find(|key| key.starts_with("destination_audit:"))
+            .unwrap()
+            .clone();
+        freeze_round(&mut writer, &identity).unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT incarnation FROM destination_audits WHERE audit_id='audit'",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            first
+        );
+        writer
+            .connection()
+            .execute("DELETE FROM destination_audits WHERE audit_id='audit'", [])
+            .unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT count(*) FROM destination_current_audits",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
+        drop(writer);
+        let mut writer = open_writer(&path, "run-restarted", 2, 2000).unwrap();
+        freeze_round(&mut writer, &identity).unwrap();
+        let second: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT incarnation FROM destination_audits WHERE audit_id='audit'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(second > first);
+        let second_status =
+            crate::m2_fault_status::snapshot(&path, "cfg", UNIX_EPOCH + Duration::from_secs(10))
+                .unwrap();
+        assert!(!second_status.control_revisions.contains_key(&first_key));
+        identity.freshness_started_at = "2025-12-31".into();
+        assert_eq!(
+            freeze_round(&mut writer, &identity),
+            Err(AuditError::IdentityConflict)
+        );
+        identity.expected_current_incarnation = Some(second);
+        freeze_round(&mut writer, &identity).unwrap();
+        let third: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT incarnation FROM destination_audits WHERE audit_id='audit'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(third > second);
+    }
+    #[test]
+    fn destination_identity_rollback_does_not_restore_old_audit_binding() {
+        let (path, mut writer, identity) = fixture("destination-rollback");
+        freeze_round(&mut writer, &identity).unwrap();
+        let first: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT incarnation FROM destination_audits WHERE audit_id='audit'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        writer.connection().execute("UPDATE destinations SET configuration_fingerprint='cfg2',revision=revision+1 WHERE destination_id='ch'",[]).unwrap();
+        writer.connection().execute("UPDATE destination_checkpoints SET configuration_fingerprint='cfg2',revision=revision+1 WHERE destination_id='ch'",[]).unwrap();
+        writer.connection().execute("UPDATE destinations SET configuration_fingerprint='cfg',revision=revision+1 WHERE destination_id='ch'",[]).unwrap();
+        writer.connection().execute("UPDATE destination_checkpoints SET configuration_fingerprint='cfg',revision=revision+1 WHERE destination_id='ch'",[]).unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT count(*) FROM destination_current_audits",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
+        freeze_round(&mut writer, &identity).unwrap();
+        let second: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT incarnation FROM destination_audits WHERE audit_id='audit'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(second > first);
+        let status =
+            crate::m2_fault_status::snapshot(&path, "cfg", UNIX_EPOCH + Duration::from_secs(10))
+                .unwrap();
+        assert_eq!(
+            status
+                .control_revisions
+                .keys()
+                .filter(|key| key.starts_with("destination_audit:"))
+                .count(),
+            1
+        );
+    }
+    #[test]
+    fn delayed_audit_cannot_reclaim_newer_current_round() {
+        let (_, mut writer, first_identity) = fixture("stale-audit");
+        freeze_round(&mut writer, &first_identity).unwrap();
+        let first: i64 = writer
+            .connection()
+            .query_row(
+                "SELECT incarnation FROM destination_audits WHERE audit_id='audit'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let mut second_identity = first_identity.clone();
+        second_identity.audit_id = "audit-new".into();
+        assert_eq!(
+            freeze_round(&mut writer, &second_identity),
+            Err(AuditError::IdentityConflict)
+        );
+        second_identity.expected_current_incarnation = Some(first);
+        freeze_round(&mut writer, &second_identity).unwrap();
+        let current: (String, i64) = writer.connection().query_row("SELECT audit_id,incarnation FROM destination_current_audits WHERE destination_id='ch'",[],|row|Ok((row.get(0)?,row.get(1)?))).unwrap();
+        assert_eq!(current.0, "audit-new");
+        assert!(current.1 > first);
+        assert_eq!(
+            freeze_round(&mut writer, &first_identity),
+            Err(AuditError::IdentityConflict)
+        );
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT audit_id FROM destination_current_audits WHERE destination_id='ch'",
+                    [],
+                    |row| row.get::<_, String>(0)
+                )
+                .unwrap(),
+            "audit-new"
         );
     }
 }
