@@ -179,12 +179,11 @@ fn hash(parts: &[&str]) -> String {
 }
 fn public_causal_digest(value: Option<String>) -> Option<String> {
     value.filter(|value| {
-        value.strip_prefix("sha256:").is_some_and(|hex| {
-            hex.len() == 64
-                && hex
-                    .bytes()
-                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
-        })
+        let hex = value.strip_prefix("sha256:").unwrap_or(value);
+        hex.len() == 64
+            && hex
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
     })
 }
 
@@ -708,7 +707,15 @@ pub mod tests {
     fn freshness_expires_and_causal_records_exclude_payloads() {
         let (p, w) = fixture();
         w.connection().execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at) VALUES('request-safe','nonce-secret',x'0102','sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','run-safe','peer-safe','completed',x'03',7,2,'unix:99')",[]).unwrap();
-        let links: Vec<String> = (1..=4).map(|n| format!("sha256:{n:064x}")).collect();
+        let links: Vec<String> = (1..=4)
+            .map(|n| {
+                if n == 4 {
+                    format!("sha256:{n:064x}")
+                } else {
+                    format!("{n:064x}")
+                }
+            })
+            .collect();
         w.connection().execute("UPDATE operator_command_requests SET plan_digest=?1,immutable_intent_id=?2,external_effect_evidence_digest=?3,postcondition_evidence_digest=?4,request_revision=request_revision+1 WHERE request_id='request-safe'",rusqlite::params![links[0],links[1],links[2],links[3]]).unwrap();
         w.connection().execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at,plan_digest,immutable_intent_id) VALUES('request-unsafe','nonce-other',x'0102','digest','run-safe','peer-safe','completed',x'03',7,2,'unix:99','secret-plan','secret-intent')",[]).unwrap();
         w.connection().execute("INSERT INTO startup_reconciliations(run_id,capture_epoch,outcome,reason_code,created_at) VALUES('old-run','epoch','ready','READY','2000-01-01T00:00:00Z')",[]).unwrap();
