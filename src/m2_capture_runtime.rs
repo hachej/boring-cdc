@@ -827,7 +827,10 @@ fn tuples(value: Option<Vec<TupleValue>>) -> Option<Vec<EncodedTuple>> {
             .collect()
     })
 }
-fn encode_row(row: &RowChange, origin: Option<&(u64, String)>) -> Result<Vec<u8>, RuntimeError> {
+pub(crate) fn encode_row(
+    row: &RowChange,
+    origin: Option<&(u64, String)>,
+) -> Result<Vec<u8>, RuntimeError> {
     serde_json::to_vec(&EncodedRow {
         kind: match row.kind {
             crate::m1_decoder::RowKind::Insert => "insert",
@@ -1144,7 +1147,7 @@ fn bind_production_control_contracts(
                 "heartbeat" => (
                     0,
                     &[
-                        ("id", 25, true),
+                        ("id", 21, true),
                         ("nonce", 20, false),
                         ("updated_at", 1184, false),
                     ],
@@ -1153,11 +1156,11 @@ fn bind_production_control_contracts(
                 "capture_fences" => (
                     1,
                     &[
-                        ("id", 25, true),
+                        ("id", 21, true),
                         ("capture_epoch", 20, false),
                         ("generation", 20, false),
-                        ("table_set_fingerprint", 25, false),
-                        ("unique_nonce", 20, false),
+                        ("table_set_fingerprint", 17, false),
+                        ("unique_nonce", 17, false),
                     ],
                     vec![1, 2, 3, 4],
                 ),
@@ -1191,7 +1194,7 @@ fn bind_production_control_contracts(
         }
         seen[index] = true;
         contract.control = Some(ControlContract {
-            immutable_key: vec![b"singleton".to_vec()],
+            immutable_key: vec![b"1".to_vec()],
             mutable_columns,
         });
     }
@@ -2338,24 +2341,24 @@ pub mod tests {
         let heartbeat = make(
             1,
             "heartbeat",
-            &[("id", 25), ("nonce", 20), ("updated_at", 1184)],
+            &[("id", 21), ("nonce", 20), ("updated_at", 1184)],
         );
         let fence = make(
             2,
             "capture_fences",
             &[
-                ("id", 25),
+                ("id", 21),
                 ("capture_epoch", 20),
                 ("generation", 20),
-                ("table_set_fingerprint", 25),
-                ("unique_nonce", 20),
+                ("table_set_fingerprint", 17),
+                ("unique_nonce", 17),
             ],
         );
         let mut contracts = BTreeMap::from([(1, heartbeat), (2, fence)]);
         bind_production_control_contracts(&mut contracts).unwrap();
         assert_eq!(
             contracts[&1].control.as_ref().unwrap().immutable_key,
-            [b"singleton".to_vec()]
+            [b"1".to_vec()]
         );
         assert_eq!(
             contracts[&1].control.as_ref().unwrap().mutable_columns,

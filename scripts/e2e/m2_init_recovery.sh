@@ -51,6 +51,7 @@ init_dry_run >"$work/dry2.json"; token2=$(confirm_token "$work/dry2.json"); [[ "
 [[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot'")" == 0 ]]
 [[ "$(psqlc -Atqc 'select count(*) from boring_cdc_control.heartbeat')" == 1 ]]
 [[ "$(psqlc -Atqc 'select count(*) from boring_cdc_control.capture_fences')" == 1 ]]
+[[ "$(psqlc -Atqc "SELECT count(*) FROM pg_constraint WHERE conrelid='boring_cdc_control.capture_fences'::regclass AND pg_get_expr(conbin,conrelid) IN ('(octet_length(table_set_fingerprint) = 32)','(octet_length(unique_nonce) = 16)')")" == 2 ]]
 [[ "$(psqlc -Atqc "select count(*) from pg_publication_tables where pubname='boring_publication'")" == 3 ]]
 [[ "$(python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("select count(*) from source_state").fetchone()[0])' "$work/run/state/boring.db")" == 1 ]]
 python3 - "$work/first.json" "$work/second.json" <<'PY'
@@ -59,6 +60,15 @@ for p in sys.argv[1:]:
  x=json.load(open(p)); assert x['outcome']=='success' and x['data']['logical_slot_exists'] is False and x['data']['control_rows']==2 and x['mutation_trace'] and x['postcondition_evidence_digest']
  s=open(p).read(); assert 'postgresql://' not in s and 'local-only' not in s
 PY
+
+
+# Existing lookalike tables must carry the exact validated byte-length checks.
+psqlc -qc 'ALTER TABLE boring_cdc_control.capture_fences DROP CONSTRAINT capture_fences_table_set_fingerprint_check, DROP CONSTRAINT capture_fences_unique_nonce_check; ALTER TABLE boring_cdc_control.capture_fences ADD CONSTRAINT weak_table_length CHECK(octet_length(table_set_fingerprint)>=16), ADD CONSTRAINT weak_nonce_length CHECK(octet_length(unique_nonce)>=8)'
+expect_init_failure M2_INIT_CONTROL_LENGTH_CONSTRAINT_INVALID weak-fence-lengths
+psqlc -qc 'ALTER TABLE boring_cdc_control.capture_fences DROP CONSTRAINT weak_table_length, DROP CONSTRAINT weak_nonce_length; ALTER TABLE boring_cdc_control.capture_fences ADD CONSTRAINT capture_fences_table_set_fingerprint_check CHECK(octet_length(table_set_fingerprint)=32), ADD CONSTRAINT capture_fences_unique_nonce_check CHECK(octet_length(unique_nonce)=16)'
+psqlc -qc 'ALTER TABLE boring_cdc_control.capture_fences DROP CONSTRAINT capture_fences_unique_nonce_check; ALTER TABLE boring_cdc_control.capture_fences ADD CONSTRAINT capture_fences_unique_nonce_check CHECK(octet_length(unique_nonce)=16) NOT VALID'
+expect_init_failure M2_INIT_CONTROL_LENGTH_CONSTRAINT_INVALID unvalidated-fence-length
+psqlc -qc 'ALTER TABLE boring_cdc_control.capture_fences VALIDATE CONSTRAINT capture_fences_unique_nonce_check'
 
 # Every publication component and the control privilege boundary reports its own check.
 psqlc -qc 'ALTER PUBLICATION boring_publication DROP TABLE public.orders'
@@ -102,4 +112,5 @@ done
 [[ "$slot_ready" == true ]]; sleep 1; kill -INT "$bootstrap_pid"; wait "$bootstrap_pid"
 (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE timeout --preserve-status --signal=INT 5 "$binary" run)
 
-echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 empty_database=true documented_sql=true init_bootstrap_run=true idempotent=true replay=blocked relation_set=diagnosed owner=diagnosed publish_flags=diagnosed privilege=diagnosed membership=diagnosed slot=pgoutput'
+echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 empty_database=true documented_sql=true init_bootstrap_run=true idempotent=true replay=blocked relation_set=diagnosed owner=diagnosed publish_flags=diagnosed privilege=diagnosed membership=diagnosed exact_fence_lengths=true validated_fence_lengths=true slot=pgoutput'
+

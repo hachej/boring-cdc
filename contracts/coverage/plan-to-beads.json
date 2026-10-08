@@ -2754,7 +2754,7 @@
     {
       "evidence_status": "pending",
       "id": "SCN-SNAPSHOT-COMPLETION-BEFORE-CAPTURE-FENCE",
-      "owner_bead": "boring-cdc-m3-bootstrap",
+      "owner_bead": "boring-cdc-m3-fence",
       "source": "docs/PLAN.md",
       "source_digest": "349c095117b26864c02fcc3423066e2dee228fd9a91abdc4e53536b0f675cd7d"
     },
