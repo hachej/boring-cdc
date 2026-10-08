@@ -5,6 +5,12 @@ on:
       - .github/workflows/m3-receive.yml
       - src/m3_planner.rs
       - vendor/pg_walstream/**
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/m3-receive.yml
+      - src/m3_planner.rs
+      - vendor/pg_walstream/**
   workflow_dispatch:
 permissions:
   contents: read
