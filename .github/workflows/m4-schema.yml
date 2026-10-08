@@ -1,0 +1,65 @@
+name: M4 ClickHouse schema
+on:
+  pull_request:
+    paths:
+      - .github/workflows/m4-schema.yml
+      - src/m4_clickhouse_schema.rs
+      - examples/m4_clickhouse_schema_probe.rs
+      - contracts/clickhouse/**
+      - scripts/e2e/m4_clickhouse_ddl.sh
+      - scripts/validate/m4_clickhouse_ddl.py
+      - scripts/validate/clickhouse_contract.py
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/m4-schema.yml
+      - src/m4_clickhouse_schema.rs
+      - examples/m4_clickhouse_schema_probe.rs
+      - contracts/clickhouse/**
+      - scripts/e2e/m4_clickhouse_ddl.sh
+      - scripts/validate/m4_clickhouse_ddl.py
+      - scripts/validate/clickhouse_contract.py
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  schema:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TMPDIR: /var/tmp
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update
+      - name: Accepted ClickHouse contract
+        run: python3 scripts/validate/clickhouse_contract.py
+      - name: Schema boundary tests
+        run: cargo test --locked m4_ddl::tests
+      - name: ClickHouse 25.8.2.29 schema and merge invariant
+        run: scripts/e2e/m4_clickhouse_ddl.sh
+      - name: Summarize validated schema evidence
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          evidence = pathlib.Path('artifacts/boring-cdc-m4-ddl/SCN-M4-CH-MERGE-INVARIANT/evidence.json')
+          packet = json.loads(evidence.read_text())
+          print(json.dumps({
+              'git_commit': packet['git_commit'],
+              'evidence_sha256': hashlib.sha256(evidence.read_bytes()).hexdigest(),
+              'object_fingerprint': packet['object_fingerprint'],
+              'merge_digest': packet['merge_invariant']['after_sha256'],
+              'status': packet['status'],
+          }, sort_keys=True))
+          print(evidence.read_text())
+          PY
+      - name: Preserve validated M4 schema evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m4-schema-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/boring-cdc-m4-ddl/SCN-M4-CH-MERGE-INVARIANT/evidence.json
+          if-no-files-found: warn

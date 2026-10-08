@@ -411,7 +411,10 @@ fn leading_statement(mut sql: &str) -> &str {
 fn runtime_read_allowed(sql: &str) -> bool {
     let statement =
         leading_statement(sql).trim_end_matches(|c: char| c.is_ascii_whitespace() || c == ';');
-    statement == history_query() || statement == current_state_query().trim_end()
+    statement == history_query()
+        || statement
+            == leading_statement(current_state_query())
+                .trim_end_matches(|c: char| c.is_ascii_whitespace() || c == ';')
 }
 
 fn has_additional_statement(sql: &str) -> bool {
@@ -597,6 +600,10 @@ mod m4_ddl {
             }
             assert_eq!(
                 authorize(Principal::Runtime, history_query()),
+                Ok(SqlClass::Read)
+            );
+            assert_eq!(
+                authorize(Principal::Runtime, current_state_query()),
                 Ok(SqlClass::Read)
             );
             for statement in [
