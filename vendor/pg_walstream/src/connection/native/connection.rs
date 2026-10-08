@@ -1607,6 +1607,7 @@ mod tests {
     async fn test_inline_get_copy_data_drains_pending() {
         use tokio::io::AsyncWriteExt;
         let (worker, mut server) = worker_with_loopback().await;
+        let transport_receive_capacity = worker.transport.retained_receive_capacity();
         let mut conn = NativeConnection {
             driver: Driver::Inline {
                 worker,
@@ -1614,6 +1615,7 @@ mod tests {
                 handle: tokio::runtime::Handle::current(),
             },
             server_ver: 160000,
+            transport_receive_capacity,
             in_copy_mode: true, // skip the replication-mode gate
             alive: Arc::new(AtomicBool::new(true)),
         };
