@@ -51,6 +51,7 @@ jobs:
               'merge_digest': packet['merge_invariant']['after_sha256'],
               'status': packet['status'],
           }, sort_keys=True))
+          print(evidence.read_text())
           PY
       - name: Preserve validated M4 schema evidence
         if: always()
