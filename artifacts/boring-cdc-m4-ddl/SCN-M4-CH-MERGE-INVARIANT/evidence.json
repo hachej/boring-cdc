@@ -1,6 +1,6 @@
 {
   "credentials_recorded": false,
-  "git_commit": "5cbc2d0063bd852b6ec6c59633ac41edb1ae10a6",
+  "git_commit": "56feb93815974213bc32929aa4e3dde6fb840d9e",
   "history_interface": {
     "ordered_without_final": true,
     "rows": 4
@@ -17,7 +17,7 @@
     "contracts/clickhouse/model.json": "4ca8932dcddc5714790f3e924930f76f8ce29fa1ae47bad3fd7667ff3c7edb3e",
     "docs/CLICKHOUSE_MODEL.md": "a42b361438fd557dd35ff333b8c2f4efeabe84eb4f6582f55de02efbb1bedee5",
     "examples/m4_clickhouse_schema_probe.rs": "102c0b92ad3b26a86a9294f0fb5fac1b45fdac31002874dc9273b572ec55a2fd",
-    "scripts/e2e/m4_clickhouse_ddl.sh": "013d6cdab198012ee11ada6cfa0eb45d05d32cca1058695372c336d43c2d1b82",
+    "scripts/e2e/m4_clickhouse_ddl.sh": "23d42b40e066707e1c736733630bb8ac084c67ec6c5800a4af1d5f7e912f2e4b",
     "scripts/validate/m4_clickhouse_ddl.py": "e76310653aca439895137ad0baf42d437990812bce459ae155cfbcfdc52b41da",
     "src/m4_clickhouse_schema.rs": "bb3ddc626512f2a980f94d4622960f824f659cf442522a1cdccfebe625072a44"
   },
