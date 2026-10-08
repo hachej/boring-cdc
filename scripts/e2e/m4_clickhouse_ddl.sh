@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
 work=$(mktemp -d /var/tmp/m4-clickhouse-ddl.XXXXXX); project="m4-ddl-$RANDOM-$$"
 cleanup(){ docker compose -p "$project" -f compose.yaml down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
+phase=setup; merge_observed=unknown; parts_before=unknown
+on_error(){ local line=$1 status=$2; printf 'E_M4_DDL_E2E phase=%s line=%s status=%s merge_observed=%s parts_before=%s\n' "$phase" "$line" "$status" "$merge_observed" "$parts_before" >&2; }
+trap 'on_error "$LINENO" "$?"' ERR
 printf 'm4-ddl-synthetic-%s\n' "$project" >"$work/postgres_password"; chmod 600 "$work/postgres_password"; export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"
 docker compose -p "$project" -f compose.yaml up -d --wait postgres clickhouse >/dev/null
+phase=contract
 ch(){ docker compose -p "$project" -f compose.yaml exec -T clickhouse clickhouse-client "$@"; }
 pg(){ docker compose -p "$project" -f compose.yaml exec -T postgres psql -Atq -U boring_cdc -d boring_cdc "$@"; }
 pg_version=$(pg -c 'show server_version'); [[ "$pg_version" == 17.6* ]]
@@ -17,6 +21,7 @@ if ch --user boring_cdc_runtime --query 'ALTER TABLE boring_cdc.event_history_v1
 lid=$(printf '8%.0s' {1..64}); schema=$(printf '9%.0s' {1..64}); keyhash=$(printf 'a%.0s' {1..64}); batch=$(printf '7%.0s' {1..64}); anchor=$(printf '6%.0s' {1..64}); setfp=$(printf '5%.0s' {1..64}); candidate=$(printf '4%.0s' {1..64})
 ch --query "INSERT INTO boring_cdc.generation_selectors_v1 VALUES (1,9,7,'$setfp','$anchor','$candidate')"
 # Seed two current rows, one TOAST patch, and one tombstone. Each insert is a distinct part.
+phase=seed
 for sql in \
 "(1,7,'$lid','$schema','k1','$keyhash','','$(printf '1%.0s' {1..64})','$(printf 'b%.0s' {1..64})','insert','upsert',1,1,0,0,1,'$batch',[(1,'explicit_value',25,-1,'YQ==')])" \
 "(1,7,'$lid','$schema','k1','$keyhash','','$(printf '2%.0s' {1..64})','$(printf 'c%.0s' {1..64})','update','upsert',2,1,0,0,2,'$batch',[(1,'unchanged_toast',25,-1,'')])" \
@@ -32,24 +37,30 @@ history_out=$(ch --user boring_cdc_runtime --query "SELECT connector_event_id FR
 before=$(current); [[ "$before" == *k1* && "$before" == *YQ==* && "$before" != *gone* ]]
 before_digest=$(printf '%s' "$before" | sha256sum | cut -d' ' -f1)
 # Hold many physical parts, then force a real merge and query while system.merges reports it.
+phase=merge_workload
 ch --query 'SYSTEM STOP MERGES boring_cdc.event_history_v1'
 for part in $(seq 1 24); do
-  ch --query "INSERT INTO boring_cdc.event_history_v1 SELECT 1,7,'$lid','$schema','k1','$keyhash','',lower(hex(SHA256(concat(toString($part),':',toString(number))))),lower(hex(SHA256(concat('p:',toString($part),':',toString(number))))),'update','upsert',toUInt64(100+$part),toUInt8(1),toUInt64(number),toUInt8(0),toUInt64(10000+$part*2000+number),'$batch',[(toUInt32(1),'explicit_value',toUInt32(25),toInt32(-1),'YQ==')] FROM numbers(2000) SETTINGS max_insert_threads=1"
+  ch --query "INSERT INTO boring_cdc.event_history_v1 SELECT 1,7,'$lid','$schema','k1','$keyhash','',lower(hex(SHA256(concat(toString($part),':',toString(number))))),lower(hex(SHA256(concat('p:',toString($part),':',toString(number))))),'update','upsert',toUInt64(100+$part),toUInt8(1),toUInt64(number),toUInt8(0),toUInt64(10000+$part*20000+number),'$batch',[(toUInt32(1),'explicit_value',toUInt32(25),toInt32(-1),'YQ==')] FROM numbers(20000) SETTINGS max_insert_threads=1"
 done
 stopped=$(current); stopped_digest=$(printf '%s' "$stopped" | sha256sum | cut -d' ' -f1); [[ "$stopped_digest" == "$before_digest" ]]
+parts_before=$(ch --query "SELECT count() FROM system.parts WHERE active AND database='boring_cdc' AND table='event_history_v1'"); [[ "$parts_before" -ge 20 ]]
+phase=merge_observation
 ch --query 'SYSTEM START MERGES boring_cdc.event_history_v1'
 ch --query 'OPTIMIZE TABLE boring_cdc.event_history_v1 FINAL' >"$work/optimize.out" 2>"$work/optimize.err" & optimize_pid=$!
 merge_observed=false; during=''
-for _ in $(seq 1 200); do
+for _ in $(seq 1 400); do
   if [[ $(ch --query "SELECT count() FROM system.merges WHERE database='boring_cdc' AND table='event_history_v1'") -gt 0 ]]; then merge_observed=true; during=$(current); break; fi
   kill -0 "$optimize_pid" 2>/dev/null || break; sleep .05
 done
+phase=merge_completion
 wait "$optimize_pid"; [[ "$merge_observed" == true && -n "$during" ]]
+phase=merge_invariant
 during_digest=$(printf '%s' "$during" | sha256sum | cut -d' ' -f1); after=$(current); after_digest=$(printf '%s' "$after" | sha256sum | cut -d' ' -f1)
 [[ "$before_digest" == "$during_digest" && "$during_digest" == "$after_digest" ]]
 parts_after=$(ch --query "SELECT count() FROM system.parts WHERE active AND database='boring_cdc' AND table='event_history_v1'")
 objects=$(ch --query "SELECT count() FROM system.tables WHERE database='boring_cdc' AND name IN ('event_history_v1','batch_markers_v1','generation_selectors_v1','selector_conflicts_v1','live_generation_v1','event_identity_conflicts_v1')")
 [[ "$objects" == 6 ]]
+phase=evidence
 commit=$(git rev-parse HEAD); mkdir -p artifacts/boring-cdc-m4-ddl/SCN-M4-CH-MERGE-INVARIANT
 python3 - "$commit" "$pg_version" "$ch_version" "$fingerprint" "$before_digest" "$during_digest" "$after_digest" "$parts_after" > artifacts/boring-cdc-m4-ddl/SCN-M4-CH-MERGE-INVARIANT/evidence.json <<'PY'
 import json,sys
