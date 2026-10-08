@@ -34,7 +34,6 @@ jobs:
     timeout-minutes: 30
     env:
       TMPDIR: /var/tmp
-      BORING_CDC_M3_FENCE_EVIDENCE_SEED: fence-${{ github.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Install repository-pinned Rust toolchain
@@ -44,14 +43,20 @@ jobs:
       - name: Fixed-row schema fault boundaries
         run: scripts/faults/m2_init_recovery.sh
       - name: PostgreSQL 17.6 fence and anchor
+        env:
+          M3_FENCE_EVIDENCE_SEED: fence-${{ github.sha }}
         run: scripts/e2e/m3_fence.sh
       - name: Fence fault boundaries
+        env:
+          M3_FENCE_EVIDENCE_SEED: fence-${{ github.sha }}
         run: scripts/faults/m3_fence.sh
       - name: Summarize validated fence evidence
+        env:
+          M3_FENCE_EVIDENCE_SEED: fence-${{ github.sha }}
         run: |
           python3 - <<'PY'
           import hashlib, json, os, pathlib
-          seed = os.environ['BORING_CDC_M3_FENCE_EVIDENCE_SEED']
+          seed = os.environ['M3_FENCE_EVIDENCE_SEED']
           root = pathlib.Path('artifacts/boring-cdc-m3-fence')
           for scenario in ('SCN-M3-FENCE-PGOUTPUT', 'SCN-M3-FENCE-FAULTS'):
               evidence = root / scenario / seed / 'evidence.json'

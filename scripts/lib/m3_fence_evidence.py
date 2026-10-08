@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import hashlib,json,os,pathlib,re,sys
 R=pathlib.Path(__file__).resolve().parents[2]
-mode=sys.argv[1]; scenario='SCN-M3-FENCE-PGOUTPUT' if mode=='e2e' else 'SCN-M3-FENCE-FAULTS'; seed=os.environ.get('BORING_CDC_M3_FENCE_EVIDENCE_SEED','fence-pg17-v1')
+mode=sys.argv[1]; scenario='SCN-M3-FENCE-PGOUTPUT' if mode=='e2e' else 'SCN-M3-FENCE-FAULTS'; seed=os.environ.get('M3_FENCE_EVIDENCE_SEED','fence-pg17-v1')
 if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,79}',seed): raise SystemExit('invalid evidence seed')
 out=R/'artifacts/boring-cdc-m3-fence'/scenario/seed
 if out.exists(): raise SystemExit(f'evidence seed already exists: {out}')

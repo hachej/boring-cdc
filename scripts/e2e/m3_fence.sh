@@ -66,4 +66,4 @@ assert all(x['pgoutput_contains_nonce'] and x['affected_rows']==1 and x['pgoutpu
 print(json.dumps({'anchor_state':'complete','first_proof':True,'post_copy_fence_seq':6,'pgoutput_contains_nonce':True,'m2_encoded_row_from_live_pgoutput':True,'affected_rows':1,'deterministic_attempts':2,'commit_end_lsns':[x['commit_end_lsn'] for x in observed]},sort_keys=True))
 PY
 BORING_CDC_M3_FENCE_OBSERVATION="$work/result.json" python3 scripts/lib/m3_fence_evidence.py e2e
-scripts/validate/evidence.sh "artifacts/boring-cdc-m3-fence/SCN-M3-FENCE-PGOUTPUT/${BORING_CDC_M3_FENCE_EVIDENCE_SEED:-fence-pg17-v1}/evidence.json"
+scripts/validate/evidence.sh "artifacts/boring-cdc-m3-fence/SCN-M3-FENCE-PGOUTPUT/${M3_FENCE_EVIDENCE_SEED:-fence-pg17-v1}/evidence.json"
