@@ -1,6 +1,6 @@
 {
   "credentials_recorded": false,
-  "git_commit": "4f8a6c6ff36586532ea9c6791570a9c8f80b59c1",
+  "git_commit": "5cbc2d0063bd852b6ec6c59633ac41edb1ae10a6",
   "history_interface": {
     "ordered_without_final": true,
     "rows": 4
@@ -8,6 +8,18 @@
   "images": {
     "clickhouse": "25.8.2.29",
     "postgres": "17.6"
+  },
+  "input_sha256": {
+    "Cargo.lock": "aa3eb1b2c55f71db2536437638395124aadf94e7859c673db7986ff744d74bf3",
+    "compose.yaml": "a011b2853414ee065dfacd2f42cf3e3ac0d218ffa01b1d44061705f4757edeec",
+    "contracts/clickhouse/canonical-query.sql": "0c1a0008e94cc1104e2b6964d39cc9aae26cddb76ba1f38372dc7c5d5442c8df",
+    "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
+    "contracts/clickhouse/model.json": "4ca8932dcddc5714790f3e924930f76f8ce29fa1ae47bad3fd7667ff3c7edb3e",
+    "docs/CLICKHOUSE_MODEL.md": "a42b361438fd557dd35ff333b8c2f4efeabe84eb4f6582f55de02efbb1bedee5",
+    "examples/m4_clickhouse_schema_probe.rs": "102c0b92ad3b26a86a9294f0fb5fac1b45fdac31002874dc9273b572ec55a2fd",
+    "scripts/e2e/m4_clickhouse_ddl.sh": "013d6cdab198012ee11ada6cfa0eb45d05d32cca1058695372c336d43c2d1b82",
+    "scripts/validate/m4_clickhouse_ddl.py": "e76310653aca439895137ad0baf42d437990812bce459ae155cfbcfdc52b41da",
+    "src/m4_clickhouse_schema.rs": "bb3ddc626512f2a980f94d4622960f824f659cf442522a1cdccfebe625072a44"
   },
   "merge_invariant": {
     "active_parts_after": 1,
@@ -17,7 +29,7 @@
     "stopped_sha256": "5f1bf8cbf6c4ef9a3034c3386c653c657882912ed72b51409eed55142e94c596",
     "system_merges_observed": true
   },
-  "object_fingerprint": "7f4c6dc18f4cbce89812d93f2b3281b0fe58447c1b9fadfe348f7f9064544237",
+  "object_fingerprint": "96300f6ff1e503e82bef1856c39a1f2276b17014d3ee5778cf4f6cb54824a97a",
   "objects_verified": 6,
   "observed_versions": {
     "clickhouse": "25.8.2.29",
