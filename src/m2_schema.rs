@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 13;
+pub const SCHEMA_VERSION: i64 = 14;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -461,6 +461,23 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_13_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v14: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=14)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v14 {
+            connection.execute_batch(MIGRATION_14)?;
+            connection.execute("INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(14,'current-audit-incarnation',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[MIGRATION_14_CHECKSUM])?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=14",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_14_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -866,6 +883,52 @@ CREATE TABLE capture_health_observations(
  observed_at_unix_seconds INTEGER NOT NULL CHECK(observed_at_unix_seconds>=0));
 "#;
 
+const MIGRATION_14_CHECKSUM: &str =
+    "sha256:203c239a278596d84519083b24a3af3569e5350416d3a055dbc8f084c019bf89";
+const MIGRATION_14: &str = r#"
+ALTER TABLE destination_audits ADD COLUMN incarnation INTEGER NOT NULL DEFAULT 0
+ CHECK(incarnation>=0);
+CREATE TABLE audit_incarnation_counter(
+ singleton INTEGER PRIMARY KEY CHECK(singleton=1),
+ last_incarnation INTEGER NOT NULL CHECK(last_incarnation>=0));
+INSERT INTO audit_incarnation_counter(singleton,last_incarnation) VALUES(1,0);
+CREATE TABLE destination_current_audits(
+ destination_id TEXT PRIMARY KEY REFERENCES destinations(destination_id) ON DELETE CASCADE,
+ audit_id TEXT NOT NULL UNIQUE REFERENCES destination_audits(audit_id) ON DELETE CASCADE,
+ incarnation INTEGER NOT NULL CHECK(incarnation>0));
+CREATE TRIGGER current_audit_insert BEFORE INSERT ON destination_current_audits
+WHEN NOT EXISTS(
+ SELECT 1 FROM destination_audits a JOIN destinations d
+ ON d.destination_id=a.destination_id
+ WHERE a.audit_id=NEW.audit_id AND a.incarnation=NEW.incarnation
+ AND a.destination_id=NEW.destination_id
+ AND a.configuration_fingerprint=d.configuration_fingerprint
+ AND a.capture_epoch=d.capture_epoch AND a.generation=d.generation)
+BEGIN SELECT RAISE(ABORT,'current audit identity mismatch'); END;
+CREATE TRIGGER current_audit_update BEFORE UPDATE ON destination_current_audits
+WHEN NOT EXISTS(
+ SELECT 1 FROM destination_audits a JOIN destinations d
+ ON d.destination_id=a.destination_id
+ WHERE a.audit_id=NEW.audit_id AND a.incarnation=NEW.incarnation
+ AND a.destination_id=NEW.destination_id
+ AND a.configuration_fingerprint=d.configuration_fingerprint
+ AND a.capture_epoch=d.capture_epoch AND a.generation=d.generation)
+BEGIN SELECT RAISE(ABORT,'current audit identity mismatch'); END;
+CREATE TRIGGER current_audit_destination_change AFTER UPDATE OF kind,configuration_fingerprint,capture_epoch,generation ON destinations
+WHEN NEW.kind!=OLD.kind OR NEW.configuration_fingerprint!=OLD.configuration_fingerprint
+ OR NEW.capture_epoch!=OLD.capture_epoch OR NEW.generation!=OLD.generation
+BEGIN DELETE FROM destination_current_audits WHERE destination_id=NEW.destination_id; END;
+CREATE TRIGGER current_audit_checkpoint_insert AFTER INSERT ON destination_checkpoints
+BEGIN DELETE FROM destination_current_audits WHERE destination_id=NEW.destination_id; END;
+CREATE TRIGGER current_audit_checkpoint_change AFTER UPDATE OF configuration_fingerprint,capture_epoch,generation,journal_seq,complete_transaction_id ON destination_checkpoints
+WHEN NEW.configuration_fingerprint!=OLD.configuration_fingerprint
+ OR NEW.capture_epoch!=OLD.capture_epoch OR NEW.generation!=OLD.generation
+ OR NEW.journal_seq!=OLD.journal_seq OR NEW.complete_transaction_id!=OLD.complete_transaction_id
+BEGIN DELETE FROM destination_current_audits WHERE destination_id=NEW.destination_id; END;
+CREATE TRIGGER current_audit_checkpoint_delete AFTER DELETE ON destination_checkpoints
+BEGIN DELETE FROM destination_current_audits WHERE destination_id=OLD.destination_id; END;
+"#;
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -934,6 +997,8 @@ pub mod tests {
             "archive_generation_markers",
             "processing_failures",
             "destination_audits",
+            "audit_incarnation_counter",
+            "destination_current_audits",
             "condition_hysteresis",
             "alerts",
             "schema_migrations",
@@ -1210,6 +1275,102 @@ pub mod tests {
         );
         drop(c);
         let _ = fs::remove_file(upgrade);
+    }
+
+    #[test]
+    fn v13_audit_upgrade_does_not_invent_a_current_round() {
+        let p = path("v13-audit-upgrade");
+        let _ = fs::remove_file(&p);
+        let connection = Connection::open(&p).unwrap();
+        connection
+            .pragma_update(None, "auto_vacuum", "INCREMENTAL")
+            .unwrap();
+        connection
+            .pragma_update(None, "foreign_keys", "ON")
+            .unwrap();
+        for (version, migration, checksum) in [
+            (1, MIGRATION_1, MIGRATION_1_CHECKSUM),
+            (2, MIGRATION_2, MIGRATION_2_CHECKSUM),
+            (3, MIGRATION_3, MIGRATION_3_CHECKSUM),
+            (4, MIGRATION_4, MIGRATION_4_CHECKSUM),
+            (5, MIGRATION_5, MIGRATION_5_CHECKSUM),
+            (6, MIGRATION_6, MIGRATION_6_CHECKSUM),
+            (7, MIGRATION_7, MIGRATION_7_CHECKSUM),
+            (8, MIGRATION_8, MIGRATION_8_CHECKSUM),
+            (9, MIGRATION_9, MIGRATION_9_CHECKSUM),
+            (10, MIGRATION_10, MIGRATION_10_CHECKSUM),
+            (11, MIGRATION_11, MIGRATION_11_CHECKSUM),
+            (12, MIGRATION_12, MIGRATION_12_CHECKSUM),
+            (13, MIGRATION_13, MIGRATION_13_CHECKSUM),
+        ] {
+            connection.execute_batch(migration).unwrap();
+            connection.execute(
+                "INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(?1,?2,?3,'before-upgrade')",
+                rusqlite::params![version, format!("migration-{version}"), checksum],
+            ).unwrap();
+        }
+        connection.execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('ch','clickhouse','cfg','epoch',1)",[]).unwrap();
+        connection.execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest) VALUES('legacy','ch','cfg','epoch',1,0,'round',0,0,'2026-01-01','2026-01-02','contract')",[]).unwrap();
+        drop(connection);
+
+        let writer = open_writer(&p, "run", 1, 1000).unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT incarnation FROM destination_audits WHERE audit_id='legacy'",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT count(*) FROM destination_current_audits",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT last_incarnation FROM audit_incarnation_counter",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            writer
+                .connection()
+                .query_row("SELECT max(version) FROM schema_migrations", [], |row| row
+                    .get::<_, i64>(
+                    0
+                ))
+                .unwrap(),
+            14
+        );
+        apply_migrations(writer.connection()).unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT count(*) FROM schema_migrations WHERE version=14",
+                    [],
+                    |row| row.get::<_, i64>(0)
+                )
+                .unwrap(),
+            1
+        );
+        drop(writer);
+        let _ = fs::remove_file(p);
     }
 
     #[test]

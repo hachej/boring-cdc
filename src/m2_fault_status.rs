@@ -205,18 +205,23 @@ fn add_current_audit_revisions(
     revisions: &mut BTreeMap<String, u64>,
 ) -> Result<(), StatusError> {
     let mut statement = connection.prepare(
-        "SELECT audit_id,round_identity_digest,revision FROM ( \
-           SELECT a.audit_id,a.round_identity_digest,a.revision, \
-             DENSE_RANK() OVER (PARTITION BY a.destination_id ORDER BY a.freshness_window_started_at DESC) AS recency \
-           FROM destination_audits a JOIN destinations d ON d.destination_id=a.destination_id \
-             AND d.capture_epoch=a.capture_epoch AND d.generation=a.generation) \
-         WHERE recency=1",
+        "SELECT a.audit_id,a.incarnation,a.revision \
+         FROM destination_current_audits current \
+         JOIN destination_audits a ON a.audit_id=current.audit_id \
+           AND a.destination_id=current.destination_id AND a.incarnation=current.incarnation \
+         JOIN destinations d ON d.destination_id=current.destination_id \
+           AND d.configuration_fingerprint=a.configuration_fingerprint \
+           AND d.capture_epoch=a.capture_epoch AND d.generation=a.generation \
+         LEFT JOIN destination_checkpoints cp ON cp.destination_id=d.destination_id \
+         WHERE a.incarnation>0 AND a.round_target_seq=coalesce(cp.journal_seq,0) \
+           AND (cp.destination_id IS NULL OR (cp.configuration_fingerprint=d.configuration_fingerprint \
+             AND cp.capture_epoch=d.capture_epoch AND cp.generation=d.generation))",
     )?;
     for (index, row) in statement
         .query_map([], |row| {
             Ok((
                 row.get::<_, String>(0)?,
-                row.get::<_, String>(1)?,
+                row.get::<_, i64>(1)?,
                 row.get::<_, u64>(2)?,
             ))
         })?
@@ -225,9 +230,12 @@ fn add_current_audit_revisions(
         if index == MAX_CONTROL_OBJECTS_PER_KIND {
             return Err(StatusError::TooManyControlObjects);
         }
-        let (id, round, revision) = row?;
+        let (id, incarnation, revision) = row?;
         revisions.insert(
-            format!("destination_audit:{}", hash(&[&id, &round])),
+            format!(
+                "destination_audit:{}",
+                hash(&[&id, &incarnation.to_string()])
+            ),
             revision,
         );
     }
@@ -713,13 +721,16 @@ pub mod tests {
             w.connection().execute("INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES(?1,?2,'epoch',1,'cfg','run',99,'held')",rusqlite::params![lease,destination]).unwrap();
             w.connection().execute("INSERT INTO destination_promotion_intents(intent_id,destination_id,capture_epoch,candidate_generation,anchor_id,configuration_fingerprint,promotion_fence,expected_selector_digest,state) VALUES(?1,?2,'epoch',1,'anchor','cfg',1,'selector','prepared')",rusqlite::params![promotion,destination]).unwrap();
         }
-        for (audit, destination) in [("audit-a", "dest-a"), ("audit-b", "dest-b")] {
-            w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest) VALUES(?1,?2,'cfg','epoch',1,0,'round',0,0,'unix:1','unix:2','contract')",rusqlite::params![audit,destination]).unwrap();
+        for (audit, destination, incarnation) in
+            [("audit-a", "dest-a", 1), ("audit-b", "dest-b", 2)]
+        {
+            w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest,incarnation) VALUES(?1,?2,'cfg','epoch',1,0,'round',0,0,'unix:1','unix:2','contract',?3)",rusqlite::params![audit,destination,incarnation]).unwrap();
+            w.connection().execute("INSERT INTO destination_current_audits(destination_id,audit_id,incarnation) VALUES(?1,?2,?3)",rusqlite::params![destination,audit,incarnation]).unwrap();
         }
         let before = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
         let key = |namespace: &str, id: &str| {
             let identity = if namespace == "destination_audit" {
-                hash(&[id, "round"])
+                hash(&[id, if id == "audit-a" { "1" } else { "2" }])
             } else {
                 hash(&[id])
             };
@@ -772,7 +783,8 @@ pub mod tests {
                 [],
             )
             .unwrap();
-        w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest) VALUES('audit-b','dest-b','cfg','epoch',1,0,'new-round',0,0,'unix:2','unix:3','contract')",[]).unwrap();
+        w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest,incarnation) VALUES('audit-b','dest-b','cfg','epoch',1,0,'round',0,0,'unix:1','unix:2','contract',3)",[]).unwrap();
+        w.connection().execute("INSERT INTO destination_current_audits(destination_id,audit_id,incarnation) VALUES('dest-b','audit-b',3)",[]).unwrap();
         let replaced = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
         assert!(
             !replaced
@@ -780,10 +792,9 @@ pub mod tests {
                 .contains_key(&key("destination_audit", "audit-b"))
         );
         assert_eq!(
-            replaced.control_revisions.get(&format!(
-                "destination_audit:{}",
-                hash(&["audit-b", "new-round"])
-            )),
+            replaced
+                .control_revisions
+                .get(&format!("destination_audit:{}", hash(&["audit-b", "3"]))),
             Some(&0)
         );
         drop(w);
@@ -805,7 +816,7 @@ pub mod tests {
     fn retained_audit_history_does_not_hide_current_status() {
         let (p, w) = fixture();
         w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('dest','clickhouse','cfg','epoch',1)",[]).unwrap();
-        w.connection().execute_batch("WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM ids WHERE n<1001) INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest) SELECT printf('audit-%04d',n),'dest','cfg','epoch',1,0,printf('round-%04d',n),0,0,printf('unix:%04d',n),printf('unix:%04d',n+1),'contract' FROM ids;").unwrap();
+        w.connection().execute_batch("WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM ids WHERE n<1001) INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest,incarnation) SELECT printf('audit-%04d',n),'dest','cfg','epoch',1,0,printf('round-%04d',n),0,0,printf('unix:%d',n),'unix:zzzz','contract',n FROM ids; INSERT INTO destination_current_audits(destination_id,audit_id,incarnation) VALUES('dest','audit-1001',1001);").unwrap();
         let status = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
         assert_eq!(
             status
@@ -817,7 +828,7 @@ pub mod tests {
         );
         assert!(status.control_revisions.contains_key(&format!(
             "destination_audit:{}",
-            hash(&["audit-1001", "round-1001"])
+            hash(&["audit-1001", "1001"])
         )));
     }
     #[test]
