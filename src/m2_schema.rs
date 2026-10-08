@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 14;
+pub const SCHEMA_VERSION: i64 = 15;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -478,6 +478,23 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_14_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v15: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=15)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v15 {
+            connection.execute_batch(MIGRATION_15)?;
+            connection.execute("INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(15,'failure-telemetry-action-causality',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[MIGRATION_15_CHECKSUM])?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=15",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_15_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -929,6 +946,43 @@ CREATE TRIGGER current_audit_checkpoint_delete AFTER DELETE ON destination_check
 BEGIN DELETE FROM destination_current_audits WHERE destination_id=OLD.destination_id; END;
 "#;
 
+const MIGRATION_15_CHECKSUM: &str =
+    "sha256:82c6451d30bf59a95457c39706cdaf80015b5f45cb46ca2c1fc123676944b5bf";
+const MIGRATION_15: &str = r#"
+ALTER TABLE processing_failures ADD COLUMN failed_capture_epoch TEXT;
+ALTER TABLE processing_failures ADD COLUMN failed_xid TEXT;
+ALTER TABLE processing_failures ADD COLUMN failed_final_lsn TEXT
+ CHECK(failed_final_lsn IS NULL OR (length(failed_final_lsn)=16 AND failed_final_lsn NOT GLOB '*[^0-9A-F]*'));
+ALTER TABLE processing_failures ADD COLUMN observed_transaction_bytes INTEGER
+ CHECK(observed_transaction_bytes IS NULL OR observed_transaction_bytes>=0);
+ALTER TABLE processing_failures ADD COLUMN observed_transaction_events INTEGER
+ CHECK(observed_transaction_events IS NULL OR observed_transaction_events>=0);
+ALTER TABLE processing_failures ADD COLUMN limit_bytes INTEGER
+ CHECK(limit_bytes IS NULL OR limit_bytes>=0);
+ALTER TABLE processing_failures ADD COLUMN limit_events INTEGER
+ CHECK(limit_events IS NULL OR limit_events>=0);
+ALTER TABLE operator_command_requests ADD COLUMN plan_digest TEXT;
+ALTER TABLE operator_command_requests ADD COLUMN immutable_intent_id TEXT;
+ALTER TABLE operator_command_requests ADD COLUMN external_effect_evidence_digest TEXT;
+ALTER TABLE operator_command_requests ADD COLUMN postcondition_evidence_digest TEXT;
+CREATE TRIGGER command_causality_insert BEFORE INSERT ON operator_command_requests
+WHEN (NEW.immutable_intent_id IS NOT NULL AND NEW.plan_digest IS NULL)
+ OR (NEW.external_effect_evidence_digest IS NOT NULL AND NEW.immutable_intent_id IS NULL)
+ OR (NEW.postcondition_evidence_digest IS NOT NULL AND NEW.immutable_intent_id IS NULL)
+BEGIN SELECT RAISE(ABORT,'incomplete operator action causal link'); END;
+CREATE TRIGGER command_causality_update BEFORE UPDATE ON operator_command_requests
+WHEN (NEW.immutable_intent_id IS NOT NULL AND NEW.plan_digest IS NULL)
+ OR (NEW.external_effect_evidence_digest IS NOT NULL AND NEW.immutable_intent_id IS NULL)
+ OR (NEW.postcondition_evidence_digest IS NOT NULL AND NEW.immutable_intent_id IS NULL)
+BEGIN SELECT RAISE(ABORT,'incomplete operator action causal link'); END;
+CREATE TRIGGER command_causality_links_immutable BEFORE UPDATE ON operator_command_requests
+WHEN (OLD.plan_digest IS NOT NULL AND NEW.plan_digest IS NOT OLD.plan_digest)
+ OR (OLD.immutable_intent_id IS NOT NULL AND NEW.immutable_intent_id IS NOT OLD.immutable_intent_id)
+ OR (OLD.external_effect_evidence_digest IS NOT NULL AND NEW.external_effect_evidence_digest IS NOT OLD.external_effect_evidence_digest)
+ OR (OLD.postcondition_evidence_digest IS NOT NULL AND NEW.postcondition_evidence_digest IS NOT OLD.postcondition_evidence_digest)
+BEGIN SELECT RAISE(ABORT,'operator action causal link is immutable'); END;
+"#;
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -1355,7 +1409,7 @@ pub mod tests {
                     0
                 ))
                 .unwrap(),
-            14
+            15
         );
         apply_migrations(writer.connection()).unwrap();
         assert_eq!(
@@ -1367,6 +1421,84 @@ pub mod tests {
                     |row| row.get::<_, i64>(0)
                 )
                 .unwrap(),
+            1
+        );
+        drop(writer);
+        let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn v14_failure_upgrade_preserves_unknowns_and_causal_links() {
+        let p = path("v14-failure-upgrade");
+        let _ = fs::remove_file(&p);
+        let connection = Connection::open(&p).unwrap();
+        connection
+            .pragma_update(None, "auto_vacuum", "INCREMENTAL")
+            .unwrap();
+        connection
+            .pragma_update(None, "foreign_keys", "ON")
+            .unwrap();
+        for (version, migration, checksum) in [
+            (1, MIGRATION_1, MIGRATION_1_CHECKSUM),
+            (2, MIGRATION_2, MIGRATION_2_CHECKSUM),
+            (3, MIGRATION_3, MIGRATION_3_CHECKSUM),
+            (4, MIGRATION_4, MIGRATION_4_CHECKSUM),
+            (5, MIGRATION_5, MIGRATION_5_CHECKSUM),
+            (6, MIGRATION_6, MIGRATION_6_CHECKSUM),
+            (7, MIGRATION_7, MIGRATION_7_CHECKSUM),
+            (8, MIGRATION_8, MIGRATION_8_CHECKSUM),
+            (9, MIGRATION_9, MIGRATION_9_CHECKSUM),
+            (10, MIGRATION_10, MIGRATION_10_CHECKSUM),
+            (11, MIGRATION_11, MIGRATION_11_CHECKSUM),
+            (12, MIGRATION_12, MIGRATION_12_CHECKSUM),
+            (13, MIGRATION_13, MIGRATION_13_CHECKSUM),
+            (14, MIGRATION_14, MIGRATION_14_CHECKSUM),
+        ] {
+            connection.execute_batch(migration).unwrap();
+            connection.execute(
+                "INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(?1,?2,?3,'before-upgrade')",
+                rusqlite::params![version, format!("migration-{version}"), checksum],
+            ).unwrap();
+        }
+        connection.execute("INSERT INTO processing_failures(failure_id,component,failure_class,fingerprint,retry_class,attempt,armed,first_failed_at,last_failed_at) VALUES('old','capture','resource','old-fingerprint','deterministic',1,1,'before','before')",[]).unwrap();
+        connection.execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,observation_revision,control_revision,expires_at) VALUES('old-request','nonce',X'01','digest','run','peer','accepted',1,1,'later')",[]).unwrap();
+        drop(connection);
+
+        let writer = open_writer(&p, "run", 1, 1000).unwrap();
+        let c = writer.connection();
+        let unknowns: (Option<String>, Option<String>, Option<i64>, Option<String>) = c.query_row(
+            "SELECT failed_xid,failed_final_lsn,observed_transaction_bytes,failed_capture_epoch FROM processing_failures WHERE failure_id='old'",
+            [], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        ).unwrap();
+        assert_eq!(unknowns, (None, None, None, None));
+        let old_plan: Option<String> = c
+            .query_row(
+                "SELECT plan_digest FROM operator_command_requests WHERE request_id='old-request'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(old_plan, None);
+        c.execute("UPDATE processing_failures SET failed_capture_epoch='epoch',failed_xid='42',failed_final_lsn='00000000000000AA',observed_transaction_bytes=101,observed_transaction_events=2,limit_bytes=100,limit_events=5 WHERE failure_id='old'",[]).unwrap();
+        assert!(
+            c.execute(
+                "UPDATE processing_failures SET failed_final_lsn='bad' WHERE failure_id='old'",
+                []
+            )
+            .is_err()
+        );
+        assert!(c.execute("UPDATE processing_failures SET observed_transaction_bytes=-1 WHERE failure_id='old'",[]).is_err());
+        c.execute("UPDATE operator_command_requests SET plan_digest='plan',immutable_intent_id='intent',request_revision=request_revision+1 WHERE request_id='old-request'",[]).unwrap();
+        assert!(c.execute("UPDATE operator_command_requests SET plan_digest='other',request_revision=request_revision+1 WHERE request_id='old-request'",[]).is_err());
+        assert!(c.execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,observation_revision,control_revision,expires_at,external_effect_evidence_digest) VALUES('invalid','other-nonce',X'01','digest','run','peer','accepted',1,1,'later','effect')",[]).is_err());
+        apply_migrations(c).unwrap();
+        assert_eq!(
+            c.query_row(
+                "SELECT count(*) FROM schema_migrations WHERE version=15",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
             1
         );
         drop(writer);
@@ -1494,7 +1626,7 @@ pub mod tests {
         tx(w.connection());
         w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','epoch',1)",[]).unwrap();
         w.connection().execute("INSERT INTO destination_checkpoints VALUES('d','epoch',NULL,'cfg',1,'tx1',1,NULL,0)",[]).unwrap();
-        w.connection().execute("INSERT INTO processing_failures VALUES('fail','d','archive','io','fingerprint',1,1,'transient',2,'later',1,'first','last')",[]).unwrap();
+        w.connection().execute("INSERT INTO processing_failures(failure_id,destination_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES('fail','d','archive','io','fingerprint',1,1,'transient',2,'later',1,'first','last')",[]).unwrap();
         w.connection()
             .execute(
                 "UPDATE destinations SET current_failure_id='fail',revision=revision+1 WHERE destination_id='d'",
@@ -1542,7 +1674,7 @@ pub mod tests {
         w.connection().execute("INSERT INTO source_transactions VALUES('tx2','epoch','sys','db','slot','8','0000000000000020',2,2,0,'sum2','committed')",[]).unwrap();
         w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','epoch',1)",[]).unwrap();
         w.connection().execute("INSERT INTO destination_checkpoints VALUES('d','epoch',NULL,'cfg',1,'tx1',1,NULL,0)",[]).unwrap();
-        w.connection().execute("INSERT INTO processing_failures VALUES('fail','d','archive','io','fingerprint',2,2,'transient',1,'later',1,'first','last')",[]).unwrap();
+        w.connection().execute("INSERT INTO processing_failures(failure_id,destination_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES('fail','d','archive','io','fingerprint',2,2,'transient',1,'later',1,'first','last')",[]).unwrap();
         w.connection().execute("UPDATE destinations SET current_failure_id='fail',revision=revision+1 WHERE destination_id='d'",[]).unwrap();
 
         assert!(w.connection().execute("UPDATE destination_checkpoints SET complete_transaction_id='tx2',journal_seq=2,revision=revision+1 WHERE destination_id='d'",[]).is_err());

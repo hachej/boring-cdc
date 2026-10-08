@@ -16,6 +16,7 @@
     {"id":"SCN-M2-SCHEMA-FAILURE-CHECKPOINT-GUARD","test":"armed_destination_failure_blocks_checkpoint_advancement","assertion":"a destination-scoped armed current failure blocks checkpoint boundary advancement until explicitly recovered"},
     {"id":"SCN-M2-SCHEMA-COMMAND-IDENTITY","test":"operator_command_identity_is_immutable_across_cas_transitions","assertion":"operator request identity and bound revisions remain immutable while result/state transitions remain revision-CAS fenced"},
     {"id":"SCN-M2-SCHEMA-AUDIT-INVALIDATION","test":"audit_coverage_is_invalidated_and_bounded_by_frozen_round","assertion":"audit identity changes require prior coverage invalidation and inline/normalized ranges remain within retention, target, and freshness bounds"},
-    {"id":"SCN-M2-SCHEMA-AUDIT-INCARNATION-UPGRADE","test":"v13_audit_upgrade_does_not_invent_a_current_round","assertion":"v13 audit history remains unknown after v14 migration until a new durable incarnation is frozen"}
+    {"id":"SCN-M2-SCHEMA-AUDIT-INCARNATION-UPGRADE","test":"v13_audit_upgrade_does_not_invent_a_current_round","assertion":"v13 audit history remains unknown after v14 migration until a new durable incarnation is frozen"},
+    {"id":"SCN-M2-SCHEMA-FAILURE-TELEMETRY-UPGRADE","test":"v14_failure_upgrade_preserves_unknowns_and_causal_links","assertion":"v14 failure and command histories remain unknown after v15 migration; new telemetry is bounded and causal links cannot be rewritten"}
   ]
 }
