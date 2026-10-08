@@ -199,6 +199,40 @@ fn add_object_revisions(
     }
     Ok(())
 }
+
+fn add_current_audit_revisions(
+    connection: &Connection,
+    revisions: &mut BTreeMap<String, u64>,
+) -> Result<(), StatusError> {
+    let mut statement = connection.prepare(
+        "SELECT audit_id,round_identity_digest,revision FROM ( \
+           SELECT a.audit_id,a.round_identity_digest,a.revision, \
+             DENSE_RANK() OVER (PARTITION BY a.destination_id ORDER BY a.freshness_window_started_at DESC) AS recency \
+           FROM destination_audits a JOIN destinations d ON d.destination_id=a.destination_id \
+             AND d.capture_epoch=a.capture_epoch AND d.generation=a.generation) \
+         WHERE recency=1",
+    )?;
+    for (index, row) in statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, u64>(2)?,
+            ))
+        })?
+        .enumerate()
+    {
+        if index == MAX_CONTROL_OBJECTS_PER_KIND {
+            return Err(StatusError::TooManyControlObjects);
+        }
+        let (id, round, revision) = row?;
+        revisions.insert(
+            format!("destination_audit:{}", hash(&[&id, &round])),
+            revision,
+        );
+    }
+    Ok(())
+}
 fn cid(n: &str) -> String {
     format!("COND-{}", n.replace('_', "-").to_ascii_uppercase())
 }
@@ -525,27 +559,24 @@ pub fn snapshot(
     for (namespace, query) in [
         (
             "bootstrap_intent",
-            "SELECT intent_id,revision FROM bootstrap_intents",
+            "SELECT intent_id,revision FROM bootstrap_intents WHERE state NOT IN ('complete','invalidated','aborted')",
         ),
         (
             "destination_lease",
-            "SELECT lease_id,revision FROM destination_generation_leases",
+            "SELECT l.lease_id,l.revision FROM destination_generation_leases l JOIN destinations d ON d.destination_id=l.destination_id AND d.capture_epoch=l.capture_epoch AND d.generation=l.generation WHERE l.state='held'",
         ),
         (
             "destination_promotion",
-            "SELECT intent_id,revision FROM destination_promotion_intents",
+            "SELECT intent_id,revision FROM destination_promotion_intents WHERE state NOT IN ('verified','retirement_eligible','retired')",
         ),
         (
             "destination",
             "SELECT destination_id,revision FROM destinations",
         ),
-        (
-            "destination_audit",
-            "SELECT audit_id,revision FROM destination_audits",
-        ),
     ] {
         add_object_revisions(&c, &mut control_revisions, namespace, query)?;
     }
+    add_current_audit_revisions(&c, &mut control_revisions)?;
     for item in &dest {
         if let (Some(id), Some(rev)) = (
             item["destination_fingerprint"].as_str(),
@@ -686,7 +717,14 @@ pub mod tests {
             w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest) VALUES(?1,?2,'cfg','epoch',1,0,'round',0,0,'unix:1','unix:2','contract')",rusqlite::params![audit,destination]).unwrap();
         }
         let before = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
-        let key = |namespace: &str, id: &str| format!("{namespace}:{}", hash(&[id]));
+        let key = |namespace: &str, id: &str| {
+            let identity = if namespace == "destination_audit" {
+                hash(&[id, "round"])
+            } else {
+                hash(&[id])
+            };
+            format!("{namespace}:{identity}")
+        };
         for (namespace, id) in [
             ("bootstrap_intent", "boot-a"),
             ("bootstrap_intent", "boot-b"),
@@ -728,9 +766,29 @@ pub mod tests {
             );
         }
         assert_ne!(before.snapshot_id, after.snapshot_id);
+        w.connection()
+            .execute(
+                "DELETE FROM destination_audits WHERE audit_id='audit-b'",
+                [],
+            )
+            .unwrap();
+        w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest) VALUES('audit-b','dest-b','cfg','epoch',1,0,'new-round',0,0,'unix:2','unix:3','contract')",[]).unwrap();
+        let replaced = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        assert!(
+            !replaced
+                .control_revisions
+                .contains_key(&key("destination_audit", "audit-b"))
+        );
+        assert_eq!(
+            replaced.control_revisions.get(&format!(
+                "destination_audit:{}",
+                hash(&["audit-b", "new-round"])
+            )),
+            Some(&0)
+        );
         drop(w);
         let restarted = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
-        assert_eq!(restarted.control_revisions, after.control_revisions);
+        assert_eq!(restarted.control_revisions, replaced.control_revisions);
         let redacted = serde_json::to_string(&restarted).unwrap();
         assert!(!redacted.contains("boot-a") && !redacted.contains("audit-a"));
     }
@@ -742,6 +800,25 @@ pub mod tests {
             snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)),
             Err(StatusError::TooManyControlObjects)
         ));
+    }
+    #[test]
+    fn retained_audit_history_does_not_hide_current_status() {
+        let (p, w) = fixture();
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('dest','clickhouse','cfg','epoch',1)",[]).unwrap();
+        w.connection().execute_batch("WITH RECURSIVE ids(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM ids WHERE n<1001) INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,freshness_window_started_at,freshness_expires_at,contract_digest) SELECT printf('audit-%04d',n),'dest','cfg','epoch',1,0,printf('round-%04d',n),0,0,printf('unix:%04d',n),printf('unix:%04d',n+1),'contract' FROM ids;").unwrap();
+        let status = snapshot(&p, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        assert_eq!(
+            status
+                .control_revisions
+                .iter()
+                .filter(|(key, _)| key.starts_with("destination_audit:"))
+                .count(),
+            1
+        );
+        assert!(status.control_revisions.contains_key(&format!(
+            "destination_audit:{}",
+            hash(&["audit-1001", "round-1001"])
+        )));
     }
     #[test]
     fn deterministic_unsupported_capture_failure_reports_capture_safe_stopped() {
