@@ -1043,6 +1043,7 @@ fn bounded_query_peak(
     result_and_receive_peak: usize,
     receive: usize,
     sql: &str,
+    transport_receive: usize,
 ) -> Result<usize, PlannerError> {
     // The reservation covers every caller-side SQL workspace allocation, including `sql`.
     // The worker clone and framed command are separate driver allocations.
@@ -1060,7 +1061,10 @@ fn bounded_query_peak(
         .and_then(|value| value.checked_add(worker_sql))
         .and_then(|value| value.checked_add(query_frame))
         .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
-    Ok(result_peak.max(send_peak))
+    result_peak
+        .max(send_peak)
+        .checked_add(transport_receive)
+        .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))
 }
 
 fn postgres_copy_peaks(
@@ -1282,14 +1286,15 @@ impl BoundedRangeSource for PostgresRangeSource {
         if schema.len() != self.key_columns.len() {
             return Err(PlannerError::Conflict("M3_KEY_SCHEMA_COLUMNS"));
         }
-        // The imported connection already owns an 8 KiB native receive backing. Refuse before
-        // rendering SQL or issuing any command when the configured source-impact bound cannot
-        // even cover that persistent allocation.
+        // The imported connection owns transport receive storage as well as the native frame
+        // buffer. Charge both before rendering SQL or issuing a command.
+        let transport_receive = self.connection.transport_receive_capacity();
         if sql_workspace_upper_bound(schema.len())? > SQL_CONSTRUCTION_RESERVE {
             return Err(PlannerError::Limit("M3_SOURCE_IMPACT"));
         }
         let render_floor = NATIVE_RECEIVE_FLOOR
             .checked_add(SQL_CONSTRUCTION_RESERVE)
+            .and_then(|value| value.checked_add(transport_receive))
             .ok_or(PlannerError::Limit("M3_SOURCE_IMPACT"))?;
         if budget.max_source_impact_bytes < render_floor {
             self.required_source_impact_bytes = Some(render_floor);
@@ -1353,10 +1358,18 @@ impl BoundedRangeSource for PostgresRangeSource {
             budget.max_bytes,
             key_column_name_bytes,
         )?;
-        let metadata_preflight =
-            bounded_query_peak(metadata_preflight, metadata_receive_capacity, &meta_sql)?;
-        let timeout_peak =
-            bounded_query_peak(NATIVE_RECEIVE_FLOOR, NATIVE_RECEIVE_FLOOR, &set_timeout_sql)?;
+        let metadata_preflight = bounded_query_peak(
+            metadata_preflight,
+            metadata_receive_capacity,
+            &meta_sql,
+            transport_receive,
+        )?;
+        let timeout_peak = bounded_query_peak(
+            NATIVE_RECEIVE_FLOOR,
+            NATIVE_RECEIVE_FLOOR,
+            &set_timeout_sql,
+            transport_receive,
+        )?;
         let preflight = metadata_preflight.max(timeout_peak);
         self.required_source_impact_bytes = Some(preflight);
         if preflight > budget.max_source_impact_bytes {
@@ -1484,6 +1497,7 @@ impl BoundedRangeSource for PostgresRangeSource {
             add_receive_peak(peaks.metadata, metadata_receive_stats.allocated_bytes)?,
             metadata_receive_stats.allocated_bytes,
             &meta_sql,
+            transport_receive,
         )?;
         let payload_receive_capacity =
             receive_capacity(schema.len() + 1, max_data_row_value_bytes)?;
@@ -1495,6 +1509,7 @@ impl BoundedRangeSource for PostgresRangeSource {
             add_receive_peak(peaks.payload, payload_receive_capacity)?,
             payload_receive_capacity,
             &data_sql,
+            transport_receive,
         )?;
         let peaks = CopyPeaks {
             metadata: metadata_peak,
@@ -1818,6 +1833,14 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn bounded_query_peak_charges_retained_tls_receive_storage() {
+        let plain = bounded_query_peak(12_000, 8_192, "SELECT 1", 0).unwrap();
+        let tls = bounded_query_peak(12_000, 8_192, "SELECT 1", 65_536).unwrap();
+        assert_eq!(tls - plain, 65_536);
+        assert!(bounded_query_peak(12_000, 8_192, "SELECT 1", usize::MAX).is_err());
     }
 
     #[test]

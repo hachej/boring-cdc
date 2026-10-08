@@ -62,6 +62,13 @@ pub enum Transport {
 }
 
 impl Transport {
+    pub(crate) fn retained_receive_capacity(&self) -> usize {
+        match self {
+            Self::Plain(_) => 0,
+            Self::Tls(_) => TLS_BUF_SIZE,
+        }
+    }
+
     /// Get the TLS `tls-server-end-point` channel binding data, if this is a TLS connection.
     ///
     /// Per RFC 5929: hash the server's DER-encoded end-entity certificate.

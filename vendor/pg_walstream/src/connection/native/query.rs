@@ -4,7 +4,7 @@
 //! `RowDescription ('T') → DataRow ('D')* → CommandComplete ('C') → ReadyForQuery ('Z')`
 //! or `ErrorResponse ('E')` or `CopyBothResponse ('W')`.
 
-use bytes::{Buf, BytesMut};
+use bytes::BytesMut;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
 use super::result::{NativePgResult, NativeResultStatus};
@@ -105,21 +105,16 @@ pub async fn bounded_simple_query<S: AsyncRead + AsyncWrite + Unpin>(
                 }
             }
             let desired = receive_capacity - buf.len();
-            // Reclaim already-consumed prefix space only when BytesMut can do so without a new
-            // allocation. If shared ownership or its compaction rules prevent reclamation, fail
-            // closed instead of calling `reserve`/`read_buf` and silently growing.
-            let _ = buf.try_reclaim(desired);
             let spare = buf.capacity().saturating_sub(buf.len()).min(desired);
             if spare == 0 {
                 return Err(ReplicationError::buffer(
-                    "bounded receive buffer has no reclaimable space for an incomplete frame",
+                    "bounded receive buffer is full with an incomplete frame",
                 ));
             }
-            let n = stream
-                .take(spare as u64)
-                .read_buf(buf)
-                .await
-                .map_err(|e| ReplicationError::transient_connection(format!("read error: {e}")))?;
+            let n =
+                stream.take(spare as u64).read_buf(buf).await.map_err(|e| {
+                    ReplicationError::transient_connection(format!("read error: {e}"))
+                })?;
             if n == 0 {
                 return Err(ReplicationError::transient_connection(
                     "connection closed by server".to_string(),
@@ -135,7 +130,7 @@ pub async fn bounded_simple_query<S: AsyncRead + AsyncWrite + Unpin>(
             let payload = &buf[5..total_len];
             match tag {
                 b'T' => result.parse_row_description(payload),
-                b'D' => result.parse_data_row(payload),
+                b'D' => result.parse_data_row_bounded(payload)?,
                 b'C' => {
                     if result.status == NativeResultStatus::Empty {
                         result.status = NativeResultStatus::CommandOk;
@@ -155,7 +150,12 @@ pub async fn bounded_simple_query<S: AsyncRead + AsyncWrite + Unpin>(
                 _ => tracing::debug!("Skipping message type '{}' during query", tag as char),
             }
         }
-        buf.advance(total_len);
+        // Keep the original allocation and move any following partial frame to its front.
+        // BytesMut::advance shrinks the visible capacity, and try_reclaim may refuse to compact
+        // when the remaining frame is larger than the consumed prefix.
+        let remaining = buf.len() - total_len;
+        buf.copy_within(total_len.., 0);
+        buf.truncate(remaining);
         if matches!(tag, b'Z' | b'W' | b'H') {
             break;
         }
@@ -500,6 +500,48 @@ mod tests {
         assert!(stats.buffered_high_water_bytes > 0);
         assert!(stats.complete_frames_high_water > 1);
         assert!(buf.is_empty());
+    }
+
+    #[tokio::test]
+    async fn bounded_query_compacts_a_partial_maximum_frame_in_place() {
+        let (mut client, mut server) = tokio::io::duplex(16384);
+        tokio::spawn(async move {
+            let mut discard = vec![0u8; 1024];
+            let _ = server.read(&mut discard).await;
+            let value = "x".repeat(8192 - 11);
+            let mut response = build_row_description(&["value"]);
+            response.extend(build_data_row(&[&value]));
+            response.extend(build_command_complete("SELECT 1"));
+            response.extend(build_ready_for_query(b'I'));
+            server.write_all(&response).await.unwrap();
+        });
+
+        let mut buf = BytesMut::new();
+        let (result, stats) = bounded_simple_query(&mut client, &mut buf, "SELECT value", 8192)
+            .await
+            .unwrap();
+        assert_eq!(result.ntuples(), 1);
+        assert_eq!(result.get_bytes(0, 0).unwrap().len(), 8192 - 11);
+        assert_eq!(stats.allocated_bytes, 8192);
+        assert_eq!(buf.capacity(), 8192);
+    }
+
+    #[tokio::test]
+    async fn bounded_query_rejects_a_short_datarow_before_column_allocation() {
+        let (mut client, mut server) = tokio::io::duplex(8192);
+        tokio::spawn(async move {
+            let mut discard = vec![0u8; 1024];
+            let _ = server.read(&mut discard).await;
+            let mut response = build_row_description(&["value"]);
+            response.extend([b'D', 0, 0, 0, 6, 0x7f, 0xff]);
+            server.write_all(&response).await.unwrap();
+        });
+
+        let mut buf = BytesMut::new();
+        let error = bounded_simple_query(&mut client, &mut buf, "SELECT value", 8192)
+            .await
+            .unwrap_err();
+        assert!(matches!(error, ReplicationError::Protocol(_)));
     }
 
     #[tokio::test]

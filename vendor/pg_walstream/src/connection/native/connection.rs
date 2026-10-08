@@ -279,11 +279,14 @@ impl WorkerInit {
 /// Consumes `ready_tx`, which is dropped when this returns (on either path), so the worker command loop never has to thread it through or drop it by hand.
 async fn build_and_report(
     init: WorkerInit,
-    ready_tx: std_mpsc::Sender<Result<i32>>,
+    ready_tx: std_mpsc::Sender<Result<(i32, usize)>>,
 ) -> Option<Worker> {
     match init.build().await {
         Ok(worker) => {
-            let _ = ready_tx.send(Ok(worker.server_ver));
+            let _ = ready_tx.send(Ok((
+                worker.server_ver,
+                worker.transport.retained_receive_capacity(),
+            )));
             Some(worker)
         }
         Err(e) => {
@@ -301,7 +304,7 @@ async fn build_and_report(
 fn run_worker(
     init: WorkerInit,
     mut cmd_rx: mpsc::UnboundedReceiver<Command>,
-    ready_tx: std_mpsc::Sender<Result<i32>>,
+    ready_tx: std_mpsc::Sender<Result<(i32, usize)>>,
 ) {
     let rt = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -400,6 +403,8 @@ pub struct NativeConnection {
     driver: Driver,
     /// Server version number (e.g. 160001 for PG 16.1), cached at connect time.
     server_ver: i32,
+    /// Retained transport receive storage, separate from the bounded protocol-frame buffer.
+    transport_receive_capacity: usize,
     /// Whether we are in COPY (replication) mode. Gates the streaming methods and tells the worker whether to send CopyDone on shutdown.
     in_copy_mode: bool,
     /// Liveness flag shared with the worker, which clears it on a transient read error.
@@ -453,6 +458,7 @@ impl NativeConnection {
         )?;
         alive.store(true, Ordering::Relaxed);
         let server_ver = worker.server_ver;
+        let transport_receive_capacity = worker.transport.retained_receive_capacity();
         debug!(
             "Connected to PostgreSQL {} via native rustls (inline)",
             server_ver
@@ -464,6 +470,7 @@ impl NativeConnection {
                 handle,
             },
             server_ver,
+            transport_receive_capacity,
             in_copy_mode: false,
             alive,
         })
@@ -494,7 +501,7 @@ impl NativeConnection {
             })?;
 
         match ready_rx.recv() {
-            Ok(Ok(server_ver)) => {
+            Ok(Ok((server_ver, transport_receive_capacity))) => {
                 alive.store(true, Ordering::Relaxed);
                 debug!("Connected to PostgreSQL {} via native rustls", server_ver);
                 Ok(Self {
@@ -505,6 +512,7 @@ impl NativeConnection {
                         batch_rx: None,
                     },
                     server_ver,
+                    transport_receive_capacity,
                     in_copy_mode: false,
                     alive,
                 })
@@ -549,6 +557,11 @@ impl NativeConnection {
     #[cold]
     fn worker_reply_dropped() -> ReplicationError {
         ReplicationError::backend("native worker thread dropped the reply")
+    }
+
+    /// Retained receive storage owned by the transport beneath the protocol-frame buffer.
+    pub fn transport_receive_capacity(&self) -> usize {
+        self.transport_receive_capacity
     }
 
     /// Execute a query with a fixed physical receive-buffer allocation and return its high-water.
@@ -1128,7 +1141,7 @@ impl NativeConnection {
             .unwrap();
 
         // The worker adopts the socket on its own reactor and reports back.
-        let server_ver = ready_rx
+        let (server_ver, transport_receive_capacity) = ready_rx
             .recv()
             .expect("null worker exited before init")
             .expect("null worker failed to adopt the test socket");
@@ -1142,6 +1155,7 @@ impl NativeConnection {
                 batch_rx: None,
             },
             server_ver,
+            transport_receive_capacity,
             in_copy_mode: false,
             alive,
         }
@@ -1170,6 +1184,7 @@ impl NativeConnection {
         )
         .expect("null worker failed to adopt the test socket");
         let server_ver = worker.server_ver;
+        let transport_receive_capacity = worker.transport.retained_receive_capacity();
 
         Self {
             driver: Driver::Inline {
@@ -1178,6 +1193,7 @@ impl NativeConnection {
                 handle,
             },
             server_ver,
+            transport_receive_capacity,
             in_copy_mode: false,
             alive,
         }
