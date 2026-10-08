@@ -195,6 +195,9 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         code: crate::failure_policy::StableErrorCode,
     ) -> Result<(), RuntimeError> {
         use std::time::{SystemTime, UNIX_EPOCH};
+        if self.last_failure_telemetry.is_none() {
+            self.record_capture_failure(None, &RuntimeError::ReconciliationRequired);
+        }
         let (capture_epoch, mut config_fingerprint) =
             self.failure_policy_identity.clone().ok_or_else(|| {
                 RuntimeError::JournalTransient("failure policy identity unavailable".into())
@@ -644,7 +647,9 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             )
         });
         let result = self.route(decoded);
-        if let Err(error) = &result {
+        if let Err(error) = &result
+            && self.last_failure_telemetry.is_none()
+        {
             self.record_capture_failure(prior_transaction, error);
         }
         if result.is_err() && self.state == RuntimeState::Capturing {
@@ -716,7 +721,13 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
                 if self.active.is_some() {
                     return self.safe_stop(RuntimeError::Protocol("nested_transaction"));
                 }
-                let spool = self.spools.begin(xid)?;
+                let spool = match self.spools.begin(xid) {
+                    Ok(spool) => spool,
+                    Err(error) => {
+                        self.record_capture_failure(Some((xid, final_lsn, 0, 0)), &error);
+                        return Err(error);
+                    }
+                };
                 self.active = Some(ActiveTransaction {
                     xid,
                     final_lsn,
@@ -1987,7 +1998,7 @@ fn rearm_changed_capture_limit(
         component: Component::Capture,
         class: FailureClass::Configuration,
         code: StableErrorCode::ResourceLimit,
-        boundary: boundary.clone(),
+        boundary: record.boundary.clone(),
         relevant_configuration_fingerprint: limit_fingerprint.into(),
         context: BTreeMap::from([(SafeContextKey::Operation, SafeContextValue::Capture)]),
     };
@@ -2570,6 +2581,15 @@ pub mod tests {
             Ok(Box::new(LimitSpool))
         }
     }
+    struct BeginFailureSpools;
+    impl SpoolFactory for BeginFailureSpools {
+        fn begin(&mut self, _: u32) -> Result<Box<dyn RuntimeSpool>, RuntimeError> {
+            Err(RuntimeError::SpoolLimit {
+                kind: "process_memory",
+                observed: None,
+            })
+        }
+    }
     struct Gate(FeedbackPermit);
     impl FeedbackGate for Gate {
         fn permit(&mut self, _: Option<u64>) -> FeedbackPermit {
@@ -2994,6 +3014,116 @@ pub mod tests {
                 end_lsn: "0000000000000010".into()
             }
         );
+        drop(c);
+        let c = rusqlite::Connection::open(&p).unwrap();
+        c.execute("INSERT OR IGNORE INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch-a','sys','timeline','db',?1,'pgoutput','publication','protocol')",[crate::article1_capture::SLOT]).unwrap();
+        c.execute("INSERT INTO source_transactions(transaction_id,capture_epoch,source_system_id,database_id,slot_name,xid,end_lsn,first_seq,last_seq,event_count,payload_checksum,state) VALUES('prior','epoch-a','sys','db',?1,'prior','0000000000000008',1,1,0,'sum','committed')",[crate::article1_capture::SLOT]).unwrap();
+        c.execute("UPDATE source_state SET durable_transaction_id='prior',durable_transaction_end_lsn='0000000000000008',durable_journal_seq=1,control_revision=control_revision+1 WHERE singleton=1",[]).unwrap();
+        c.execute("INSERT INTO capture_configuration_receipts(singleton,capture_epoch,runtime_fingerprint,non_limit_fingerprint,limit_fingerprint) VALUES(1,'epoch-a','runtime-a','non-limit-a','limits-a')",[]).unwrap();
+        drop(c);
+        let receipt = CaptureConfigurationReceipt {
+            capture_epoch: "epoch-a".into(),
+            runtime_fingerprint: "runtime-a".into(),
+            non_limit_fingerprint: "non-limit-a".into(),
+            limit_fingerprint: "limits-a".into(),
+            revision: 0,
+        };
+        let live = crate::m2_reconcile::LiveSourceObservation {
+            source_system_id: "sys".into(),
+            timeline_id: "timeline".into(),
+            database_id: "db".into(),
+            slot_name: crate::article1_capture::SLOT.into(),
+            plugin: "pgoutput".into(),
+            publication_fingerprint: "publication".into(),
+            protocol_fingerprint: "protocol".into(),
+            slot_exists: true,
+            slot_valid: true,
+            invalidation_reason: None,
+            wal_status: Some("reserved".into()),
+            resume_wal_available: true,
+            confirmed_flush_lsn: Some("0000000000000008".into()),
+            restart_lsn: Some("0000000000000008".into()),
+        };
+        rearm_changed_capture_limit(
+            &p,
+            "rearm-test",
+            2000,
+            &receipt,
+            "runtime-b",
+            "limits-b",
+            &live,
+        )
+        .unwrap();
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn disconnect_mid_transaction_persists_known_boundary_before_restart() {
+        let (p, store) = store("disconnect-telemetry");
+        let service = JournalWriterService::new(store, [2, 2, 1, 1], 1).unwrap();
+        let (rel, contract) = relation();
+        let mut runtime = CaptureRuntime::new(
+            service,
+            MemorySpools,
+            Gate(FeedbackPermit::Hold),
+            BTreeMap::from([(7, contract)]),
+            None,
+        );
+        runtime.enable_failure_policy("epoch-a".into(), "config-a".into());
+        runtime.enable_capture_limits("limits-a".into(), 1000, 5);
+        runtime.receive(&rel).unwrap();
+        runtime.receive(&begin(42, 0x10)).unwrap();
+        runtime.receive(&insert(42, 7, b"value")).unwrap();
+        assert_eq!(
+            runtime.unexpected_eof(),
+            RuntimeError::UnexpectedCopyBothLoss
+        );
+        runtime
+            .persist_if_enabled(
+                crate::failure_policy::FailureClass::TransientSource,
+                crate::failure_policy::StableErrorCode::TransportUnavailable,
+            )
+            .unwrap();
+        drop(runtime);
+        let c = rusqlite::Connection::open(&p).unwrap();
+        let (xid, lsn, bytes, events): (String, String, u64, u64) = c.query_row("SELECT failed_xid,failed_final_lsn,observed_transaction_bytes,observed_transaction_events FROM processing_failures WHERE component='capture' AND armed=1",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).unwrap();
+        assert_eq!(
+            (xid.as_str(), lsn.as_str(), events),
+            ("42", "0000000000000010", 1)
+        );
+        assert!(bytes > 0);
+        drop(c);
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn failed_spool_creation_retains_decoded_begin_identity() {
+        let (p, store) = store("begin-telemetry");
+        let service = JournalWriterService::new(store, [2, 2, 1, 1], 1).unwrap();
+        let mut runtime = CaptureRuntime::new(
+            service,
+            BeginFailureSpools,
+            Gate(FeedbackPermit::Hold),
+            BTreeMap::new(),
+            None,
+        );
+        runtime.enable_failure_policy("epoch-a".into(), "config-a".into());
+        runtime.enable_capture_limits("limits-a".into(), 100, 2);
+        assert!(matches!(
+            runtime.receive(&begin(42, 0x10)),
+            Err(RuntimeError::SpoolLimit {
+                kind: "process_memory",
+                ..
+            })
+        ));
+        runtime
+            .persist_if_enabled(
+                crate::failure_policy::FailureClass::Configuration,
+                crate::failure_policy::StableErrorCode::ResourceLimit,
+            )
+            .unwrap();
+        drop(runtime);
+        let c = rusqlite::Connection::open(&p).unwrap();
+        let telemetry: (String, String, u64, u64) = c.query_row("SELECT failed_xid,failed_final_lsn,observed_transaction_bytes,observed_transaction_events FROM processing_failures WHERE component='capture' AND armed=1",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).unwrap();
+        assert_eq!(telemetry, ("42".into(), "0000000000000010".into(), 0, 0));
         drop(c);
         let _ = std::fs::remove_file(p);
     }

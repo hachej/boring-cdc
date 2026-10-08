@@ -177,6 +177,16 @@ fn hash(parts: &[&str]) -> String {
     }
     format!("sha256:{:x}", h.finalize())
 }
+fn public_causal_digest(value: Option<String>) -> Option<String> {
+    value.filter(|value| {
+        value.strip_prefix("sha256:").is_some_and(|hex| {
+            hex.len() == 64
+                && hex
+                    .bytes()
+                    .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        })
+    })
+}
 
 fn add_object_revisions(
     connection: &Connection,
@@ -567,7 +577,7 @@ pub fn snapshot(
     for row in dq.query_map([],|r|{let id:String=r.get(0)?;Ok(json!({"destination_fingerprint":hash(&[&id]),"kind":r.get::<_,String>(1)?,"generation":r.get::<_,u64>(2)?,"highest_external_fence":r.get::<_,u64>(3)?,"checkpoint_seq":r.get::<_,u64>(4)?,"checkpoint_revision":r.get::<_,u64>(5)?}))})?{dest.push(row?)}
     let mut action_causality = Vec::new();
     let mut aq = c.prepare("SELECT request_id,payload_digest,run_id,state,observation_revision,control_revision,plan_digest,immutable_intent_id,external_effect_evidence_digest,postcondition_evidence_digest FROM operator_command_requests ORDER BY request_id LIMIT 100")?;
-    for row in aq.query_map([], |r| Ok(json!({"request_id":r.get::<_,String>(0)?,"canonical_payload_digest":r.get::<_,String>(1)?,"plan_digest":r.get::<_,Option<String>>(6)?,"immutable_intent_id":r.get::<_,Option<String>>(7)?,"external_effect_evidence_digest":r.get::<_,Option<String>>(8)?,"postcondition_evidence_digest":r.get::<_,Option<String>>(9)?,"run_id":r.get::<_,String>(2)?,"terminal_state":r.get::<_,String>(3)?,"before_state_revision":r.get::<_,u64>(4)?,"bound_control_revision":r.get::<_,u64>(5)?})))? { action_causality.push(row?); }
+    for row in aq.query_map([], |r| Ok(json!({"request_id":r.get::<_,String>(0)?,"canonical_payload_digest":r.get::<_,String>(1)?,"plan_digest":public_causal_digest(r.get::<_,Option<String>>(6)?),"immutable_intent_id":public_causal_digest(r.get::<_,Option<String>>(7)?),"external_effect_evidence_digest":public_causal_digest(r.get::<_,Option<String>>(8)?),"postcondition_evidence_digest":public_causal_digest(r.get::<_,Option<String>>(9)?),"run_id":r.get::<_,String>(2)?,"terminal_state":r.get::<_,String>(3)?,"before_state_revision":r.get::<_,u64>(4)?,"bound_control_revision":r.get::<_,u64>(5)?})))? { action_causality.push(row?); }
     let mut control_revisions = BTreeMap::from([
         ("source".into(), s.9),
         ("ownership".into(), owner.as_ref().map(|x| x.3).unwrap_or(0)),
@@ -698,24 +708,32 @@ pub mod tests {
     fn freshness_expires_and_causal_records_exclude_payloads() {
         let (p, w) = fixture();
         w.connection().execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at) VALUES('request-safe','nonce-secret',x'0102','sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','run-safe','peer-safe','completed',x'03',7,2,'unix:99')",[]).unwrap();
-        w.connection().execute("UPDATE operator_command_requests SET plan_digest='plan-safe',immutable_intent_id='intent-safe',external_effect_evidence_digest='effect-safe',postcondition_evidence_digest='postcondition-safe',request_revision=request_revision+1 WHERE request_id='request-safe'",[]).unwrap();
+        let links: Vec<String> = (1..=4).map(|n| format!("sha256:{n:064x}")).collect();
+        w.connection().execute("UPDATE operator_command_requests SET plan_digest=?1,immutable_intent_id=?2,external_effect_evidence_digest=?3,postcondition_evidence_digest=?4,request_revision=request_revision+1 WHERE request_id='request-safe'",rusqlite::params![links[0],links[1],links[2],links[3]]).unwrap();
+        w.connection().execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at,plan_digest,immutable_intent_id) VALUES('request-unsafe','nonce-other',x'0102','digest','run-safe','peer-safe','completed',x'03',7,2,'unix:99','secret-plan','secret-intent')",[]).unwrap();
         w.connection().execute("INSERT INTO startup_reconciliations(run_id,capture_epoch,outcome,reason_code,created_at) VALUES('old-run','epoch','ready','READY','2000-01-01T00:00:00Z')",[]).unwrap();
         drop(w);
         let s = snapshot(&p, "cfg", SystemTime::now() + Duration::from_secs(60)).unwrap();
         assert_eq!(s.freshness, "stale");
         assert_eq!(s.action_causality[0]["request_id"], "request-safe");
-        assert_eq!(s.action_causality[0]["plan_digest"], "plan-safe");
-        assert_eq!(s.action_causality[0]["immutable_intent_id"], "intent-safe");
+        assert_eq!(s.action_causality[0]["plan_digest"], links[0]);
+        assert_eq!(s.action_causality[0]["immutable_intent_id"], links[1]);
         assert_eq!(
             s.action_causality[0]["external_effect_evidence_digest"],
-            "effect-safe"
+            links[2]
         );
         assert_eq!(
             s.action_causality[0]["postcondition_evidence_digest"],
-            "postcondition-safe"
+            links[3]
         );
+        assert!(s.action_causality[1]["plan_digest"].is_null());
         let text = serde_json::to_string(&s).unwrap();
-        assert!(!text.contains("nonce-secret") && !text.contains("0102"));
+        assert!(
+            !text.contains("nonce-secret")
+                && !text.contains("0102")
+                && !text.contains("secret-plan")
+                && !text.contains("secret-intent")
+        );
     }
     #[test]
     fn domain_alerts_project_declared_conditions_and_revisions() {
