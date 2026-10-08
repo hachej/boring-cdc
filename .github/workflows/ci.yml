@@ -19,6 +19,8 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Test
         run: cargo test --locked --workspace --all-targets
+      - name: Python contract tests
+        run: python3 -m unittest discover -s tests
       - name: Package boundary
         run: scripts/validate/scaffold_package.sh
       - name: Scaffold contract
