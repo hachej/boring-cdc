@@ -652,6 +652,11 @@ pub fn bounded_metadata_gc(
             |row| row.get::<_, bool>(0),
         )?;
         if !terminal {
+            tx.execute(
+                "DELETE FROM terminal_metadata_retention
+                 WHERE category='destination_audit' AND object_id=?1",
+                [&audit_id],
+            )?;
             continue;
         }
         // The owner index and shared row budget keep reconciliation bounded even when corrupt or
@@ -1134,6 +1139,69 @@ pub(crate) mod tests {
         assert_eq!(
             w.connection()
                 .query_row("SELECT count(*) FROM terminal_metadata_retention WHERE category='destination_audit'", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            1
+        );
+        drop(w);
+        let _ = std::fs::remove_file(p);
+    }
+
+    #[test]
+    fn invalid_terminal_registration_cannot_starve_audit_gc() {
+        let (mut w, p) = writer();
+        w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','clickhouse','cfg','epoch',1)",[]).unwrap();
+        for (audit_id, terminal_at, cursor) in [("active", 1_i64, 9_i64), ("done", 2, 10)] {
+            w.connection().execute("INSERT INTO destination_audits(audit_id,destination_id,configuration_fingerprint,capture_epoch,generation,round_target_seq,round_identity_digest,journal_cursor_seq,self_cursor_seq,budget_bytes_used,budget_events_used,budget_ms_used,freshness_window_started_at,freshness_expires_at,contract_digest) VALUES(?1,'d','cfg','epoch',1,10,'round',?2,?2,0,0,0,'2026','2027','contract')",params![audit_id,cursor]).unwrap();
+            w.connection().execute("INSERT INTO terminal_metadata_retention(category,object_id,terminal_at_unix_ms) VALUES('destination_audit',?1,?2)",params![audit_id,terminal_at]).unwrap();
+        }
+        create_pin(
+            &mut w,
+            PinSpec {
+                pin_id: "active-pin",
+                owner_kind: "audit",
+                owner_id: "active",
+                capture_epoch: "epoch",
+                start_seq: 1,
+                end_seq: Some(10),
+                expires_at_unix_ms: None,
+            },
+        )
+        .unwrap();
+        let limits = MetadataRetention {
+            alerts_rows: 1,
+            audit_rows: 1,
+            completed_command_cutoff_ms: 1,
+            invalid_generation_cutoff_ms: 1,
+            retired_generation_cutoff_ms: 1,
+            orphan_cutoff_ms: 1,
+            batch_max: 1,
+        };
+        assert_eq!(
+            bounded_metadata_gc(&mut w, limits.clone()).unwrap().audits,
+            0
+        );
+        assert_eq!(
+            w.connection().query_row("SELECT count(*) FROM terminal_metadata_retention WHERE category='destination_audit' AND object_id='active'", [], |r| r.get::<_, i64>(0)).unwrap(),
+            0
+        );
+        assert_eq!(bounded_metadata_gc(&mut w, limits).unwrap().audits, 1);
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT state FROM logical_range_pins WHERE pin_id='active-pin'",
+                    [],
+                    |r| r.get::<_, String>(0)
+                )
+                .unwrap(),
+            "active"
+        );
+        assert_eq!(
+            w.connection()
+                .query_row(
+                    "SELECT count(*) FROM destination_audits WHERE audit_id='active'",
+                    [],
+                    |r| r.get::<_, i64>(0)
+                )
                 .unwrap(),
             1
         );
