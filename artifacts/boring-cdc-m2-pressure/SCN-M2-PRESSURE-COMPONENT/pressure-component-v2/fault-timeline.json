@@ -1,0 +1,1 @@
+[{"after_release_remaining_events":0,"expired_pin_blocked":true,"first_gc_remaining_events":2,"first_gc_transactions":3,"probe":"pin_gc","second_gc_transactions":2},{"checkpoint_busy":0,"gc_transactions":5,"pressure_state":"action","probe":"runtime_service","remaining_events":0}]
