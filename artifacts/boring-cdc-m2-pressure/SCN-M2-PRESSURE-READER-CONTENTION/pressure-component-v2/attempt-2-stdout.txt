@@ -17,7 +17,7 @@ ok
 test m2_pressure::tests::transition_order_and_actions_are_exact ... ok
 test m2_pressure::tests::wal_forecast_is_honest ... ok
 
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 392 filtered out; finished in 1.15s
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 392 filtered out; finished in 1.26s
 
 
 running 0 tests
