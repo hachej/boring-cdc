@@ -9,10 +9,16 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      BORING_CDC_POSTGRES_IMAGE_MIRROR: public.ecr.aws/docker/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+      - name: Verify pinned PostgreSQL mirror
+        run: |
+          scripts/lib/ci_postgres_image.sh > /dev/null
+          docker manifest inspect "$BORING_CDC_POSTGRES_IMAGE_MIRROR" > /dev/null
       - name: Install repository-pinned Rust toolchain
         run: rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update
       - name: Format

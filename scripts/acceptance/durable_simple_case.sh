@@ -46,10 +46,12 @@ chmod 600 "$work/postgres_password"
 export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"
 export PGPASSWORD
 PGPASSWORD=$(cat "$BORING_CDC_POSTGRES_PASSWORD_FILE")
+mirror_override=$(scripts/lib/ci_postgres_image.sh)
 cat >"$work/override.yml" <<YAML
 services:
   postgres:
     ports: ["127.0.0.1:${port}:5432"]
+${mirror_override}
 YAML
 docker compose -p "$project" -f compose.yaml -f "$work/override.yml" up -d --wait postgres >/dev/null
 psqlc() { docker compose -p "$project" -f compose.yaml -f "$work/override.yml" exec -T postgres psql -X -v ON_ERROR_STOP=1 -U boring_cdc -d boring_cdc "$@"; }
