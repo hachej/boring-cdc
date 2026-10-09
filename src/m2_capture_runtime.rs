@@ -3165,6 +3165,43 @@ pub mod tests {
     }
 
     #[test]
+    fn capture_reserve_breach_safe_stops_before_accepting_more_wal() {
+        let (path, store) = store("pressure-hard-stop");
+        let writer = JournalWriterService::new(store, [2, 2, 1, 1], 1).unwrap();
+        let (_, relation) = relation();
+        let mut runtime = CaptureRuntime::new(
+            writer,
+            MemorySpools,
+            Gate(FeedbackPermit::AllowSafeBoundary { lsn: u64::MAX }),
+            BTreeMap::from([(7, relation)]),
+            None,
+        );
+        let free = filesystem_free_bytes(&path).unwrap();
+        let hard = free.checked_add(1 << 30).unwrap();
+        let thresholds = crate::m2_pressure::PressureThresholds {
+            warning: hard + 3,
+            action: hard + 2,
+            critical: hard + 1,
+            hard,
+            reserve: hard,
+        };
+        assert!(free < thresholds.reserve);
+        runtime.enable_pressure_service(path.clone(), thresholds, "epoch-a".into(), 0);
+        assert_eq!(runtime.state(), RuntimeState::Starting);
+        runtime.service_pressure().unwrap();
+        assert_eq!(runtime.state(), RuntimeState::CaptureSafeStopped);
+        runtime.receive(&begin(42, 0x10)).unwrap();
+        runtime.receive(&commit(0x20)).unwrap();
+        assert_eq!(runtime.committed_transactions(), 0);
+        assert!(runtime.take_feedback().is_empty());
+        println!(
+            "PRESSURE_CAPTURE_OBSERVATION {{\"reserve_breached\":true,\"safe_stopped\":true,\"committed_transactions\":0,\"feedback_packets\":0}}"
+        );
+        drop(runtime);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn receive_lane_is_admitted_before_frame_validation() {
         assert!(TransportReceiveLane::admit(0).is_err());
         assert!(TransportReceiveLane::admit(8).unwrap().validate(8).is_ok());

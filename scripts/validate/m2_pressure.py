@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/lib"))
-from m2_pressure_component import PRIVATE, SEED, implementation_digest, observations, sha  # noqa: E402
+from m2_pressure_component import CAPTURE_COMMAND, COMMAND, PRIVATE, SEED, capture_observation, implementation_digest, observations, sha  # noqa: E402
 
 
 def main():
@@ -23,8 +23,9 @@ def main():
     assert manifest["tier_proof"]["clean_environment"] is False
     assert manifest["source_preservation"]["before_sha256"] == implementation_digest()
     assert manifest["source_preservation"]["after_sha256"] == implementation_digest()
-    assert len(manifest["commands"]) == 2
+    assert len(manifest["commands"]) == (4 if mode == "fault" else 2)
     probes = []
+    capture_probes = []
     for command in manifest["commands"]:
         stdout = ROOT / command["stdout_path"]
         stderr = ROOT / command["stderr_path"]
@@ -33,13 +34,21 @@ def main():
         assert command["exit_code"] == 0
         assert not PRIVATE.search(stdout.read_bytes())
         assert not PRIVATE.search(stderr.read_bytes())
-        probes.append(observations(stdout.read_bytes(), expected))
+        if command["argv"] == " ".join(COMMAND):
+            probes.append(observations(stdout.read_bytes(), expected))
+        elif mode == "fault" and command["argv"] == " ".join(CAPTURE_COMMAND):
+            capture_probes.append(capture_observation(stdout.read_bytes()))
+        else:
+            raise AssertionError("unexpected pressure evidence command")
+    assert len(probes) == 2 and len(capture_probes) == (2 if mode == "fault" else 0)
     assert probes[0] == probes[1]
+    if mode == "fault":
+        assert capture_probes[0] == capture_probes[1]
     observed = probes[0]
     selected = (observed["runtime_service"] if mode == "e2e"
-                else {"reader_contention": observed["reader_contention"], "wal_recycling": observed["wal_recycling"]})
+                else {"reader_contention": observed["reader_contention"], "wal_recycling": observed["wal_recycling"], "capture_hard_stop": capture_probes[0]})
     timeline = ([observed["pin_gc"], observed["runtime_service"]] if mode == "e2e"
-                else [observed["reader_contention"], observed["wal_recycling"], observed["pin_gc"]])
+                else [observed["reader_contention"], observed["wal_recycling"], capture_probes[0], observed["pin_gc"]])
     assert json.loads((path / "state/after.json").read_text()) == selected
     assert json.loads((path / "fault-timeline.json").read_text()) == timeline
     events = [json.loads(line) for line in (path / "logs/boring-cdc.jsonl").read_text().splitlines()]
@@ -53,7 +62,7 @@ def main():
     for relative, digest in inventory.items():
         assert sha((path / relative).read_bytes()) == digest
     assert set(inventory) == {item.relative_to(path).as_posix() for item in path.rglob("*") if item.is_file()} - {"sha256.txt"}
-    print(json.dumps({"mode": mode, "status": "pass", "observed_probes": sorted(observed)}, sort_keys=True))
+    print(json.dumps({"mode": mode, "status": "pass", "observed_probes": sorted(observed) + (["capture_hard_stop"] if mode == "fault" else [])}, sort_keys=True))
 
 
 if __name__ == "__main__":

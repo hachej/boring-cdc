@@ -12,7 +12,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 SEED = "pressure-component-v2"
 COMMAND = ["cargo", "test", "--locked", "m2_pressure::tests", "--", "--nocapture", "--test-threads=1"]
+CAPTURE_COMMAND = ["cargo", "test", "--locked", "m2_capture_runtime::tests::capture_reserve_breach_safe_stops_before_accepting_more_wal", "--", "--nocapture"]
 MARKER = re.compile(r"PRESSURE_OBSERVATION (\{[^\n]+\})")
+CAPTURE_MARKER = re.compile(r"PRESSURE_CAPTURE_OBSERVATION (\{[^\n]+\})")
 PRIVATE = re.compile(rb"(?i)(password|secret|token|postgresql://|/home/|/tmp/)")
 IMPLEMENTATION_PATHS = (
     "src/m2_pressure.rs", "src/m2_schema.rs", "src/m2_journal.rs",
@@ -83,6 +85,19 @@ def observations(stdout, expected):
     return by_probe
 
 
+def capture_observation(stdout):
+    output = stdout.decode()
+    name = "m2_capture_runtime::tests::capture_reserve_breach_safe_stops_before_accepting_more_wal"
+    if f"test {name} ... ok" not in output or "test result: ok. 1 passed; 0 failed" not in output:
+        raise RuntimeError("capture Hard-stop test did not pass")
+    records = CAPTURE_MARKER.findall(output)
+    expected = {"reserve_breached": True, "safe_stopped": True,
+                "committed_transactions": 0, "feedback_packets": 0}
+    if len(records) != 1 or json.loads(records[0]) != expected:
+        raise RuntimeError("capture Hard-stop observation missing or unexpected")
+    return {"probe": "capture_hard_stop", **expected}
+
+
 def main():
     mode = sys.argv[1]
     if mode not in {"e2e", "fault"}:
@@ -92,6 +107,7 @@ def main():
     expected = {case["test"] for case in json.loads((ROOT / "contracts/m2/pressure-cases.json").read_text())["cases"]}
     implementation = implementation_digest()
     runs = []
+    capture_runs = []
     for attempt in (1, 2):
         completed = run(COMMAND)
         if completed.returncode:
@@ -101,16 +117,27 @@ def main():
         if PRIVATE.search(completed.stdout) or PRIVATE.search(completed.stderr):
             raise RuntimeError("pressure test output contains unapproved path or secret-like text")
         runs.append((completed, observations(completed.stdout, expected)))
+        if mode == "fault":
+            capture = run(CAPTURE_COMMAND)
+            if capture.returncode:
+                raise RuntimeError(f"capture Hard-stop attempt {attempt} exited {capture.returncode}: {capture.stderr.decode()[-2000:]}")
+            capture.stdout = capture.stdout.replace(str(ROOT).encode(), b"[REPO]")
+            capture.stderr = capture.stderr.replace(str(ROOT).encode(), b"[REPO]")
+            if PRIVATE.search(capture.stdout) or PRIVATE.search(capture.stderr):
+                raise RuntimeError("capture Hard-stop output contains unapproved path or secret-like text")
+            capture_runs.append((capture, capture_observation(capture.stdout)))
     if runs[0][1] != runs[1][1]:
         raise RuntimeError("pressure observations changed between attempts")
+    if mode == "fault" and capture_runs[0][1] != capture_runs[1][1]:
+        raise RuntimeError("capture Hard-stop observations changed between attempts")
     after_implementation = implementation_digest()
     if implementation != after_implementation:
         raise RuntimeError("pressure source changed during evidence capture")
     observed = runs[0][1]
     selected = (observed["runtime_service"] if mode == "e2e"
-                else {"reader_contention": observed["reader_contention"], "wal_recycling": observed["wal_recycling"]})
+                else {"reader_contention": observed["reader_contention"], "wal_recycling": observed["wal_recycling"], "capture_hard_stop": capture_runs[0][1]})
     timeline = ([observed["pin_gc"], observed["runtime_service"]] if mode == "e2e"
-                else [observed["reader_contention"], observed["wal_recycling"], observed["pin_gc"]])
+                else [observed["reader_contention"], observed["wal_recycling"], capture_runs[0][1], observed["pin_gc"]])
     shutil.rmtree(out, ignore_errors=True)
     before = {"journal_events": observed["pin_gc"]["first_gc_transactions"] + observed["pin_gc"]["first_gc_remaining_events"]}
     write(out / "state/before.json", encoded(before))
@@ -120,15 +147,17 @@ def main():
     git_commit = run(["git", "rev-parse", "HEAD"]).stdout.decode().strip()
     rustc = run(["rustc", "--version"]).stdout.decode().strip()
     write(out / "versions.json", encoded({"git_commit": git_commit, "rustc": rustc, "implementation_sha256": implementation}))
-    write(out / "commands.txt", " ".join(COMMAND) + "\n")
+    write(out / "commands.txt", " ".join(COMMAND) + "\n" + (" ".join(CAPTURE_COMMAND) + "\n" if mode == "fault" else ""))
     commands = []
-    for attempt, (completed, _) in enumerate(runs, 1):
-        stdout, stderr = out / f"attempt-{attempt}-stdout.txt", out / f"attempt-{attempt}-stderr.txt"
-        write(stdout, completed.stdout)
-        write(stderr, completed.stderr)
-        commands.append({"argv": " ".join(COMMAND), "version": "cargo-test/v1", "exit_code": completed.returncode,
-                         "stdout_path": stdout.relative_to(ROOT).as_posix(), "stdout_sha256": sha(completed.stdout),
-                         "stderr_path": stderr.relative_to(ROOT).as_posix(), "stderr_sha256": sha(completed.stderr)})
+    for name, argv, attempts in (("pressure", COMMAND, runs), ("capture", CAPTURE_COMMAND, capture_runs)):
+        for attempt, (completed, _) in enumerate(attempts, 1):
+            stem = f"attempt-{attempt}" if name == "pressure" else f"attempt-{attempt}-{name}"
+            stdout, stderr = out / f"{stem}-stdout.txt", out / f"{stem}-stderr.txt"
+            write(stdout, completed.stdout)
+            write(stderr, completed.stderr)
+            commands.append({"argv": " ".join(argv), "version": "cargo-test/v1", "exit_code": completed.returncode,
+                             "stdout_path": stdout.relative_to(ROOT).as_posix(), "stdout_sha256": sha(completed.stdout),
+                             "stderr_path": stderr.relative_to(ROOT).as_posix(), "stderr_sha256": sha(completed.stderr)})
     events = []
     for sequence, item in enumerate(timeline, 1):
         events.append({"schema_version": "journal-event/v1", "bead_id": "boring-cdc-m2-pressure",
@@ -137,7 +166,7 @@ def main():
                        "phase": item["probe"], "outcome": "pass", "config_fingerprint": implementation,
                        "generation": None, "intent_id": None, "request_id": None, "xid": None, "commit_lsn": None,
                        "end_lsn": None, "journal_range": None, "anchor": None, "fence": None, "attempt": 1,
-                       "fault_hook": "stalled-sqlite-reader" if mode == "fault" else None,
+                       "fault_hook": ("reserve-breach" if item["probe"] == "capture_hard_stop" else "stalled-sqlite-reader") if mode == "fault" else None,
                        "failure_class": None, "failure_fingerprint": None, "metric_units": None,
                        "evidence_digest": sha(encoded(item))})
     write(out / "logs/boring-cdc.jsonl", b"".join(encoded(event) for event in events))
@@ -153,13 +182,13 @@ def main():
                                "endurance": False, "full_failure_matrix": False, "clean_clone": False},
                 "result": {"status": "pass", "digest": sha(b"".join(path.read_bytes() for path in result_paths)),
                            "artifacts": [path.relative_to(ROOT).as_posix() for path in result_paths],
-                           "product_faults": "stalled_sqlite_reader_and_wal_recycling" if mode == "fault" else "none",
+                           "product_faults": "stalled_sqlite_reader_wal_recycling_and_capture_reserve_breach" if mode == "fault" else "none",
                            "runtime_observed": True, "attempts": ["sqlite-probe-1", "sqlite-probe-2"]}}
     write(out / "manifest.json", encoded(manifest))
     write(out / "evidence.json", encoded(manifest))
     files = sorted(path for path in out.rglob("*") if path.is_file())
     write(out / "sha256.txt", "".join(f"{sha(path.read_bytes())}  {path.relative_to(out).as_posix()}\n" for path in files))
-    print(json.dumps({"mode": mode, "status": "pass", "observed_probes": sorted(observed)}))
+    print(json.dumps({"mode": mode, "status": "pass", "observed_probes": sorted(observed) + (["capture_hard_stop"] if mode == "fault" else [])}))
 
 
 if __name__ == "__main__":
