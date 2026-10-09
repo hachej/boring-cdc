@@ -1,0 +1,1 @@
+[{"automatic_full_vacuum":false,"blocked_checkpoint_busy":1,"incremental_vacuum_max_pages":1000,"probe":"reader_contention","released_checkpoint_busy":0},{"after_release_remaining_events":0,"expired_pin_blocked":true,"first_gc_remaining_events":2,"first_gc_transactions":3,"probe":"pin_gc","second_gc_transactions":2}]

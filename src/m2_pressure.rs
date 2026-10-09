@@ -805,8 +805,12 @@ pub(crate) mod tests {
     static N: AtomicU64 = AtomicU64::new(1);
     fn writer() -> (WriterConnection, std::path::PathBuf) {
         let p = std::env::temp_dir().join(format!(
-            "m2-pressure-{}-{}.db",
+            "m2-pressure-{}-{}-{}.db",
             std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos(),
             N.fetch_add(1, Ordering::Relaxed)
         ));
         (open_writer(&p, "run", 1, 0).unwrap(), p)
@@ -943,13 +947,12 @@ pub(crate) mod tests {
             g.blockers
                 .contains(&"expired_pin_requires_reconciliation:p".into())
         );
-        assert_eq!(
-            w.connection()
-                .query_row("SELECT count(*) FROM journal_events", [], |r| r
-                    .get::<_, i64>(0))
-                .unwrap(),
-            2
-        );
+        let first_remaining: i64 = w
+            .connection()
+            .query_row("SELECT count(*) FROM journal_events", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(first_remaining, 2);
+        let first_gc = g;
         request_pin_release(&mut w, "p", 0).unwrap();
         assert_eq!(
             confirm_pin_release(&mut w, "p", 1),
@@ -960,6 +963,21 @@ pub(crate) mod tests {
         confirm_pin_release(&mut w, "p", 1).unwrap();
         let g = automatic_gc(&mut w, "epoch", 6, 2, 10, GC_MAX_HOLD).unwrap();
         assert_eq!(g.transactions, 2);
+        let remaining: i64 = w
+            .connection()
+            .query_row("SELECT count(*) FROM journal_events", [], |r| r.get(0))
+            .unwrap();
+        println!(
+            "PRESSURE_OBSERVATION {}",
+            serde_json::json!({
+                "probe": "pin_gc",
+                "first_gc_transactions": first_gc.transactions,
+                "first_gc_remaining_events": first_remaining,
+                "expired_pin_blocked": first_gc.blockers.contains(&"expired_pin_requires_reconciliation:p".into()),
+                "second_gc_transactions": g.transactions,
+                "after_release_remaining_events": remaining,
+            })
+        );
         drop(w);
         let _ = std::fs::remove_file(p);
     }
@@ -1000,7 +1018,8 @@ pub(crate) mod tests {
         assert!(blocked.wal_pages >= blocked.checkpointed_pages);
         reader.execute_batch("ROLLBACK").unwrap();
         drop(reader);
-        assert_eq!(checkpoint_restart(&mut w).unwrap().busy, 0);
+        let released = checkpoint_restart(&mut w).unwrap();
+        assert_eq!(released.busy, 0);
         incremental_vacuum(&mut w, INCREMENTAL_VACUUM_MAX_PAGES).unwrap();
         assert!(matches!(
             incremental_vacuum(&mut w, 1001),
@@ -1015,6 +1034,16 @@ pub(crate) mod tests {
             )
             .unwrap();
         assert!(!sql.contains("VACUUM"));
+        println!(
+            "PRESSURE_OBSERVATION {}",
+            serde_json::json!({
+                "probe": "reader_contention",
+                "blocked_checkpoint_busy": blocked.busy,
+                "released_checkpoint_busy": released.busy,
+                "incremental_vacuum_max_pages": INCREMENTAL_VACUUM_MAX_PAGES,
+                "automatic_full_vacuum": sql.contains("VACUUM"),
+            })
+        );
         drop(w);
         let _ = std::fs::remove_file(p);
     }
@@ -1382,9 +1411,23 @@ pub(crate) mod tests {
         )
         .unwrap();
         assert_eq!(result.decision.state, PressureState::Action);
-        assert_eq!(result.gc.unwrap().transactions, 5);
+        assert_eq!(result.gc.as_ref().unwrap().transactions, 5);
         assert_eq!(result.metadata_gc.unwrap(), MetadataGcResult::default());
         assert!(result.checkpoint.is_some());
+        let remaining: i64 = w
+            .connection()
+            .query_row("SELECT count(*) FROM journal_events", [], |r| r.get(0))
+            .unwrap();
+        println!(
+            "PRESSURE_OBSERVATION {}",
+            serde_json::json!({
+                "probe": "runtime_service",
+                "pressure_state": format!("{:?}", result.decision.state).to_lowercase(),
+                "gc_transactions": result.gc.as_ref().unwrap().transactions,
+                "remaining_events": remaining,
+                "checkpoint_busy": result.checkpoint.unwrap().busy,
+            })
+        );
         drop(w);
         let _ = std::fs::remove_file(p);
     }

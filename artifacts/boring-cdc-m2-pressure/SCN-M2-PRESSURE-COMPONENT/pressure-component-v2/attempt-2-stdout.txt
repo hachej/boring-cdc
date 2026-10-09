@@ -1,0 +1,31 @@
+
+running 13 tests
+test m2_pressure::tests::audit_metadata_gc_atomically_releases_active_and_pending_pins ... ok
+test m2_pressure::tests::audit_pin_reconciliation_bounds_many_owner_pins_per_tick ... ok
+test m2_pressure::tests::audit_pin_release_rolls_back_when_metadata_delete_fails ... ok
+test m2_pressure::tests::configured_thresholds_group_shared_devices_and_preserve_boundaries ... ok
+test m2_pressure::tests::invalid_terminal_registration_cannot_starve_audit_gc ... ok
+test m2_pressure::tests::maintenance_is_bounded_and_never_full_vacuum ... PRESSURE_OBSERVATION {"automatic_full_vacuum":false,"blocked_checkpoint_busy":1,"incremental_vacuum_max_pages":1000,"probe":"reader_contention","released_checkpoint_busy":0}
+ok
+test m2_pressure::tests::metadata_gc_is_terminal_bounded_and_preserves_active_rows ... ok
+test m2_pressure::tests::paused_destination_is_a_visible_retention_pin ... ok
+test m2_pressure::tests::per_filesystem_reserve_equal_admits_and_one_over_rejects ... ok
+test m2_pressure::tests::pin_lifecycle_and_gc_preserve_whole_transactions ... PRESSURE_OBSERVATION {"after_release_remaining_events":0,"expired_pin_blocked":true,"first_gc_remaining_events":2,"first_gc_transactions":3,"probe":"pin_gc","second_gc_transactions":2}
+ok
+test m2_pressure::tests::runtime_service_tick_executes_action_gc_and_maintenance ... PRESSURE_OBSERVATION {"checkpoint_busy":0,"gc_transactions":5,"pressure_state":"action","probe":"runtime_service","remaining_events":0}
+ok
+test m2_pressure::tests::transition_order_and_actions_are_exact ... ok
+test m2_pressure::tests::wal_forecast_is_honest ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 392 filtered out; finished in 1.34s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
