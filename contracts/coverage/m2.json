@@ -1,5 +1,5 @@
 {
-  "completion_policy": "factory-handoff/v1",
+  "completion_policy": "closed-leaf/v1",
   "owner_bead": "boring-cdc-m2-complete",
   "plan_coverage": "contracts/coverage/plan-to-beads.json",
   "prior_terminal_proof": "boring-cdc-m1-raw-demo",

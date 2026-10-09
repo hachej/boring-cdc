@@ -64,7 +64,7 @@ coverage=load(coverage_path)
 freeze=subprocess.run(['python3','scripts/lib/freeze_m2_completion_inputs.py','--verify'],text=True,capture_output=True)
 if freeze.returncode: fail(f'completion input pin verification failed: {freeze.stdout.strip()} {freeze.stderr.strip()}')
 if coverage.get('schema_version')!='m2-coverage/v1': fail('coverage schema_version mismatch')
-if coverage.get('completion_policy')!='factory-handoff/v1': fail('coverage completion policy mismatch')
+if coverage.get('completion_policy')!='closed-leaf/v1': fail('coverage completion policy mismatch')
 if coverage.get('owner_bead')!=barrier_id: fail('coverage owner mismatch')
 if coverage.get('prior_terminal_proof')!=prior: fail('prior terminal proof mismatch')
 if coverage.get('terminal_proof')!={'bead':terminal,'role':'downstream-proof-excluded-from-barrier-inputs'}: fail('terminal proof boundary mismatch')
@@ -80,16 +80,16 @@ try:
    rows[row['id']]=row
 except Exception as exc: fail(f'invalid durable Bead snapshot: {exc}')
 
-# Factory Workers never close their own Beads. Certification therefore consumes
-# contract-pinned, content-addressed handoff comments, including review-cap
-# replacement Beads, instead of treating mutable status as completion proof.
-completed=[]; handoff_count=0; manifest_count=0; capped_residuals=[]
+# Closed Bead state is required for every leaf. Pinned handoffs supply the
+# supporting provenance and never substitute for that closure.
+verified_handoffs=[]; handoff_count=0; manifest_count=0; capped_residuals=[]
 features={}; contracts={}
 plan=load(root/'contracts/coverage/plan-to-beads.json')
 canonical={a.get('id'):a.get('owner_bead') for a in plan.get('assignments',[])}
 handoff_header=re.compile(r'^\[Boring CDC [^\]]+\] handoff · ([A-Za-z0-9.-]+) · ([0-9a-f]{7,40})(?:\n|$)')
 for leaf in leaves:
  owner=leaf.get('owner_bead','unknown')
+ if rows.get(owner,{}).get('status')!='closed': fail(f'required leaf not closed: {owner}')
  if not leaf.get('unit_target'): fail(f'{owner}: missing unit target')
  scripts=leaf.get('component_and_fault_scripts',[])
  if not scripts: fail(f'{owner}: missing component/fault/validator scripts')
@@ -154,7 +154,7 @@ for leaf in leaves:
    capped_residuals.append({'owner_bead':owner,'handoff_bead':ref.get('bead'),'target_sha':target})
   bead_comments='\n'.join(str(c.get('text','')) for c in bead.get('comments',[])).lower()
   if 'friction:' not in bead_comments: fail(f'{owner}: handoff bead lacks friction note: {ref.get("bead")}'); leaf_ok=False
- if leaf_ok: completed.append(owner)
+ if leaf_ok: verified_handoffs.append(owner)
 
 if rows.get(prior,{}).get('status')!='closed': fail(f'prior terminal proof not closed: {prior}')
 barrier=rows.get(barrier_id,{})
@@ -179,7 +179,7 @@ for node in graph: visit(node)
 run=subprocess.run(['scripts/validate/plan_coverage.sh'],text=True,capture_output=True)
 if run.returncode: fail(f'plan coverage failed: {run.stdout.strip()} {run.stderr.strip()}')
 
-summary={'schema_version':'m2-completion-summary/v1','status':'fail' if errors else 'pass','completion_policy':'factory-handoff/v1','required_leaves':required,'completed_by_immutable_handoff':completed,'review_cap_residual_handoffs':capped_residuals,'immutable_handoff_count':handoff_count,'feature_owner_count':len(features),'contract_owner_count':len(contracts),'pinned_manifest_count':manifest_count,'prior_terminal_proof':{'bead':prior,'closed':rows.get(prior,{}).get('status')=='closed'},'blocking_edges':sorted(blockers),'terminal_proof_downstream':barrier_id in terminal_blockers,'blocking_graph_acyclic':not cycle,'findings':errors}
+summary={'schema_version':'m2-completion-summary/v1','status':'fail' if errors else 'pass','completion_policy':'closed-leaf/v1','required_leaves':required,'closed_leaves':[owner for owner in required if rows.get(owner,{}).get('status')=='closed'],'verified_handoffs':verified_handoffs,'review_cap_residual_handoffs':capped_residuals,'immutable_handoff_count':handoff_count,'feature_owner_count':len(features),'contract_owner_count':len(contracts),'pinned_manifest_count':manifest_count,'prior_terminal_proof':{'bead':prior,'closed':rows.get(prior,{}).get('status')=='closed'},'blocking_edges':sorted(blockers),'terminal_proof_downstream':barrier_id in terminal_blockers,'blocking_graph_acyclic':not cycle,'findings':errors}
 encoded=json.dumps(summary,sort_keys=True,indent=2)+'\n'
 if errors:
  print(encoded,end=''); raise SystemExit(1)
