@@ -51,9 +51,10 @@ def observations(stdout, expected):
         raise RuntimeError("test summary disagrees with passing test names")
     records = [json.loads(value) for value in MARKER.findall(output)]
     by_probe = {record["probe"]: record for record in records}
-    if len(records) != 3 or set(by_probe) != {"pin_gc", "reader_contention", "runtime_service"}:
+    if len(records) != 4 or set(by_probe) != {"pin_gc", "reader_contention", "runtime_service", "wal_recycling"}:
         raise RuntimeError("required SQLite observations missing or duplicated")
     pin, reader, service = (by_probe[name] for name in ("pin_gc", "reader_contention", "runtime_service"))
+    wal = by_probe["wal_recycling"]
     if not (
         pin["first_gc_transactions"] == 3
         and pin["first_gc_remaining_events"] == 2
@@ -68,6 +69,15 @@ def observations(stdout, expected):
         and service["gc_transactions"] == 5
         and service["remaining_events"] == 0
         and service["checkpoint_busy"] == 0
+        and wal["writes_while_reader_held"] == 64
+        and wal["reader_snapshot_count"] == 0
+        and wal["stalled_checkpoint_busy"] == 1
+        and wal["stalled_wal_pages"] >= 64
+        and wal["released_checkpoint_busy"] == 0
+        and wal["released_checkpointed_pages"] == wal["stalled_wal_pages"]
+        and wal["recycled_wal_pages"] < wal["stalled_wal_pages"]
+        and wal["gc_transactions"] == 3
+        and wal["remaining_pinned_events"] == 2
     ):
         raise RuntimeError("pressure probe observed unexpected state")
     return by_probe
@@ -97,9 +107,10 @@ def main():
     if implementation != after_implementation:
         raise RuntimeError("pressure source changed during evidence capture")
     observed = runs[0][1]
-    selected = observed["runtime_service"] if mode == "e2e" else observed["reader_contention"]
+    selected = (observed["runtime_service"] if mode == "e2e"
+                else {"reader_contention": observed["reader_contention"], "wal_recycling": observed["wal_recycling"]})
     timeline = ([observed["pin_gc"], observed["runtime_service"]] if mode == "e2e"
-                else [observed["reader_contention"], observed["pin_gc"]])
+                else [observed["reader_contention"], observed["wal_recycling"], observed["pin_gc"]])
     shutil.rmtree(out, ignore_errors=True)
     before = {"journal_events": observed["pin_gc"]["first_gc_transactions"] + observed["pin_gc"]["first_gc_remaining_events"]}
     write(out / "state/before.json", encoded(before))
@@ -142,7 +153,7 @@ def main():
                                "endurance": False, "full_failure_matrix": False, "clean_clone": False},
                 "result": {"status": "pass", "digest": sha(b"".join(path.read_bytes() for path in result_paths)),
                            "artifacts": [path.relative_to(ROOT).as_posix() for path in result_paths],
-                           "product_faults": "stalled_sqlite_reader" if mode == "fault" else "none",
+                           "product_faults": "stalled_sqlite_reader_and_wal_recycling" if mode == "fault" else "none",
                            "runtime_observed": True, "attempts": ["sqlite-probe-1", "sqlite-probe-2"]}}
     write(out / "manifest.json", encoded(manifest))
     write(out / "evidence.json", encoded(manifest))

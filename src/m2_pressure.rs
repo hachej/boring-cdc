@@ -1048,6 +1048,88 @@ pub(crate) mod tests {
         let _ = std::fs::remove_file(p);
     }
     #[test]
+    fn stalled_reader_releases_wal_for_reuse_without_crossing_pin() {
+        let (mut w, p) = writer();
+        seed(&w);
+        create_pin(
+            &mut w,
+            PinSpec {
+                pin_id: "reader-pin",
+                owner_kind: "clickhouse_intent",
+                owner_id: "intent",
+                capture_epoch: "epoch",
+                start_seq: 4,
+                end_seq: None,
+                expires_at_unix_ms: None,
+            },
+        )
+        .unwrap();
+        w.connection()
+            .execute("CREATE TABLE pressure_write_probe(value INTEGER)", [])
+            .unwrap();
+        assert_eq!(checkpoint_restart(&mut w).unwrap().busy, 0);
+
+        let reader = rusqlite::Connection::open(&p).unwrap();
+        reader
+            .execute_batch("BEGIN; SELECT count(*) FROM pressure_write_probe;")
+            .unwrap();
+        let writes = 64;
+        for value in 0..writes {
+            w.connection()
+                .execute(
+                    "INSERT INTO pressure_write_probe(value) VALUES(?1)",
+                    params![value],
+                )
+                .unwrap();
+        }
+        let reader_count: i64 = reader
+            .query_row("SELECT count(*) FROM pressure_write_probe", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(reader_count, 0);
+        let blocked = checkpoint_restart(&mut w).unwrap();
+        assert_eq!(blocked.busy, 1);
+        assert!(blocked.wal_pages >= 64);
+
+        reader.execute_batch("ROLLBACK").unwrap();
+        drop(reader);
+        let released = checkpoint_restart(&mut w).unwrap();
+        assert_eq!(released.busy, 0);
+        assert_eq!(released.checkpointed_pages, released.wal_pages);
+        w.connection()
+            .execute("INSERT INTO pressure_write_probe(value) VALUES(64)", [])
+            .unwrap();
+        let recycled = checkpoint_restart(&mut w).unwrap();
+        assert_eq!(recycled.busy, 0);
+        assert!(recycled.wal_pages < blocked.wal_pages);
+
+        let gc = automatic_gc(&mut w, "epoch", 6, 2, 10, GC_MAX_HOLD).unwrap();
+        assert_eq!(gc.transactions, 3);
+        let remaining: i64 = w
+            .connection()
+            .query_row("SELECT count(*) FROM journal_events", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(remaining, 2);
+        println!(
+            "PRESSURE_OBSERVATION {}",
+            serde_json::json!({
+                "probe": "wal_recycling",
+                "writes_while_reader_held": writes,
+                "reader_snapshot_count": reader_count,
+                "stalled_checkpoint_busy": blocked.busy,
+                "stalled_wal_pages": blocked.wal_pages,
+                "released_checkpoint_busy": released.busy,
+                "released_checkpointed_pages": released.checkpointed_pages,
+                "recycled_wal_pages": recycled.wal_pages,
+                "gc_transactions": gc.transactions,
+                "remaining_pinned_events": remaining,
+            })
+        );
+        drop(w);
+        let _ = std::fs::remove_file(p);
+    }
+    #[test]
     fn metadata_gc_is_terminal_bounded_and_preserves_active_rows() {
         let (mut w, p) = writer();
         for i in 0..4 {
