@@ -805,8 +805,12 @@ pub(crate) mod tests {
     static N: AtomicU64 = AtomicU64::new(1);
     fn writer() -> (WriterConnection, std::path::PathBuf) {
         let p = std::env::temp_dir().join(format!(
-            "m2-pressure-{}-{}.db",
+            "m2-pressure-{}-{}-{}.db",
             std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos(),
             N.fetch_add(1, Ordering::Relaxed)
         ));
         (open_writer(&p, "run", 1, 0).unwrap(), p)

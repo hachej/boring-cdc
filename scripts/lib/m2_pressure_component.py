@@ -86,6 +86,8 @@ def main():
         completed = run(COMMAND)
         if completed.returncode:
             raise RuntimeError(f"pressure attempt {attempt} exited {completed.returncode}: {completed.stderr.decode()[-2000:]}")
+        completed.stdout = completed.stdout.replace(str(ROOT).encode(), b"[REPO]")
+        completed.stderr = completed.stderr.replace(str(ROOT).encode(), b"[REPO]")
         if PRIVATE.search(completed.stdout) or PRIVATE.search(completed.stderr):
             raise RuntimeError("pressure test output contains unapproved path or secret-like text")
         runs.append((completed, observations(completed.stdout, expected)))
@@ -103,7 +105,7 @@ def main():
     write(out / "state/before.json", encoded(before))
     write(out / "state/after.json", encoded(selected))
     write(out / "fault-timeline.json", encoded(timeline))
-    write(out / "config.json", encoded({"seed": SEED, "test_threads": 1}))
+    write(out / "config.json", encoded({"seed": SEED, "test_threads": 1, "command_output_redaction": "checkout root replaced with [REPO]"}))
     git_commit = run(["git", "rev-parse", "HEAD"]).stdout.decode().strip()
     rustc = run(["rustc", "--version"]).stdout.decode().strip()
     write(out / "versions.json", encoded({"git_commit": git_commit, "rustc": rustc, "implementation_sha256": implementation}))
