@@ -36,9 +36,10 @@ def main():
         probes.append(observations(stdout.read_bytes(), expected))
     assert probes[0] == probes[1]
     observed = probes[0]
-    selected = observed["runtime_service"] if mode == "e2e" else observed["reader_contention"]
+    selected = (observed["runtime_service"] if mode == "e2e"
+                else {"reader_contention": observed["reader_contention"], "wal_recycling": observed["wal_recycling"]})
     timeline = ([observed["pin_gc"], observed["runtime_service"]] if mode == "e2e"
-                else [observed["reader_contention"], observed["pin_gc"]])
+                else [observed["reader_contention"], observed["wal_recycling"], observed["pin_gc"]])
     assert json.loads((path / "state/after.json").read_text()) == selected
     assert json.loads((path / "fault-timeline.json").read_text()) == timeline
     events = [json.loads(line) for line in (path / "logs/boring-cdc.jsonl").read_text().splitlines()]

@@ -1,5 +1,5 @@
 
-running 13 tests
+running 14 tests
 test m2_pressure::tests::audit_metadata_gc_atomically_releases_active_and_pending_pins ... ok
 test m2_pressure::tests::audit_pin_reconciliation_bounds_many_owner_pins_per_tick ... ok
 test m2_pressure::tests::audit_pin_release_rolls_back_when_metadata_delete_fails ... ok
@@ -14,10 +14,12 @@ test m2_pressure::tests::pin_lifecycle_and_gc_preserve_whole_transactions ... PR
 ok
 test m2_pressure::tests::runtime_service_tick_executes_action_gc_and_maintenance ... PRESSURE_OBSERVATION {"checkpoint_busy":0,"gc_transactions":5,"pressure_state":"action","probe":"runtime_service","remaining_events":0}
 ok
+test m2_pressure::tests::stalled_reader_releases_wal_for_reuse_without_crossing_pin ... PRESSURE_OBSERVATION {"gc_transactions":3,"probe":"wal_recycling","reader_snapshot_count":0,"recycled_wal_pages":1,"released_checkpoint_busy":0,"released_checkpointed_pages":64,"remaining_pinned_events":2,"stalled_checkpoint_busy":1,"stalled_wal_pages":64,"writes_while_reader_held":64}
+ok
 test m2_pressure::tests::transition_order_and_actions_are_exact ... ok
 test m2_pressure::tests::wal_forecast_is_honest ... ok
 
-test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 392 filtered out; finished in 1.39s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 392 filtered out; finished in 1.56s
 
 
 running 0 tests
