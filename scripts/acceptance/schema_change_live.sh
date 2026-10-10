@@ -67,6 +67,9 @@ reset_source() {
   mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"
   chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
   cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
+  if [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} ]]; then
+    sed -i 's/heartbeat_cadence_ms = 5000/heartbeat_cadence_ms = 300000/' "$work/run/boring-cdc.toml"
+  fi
   psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_credential" -v "control_password=$control_credential" -v "application_password=$application_credential" \
     < scripts/setup/durable_simple_prerequisites.sql >"$work/${scenario}-prerequisites.out"
 
@@ -100,6 +103,12 @@ start_runtime() {
     kill -0 "$runtime_pid" 2>/dev/null || { wait "$runtime_pid"; exit 1; }
     sleep .1
   done
+  if [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} ]]; then
+    replication_pid=$(psqlc -Atqc 'SELECT pid FROM pg_stat_replication ORDER BY pid')
+    advisory_pid=$(psqlc -Atqc "SELECT pid FROM pg_locks WHERE locktype='advisory' AND granted AND pid <> pg_backend_pid() ORDER BY pid")
+    [[ "$replication_pid" =~ ^[0-9]+$ && "$advisory_pid" =~ ^[0-9]+$ && "$replication_pid" != "$advisory_pid" ]] ||
+      { echo 'E_SCHEMA_STOP_OWNERSHIP_AMBIGUOUS' >&2; exit 1; }
+  fi
 }
 commit_order() {
   local key=$1 value=$2 extra=${3:-}
@@ -161,6 +170,73 @@ with open(result_path,'w') as f: json.dump(result,f,sort_keys=True); f.write('\n
 print(json.dumps(result,sort_keys=True))
 PY
 }
+verify_stable_stop() {
+  local scenario=$1 key=$2 value=$3 extra=${4:-} before after confirmed state target_lsn sent_lsn deadline
+  [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} ]] || return 0
+  before=$(python3 - "$journal" <<'PY'
+import json,sqlite3,sys
+connection=sqlite3.connect(sys.argv[1])
+print(json.dumps({
+ 'transactions':connection.execute('SELECT count(*) FROM source_transactions').fetchone()[0],
+ 'failure':connection.execute("SELECT failure_id,fingerprint,failure_class,retry_class,attempt,armed,failed_final_lsn FROM processing_failures WHERE component='capture' AND armed=1").fetchone(),
+ 'durable_lsn':connection.execute('SELECT durable_transaction_end_lsn FROM source_state WHERE singleton=1').fetchone()[0],
+},sort_keys=True))
+PY
+)
+  commit_order "$key" "$value" "$extra"
+  target_lsn=$(psqlc -Atqc 'SELECT pg_current_wal_lsn()::text')
+  deadline=$((SECONDS+10))
+  while true; do
+    sent_lsn=$(psqlc -Atqc "SELECT coalesce(sent_lsn::text,'0/0') FROM pg_stat_replication WHERE pid=$replication_pid")
+    if python3 - "$target_lsn" "$sent_lsn" <<'PY'
+import sys
+def lsn(value):
+    high,low=value.split('/')
+    return (int(high,16)<<32)|int(low,16)
+raise SystemExit(0 if lsn(sys.argv[2])>=lsn(sys.argv[1]) else 1)
+PY
+    then break; fi
+    (( SECONDS < deadline )) || { echo 'E_SCHEMA_STOP_SOURCE_NOT_SENT' >&2; exit 1; }
+    sleep .05
+  done
+  sleep .2
+  state=$(ps -o stat= -p "$runtime_pid" 2>/dev/null || true)
+  [[ -n "$state" && "$state" != Z* ]] || { echo 'E_SCHEMA_STOP_PROCESS_EXITED' >&2; exit 1; }
+  [[ "$(psqlc -Atqc 'SELECT pid FROM pg_stat_replication ORDER BY pid')" == "$replication_pid" ]] ||
+    { echo 'E_SCHEMA_STOP_REPLICATION_REOPENED' >&2; exit 1; }
+  [[ "$(psqlc -Atqc "SELECT pid FROM pg_locks WHERE locktype='advisory' AND granted AND pid <> pg_backend_pid() ORDER BY pid")" == "$advisory_pid" ]] ||
+    { echo 'E_SCHEMA_STOP_OWNERSHIP_LOST' >&2; exit 1; }
+  after=$(python3 - "$journal" <<'PY'
+import json,sqlite3,sys
+connection=sqlite3.connect(sys.argv[1])
+print(json.dumps({
+ 'transactions':connection.execute('SELECT count(*) FROM source_transactions').fetchone()[0],
+ 'failure':connection.execute("SELECT failure_id,fingerprint,failure_class,retry_class,attempt,armed,failed_final_lsn FROM processing_failures WHERE component='capture' AND armed=1").fetchone(),
+ 'durable_lsn':connection.execute('SELECT durable_transaction_end_lsn FROM source_state WHERE singleton=1').fetchone()[0],
+},sort_keys=True))
+PY
+)
+  [[ "$before" == "$after" ]] || { echo 'E_SCHEMA_STOP_STATE_ADVANCED' >&2; exit 1; }
+  confirmed=$(psqlc -Atqc "SELECT coalesce(write_lsn::text,'0/0')||','||coalesce(flush_lsn::text,'0/0')||','||coalesce(replay_lsn::text,'0/0') FROM pg_stat_replication WHERE pid=$replication_pid")
+  python3 - "$before" "$confirmed" "$scenario" "$replication_pid" "$advisory_pid" "$version" "$work/${scenario}-safe-stop.json" <<'PY'
+import json,sys
+state=json.loads(sys.argv[1]); positions=sys.argv[2].split(',')
+def lsn(value):
+    high,low=value.split('/')
+    return (int(high,16)<<32)|int(low,16)
+assert len(positions)==3 and all(lsn(value)<=int(state['durable_lsn'],16) for value in positions)
+assert state['failure'] is not None and state['failure'][2:6]==['unsupported','deterministic',1,1]
+with open(sys.argv[7],'w') as output:
+    json.dump({'schema_version':'m2-schema-safe-stop-observation/v1','scenario':sys.argv[3],
+      'postgres_version':sys.argv[6],'replication_pid':int(sys.argv[4]),'advisory_pid':int(sys.argv[5]),
+      'durable_transaction_count':state['transactions'],'durable_lsn':state['durable_lsn'],
+      'failure_class':state['failure'][2],'retry_class':state['failure'][3],
+      'failure_armed':True,'process_alive_after_later_commit':True,
+      'replication_pid_stable':True,'advisory_pid_stable':True,
+      'feedback_positions':sys.argv[2]},output,sort_keys=True)
+    output.write('\n')
+PY
+}
 
 run_nullable() {
   reset_source nullable
@@ -172,6 +248,7 @@ run_nullable() {
   commit_order 102 102.25 "'nullable-value'"
   wait_for_schema_stop nullable
   verify_fail_closed nullable 102
+  verify_stable_stop nullable 103 103.25 "'later-value'"
 }
 run_incompatible() {
   reset_source incompatible
@@ -183,10 +260,16 @@ run_incompatible() {
   commit_order 202 "'incompatible-value'"
   wait_for_schema_stop incompatible
   verify_fail_closed incompatible 202
+  verify_stable_stop incompatible 203 "'later-value'"
 }
 
 run_nullable
 run_incompatible
+if [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} ]]; then
+  [[ ! -e "$M2_SCHEMA_SAFE_STOP_OUT" ]] || { echo 'E_SCHEMA_STOP_ARTIFACT_EXISTS' >&2; exit 1; }
+  mkdir -p "$M2_SCHEMA_SAFE_STOP_OUT"
+  cp -f "$work/nullable-safe-stop.json" "$work/incompatible-safe-stop.json" "$M2_SCHEMA_SAFE_STOP_OUT/"
+fi
 set +e
 stop_bounded "$runtime_pid" TERM incompatible-runtime
 stopped_status=$?

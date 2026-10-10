@@ -81,6 +81,42 @@ jobs:
           name: m2-sqlite-persistence-outage
           path: artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-CRASH-BEFORE-COMMIT/current-head
           if-no-files-found: error
+  m2_schema_safe_stop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update
+      - name: M2 live deterministic capture safe-stop proof
+        timeout-minutes: 15
+        env:
+          TMPDIR: /var/tmp
+        run: |
+          packet="$PWD/artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-SAFE-STOP-REARM/current-head"
+          for attempt in 1 2; do
+            if ! M2_SCHEMA_SAFE_STOP_OUT="$packet/attempt-$attempt" \
+              scripts/acceptance/schema_change_live.sh \
+              >>"$RUNNER_TEMP/m2-schema-safe-stop.stdout" \
+              2>>"$RUNNER_TEMP/m2-schema-safe-stop.stderr"; then
+              grep -Eo 'E_[A-Z0-9_]+|M2_[A-Z0-9_]+' "$RUNNER_TEMP/m2-schema-safe-stop.stderr" | tail -n 12 || true
+              grep -E 'AssertionError|Traceback' "$RUNNER_TEMP/m2-schema-safe-stop.stderr" | tail -n 4 || true
+              exit 1
+            fi
+          done
+          python3 scripts/lib/m2_schema_safe_stop_evidence.py "$packet" \
+            "$RUNNER_TEMP/m2-schema-safe-stop.stdout" "$RUNNER_TEMP/m2-schema-safe-stop.stderr"
+          python3 scripts/validate/m2_schema_safe_stop.py "$packet"
+          scripts/validate/evidence.sh "$packet/evidence.json"
+      - name: Retain M2 schema safe-stop packet
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m2-schema-safe-stop
+          path: artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-SAFE-STOP-REARM/current-head
+          if-no-files-found: error
   m2_source_commit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
