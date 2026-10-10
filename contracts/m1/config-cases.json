@@ -6164,6 +6164,144 @@
           "mutation": "unsupported_schema"
         }
       }
+    },
+    {
+      "accepted_examples": [
+        "fixture::observability.status_tls_cert_env::accepted"
+      ],
+      "constraint": {
+        "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+        "negative_mutation": "wrong_type"
+      },
+      "error_codes": [
+        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
+      "expected_type": "string",
+      "field": "status_tls_cert_env",
+      "fingerprint_impact": {
+        "always": [
+          "runtime"
+        ],
+        "conditional": {}
+      },
+      "fingerprint_probe": {
+        "expected_changed": [
+          "runtime"
+        ],
+        "mutation": "same_type_change_in_representative_fixture"
+      },
+      "group": "observability",
+      "id": "SCN-M1-CONFIG-OBSERVABILITY-STATUS-TLS-CERT-ENV",
+      "log_code": null,
+      "redaction": "shared_config_error_contains_only_stable_code_and_field",
+      "rejected_examples": [
+        "wrong_type::observability.status_tls_cert_env::CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+      ],
+      "status_code": null,
+      "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
+      "vectors": {
+        "accepted": {
+          "expected": "accepted",
+          "mutation": "fixture"
+        },
+        "rejected": {
+          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+          "mutation": "wrong_type"
+        }
+      }
+    },
+    {
+      "accepted_examples": [
+        "fixture::observability.status_tls_key_env::accepted"
+      ],
+      "constraint": {
+        "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+        "negative_mutation": "wrong_type"
+      },
+      "error_codes": [
+        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
+      "expected_type": "string",
+      "field": "status_tls_key_env",
+      "fingerprint_impact": {
+        "always": [
+          "runtime"
+        ],
+        "conditional": {}
+      },
+      "fingerprint_probe": {
+        "expected_changed": [
+          "runtime"
+        ],
+        "mutation": "same_type_change_in_representative_fixture"
+      },
+      "group": "observability",
+      "id": "SCN-M1-CONFIG-OBSERVABILITY-STATUS-TLS-KEY-ENV",
+      "log_code": null,
+      "redaction": "shared_config_error_contains_only_stable_code_and_field",
+      "rejected_examples": [
+        "wrong_type::observability.status_tls_key_env::CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+      ],
+      "status_code": null,
+      "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
+      "vectors": {
+        "accepted": {
+          "expected": "accepted",
+          "mutation": "fixture"
+        },
+        "rejected": {
+          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+          "mutation": "wrong_type"
+        }
+      }
+    },
+    {
+      "accepted_examples": [
+        "fixture::observability.status_tls_client_ca_env::accepted"
+      ],
+      "constraint": {
+        "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+        "negative_mutation": "wrong_type"
+      },
+      "error_codes": [
+        "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+      ],
+      "executable_scenario": "cargo test --locked m1_config::tests::executable_case_inventory_matches_loader",
+      "expected_type": "string",
+      "field": "status_tls_client_ca_env",
+      "fingerprint_impact": {
+        "always": [
+          "runtime"
+        ],
+        "conditional": {}
+      },
+      "fingerprint_probe": {
+        "expected_changed": [
+          "runtime"
+        ],
+        "mutation": "same_type_change_in_representative_fixture"
+      },
+      "group": "observability",
+      "id": "SCN-M1-CONFIG-OBSERVABILITY-STATUS-TLS-CLIENT-CA-ENV",
+      "log_code": null,
+      "redaction": "shared_config_error_contains_only_stable_code_and_field",
+      "rejected_examples": [
+        "wrong_type::observability.status_tls_client_ca_env::CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD"
+      ],
+      "status_code": null,
+      "unit_target": "m1_config::tests::executable_case_inventory_matches_loader",
+      "vectors": {
+        "accepted": {
+          "expected": "accepted",
+          "mutation": "fixture"
+        },
+        "rejected": {
+          "expected_error_code": "CONFIG_INVALID_TOML_OR_UNKNOWN_FIELD",
+          "mutation": "wrong_type"
+        }
+      }
     }
   ],
   "owner_bead": "boring-cdc-m1-config",

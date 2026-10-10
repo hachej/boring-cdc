@@ -218,7 +218,7 @@ pub struct Conditions {
     pub hysteresis_ms: Milliseconds,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Observability {
     pub log_level: String,
@@ -226,6 +226,25 @@ pub struct Observability {
     pub prometheus_listen_addr: String,
     pub authentication: bool,
     pub tls: bool,
+    #[serde(skip_serializing)]
+    status_tls_cert_env: String,
+    #[serde(skip_serializing)]
+    status_tls_key_env: String,
+    #[serde(skip_serializing)]
+    status_tls_client_ca_env: String,
+}
+
+impl fmt::Debug for Observability {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Observability")
+            .field("log_level", &self.log_level)
+            .field("status_listen_addr", &self.status_listen_addr)
+            .field("prometheus_listen_addr", &self.prometheus_listen_addr)
+            .field("authentication", &self.authentication)
+            .field("tls", &self.tls)
+            .field("status_tls_material", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl Default for Observability {
@@ -236,6 +255,9 @@ impl Default for Observability {
             prometheus_listen_addr: "127.0.0.1:8788".into(),
             authentication: false,
             tls: false,
+            status_tls_cert_env: String::new(),
+            status_tls_key_env: String::new(),
+            status_tls_client_ca_env: String::new(),
         }
     }
 }
@@ -313,6 +335,9 @@ struct Secrets {
     administration: Option<SecretString>,
     clickhouse_runtime: Option<SecretString>,
     clickhouse_maintenance: Option<SecretString>,
+    status_tls_cert: Option<SecretString>,
+    status_tls_key: Option<SecretString>,
+    status_tls_client_ca: Option<SecretString>,
 }
 
 /// Selects the least-privilege secret set resolved by the shared loader.
@@ -447,6 +472,13 @@ impl LoadedConfig {
             .as_ref()
             .map(SecretString::expose)
     }
+    pub fn status_tls_material(&self) -> Option<(&str, &str, &str)> {
+        Some((
+            self.secrets.status_tls_cert.as_ref()?.expose(),
+            self.secrets.status_tls_key.as_ref()?.expose(),
+            self.secrets.status_tls_client_ca.as_ref()?.expose(),
+        ))
+    }
 
     /// Safe diagnostic projection: fixed secret role labels, never environment names or values.
     pub fn redacted_diagnostics(&self) -> serde_json::Value {
@@ -544,6 +576,9 @@ pub fn load_str_for(
             &raw.source.administration_dsn_env,
             &raw.clickhouse.runtime_dsn_env,
             &raw.clickhouse.maintenance_dsn_env,
+            &raw.observability.status_tls_cert_env,
+            &raw.observability.status_tls_key_env,
+            &raw.observability.status_tls_client_ca_env,
         ],
     )?;
     validate_secret_references([
@@ -552,6 +587,9 @@ pub fn load_str_for(
         &raw.source.administration_dsn_env,
         &raw.clickhouse.runtime_dsn_env,
         &raw.clickhouse.maintenance_dsn_env,
+        &raw.observability.status_tls_cert_env,
+        &raw.observability.status_tls_key_env,
+        &raw.observability.status_tls_client_ca_env,
     ])?;
     apply_overrides(&mut raw, env)?;
     validate(&mut raw)?;
@@ -595,6 +633,14 @@ pub fn load_str_for(
                 )
             })
             .transpose()?,
+        status_tls_cert: resolve_status_material(env, &raw, purpose, StatusMaterialRole::Cert)?,
+        status_tls_key: resolve_status_material(env, &raw, purpose, StatusMaterialRole::Key)?,
+        status_tls_client_ca: resolve_status_material(
+            env,
+            &raw,
+            purpose,
+            StatusMaterialRole::ClientCa,
+        )?,
     };
     let public = into_public(raw);
     let fingerprints = fingerprints(&public)?;
@@ -607,7 +653,7 @@ pub fn load_str_for(
 
 fn reject_unapproved_overrides(
     env: &dyn Environment,
-    secret_names: [&String; 5],
+    secret_names: [&String; 8],
 ) -> Result<(), ConfigError> {
     for name in env.names() {
         if !name.starts_with("BORING_CDC_") {
@@ -673,6 +719,51 @@ fn resolve_secret(
             field,
         }),
     }
+}
+
+#[derive(Clone, Copy)]
+enum StatusMaterialRole {
+    Cert,
+    Key,
+    ClientCa,
+}
+
+fn resolve_status_material(
+    env: &dyn Environment,
+    raw: &RawConfig,
+    purpose: LoadPurpose,
+    role: StatusMaterialRole,
+) -> Result<Option<SecretString>, ConfigError> {
+    if !raw.observability.tls || !matches!(purpose, LoadPurpose::Check | LoadPurpose::Run) {
+        return Ok(None);
+    }
+    let (name, field, marker) = match role {
+        StatusMaterialRole::Cert => (
+            &raw.observability.status_tls_cert_env,
+            "observability.status_tls_cert_env",
+            "CERTIFICATE",
+        ),
+        StatusMaterialRole::Key => (
+            &raw.observability.status_tls_key_env,
+            "observability.status_tls_key_env",
+            "PRIVATE KEY",
+        ),
+        StatusMaterialRole::ClientCa => (
+            &raw.observability.status_tls_client_ca_env,
+            "observability.status_tls_client_ca_env",
+            "CERTIFICATE",
+        ),
+    };
+    let value = resolve_secret(env, name, field)?;
+    if !value
+        .expose()
+        .contains(&format!("-----BEGIN {marker}-----"))
+        || !value.expose().contains(&format!("-----END {marker}-----"))
+        || value.expose().len() > 1_048_576
+    {
+        return err("CONFIG_INVALID_TLS_MATERIAL", field);
+    }
+    Ok(Some(value))
 }
 
 fn valid_env_name(value: &str) -> bool {
@@ -916,6 +1007,20 @@ fn validate(raw: &mut RawConfig) -> Result<(), ConfigError> {
         &raw.observability.prometheus_listen_addr,
         &raw.observability,
     )?;
+    if raw.observability.authentication != raw.observability.tls {
+        return err("CONFIG_STATUS_REQUIRES_AUTH_TLS", "observability");
+    }
+    if raw.observability.tls
+        && [
+            &raw.observability.status_tls_cert_env,
+            &raw.observability.status_tls_key_env,
+            &raw.observability.status_tls_client_ca_env,
+        ]
+        .iter()
+        .any(|name| name.is_empty())
+    {
+        return err("CONFIG_STATUS_MISSING_MATERIAL_REFERENCE", "observability");
+    }
     // M0-RECONCILED: boring-cdc-d-ch-accept recommended concrete pins pending approval.
     if raw.clickhouse.server_version != "25.8.2.29"
         || raw.clickhouse.client_version != "0.2.0"
@@ -1004,20 +1109,27 @@ fn validate_replica_key(table: &Table) -> Result<(), ConfigError> {
     Ok(())
 }
 
-fn validate_secret_references(references: [&str; 5]) -> Result<(), ConfigError> {
-    if references
+fn validate_secret_references(references: [&str; 8]) -> Result<(), ConfigError> {
+    if references[..5]
         .iter()
         .any(|reference| !valid_env_name(reference))
+        || references[5..]
+            .iter()
+            .any(|reference| !reference.is_empty() && !valid_env_name(reference))
     {
         return err("CONFIG_INVALID_SECRET_REFERENCE", "secret_reference");
     }
     let mut seen = BTreeSet::new();
-    if references.iter().any(|reference| !seen.insert(*reference)) {
+    if references
+        .iter()
+        .filter(|reference| !reference.is_empty())
+        .any(|reference| !seen.insert(*reference))
+    {
         return err("CONFIG_ALIASED_SECRET_REFERENCE", "secret_reference");
     }
     if references
         .iter()
-        .any(|reference| APPROVED_OVERRIDES.contains(reference))
+        .any(|reference| !reference.is_empty() && APPROVED_OVERRIDES.contains(reference))
     {
         return err(
             "CONFIG_SECRET_REFERENCE_COLLIDES_WITH_OVERRIDE",
@@ -1186,7 +1298,12 @@ fn fingerprints(config: &PublicConfig) -> Result<Fingerprints, ConfigError> {
             "archive_continuity": config.archive.continuity_break_policy,
         }))?,
         backfill: digest(&(&config.backfill, &config.retention, state_budget))?,
-        runtime: digest(config)?,
+        runtime: digest(&(
+            config,
+            &config.observability.status_tls_cert_env,
+            &config.observability.status_tls_key_env,
+            &config.observability.status_tls_client_ca_env,
+        ))?,
     })
 }
 
@@ -1237,6 +1354,73 @@ pub mod tests {
 
     fn fixture() -> String {
         include_str!("../tests/fixtures/m1_config/representative.toml").into()
+    }
+
+    #[test]
+    fn exposed_status_requires_material_and_scopes_secrets() {
+        let exposed = fixture()
+            .replace(
+                "status_listen_addr = \"127.0.0.1:8787\"",
+                "status_listen_addr = \"0.0.0.0:8787\"",
+            )
+            .replace("authentication = false", "authentication = true")
+            .replace("tls = false", "tls = true");
+        let no_reference = exposed.replace(
+            "status_tls_key_env = \"STATUS_TLS_KEY\"",
+            "status_tls_key_env = \"\"",
+        );
+        assert_eq!(
+            load_str_for(&no_reference, &Env::default(), LoadPurpose::Status)
+                .unwrap_err()
+                .code,
+            "CONFIG_STATUS_MISSING_MATERIAL_REFERENCE"
+        );
+        let missing = load_str_for(&exposed, &env(), LoadPurpose::Run).unwrap_err();
+        assert_eq!(missing.code, "CONFIG_MISSING_SECRET");
+        assert_eq!(missing.field, "observability.status_tls_cert_env");
+
+        let status = load_str_for(&exposed, &Env::default(), LoadPurpose::Status).unwrap();
+        assert!(status.status_tls_material().is_none());
+        assert!(!format!("{status:?}").contains("STATUS_TLS_CERT"));
+        assert!(
+            !serde_json::to_string(status.public())
+                .unwrap()
+                .contains("STATUS_TLS_CERT")
+        );
+
+        let mut first_env = env();
+        first_env.0.insert(
+            "STATUS_TLS_CERT".into(),
+            "-----BEGIN CERTIFICATE-----\nfirst\n-----END CERTIFICATE-----".into(),
+        );
+        first_env.0.insert(
+            "STATUS_TLS_KEY".into(),
+            "-----BEGIN PRIVATE KEY-----\nfirst\n-----END PRIVATE KEY-----".into(),
+        );
+        first_env.0.insert(
+            "STATUS_TLS_CLIENT_CA".into(),
+            "-----BEGIN CERTIFICATE-----\nca\n-----END CERTIFICATE-----".into(),
+        );
+        let first = load_str_for(&exposed, &first_env, LoadPurpose::Check).unwrap();
+        assert!(first.status_tls_material().is_some());
+        let report = first.redacted_diagnostics().to_string();
+        assert!(!report.contains("STATUS_TLS_CERT"));
+        assert!(!report.contains("first"));
+
+        let mut rotated_env = first_env;
+        rotated_env.0.insert(
+            "STATUS_TLS_KEY".into(),
+            "-----BEGIN PRIVATE KEY-----\nrotated\n-----END PRIVATE KEY-----".into(),
+        );
+        let rotated = load_str_for(&exposed, &rotated_env, LoadPurpose::Run).unwrap();
+        assert_eq!(first.fingerprints(), rotated.fingerprints());
+        assert!(rotated.status_tls_material().unwrap().1.contains("rotated"));
+
+        rotated_env
+            .0
+            .insert("STATUS_TLS_CERT".into(), "broken PEM".into());
+        let invalid = load_str_for(&exposed, &rotated_env, LoadPurpose::Run).unwrap_err();
+        assert_eq!(invalid.code, "CONFIG_INVALID_TLS_MATERIAL");
     }
 
     fn separate_filesystem_fixture() -> String {
@@ -2221,7 +2405,7 @@ relation_contract = { customer_id = "int8:not-null", region = "text:not-null", n
         assert_eq!(inventory["schema_version"], "m1-config-cases/v2");
         assert_eq!(inventory["owner_bead"], "boring-cdc-m1-config");
         let cases = inventory["cases"].as_array().unwrap();
-        assert_eq!(cases.len(), 128);
+        assert_eq!(cases.len(), 131);
         assert!(inventory["status_log_projection"]["status_code"].is_null());
         assert!(inventory["status_log_projection"]["log_code"].is_null());
         assert!(
