@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/var/tmp}"; [[ "$TMPDIR" == /var/tmp ]]
-if [[ ${M2_WIRE_LIMIT_PROOF:-0} != 1 ]]; then
+if [[ ${M2_WIRE_LIMIT_PROOF:-0} != 1 && ${M2_ADVISORY_LOSS_PROOF:-0} != 1 ]]; then
   cargo test --locked --workspace --all-targets
 fi
 cargo test --locked m2_capture_runtime::tests
@@ -164,6 +164,55 @@ if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback && -n ${M2_FEEDBACK_RECEIP
     (( SECONDS < deadline )) || { echo 'E_AFTER_FEEDBACK_ABORT_NOT_REACHED' >&2; exit 1; }
     sleep .05
   done
+fi
+if [[ ${M2_ADVISORY_LOSS_PROOF:-0} == 1 ]]; then
+  artifact=${M2_ADVISORY_LOSS_OUT:?set M2_ADVISORY_LOSS_OUT for the live advisory-loss proof}
+  [[ ! -e "$artifact" ]] || { echo 'E_ADVISORY_ARTIFACT_EXISTS' >&2; exit 1; }
+  owner_pid=$(psqlc -Atqc "SELECT pid FROM pg_locks WHERE locktype='advisory' AND granted AND pid <> pg_backend_pid() ORDER BY pid")
+  [[ "$owner_pid" =~ ^[0-9]+$ ]] || { echo 'E_ADVISORY_OWNER_AMBIGUOUS' >&2; exit 1; }
+  [[ "$(psqlc -Atqc "SELECT pg_terminate_backend($owner_pid)::int")" == 1 ]]
+  deadline=$((SECONDS+15))
+  reacquired=0
+  while true; do
+    state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
+    [[ -z "$state" || "$state" == Z* ]] && break
+    [[ "$(psqlc -Atqc "SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND granted")" == 0 ]] || reacquired=1
+    (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }
+    sleep .05
+  done
+  child=$pid; set +e; wait "$pid"; rc=$?; set -e; pid=
+  [[ $rc -ne 0 && $reacquired -eq 0 ]]
+  grep -q 'M2_OWNERSHIP_LOST' "$work/runtime.err"
+  [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='runtime_slot'")" == 0 ]]
+  [[ "$(psqlc -Atqc "SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND granted")" == 0 ]]
+  [[ "$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
+PY2
+)" == 1 ]]
+  confirmed=$(psqlc -Atqc "SELECT confirmed_flush_lsn::text FROM pg_replication_slots WHERE slot_name='runtime_slot'")
+  python3 - "$confirmed" "$durable_lsn" <<'PY2'
+import sys
+def lsn(s):
+    high,low=s.split('/')
+    return (int(high,16)<<32)|int(low,16)
+assert lsn(sys.argv[1])<=lsn(sys.argv[2])
+PY2
+  mkdir -p "$artifact"
+  python3 - "$artifact" "$version" "$durable_lsn" "$feedback" "$owner_pid" "$rc" "$confirmed" <<'PY2'
+import json,pathlib,sys
+out=pathlib.Path(sys.argv[1])
+(out/'observation.json').write_text(json.dumps({
+ 'schema_version':'m2-advisory-loss-observation/v1','postgres_version':sys.argv[2],
+ 'durable_lsn_before_loss':sys.argv[3],'feedback_before_loss':sys.argv[4],
+ 'terminated_advisory_pid':int(sys.argv[5]),'runtime_exit_code':int(sys.argv[6]),
+ 'slot_confirmed_flush_after_loss':sys.argv[7],
+ 'durable_transaction_count_after_loss':1,'replication_slot_active_after_loss':False,
+ 'advisory_lock_reacquired':False,'runtime_exited_without_operator_signal':True,
+ },sort_keys=True,indent=2)+'\n')
+PY2
+  printf 'M2_ADVISORY_LOSS_FENCED_OK postgres=%s\n' "$version"
+  exit 0
 fi
 if [[ ${M2_WIRE_LIMIT_PROOF:-0} == 1 ]]; then
   artifact=${M2_WIRE_LIMIT_OUT:?set M2_WIRE_LIMIT_OUT for the live wire-limit proof}
