@@ -9,7 +9,7 @@ report_failure(){
     for log in "$work"/*.err; do
       [[ -f "$log" ]] || continue
       printf 'failure_log=%s\n' "${log##*/}" >&2
-      tail -n 35 "$log" | sed -E 's#(postgresql://[^:]+:)[^@]+@#\1[REDACTED]@#g' >&2
+      rg -o 'E_[A-Z0-9_]+|M2_[A-Z0-9_]+' "$log" | tail -n 35 >&2 || true
     done
   fi
   rm -rf "$work"
