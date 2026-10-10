@@ -17,6 +17,8 @@ def main():
     scenario = "SCN-M2-PRESSURE-COMPONENT" if mode == "e2e" else "SCN-M2-PRESSURE-READER-CONTENTION"
     path = ROOT / "artifacts/boring-cdc-m2-pressure" / scenario / SEED
     manifest = json.loads((path / "manifest.json").read_text())
+    config = json.loads((path / "config.json").read_text())
+    assert config["physical_fill_max_bytes"] == (128 << 20 if mode == "fault" else 0)
     expected = {case["test"] for case in json.loads((ROOT / "contracts/m2/pressure-cases.json").read_text())["cases"]}
     assert manifest["result"]["status"] == "pass"
     assert manifest["result"]["runtime_observed"] is True
