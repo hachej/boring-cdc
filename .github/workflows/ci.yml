@@ -58,10 +58,16 @@ jobs:
           name: m2-init-receipt
           path: ${{ runner.temp }}/m2-init-receipt/receipt.json
           if-no-files-found: error
+      - name: Prepare exact M2 heartbeat evidence input
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: git worktree add --detach "$RUNNER_TEMP/m2-heartbeat-head" "$HEAD_SHA"
       - name: M2 heartbeat component and fault proof
         timeout-minutes: 12
+        working-directory: ${{ runner.temp }}/m2-heartbeat-head
         env:
           TMPDIR: /var/tmp
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: |
           scripts/e2e/m2_heartbeat.sh
           scripts/faults/m2_heartbeat.sh
@@ -70,7 +76,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: m2-heartbeat-component-packets
-          path: artifacts/boring-cdc-m2-heartbeat
+          path: ${{ runner.temp }}/m2-heartbeat-head/artifacts/boring-cdc-m2-heartbeat
           if-no-files-found: error
       - name: Live schema-change boundary
         timeout-minutes: 5
