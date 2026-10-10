@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/var/tmp}"; [[ "$TMPDIR" == /var/tmp ]]
-if [[ ${M2_WIRE_LIMIT_PROOF:-0} != 1 && ${M2_ADVISORY_LOSS_PROOF:-0} != 1 && ${M2_COPYBOTH_LOSS_PROOF:-0} != 1 && ${M2_SOURCE_COMMIT_PROOF:-0} != 1 ]]; then
+if [[ ${M2_WIRE_LIMIT_PROOF:-0} != 1 && ${M2_ADVISORY_LOSS_PROOF:-0} != 1 && ${M2_COPYBOTH_LOSS_PROOF:-0} != 1 && ${M2_SOURCE_COMMIT_PROOF:-0} != 1 && ${M2_SQLITE_CONTENTION_PROOF:-0} != 1 ]]; then
   cargo test --locked --workspace --all-targets
 fi
-if [[ ${M2_SOURCE_COMMIT_PROOF:-0} != 1 ]]; then
+if [[ ${M2_SOURCE_COMMIT_PROOF:-0} != 1 && ${M2_SQLITE_CONTENTION_PROOF:-0} != 1 ]]; then
   cargo test --locked m2_capture_runtime::tests
 fi
-work=$(mktemp -d /var/tmp/m2-capture-e2e.XXXXXX); project="m2-capture-$RANDOM-$$"; port=$((56000 + $$ % 2000)); bootstrap_pid=; pid=
+work=$(mktemp -d /var/tmp/m2-capture-e2e.XXXXXX); project="m2-capture-$RANDOM-$$"; port=$((56000 + $$ % 2000)); bootstrap_pid=; pid=; contention_pid=
 record_feedback_abort() {
   local phase=$1 child=$2 rc=$3 observed_feedback=$4 elapsed_ms
   [[ -n ${M2_FEEDBACK_RECEIPT_DIR:-} ]] || return 0
@@ -50,7 +50,7 @@ cleanup_child() {
   [[ $rc -eq 134 ]] && echo "Aborted runtime child $child" >&2
   return 0
 }
-cleanup(){ [[ -z "$bootstrap_pid" ]] || cleanup_child "$bootstrap_pid"; [[ -z "$pid" ]] || cleanup_child "$pid"; docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
+cleanup(){ [[ -z "$bootstrap_pid" ]] || cleanup_child "$bootstrap_pid"; [[ -z "$pid" ]] || cleanup_child "$pid"; [[ -z "$contention_pid" ]] || cleanup_child "$contention_pid"; docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
 stop_bounded() {
   local child=$1 signal=$2 label=$3 deadline
   kill -"$signal" "$child"
@@ -246,6 +246,128 @@ if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback && -n ${M2_FEEDBACK_RECEIP
     (( SECONDS < deadline )) || { echo 'E_AFTER_FEEDBACK_ABORT_NOT_REACHED' >&2; exit 1; }
     sleep .05
   done
+fi
+if [[ ${M2_SQLITE_CONTENTION_PROOF:-0} == 1 ]]; then
+  artifact=${M2_SQLITE_CONTENTION_OUT:?set M2_SQLITE_CONTENTION_OUT for the live SQLite contention proof}
+  [[ ! -e "$artifact" ]] || { echo 'E_SQLITE_CONTENTION_ARTIFACT_EXISTS' >&2; exit 1; }
+  replication_pid=$(psqlc -Atqc 'SELECT pid FROM pg_stat_replication ORDER BY pid')
+  [[ "$replication_pid" =~ ^[0-9]+$ ]] || { echo 'E_SQLITE_CONTENTION_REPLICATION_PID' >&2; exit 1; }
+  pre_confirmed=$(psqlc -Atqc "SELECT coalesce(confirmed_flush_lsn::text,'0/0') FROM pg_replication_slots WHERE slot_name='runtime_slot'")
+  python3 - "$work/run/state/journal.sqlite" "$work/sqlite-contention-locked" <<'PY2' & contention_pid=$!
+import pathlib,sqlite3,sys,time
+connection=sqlite3.connect(sys.argv[1]); connection.execute('BEGIN IMMEDIATE')
+pathlib.Path(sys.argv[2]).touch()
+time.sleep(7)
+connection.commit()
+PY2
+  deadline=$((SECONDS+10)); until [[ -e "$work/sqlite-contention-locked" ]]; do (( SECONDS < deadline )) || { echo 'E_SQLITE_CONTENTION_LOCK_TIMEOUT' >&2; exit 1; }; sleep .02; done
+  psqlc -c 'INSERT INTO orders(id) VALUES(2)' >/dev/null
+  blocked_count=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
+PY2
+)
+  blocked_confirmed=$(psqlc -Atqc "SELECT coalesce(confirmed_flush_lsn::text,'0/0') FROM pg_replication_slots WHERE slot_name='runtime_slot'")
+  [[ "$blocked_count" == 1 ]] || { echo 'E_SQLITE_CONTENTION_DURABILITY' >&2; exit 1; }
+  python3 - "$pre_confirmed" "$blocked_confirmed" "$durable_lsn" <<'PY2'
+import sys
+def lsn(value):
+    high,low=value.split('/')
+    return (int(high,16)<<32)|int(low,16)
+assert lsn(sys.argv[1])<=lsn(sys.argv[2])<=lsn(sys.argv[3])
+PY2
+  wait "$contention_pid"; contention_pid=
+  deadline=$((SECONDS+15))
+  while true; do
+    state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
+    [[ -z "$state" || "$state" == Z* ]] && break
+    (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }
+    sleep .05
+  done
+  child=$pid; set +e; wait "$pid"; rc=$?; set -e; pid=
+  [[ $rc -ne 0 ]] || { echo 'E_SQLITE_CONTENTION_EXIT' >&2; exit 1; }
+  grep -q 'M2_CAPTURE_FAILED' "$work/runtime.err" || { cat "$work/runtime.err" >&2; exit 1; }
+  [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='runtime_slot'")" == 0 ]]
+  [[ "$(psqlc -Atqc 'SELECT count(*) FROM pg_stat_replication')" == 0 ]]
+  failure=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+row=sqlite3.connect(sys.argv[1]).execute("SELECT failure_class,retry_class,attempt,next_retry_at FROM processing_failures WHERE component='capture' AND armed=1").fetchone()
+assert row is not None and row[0:3]==('transient_io','transient',1) and row[3].startswith('unix-ms:')
+print(','.join((row[0],row[1],str(row[2]),row[3])))
+PY2
+)
+  post_confirmed=$(psqlc -Atqc "SELECT coalesce(confirmed_flush_lsn::text,'0/0') FROM pg_replication_slots WHERE slot_name='runtime_slot'")
+  python3 - "$blocked_confirmed" "$post_confirmed" "$durable_lsn" <<'PY2'
+import sys
+def lsn(value):
+    high,low=value.split('/')
+    return (int(high,16)<<32)|int(low,16)
+assert lsn(sys.argv[1])<=lsn(sys.argv[2])<=lsn(sys.argv[3])
+PY2
+  [[ "$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
+PY2
+)" == 1 ]]
+  retry_at=${failure##*,unix-ms:}
+  wait_ms=$(python3 - "$retry_at" <<'PY2'
+import sys,time
+print(max(0,int(sys.argv[1])-time.time_ns()//1000000+100))
+PY2
+)
+  sleep "$(python3 - "$wait_ms" <<'PY2'
+import sys
+print(int(sys.argv[1])/1000)
+PY2
+)"
+  (cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/successor.out" 2>"$work/successor.err") & pid=$!
+  deadline=$((SECONDS+30))
+  while true; do
+    successor_count=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
+PY2
+)
+    [[ "$successor_count" == 2 ]] && break
+    kill -0 "$pid" 2>/dev/null || { cat "$work/successor.err" >&2; exit 1; }
+    (( SECONDS < deadline )) || { cat "$work/successor.err" >&2; exit 1; }
+    sleep .1
+  done
+  successor_hex=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+print(sqlite3.connect(sys.argv[1]).execute('SELECT durable_transaction_end_lsn FROM source_state WHERE singleton=1').fetchone()[0])
+PY2
+)
+  successor_lsn=$(python3 - "$successor_hex" <<'PY2'
+import sys
+value=int(sys.argv[1],16); print(f'{value>>32:X}/{value&0xffffffff:X}')
+PY2
+)
+  deadline=$((SECONDS+15))
+  while true; do
+    successor_feedback=$(psqlc -Atqc "SELECT coalesce(write_lsn::text,'')||','||coalesce(flush_lsn::text,'')||','||coalesce(replay_lsn::text,'') FROM pg_stat_replication ORDER BY pid LIMIT 1")
+    [[ "$successor_feedback" == "$successor_lsn,$successor_lsn,$successor_lsn" ]] && break
+    (( SECONDS < deadline )) || { cat "$work/successor.err" >&2; exit 1; }
+    sleep .05
+  done
+  stop_bounded "$pid" TERM sqlite-contention-successor; pid=
+  mkdir -p "$artifact"
+  python3 - "$artifact" "$version" "$durable_lsn" "$feedback" "$replication_pid" "$rc" "$failure" "$pre_confirmed" "$blocked_confirmed" "$post_confirmed" "$successor_lsn" "$successor_feedback" <<'PY2'
+import json,pathlib,sys
+out=pathlib.Path(sys.argv[1])
+(out/'observation.json').write_text(json.dumps({
+ 'schema_version':'m2-sqlite-contention-observation/v1','postgres_version':sys.argv[2],
+ 'durable_lsn_before_contention':sys.argv[3],'feedback_before_contention':sys.argv[4],
+ 'original_replication_pid':int(sys.argv[5]),'runtime_exit_code':int(sys.argv[6]),
+ 'persisted_failure':sys.argv[7],'slot_confirmed_before_contention':sys.argv[8],
+ 'slot_confirmed_while_locked':sys.argv[9],'slot_confirmed_after_failure':sys.argv[10],
+ 'durable_transaction_count_after_failure':1,'replication_slot_active_after_failure':False,
+ 'successor_durable_transaction_count':2,'successor_durable_lsn':sys.argv[11],
+ 'successor_feedback':sys.argv[12],'successor_clean_shutdown':True,
+ },sort_keys=True,indent=2)+'\n')
+PY2
+  printf 'M2_SQLITE_CONTENTION_RETRY_OK postgres=%s\n' "$version"
+  exit 0
 fi
 if [[ ${M2_COPYBOTH_LOSS_PROOF:-0} == 1 ]]; then
   artifact=${M2_COPYBOTH_LOSS_OUT:?set M2_COPYBOTH_LOSS_OUT for the live CopyBoth-loss proof}
