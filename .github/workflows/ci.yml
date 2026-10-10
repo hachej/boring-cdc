@@ -117,23 +117,24 @@ jobs:
           TMPDIR: /var/tmp
           CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: |
-          mkdir -p "$RUNNER_TEMP/m2-reconcile-packet/attempt-1" "$RUNNER_TEMP/m2-reconcile-packet/attempt-2"
-          M2_RECONCILE_PROOF_OUT="$RUNNER_TEMP/m2-reconcile-packet/attempt-1/crash-proof.json" \
+          packet="$PWD/artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/current-head"
+          mkdir -p "$packet/attempt-1" "$packet/attempt-2"
+          M2_RECONCILE_PROOF_OUT="$packet/attempt-1/crash-proof.json" \
             scripts/e2e/m2_reconcile.sh \
-            >"$RUNNER_TEMP/m2-reconcile-packet/attempt-1/stdout.txt" \
-            2>"$RUNNER_TEMP/m2-reconcile-attempt-1.stderr"
-          M2_RECONCILE_PROOF_OUT="$RUNNER_TEMP/m2-reconcile-packet/attempt-2/crash-proof.json" \
+            >"$packet/attempt-1/stdout.txt" \
+            2>"$packet/attempt-1/stderr.txt"
+          M2_RECONCILE_PROOF_OUT="$packet/attempt-2/crash-proof.json" \
             scripts/faults/m2_reconcile.sh \
-            >"$RUNNER_TEMP/m2-reconcile-packet/attempt-2/stdout.txt" \
-            2>"$RUNNER_TEMP/m2-reconcile-attempt-2.stderr"
-          python3 scripts/validate/m2_reconcile_component.py create "$RUNNER_TEMP/m2-reconcile-packet"
-          python3 scripts/validate/m2_reconcile_component.py validate "$RUNNER_TEMP/m2-reconcile-packet"
-          scripts/validate/evidence.sh artifacts/boring-cdc-m2-reconcile
+            >"$packet/attempt-2/stdout.txt" \
+            2>"$packet/attempt-2/stderr.txt"
+          python3 scripts/validate/m2_reconcile_component.py create "$packet"
+          python3 scripts/validate/m2_reconcile_component.py validate "$packet"
+          scripts/validate/evidence.sh "$packet/evidence.json"
       - name: Retain M2 reconcile component packet
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: m2-reconcile-component-packet
-          path: ${{ runner.temp }}/m2-reconcile-packet
+          path: ${{ runner.temp }}/m2-reconcile-head/artifacts/boring-cdc-m2-reconcile/SCN-M2-RECONCILE-LIVE-PG17/current-head
           if-no-files-found: error
       - name: Prepare exact M2 heartbeat evidence input
         env:
