@@ -1581,14 +1581,46 @@ pub fn acquire_production_ownership(
         .ok_or_else(|| CaptureFailure::at("ownership", "M2_RUNTIME_DSN_UNAVAILABLE"))?;
     let mut connection = PgReplicationConnection::connect(dsn)
         .map_err(|_| CaptureFailure::at("ownership", "M2_SOURCE_LOCK_CONNECTION_FAILED"))?;
+    let live = observe_live_source(
+        dsn,
+        &config.public().source.publication,
+        &config.public().source.slot,
+    )?;
+    let system_identifier: u64 = live
+        .source_system_id
+        .parse()
+        .map_err(|_| CaptureFailure::at("ownership", "M2_SOURCE_LOCK_IDENTITY_FAILED"))?;
+    let timeline: u32 = live
+        .timeline_id
+        .parse()
+        .map_err(|_| CaptureFailure::at("ownership", "M2_SOURCE_LOCK_IDENTITY_FAILED"))?;
+    let database_identity: u32 = live
+        .database_id
+        .parse()
+        .map_err(|_| CaptureFailure::at("ownership", "M2_SOURCE_LOCK_IDENTITY_FAILED"))?;
     let backend_pid = connection
         .exec("SELECT pg_backend_pid()::text")
         .ok()
         .and_then(|r| r.get_value(0, 0))
         .and_then(|v| v.parse().ok())
         .ok_or_else(|| CaptureFailure::at("ownership", "M2_SOURCE_LOCK_PID_FAILED"))?;
-    let digest = Sha256::digest(config.fingerprints().source.as_bytes());
-    let key = i64::from_be_bytes(digest[..8].try_into().expect("sha256 width"));
+    let expected_publication = crate::m1_control_fixtures::PublicationSpec::new(
+        &config.public().source.publication,
+        crate::m2_init_recovery::ADMIN_ROLE,
+        config
+            .public()
+            .tables
+            .iter()
+            .map(|table| table.source_relation.clone()),
+    );
+    let key = crate::m2_init_recovery::source_advisory_key(
+        system_identifier,
+        timeline,
+        database_identity,
+        &config.public().source.slot,
+        &expected_publication,
+    )
+    .map_err(|_| CaptureFailure::at("ownership", "M2_SOURCE_LOCK_IDENTITY_FAILED"))?;
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|_| CaptureFailure::at("ownership", "M2_CLOCK_INVALID"))?
