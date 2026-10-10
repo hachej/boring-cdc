@@ -60,7 +60,7 @@ def validate(receipt: dict, root: Path = ROOT) -> list[str]:
     if receipt.get("input_sha256") != expected_inputs:
         findings.append("E_INPUTS_STALE")
     cases = json.loads((root / "contracts/m2/init-recovery-cases.json").read_text())["cases"]
-    expected_ids = {case["id"] for case in cases} - {"SCN-M2-INIT-AMBIGUOUS"}
+    expected_ids = {case["id"] for case in cases}
     observed_ids = receipt.get("verified_live_case_ids")
     if not isinstance(observed_ids, list) or not all(isinstance(item, str) for item in observed_ids) or len(observed_ids) != len(set(observed_ids)) or set(observed_ids) != expected_ids:
         findings.append("E_CASE_COVERAGE")
@@ -73,7 +73,7 @@ def validate(receipt: dict, root: Path = ROOT) -> list[str]:
         item["case"]: item["condition"] for item in observed_rejections
     } != REJECTIONS:
         findings.append("E_REJECTIONS")
-    for key in ("first_init", "idempotent_init", "post_fault_init"):
+    for key in ("first_init", "idempotent_init", "post_fault_init", "resumed_init"):
         result = receipt.get(key)
         if not isinstance(result, dict) or result.get("outcome") != "success" or result.get("logical_slot_exists") is not False or result.get("control_rows") != 2 or not re.fullmatch(r"[0-9a-f]{64}", str(result.get("postcondition_evidence_digest", ""))):
             findings.append("E_INIT_RESULT_" + key.upper())
@@ -85,6 +85,8 @@ def validate(receipt: dict, root: Path = ROOT) -> list[str]:
         "peer_init_rejected_by_source_lock": True,
     }:
         findings.append("E_BOOTSTRAP_STATE")
+    if receipt.get("ambiguous_new_plan_rejected") is not True:
+        findings.append("E_AMBIGUOUS_PLAN")
     raw = json.dumps(receipt, sort_keys=True).lower()
     if any(value in raw for value in ("postgresql://", "local-only", "password=", "/tmp/", "/home/")):
         findings.append("E_REDACTION")
@@ -94,7 +96,7 @@ def validate(receipt: dict, root: Path = ROOT) -> list[str]:
 def comparable_observation(receipt: dict) -> dict:
     """Compare boundary outcomes, excluding per-run postcondition digests."""
     observation = json.loads(json.dumps(receipt))
-    for key in ("first_init", "idempotent_init", "post_fault_init"):
+    for key in ("first_init", "idempotent_init", "post_fault_init", "resumed_init"):
         observation[key].pop("postcondition_evidence_digest")
     return observation
 

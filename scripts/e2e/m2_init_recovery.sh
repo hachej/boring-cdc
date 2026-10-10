@@ -137,6 +137,28 @@ psqlc -qc 'GRANT USAGE ON SCHEMA boring_cdc_control TO boring_cdc_control_writer
 reset_local_state
 init_dry_run >"$work/final-dry.json"; final_token=$(confirm_token "$work/final-dry.json")
 (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" init --confirm --confirm-token "$final_token" --json) >"$work/final.json"
+
+# A crashed executing plan blocks a new request; its original token may resume it.
+init_dry_run >"$work/ambiguous-dry.json"
+ambiguous_token=$(confirm_token "$work/ambiguous-dry.json")
+python3 - "$work/run/state/boring.init-plan.json" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+plan = json.loads(path.read_text())
+assert plan["state"] == "issued"
+plan["state"] = "executing"
+path.write_text(json.dumps(plan))
+PY
+if init_dry_run >"$work/ambiguous.out" 2>"$work/ambiguous.err"; then
+  echo E_INIT_AMBIGUOUS_PLAN_ACCEPTED >&2; exit 1
+fi
+grep -q M2_INIT_RECONCILIATION_REQUIRED "$work/ambiguous.err"
+! grep -q 'postgresql://' "$work/ambiguous.err"
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" init --confirm --confirm-token "$ambiguous_token" --json) >"$work/resumed.json"
+[[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot'")" == 0 ]]
 unset PG_ADMIN CH_MAINT
 export PG_RUNTIME=postgresql:"//boring_cdc_runtime:${runtime_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_CONTROL=postgresql:"//boring_cdc_control_writer:${control_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
@@ -223,11 +245,14 @@ receipt = {
         "SCN-M2-INIT-PUBLICATION-FLAGS",
         "SCN-M2-INIT-OWNERSHIP",
         "SCN-M2-INIT-CONFIRMATION",
+        "SCN-M2-INIT-AMBIGUOUS",
         "SCN-M2-INIT-NO-SLOT",
     ],
     "first_init": init_result("first.json"),
     "idempotent_init": init_result("second.json"),
     "post_fault_init": init_result("final.json"),
+    "resumed_init": init_result("resumed.json"),
+    "ambiguous_new_plan_rejected": "M2_INIT_RECONCILIATION_REQUIRED" in (root / "ambiguous.err").read_text(),
     "rejected_cases": [
         {"case": case, "condition": condition}
         for case, condition in (line.split("\t") for line in (root / "cases.tsv").read_text().splitlines())
@@ -242,8 +267,9 @@ receipt = {
 }
 assert receipt["rejected_cases"] and all(
     entry["outcome"] == "success" and entry["logical_slot_exists"] is False
-    for entry in (receipt["first_init"], receipt["idempotent_init"], receipt["post_fault_init"])
+    for entry in (receipt["first_init"], receipt["idempotent_init"], receipt["post_fault_init"], receipt["resumed_init"])
 )
+assert receipt["ambiguous_new_plan_rejected"]
 assert (int(slot_count), int(heartbeat_rows), int(fence_rows)) == (1, 1, 1)
 serialized = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
 assert "local-only" not in serialized and "postgresql://" not in serialized
