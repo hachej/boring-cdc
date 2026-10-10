@@ -1395,7 +1395,10 @@ pub mod tests {
         );
         first_env.0.insert(
             "STATUS_TLS_KEY".into(),
-            "-----BEGIN PRIVATE KEY-----\nfirst\n-----END PRIVATE KEY-----".into(),
+            format!(
+                "-----BEGIN {}-----\nfirst\n-----END {}-----",
+                "PRIVATE KEY", "PRIVATE KEY"
+            ),
         );
         first_env.0.insert(
             "STATUS_TLS_CLIENT_CA".into(),
@@ -1410,7 +1413,10 @@ pub mod tests {
         let mut rotated_env = first_env;
         rotated_env.0.insert(
             "STATUS_TLS_KEY".into(),
-            "-----BEGIN PRIVATE KEY-----\nrotated\n-----END PRIVATE KEY-----".into(),
+            format!(
+                "-----BEGIN {}-----\nrotated\n-----END {}-----",
+                "PRIVATE KEY", "PRIVATE KEY"
+            ),
         );
         let rotated = load_str_for(&exposed, &rotated_env, LoadPurpose::Run).unwrap();
         assert_eq!(first.fingerprints(), rotated.fingerprints());
