@@ -189,6 +189,18 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             self.persist_capture_failure(class, code)
         }
     }
+    fn wire_limit_safe_stop(&mut self, observed: usize) -> Result<(), RuntimeError> {
+        let error = RuntimeError::SpoolLimit {
+            kind: "wire_frame",
+            observed: u64::try_from(observed).ok(),
+        };
+        self.record_capture_failure(None, &error);
+        self.state = RuntimeState::CaptureSafeStopped;
+        self.persist_if_enabled(
+            crate::failure_policy::FailureClass::Configuration,
+            crate::failure_policy::StableErrorCode::ResourceLimit,
+        )
+    }
     fn persist_capture_failure(
         &mut self,
         class: crate::failure_policy::FailureClass,
@@ -1416,15 +1428,10 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         drop(read); // completed or cooperatively cancelled and awaited above
         let frame = match received {
             Ok(frame) => frame,
-            Err(pg_walstream::ReplicationError::CopyDataLimit { .. }) => {
-                runtime
-                    .persist_if_enabled(
-                        crate::failure_policy::FailureClass::Configuration,
-                        crate::failure_policy::StableErrorCode::ResourceLimit,
-                    )
-                    .map_err(|_| {
-                        CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED")
-                    })?;
+            Err(pg_walstream::ReplicationError::CopyDataLimit { observed, .. }) => {
+                runtime.wire_limit_safe_stop(observed).map_err(|_| {
+                    CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED")
+                })?;
                 eprintln!(
                     "M2_CAPTURE_RESOURCE_LIMIT kind=wire_frame recovery=changed_limit_required"
                 );
@@ -1521,6 +1528,22 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                 CaptureFailure::at("runtime", "M2_SHUTDOWN_RECONCILIATION_REQUIRED")
             })?;
             return Ok(());
+        }
+    }
+}
+
+async fn hold_capture_safe_stop(
+    cancellation: &CancellationToken,
+    probe_interval: std::time::Duration,
+    mut ownership_probe: impl FnMut() -> bool,
+) -> Result<(), CaptureFailure> {
+    loop {
+        if !ownership_probe() {
+            return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
+        }
+        tokio::select! {
+            _ = cancellation.cancelled() => return Ok(()),
+            _ = tokio::time::sleep(probe_interval) => {}
         }
     }
 }
@@ -2479,6 +2502,23 @@ pub async fn run_loaded_config(
     )
     .await;
     drop(heartbeat_lane);
+    if matches!(&result, Err(error) if error.code == "M2_RECEIVE_FRAME_LIMIT") {
+        let held = hold_capture_safe_stop(
+            cancellation,
+            Duration::from_millis(public.source.lock_probe_interval_ms.0),
+            || {
+                control_lane.ownership_live()
+                    && ownership
+                        .probe(Duration::from_millis(public.source.ownership_deadline_ms.0))
+                        .is_ok()
+            },
+        )
+        .await;
+        if held.is_err() {
+            let _ = ownership.unexpected_transport_loss();
+        }
+        return held;
+    }
     if result.is_err() {
         let _ = ownership.unexpected_transport_loss();
     }
@@ -3256,6 +3296,67 @@ pub mod tests {
         assert_eq!(telemetry, ("42".into(), "0000000000000010".into(), 0, 0));
         drop(c);
         let _ = std::fs::remove_file(p);
+    }
+    #[test]
+    fn wire_limit_persists_safe_stop_and_waits_for_shutdown_without_reopening() {
+        let (path, store) = store("wire-limit-safe-stop");
+        let service = JournalWriterService::new(store, [2, 2, 1, 1], 1).unwrap();
+        let mut runtime = CaptureRuntime::new(
+            service,
+            MemorySpools,
+            Gate(FeedbackPermit::AllowSafeBoundary { lsn: u64::MAX }),
+            BTreeMap::new(),
+            None,
+        );
+        runtime.enable_failure_policy("epoch-a".into(), "config-a".into());
+        runtime.enable_capture_limits("limits-a".into(), 1_048_576, 10);
+        runtime.wire_limit_safe_stop(1_048_577).unwrap();
+        assert_eq!(runtime.state(), RuntimeState::CaptureSafeStopped);
+        assert!(runtime.take_feedback().is_empty());
+        drop(runtime);
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        let (class, retry): (String, String) = connection
+            .query_row(
+                "SELECT failure_class,retry_class FROM processing_failures WHERE component='capture' AND armed=1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            (class.as_str(), retry.as_str()),
+            ("configuration", "deterministic")
+        );
+        drop(connection);
+        let _ = std::fs::remove_file(path);
+
+        let executor = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        executor.block_on(async {
+            let cancellation = CancellationToken::new();
+            let signal = cancellation.clone();
+            tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(15)).await;
+                signal.cancel();
+            });
+            let mut probes = 0;
+            hold_capture_safe_stop(&cancellation, Duration::from_millis(1), || {
+                probes += 1;
+                true
+            })
+            .await
+            .unwrap();
+            assert!(probes > 1);
+
+            let lost =
+                hold_capture_safe_stop(&CancellationToken::new(), Duration::from_millis(1), || {
+                    false
+                })
+                .await
+                .unwrap_err();
+            assert_eq!(lost.code, "M2_OWNERSHIP_LOST");
+        });
     }
     #[test]
     fn archive_only_hard_pressure_does_not_safe_stop_capture() {

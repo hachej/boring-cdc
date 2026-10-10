@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/var/tmp}"; [[ "$TMPDIR" == /var/tmp ]]
-cargo test --locked --workspace --all-targets
+if [[ ${M2_WIRE_LIMIT_PROOF:-0} != 1 ]]; then
+  cargo test --locked --workspace --all-targets
+fi
 cargo test --locked m2_capture_runtime::tests
 work=$(mktemp -d /var/tmp/m2-capture-e2e.XXXXXX); project="m2-capture-$RANDOM-$$"; port=$((56000 + $$ % 2000)); bootstrap_pid=; pid=
 record_feedback_abort() {
@@ -74,6 +76,9 @@ version=$(psqlc -Atqc 'show server_version'); [[ "$version" == 17.6* ]]
 admin_credential='admin-runtime-proof'; runtime_credential='runtime-runtime-proof'; control_credential='control-runtime-proof'; application_credential='application-runtime-proof'
 psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_credential" -v "control_password=$control_credential" -v "application_password=$application_credential" \
   < scripts/setup/durable_simple_prerequisites.sql >/dev/null
+if [[ ${M2_WIRE_LIMIT_PROOF:-0} == 1 ]]; then
+  psqlc -c 'ALTER TABLE public.orders ADD COLUMN payload text' >/dev/null
+fi
 cargo build --quiet --locked --bin boring-cdc
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 sed -i 's/publication = "boring_publication"/publication = "RuntimePublication"/; s/slot = "boring_slot"/slot = "runtime_slot"/; s#sqlite_path = "state/boring.db"#sqlite_path = "state/journal.sqlite"#' "$work/run/boring-cdc.toml"
@@ -108,7 +113,7 @@ import pathlib,sqlite3,sys,time
 c=sqlite3.connect(sys.argv[1]); c.execute('BEGIN IMMEDIATE'); pathlib.Path(sys.argv[2]).touch(); time.sleep(2); c.commit()
 PY2
 deadline=$((SECONDS+10)); until [[ -e "$work/sqlite-locked" ]]; do (( SECONDS < deadline )); sleep .02; done
-psqlc -c "BEGIN; INSERT INTO orders VALUES(1); UPDATE orders SET id=id WHERE id=1; COMMIT" >/dev/null
+psqlc -c "BEGIN; INSERT INTO orders(id) VALUES(1); UPDATE orders SET id=id WHERE id=1; COMMIT" >/dev/null
 sleep .25
 blocked_transactions=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
 import sqlite3,sys
@@ -159,6 +164,46 @@ if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback && -n ${M2_FEEDBACK_RECEIP
     (( SECONDS < deadline )) || { echo 'E_AFTER_FEEDBACK_ABORT_NOT_REACHED' >&2; exit 1; }
     sleep .05
   done
+fi
+if [[ ${M2_WIRE_LIMIT_PROOF:-0} == 1 ]]; then
+  artifact=${M2_WIRE_LIMIT_OUT:?set M2_WIRE_LIMIT_OUT for the live wire-limit proof}
+  [[ ! -e "$artifact" ]] || { echo 'E_WIRE_LIMIT_ARTIFACT_EXISTS' >&2; exit 1; }
+  psqlc -c "INSERT INTO orders(id,payload) SELECT 2,string_agg(md5(g::text),'') FROM generate_series(1,65536) AS series(g)" >/dev/null
+  deadline=$((SECONDS+30))
+  while true; do
+    failure=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+row=sqlite3.connect(sys.argv[1]).execute("SELECT failure_class||','||retry_class FROM processing_failures WHERE component='capture' AND armed=1").fetchone()
+print(row[0] if row else '')
+PY2
+)
+    [[ "$failure" == 'configuration,deterministic' ]] && break
+    kill -0 "$pid" 2>/dev/null || { cat "$work/runtime.err" >&2; exit 1; }
+    (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }
+    sleep .1
+  done
+  [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='runtime_slot'")" == 0 ]]
+  [[ "$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
+PY2
+)" == 1 ]]
+  [[ "$(psqlc -Atqc "SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND granted")" -gt 0 ]]
+  grep -q 'M2_CAPTURE_RESOURCE_LIMIT kind=wire_frame' "$work/runtime.err"
+  kill -0 "$pid"
+  stop_bounded "$pid" TERM wire-limit-safe-stop; pid=
+  mkdir -p "$artifact"
+  python3 - "$artifact" "$version" "$durable_lsn" "$feedback" <<'PY2'
+import json,pathlib,sys
+out=pathlib.Path(sys.argv[1]); (out/'observation.json').write_text(json.dumps({
+ 'schema_version':'m2-wire-limit-observation/v1','postgres_version':sys.argv[2],
+ 'durable_lsn_before_limit':sys.argv[3],'feedback_before_limit':sys.argv[4],
+ 'armed_failure':'configuration,deterministic','durable_transaction_count_after_limit':1,
+ 'replication_slot_active_after_limit':False,'advisory_lock_held_after_limit':True,
+ 'process_alive_after_limit':True,'clean_shutdown':True},sort_keys=True,indent=2)+'\n')
+PY2
+  printf 'M2_WIRE_LIMIT_SAFE_STOP_OK postgres=%s\n' "$version"
+  exit 0
 fi
 state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
 if [[ -z "$state" || "$state" == Z* ]]; then
