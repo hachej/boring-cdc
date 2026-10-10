@@ -9,7 +9,7 @@ report_failure(){
     for log in "$work"/*.err; do
       [[ -f "$log" ]] || continue
       printf 'failure_log=%s\n' "${log##*/}" >&2
-      rg -o 'E_[A-Z0-9_]+|M2_[A-Z0-9_]+' "$log" | tail -n 35 >&2 || true
+      grep -Eo 'E_[A-Z0-9_]+|M2_[A-Z0-9_]+|Aborted runtime[^[:cntrl:]]*' "$log" | tail -n 35 >&2 || true
     done
   fi
   rm -rf "$work"
@@ -22,9 +22,18 @@ expect_live_abort(){
   BORING_CDC_M2_FAULT_HOOK="$hook" M2_FEEDBACK_RECEIPT_DIR="$receipt" timeout 240 scripts/e2e/m2_capture_runtime.sh >"$work/$hook.out" 2>"$work/$hook.err"
   rc=$?
   set -e
-  [[ $rc -ne 0 && $rc -ne 124 ]]
-  grep -q 'Aborted runtime' "$work/$hook.err"
-  python3 scripts/validate/m2_feedback_receipts.py single "$receipt" "$hook"
+  if [[ $rc -eq 0 || $rc -eq 124 ]]; then
+    printf 'E_FEEDBACK_ABORT_EXIT hook=%s exit=%s\n' "$hook" "$rc" >&2
+    return 1
+  fi
+  if ! grep -q 'Aborted runtime' "$work/$hook.err"; then
+    printf 'E_FEEDBACK_ABORT_MARKER hook=%s exit=%s\n' "$hook" "$rc" >&2
+    return 1
+  fi
+  if ! python3 scripts/validate/m2_feedback_receipts.py single "$receipt" "$hook"; then
+    printf 'E_FEEDBACK_RECEIPT_VALIDATION hook=%s exit=%s\n' "$hook" "$rc" >&2
+    return 1
+  fi
   if [[ -n ${M2_FEEDBACK_RECEIPT_OUT:-} ]]; then
     mkdir -p "$M2_FEEDBACK_RECEIPT_OUT/$hook"
     cp -f "$receipt/receipt.json" "$receipt/runtime.stdout" "$receipt/runtime.stderr" "$M2_FEEDBACK_RECEIPT_OUT/$hook/"
