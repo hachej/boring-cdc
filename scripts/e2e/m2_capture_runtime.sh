@@ -96,6 +96,9 @@ done
 sleep 1; stop_bounded "$bootstrap_pid" INT bootstrap; bootstrap_pid=
 (
   cd "$work/run"
+  if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback ]]; then
+    export M2_FEEDBACK_ABORT_RELEASE_FILE="$work/feedback-observed"
+  fi
   exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/runtime.out" 2>"$work/runtime.err"
 ) & pid=$!
 runtime_started_ms=$(date +%s%3N)
@@ -146,6 +149,9 @@ while true; do
   (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }
   sleep .05
 done
+if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback ]]; then
+  touch "$work/feedback-observed"
+fi
 sleep .1
 if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback && -n ${M2_FEEDBACK_RECEIPT_DIR:-} ]]; then
   deadline=$((SECONDS+5))

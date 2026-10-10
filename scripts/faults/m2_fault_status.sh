@@ -9,7 +9,7 @@ report_failure(){
     for log in "$work"/*.err; do
       [[ -f "$log" ]] || continue
       printf 'failure_log=%s\n' "${log##*/}" >&2
-      grep -Eo 'E_[A-Z0-9_]+|M2_[A-Z0-9_]+|Aborted runtime[^[:cntrl:]]*' "$log" | tail -n 35 >&2 || true
+      grep -E 'E_FEEDBACK_FAULT_NOT_REACHED|E_FEEDBACK_ABORT_|E_AFTER_FEEDBACK_ABORT_NOT_REACHED' "$log" | tail -n 15 >&2 || true
     done
   fi
   rm -rf "$work"
