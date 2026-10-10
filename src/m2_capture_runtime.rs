@@ -1607,6 +1607,74 @@ fn enforce_capture_startup_gate(
     }
 }
 
+fn changed_limit_rearm_candidate(
+    connection: &rusqlite::Connection,
+    runtime_fingerprint: &str,
+    fingerprints: &CaptureRecoveryFingerprints,
+) -> Result<bool, CaptureFailure> {
+    use rusqlite::OptionalExtension;
+
+    // This admits a candidate to ownership and live-WAL validation only. The writer later
+    // verifies the incident fingerprint and boundary, then atomically consumes its re-arm token.
+    let candidate = connection
+        .query_row(
+            "SELECT f.failure_class,f.retry_class,f.limit_bytes,f.limit_events,\
+                    r.runtime_fingerprint,r.non_limit_fingerprint,r.limit_fingerprint \
+             FROM processing_failures f \
+             JOIN source_state s ON s.singleton=1 AND s.capture_epoch=f.failed_capture_epoch \
+             JOIN capture_configuration_receipts r ON r.singleton=1 AND r.capture_epoch=s.capture_epoch \
+             WHERE f.component='capture' AND f.armed=1",
+            [],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<u64>>(2)?,
+                    row.get::<_, Option<u64>>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, String>(5)?,
+                    row.get::<_, String>(6)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
+    Ok(candidate.is_some_and(
+        |(class, retry, bytes, events, runtime, non_limit, limits)| {
+            class == "configuration"
+                && retry == "deterministic"
+                && (bytes.is_some() || events.is_some())
+                && runtime != runtime_fingerprint
+                && non_limit == fingerprints.non_limit
+                && limits != fingerprints.limits
+        },
+    ))
+}
+
+fn enforce_capture_startup_gate_for_config(
+    connection: &rusqlite::Connection,
+    config: &crate::m1_config::LoadedConfig,
+    now_ms: u64,
+) -> Result<(), CaptureFailure> {
+    let gate = crate::m2_journal::capture_startup_gate(connection)
+        .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
+    match enforce_capture_startup_gate(gate, now_ms) {
+        Err(error) if error.code == "M2_EXPLICIT_REARM_REQUIRED" => {
+            let fingerprints = capture_recovery_fingerprints(config.public())?;
+            if changed_limit_rearm_candidate(
+                connection,
+                &config.fingerprints().runtime,
+                &fingerprints,
+            )? {
+                Ok(())
+            } else {
+                Err(error)
+            }
+        }
+        result => result,
+    }
+}
+
 pub fn acquire_production_ownership(
     config: &crate::m1_config::LoadedConfig,
     run_id: &str,
@@ -1620,13 +1688,11 @@ pub fn acquire_production_ownership(
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
         )
         .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
-        let gate = crate::m2_journal::capture_startup_gate(&connection)
-            .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?
             .as_millis() as u64;
-        enforce_capture_startup_gate(gate, now)?;
+        enforce_capture_startup_gate_for_config(&connection, config, now)?;
     }
     use crate::m2_ownership::{OwnerKind, OwnershipGuard};
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -3326,6 +3392,35 @@ pub mod tests {
             (class.as_str(), retry.as_str()),
             ("configuration", "deterministic")
         );
+        connection.execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch-a','sys','timeline','db',?1,'pgoutput','publication','protocol')",[crate::article1_capture::SLOT]).unwrap();
+        connection.execute("INSERT INTO capture_configuration_receipts(singleton,capture_epoch,runtime_fingerprint,non_limit_fingerprint,limit_fingerprint) VALUES(1,'epoch-a','runtime-a','non-limit-a','limits-a')",[]).unwrap();
+        let fingerprints = CaptureRecoveryFingerprints {
+            non_limit: "non-limit-a".into(),
+            limits: "limits-b".into(),
+        };
+        let candidate = |runtime: &str, fingerprints: &CaptureRecoveryFingerprints| {
+            changed_limit_rearm_candidate(&connection, runtime, fingerprints).unwrap()
+        };
+        assert!(candidate("runtime-b", &fingerprints));
+        assert!(!candidate("runtime-a", &fingerprints));
+        assert!(!candidate(
+            "runtime-b",
+            &CaptureRecoveryFingerprints {
+                non_limit: "unrelated".into(),
+                limits: "limits-b".into(),
+            }
+        ));
+        assert!(!candidate(
+            "runtime-b",
+            &CaptureRecoveryFingerprints {
+                non_limit: "non-limit-a".into(),
+                limits: "limits-a".into(),
+            }
+        ));
+        connection.execute("UPDATE processing_failures SET failed_capture_epoch='other' WHERE component='capture'",[]).unwrap();
+        assert!(!candidate("runtime-b", &fingerprints));
+        connection.execute("UPDATE processing_failures SET failed_capture_epoch='epoch-a',failure_class='integrity' WHERE component='capture'",[]).unwrap();
+        assert!(!candidate("runtime-b", &fingerprints));
         drop(connection);
         let _ = std::fs::remove_file(path);
 
