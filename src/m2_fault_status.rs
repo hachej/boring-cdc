@@ -90,12 +90,12 @@ impl FaultHook {
 pub fn fault_hook(h: FaultHook) {
     #[cfg(debug_assertions)]
     if std::env::var("BORING_CDC_M2_FAULT_HOOK").ok().as_deref() == Some(h.name()) {
-        if matches!(h, FaultHook::AfterFeedback) {
-            if let Ok(path) = std::env::var("M2_FEEDBACK_ABORT_RELEASE_FILE") {
-                let deadline = std::time::Instant::now() + Duration::from_secs(10);
-                while !Path::new(&path).exists() && std::time::Instant::now() < deadline {
-                    std::thread::sleep(Duration::from_millis(10));
-                }
+        if matches!(h, FaultHook::AfterFeedback)
+            && let Ok(path) = std::env::var("M2_FEEDBACK_ABORT_RELEASE_FILE")
+        {
+            let deadline = std::time::Instant::now() + Duration::from_secs(10);
+            while !Path::new(&path).exists() && std::time::Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(10));
             }
         }
         std::process::abort()
