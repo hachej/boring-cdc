@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
+cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/tmp}"
 cargo test --locked --workspace --all-targets
 for attempt in 1 2; do
-  cargo test --locked m2_heartbeat::tests -- --nocapture >"/var/tmp/m2-heartbeat-tests-${attempt}-$$.out"
-  grep -q 'real_journal_preserves_control_route_and_persisted_feedback_boundary ... ok' "/var/tmp/m2-heartbeat-tests-${attempt}-$$.out"
-  grep -q 'published_heartbeat_commits_before_feedback ... ok' "/var/tmp/m2-heartbeat-tests-${attempt}-$$.out"
-  rm -f "/var/tmp/m2-heartbeat-tests-${attempt}-$$.out"
+  cargo test --locked m2_heartbeat::tests -- --nocapture >"$TMPDIR/m2-heartbeat-tests-${attempt}-$$.out"
+  grep -q 'real_journal_preserves_control_route_and_persisted_feedback_boundary ... ok' "$TMPDIR/m2-heartbeat-tests-${attempt}-$$.out"
+  grep -q 'published_heartbeat_commits_before_feedback ... ok' "$TMPDIR/m2-heartbeat-tests-${attempt}-$$.out"
+  rm -f "$TMPDIR/m2-heartbeat-tests-${attempt}-$$.out"
 done
-work=$(mktemp -d /var/tmp/m2-heartbeat-e2e.XXXXXX); project="m2-heartbeat-$RANDOM-$$"; port=$((58000 + $$ % 1000))
+work=$(mktemp -d "$TMPDIR/m2-heartbeat-e2e.XXXXXX"); project="m2-heartbeat-$RANDOM-$$"; port=$((58000 + $$ % 1000))
 cleanup(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
 printf 'heartbeat-admin-%s\n' "$project" >"$work/postgres_password";chmod 600 "$work/postgres_password";export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"; export PGPASSWORD; PGPASSWORD=$(cat "$BORING_CDC_POSTGRES_PASSWORD_FILE")
 cat >"$work/override.yml" <<YAML

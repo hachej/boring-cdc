@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/../..";export TMPDIR=/var/tmp
+cd "$(dirname "$0")/../..";export TMPDIR="${TMPDIR:-/tmp}"
 for attempt in 1 2; do
-  out="/var/tmp/m2-heartbeat-fault-tests-${attempt}-$$.out"
+  out="$TMPDIR/m2-heartbeat-fault-tests-${attempt}-$$.out"
   cargo test --locked m2_heartbeat::tests -- --nocapture >"$out"
   grep -q 'failed_or_non_heartbeat_commit_never_invokes_feedback ... ok' "$out"
   grep -q 'cadence_backoff_cardinality_and_degraded_health_are_bounded ... ok' "$out"
@@ -10,7 +10,7 @@ for attempt in 1 2; do
   grep -q 'generic_router_never_checkpoints_failed_user_transaction ... ok' "$out"
   rm -f "$out"
 done
-work=$(mktemp -d /var/tmp/m2-heartbeat-fault.XXXXXX);trap 'rm -rf "$work"' EXIT INT TERM
+work=$(mktemp -d "$TMPDIR/m2-heartbeat-fault.XXXXXX");trap 'rm -rf "$work"' EXIT INT TERM
 stdout1="$work/lane-1.stdout"; stderr1="$work/lane-1.stderr"
 stdout2="$work/lane-2.stdout"; stderr2="$work/lane-2.stderr"
 cargo run --quiet --locked --example m2_heartbeat_component -- timeout >"$stdout1" 2>"$stderr1"
