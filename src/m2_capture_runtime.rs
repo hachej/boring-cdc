@@ -1444,15 +1444,23 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                 return Ok(());
             }
             Err(_) => {
+                // The durable deterministic failure already owns this stopped capture
+                // boundary. A later unmatched EOF still exits, but must not arm a second
+                // capture failure that makes successor startup ambiguous.
+                let preserve_safe_stop_failure = runtime.state()
+                    == RuntimeState::CaptureSafeStopped
+                    && runtime.active_failure.is_some();
                 runtime.unexpected_eof();
-                runtime
-                    .persist_if_enabled(
-                        crate::failure_policy::FailureClass::TransientSource,
-                        crate::failure_policy::StableErrorCode::TransportUnavailable,
-                    )
-                    .map_err(|_| {
-                        CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED")
-                    })?;
+                if !preserve_safe_stop_failure {
+                    runtime
+                        .persist_if_enabled(
+                            crate::failure_policy::FailureClass::TransientSource,
+                            crate::failure_policy::StableErrorCode::TransportUnavailable,
+                        )
+                        .map_err(|_| {
+                            CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED")
+                        })?;
+                }
                 return Err(CaptureFailure::at("runtime", "M2_COPYBOTH_UNEXPECTED_LOSS"));
             }
         };
