@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
+cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/tmp}"
 cargo test --locked m2_init_recovery::tests
 # Static fault assertions cover the irreversible boundary: init has no slot create/drop path,
 # source identifiers are validated before interpolation, and every source mutation is lock-gated.

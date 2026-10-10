@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
-work=$(mktemp -d /var/tmp/m2-init-e2e.XXXXXX); project="m2-init-$RANDOM-$$"; port=$((58000 + $$ % 1000)); bootstrap_pid=; runtime_pid=
+cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/tmp}"
+work=$(mktemp -d "${TMPDIR%/}/m2-init-e2e.XXXXXX"); project="m2-init-$RANDOM-$$"; port=$((58000 + $$ % 1000)); bootstrap_pid=; runtime_pid=
+: >"$work/cases.tsv"
 cleanup(){
   for child in "$runtime_pid" "$bootstrap_pid"; do
     if [[ -n "$child" ]]; then kill -INT "$child" 2>/dev/null || true; wait "$child" 2>/dev/null || true; fi
@@ -45,6 +46,7 @@ expect_init_failure(){
   fi
   grep -q "$expected" "$work/${label}.err"
   ! grep -q 'postgresql://' "$work/${label}.err"
+  printf '%s\t%s\n' "$label" "$expected" >>"$work/cases.tsv"
 }
 
 # Exercise the documented init --dry-run -> init --confirm order from empty local state.
@@ -172,6 +174,57 @@ grep -q M2_INIT_OWNERSHIP_CONFLICT "$work/peer.err"
 [[ "$(psqlc -Atqc "SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid WHERE l.locktype='advisory' AND l.granted AND a.usename='boring_cdc_runtime'")" == 1 ]]
 kill -INT "$runtime_pid"; wait "$runtime_pid"; runtime_pid=
 unset PG_ADMIN CH_MAINT
+
+if [[ -n "${M2_INIT_RECEIPT_DIR:-}" ]]; then
+  mkdir -p "$M2_INIT_RECEIPT_DIR"
+  python3 - "$work" "$M2_INIT_RECEIPT_DIR/receipt.json" "$(git rev-parse HEAD)" \
+    "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot' and plugin='pgoutput'")" \
+    "$(psqlc -Atqc 'select count(*) from boring_cdc_control.heartbeat')" \
+    "$(psqlc -Atqc 'select count(*) from boring_cdc_control.capture_fences')" <<'PY'
+import json
+import pathlib
+import sys
+
+work, output, git_sha, slot_count, heartbeat_rows, fence_rows = sys.argv[1:]
+root = pathlib.Path(work)
+def init_result(name):
+    data = json.loads((root / name).read_text())
+    return {
+        "outcome": data["outcome"],
+        "logical_slot_exists": data["data"]["logical_slot_exists"],
+        "control_rows": data["data"]["control_rows"],
+        "postcondition_evidence_digest": data["postcondition_evidence_digest"],
+    }
+
+receipt = {
+    "schema_version": "m2-init-live-receipt/v1",
+    "git_commit": git_sha,
+    "postgres_version": "17.6",
+    "first_init": init_result("first.json"),
+    "idempotent_init": init_result("second.json"),
+    "post_fault_init": init_result("final.json"),
+    "rejected_cases": [
+        {"case": case, "condition": condition}
+        for case, condition in (line.split("\t") for line in (root / "cases.tsv").read_text().splitlines())
+    ],
+    "post_bootstrap": {
+        "pgoutput_slot_count": int(slot_count),
+        "heartbeat_rows": int(heartbeat_rows),
+        "fence_rows": int(fence_rows),
+        "runtime_source_lock_observed": True,
+        "peer_init_rejected_by_source_lock": True,
+    },
+}
+assert receipt["rejected_cases"] and all(
+    entry["outcome"] == "success" and entry["logical_slot_exists"] is False
+    for entry in (receipt["first_init"], receipt["idempotent_init"], receipt["post_fault_init"])
+)
+assert (int(slot_count), int(heartbeat_rows), int(fence_rows)) == (1, 1, 1)
+serialized = json.dumps(receipt, indent=2, sort_keys=True) + "\n"
+assert "local-only" not in serialized and "postgresql://" not in serialized
+pathlib.Path(output).write_text(serialized)
+PY
+fi
 
 echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 empty_database=true documented_sql=true init_bootstrap_run=true idempotent=true replay=blocked relation_set=diagnosed owner=diagnosed publish_flags=diagnosed privilege=diagnosed membership=diagnosed exact_fence_lengths=true validated_fence_lengths=true slot=pgoutput runtime_init_source_lock=shared'
 

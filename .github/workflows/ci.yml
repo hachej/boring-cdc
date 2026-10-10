@@ -50,7 +50,14 @@ jobs:
         timeout-minutes: 10
         env:
           TMPDIR: /var/tmp
+          M2_INIT_RECEIPT_DIR: ${{ runner.temp }}/m2-init-receipt
         run: scripts/e2e/m2_init_recovery.sh
+      - name: Retain M2 init live receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m2-init-receipt
+          path: ${{ runner.temp }}/m2-init-receipt/receipt.json
+          if-no-files-found: error
       - name: Live schema-change boundary
         timeout-minutes: 5
         env:
