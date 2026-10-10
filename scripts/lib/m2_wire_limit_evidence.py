@@ -95,6 +95,7 @@ manifest = {
     "result": {
         "status": "pass", "digest": digest(b"".join(path.read_bytes() for path in artifacts)),
         "artifacts": [relative(path) for path in artifacts],
+        "product_faults": "oversized CopyData header after a durable transaction",
         "runtime_observed": True,
         "attempts": ["fresh-postgres-17.6-a", "fresh-postgres-17.6-b"],
     },
