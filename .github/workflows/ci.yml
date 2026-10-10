@@ -6,6 +6,38 @@ on:
 permissions:
   contents: read
 jobs:
+  m2_copyboth_loss:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update
+      - name: M2 CopyBoth-loss live proof
+        timeout-minutes: 12
+        env:
+          TMPDIR: /var/tmp
+        run: |
+          packet="$PWD/artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-COPYBOTH-LOSS/current-head"
+          for attempt in 1 2; do
+            M2_COPYBOTH_LOSS_PROOF=1 M2_COPYBOTH_LOSS_OUT="$packet/attempt-$attempt" \
+              scripts/e2e/m2_capture_runtime.sh \
+              >>"$RUNNER_TEMP/m2-copyboth-loss.stdout" \
+              2>>"$RUNNER_TEMP/m2-copyboth-loss.stderr"
+          done
+          python3 scripts/lib/m2_copyboth_loss_evidence.py "$packet" \
+            "$RUNNER_TEMP/m2-copyboth-loss.stdout" "$RUNNER_TEMP/m2-copyboth-loss.stderr"
+          python3 scripts/validate/m2_copyboth_loss.py "$packet"
+          scripts/validate/evidence.sh "$packet/evidence.json"
+      - name: Retain M2 CopyBoth-loss packet
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m2-copyboth-loss
+          path: artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-COPYBOTH-LOSS/current-head
+          if-no-files-found: error
   m2_advisory_loss:
     runs-on: ubuntu-latest
     timeout-minutes: 15
