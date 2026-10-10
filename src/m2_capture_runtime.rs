@@ -1340,6 +1340,12 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     mut ownership_probe: impl FnMut() -> bool,
     on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
 ) -> Result<(), CaptureFailure> {
+    if runtime.state() == RuntimeState::ExpectedClose {
+        return Err(CaptureFailure::at(
+            "runtime",
+            "M2_SUPERVISED_RESTART_REQUIRED",
+        ));
+    }
     let (mut connection, mut contracts) = setup_runtime(config)?;
     bind_production_control_contracts(&mut contracts)?;
     runtime.contracts = contracts;
@@ -2810,6 +2816,37 @@ pub mod tests {
             !started.get(),
             "publisher must not start before CopyBoth preflight"
         );
+        drop(capture);
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(path.with_extension("sqlite-wal"));
+        let _ = std::fs::remove_file(path.with_extension("sqlite-shm"));
+    }
+
+    #[test]
+    fn expected_close_rejects_copyboth_before_opening_a_successor_connection() {
+        let (path, mut capture) = runtime(FeedbackPermit::Hold);
+        capture.graceful_shutdown().unwrap();
+        let config = CaptureConfig::production(
+            "postgresql://127.0.0.1:1/postgres",
+            "boring_publication",
+            "boring_slot",
+            ["public.orders".to_owned()],
+        )
+        .unwrap();
+        let executor = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = executor.block_on(capture_copyboth_until_with_probe(
+            &config,
+            &CancellationToken::new(),
+            &mut capture,
+            1,
+            Duration::from_millis(10),
+            || true,
+            || panic!("old generation must not become ready"),
+        ));
+        assert_eq!(result.unwrap_err().code, "M2_SUPERVISED_RESTART_REQUIRED");
         drop(capture);
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(path.with_extension("sqlite-wal"));
