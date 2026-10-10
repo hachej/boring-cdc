@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/var/tmp}"; [[ "$TMPDIR" == /var/tmp ]]
-if [[ ${M2_WIRE_LIMIT_PROOF:-0} != 1 && ${M2_ADVISORY_LOSS_PROOF:-0} != 1 && ${M2_COPYBOTH_LOSS_PROOF:-0} != 1 && ${M2_SOURCE_COMMIT_PROOF:-0} != 1 && ${M2_SQLITE_CONTENTION_PROOF:-0} != 1 ]]; then
+if [[ ${M2_WIRE_LIMIT_PROOF:-0} != 1 && ${M2_ADVISORY_LOSS_PROOF:-0} != 1 && ${M2_COPYBOTH_LOSS_PROOF:-0} != 1 && ${M2_SOURCE_COMMIT_PROOF:-0} != 1 && ${M2_SQLITE_CONTENTION_PROOF:-0} != 1 && ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} != 1 ]]; then
   cargo test --locked --workspace --all-targets
 fi
-if [[ ${M2_SOURCE_COMMIT_PROOF:-0} != 1 && ${M2_SQLITE_CONTENTION_PROOF:-0} != 1 ]]; then
+if [[ ${M2_SOURCE_COMMIT_PROOF:-0} != 1 && ${M2_SQLITE_CONTENTION_PROOF:-0} != 1 && ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} != 1 ]]; then
   cargo test --locked m2_capture_runtime::tests
 fi
 work=$(mktemp -d /var/tmp/m2-capture-e2e.XXXXXX); project="m2-capture-$RANDOM-$$"; port=$((56000 + $$ % 2000)); bootstrap_pid=; pid=; contention_pid=
@@ -84,7 +84,7 @@ fi
 cargo build --quiet --locked --bin boring-cdc
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 sed -i 's/publication = "boring_publication"/publication = "RuntimePublication"/; s/slot = "boring_slot"/slot = "runtime_slot"/; s#sqlite_path = "state/boring.db"#sqlite_path = "state/journal.sqlite"#' "$work/run/boring-cdc.toml"
-if [[ ${M2_SQLITE_CONTENTION_PROOF:-0} == 1 ]]; then
+if [[ ${M2_SQLITE_CONTENTION_PROOF:-0} == 1 || ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} == 1 ]]; then
   sed -i 's/heartbeat_cadence_ms = 5000/heartbeat_cadence_ms = 300000/' "$work/run/boring-cdc.toml"
 fi
 binary="$PWD/target/debug/boring-cdc"
@@ -250,18 +250,24 @@ if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback && -n ${M2_FEEDBACK_RECEIP
     sleep .05
   done
 fi
-if [[ ${M2_SQLITE_CONTENTION_PROOF:-0} == 1 ]]; then
+if [[ ${M2_SQLITE_CONTENTION_PROOF:-0} == 1 || ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} == 1 ]]; then
   printf 'M2_SQLITE_CONTENTION_PHASE=baseline_durable\n'
-  artifact=${M2_SQLITE_CONTENTION_OUT:?set M2_SQLITE_CONTENTION_OUT for the live SQLite contention proof}
+  if [[ ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} == 1 ]]; then
+    artifact=${M2_SQLITE_PERSISTENCE_OUTAGE_OUT:?set M2_SQLITE_PERSISTENCE_OUTAGE_OUT for the live persistence outage proof}
+    lock_seconds=25
+  else
+    artifact=${M2_SQLITE_CONTENTION_OUT:?set M2_SQLITE_CONTENTION_OUT for the live SQLite contention proof}
+    lock_seconds=7
+  fi
   [[ ! -e "$artifact" ]] || { echo 'E_SQLITE_CONTENTION_ARTIFACT_EXISTS' >&2; exit 1; }
   replication_pid=$(psqlc -Atqc 'SELECT pid FROM pg_stat_replication ORDER BY pid')
   [[ "$replication_pid" =~ ^[0-9]+$ ]] || { echo 'E_SQLITE_CONTENTION_REPLICATION_PID' >&2; exit 1; }
   pre_confirmed=$(psqlc -Atqc "SELECT coalesce(confirmed_flush_lsn::text,'0/0') FROM pg_replication_slots WHERE slot_name='runtime_slot'")
-  python3 - "$work/run/state/journal.sqlite" "$work/sqlite-contention-locked" <<'PY2' & contention_pid=$!
+  python3 - "$work/run/state/journal.sqlite" "$work/sqlite-contention-locked" "$lock_seconds" <<'PY2' & contention_pid=$!
 import pathlib,sqlite3,sys,time
 connection=sqlite3.connect(sys.argv[1]); connection.execute('BEGIN IMMEDIATE')
 pathlib.Path(sys.argv[2]).touch()
-time.sleep(7)
+time.sleep(int(sys.argv[3]))
 connection.commit()
 PY2
   deadline=$((SECONDS+10)); until [[ -e "$work/sqlite-contention-locked" ]]; do (( SECONDS < deadline )) || { echo 'E_SQLITE_CONTENTION_LOCK_TIMEOUT' >&2; exit 1; }; sleep .02; done
@@ -282,8 +288,10 @@ def lsn(value):
     return (int(high,16)<<32)|int(low,16)
 assert lsn(sys.argv[1])<=lsn(sys.argv[2])<=lsn(sys.argv[3])
 PY2
-  wait "$contention_pid"; contention_pid=
-  printf 'M2_SQLITE_CONTENTION_PHASE=writer_released\n'
+  if [[ ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} != 1 ]]; then
+    wait "$contention_pid"; contention_pid=
+    printf 'M2_SQLITE_CONTENTION_PHASE=writer_released\n'
+  fi
   deadline=$((SECONDS+15))
   while true; do
     state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
@@ -294,16 +302,54 @@ PY2
   child=$pid; set +e; wait "$pid"; rc=$?; set -e; pid=
   printf 'M2_SQLITE_CONTENTION_PHASE=original_exited\n'
   [[ $rc -ne 0 ]] || { echo 'E_SQLITE_CONTENTION_EXIT' >&2; exit 1; }
-  grep -q 'M2_CAPTURE_FAILED' "$work/runtime.err" || { cat "$work/runtime.err" >&2; exit 1; }
-  [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='runtime_slot'")" == 0 ]]
-  [[ "$(psqlc -Atqc 'SELECT count(*) FROM pg_stat_replication')" == 0 ]]
-  failure=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+  if [[ ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} == 1 ]]; then
+    grep -q 'M2_FAILURE_PERSIST_FAILED' "$work/runtime.err" || { echo 'E_SQLITE_OUTAGE_FAILURE_CODE' >&2; exit 1; }
+    python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+connection=sqlite3.connect(sys.argv[1],timeout=0.1)
+try:
+    connection.execute('BEGIN IMMEDIATE')
+except sqlite3.OperationalError as error:
+    assert error.sqlite_errorcode == sqlite3.SQLITE_BUSY
+else:
+    connection.rollback()
+    raise AssertionError('E_SQLITE_OUTAGE_LOCK_LOST')
+PY2
+    [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='runtime_slot'")" == 0 ]] || { echo 'E_SQLITE_OUTAGE_SLOT_ACTIVE' >&2; exit 1; }
+    [[ "$(psqlc -Atqc 'SELECT count(*) FROM pg_stat_replication')" == 0 ]] || { echo 'E_SQLITE_OUTAGE_REPLICATION_ACTIVE' >&2; exit 1; }
+    outage_failure_count=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+connection=sqlite3.connect(sys.argv[1])
+print(connection.execute("SELECT count(*) FROM processing_failures WHERE component='capture' AND armed=1").fetchone()[0])
+PY2
+)
+    [[ "$outage_failure_count" == 0 ]] || { echo 'E_SQLITE_OUTAGE_FALSE_FAILURE_RECORD' >&2; exit 1; }
+    outage_count=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
+PY2
+)
+    [[ "$outage_count" == 1 ]] || { echo 'E_SQLITE_OUTAGE_DURABILITY' >&2; exit 1; }
+    outage_confirmed=$(psqlc -Atqc "SELECT coalesce(confirmed_flush_lsn::text,'0/0') FROM pg_replication_slots WHERE slot_name='runtime_slot'")
+    [[ "$outage_confirmed" == "$blocked_confirmed" ]] || { echo 'E_SQLITE_OUTAGE_FEEDBACK_ADVANCED' >&2; exit 1; }
+    printf 'M2_SQLITE_CONTENTION_PHASE=outage_fenced_before_release\n'
+    wait "$contention_pid"; contention_pid=
+    printf 'M2_SQLITE_CONTENTION_PHASE=writer_released\n'
+  fi
+  if [[ ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} != 1 ]]; then
+    grep -q 'M2_CAPTURE_FAILED' "$work/runtime.err" || { cat "$work/runtime.err" >&2; exit 1; }
+    [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='runtime_slot'")" == 0 ]]
+    [[ "$(psqlc -Atqc 'SELECT count(*) FROM pg_stat_replication')" == 0 ]]
+    failure=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
 import sqlite3,sys
 row=sqlite3.connect(sys.argv[1]).execute("SELECT failure_class,retry_class,attempt,next_retry_at FROM processing_failures WHERE component='capture' AND armed=1").fetchone()
 assert row is not None and row[0:3]==('transient_io','transient',1) and row[3].startswith('unix-ms:')
 print(','.join((row[0],row[1],str(row[2]),row[3])))
 PY2
 )
+  else
+    failure=''
+  fi
   post_confirmed=$(psqlc -Atqc "SELECT coalesce(confirmed_flush_lsn::text,'0/0') FROM pg_replication_slots WHERE slot_name='runtime_slot'")
   python3 - "$blocked_confirmed" "$post_confirmed" "$durable_lsn" <<'PY2'
 import sys
@@ -317,18 +363,20 @@ import sqlite3,sys
 print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
 PY2
 )" == 1 ]]
-  printf 'M2_SQLITE_CONTENTION_PHASE=retry_persisted\n'
-  retry_at=${failure##*,unix-ms:}
-  wait_ms=$(python3 - "$retry_at" <<'PY2'
+  if [[ ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} != 1 ]]; then
+    printf 'M2_SQLITE_CONTENTION_PHASE=retry_persisted\n'
+    retry_at=${failure##*,unix-ms:}
+    wait_ms=$(python3 - "$retry_at" <<'PY2'
 import sys,time
 print(max(0,int(sys.argv[1])-time.time_ns()//1000000+100))
 PY2
 )
-  sleep "$(python3 - "$wait_ms" <<'PY2'
+    sleep "$(python3 - "$wait_ms" <<'PY2'
 import sys
 print(int(sys.argv[1])/1000)
 PY2
 )"
+  fi
   (cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/successor.out" 2>"$work/successor.err") & pid=$!
   printf 'M2_SQLITE_CONTENTION_PHASE=successor_started\n'
   deadline=$((SECONDS+30))
@@ -365,6 +413,25 @@ PY2
   stop_bounded "$pid" TERM sqlite-contention-successor; pid=
   printf 'M2_SQLITE_CONTENTION_PHASE=successor_converged\n'
   mkdir -p "$artifact"
+  if [[ ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} == 1 ]]; then
+    python3 - "$artifact" "$version" "$durable_lsn" "$feedback" "$replication_pid" "$rc" "$pre_confirmed" "$blocked_confirmed" "$outage_confirmed" "$successor_lsn" "$successor_feedback" <<'PY2'
+import json,pathlib,sys
+out=pathlib.Path(sys.argv[1])
+(out/'observation.json').write_text(json.dumps({
+ 'schema_version':'m2-sqlite-persistence-outage-observation/v1','postgres_version':sys.argv[2],
+ 'durable_lsn_before_outage':sys.argv[3],'feedback_before_outage':sys.argv[4],
+ 'original_replication_pid':int(sys.argv[5]),'runtime_exit_code':int(sys.argv[6]),
+ 'runtime_failure_code':'M2_FAILURE_PERSIST_FAILED','armed_failure_count_before_release':0,
+ 'slot_confirmed_before_outage':sys.argv[7],
+ 'slot_confirmed_while_locked':sys.argv[8],'slot_confirmed_after_exit_before_release':sys.argv[9],
+ 'durable_transaction_count_before_release':1,'replication_slot_active_after_exit':False,
+ 'successor_durable_transaction_count':2,'successor_durable_lsn':sys.argv[10],
+ 'successor_feedback':sys.argv[11],'successor_clean_shutdown':True,
+ },sort_keys=True,indent=2)+'\n')
+PY2
+    printf 'M2_SQLITE_PERSISTENCE_OUTAGE_REPLAY_OK postgres=%s\n' "$version"
+    exit 0
+  fi
   python3 - "$artifact" "$version" "$durable_lsn" "$feedback" "$replication_pid" "$rc" "$failure" "$pre_confirmed" "$blocked_confirmed" "$post_confirmed" "$successor_lsn" "$successor_feedback" <<'PY2'
 import json,pathlib,sys
 out=pathlib.Path(sys.argv[1])
