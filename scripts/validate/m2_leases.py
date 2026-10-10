@@ -30,7 +30,7 @@ def passing_tests(stdout):
 
 if OUT.exists(): shutil.rmtree(OUT)
 before=source_digest()
-env=dict(os.environ); env['TMPDIR']='/var/tmp'
+env=dict(os.environ); env['TMPDIR']=os.environ.get('TMPDIR') or '/tmp'
 fmt,fmt_record=run_record(['cargo','fmt','--all','--','--check'],'fmt','m2-leases/v2',env)
 first,first_record=run_record(['cargo','test','--locked','m2_leases::tests'],'test-run-1','m2-leases/v2',env)
 second,second_record=run_record(['cargo','test','--locked','m2_leases::tests'],'test-run-2','m2-leases/v2',env)
@@ -46,7 +46,7 @@ comparison={'attempts':['deterministic-model-v1-run-1','deterministic-model-v1-r
             'normalized_result_sha256':sha(canon(first_tests)),'identical':True}
 write(OUT/'config.json',canon(config))
 write(OUT/'versions.json',canon({'rust':subprocess.run(['rustc','--version'],text=True,capture_output=True,check=True).stdout.strip(),'cargo':subprocess.run(['cargo','--version'],text=True,capture_output=True,check=True).stdout.strip()}))
-write(OUT/'commands.txt','TMPDIR=/var/tmp cargo fmt --all -- --check\nTMPDIR=/var/tmp cargo test --locked m2_leases::tests\nTMPDIR=/var/tmp cargo test --locked m2_leases::tests\n')
+write(OUT/'commands.txt',f"TMPDIR={env['TMPDIR']} cargo fmt --all -- --check\nTMPDIR={env['TMPDIR']} cargo test --locked m2_leases::tests\nTMPDIR={env['TMPDIR']} cargo test --locked m2_leases::tests\n")
 write(OUT/'rerun-comparison.json',canon(comparison))
 write(OUT/'state/before.json',canon({'active_generation':1,'lease_state':'held','checkpoint_revision':0,'live_selector_changed':False}))
 write(OUT/'state/after.json',canon({'cases_passed':len(cases),'stale_checkpoint_updates':0,'stale_selector_updates':0,'stale_artifacts_classified':True,'live_selector_changed':False}))
