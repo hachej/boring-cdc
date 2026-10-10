@@ -56,6 +56,7 @@ enum Command {
     StreamCopy {
         token: CancellationToken,
         batch_tx: mpsc::Sender<Result<VecDeque<Bytes>>>,
+        max_copy_data_bytes: Option<usize>,
     },
     /// Send one CopyData message (standby status update or hot standby feedback).
     PutCopyData {
@@ -112,6 +113,7 @@ impl Worker {
         &mut self,
         token: CancellationToken,
         batch_tx: mpsc::Sender<Result<VecDeque<Bytes>>>,
+        max_copy_data_bytes: Option<usize>,
         cmd_rx: &mut mpsc::UnboundedReceiver<Command>,
     ) -> bool {
         let mut held: Option<VecDeque<Bytes>> = None;
@@ -143,8 +145,9 @@ impl Worker {
                             StreamCmd::WorkerGone => return false,
                         }
                     }
-                    read = copy::get_copy_data(
+                    read = copy::get_copy_data_with_limit(
                         &mut self.transport, &mut self.read_buf, &mut batch, &token,
+                        max_copy_data_bytes,
                     ) => match read {
                         Ok(first) => {
                             batch.push_front(first);
@@ -322,10 +325,17 @@ fn run_worker(
                 Command::BoundedQuery { sql, limits, reply } => {
                     let _ = reply.send(worker.bounded_query(&sql, limits).await);
                 }
-                Command::StreamCopy { token, batch_tx } => {
+                Command::StreamCopy {
+                    token,
+                    batch_tx,
+                    max_copy_data_bytes,
+                } => {
                     // Runs its own loop, servicing interleaved commands, until
                     // streaming ends. Returns true only if it handled a Close.
-                    if worker.stream_copy(token, batch_tx, &mut cmd_rx).await {
+                    if worker
+                        .stream_copy(token, batch_tx, max_copy_data_bytes, &mut cmd_rx)
+                        .await
+                    {
                         break;
                     }
                 }
@@ -393,6 +403,7 @@ pub struct NativeConnection {
     transport_receive_capacity: usize,
     /// Whether we are in COPY (replication) mode. Gates the streaming methods and tells the worker whether to send CopyDone on shutdown.
     in_copy_mode: bool,
+    max_copy_data_bytes: Option<usize>,
     /// Liveness flag shared with the worker, which clears it on a transient read error.
     alive: Arc<AtomicBool>,
 }
@@ -458,6 +469,7 @@ impl NativeConnection {
             server_ver,
             transport_receive_capacity,
             in_copy_mode: false,
+            max_copy_data_bytes: None,
             alive,
         })
     }
@@ -500,6 +512,7 @@ impl NativeConnection {
                     server_ver,
                     transport_receive_capacity,
                     in_copy_mode: false,
+                    max_copy_data_bytes: None,
                     alive,
                 })
             }
@@ -548,6 +561,29 @@ impl NativeConnection {
     /// Retained receive storage owned by the transport beneath the protocol-frame buffer.
     pub fn transport_receive_capacity(&self) -> usize {
         self.transport_receive_capacity
+    }
+
+    /// Reject CopyData frames above this payload size from their wire header.
+    /// Configure before the first streaming read; no buffered frame may predate the limit.
+    pub fn set_copy_data_limit(&mut self, max_bytes: usize) -> Result<()> {
+        if max_bytes == 0 || max_bytes > 128 * 1024 * 1024 - 4 {
+            return Err(ReplicationError::protocol("invalid CopyData limit"));
+        }
+        match &self.driver {
+            Driver::Inline { pending, .. } if !pending.is_empty() => {
+                return Err(ReplicationError::protocol("CopyData already buffered"));
+            }
+            Driver::Threaded {
+                pending, batch_rx, ..
+            } if !pending.is_empty() || batch_rx.is_some() => {
+                return Err(ReplicationError::protocol(
+                    "CopyData stream already started",
+                ));
+            }
+            _ => {}
+        }
+        self.max_copy_data_bytes = Some(max_bytes);
+        Ok(())
     }
 
     /// Execute a query with a fixed physical receive-buffer allocation and return its high-water.
@@ -670,11 +706,12 @@ impl NativeConnection {
             Driver::Inline {
                 worker, pending, ..
             } => {
-                let result = copy::get_copy_data(
+                let result = copy::get_copy_data_with_limit(
                     &mut worker.transport,
                     &mut worker.read_buf,
                     pending,
                     cancellation_token,
+                    self.max_copy_data_bytes,
                 )
                 .await;
                 if let Err(ReplicationError::TransientConnection(_)) = &result {
@@ -701,6 +738,7 @@ impl NativeConnection {
                         .send(Command::StreamCopy {
                             token: cancellation_token.clone(),
                             batch_tx,
+                            max_copy_data_bytes: self.max_copy_data_bytes,
                         })
                         .is_err()
                     {
@@ -1143,6 +1181,7 @@ impl NativeConnection {
             server_ver,
             transport_receive_capacity,
             in_copy_mode: false,
+            max_copy_data_bytes: None,
             alive,
         }
     }
@@ -1181,6 +1220,7 @@ impl NativeConnection {
             server_ver,
             transport_receive_capacity,
             in_copy_mode: false,
+            max_copy_data_bytes: None,
             alive,
         }
     }

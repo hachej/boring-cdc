@@ -21,6 +21,8 @@ jobs:
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Test
         run: cargo test --locked --workspace --all-targets
+      - name: Vendored CopyData receive limit
+        run: cargo test --manifest-path vendor/pg_walstream/Cargo.toml --no-default-features --features rustls-tls --lib configured_copy_data_limit
       - name: Python contract tests
         run: python3 -m unittest discover -s tests
       - name: Package boundary

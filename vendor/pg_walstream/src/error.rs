@@ -12,6 +12,9 @@ pub enum ReplicationError {
     /// Protocol parsing errors
     Protocol(String),
 
+    /// Configured CopyData payload bound was exceeded before the full frame was read.
+    CopyDataLimit { observed: usize, limit: usize },
+
     /// Buffer operation errors
     Buffer(String),
 
@@ -66,6 +69,12 @@ impl core::fmt::Display for ReplicationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Protocol(msg) => write!(f, "Protocol parsing error: {msg}"),
+            Self::CopyDataLimit { observed, limit } => {
+                write!(
+                    f,
+                    "CopyData payload length {observed} exceeds configured maximum {limit}"
+                )
+            }
             Self::Buffer(msg) => write!(f, "Buffer error: {msg}"),
             Self::TransientConnection(msg) => write!(f, "Transient connection error: {msg}"),
             Self::PermanentConnection(msg) => write!(f, "Permanent connection error: {msg}"),

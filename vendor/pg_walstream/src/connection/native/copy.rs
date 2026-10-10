@@ -54,11 +54,22 @@ const _: () = assert!(MIN_HEADROOM > super::startup::TLS_BUF_SIZE);
 /// - `split_to().freeze().slice(5..)` — zero-copy extraction of CopyData payload.
 /// - Drain loop: one `read_buf()` → parse ALL complete messages → amortize syscall.
 /// - Native `AsyncRead` on `TlsStream` — no `AsyncFd` wrapper around C socket fd.
+#[cfg(test)]
 pub async fn get_copy_data<R: AsyncRead + Unpin>(
     reader: &mut R,
     read_buf: &mut BytesMut,
     pending: &mut VecDeque<Bytes>,
     cancellation_token: &CancellationToken,
+) -> Result<Bytes, ReplicationError> {
+    get_copy_data_with_limit(reader, read_buf, pending, cancellation_token, None).await
+}
+
+pub async fn get_copy_data_with_limit<R: AsyncRead + Unpin>(
+    reader: &mut R,
+    read_buf: &mut BytesMut,
+    pending: &mut VecDeque<Bytes>,
+    cancellation_token: &CancellationToken,
+    max_copy_data_bytes: Option<usize>,
 ) -> Result<Bytes, ReplicationError> {
     loop {
         // ── Fast path: return from pre-drained queue (no syscall) ──
@@ -70,11 +81,12 @@ pub async fn get_copy_data<R: AsyncRead + Unpin>(
         if read_buf.capacity() - read_buf.len() < MIN_HEADROOM {
             read_buf.reserve(READ_CHUNK);
         }
+        let mut limited_read = (&mut *reader).take(READ_CHUNK as u64);
         tokio::select! {
             biased;
             _ = cancellation_token.cancelled() => {
                 // Check for remaining buffered data before returning
-                if let Some(err) = drain_read_buffer(read_buf, pending) {
+                if let Some(err) = drain_read_buffer_with_limit(read_buf, pending, max_copy_data_bytes) {
                     return Err(err);
                 }
                 if let Some(payload) = pending.pop_front() {
@@ -85,7 +97,7 @@ pub async fn get_copy_data<R: AsyncRead + Unpin>(
                     "Operation cancelled".to_string(),
                 ));
             }
-            result = reader.read_buf(read_buf) => {
+            result = limited_read.read_buf(read_buf) => {
                 let n = result.map_err(|e| {
                     ReplicationError::transient_connection(format!("read error: {e}"))
                 })?;
@@ -96,7 +108,7 @@ pub async fn get_copy_data<R: AsyncRead + Unpin>(
                 }
 
                 // Drain all complete messages from the buffer
-                if let Some(err) = drain_read_buffer(read_buf, pending) {
+                if let Some(err) = drain_read_buffer_with_limit(read_buf, pending, max_copy_data_bytes) {
                     return Err(err);
                 }
 
@@ -117,9 +129,18 @@ pub async fn get_copy_data<R: AsyncRead + Unpin>(
 ///
 /// Returns `Some(error)` if an ErrorResponse is received during COPY mode,
 /// indicating the server reported a protocol-level error.
+#[cfg(test)]
 fn drain_read_buffer(
     read_buf: &mut BytesMut,
     pending: &mut VecDeque<Bytes>,
+) -> Option<ReplicationError> {
+    drain_read_buffer_with_limit(read_buf, pending, None)
+}
+
+fn drain_read_buffer_with_limit(
+    read_buf: &mut BytesMut,
+    pending: &mut VecDeque<Bytes>,
+    max_copy_data_bytes: Option<usize>,
 ) -> Option<ReplicationError> {
     let mut drained = 0;
 
@@ -137,6 +158,15 @@ fn drain_read_buffer(
                 "message length {} exceeds maximum allowed {} bytes",
                 body_len_usize, MAX_MESSAGE_LEN
             )));
+        }
+        match (read_buf[0], max_copy_data_bytes) {
+            (b'd', Some(limit)) if body_len_usize - 4 > limit => {
+                return Some(ReplicationError::CopyDataLimit {
+                    observed: body_len_usize - 4,
+                    limit,
+                });
+            }
+            _ => {}
         }
         let total_len = 1 + body_len_usize; // tag + body (body_len includes its own 4 bytes)
 
@@ -323,6 +353,34 @@ mod tests {
         assert_eq!(buf.len(), 5); // header remains
     }
 
+    #[test]
+    fn configured_copy_data_limit_rejects_from_header_before_payload_allocation() {
+        let mut oversized = BytesMut::new();
+        oversized.put_u8(b'd');
+        oversized.put_i32(4 + 1_048_577);
+        let capacity = oversized.capacity();
+        let mut pending = VecDeque::new();
+        let error = drain_read_buffer_with_limit(&mut oversized, &mut pending, Some(1_048_576))
+            .expect("oversized header must fail without a payload");
+        assert!(matches!(
+            error,
+            ReplicationError::CopyDataLimit {
+                observed: 1_048_577,
+                limit: 1_048_576
+            }
+        ));
+        assert_eq!(oversized.len(), 5);
+        assert_eq!(oversized.capacity(), capacity);
+        assert!(pending.is_empty());
+
+        let mut accepted = BytesMut::new();
+        accepted.put_u8(b'd');
+        accepted.put_i32(4 + 3);
+        accepted.put_slice(b"abc");
+        assert!(drain_read_buffer_with_limit(&mut accepted, &mut pending, Some(3)).is_none());
+        assert_eq!(pending.pop_front().as_deref(), Some(b"abc".as_slice()));
+    }
+
     // === Additional drain_read_buffer tests ===
 
     #[test]
@@ -501,6 +559,36 @@ mod tests {
     }
 
     // === Async tests ===
+
+    #[tokio::test]
+    async fn configured_copy_data_limit_rejects_header_without_waiting_for_payload() {
+        use tokio::io::AsyncWriteExt;
+        let (mut client, mut server) = tokio::io::duplex(8192);
+        server.write_all(&[b'd', 0, 16, 0, 5]).await.unwrap();
+        let mut read_buf = BytesMut::new();
+        let mut pending = VecDeque::new();
+        let token = CancellationToken::new();
+        let result = tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            get_copy_data_with_limit(
+                &mut client,
+                &mut read_buf,
+                &mut pending,
+                &token,
+                Some(1_048_576),
+            ),
+        )
+        .await
+        .expect("header rejection must not wait for the claimed payload");
+        assert!(matches!(
+            result.unwrap_err(),
+            ReplicationError::CopyDataLimit {
+                observed: 1_048_577,
+                limit: 1_048_576
+            }
+        ));
+        assert_eq!(read_buf.len(), 5);
+    }
 
     #[tokio::test]
     async fn test_get_copy_data_returns_payload() {

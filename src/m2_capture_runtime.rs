@@ -1347,6 +1347,9 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         ));
     }
     let (mut connection, mut contracts) = setup_runtime(config)?;
+    connection
+        .set_copy_data_limit(WireLimits::default().max_copy_data_bytes)
+        .map_err(|_| CaptureFailure::at("admission", "M2_RECEIVE_ADMISSION_INVALID"))?;
     bind_production_control_contracts(&mut contracts)?;
     runtime.contracts = contracts;
     let mut on_ready = Some(on_ready);
@@ -1376,8 +1379,9 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
             })?;
             return Ok(());
         }
-        // Admit a maximum-sized CopyData allocation before transport receive. The read future is
-        // cancelled (not dropped) at every control tick, so a quiet source cannot starve ownership.
+        // Reserve the application frame budget; the native transport rejects an oversized
+        // CopyData header before reading its full payload. The read future is cancelled and
+        // awaited at every control tick so a quiet source cannot starve ownership.
         let admission = TransportReceiveLane::admit(WireLimits::default().max_copy_data_bytes)?;
         if let Some(start) = on_ready.take() {
             start()?;
@@ -1400,7 +1404,11 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                         ).map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
                         return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
                     }
-                    match result { Ok(frame) => Some(Ok(frame)), Err(_) => None }
+                    match result {
+                        Ok(frame) => Some(Ok(frame)),
+                        Err(pg_walstream::ReplicationError::Cancelled(_)) => None,
+                        Err(error) => Some(Err(error)),
+                    }
                 }
             }
         };
@@ -1408,6 +1416,20 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         drop(read); // completed or cooperatively cancelled and awaited above
         let frame = match received {
             Ok(frame) => frame,
+            Err(pg_walstream::ReplicationError::CopyDataLimit { .. }) => {
+                runtime
+                    .persist_if_enabled(
+                        crate::failure_policy::FailureClass::Configuration,
+                        crate::failure_policy::StableErrorCode::ResourceLimit,
+                    )
+                    .map_err(|_| {
+                        CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED")
+                    })?;
+                eprintln!(
+                    "M2_CAPTURE_RESOURCE_LIMIT kind=wire_frame recovery=changed_limit_required"
+                );
+                return Err(CaptureFailure::at("admission", "M2_RECEIVE_FRAME_LIMIT"));
+            }
             Err(_) if cancellation.is_cancelled() => {
                 runtime.graceful_shutdown().map_err(|_| {
                     CaptureFailure::at("runtime", "M2_SHUTDOWN_RECONCILIATION_REQUIRED")
