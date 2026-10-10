@@ -1,9 +1,9 @@
 
 running 1 test
-PRESSURE_CAPTURE_OBSERVATION {"after_free_bytes":5048471552,"before_free_bytes":5082025984,"committed_transactions":0,"feedback_packets":0,"hard_free_bytes":5065248768,"physical_fill_bytes":33554432,"safe_stopped":true}
+PRESSURE_CAPTURE_OBSERVATION {"after_free_bytes":359526400,"before_free_bytes":393080832,"committed_transactions":0,"feedback_packets":0,"hard_free_bytes":376303616,"physical_fill_bytes":33554432,"safe_stopped":true}
 test m2_capture_runtime::tests::capture_reserve_breach_safe_stops_before_accepting_more_wal ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 408 filtered out; finished in 0.22s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 409 filtered out; finished in 0.14s
 
 
 running 0 tests
