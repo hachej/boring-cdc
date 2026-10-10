@@ -244,6 +244,31 @@ fn simple_ident(value: &str) -> bool {
     matches!(c.next(), Some('a'..='z' | 'A'..='Z' | '_'))
         && c.all(|x| x.is_ascii_alphanumeric() || x == '_')
 }
+
+pub(crate) fn source_advisory_key(
+    system_identifier: u64,
+    timeline: u32,
+    database_identity: u32,
+    slot_name: &str,
+    expected: &PublicationSpec,
+) -> Result<i64, crate::m1_source_identity::IdentityValidationError> {
+    let definition =
+        serde_json::to_vec(expected).expect("serializing a typed publication spec cannot fail");
+    let identity = crate::m1_source_identity::SourceIdentity {
+        system_identifier,
+        timeline,
+        database_identity,
+        slot_name: slot_name.into(),
+        plugin: "pgoutput".into(),
+        publication_fingerprint: crate::m1_source_identity::publication_fingerprint(
+            &expected.name,
+            &definition,
+        ),
+        protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
+    };
+    identity.validate()?;
+    Ok(identity.advisory_lock_key())
+}
 fn relation(value: &str) -> Option<String> {
     let p = value.split('.').collect::<Vec<_>>();
     (p.len() == 2 && p.iter().all(|x| simple_ident(x)))
@@ -302,24 +327,14 @@ fn acquire(
         .get_value(0, 2)
         .and_then(|v| v.parse().ok())
         .ok_or_else(|| InitFailure::at("ownership", "M2_INIT_SOURCE_IDENTITY_INVALID"))?;
-    let definition = serde_json::to_vec(expected)
-        .map_err(|_| InitFailure::at("ownership", "M2_INIT_SOURCE_IDENTITY_INVALID"))?;
-    let identity = crate::m1_source_identity::SourceIdentity {
+    let key = source_advisory_key(
         system_identifier,
         timeline,
         database_identity,
-        slot_name: config.public().source.slot.clone(),
-        plugin: "pgoutput".into(),
-        publication_fingerprint: crate::m1_source_identity::publication_fingerprint(
-            &config.public().source.publication,
-            &definition,
-        ),
-        protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
-    };
-    identity
-        .validate()
-        .map_err(|_| InitFailure::at("ownership", "M2_INIT_SOURCE_IDENTITY_INVALID"))?;
-    let key = identity.advisory_lock_key();
+        &config.public().source.slot,
+        expected,
+    )
+    .map_err(|_| InitFailure::at("ownership", "M2_INIT_SOURCE_IDENTITY_INVALID"))?;
     let nonce = format!("{:x}", Sha256::digest(format!("{run_id}:{pid}").as_bytes()));
     let path = Path::new(&config.public().storage.sqlite_path);
     std::fs::create_dir_all(parent_directory(path))
@@ -713,6 +728,28 @@ pub mod tests {
     #[test]
     fn basename_plan_fsyncs_the_current_directory() {
         sync_parent(Path::new("state.init-plan.json")).unwrap();
+    }
+    #[test]
+    fn source_lock_key_is_shared_across_equivalent_publication_order() {
+        let first = PublicationSpec::new(
+            "boring_cdc_publication",
+            ADMIN_ROLE,
+            ["public.alpha".into(), "public.beta".into()],
+        );
+        let reordered = PublicationSpec::new(
+            "boring_cdc_publication",
+            ADMIN_ROLE,
+            ["public.beta".into(), "public.alpha".into()],
+        );
+        let key = source_advisory_key(42, 1, 17, "boring_cdc_slot", &first).unwrap();
+        assert_eq!(
+            key,
+            source_advisory_key(42, 1, 17, "boring_cdc_slot", &reordered).unwrap()
+        );
+        assert_ne!(
+            key,
+            source_advisory_key(42, 1, 18, "boring_cdc_slot", &first).unwrap()
+        );
     }
     #[test]
     fn confirmation_plan_is_random_expiring_and_one_shot() {
