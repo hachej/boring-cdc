@@ -4,6 +4,7 @@
 import hashlib
 import json
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -26,6 +27,10 @@ def write(path, data):
     path.write_bytes(data if isinstance(data, bytes) else encoded(data))
 
 
+def redact_paths(data):
+    return re.sub(rb"/(?:home|var/tmp|tmp)/[^\s\"'(),]+", b"<runner-path>", data)
+
+
 def main():
     if len(sys.argv) != 2:
         raise SystemExit("usage: scripts/lib/m2_init_component.py RUN_OUTPUT_DIR")
@@ -41,15 +46,25 @@ def main():
     shutil.rmtree(output, ignore_errors=True)
     output.mkdir(parents=True)
     records = []
+    redactions = []
     for number in (1, 2):
         attempt = run / f"attempt-{number}"
         write(output / f"attempt-{number}/receipt.json", (attempt / "receipt.json").read_bytes())
         for stream in ("stdout", "stderr"):
-            write(output / f"attempt-{number}/{stream}.txt", (attempt / f"{stream}.txt").read_bytes())
+            raw = (attempt / f"{stream}.txt").read_bytes()
+            retained = redact_paths(raw)
+            path = output / f"attempt-{number}/{stream}.txt"
+            write(path, retained)
+            redactions.append({"path": path.relative_to(ROOT).as_posix(), "raw_sha256": sha(raw), "retained_sha256": sha(retained)})
         records.append(("scripts/e2e/m2_init_recovery.sh", f"attempt-{number}"))
     for stream in ("stdout", "stderr"):
-        write(output / f"fault-{stream}.txt", (run / f"fault-{stream}.txt").read_bytes())
+        raw = (run / f"fault-{stream}.txt").read_bytes()
+        retained = redact_paths(raw)
+        path = output / f"fault-{stream}.txt"
+        write(path, retained)
+        redactions.append({"path": path.relative_to(ROOT).as_posix(), "raw_sha256": sha(raw), "retained_sha256": sha(retained)})
     records.append(("scripts/faults/m2_init_recovery.sh", "fault"))
+    write(output / "redaction.json", {"transformation": "absolute-runner-paths/v1", "streams": redactions})
 
     source = sha(encoded(receipts[0]["input_sha256"]))
     write(output / "versions.json", {"git_commit": receipts[0]["git_commit"], "postgres": receipts[0]["postgres_version"], "source_sha256": source})
@@ -71,7 +86,7 @@ def main():
             "stderr_sha256": sha(stderr.read_bytes()),
         })
     artifacts = [output / f"attempt-{number}/receipt.json" for number in (1, 2)]
-    artifacts += [output / "state/after.json", output / "fault-timeline.json"]
+    artifacts += [output / "state/after.json", output / "fault-timeline.json", output / "redaction.json"]
     forbidden = (b"postgresql://", b"local-only", b"password=", b"/tmp/", b"/home/")
     for path in output.rglob("*"):
         if path.is_file() and any(secret in path.read_bytes().lower() for secret in forbidden):
