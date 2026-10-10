@@ -26,7 +26,9 @@ jobs:
       - name: Install repository-pinned Rust toolchain
         run: rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update
       - name: Vendored bounded receive regressions
-        run: cargo test --manifest-path vendor/pg_walstream/Cargo.toml bounded_query
+        run: |
+          cargo test --manifest-path vendor/pg_walstream/Cargo.toml bounded_query
+          cargo test --manifest-path vendor/pg_walstream/Cargo.toml configured_copy_data_limit
       - name: PostgreSQL 17.6 planner component
         run: scripts/e2e/m3_planner.sh
       - name: Planner fault boundaries

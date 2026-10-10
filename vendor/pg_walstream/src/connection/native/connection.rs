@@ -1643,6 +1643,7 @@ mod tests {
             server_ver: 160000,
             transport_receive_capacity,
             in_copy_mode: true, // skip the replication-mode gate
+            max_copy_data_bytes: None,
             alive: Arc::new(AtomicBool::new(true)),
         };
 
@@ -1692,7 +1693,7 @@ mod tests {
 
         let handle = tokio::spawn(async move {
             let mut worker = worker;
-            worker.stream_copy(token, batch_tx, &mut cmd_rx).await
+            worker.stream_copy(token, batch_tx, None, &mut cmd_rx).await
         });
 
         // Server streams two WAL messages; the worker pushes them down the channel.
@@ -1730,7 +1731,7 @@ mod tests {
 
         // A pre-cancelled token makes the first read return Cancelled, which the
         // loop forwards down the channel before stopping (not a Close → false).
-        let stopped_via_close = worker.stream_copy(token, batch_tx, &mut cmd_rx).await;
+        let stopped_via_close = worker.stream_copy(token, batch_tx, None, &mut cmd_rx).await;
         assert!(!stopped_via_close);
         match batch_rx.try_recv() {
             Ok(Err(ReplicationError::Cancelled(_))) => {}
