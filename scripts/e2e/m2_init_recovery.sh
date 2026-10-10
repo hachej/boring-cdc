@@ -129,6 +129,7 @@ psqlc -qc 'GRANT UPDATE(capture_epoch) ON boring_cdc_control.capture_fences TO b
 psqlc -qc 'GRANT boring_cdc_runtime TO boring_cdc_control_writer'
 expect_init_failure M2_INIT_CONTROL_ROLE_MEMBERSHIP_EXCESS membership
 psqlc -qc 'REVOKE boring_cdc_runtime FROM boring_cdc_control_writer'
+psqlc -qc 'GRANT USAGE ON SCHEMA boring_cdc_control TO boring_cdc_control_writer; GRANT SELECT(id),UPDATE(nonce,updated_at) ON boring_cdc_control.heartbeat TO boring_cdc_control_writer; GRANT SELECT(id),UPDATE(capture_epoch,generation,table_set_fingerprint,unique_nonce) ON boring_cdc_control.capture_fences TO boring_cdc_control_writer'
 
 # Re-initialize clean local state, then exercise the documented capture-only bootstrap handoff.
 reset_local_state
