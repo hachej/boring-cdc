@@ -78,7 +78,8 @@ def check(packet):
 def main():
     if len(sys.argv) != 2:
         raise SystemExit("usage: scripts/validate/m2_init_component.py ARTIFACT_ROOT")
-    packet = pathlib.Path(sys.argv[1]) / SCENARIO / SEED
+    root = pathlib.Path(sys.argv[1])
+    packet = (root if root.is_absolute() else ROOT / root) / SCENARIO / SEED
     findings = check(packet)
     print(json.dumps({"validator": "m2-init-component/v1", "status": "pass" if not findings else "fail", "findings": findings}, sort_keys=True))
     return bool(findings)
