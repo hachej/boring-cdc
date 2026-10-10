@@ -1345,6 +1345,12 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     runtime.contracts = contracts;
     let mut on_ready = Some(on_ready);
     loop {
+        if runtime.state() == RuntimeState::ExpectedClose {
+            return Err(CaptureFailure::at(
+                "runtime",
+                "M2_SUPERVISED_RESTART_REQUIRED",
+            ));
+        }
         runtime
             .service_pressure()
             .map_err(|_| CaptureFailure::at("pressure", "M2_PRESSURE_SERVICE_FAILED"))?;
@@ -1526,6 +1532,30 @@ impl crate::m2_ownership::SourceLockSession for PgSourceLock {
     }
 }
 
+fn enforce_capture_startup_gate(
+    gate: Option<(String, Option<u64>)>,
+    now_ms: u64,
+) -> Result<(), CaptureFailure> {
+    let Some((retry_class, deadline)) = gate else {
+        return Ok(());
+    };
+    match retry_class.as_str() {
+        "rearmed" => Ok(()),
+        "transient" => match deadline {
+            Some(deadline) if deadline <= now_ms => Ok(()),
+            Some(_) => Err(CaptureFailure::at("failure_policy", "M2_RETRY_NOT_DUE")),
+            None => Err(CaptureFailure::at(
+                "failure_policy",
+                "M2_FAILURE_LOAD_FAILED",
+            )),
+        },
+        _ => Err(CaptureFailure::at(
+            "failure_policy",
+            "M2_EXPLICIT_REARM_REQUIRED",
+        )),
+    }
+}
+
 pub fn acquire_production_ownership(
     config: &crate::m1_config::LoadedConfig,
     run_id: &str,
@@ -1539,42 +1569,15 @@ pub fn acquire_production_ownership(
             rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
         )
         .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
-        let gate = connection.query_row(
-            "SELECT failure_class,CASE WHEN instr(last_failed_at,';rearm-' || char(116,111,107,101,110,61))>0 THEN 'rearmed' ELSE retry_class END,next_retry_at FROM processing_failures WHERE component='capture' AND armed=1",
-            [],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, Option<String>>(2)?)),
-        ).optional().map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
-        if let Some((failure_class, retry_class, next)) = gate {
-            if retry_class != "transient"
-                && retry_class != "rearmed"
-                && failure_class != "configuration"
-            {
-                return Err(CaptureFailure::at(
-                    "failure_policy",
-                    "M2_EXPLICIT_REARM_REQUIRED",
-                ));
-            }
-            let deadline = if retry_class == "transient" {
-                Some(
-                    next.and_then(|value| value.strip_prefix("unix-ms:")?.parse::<u64>().ok())
-                        .ok_or_else(|| {
-                            CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED")
-                        })?,
-                )
-            } else {
-                None
-            };
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?
-                .as_millis() as u64;
-            if deadline.is_some_and(|deadline| deadline > now) {
-                return Err(CaptureFailure::at("failure_policy", "M2_RETRY_NOT_DUE"));
-            }
-        }
+        let gate = crate::m2_journal::capture_startup_gate(&connection)
+            .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?
+            .as_millis() as u64;
+        enforce_capture_startup_gate(gate, now)?;
     }
     use crate::m2_ownership::{OwnerKind, OwnershipGuard};
-    use rusqlite::OptionalExtension;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
     let dsn = config
         .runtime_dsn()
@@ -2377,22 +2380,11 @@ pub async fn run_loaded_config(
     // M0-PROVISIONAL: boring-cdc-m2-capture-runtime.1 (writer queue caps and capture burst).
     let writer_service = JournalWriterService::new(store, [8, 4, 2, 1], 4)
         .map_err(|_| CaptureFailure::at("journal", "M2_WRITER_SERVICE_INVALID"))?;
-    if let Some((retry_class, next_retry_at_ms)) = writer_service
+    let gate = writer_service
         .capture_startup_gate()
-        .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?
-    {
-        let now_ms =
-            u64::try_from(now).map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?;
-        if retry_class != "transient" && retry_class != "rearmed" {
-            return Err(CaptureFailure::at(
-                "failure_policy",
-                "M2_EXPLICIT_REARM_REQUIRED",
-            ));
-        }
-        if next_retry_at_ms.is_some_and(|deadline| deadline > now_ms) {
-            return Err(CaptureFailure::at("failure_policy", "M2_RETRY_NOT_DUE"));
-        }
-    }
+        .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
+    let now_ms = u64::try_from(now).map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?;
+    enforce_capture_startup_gate(gate, now_ms)?;
     let mut runtime = CaptureRuntime::new(
         writer_service,
         factory,
@@ -2474,6 +2466,46 @@ pub mod tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::Duration;
     static NEXT: AtomicU64 = AtomicU64::new(1);
+
+    #[test]
+    fn startup_gate_requires_a_valid_persisted_rearm_before_ownership() {
+        let connection = rusqlite::Connection::open_in_memory().unwrap();
+        connection.execute_batch("CREATE TABLE processing_failures(component TEXT,armed INTEGER,retry_class TEXT,next_retry_at TEXT,last_failed_at TEXT);").unwrap();
+        let load = || crate::m2_journal::capture_startup_gate(&connection);
+        assert_eq!(load().unwrap(), None);
+        connection.execute("INSERT INTO processing_failures VALUES('capture',1,'deterministic',NULL,'unix-ms:10')",[]).unwrap();
+        assert_eq!(
+            enforce_capture_startup_gate(load().unwrap(), 20)
+                .unwrap_err()
+                .code,
+            "M2_EXPLICIT_REARM_REQUIRED"
+        );
+        connection
+            .execute(
+                "UPDATE processing_failures SET last_failed_at='unix-ms:10;rearm-token=invalid'",
+                [],
+            )
+            .unwrap();
+        assert!(load().is_err());
+        let valid_token = format!("sha256:{}", "a".repeat(64));
+        connection
+            .execute(
+                "UPDATE processing_failures SET last_failed_at=?1",
+                [format!("unix-ms:10;rearm-token={valid_token}")],
+            )
+            .unwrap();
+        assert_eq!(enforce_capture_startup_gate(load().unwrap(), 20), Ok(()));
+        connection.execute("UPDATE processing_failures SET retry_class='transient',next_retry_at='unix-ms:30',last_failed_at='unix-ms:10'",[]).unwrap();
+        assert_eq!(
+            enforce_capture_startup_gate(load().unwrap(), 20)
+                .unwrap_err()
+                .code,
+            "M2_RETRY_NOT_DUE"
+        );
+        assert_eq!(enforce_capture_startup_gate(load().unwrap(), 30), Ok(()));
+        connection.execute("INSERT INTO processing_failures VALUES('capture',1,'transient','unix-ms:30','unix-ms:10')",[]).unwrap();
+        assert!(load().is_err());
+    }
 
     #[test]
     fn production_control_contracts_require_exact_published_shapes() {

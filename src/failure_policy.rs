@@ -1113,7 +1113,7 @@ fn parse_timestamp(value: &str) -> rusqlite::Result<u64> {
         .ok_or(rusqlite::Error::InvalidQuery)
 }
 
-fn parse_rearm_token(value: &str) -> rusqlite::Result<Option<String>> {
+pub(crate) fn parse_rearm_token(value: &str) -> rusqlite::Result<Option<String>> {
     let Some((_, token)) = value.split_once(";rearm-token=") else {
         return Ok(None);
     };

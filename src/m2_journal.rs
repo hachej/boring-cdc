@@ -1086,33 +1086,51 @@ impl JournalWriterService {
         )
     }
     pub fn capture_startup_gate(&self) -> Result<Option<(String, Option<u64>)>, JournalError> {
-        let mut statement = self.store.writer.connection().prepare(
-            "SELECT CASE WHEN instr(last_failed_at,';rearm-' || char(116,111,107,101,110,61))>0 THEN 'rearmed' ELSE retry_class END,next_retry_at FROM processing_failures WHERE component='capture' AND armed=1",
-        )?;
-        let values = statement
-            .query_map([], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        if values.len() > 1 {
-            return Err(JournalError::Conflict("multiple armed capture failures"));
-        }
-        values
-            .into_iter()
-            .next()
-            .map(|(class, next)| {
-                let parsed = next
-                    .map(|value| {
-                        value
-                            .strip_prefix("unix-ms:")
-                            .and_then(|v| v.parse::<u64>().ok())
-                            .ok_or(JournalError::Conflict("invalid capture retry timestamp"))
-                    })
-                    .transpose()?;
-                Ok((class, parsed))
-            })
-            .transpose()
+        capture_startup_gate(self.store.writer.connection())
     }
+}
+
+pub(crate) fn capture_startup_gate(
+    connection: &rusqlite::Connection,
+) -> Result<Option<(String, Option<u64>)>, JournalError> {
+    let mut statement = connection.prepare(
+            "SELECT retry_class,next_retry_at,last_failed_at FROM processing_failures WHERE component='capture' AND armed=1",
+        )?;
+    let values = statement
+        .query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    if values.len() > 1 {
+        return Err(JournalError::Conflict("multiple armed capture failures"));
+    }
+    values
+        .into_iter()
+        .next()
+        .map(|(class, next, last_failed_at)| {
+            let class = if crate::failure_policy::parse_rearm_token(&last_failed_at)?.is_some() {
+                "rearmed".to_owned()
+            } else {
+                class
+            };
+            let parsed = next
+                .map(|value| {
+                    value
+                        .strip_prefix("unix-ms:")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .ok_or(JournalError::Conflict("invalid capture retry timestamp"))
+                })
+                .transpose()?;
+            Ok((class, parsed))
+        })
+        .transpose()
+}
+
+impl JournalWriterService {
     pub fn active_capture_retry_at_ms(&self) -> Result<Option<u64>, JournalError> {
         let mut statement = self.store.writer.connection().prepare(
             "SELECT next_retry_at FROM processing_failures WHERE component='capture' AND armed=1 AND retry_class='transient'",
