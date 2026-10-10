@@ -249,7 +249,7 @@
     "ordered_steps": [
       "persist immutable batch intent and exact complete-transaction journal range",
       "insert event_history_v1 with pinned settings and query_id=batch_id",
-      "drive Rust insert future/body to successful end-of-stream finalization",
+      "await Rust insert.end() for clickhouse 0.13.3 RowBinary-over-HTTP and complete response with no server error",
       "read back exact event count, unique IDs, ordered event digest and zero ID/hash conflicts",
       "insert batch_markers_v1 only after verification",
       "read back one identical marker and object fingerprint",
@@ -261,6 +261,7 @@
       "fsync_part_directory": 1,
       "insert_deduplicate": 0,
       "insert_quorum": 1,
+      "wait_end_of_query": 1,
       "wait_for_async_insert": 1
     }
   },
@@ -293,7 +294,7 @@
   },
   "owner_bead": "boring-cdc-m0-ch-model",
   "pins": {
-    "client_protocol": "native",
+    "client_protocol": "HTTP RowBinary",
     "image": "docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f",
     "image_platform_digest": "sha256:78b6f0863688458b229b597f6a1bbf891855a01cf59c3f3dbe66428571c518c9",
     "platform": "linux/amd64",

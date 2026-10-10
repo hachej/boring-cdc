@@ -77,6 +77,8 @@ def validate():
  paths=[C,S,F,FS,RS,DDL,Q,R,D,V]
  text='\n'.join(p.read_text(errors='replace') for p in paths)
  if c['objects']['materialized_views']!=[] or not c['objects']['materialized_view_policy'].startswith('none:'):add(out,'E_MATERIALIZED_VIEW','objects','materialized-view policy changed')
+ if c['pins']['client_protocol']!='HTTP RowBinary' or c['pins']['rust_client_crate']!='clickhouse 0.13.3':add(out,'E_CLIENT_TRANSPORT','pins','pinned crate requires HTTP RowBinary transport')
+ if c['insert_acceptance']['settings'].get('wait_end_of_query')!=1 or 'insert.end()' not in ' '.join(c['insert_acceptance']['ordered_steps']):add(out,'E_INSERT_FINALIZATION','insert_acceptance','HTTP insert must await complete response and end() before readback')
  if c['lookup_behavior']['external_dictionaries']!='forbidden for correctness and TOAST reconstruction' or c['lookup_behavior']['postgres_joins']!='forbidden':add(out,'E_LOOKUP','lookup_behavior','dictionary/source join would weaken reconstruction')
  provisional=[]
  if c.get('provisional_markers')!=provisional:add(out,'E_PROVISIONAL','provisional_markers','owner-card provisional inventory changed')
@@ -98,7 +100,7 @@ def validate():
  settings=c['insert_acceptance']['settings']
  for required in ('fsync_after_insert=1','fsync_part_directory=1'):
   if ddl.count(required)<3:add(out,'E_DDL_DURABILITY','files/ddl','all durable tables must pin '+required)
- if settings!={'async_insert':0,'wait_for_async_insert':1,'insert_quorum':1,'fsync_after_insert':1,'fsync_part_directory':1,'insert_deduplicate':0}:add(out,'E_DURABILITY_SETTINGS','insert_acceptance/settings','pinned settings changed')
+ if settings!={'async_insert':0,'wait_for_async_insert':1,'wait_end_of_query':1,'insert_quorum':1,'fsync_after_insert':1,'fsync_part_directory':1,'insert_deduplicate':0}:add(out,'E_DURABILITY_SETTINGS','insert_acceptance/settings','pinned settings changed')
  for obj in c['objects']['tables']+c['objects']['views']:
   if obj not in ddl:add(out,'E_DDL_OBJECT','files/ddl','missing '+obj)
  for forbidden in ('ReplacingMergeTree','CollapsingMergeTree','VersionedCollapsingMergeTree',' TTL '):
@@ -139,6 +141,7 @@ def validate():
   except (KeyError,IndexError,TypeError,ValueError) as e:add(out,'E_EXECUTABLE_FIXTURE',f'cases/{i}/execution/fault/arguments','fault setup_pointer is not executable: '+str(e))
   if x['action']['fault_hook']=='mutate_payload_keep_ids_hash_marker' and fault.get('preserve')!=['connector_event_id','payload_hash','batch_marker']:add(out,'E_PAYLOAD_CORRUPTION_FIXTURE',f'cases/{i}','payload-only corruption does not preserve required identity')
   setup=execution.get('setup',{}); hook=x['action']['fault_hook']
+  if hook=='after_insert_before_marker' and fault.get('arguments',{}).get('value')!={'client':'clickhouse 0.13.3','protocol':'HTTP RowBinary','history_insert_finalization':'insert.end().await succeeded with complete response and no server error','crash_boundary':'after acknowledged history insert, before marker insert'}:add(out,'E_ACK_CRASH_FIXTURE',f'cases/{i}/execution/fault/arguments/value','crash fixture must identify the acknowledged HTTP insert boundary')
   required_setup={'history_events','selector_rows','batch_markers','selected_table_ids','candidate_table_ids','audit','quota','retirement','retry','sqlite'}
   required_history={'capture_epoch','generation','logical_table_id','journal_seq','batch_id','before_key','cells','hash','id','key','key_hash','mutation_kind','op','relation_schema_fingerprint','version'}
   for j,event in enumerate(setup.get('history_events',[])):

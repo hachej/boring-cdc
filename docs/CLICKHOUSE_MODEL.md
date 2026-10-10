@@ -18,9 +18,9 @@ Normal queries use the canonical view/query without `FINAL`. Correctness is inva
 
 ## Durable batch acceptance and recovery
 
-For an exact complete-transaction journal range, the worker persists an immutable SQLite intent, inserts history with synchronous settings, drives the Rust insert body/future through successful end-of-stream finalization, and reads back exact count, identity/payload digest, and zero conflicts. Only then does it insert and read back an identical batch marker and atomically advance the ClickHouse checkpoint/finalized intent in SQLite. No marker replays the same intent; a valid marker is adopted; conflicting history/marker blocks. Checkpoints never skip a failed transaction.
+For an exact complete-transaction journal range, the worker persists an immutable SQLite intent and inserts history with `clickhouse 0.13.3` using RowBinary over HTTP. It awaits `insert.end().await` and the complete HTTP response with no server error, then reads back exact count, identity/payload digest, and zero conflicts. An HTTP status alone is not an acknowledgement. Only then does it insert and read back an identical batch marker and atomically advance the ClickHouse checkpoint/finalized intent in SQLite. No marker replays the same intent; a valid marker is adopted; conflicting history/marker blocks. Checkpoints never skip a failed transaction. M4 must kill and restart ClickHouse after acknowledgement and prove the marker and events survive before trusting a checkpoint.
 
-The fixed settings are `async_insert=0`, `wait_for_async_insert=1`, `insert_quorum=1`, `fsync_after_insert=1`, `fsync_part_directory=1`, and `insert_deduplicate=0`. They and every correctness-bearing object/query form the object fingerprint. Drift blocks only ClickHouse.
+The fixed settings are `async_insert=0`, `wait_for_async_insert=1`, `wait_end_of_query=1`, `insert_quorum=1`, `fsync_after_insert=1`, `fsync_part_directory=1`, and `insert_deduplicate=0`. They and every correctness-bearing object/query form the object fingerprint. Drift blocks only ClickHouse.
 
 ## Promotion and schema evolution
 

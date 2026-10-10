@@ -17,7 +17,7 @@ import json, subprocess, sys
 from pathlib import Path
 root=Path.cwd(); tmp=Path(sys.argv[1])
 required={
- 'core.log':('Ran 14 tests','OK'),
+ 'core.log':('Ran 16 tests','OK'),
  'context.log':('context unit corpus: 17 passed','plan-coverage/v1'),
  'knowledge.log':('tests=12',),
 }

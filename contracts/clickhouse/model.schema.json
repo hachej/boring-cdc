@@ -519,6 +519,9 @@
             "insert_quorum": {
               "type": "integer"
             },
+            "wait_end_of_query": {
+              "const": 1
+            },
             "wait_for_async_insert": {
               "type": "integer"
             }
@@ -529,7 +532,8 @@
             "fsync_part_directory",
             "insert_deduplicate",
             "insert_quorum",
-            "wait_for_async_insert"
+            "wait_for_async_insert",
+            "wait_end_of_query"
           ],
           "type": "object"
         }
@@ -632,7 +636,7 @@
       "additionalProperties": false,
       "properties": {
         "client_protocol": {
-          "type": "string"
+          "const": "HTTP RowBinary"
         },
         "image": {
           "type": "string"
@@ -644,7 +648,7 @@
           "type": "string"
         },
         "rust_client_crate": {
-          "type": "string"
+          "const": "clickhouse 0.13.3"
         },
         "server": {
           "type": "string"

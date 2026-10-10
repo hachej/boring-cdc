@@ -4304,7 +4304,13 @@
       "execution": {
         "fault": {
           "arguments": {
-            "setup_pointer": "/execution/setup/history_events"
+            "setup_pointer": "/execution/setup/history_events",
+            "value": {
+              "client": "clickhouse 0.13.3",
+              "crash_boundary": "after acknowledged history insert, before marker insert",
+              "history_insert_finalization": "insert.end().await succeeded with complete response and no server error",
+              "protocol": "HTTP RowBinary"
+            }
           },
           "operation": "after_insert_before_marker",
           "preserve": [],
