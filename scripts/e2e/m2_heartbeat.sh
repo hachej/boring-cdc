@@ -30,7 +30,7 @@ SQL
 psql "$admin" -v ON_ERROR_STOP=1 <<SQL >/dev/null
 ALTER ROLE boring_cdc_control_writer PASSWORD '$PGPASSWORD';
 SQL
-control="postgresql://boring_cdc_control_writer:${PGPASSWORD}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
+control="postgresql://boring_cdc_control_writer@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 first=$(M2_HEARTBEAT_DSN="$control" cargo run --quiet --locked --example m2_heartbeat_component -- 1)
 second=$(M2_HEARTBEAT_DSN="$control" cargo run --quiet --locked --example m2_heartbeat_component -- 2)
 [[ "$first" == '{"affected_rows":1,"selected_keys":1,"runtime_rust_writer":true}' && "$second" == "$first" ]]
