@@ -787,6 +787,21 @@ pub mod tests {
         let _ = std::fs::remove_dir_all(root);
     }
     #[test]
+    fn executing_plan_resumes_with_exact_token_after_issue_expiry() {
+        let root =
+            std::env::temp_dir().join(format!("m2-init-expired-executing-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        let store = root.join("state.sqlite");
+        let (digest, token) = issue_plan(&store, "config", 0).unwrap();
+        let executing = consume_plan(&store, "config", &token, 1).unwrap();
+        drop(executing); // process died after recording the nonterminal intent
+        let resumed = consume_plan(&store, "config", &token, 300_001).unwrap();
+        assert_eq!(resumed.plan_digest, digest);
+        complete_plan(resumed, &store).unwrap();
+        let _ = std::fs::remove_dir_all(root);
+    }
+    #[test]
     fn fresh_schema_accepts_init_identity_without_slot_intent() {
         let root = std::env::temp_dir().join(format!("m2-init-schema-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&root);
