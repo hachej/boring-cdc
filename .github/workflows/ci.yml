@@ -46,6 +46,11 @@ jobs:
         env:
           TMPDIR: /var/tmp
         run: scripts/acceptance/durable_simple_case.sh
+      - name: M2 init and runtime source lock
+        timeout-minutes: 10
+        env:
+          TMPDIR: /var/tmp
+        run: scripts/e2e/m2_init_recovery.sh
       - name: Live schema-change boundary
         timeout-minutes: 5
         env:
