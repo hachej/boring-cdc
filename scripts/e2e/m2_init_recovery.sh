@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
-work=$(mktemp -d /var/tmp/m2-init-e2e.XXXXXX); project="m2-init-$RANDOM-$$"; port=$((58000 + $$ % 1000))
-cleanup(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
+work=$(mktemp -d /var/tmp/m2-init-e2e.XXXXXX); project="m2-init-$RANDOM-$$"; port=$((58000 + $$ % 1000)); bootstrap_pid=; runtime_pid=
+cleanup(){
+  for child in "$runtime_pid" "$bootstrap_pid"; do
+    if [[ -n "$child" ]]; then kill -INT "$child" 2>/dev/null || true; wait "$child" 2>/dev/null || true; fi
+  done
+  docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true
+  rm -rf "$work"
+}; trap cleanup EXIT INT TERM
 printf 'm2-init-password-%s\n' "$project" >"$work/postgres_password"; chmod 600 "$work/postgres_password"; export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"; export PGPASSWORD; PGPASSWORD=$(cat "$BORING_CDC_POSTGRES_PASSWORD_FILE")
 cat >"$work/override.yml" <<YAML
 services:
@@ -110,7 +116,31 @@ for _ in $(seq 1 100); do
   sleep 0.1
 done
 [[ "$slot_ready" == true ]]; sleep 1; kill -INT "$bootstrap_pid"; wait "$bootstrap_pid"
-(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE timeout --preserve-status --signal=INT 5 "$binary" run)
+bootstrap_pid=
+(cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/runtime.out" 2>"$work/runtime.err") & runtime_pid=$!
+runtime_lock=false
+for _ in $(seq 1 100); do
+  if [[ "$(psqlc -Atqc "SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid WHERE l.locktype='advisory' AND l.granted AND a.usename='boring_cdc_runtime'")" == 1 ]]; then runtime_lock=true; break; fi
+  kill -0 "$runtime_pid" 2>/dev/null || { wait "$runtime_pid"; exit 1; }
+  sleep 0.1
+done
+[[ "$runtime_lock" == true ]] || { echo E_INIT_RUNTIME_LOCK_NOT_OBSERVED >&2; exit 1; }
 
-echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 empty_database=true documented_sql=true init_bootstrap_run=true idempotent=true replay=blocked relation_set=diagnosed owner=diagnosed publish_flags=diagnosed privilege=diagnosed membership=diagnosed exact_fence_lengths=true validated_fence_lengths=true slot=pgoutput'
+# A separate local state avoids the local file lock; only the source advisory key can reject it.
+mkdir -p "$work/peer/state/spool" "$work/peer/state/tmp" "$work/peer/archive/root"
+chmod 700 "$work/peer/state" "$work/peer/state/spool" "$work/peer/archive" "$work/peer/archive/root"
+cp tests/fixtures/m1_config/representative.toml "$work/peer/boring-cdc.toml"
+export PG_ADMIN="$admin_dsn" CH_MAINT='https://unused.invalid'
+(cd "$work/peer"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PG_ADMIN -u CH_MAINT "$binary" init --dry-run --json) >"$work/peer-dry.json"
+peer_token=$(confirm_token "$work/peer-dry.json")
+if (cd "$work/peer"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" init --confirm --confirm-token "$peer_token" --json) >"$work/peer.out" 2>"$work/peer.err"; then
+  echo E_INIT_RUNTIME_SOURCE_LOCK_NOT_SHARED >&2; exit 1
+fi
+grep -q M2_INIT_OWNERSHIP_CONFLICT "$work/peer.err"
+! grep -q 'postgresql://' "$work/peer.err"
+[[ "$(psqlc -Atqc "SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid=l.pid WHERE l.locktype='advisory' AND l.granted AND a.usename='boring_cdc_runtime'")" == 1 ]]
+kill -INT "$runtime_pid"; wait "$runtime_pid"; runtime_pid=
+unset PG_ADMIN CH_MAINT
+
+echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 empty_database=true documented_sql=true init_bootstrap_run=true idempotent=true replay=blocked relation_set=diagnosed owner=diagnosed publish_flags=diagnosed privilege=diagnosed membership=diagnosed exact_fence_lengths=true validated_fence_lengths=true slot=pgoutput runtime_init_source_lock=shared'
 
