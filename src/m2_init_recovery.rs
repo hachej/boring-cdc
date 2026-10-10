@@ -472,6 +472,13 @@ pub fn execute_confirmed(
     } else {
         ""
     };
+    let initial_grants = if seed_controls {
+        format!(
+            "GRANT USAGE ON SCHEMA boring_cdc_control TO {CONTROL_ROLE};\nGRANT SELECT(id),UPDATE(nonce,updated_at) ON boring_cdc_control.heartbeat TO {CONTROL_ROLE};\nGRANT SELECT(id),UPDATE(capture_epoch,generation,table_set_fingerprint,unique_nonce) ON boring_cdc_control.capture_fences TO {CONTROL_ROLE};"
+        )
+    } else {
+        String::new()
+    };
     let setup = format!(
         r#"BEGIN;
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='{ADMIN_ROLE}') THEN CREATE ROLE {ADMIN_ROLE} NOLOGIN; END IF; IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='{CONTROL_ROLE}') THEN CREATE ROLE {CONTROL_ROLE} LOGIN; END IF; END $$;
@@ -479,9 +486,7 @@ CREATE SCHEMA IF NOT EXISTS boring_cdc_control AUTHORIZATION {ADMIN_ROLE};
 CREATE TABLE IF NOT EXISTS boring_cdc_control.heartbeat(id smallint PRIMARY KEY CHECK(id=1),nonce bigint NOT NULL,updated_at timestamptz NOT NULL);
 CREATE TABLE IF NOT EXISTS boring_cdc_control.capture_fences(id smallint PRIMARY KEY CHECK(id=1),capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint bytea NOT NULL CHECK(octet_length(table_set_fingerprint)=32),unique_nonce bytea NOT NULL CHECK(octet_length(unique_nonce)=16));
 {seed_rows}
-GRANT USAGE ON SCHEMA boring_cdc_control TO {CONTROL_ROLE};
-GRANT SELECT(id),UPDATE(nonce,updated_at) ON boring_cdc_control.heartbeat TO {CONTROL_ROLE};
-GRANT SELECT(id),UPDATE(capture_epoch,generation,table_set_fingerprint,unique_nonce) ON boring_cdc_control.capture_fences TO {CONTROL_ROLE};
+{initial_grants}
 {} COMMIT;"#,
         if publication_exists {
             String::new()
