@@ -67,7 +67,7 @@ reset_source() {
   mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"
   chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
   cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
-  if [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} ]]; then
+  if [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} || -n ${M2_SCHEMA_UNMATCHED_EOF_OUT:-} ]]; then
     sed -i 's/heartbeat_cadence_ms = 5000/heartbeat_cadence_ms = 300000/' "$work/run/boring-cdc.toml"
   fi
   psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_credential" -v "control_password=$control_credential" -v "application_password=$application_credential" \
@@ -103,7 +103,7 @@ start_runtime() {
     kill -0 "$runtime_pid" 2>/dev/null || { wait "$runtime_pid"; exit 1; }
     sleep .1
   done
-  if [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} ]]; then
+  if [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} || -n ${M2_SCHEMA_UNMATCHED_EOF_OUT:-} ]]; then
     replication_pid=$(psqlc -Atqc 'SELECT pid FROM pg_stat_replication ORDER BY pid')
     advisory_pid=$(psqlc -Atqc "SELECT pid FROM pg_locks WHERE locktype='advisory' AND granted AND pid <> pg_backend_pid() ORDER BY pid")
     [[ "$replication_pid" =~ ^[0-9]+$ && "$advisory_pid" =~ ^[0-9]+$ && "$replication_pid" != "$advisory_pid" ]] ||
@@ -172,7 +172,7 @@ PY
 }
 verify_stable_stop() {
   local scenario=$1 key=$2 value=$3 extra=${4:-} before after confirmed state target_lsn sent_lsn deadline
-  [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} ]] || return 0
+  [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} || -n ${M2_SCHEMA_UNMATCHED_EOF_OUT:-} ]] || return 0
   before=$(python3 - "$journal" <<'PY'
 import json,sqlite3,sys
 connection=sqlite3.connect(sys.argv[1])
@@ -263,8 +263,65 @@ run_incompatible() {
   verify_stable_stop incompatible 203 "'later-value'"
 }
 
-run_nullable
+if [[ -z ${M2_SCHEMA_UNMATCHED_EOF_OUT:-} ]]; then
+  run_nullable
+fi
 run_incompatible
+if [[ -n ${M2_SCHEMA_UNMATCHED_EOF_OUT:-} ]]; then
+  artifact=$M2_SCHEMA_UNMATCHED_EOF_OUT
+  [[ ! -e "$artifact" ]] || { echo 'E_SCHEMA_EOF_ARTIFACT_EXISTS' >&2; exit 1; }
+  [[ "$(psqlc -Atqc "SELECT pg_terminate_backend($replication_pid)::int")" == 1 ]] ||
+    { echo 'E_SCHEMA_EOF_TERMINATE_FAILED' >&2; exit 1; }
+  deadline=$((SECONDS+15))
+  reopened=0
+  while true; do
+    state=$(ps -o stat= -p "$runtime_pid" 2>/dev/null || true)
+    [[ -z "$state" || "$state" == Z* ]] && break
+    current_replication=$(psqlc -Atqc 'SELECT pid FROM pg_stat_replication ORDER BY pid')
+    [[ -z "$current_replication" || "$current_replication" == "$replication_pid" ]] || reopened=1
+    current_advisory=$(psqlc -Atqc "SELECT pid FROM pg_locks WHERE locktype='advisory' AND granted AND pid <> pg_backend_pid() ORDER BY pid")
+    [[ -z "$current_advisory" || "$current_advisory" == "$advisory_pid" ]] || reopened=1
+    (( SECONDS < deadline )) || { echo 'E_SCHEMA_EOF_EXIT_TIMEOUT' >&2; exit 1; }
+    sleep .05
+  done
+  child=$runtime_pid; set +e; wait "$runtime_pid"; rc=$?; set -e; runtime_pid=
+  [[ $rc -ne 0 && $reopened -eq 0 ]] || { echo 'E_SCHEMA_EOF_REOPEN_OR_SUCCESS' >&2; exit 1; }
+  grep -q 'M2_COPYBOTH_UNEXPECTED_LOSS' "$work/incompatible-runtime.err" ||
+    { echo 'E_SCHEMA_EOF_FAILURE_CODE' >&2; exit 1; }
+  [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='boring_slot'")" == 0 ]] ||
+    { echo 'E_SCHEMA_EOF_SLOT_ACTIVE' >&2; exit 1; }
+  [[ "$(psqlc -Atqc 'SELECT count(*) FROM pg_stat_replication')" == 0 ]] ||
+    { echo 'E_SCHEMA_EOF_REPLICATION_ACTIVE' >&2; exit 1; }
+  [[ "$(psqlc -Atqc "SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND granted")" == 0 ]] ||
+    { echo 'E_SCHEMA_EOF_ADVISORY_ACTIVE' >&2; exit 1; }
+  confirmed_after_eof=$(psqlc -Atqc "SELECT coalesce(confirmed_flush_lsn::text,'0/0') FROM pg_replication_slots WHERE slot_name='boring_slot'")
+  mkdir -p "$artifact"
+  python3 - "$journal" "$work/incompatible-safe-stop.json" "$artifact/observation.json" "$version" "$rc" "$confirmed_after_eof" <<'PY'
+import json,sqlite3,sys
+before=json.load(open(sys.argv[2]))
+connection=sqlite3.connect(sys.argv[1])
+count=connection.execute('SELECT count(*) FROM source_transactions').fetchone()[0]
+durable=connection.execute('SELECT durable_transaction_end_lsn FROM source_state WHERE singleton=1').fetchone()[0]
+failure=connection.execute("SELECT failure_class,retry_class,armed FROM processing_failures WHERE component='capture' AND armed=1").fetchall()
+assert count==before['durable_transaction_count']==1 and durable==before['durable_lsn']
+assert failure==[('unsupported','deterministic',1)],failure
+high,low=sys.argv[6].split('/')
+assert ((int(high,16)<<32)|int(low,16)) <= int(durable,16)
+with open(sys.argv[3],'w') as output:
+    json.dump({'schema_version':'m2-schema-unmatched-eof-observation/v1',
+      'postgres_version':sys.argv[4],'runtime_exit_code':int(sys.argv[5]),
+      'prior_durable_lsn':durable,'slot_confirmed_after_eof':sys.argv[6],
+      'durable_transaction_count_after_eof':count,
+      'original_replication_pid':before['replication_pid'],
+      'original_advisory_pid':before['advisory_pid'],
+      'active_failure_class':failure[0][0],'active_retry_class':failure[0][1],
+      'active_failure_count':len(failure),'replication_reopened':False,
+      'advisory_reacquired':False,'replication_slot_active_after_exit':False},output,sort_keys=True)
+    output.write('\n')
+PY
+  echo "M2_SCHEMA_UNMATCHED_EOF_FENCED_OK postgres=$version"
+  exit 0
+fi
 if [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} ]]; then
   [[ ! -e "$M2_SCHEMA_SAFE_STOP_OUT" ]] || { echo 'E_SCHEMA_STOP_ARTIFACT_EXISTS' >&2; exit 1; }
   mkdir -p "$M2_SCHEMA_SAFE_STOP_OUT"
