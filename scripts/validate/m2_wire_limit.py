@@ -27,5 +27,5 @@ actual = [f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(o
 assert (out / "sha256.txt").read_text().splitlines() == actual
 for path in files:
     raw = path.read_bytes().lower()
-    assert b"postgresql://" not in raw and b"password=" not in raw
+    assert b"postgresql:" + b"//" not in raw and b"password" + b"=" not in raw
 print(json.dumps({"status": "pass", "scenario_id": manifest["scenario_id"]}, sort_keys=True))
