@@ -24,10 +24,15 @@ jobs:
           cargo test --locked m2_capture_runtime::tests::persisted_retry_schedule_gates_successor_startup
           packet="$PWD/artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-PERSISTED-RETRY/current-head"
           for attempt in 1 2; do
-            M2_SQLITE_CONTENTION_PROOF=1 M2_SQLITE_CONTENTION_OUT="$packet/attempt-$attempt" \
+            if ! M2_SQLITE_CONTENTION_PROOF=1 M2_SQLITE_CONTENTION_OUT="$packet/attempt-$attempt" \
               scripts/e2e/m2_capture_runtime.sh \
               >>"$RUNNER_TEMP/m2-sqlite-contention.stdout" \
-              2>>"$RUNNER_TEMP/m2-sqlite-contention.stderr"
+              2>>"$RUNNER_TEMP/m2-sqlite-contention.stderr"; then
+              grep -E 'M2_SQLITE_CONTENTION_PHASE=' "$RUNNER_TEMP/m2-sqlite-contention.stdout" | tail -n 8 || true
+              grep -Eo 'E_[A-Z0-9_]+|M2_[A-Z0-9_]+' "$RUNNER_TEMP/m2-sqlite-contention.stderr" | tail -n 12 || true
+              grep -E 'AssertionError|Traceback' "$RUNNER_TEMP/m2-sqlite-contention.stderr" | tail -n 4 || true
+              exit 1
+            fi
           done
           python3 scripts/lib/m2_sqlite_contention_evidence.py "$packet" \
             "$RUNNER_TEMP/m2-sqlite-contention.stdout" "$RUNNER_TEMP/m2-sqlite-contention.stderr"

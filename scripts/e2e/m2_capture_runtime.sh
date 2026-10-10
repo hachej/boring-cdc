@@ -248,6 +248,7 @@ if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback && -n ${M2_FEEDBACK_RECEIP
   done
 fi
 if [[ ${M2_SQLITE_CONTENTION_PROOF:-0} == 1 ]]; then
+  printf 'M2_SQLITE_CONTENTION_PHASE=baseline_durable\n'
   artifact=${M2_SQLITE_CONTENTION_OUT:?set M2_SQLITE_CONTENTION_OUT for the live SQLite contention proof}
   [[ ! -e "$artifact" ]] || { echo 'E_SQLITE_CONTENTION_ARTIFACT_EXISTS' >&2; exit 1; }
   replication_pid=$(psqlc -Atqc 'SELECT pid FROM pg_stat_replication ORDER BY pid')
@@ -261,7 +262,9 @@ time.sleep(7)
 connection.commit()
 PY2
   deadline=$((SECONDS+10)); until [[ -e "$work/sqlite-contention-locked" ]]; do (( SECONDS < deadline )) || { echo 'E_SQLITE_CONTENTION_LOCK_TIMEOUT' >&2; exit 1; }; sleep .02; done
+  printf 'M2_SQLITE_CONTENTION_PHASE=writer_locked\n'
   psqlc -c 'INSERT INTO orders(id) VALUES(2)' >/dev/null
+  printf 'M2_SQLITE_CONTENTION_PHASE=second_source_committed\n'
   blocked_count=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
 import sqlite3,sys
 print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
@@ -277,6 +280,7 @@ def lsn(value):
 assert lsn(sys.argv[1])<=lsn(sys.argv[2])<=lsn(sys.argv[3])
 PY2
   wait "$contention_pid"; contention_pid=
+  printf 'M2_SQLITE_CONTENTION_PHASE=writer_released\n'
   deadline=$((SECONDS+15))
   while true; do
     state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
@@ -285,6 +289,7 @@ PY2
     sleep .05
   done
   child=$pid; set +e; wait "$pid"; rc=$?; set -e; pid=
+  printf 'M2_SQLITE_CONTENTION_PHASE=original_exited\n'
   [[ $rc -ne 0 ]] || { echo 'E_SQLITE_CONTENTION_EXIT' >&2; exit 1; }
   grep -q 'M2_CAPTURE_FAILED' "$work/runtime.err" || { cat "$work/runtime.err" >&2; exit 1; }
   [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='runtime_slot'")" == 0 ]]
@@ -309,6 +314,7 @@ import sqlite3,sys
 print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
 PY2
 )" == 1 ]]
+  printf 'M2_SQLITE_CONTENTION_PHASE=retry_persisted\n'
   retry_at=${failure##*,unix-ms:}
   wait_ms=$(python3 - "$retry_at" <<'PY2'
 import sys,time
@@ -321,6 +327,7 @@ print(int(sys.argv[1])/1000)
 PY2
 )"
   (cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/successor.out" 2>"$work/successor.err") & pid=$!
+  printf 'M2_SQLITE_CONTENTION_PHASE=successor_started\n'
   deadline=$((SECONDS+30))
   while true; do
     successor_count=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
@@ -351,6 +358,7 @@ PY2
     sleep .05
   done
   stop_bounded "$pid" TERM sqlite-contention-successor; pid=
+  printf 'M2_SQLITE_CONTENTION_PHASE=successor_converged\n'
   mkdir -p "$artifact"
   python3 - "$artifact" "$version" "$durable_lsn" "$feedback" "$replication_pid" "$rc" "$failure" "$pre_confirmed" "$blocked_confirmed" "$post_confirmed" "$successor_lsn" "$successor_feedback" <<'PY2'
 import json,pathlib,sys
