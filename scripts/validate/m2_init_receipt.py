@@ -91,15 +91,24 @@ def validate(receipt: dict, root: Path = ROOT) -> list[str]:
     return findings
 
 
+def comparable_observation(receipt: dict) -> dict:
+    """Compare boundary outcomes, excluding per-run postcondition digests."""
+    observation = json.loads(json.dumps(receipt))
+    for key in ("first_init", "idempotent_init", "post_fault_init"):
+        observation[key].pop("postcondition_evidence_digest")
+    return observation
+
+
 def main() -> int:
-    if len(sys.argv) != 2:
-        print("usage: scripts/validate/m2_init_receipt.py RECEIPT", file=sys.stderr)
+    if len(sys.argv) not in (2, 3):
+        print("usage: scripts/validate/m2_init_receipt.py RECEIPT [RERUN_RECEIPT]", file=sys.stderr)
         return 2
-    path = Path(sys.argv[1])
     try:
-        receipt = json.loads(path.read_text())
-        findings = validate(receipt)
-    except (OSError, ValueError) as exc:
+        receipts = [json.loads(Path(name).read_text()) for name in sys.argv[1:]]
+        findings = [item for receipt in receipts for item in validate(receipt)]
+        if len(receipts) == 2 and not findings and comparable_observation(receipts[0]) != comparable_observation(receipts[1]):
+            findings.append("E_RERUN_DIVERGENCE")
+    except (OSError, ValueError, KeyError, TypeError) as exc:
         findings = ["E_RECEIPT: " + str(exc)]
     print(json.dumps({"validator": "m2-init-receipt/v1", "status": "pass" if not findings else "fail", "findings": findings}, sort_keys=True))
     return bool(findings)

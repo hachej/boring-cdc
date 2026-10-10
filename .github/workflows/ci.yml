@@ -51,21 +51,25 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: git worktree add --detach "$RUNNER_TEMP/m2-init-head" "$HEAD_SHA"
       - name: M2 init and runtime source lock
-        timeout-minutes: 10
+        timeout-minutes: 20
         working-directory: ${{ runner.temp }}/m2-init-head
         env:
           TMPDIR: /var/tmp
           CARGO_TARGET_DIR: ${{ github.workspace }}/target
-          M2_INIT_RECEIPT_DIR: ${{ runner.temp }}/m2-init-receipt
         run: |
-          scripts/e2e/m2_init_recovery.sh
+          for attempt in 1 2; do
+            M2_INIT_RECEIPT_DIR="$RUNNER_TEMP/m2-init-receipt/attempt-$attempt" scripts/e2e/m2_init_recovery.sh
+            python3 scripts/validate/m2_init_receipt.py "$RUNNER_TEMP/m2-init-receipt/attempt-$attempt/receipt.json"
+          done
           scripts/faults/m2_init_recovery.sh
-          python3 scripts/validate/m2_init_receipt.py "$M2_INIT_RECEIPT_DIR/receipt.json"
+          python3 scripts/validate/m2_init_receipt.py \
+            "$RUNNER_TEMP/m2-init-receipt/attempt-1/receipt.json" \
+            "$RUNNER_TEMP/m2-init-receipt/attempt-2/receipt.json"
       - name: Retain M2 init live receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: m2-init-receipt
-          path: ${{ runner.temp }}/m2-init-receipt/receipt.json
+          path: ${{ runner.temp }}/m2-init-receipt/attempt-*/receipt.json
           if-no-files-found: error
       - name: Prepare exact M2 heartbeat evidence input
         env:
