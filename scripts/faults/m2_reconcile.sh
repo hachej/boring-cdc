@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
+cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/tmp}"
 # The e2e scenario includes an injected SQLite source-receipt abort after migrations and proves
 # retry from durable table state against PostgreSQL 17.6.
 scripts/e2e/m2_reconcile.sh

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp
-work=$(mktemp -d /var/tmp/m2-reconcile-e2e.XXXXXX); project="m2-reconcile-$RANDOM-$$"; port=$((57000 + $$ % 1000))
+cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/tmp}"
+work=$(mktemp -d "${TMPDIR%/}/m2-reconcile-e2e.XXXXXX"); project="m2-reconcile-$RANDOM-$$"; port=$((57000 + $$ % 1000))
 cleanup(){ if [[ "${KEEP:-0}" == 1 ]]; then return; fi; docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
 printf 'm2-reconcile-admin-%s\n' "$project" >"$work/postgres_password"; chmod 600 "$work/postgres_password"; export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"; export PGPASSWORD; PGPASSWORD=$(cat "$BORING_CDC_POSTGRES_PASSWORD_FILE")
 cat >"$work/override.yml" <<YAML
@@ -23,12 +23,13 @@ GRANT SELECT ON orders TO cdc_runtime;
 SQL
 [[ "$(psqlc -Atqc 'show server_version')" == 17.6* ]]
 cargo build --quiet --locked --bin boring-cdc
+binary="$(realpath "${CARGO_TARGET_DIR:-target}/debug/boring-cdc")"
 mkdir -p "$work/run/state/spool"; chmod 700 "$work/run/state" "$work/run/state/spool"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 sed -i 's/publication = "boring_publication"/publication = "article1_publication"/; s/slot = "boring_slot"/slot = "article1_slot"/' "$work/run/boring-cdc.toml"
 runtime_dsn="postgresql://cdc_runtime@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 admin_dsn="postgresql://boring_cdc@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_RUNTIME="$runtime_dsn" PG_CONTROL="$admin_dsn" PG_ADMIN="$admin_dsn" CH_RUNTIME='https://unused.invalid' CH_MAINT='https://unused.invalid'
-run_connector(){ (cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run); }
+run_connector(){ (cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run); }
 # A pre-existing slot beside a fresh durable journal is never silently adopted.
 if run_connector >"$work/fresh.out" 2>"$work/fresh.err"; then echo E_FRESH_SLOT_ADMITTED >&2; exit 1; fi
 grep -q M2_STARTUP_BLOCKED "$work/fresh.err" || { cat "$work/fresh.err" >&2; exit 1; }
@@ -63,7 +64,7 @@ PY
   exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE \
     M2_RECONCILE_FAULT_BEFORE_SOURCE_RECEIPT_MARKER="$work/before-source-receipt" \
     M2_RECONCILE_FAULT_BEFORE_SOURCE_RECEIPT_RELEASE="$work/release-source-receipt" \
-    "$OLDPWD/target/debug/boring-cdc" run >"$work/crash.out" 2>"$work/crash.err"
+    "$binary" run >"$work/crash.out" 2>"$work/crash.err"
 ) & crash_pid=$!
 deadline=$((SECONDS+10)); until [[ -e "$work/before-source-receipt" ]]; do
   (( SECONDS < deadline )) || { echo E_CRASH_BOUNDARY_NOT_REACHED >&2; exit 1; }
@@ -117,10 +118,10 @@ import sqlite3,sys
 c=sqlite3.connect(sys.argv[1]); assert c.execute('select reason_code from startup_reconciliations order by reconciliation_id desc limit 1').fetchone()[0]=='SLOT_INVALID_WAL_REMOVED'
 PY
 # Exercise the live read-only CLI in JSON and text modes against the component journal.
-(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PGPASSWORD -u PG_RUNTIME -u PG_CONTROL -u PG_ADMIN -u CH_RUNTIME -u CH_MAINT "$OLDPWD/target/debug/boring-cdc" journal verify --json) >"$work/journal.json"
-(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PGPASSWORD -u PG_RUNTIME -u PG_CONTROL -u PG_ADMIN -u CH_RUNTIME -u CH_MAINT "$OLDPWD/target/debug/boring-cdc" journal verify) >"$work/journal.txt"
-(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PGPASSWORD -u PG_RUNTIME -u PG_CONTROL -u PG_ADMIN -u CH_RUNTIME -u CH_MAINT "$OLDPWD/target/debug/boring-cdc" recover inspect --json) >"$work/recover.json"
-(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PGPASSWORD -u PG_RUNTIME -u PG_CONTROL -u PG_ADMIN -u CH_RUNTIME -u CH_MAINT "$OLDPWD/target/debug/boring-cdc" recover inspect) >"$work/recover.txt"
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PGPASSWORD -u PG_RUNTIME -u PG_CONTROL -u PG_ADMIN -u CH_RUNTIME -u CH_MAINT "$binary" journal verify --json) >"$work/journal.json"
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PGPASSWORD -u PG_RUNTIME -u PG_CONTROL -u PG_ADMIN -u CH_RUNTIME -u CH_MAINT "$binary" journal verify) >"$work/journal.txt"
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PGPASSWORD -u PG_RUNTIME -u PG_CONTROL -u PG_ADMIN -u CH_RUNTIME -u CH_MAINT "$binary" recover inspect --json) >"$work/recover.json"
+(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PGPASSWORD -u PG_RUNTIME -u PG_CONTROL -u PG_ADMIN -u CH_RUNTIME -u CH_MAINT "$binary" recover inspect) >"$work/recover.txt"
 python3 - "$work/journal.json" "$work/recover.json" "$work/journal.txt" "$work/recover.txt" <<'PY'
 import json,sys
 j=json.load(open(sys.argv[1])); r=json.load(open(sys.argv[2]))

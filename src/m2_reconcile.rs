@@ -510,8 +510,12 @@ pub mod tests {
     static NEXT: AtomicU64 = AtomicU64::new(1);
     fn db(name: &str) -> std::path::PathBuf {
         let p = std::env::temp_dir().join(format!(
-            "m2-reconcile-{name}-{}-{}.sqlite",
+            "m2-reconcile-{name}-{}-{}-{}.sqlite",
             std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         let w = open_writer(&p, "fixture", 1, 0).unwrap();

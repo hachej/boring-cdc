@@ -8,6 +8,6 @@ findings=[f'missing test {name}' for name in required if not re.search(r'fn\s+'+
 for symbol in ['ArchiveReconciler','SLOT_INVALID_WAL_REMOVED','RESUME_WAL_STATUS_UNAVAILABLE','journal_report','recover_report','startup_reconciliations','drop(reader)']:
  if symbol not in src: findings.append(f'missing boundary {symbol}')
 for script in ['scripts/e2e/m2_reconcile.sh','scripts/faults/m2_reconcile.sh']:
- if 'TMPDIR=/var/tmp' not in (root/script).read_text(): findings.append(f'{script} does not pin TMPDIR')
+ if 'TMPDIR="${TMPDIR:-/tmp}"' not in (root/script).read_text(): findings.append(f'{script} does not provide a portable TMPDIR default')
 print(json.dumps({'schema_version':'validation-result/v1','validator':'m2-reconcile/v1','valid':not findings,'findings':findings},sort_keys=True,separators=(',',':')))
 raise SystemExit(bool(findings))

@@ -106,6 +106,35 @@ jobs:
           name: m2-jsonl-component-packets
           path: ${{ runner.temp }}/m2-jsonl-head/artifacts/boring-cdc-m2-jsonl
           if-no-files-found: error
+      - name: Prepare exact M2 reconcile evidence input
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: git worktree add --detach "$RUNNER_TEMP/m2-reconcile-head" "$HEAD_SHA"
+      - name: M2 reconcile live component and fault proof
+        timeout-minutes: 15
+        working-directory: ${{ runner.temp }}/m2-reconcile-head
+        env:
+          TMPDIR: /var/tmp
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+        run: |
+          mkdir -p "$RUNNER_TEMP/m2-reconcile-packet/attempt-1" "$RUNNER_TEMP/m2-reconcile-packet/attempt-2"
+          M2_RECONCILE_PROOF_OUT="$RUNNER_TEMP/m2-reconcile-packet/attempt-1/crash-proof.json" \
+            scripts/e2e/m2_reconcile.sh \
+            >"$RUNNER_TEMP/m2-reconcile-packet/attempt-1/stdout.txt" \
+            2>"$RUNNER_TEMP/m2-reconcile-attempt-1.stderr"
+          M2_RECONCILE_PROOF_OUT="$RUNNER_TEMP/m2-reconcile-packet/attempt-2/crash-proof.json" \
+            scripts/faults/m2_reconcile.sh \
+            >"$RUNNER_TEMP/m2-reconcile-packet/attempt-2/stdout.txt" \
+            2>"$RUNNER_TEMP/m2-reconcile-attempt-2.stderr"
+          python3 scripts/validate/m2_reconcile_component.py create "$RUNNER_TEMP/m2-reconcile-packet"
+          python3 scripts/validate/m2_reconcile_component.py validate "$RUNNER_TEMP/m2-reconcile-packet"
+          scripts/validate/evidence.sh artifacts/boring-cdc-m2-reconcile
+      - name: Retain M2 reconcile component packet
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m2-reconcile-component-packet
+          path: ${{ runner.temp }}/m2-reconcile-packet
+          if-no-files-found: error
       - name: Prepare exact M2 heartbeat evidence input
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
