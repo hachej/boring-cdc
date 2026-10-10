@@ -156,6 +156,26 @@ jobs:
           name: m2-spool-component-packets
           path: ${{ runner.temp }}/m2-spool-head/artifacts/boring-cdc-m2-spool
           if-no-files-found: error
+      - name: Prepare exact M2 capture runtime evidence input
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: git worktree add --detach "$RUNNER_TEMP/m2-capture-head" "$HEAD_SHA"
+      - name: M2 capture runtime live source and fault proof
+        timeout-minutes: 12
+        working-directory: ${{ runner.temp }}/m2-capture-head
+        env:
+          TMPDIR: /var/tmp
+        run: |
+          scripts/e2e/m2_capture_runtime.sh
+          scripts/faults/m2_capture_runtime.sh
+          python3 scripts/validate/m2_capture_runtime.py
+          scripts/validate/evidence.sh artifacts/boring-cdc-m2-capture-runtime
+      - name: Retain M2 capture runtime packets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m2-capture-runtime-packets
+          path: ${{ runner.temp }}/m2-capture-head/artifacts/boring-cdc-m2-capture-runtime
+          if-no-files-found: error
       - name: Prepare exact M2 heartbeat evidence input
         env:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
