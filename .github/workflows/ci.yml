@@ -46,12 +46,21 @@ jobs:
         env:
           TMPDIR: /var/tmp
         run: scripts/acceptance/durable_simple_case.sh
+      - name: Prepare exact M2 init evidence input
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: git worktree add --detach "$RUNNER_TEMP/m2-init-head" "$HEAD_SHA"
       - name: M2 init and runtime source lock
         timeout-minutes: 10
+        working-directory: ${{ runner.temp }}/m2-init-head
         env:
           TMPDIR: /var/tmp
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
           M2_INIT_RECEIPT_DIR: ${{ runner.temp }}/m2-init-receipt
-        run: scripts/e2e/m2_init_recovery.sh
+        run: |
+          scripts/e2e/m2_init_recovery.sh
+          scripts/faults/m2_init_recovery.sh
+          python3 scripts/validate/m2_init_receipt.py "$M2_INIT_RECEIPT_DIR/receipt.json"
       - name: Retain M2 init live receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

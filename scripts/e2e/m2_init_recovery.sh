@@ -32,7 +32,7 @@ cargo build --quiet --locked --bin boring-cdc
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 admin_dsn=postgresql:"//boring_cdc_admin:${admin_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_ADMIN="$admin_dsn" CH_MAINT='https://unused.invalid'; unset PG_RUNTIME PG_CONTROL CH_RUNTIME || true
-binary="$PWD/target/debug/boring-cdc"
+binary="${CARGO_TARGET_DIR:-$PWD/target}/debug/boring-cdc"
 init_dry_run(){ (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u PG_ADMIN -u CH_MAINT "$binary" init --dry-run --json); }
 confirm_token(){ python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"]["confirm_token"])' "$1"; }
 reset_local_state(){ rm -rf "$work/run/state"; mkdir -p "$work/run/state/spool" "$work/run/state/tmp"; chmod 700 "$work/run/state" "$work/run/state/spool"; }
@@ -182,11 +182,13 @@ if [[ -n "${M2_INIT_RECEIPT_DIR:-}" ]]; then
     "$(psqlc -Atqc 'select count(*) from boring_cdc_control.heartbeat')" \
     "$(psqlc -Atqc 'select count(*) from boring_cdc_control.capture_fences')" <<'PY'
 import json
+import hashlib
 import pathlib
 import sys
 
 work, output, git_sha, slot_count, heartbeat_rows, fence_rows = sys.argv[1:]
 root = pathlib.Path(work)
+checkout = pathlib.Path.cwd()
 def init_result(name):
     data = json.loads((root / name).read_text())
     return {
@@ -200,6 +202,29 @@ receipt = {
     "schema_version": "m2-init-live-receipt/v1",
     "git_commit": git_sha,
     "postgres_version": "17.6",
+    "input_sha256": {
+        name: hashlib.sha256((checkout / name).read_bytes()).hexdigest()
+        for name in (
+            "src/m2_init_recovery.rs",
+            "src/m2_capture_runtime.rs",
+            "scripts/e2e/m2_init_recovery.sh",
+            "scripts/validate/m2_init_receipt.py",
+            "contracts/m2/init-recovery-cases.json",
+            "scripts/setup/durable_simple_prerequisites.sql",
+        )
+    },
+    "verified_live_case_ids": [
+        "SCN-M2-INIT-CLEAN",
+        "SCN-M2-INIT-IDEMPOTENT",
+        "SCN-M2-INIT-CARDINALITY",
+        "SCN-M2-INIT-PRIVILEGE",
+        "SCN-M2-INIT-PUBLICATION-RELATIONS",
+        "SCN-M2-INIT-PUBLICATION-OWNER",
+        "SCN-M2-INIT-PUBLICATION-FLAGS",
+        "SCN-M2-INIT-OWNERSHIP",
+        "SCN-M2-INIT-CONFIRMATION",
+        "SCN-M2-INIT-NO-SLOT",
+    ],
     "first_init": init_result("first.json"),
     "idempotent_init": init_result("second.json"),
     "post_fault_init": init_result("final.json"),
