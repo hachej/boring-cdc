@@ -8,7 +8,8 @@ record_feedback_abort() {
   local phase=$1 child=$2 rc=$3 observed_feedback=$4 elapsed_ms
   [[ -n ${M2_FEEDBACK_RECEIPT_DIR:-} ]] || return 0
   if [[ ${BORING_CDC_M2_FAULT_HOOK:-} != "$phase" || $rc -ne 134 ]]; then
-    echo "E_FEEDBACK_FAULT_NOT_REACHED $phase" >&2
+    printf 'E_FEEDBACK_FAULT_NOT_REACHED phase=%s exit=%s\n' "$phase" "$rc" >&2
+    grep -Eo 'E_[A-Z0-9_]+|M2_[A-Z0-9_]+' "$work/runtime.err" | tail -n 15 >&2 || true
     return 1
   fi
   elapsed_ms=$(( $(date +%s%3N) - runtime_started_ms ))
