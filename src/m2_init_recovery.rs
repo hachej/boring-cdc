@@ -45,11 +45,13 @@ struct PersistedPlan {
 fn plan_path(store: &Path) -> PathBuf {
     store.with_extension("init-plan.json")
 }
+fn parent_directory(path: &Path) -> &Path {
+    path.parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."))
+}
 fn sync_parent(path: &Path) -> Result<(), InitFailure> {
-    let parent = path
-        .parent()
-        .ok_or_else(|| InitFailure::at("plan", "M2_INIT_PLAN_IO"))?;
-    std::fs::File::open(parent)
+    std::fs::File::open(parent_directory(path))
         .and_then(|f| f.sync_all())
         .map_err(|_| InitFailure::at("plan", "M2_INIT_PLAN_IO"))
 }
@@ -60,9 +62,8 @@ pub fn issue_plan(
     config_fingerprint: &str,
     now_ms: u64,
 ) -> Result<(String, String), InitFailure> {
-    if let Some(parent) = store.parent() {
-        std::fs::create_dir_all(parent).map_err(|_| InitFailure::at("plan", "M2_INIT_PLAN_IO"))?;
-    }
+    std::fs::create_dir_all(parent_directory(store))
+        .map_err(|_| InitFailure::at("plan", "M2_INIT_PLAN_IO"))?;
     let lock_path = store.with_extension("ownership.lock");
     let lock = OpenOptions::new()
         .read(true)
@@ -321,10 +322,8 @@ fn acquire(
     let key = identity.advisory_lock_key();
     let nonce = format!("{:x}", Sha256::digest(format!("{run_id}:{pid}").as_bytes()));
     let path = Path::new(&config.public().storage.sqlite_path);
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|_| InitFailure::at("ownership", "M2_INIT_STATE_DIRECTORY_FAILED"))?;
-    }
+    std::fs::create_dir_all(parent_directory(path))
+        .map_err(|_| InitFailure::at("ownership", "M2_INIT_STATE_DIRECTORY_FAILED"))?;
     let mut guard = OwnershipGuard::acquire(
         path,
         run_id.into(),
@@ -710,6 +709,10 @@ pub mod tests {
             Some("\"public\".\"accounts\"")
         );
         assert!(relation("public.accounts.extra").is_none());
+    }
+    #[test]
+    fn basename_plan_fsyncs_the_current_directory() {
+        sync_parent(Path::new("state.init-plan.json")).unwrap();
     }
     #[test]
     fn confirmation_plan_is_random_expiring_and_one_shot() {
