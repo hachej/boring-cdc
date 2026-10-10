@@ -12,7 +12,7 @@ class ContextTests(unittest.TestCase):
   reg=json.loads((ROOT/'contracts/agent/stable-ids.json').read_text()); es=reg['entries']; ids=[e['id'] for e in es]
   self.assertEqual(len(ids),len(set(ids))); self.assertEqual(ac.validate(),[])
   counts={n:sum(e['namespace']==n for e in es) for n in set(e['namespace'] for e in es)}
-  self.assertEqual(counts,{'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':121,'REL':33,'RISK':38})
+  self.assertEqual(counts,{'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':250,'REL':33,'RISK':38})
   self.assertTrue(all(e['evidence_status']=='pending' for e in es));self.assertNotIn('pass_digest',json.dumps(reg))
   self.assertTrue({'RUNBOOK','CLAIM','FINDING'} <= set(json.loads((ROOT/'contracts/agent/stable-ids.schema.json').read_text())['properties']['entries']['items']['properties']['namespace']['enum']))
  def test_all_interfaces_help_and_read_only(self):

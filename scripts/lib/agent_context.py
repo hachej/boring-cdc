@@ -46,7 +46,7 @@ def closure(selected,by):
 def world(selected=None,observed=None):
  rs=rows();by={r['id']:r for r in rs};deps=closure(selected,by) if selected else [];paths,tree=dirty_state();commit=run('git','rev-parse','HEAD').stdout.strip()
  cds={str(p.relative_to(ROOT)):digest(p) for p in CONTRACTS if p.exists()}
- return {'schema_version':'world-state/v1','git_commit':commit,'working_tree_digest':tree,'dirty_paths':paths,'beads_snapshot_digest':digest(GRAPH),'selected_bead':selected,'dependency_closure_digest':digest_bytes(canonical(deps).encode()),'contract_digests':cds,'generated_view_versions':['stable-registry/v1','plan-to-beads/v1'],'evidence_index_status':'pending_unavailable','observed_at':observed or os.environ.get('BORING_AGENT_NOW','1970-01-01T00:00:00Z')}
+ return {'schema_version':'world-state/v1','git_commit':commit,'working_tree_digest':tree,'dirty_paths':paths,'beads_snapshot_digest':digest(GRAPH),'selected_bead':selected,'dependency_closure_digest':digest_bytes(canonical(deps).encode()),'contract_digests':cds,'generated_view_versions':['stable-registry/v1','plan-to-beads/v2'],'evidence_index_status':'pending_unavailable','observed_at':observed or os.environ.get('BORING_AGENT_NOW','1970-01-01T00:00:00Z')}
 def registry():return json.loads(REG.read_text())
 def source_conflicts(reg):
  out=[]
@@ -68,7 +68,7 @@ def validate():
  raw='\n'.join(f"{e.get('id')}\0{e.get('owner_bead')}\0{e.get('source')}\0{e.get('source_digest')}" for e in reg.get('entries',[])).encode()
  expected_inventory=json.loads((ROOT/'contracts/agent/stable-ids.schema.json').read_text())['properties']['inventory_digest']['const']
  if digest_bytes(raw)!=reg.get('inventory_digest') or reg.get('inventory_digest')!=expected_inventory:f.append(['E_INVENTORY_DIGEST','/inventory_digest'])
- expected={'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':121,'REL':33,'RISK':38,'RUNBOOK':0,'CLAIM':0,'FINDING':0}
+ expected={'REQ':144,'INV':20,'DEC':25,'CMD':26,'COND':6,'TRANS':6,'SCN':250,'REL':33,'RISK':38,'RUNBOOK':0,'CLAIM':0,'FINDING':0}
  counts={k:sum(e.get('namespace')==k for e in reg.get('entries',[])) for k in expected}
  for k,want in expected.items():
   if counts[k]!=want:f.append(['E_COVERAGE_INCOMPLETE',f'/{k}:{counts[k]}!={want}'])
@@ -85,7 +85,23 @@ def validate():
   if not isinstance(excerpt,str) or not isinstance(anchor,str) or text.count(anchor)!=1 or excerpt not in anchor or digest_bytes(anchor.encode())!=e.get('source_digest') or not locator.endswith(digest_bytes(anchor.encode())[:12]):f.append(['E_SOURCE_FRAGMENT',str(ident)])
  f += [['E_SOURCE_CONFLICT',x['source']] for x in source_conflicts(reg)]
  covp=ROOT/'contracts/coverage/plan-to-beads.json';cov=json.loads(covp.read_text())
+ if cov.get('schema_version')!='plan-to-beads/v2':f.append(['E_COVERAGE_VERSION',str(covp.relative_to(ROOT))])
  if {(e['id'],e['owner_bead'],e['source_digest']) for e in reg['entries']}!={(e.get('id'),e.get('owner_bead'),e.get('source_digest')) for e in cov.get('assignments',[])}:f.append(['E_COVERAGE_DRIFT',str(covp.relative_to(ROOT))])
+ assignments={e['id']:e for e in cov.get('assignments',[]) if isinstance(e.get('id'),str)}
+ case_ids=set();bound_ids=set()
+ for path in sorted((ROOT/'contracts/m2').glob('*cases.json')):
+  document=json.loads(path.read_bytes());case_rows=document.get('cases',[])+document.get('scenarios',[])
+  if not case_rows:continue
+  relative=str(path.relative_to(ROOT));source_digest=digest(path)
+  for case in case_rows:
+   case_ids.add(case['id'])
+   assignment=assignments.get(case['id'])
+   if assignment is None:f.append(['E_M2_CASE_UNASSIGNED',case['id']]);continue
+   if assignment['owner_bead']!=document['owner_bead']:continue
+   bound_ids.add(case['id'])
+   expected_binding={'source':relative,'source_digest':source_digest,'case_digest':digest_bytes(json.dumps(case,sort_keys=True,separators=(',',':')).encode())}
+   if assignment.get('case_binding')!=expected_binding:f.append(['E_M2_CASE_BINDING',case['id']])
+ for ident in sorted(case_ids-bound_ids):f.append(['E_M2_CASE_OWNER',ident])
  return sorted(f)
 def require_authority():
  f=validate()

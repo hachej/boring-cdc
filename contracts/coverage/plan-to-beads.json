@@ -96,21 +96,36 @@
       "id": "CMD-JOURNAL-GC-DRY-RUN",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "eb4101d5f79bf2f6f8ac5b83cc13d642e531e5e040b5c811475a5ecf18ead049"
+      "source_digest": "eb4101d5f79bf2f6f8ac5b83cc13d642e531e5e040b5c811475a5ecf18ead049",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "2d0bee24fdbf6c276038e849cbe22e52932bf17ea6508a5c46b3edb8ac0bb1a4"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "CMD-JOURNAL-INSPECT-EVENT-ID-ID-EXPLAIN-JSON",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "2375098a9582adf60d5f2fdc856d46fc18b0a6efce805696da7924074ae927e3"
+      "source_digest": "2375098a9582adf60d5f2fdc856d46fc18b0a6efce805696da7924074ae927e3",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "27120564aa7fed03712721a28253c55b5e4a623c990ce0060ed2a2dc463d5f6b"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "CMD-JOURNAL-VERIFY",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "bd9a968823f6f65f7f9809739589cc62c284eaf2ac6a28f86910891e7c2fb4d4"
+      "source_digest": "bd9a968823f6f65f7f9809739589cc62c284eaf2ac6a28f86910891e7c2fb4d4",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "ab764e4fd22c69b00706fb9de8aa07cbea52af24ca75ff57286ca275fa2df4b6"
+      }
     },
     {
       "evidence_status": "pending",
@@ -446,21 +461,36 @@
       "id": "INV-DURABLE-BEFORE-FEEDBACK-POSTGRESQL-FLUSHLSN-AND-APPLYLSN",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "a551bc9ae42c060b547831b982e89c3e7c1743dfd8b7f08b020713a12c88bf92"
+      "source_digest": "a551bc9ae42c060b547831b982e89c3e7c1743dfd8b7f08b020713a12c88bf92",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "90f9a6342ed736e718364580af0a537bf54abae547d3854d3751d250e8e42f23"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "INV-IDLE-PROGRESS-IS-PUBLISHED-NOT-INFERRED-INFORMATIONAL",
-      "owner_bead": "boring-cdc-m2-journal",
+      "owner_bead": "boring-cdc-m2-heartbeat",
       "source": "docs/PLAN.md",
-      "source_digest": "d41d823db4f1273df5f2d9037de3281b807cc5d23e68b63576bddab79d092bc0"
+      "source_digest": "d41d823db4f1273df5f2d9037de3281b807cc5d23e68b63576bddab79d092bc0",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "9a428256d57a34792ca254f8252642f972a533f1c22fdf7b86af902bbd59a436"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "INV-JOURNAL-ORDER-IS-NOT-SOURCE-ORDER-JOURNALSEQ",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "1e96f9309e5a1907f2b9d99c40ecbb5a664d4dd5e04d6c898343da121244ba67"
+      "source_digest": "1e96f9309e5a1907f2b9d99c40ecbb5a664d4dd5e04d6c898343da121244ba67",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "e7e0874fad76469244d1ef221dcb4116f4f2ef1135478cd421412c43cba339a7"
+      }
     },
     {
       "evidence_status": "pending",
@@ -509,7 +539,12 @@
       "id": "INV-ONE-SQLITE-DATABASE-JOURNALEVENTS-IS-THE-LOGICAL",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "315517d143025628d0ca8f3e5ca69c25c99a306f6abf4b5015cc03b9eac3c174"
+      "source_digest": "315517d143025628d0ca8f3e5ca69c25c99a306f6abf4b5015cc03b9eac3c174",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "b51e4b1e1fb9db06285593c0deef6b121d9fa246d0f8e8c6957aad78aaa01a57"
+      }
     },
     {
       "evidence_status": "pending",
@@ -1216,77 +1251,132 @@
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-BE-APPEND-ONLY-FOR-CAPTURED-EVENTS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "2dfcbcb84bf7da0f18b5387f37c0498de48a0f81200624e2295b7af2fa0fb3a4"
+      "source_digest": "2dfcbcb84bf7da0f18b5387f37c0498de48a0f81200624e2295b7af2fa0fb3a4",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "d8e9e19d3658dccdbab761f4079ef5158440c935c642f9eecaa8bd66cae5d17f"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-BOUND-SQLITE-READER-LIFETIMES-AND-RANGE-SIZES",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "88e6d26d72333ff1dd3e749b0f8d4a03a05070eed7243f1f3d0e62b298f8b0a3"
+      "source_digest": "88e6d26d72333ff1dd3e749b0f8d4a03a05070eed7243f1f3d0e62b298f8b0a3",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "80421d9cdcfae5e0cafb8e250e15f63e01f7770c24243744f0915b9d1d0cb424"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-COMMIT-EVENTS-AND-SOURCE-CHECKPOINT-CONSISTENTLY",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "238edd3681ebf5995b8364dba44c9e46c8a7dab5d8249349677305e121dd5c2b"
+      "source_digest": "238edd3681ebf5995b8364dba44c9e46c8a7dab5d8249349677305e121dd5c2b",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "43e3241479973057b892c1e65fdd3e032d8d5e3db6aa6753ea77856ced730d51"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-DEFINE-WHAT-HAPPENS-WHEN-A-DESTINATION-FALLS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "fe0aea0a86f8c12be8f45bb79431d25a00038fd2a1c10a01b90cb7244964ad0b"
+      "source_digest": "fe0aea0a86f8c12be8f45bb79431d25a00038fd2a1c10a01b90cb7244964ad0b",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "e72b7d60930e3d530037da7f1673ca2dac3d55ff9347aa0eb7d4d6fdbd52eff8"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-DETECT-JOURNAL-CORRUPTION-AND-UNAVAILABLE-REPLAY-POSITIONS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "9bb8f6a6aaedbab88cbd46fbdd39b2eb691c3e24b5ce6967218920db17fd8c47"
+      "source_digest": "9bb8f6a6aaedbab88cbd46fbdd39b2eb691c3e24b5ce6967218920db17fd8c47",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "5b1ed4557710e5eda6096d0447c49aaf94de03fb34b07a93ffcd6adc331a5bc0"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-DISTINGUISH-PERSISTENT-DATABASE-SETTINGS-FROM-ACTUAL-WRITER",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "e4f06b00aa0c068b60b1ddbe317e1f9c528ac2a13d9f6a75eee95b85e2608d42"
+      "source_digest": "e4f06b00aa0c068b60b1ddbe317e1f9c528ac2a13d9f6a75eee95b85e2608d42",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "de77157c379fd3a20c8a9d603a6ac42a9109c5338bb4b8da50734f6ba4e488e6"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-ENFORCE-AN-EXPLICIT-DISK-BUDGET-AND-REPLAY",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "e5497ee8a6c4fc62c3d22d4f220ce8dc1f2bf3d09b1a2a9092141e5a5bf206cd"
+      "source_digest": "e5497ee8a6c4fc62c3d22d4f220ce8dc1f2bf3d09b1a2a9092141e5a5bf206cd",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "936b28cbc6a7527dd7a40a329a326260b274ef818ee6e68e41cfe413bf30fb17"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-ENTER-A-DOCUMENTED-SAFE-STOP-FAIL-LOUD",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "1a21a3c4a5f157ec24c8e24f9035b3a017e626e857b90260f058e9f8f8ff7529"
+      "source_digest": "1a21a3c4a5f157ec24c8e24f9035b3a017e626e857b90260f058e9f8f8ff7529",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "2a67544794731ec45f822e8850723c432b97609ca067aaf841452de875525c42"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-EXPOSE-LOCAL-BYTES-USED-OLDEST-NEWEST-REPLAY",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "ef3038ce65ad49bcf76e3f1aa175a5a0fc8d2dc18bd1583b3ca35d3c6042d07c"
+      "source_digest": "ef3038ce65ad49bcf76e3f1aa175a5a0fc8d2dc18bd1583b3ca35d3c6042d07c",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "ba7fb114e4bfd4446b4a1a5b5a23b12d0626d5e611491648bcc9ecb33b289ed1"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-STORE-INDEPENDENT-DESTINATION-CHECKPOINTS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "d8b1345548b83cc7a7f172e8a21e8e88d362798c160678166d3716ee97b6a2d0"
+      "source_digest": "d8b1345548b83cc7a7f172e8a21e8e88d362798c160678166d3716ee97b6a2d0",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "3555f4500406e731403fe6962b87f66f0fdafc6865f8940566528a5eae829592"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "REQ-DURABLE-JOURNAL-AND-RETENTION-SUPPORT-ORDERED-REPLAY-FROM-A-STABLE-JOURNAL",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/REQUIREMENTS.md",
-      "source_digest": "8e83557d72577eb764067531edf92fcce756ccdbead4511238078e66be6d4048"
+      "source_digest": "8e83557d72577eb764067531edf92fcce756ccdbead4511238078e66be6d4048",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "6b896cf6731480a9123c2a132713a5d4fc840b1170508caa03506ff4cedd8cc0"
+      }
     },
     {
       "evidence_status": "pending",
@@ -1867,7 +1957,12 @@
       "id": "RISK-DELAYED-STALE-WORKER-PROMOTION-OR-LOCAL-STATE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "aab79a9fe26eee625e0567f2728c73e002f8256dbf6787c23b489205adf75638"
+      "source_digest": "aab79a9fe26eee625e0567f2728c73e002f8256dbf6787c23b489205adf75638",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "042f78660b66c1f792de3fdbfb34f4785eb2a312c9c87a8647843f25cef249c5"
+      }
     },
     {
       "evidence_status": "pending",
@@ -1895,7 +1990,12 @@
       "id": "RISK-IDLE-SOURCE-RECEIVES-UNRELATED-WAL",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "73326b3e9d0c7544ac030c4674078a6a95b832eb96053af6a20439bfb283bc95"
+      "source_digest": "73326b3e9d0c7544ac030c4674078a6a95b832eb96053af6a20439bfb283bc95",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "977cd83cb7b1890d07929b461f90f262fa701a973590a258a8beb86a0c5babb9"
+      }
     },
     {
       "evidence_status": "pending",
@@ -1965,7 +2065,12 @@
       "id": "RISK-ROUTINE-CLI-OPENS-A-SECOND-SQLITE-WRITER",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "e2585628a676c4b70e387a2991e5ff2f111b0232e43f0231ed1a0627aaf6949f"
+      "source_digest": "e2585628a676c4b70e387a2991e5ff2f111b0232e43f0231ed1a0627aaf6949f",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "d73ab160f38849ce93d0e17999f55473834ca2b9487b98613b22df65566fae42"
+      }
     },
     {
       "evidence_status": "pending",
@@ -1986,7 +2091,12 @@
       "id": "RISK-SLOT-CREATION-FLOOR-IS-MISTAKEN-FOR-A",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "ae0e64f110f09b281ca70096119672efe681bb62b62ce41735366c23048c1923"
+      "source_digest": "ae0e64f110f09b281ca70096119672efe681bb62b62ce41735366c23048c1923",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "03194e726371f89b36aebae6f9d3015f915f15bc67790382f3d87e2230e4e85a"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2007,21 +2117,36 @@
       "id": "RISK-SQLITE-CORRUPTION-LOCAL-RESTORE-DIVERGENCE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "fea47943903e12761e0a7bda7ad58e827ccd9e11dcddeb79f7e396913056a17e"
+      "source_digest": "fea47943903e12761e0a7bda7ad58e827ccd9e11dcddeb79f7e396913056a17e",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "6299be0adb15dd914d1ba2bef696c592fdedaf34f1217104690d7396fa0bc45c"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "RISK-SQLITE-SETTINGS-STORAGE-DO-NOT-HONOR-SYNC",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "e6b92faf8c85815eb23db395449e291f299767b8f55541c9befa7af5123cbcda"
+      "source_digest": "e6b92faf8c85815eb23db395449e291f299767b8f55541c9befa7af5123cbcda",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "b5d1376aea831a4199f4b42ef56566126db56afa0c11cbdd2a515b011ec4e9f7"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "RISK-SQLITE-WRITER-BOTTLENECKS-BEFORE-DECODING",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "bf2364f3ad1a2f712d03e5bdaa91ff961b081e6188a038cedad1077e3bccf29e"
+      "source_digest": "bf2364f3ad1a2f712d03e5bdaa91ff961b081e6188a038cedad1077e3bccf29e",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "907088f2a98a97c2059d3796f29f64819e6970c80166ad1c1f497b1da2e0b73e"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2252,14 +2377,24 @@
       "id": "SCN-CRASH-AFTER-SQLITE-COMMIT-BEFORE-POSTGRESQL-FEEDBACK",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "5b693e2ab4d2ba1112e3fb6b047a2cf33da45d7b58e3fe64e9ea3844f66e0d9e"
+      "source_digest": "5b693e2ab4d2ba1112e3fb6b047a2cf33da45d7b58e3fe64e9ea3844f66e0d9e",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "09926d05d6675d1e8d9a4993115124e7c5092ef2e7d16bdf9b408fff956c9c1e"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "SCN-CRASH-BEFORE-SQLITE-COMMIT",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "3f2a5fd9f32b296dd43ef14e7221d34c2f44fe8b708d525f3469ec8c508ebc5e"
+      "source_digest": "3f2a5fd9f32b296dd43ef14e7221d34c2f44fe8b708d525f3469ec8c508ebc5e",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "f90b5778dafe3a154d7b292b106db6b98fd253a4f6cfc8117c85b32e8326f424"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2336,7 +2471,12 @@
       "id": "SCN-DETERMINISTIC-DESTINATION-POISON-RETRY-EXHAUSTION",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "e1ae43f982373faa2827245bb32637ebe1b9d6a36ff8dffa06181ad48322061b"
+      "source_digest": "e1ae43f982373faa2827245bb32637ebe1b9d6a36ff8dffa06181ad48322061b",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "33cde8c2bf95547306f6aec1ef2a58dfc21a479f5c9c251fd32c47423acc8eaf"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2404,9 +2544,14 @@
     {
       "evidence_status": "pending",
       "id": "SCN-HEARTBEAT-PERMISSION-OUTAGE",
-      "owner_bead": "boring-cdc-m6-failure-matrix",
+      "owner_bead": "boring-cdc-m2-heartbeat",
       "source": "docs/PLAN.md",
-      "source_digest": "2c93cd90fde4cc901b449d8dee78de0636c61a14e8ed8185bf2c871c76e167f1"
+      "source_digest": "2c93cd90fde4cc901b449d8dee78de0636c61a14e8ed8185bf2c871c76e167f1",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "867022f3f7515092ce4d6bfcc1cb5808edf9d9271ee85807208215fe64f13605"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2425,9 +2570,14 @@
     {
       "evidence_status": "pending",
       "id": "SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL",
-      "owner_bead": "boring-cdc-m2-journal",
+      "owner_bead": "boring-cdc-m2-heartbeat",
       "source": "docs/PLAN.md",
-      "source_digest": "1c5c37e000f7d0d916a985c61d7d37911d73e85b0e1218607b5f49614b859070"
+      "source_digest": "1c5c37e000f7d0d916a985c61d7d37911d73e85b0e1218607b5f49614b859070",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "63065a4f1cf09ec86c2069eedb3702b3d0d9f838e379a4cd0cf45946110e8794"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2474,23 +2624,38 @@
     {
       "evidence_status": "pending",
       "id": "SCN-INTERNAL-CONTROL-EVENT-ROUTING",
-      "owner_bead": "boring-cdc-m6-endurance",
+      "owner_bead": "boring-cdc-m2-heartbeat",
       "source": "docs/PLAN.md",
-      "source_digest": "16120883a249d8af64ff51dd3beb1c86b1c4c2af9bfba9f033a0e3695d387952"
+      "source_digest": "16120883a249d8af64ff51dd3beb1c86b1c4c2af9bfba9f033a0e3695d387952",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "6b0a64ea2db5bf9793b4050b5d7f552f229b5d53f102e09488ac43e9d92c34b3"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "SCN-JOURNAL-CORRUPTION-MISSING-SEQUENCE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "7a40c47f0f5a1e8519ee61dec2a6ed3859152a9576f8f23fbb9196ee29a65d89"
+      "source_digest": "7a40c47f0f5a1e8519ee61dec2a6ed3859152a9576f8f23fbb9196ee29a65d89",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "6df3927aa7d36f2e06773eac84f9bad3ce557b9df34c0fc5f93c2a3bdd6d18be"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "SCN-JOURNAL-PRESSURE-TRANSITIONS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "14c5660f8b983c3e01ccc8863570b96b9365437cff2acd1c68407e7814265036"
+      "source_digest": "14c5660f8b983c3e01ccc8863570b96b9365437cff2acd1c68407e7814265036",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "a8abe0d2c5171b1abbe8d5116d486058c3bc129f0f2559fe4615cbe5d6c0efaa"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2536,6 +2701,1554 @@
     },
     {
       "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-ABRUPT-TAKEOVER",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "5bccfda1a0941788aa32121cbd7140b7c26ce0179e98bcbaec642594a8a64cb5",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "ed54ca5f95d8fcdfe90bb3cb345144c62bc8e6f3d4b5970bf8d834ff8cd1842f"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-CLEAN-SHUTDOWN",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "7957deb0a5c14c850a8a2d751edb03164c1972bfe24098d03027f099ff3bf51b",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "3c3bdfad65f3a4a7502c4c69da357e17ffef695d3bf87cb89bb2282e2291833d"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-CONTROL-NOOP",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "0b5a991714f7720d3bf0fbd23b9c88aec8870e2d3cf5fb50234e09dd2f833f04",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "65af3efe9028fc474e2c0f195dad304ac68fe742aaf9c9ca9de32ff00b405871"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-COPYBOTH-LOSS",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "6269f59d745ba4c617b1db8a8c103d2c74f13cf58665b8ba82edfbdf200acccd",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "2a5459e8e8af2d491116e1b943b333bcb13ce53cb7272a7505c7ee7621fe2dac"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-CRASH-AFTER-COMMIT",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "e60dd363dd68b1450af8a3bb753bc44f364ba045816a454a04ee1b2d3549a921",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "600fd810dacbddef7a64e6085fed0dbc9dfe639787ee170bfd246042c7fd0a5a"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-CRASH-BEFORE-COMMIT",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "cce41418669635edd47c94f54640174837b73fabc697be4444bd566702e051bf",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "2b3973b8b7e4252289e53189ae6e5c3796676d2dd3507ea284dbed7c2ab3e266"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-GATE-HOLD-RELEASE-STALE",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "f5b8b8db2d3aebddf1096869cafa99f80f7bed5c75baf06d9a71e8f2846f2414",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "e8a35cd4e7ebc7a0645622cfd01a147c50555526ac5e3676f0dd75a6fb78a072"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-KEEPALIVE-REQUEST",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "9fe1a644a01739f057ea37704c1be219b0dad9e764eb0404b2a6b0bc8dc52c5f",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "85dd46c113a2b6d17a0cd5f69f0976afc82b028bd48941a4c09bdbdc174ddeba"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-OVERSIZED",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "08c78587a9b09da3466db409f07b17c9d0547a98752a84515b67e7cea08bc641",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "4e2f33fb6a9e99bfbd951de9f1d881884e4c8f6c696a46f20510985d4f901e9d"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-PERSISTED-RETRY",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "98e1f9588cb9aa0deabc804b15de90af90cb6e280dc34022b8702c082f1e4bc8",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "2c6b8e9f31dfff1e29ef108ffbff60b4094d59471dcf2c9c5f2c77f358fb00e3"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-RECEIVE-SPOOL-JOURNAL-FEEDBACK",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "b4e6f9b83d0de792c82f3fc39a715c4b394d3e7e61ad933dd9e09e0bf33936dc",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "a4a2cf52e0b837f92527b54d9fe93dd38b1b2222e99c8ccf2e87ad2bed13c8d6"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-SAFE-STOP-REARM",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "d4178a8ce5bd97067b934f01aff90b5aee118cb43b8219743388d229045047da",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "a521ff168bbd6df40541d8c001dde7fcd40452575455ef106e73fae33fc9579d"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-SLOW-SERVICE",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "e855a226905eb146dde02c706650d4257bcc5eda9f4fb7e0ce504a057f333b23",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "96bac9ee8c2bb6b39142d3f9168475b7b5b39390bc7d2b59e703343596cb2061"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-STARTUP-RECONCILE",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "7245bd606e422927ff2e3107c4e875d0ef56b3e8d7f11d2f71dfc36df802ce51",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "af9331f7812cb1097b30b82d251307cf74e2cb7d0e36adcad0dd34f4d957e5cf"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-CAPTURE-TWO-STATE-PATHS",
+      "owner_bead": "boring-cdc-m2-capture-runtime",
+      "source": "contracts/m2/capture-runtime-cases.json",
+      "source_digest": "7b35550048f842e455ec24248a0e330da50a7d5b67661a04b1eb30c1ebf9d090",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "0b8ecdcb89656f00b9f614f959c908ca9850997b61fe5f1e88bc451fdb5e4812"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-BOUNDED-HARNESS",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "53be858f679b15b0855246bde47d0b2f01f9a6b9adad7efeec35667ad46bddce",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "63647fca308d45075d902bd4a4f5409434a3ca398ee0a0a4f3700e141648faa3"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-COMPLETE-HARNESS-INVENTORY",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "e8da5b9d1798ca72ad5060cdb78a1eb691ba2f2172306578202f2504622c2747",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "360f542e20605e01a43df41aa99c6f19cdd40214141415a513fdcce0a9797a5a"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-DUE-RECURRENCE",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "425538ce4d83dbaf27b00231043921cb5f58d6abffaa7d35df2d61670e0c76ea",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "475cbc432e12f521e95842c5a0cecc1da6aa70960fab5da17c49c69acdd977c2"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-ENUM",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "d48aad314b8134f27e700b56d0d979108fd8ea04c88483e503905f172723afaf",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "7c15ccb99c57dabc798e3670f735f3b9abf7740a7e2682463b024c9f4cd903cc"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-FINGERPRINT",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "c7e210f8e5bc76f009d1a20156eefdef234d60ef14a4421074bedfcfa42f1f90",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "a1067a26123679146c678ad208e83796771cf386e105cae0d76776619638cbd5"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-HARNESS-PERSISTENCE-CAS",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "e040df4e10dbb8ec4cb4a82acc3d17cdbf80062e6c26c19d744d9b24d14bee81",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "d6b52ae33c0cdb78b6029fa44a9128554fd0c263e9e6028e30a3d0ac834b2d60"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-HOOKS",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "0e1083a18a36aec3f224bc61e0808f57074df8cb57468f545a8137c4e9c282bc",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "8bde1e11281d237b5ed566ab28495684d388235ace2b369128f60224c4d0b2d3"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-JITTER-GOLDEN",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "20c98add8332862a2f81f0ffc8c0846629b5592cf8b16ea2b56454862de87bd7",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "ec99d0613da71f20de6d312869dae3d76b86fbe73aa273215f3238f3bffe758b"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-PERSISTENCE",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "a4e930763a0387f1885853120a7293227d5710f457a2c8f2133e2767a0262d07",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "1dcecebf26b53052e60401feb96f0290d4b6d2d25d016049dc911384fb885a40"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-PERSISTENCE-CAS",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "2794431d52d6c8c741eed543cc0bebfb6f8cf5e51ee55fcecc992d788a1f2b12",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "3720faa452bd3d2a64042d95a1da74f04c5c28c276ff2d82cae3a85555a725c2"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-REARM",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "268fb158f7d69df37f2083b551495c4c0ba1f6233b60e1a27ed096fc9821ac5d",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "f3c306e6ebe733bda984512cc184ec57cec2eb3f752f0107cfb32c89eea7704c"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-RESTART-SUPPRESS",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "b9994450c4ba9b5a4d2d9c7dd6e6b641853daa5910d1b2f9eaedb3b6ed28df92",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "07be94ae6d4bc69357659cff1fdb904c238d5ae88d6e5c83e5800cb93d122cbc"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-SCHEDULE",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "c2d175b7767b85b292f7b56d5386b98c8e8b2a8e25774fc58ee40d080fae9fc6",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "53a7cea3487d3b653b1ae509cf8f2188e8da906de8f51e29085eb182c3eed7b7"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAILURE-STALE",
+      "owner_bead": "boring-cdc-m2.1",
+      "source": "contracts/m2/failure-policy-cases.json",
+      "source_digest": "afd0098e9b8fa3e1d1cd58ae5cbb3cae9c3bf2e7b063788e3e593f992812649e",
+      "case_binding": {
+        "source": "contracts/m2/failure-policy-cases.json",
+        "source_digest": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+        "case_digest": "5df926088cc8ec55a5a1f506f461ccb8b911e4816a30e7f661ddf8a0b44b45be"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAULT-STATUS-CONDITIONS",
+      "owner_bead": "boring-cdc-m2-fault-status",
+      "source": "contracts/m2/fault-status-cases.json",
+      "source_digest": "182e6a07bfbf242664ba87a2fdfa5ed9e3f7b320dc35ab242c63ee2e6e3068fa",
+      "case_binding": {
+        "source": "contracts/m2/fault-status-cases.json",
+        "source_digest": "730a1d8333f4a97621c8d67a5a0eec71c671b0a51ccea7037c75b05a2a069440",
+        "case_digest": "b963ed85d35a9686ae19afacaa4dac6b6d1db6f3f940e5bd3014af9505ded83d"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAULT-STATUS-CRASH-MATRIX",
+      "owner_bead": "boring-cdc-m2-fault-status",
+      "source": "contracts/m2/fault-status-cases.json",
+      "source_digest": "6493b8df8bffaa930292e71f7a57b97787c491a978f1d5ad496f1e9af87d99d6",
+      "case_binding": {
+        "source": "contracts/m2/fault-status-cases.json",
+        "source_digest": "730a1d8333f4a97621c8d67a5a0eec71c671b0a51ccea7037c75b05a2a069440",
+        "case_digest": "ba1e108ef9c94b976b06e331e6020f34c8251e2f0b46afac294eb8f791233a09"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAULT-STATUS-FAILURE-CLASSES",
+      "owner_bead": "boring-cdc-m2-fault-status",
+      "source": "contracts/m2/fault-status-cases.json",
+      "source_digest": "0926fe87415ac4dde8cc58ea490f93b188f86b6a4d09ebe82b361aa260ffabc9",
+      "case_binding": {
+        "source": "contracts/m2/fault-status-cases.json",
+        "source_digest": "730a1d8333f4a97621c8d67a5a0eec71c671b0a51ccea7037c75b05a2a069440",
+        "case_digest": "84c1219821b9c47c58903078359baf8c0d84cf539f1e341510dfe318f0401db6"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAULT-STATUS-FAILURE-TELEMETRY",
+      "owner_bead": "boring-cdc-m2-fault-status",
+      "source": "contracts/m2/fault-status-cases.json",
+      "source_digest": "a4ecfce57461a26e11b4804f0943bc6a62533f6732ed0cead10353a025ed1101",
+      "case_binding": {
+        "source": "contracts/m2/fault-status-cases.json",
+        "source_digest": "730a1d8333f4a97621c8d67a5a0eec71c671b0a51ccea7037c75b05a2a069440",
+        "case_digest": "899f97848dd5d901cde6ea96704af03df5f5057b6412a36ce7f317483ed5e2d6"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-FAULT-STATUS-STABLE-RESTART",
+      "owner_bead": "boring-cdc-m2-fault-status",
+      "source": "contracts/m2/fault-status-cases.json",
+      "source_digest": "77ed8b807abe283b8a2f567d133ebd09a9ca1f62f3efa30e8c7c82f08e500841",
+      "case_binding": {
+        "source": "contracts/m2/fault-status-cases.json",
+        "source_digest": "730a1d8333f4a97621c8d67a5a0eec71c671b0a51ccea7037c75b05a2a069440",
+        "case_digest": "4d7cec7b01bd22a07389f95815e03627f8c20488279d388413f11b21bf6b3838"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-HEARTBEAT-CADENCE-RETRY",
+      "owner_bead": "boring-cdc-m2-heartbeat",
+      "source": "contracts/m2/heartbeat-cases.json",
+      "source_digest": "bd7d6d8667144051cea728daa48975977b8c03167b6c3acbb2d23b08cc9c928b",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "e3cfbdebb51221006a0217f20f708cf8b56afc8a8f377384b5f398c00c813a6e"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-HEARTBEAT-CHECKPOINT-ATOMICITY",
+      "owner_bead": "boring-cdc-m2-heartbeat",
+      "source": "contracts/m2/heartbeat-cases.json",
+      "source_digest": "888f355163c0eaaa474d893326f3c1e5bb80b8b68d0d4c1687eba5220ddb73e3",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "0ed518ec2fd0ab14775bd4cca631da342d59fa17992b0ebbb233f0fc462bdc4e"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-HEARTBEAT-DURABLE-BEFORE-FEEDBACK",
+      "owner_bead": "boring-cdc-m2-heartbeat",
+      "source": "contracts/m2/heartbeat-cases.json",
+      "source_digest": "866c83858f2584a404df2cab3bafc2d8874468eafd3338943b00e466b2b7301f",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "83f15bbb5df051f04fe695cc68b21114aef7ebca0c550ae70dae218aef98a39f"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-HEARTBEAT-EXACTLY-ONE-ROW",
+      "owner_bead": "boring-cdc-m2-heartbeat",
+      "source": "contracts/m2/heartbeat-cases.json",
+      "source_digest": "08baa424a409fdb54c43c456aad31e7e7a177e383d2f8955b468e6ae4257e85a",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "4774a6285732a2969b5f7a379e4d85daaebb68f757c85253c0e20e6c22ba972a"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-HEARTBEAT-GENERIC-NOOP",
+      "owner_bead": "boring-cdc-m2-heartbeat",
+      "source": "contracts/m2/heartbeat-cases.json",
+      "source_digest": "d2e3897b46efe4239a8bc16443a2f7a1d6d8f82e1ae7d268b5821ed395d09250",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "55d7c76346ffc0375fe09592bfae746c428afe982fa51440de213bb09b5a83e1"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-HEARTBEAT-INCOMPLETE-RANGE",
+      "owner_bead": "boring-cdc-m2-heartbeat",
+      "source": "contracts/m2/heartbeat-cases.json",
+      "source_digest": "a59f4b7e2924b1209be3d6453f997e409b8128ee092389af58f2173d3674c51e",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "71e9503f922ab1b3bb1a47a80ed6741beee8561bc31fa4e6959d7a550a2d9046"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-HEARTBEAT-JOURNAL-FAILURE",
+      "owner_bead": "boring-cdc-m2-heartbeat",
+      "source": "contracts/m2/heartbeat-cases.json",
+      "source_digest": "a585a48fbde6cbf29df516cffddcf6e01378ee0fc14b343fa182be954969e094",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "362b9b57914ebc5af3af686d7d2daad4eb38c902b536f30918cfb5e8115f0dbd"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-HEARTBEAT-MAXIMUM-OPERATION",
+      "owner_bead": "boring-cdc-m2-heartbeat",
+      "source": "contracts/m2/heartbeat-cases.json",
+      "source_digest": "25e777f01d38d3f517d0e526d4e239702951d10e8589d91840086e2f049b8f58",
+      "case_binding": {
+        "source": "contracts/m2/heartbeat-cases.json",
+        "source_digest": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+        "case_digest": "2d70025df46eb461ee8e23e7dd6dde9244ce0869034db9cf950ed040dd65cc4f"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-AMBIGUOUS",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "46b3721a91c1eb56ab539fc7ec7d44dc8f86280bd891681fbb329b239c7567b9",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "e8002dcf20daa35ea620b9d5ebae8cef2250885cd5f5b297dfb5ee5f721b2ffa"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-CARDINALITY",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "1795efa7535dcddea5a2903b72db272ee0a7a966af01b8bee003fdc8c7ef12e1",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "d48228689597ecf1fc889f4a378067c8af771ba8a06fb1710a1014a39da8fc2a"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-CLEAN",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "bcd363d9a14d819353734dacb2a9e711adb3c661d68a1688489088a430c663db",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "9fc546cd0e32f20db493453d923dc971cf1749ed65432c53e94937f2075a5e26"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-CONFIRMATION",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "8f25b8212c476b26aab55304818923749d6e5a3e2137ac3a5d09d57b8f2f5019",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "8798c192aacfffe19d9e147e6279cf23e54d4ebfc6fef16c34dc7e47b21d89c0"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-IDEMPOTENT",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "97490b206a1e4aaf421dc49fb391ce080487d58e0c7a1328a3bdbeb0874cf0b9",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "1476ebc5f178da819a2138036721f376abd143eabfec293a87cf17599251db97"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-NO-SLOT",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "78ea93f159e7ae562729cc32bec841b52ec52b57bae5eda9e4527a178332ebd8",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "9a56bcb29b1499d5305219113b4ee6e1e70e512be3a6eca6db2811a4042d42bf"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-OWNERSHIP",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "827e1b28501109b50c94cb22f399d86d76f504c1b8508bfeb1edfa075f8ef7db",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "2bfa7853c0dcc3d81d80d3a0a674fba0dc25953fffd2b46eb96b9790b983e3ec"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-PRIVILEGE",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "6e44811b9666c5d41c9616989e51047ea0893afaec3b0e621e3fea25ef24fd24",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "721a19c689e4bd62660081cf5d8ed7cdcbf1fd93d046aac42222c7315429beaa"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-PUBLICATION-FLAGS",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "a693e3ada63e53a3676b2ec2e3e559f53929a5b0f900f1fecf5d33f81e66bbb9",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "71f508f1170f384d6a80f9369191432f4aa91f8904271e1c83c6426e60019ab0"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-PUBLICATION-OWNER",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "ea17d516a64b84df08924512bd3f9a852de6cf1d47728304fe850ef004d327a9",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "ca54d2ead59221d82ceaec375b7567e507300d0188841a77c9d21479204003fa"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-INIT-PUBLICATION-RELATIONS",
+      "owner_bead": "boring-cdc-m2-init-recovery",
+      "source": "contracts/m2/init-recovery-cases.json",
+      "source_digest": "49121d91012c95d4ba8a0ea10208100d21c4548697e593aaf7149202e711fbe9",
+      "case_binding": {
+        "source": "contracts/m2/init-recovery-cases.json",
+        "source_digest": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+        "case_digest": "443c68299d2c46c2f1a5cd50a0a02bcc2fa2af4c2352566f82162db2d9b6db0e"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JOURNAL-ATOMIC",
+      "owner_bead": "boring-cdc-m2-journal",
+      "source": "contracts/m2/journal-cases.json",
+      "source_digest": "003263ad2933417c197deb09d55a71ddca551bba9db3b52e2f8f3f41e7f0e27f",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "99d828e6f146ac9410e00f17c49618f534f00bd62f130c966747acb7ba5d2786"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JOURNAL-CRASH-BOUNDARY",
+      "owner_bead": "boring-cdc-m2-journal",
+      "source": "contracts/m2/journal-cases.json",
+      "source_digest": "3ed4c69c18b7ba6a8ebd1cb75ccc698d1b5f1a2b583981e03aed043b021f7bf6",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "ea5e82492b6212462bc31e880ece7eb296ecd9164667e2cb3ef0d7a6aa38c485"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JOURNAL-DUPLICATE-CONFLICT",
+      "owner_bead": "boring-cdc-m2-journal",
+      "source": "contracts/m2/journal-cases.json",
+      "source_digest": "59f421a499bb22a01e6c15c6c8f9dafeafd08a7b870e3835e53af12d087be2f1",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "9730f4e60b5dd6d0f3afdbf5b57c0d515734273d7ea7f6dfd8ff6d54a11e3206"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JOURNAL-FAIR-SERVICE",
+      "owner_bead": "boring-cdc-m2-journal",
+      "source": "contracts/m2/journal-cases.json",
+      "source_digest": "7a16febdb25bf98cdef28f2e41a330aeac6f6cb5fd94314180016ef2b8345926",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "031e84dcbb63e6f20682852b1d55eea9449a597e68fc215bb750f244eb42d072"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JOURNAL-FEEDBACK-ORDER",
+      "owner_bead": "boring-cdc-m2-journal",
+      "source": "contracts/m2/journal-cases.json",
+      "source_digest": "3a411fa5bc40b49811e407f1cac0c359ab858d4abe1bde84103dfeef322afe6d",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "e591dfc58814e66a6796aa1f10118437c8237a6cb98c34bb27a5a6c2c9812637"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JOURNAL-INVALID-LIMIT",
+      "owner_bead": "boring-cdc-m2-journal",
+      "source": "contracts/m2/journal-cases.json",
+      "source_digest": "02d4dacc1e547fdeeddcb010695db482858c22e58c2a406f3487f69434fb6d10",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "902a84f1c13a8cbdc655f6a365371a2b5196b9109d7e9a929b18bbfa61770a54"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JOURNAL-RANGE",
+      "owner_bead": "boring-cdc-m2-journal",
+      "source": "contracts/m2/journal-cases.json",
+      "source_digest": "760d4a1709779f68a7b59fa22a09d120f0723c5ec9cb98f58179c8f6606ec54f",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "f0b279a0cd85a8692984e73efea11c3ee1c19937e9840313939d03e7ed9db48a"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JOURNAL-SCHEMA-CONFLICT",
+      "owner_bead": "boring-cdc-m2-journal",
+      "source": "contracts/m2/journal-cases.json",
+      "source_digest": "3e89d899e34e3ceb399a5eceea5b73da1756a3f0045c14e42488eadb8e6dcd15",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "45a477a36772a9c43b2b6b3249d38fe92da9378a534be30f26891fca8b466978"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JOURNAL-SLOW-STORAGE",
+      "owner_bead": "boring-cdc-m2-journal",
+      "source": "contracts/m2/journal-cases.json",
+      "source_digest": "199520206569fae09532c432623d1b81d744e2cec2c75b0359663e858109a99a",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "2209a22d8e4db8fe71312bf1c223ab9d4d8c930a9a7d54fb2397fac5b0d03c29"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JSONL-CANDIDATE-INVISIBLE",
+      "owner_bead": "boring-cdc-m2-jsonl.1",
+      "source": "contracts/m2/jsonl-cases.json",
+      "source_digest": "697fca6e611e6719c815f749fc86c3e5125751b938174fb56d068e84d9992bdb",
+      "case_binding": {
+        "source": "contracts/m2/jsonl-cases.json",
+        "source_digest": "d2c4445717cbdd986462caf1970017785f3ab305d93ff835f762e6907e9f2b30",
+        "case_digest": "394c1a71394225c5b9198a6077acec5853eea9d3c51ede8b29c08810013ebfbd"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JSONL-CONTIGUOUS-START",
+      "owner_bead": "boring-cdc-m2-jsonl.1",
+      "source": "contracts/m2/jsonl-cases.json",
+      "source_digest": "a3c7669b9ae8930b8eea4fef89cc9434d577e84dff5f72b2ee8636fb9c0c3aea",
+      "case_binding": {
+        "source": "contracts/m2/jsonl-cases.json",
+        "source_digest": "d2c4445717cbdd986462caf1970017785f3ab305d93ff835f762e6907e9f2b30",
+        "case_digest": "215fefd744fe32ee60cabafd598377ae6ad63003059b204f0be26c0effc41beb"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JSONL-CRASH-BOUNDARIES",
+      "owner_bead": "boring-cdc-m2-jsonl.1",
+      "source": "contracts/m2/jsonl-cases.json",
+      "source_digest": "943c2c2ad5f8a621473af6d9f9af894a9a0682b113f72089844ceb9aff08af1c",
+      "case_binding": {
+        "source": "contracts/m2/jsonl-cases.json",
+        "source_digest": "d2c4445717cbdd986462caf1970017785f3ab305d93ff835f762e6907e9f2b30",
+        "case_digest": "fd93d92953dcef14f19402639485c49222237ad126b8ca935f8604e075f7b364"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JSONL-DIRECT-EVIDENCE",
+      "owner_bead": "boring-cdc-m2-jsonl.1",
+      "source": "contracts/m2/jsonl-cases.json",
+      "source_digest": "522eb4afa57382a5ac3cb57e6f9d5c3684cd6ea552dee2aac90ec64286cc1ffc",
+      "case_binding": {
+        "source": "contracts/m2/jsonl-cases.json",
+        "source_digest": "d2c4445717cbdd986462caf1970017785f3ab305d93ff835f762e6907e9f2b30",
+        "case_digest": "494b6614c9f5ab64a005e3acf1284c3ebb069d00f3872ba6644da3125a7595f6"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JSONL-INTENT-RANGE",
+      "owner_bead": "boring-cdc-m2-jsonl.1",
+      "source": "contracts/m2/jsonl-cases.json",
+      "source_digest": "7f6e423768ca5531ad3e12438b1622f600ace19d8a478c60a2c4a9d720e5a5d8",
+      "case_binding": {
+        "source": "contracts/m2/jsonl-cases.json",
+        "source_digest": "d2c4445717cbdd986462caf1970017785f3ab305d93ff835f762e6907e9f2b30",
+        "case_digest": "23a23c487a2507973406668a7431b4909d3ce61f422fb759728d09746d19d422"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JSONL-PATH-SAFETY",
+      "owner_bead": "boring-cdc-m2-jsonl.1",
+      "source": "contracts/m2/jsonl-cases.json",
+      "source_digest": "90a4950e9587f4679fea035d70c04155b14238a12245719881cefa7f37ea9e3f",
+      "case_binding": {
+        "source": "contracts/m2/jsonl-cases.json",
+        "source_digest": "d2c4445717cbdd986462caf1970017785f3ab305d93ff835f762e6907e9f2b30",
+        "case_digest": "526cb02236165bc84eacfb9ffdbd18901c9d9767d82752cc091b912d7ac6449e"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JSONL-POLICY-COMPLETION",
+      "owner_bead": "boring-cdc-m2-jsonl.1",
+      "source": "contracts/m2/jsonl-cases.json",
+      "source_digest": "3ade4248a524dc94fd0c44357097f5953c4447efc4f57143ae00c77dbd7b6685",
+      "case_binding": {
+        "source": "contracts/m2/jsonl-cases.json",
+        "source_digest": "d2c4445717cbdd986462caf1970017785f3ab305d93ff835f762e6907e9f2b30",
+        "case_digest": "c7249682e7dc04e89df7761ee00b453a491ca88375c62e4e2cf0b3a6b722c51a"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-JSONL-SHARED-POLICY",
+      "owner_bead": "boring-cdc-m2-jsonl.1",
+      "source": "contracts/m2/jsonl-cases.json",
+      "source_digest": "b39fd9081615318af87365e670010f2ff35e395953feb2dc66dca995efa4a94f",
+      "case_binding": {
+        "source": "contracts/m2/jsonl-cases.json",
+        "source_digest": "d2c4445717cbdd986462caf1970017785f3ab305d93ff835f762e6907e9f2b30",
+        "case_digest": "0783dc8cf7af09bfeaa53064260aac6b4137cff9c2ed86aecee4ed80ec40508f"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-CAS-EXPIRY",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "8bb21a3b06ed49a993a4b5420d0c3ee55716839175726e39a0528c067dcf1f27",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "dbeb561724a190d0e9b735151ad68a9a3af404a1c7c1bb0bb2d24642fb4eb846"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-FAIL-CLOSED",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "bf6bb5764346f7f1dce0d0e3f150a5f1f66213f33d02efaff5a6d1292da8efd9",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "7c2a45af46b3843decd433fedd50dcfd5fd11c60c57a8625acf0dda243657878"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-IDENTITY-CYCLE",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "13b3469adaf69c1a0bdb5c6662a961631110ee7107538686fb10887d97e76a25",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "4fcd6cdd3701eb1d2849f105f2a185dfa51fc6f6f195b13eb3b3dd58f9be9b35"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-INVALID-INPUT",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "0426cb06bcd0c00af433715576b0562190a2cb27c6460b15620ee99041c3417d",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "c426d6655d7901b685a186cf6e38e8def1b7b0c5da90bb846a6b080822bcb6f8"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-MIDCALL-EXPIRY",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "93e959436fa40e855a585e5bb34a48b43855098f7c5d5349f1582445d5b6956a",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "d0920c1f51dca9f10f3fe1fd964064d7c5400f70b3c60157db110245e6e5c9d6"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-NAMESPACE",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "eeb20a32d6bdc7f5827d630f6874e385f630d4246bd648a69469328f26755284",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "0af766450c27b45b6d9973c4743abc7e339b9417c5aacff36bd405478a07de08"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-PAUSE-DETACH",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "d7f94b8d49c6a2a901ac83721bba6e066c8649a202d7f62602f56fbb3fe3c341",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "47173706978271accd8606906928ab4e87a1fecf7044bb350b4def9d291073dc"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-PROMOTION-INTENT",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "6f0d1ddd4fd5bff15a9a81baf28717382777e3dd69762c6245f4b1d11e01326d",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "16f19b094f3c1d715b97d01798541acd3400199eacda3a20edee2db4146d0585"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-RESEED",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "d64e937b895ce46b041b61edf7651a96f652df4534205d32b945a68d341615f1",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "2a0ca67dab341433ce846ccc6effc52a3736aa10c749f7421352ab05f6f95bf2"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-SUCCESSOR-REACQUIRE",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "7d4f1b0bb125144ac8042595e8944a4bee7f0b889316c57a8d9e41ac91f57c8c",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "ce5a1471f9dae69974c046e9946a752c969d052a716be1ed161ac992a82bee25"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-LEASE-TWO-RUNTIME-RACE",
+      "owner_bead": "boring-cdc-m2-leases",
+      "source": "contracts/m2/leases-cases.json",
+      "source_digest": "1c6cceb8a237b7bd9cda215b50b0cf3eb8871fb1a9aa22136d9e6c63afbb0a72",
+      "case_binding": {
+        "source": "contracts/m2/leases-cases.json",
+        "source_digest": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+        "case_digest": "b0fd40fe9816af1b8e71dc6f6da13b0fabbe7fd7e69cec37420ed2ead4ffc73d"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-ABORT-RESTART",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "be13a01e2b506a04a90082b15e3d125a0dd16b90891f67c73fe2c8f9ad0b388a",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "1e2b137eb5a0b73b05c6e38d6c3f7dd152b66544e56c854042f825fbcb58b739"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-ADMIN-SECRET",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "7a2dfa121552a70b6c153634625e53a360124f5eba59960008dab69da6dbec23",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "11f1ed802f0c5117f0f9b695b7f7d6fb5ecd2232df3c027a7fde4919aa20dffb"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-CONFIRM-USABILITY",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "b582c41ac6bca1c08bd0d5e2882dd9363f7b6420dab5e8a552bdf37ddb161f73",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "73334177707c5c115fef8a6aab433417cb5ccfb0fd3c63ce9459d3c45d1b63c1"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-COPYBOTH-LOSS",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "7cd32d73bdf6b9b0513aff5f27454a3ae3a27199d786d45f3754e3fec5550caf",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "2b49dcf82302a1b10e8a1133b11b4d7eca0ef01e8a9ccce20e0833f334dc6a66"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-NONCE-REPLAY",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "d3c956f36b53391bd92eac84ec84b74431cd9bd2e0b5af03c8ccee25ffe77c48",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "1f779c423e6230c0a91aa8af4be2db3ed51759801043f1c05f19b96586cffc1d"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-OFFLINE-RACE",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "e89623b08bbf7748cca32c1ddf423ff7b1a738d0c9aec44c361e686aac163ffe",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "1910f0b850961e8ea94a15550110d8f98c2416067b0bb5e179a0d93b15d11f27"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-RESEED-PHASES",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "66cea1e8c132ba75ce25a2bda50431400d52802450e2b4832d8a3682598ea382",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "a2d29617acefcdb4c162158835116954013df38c239fe75d87f2b489d63bea17"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-SAME-SOURCE",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "cf7b0d107dd700ff76e3cb4a1e58c5ff264a02a4b1871eb952956bde2a12b7ff",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "6aa42be3e00ece50274d038cad519ff729bb70aa7a67666748846bcca46e1f2a"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-SAME-STORE",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "1390c2181b345ce5bfb917b0262cca0f26fa8678ce1e65526a9d168794ba286d",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "b9db587dfeee89d5a557fbfdae28f9987b9b843771df3f3838e38bae61903d71"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-SESSION-LOSS",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "7545b0a8a77415c17005794e7605a8d4e0f99326df7a16939f7dd8628332de7e",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "44774033492449fca0c5ebd65204a8d8b6320ec82cc94d2b3aadaed23e4da0ca"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-SOCKET-BOUNDS",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "6f3e671bcc4cfcad1ea48e1ae6c431cd286b7dcce47a97c7d8a301701c01a8a4",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "91a56a35a873fa45ee6fc320a07401ac29da12c5523fba8eef16a669fcce0b29"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-OWN-SYMLINK-PARENT",
+      "owner_bead": "boring-cdc-m2-ownership",
+      "source": "contracts/m2/ownership-cases.json",
+      "source_digest": "50a5aa89c1c51e9c422b00b577b039ee9d033ec5d6cb6eeb4b175a4f2a023183",
+      "case_binding": {
+        "source": "contracts/m2/ownership-cases.json",
+        "source_digest": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+        "case_digest": "6147ff7b63c6f2c29c36ea605ed74d2bd72f4060230cf28744c5ed595166e2bd"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-PRESSURE-CHECKPOINT",
+      "owner_bead": "boring-cdc-m2-pressure",
+      "source": "contracts/m2/pressure-cases.json",
+      "source_digest": "5363cde712b57edcd4635ee319520bb88a0f349875e752787cb562e7e52138e9",
+      "case_binding": {
+        "source": "contracts/m2/pressure-cases.json",
+        "source_digest": "1bffddcdf01601d1e4ee05c531dfb84d7c92a1498699a1396dd284b03d6ef858",
+        "case_digest": "1665875d3494de32fb6dc0b83a91a2abe7c4a6bef15646ddcb826340fac88e9d"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-PRESSURE-METADATA",
+      "owner_bead": "boring-cdc-m2-pressure",
+      "source": "contracts/m2/pressure-cases.json",
+      "source_digest": "9abbbc01c3bec0a7d4b2766070b3277da6bab4a5d04206ac4c03e2249eb12b49",
+      "case_binding": {
+        "source": "contracts/m2/pressure-cases.json",
+        "source_digest": "1bffddcdf01601d1e4ee05c531dfb84d7c92a1498699a1396dd284b03d6ef858",
+        "case_digest": "929c71886baeb784ba470197c2a0861756f7598a3f7f7039fe0b287e1f11232d"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-PRESSURE-PAUSED-DESTINATION",
+      "owner_bead": "boring-cdc-m2-pressure",
+      "source": "contracts/m2/pressure-cases.json",
+      "source_digest": "ff9032d81a7840bad9edf71231d6c472176bd644d61d5c3f0518eb86f595f232",
+      "case_binding": {
+        "source": "contracts/m2/pressure-cases.json",
+        "source_digest": "1bffddcdf01601d1e4ee05c531dfb84d7c92a1498699a1396dd284b03d6ef858",
+        "case_digest": "83f83e8a5aec7e7a55f6fb5d91a4a7e26633c93e0293902cbeeb61b8c95060ef"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-PRESSURE-PIN-GC",
+      "owner_bead": "boring-cdc-m2-pressure",
+      "source": "contracts/m2/pressure-cases.json",
+      "source_digest": "2e089507e3b63da476d8a7a7e52cc94c8e9f45574b21e408d535d5eb1b80e3bc",
+      "case_binding": {
+        "source": "contracts/m2/pressure-cases.json",
+        "source_digest": "1bffddcdf01601d1e4ee05c531dfb84d7c92a1498699a1396dd284b03d6ef858",
+        "case_digest": "d68bba57836ec7263360a8268c862e68b35dcb4eb3341996117de467ef9876f4"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-PRESSURE-RESERVE",
+      "owner_bead": "boring-cdc-m2-pressure",
+      "source": "contracts/m2/pressure-cases.json",
+      "source_digest": "d47273978f4e2a3ab0189062ee62867de60b0ed3a0fa60df2969cd4cf73ae3dd",
+      "case_binding": {
+        "source": "contracts/m2/pressure-cases.json",
+        "source_digest": "1bffddcdf01601d1e4ee05c531dfb84d7c92a1498699a1396dd284b03d6ef858",
+        "case_digest": "6455ddaa5155cf0d8591a7833d6ade8de5c33cb7e5d9a35db42745ccd23c1b9c"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-PRESSURE-RUNTIME-SERVICE",
+      "owner_bead": "boring-cdc-m2-pressure",
+      "source": "contracts/m2/pressure-cases.json",
+      "source_digest": "c15c73803e7990151cf5f79a0ffafad3729c02d50e22e913b7154881206362ba",
+      "case_binding": {
+        "source": "contracts/m2/pressure-cases.json",
+        "source_digest": "1bffddcdf01601d1e4ee05c531dfb84d7c92a1498699a1396dd284b03d6ef858",
+        "case_digest": "c7c28887c9c10fd344eb1f8a87a7d15be8e544ee6b6360355b3a0d255f4dd8cd"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-PRESSURE-TRANSITIONS",
+      "owner_bead": "boring-cdc-m2-pressure",
+      "source": "contracts/m2/pressure-cases.json",
+      "source_digest": "69f0279e7f5b70473393d870fcc1593643f750029c2254bd581f0ee6527333c7",
+      "case_binding": {
+        "source": "contracts/m2/pressure-cases.json",
+        "source_digest": "1bffddcdf01601d1e4ee05c531dfb84d7c92a1498699a1396dd284b03d6ef858",
+        "case_digest": "46e5756cb817497afade25f795f0e6b52b5caba2e046b4486c7d407445a781b3"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-PRESSURE-WAL-RISK",
+      "owner_bead": "boring-cdc-m2-pressure",
+      "source": "contracts/m2/pressure-cases.json",
+      "source_digest": "f514ed55c3e9ce881eebca140425716cf4cc02b2c3d2678fe87bfa2fa17a01a6",
+      "case_binding": {
+        "source": "contracts/m2/pressure-cases.json",
+        "source_digest": "1bffddcdf01601d1e4ee05c531dfb84d7c92a1498699a1396dd284b03d6ef858",
+        "case_digest": "469c0a11abe03162d2336b237b3f6c1f7d9252c8b727cf9951b3ef538a537a6d"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-AUDIT-INCARNATION-UPGRADE",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "83eece69700ffb1d872d5716fa25e3d0fece0cef0a0bcfcfed9a57680fc536af",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "7d40bf21a5d33861be658d8c43f17ec9054134622ba3446c7c28fcde4674f550"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-AUDIT-INVALIDATION",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "9033300c2b45280bfcc01e462f45fd3a42f1d3b81c9d7b5c754cbaa1384dcaa2",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "de0233a7b90a5d42dfc3d179909e8589d76f51261cf04d433e16778f987d3082"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-CAS",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "559d789e80f6d870dd4db67ba2ea42855836c49db068ba828b4a0b0f0bfd67c6",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "5ab9fe8f5da8fd7fb70c2f6de45975e774cdc96e3b8da91a4612e38204549390"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-CLEAN-INSTALL",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "a527ec3b6846167a5c7376efb2156cce50a2162119a1a68740361b32396230b4",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "70ecbc6db265d3c0e7b438371ab8ef2d6f3f9a9ba8be8b65ce2eb2dc7a0cd144"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-COMMAND-IDENTITY",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "082d3149b59286aee789ed76cbbd7bb38a88a5b3a1a6bed4dd966870fad9338b",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "dfdbcbd579906469cc8c2137eec67d3de4f79d6cf12b378ccc01db15bf503d6a"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-CONSTRAINTS",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "fc901640e9cd8dfd8c20b8bc53afdc678a352bbb983fd19cfeb1e569eea6a391",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "d920b5274882bdb5dfb8fc53dfddfe52bb6add4adb9bc4c1ec1c918060d19aef"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-CREATION-FLOOR",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "8ae68f6697ee11a87da634c0c4aeac23b6a0f3b6f7c563f7a9fb1ee7a62fc371",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "2f719e755130300e1b04c321eb21c6f8cada59f32f29690a8c4a12adab54cb40"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-FAILURE-AUDIT",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "57c5aacde051a6f191c803fe84e881db228ce087b123007cc95cdd61009aaf73",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "871c5be52177e4d12aba0a51495f1c074611f9c5719be1dd889b17e7d2a20c27"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-FAILURE-CHECKPOINT-GUARD",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "39a8c8a9c4c2c0c1af50079c04f3eb9288ff8d2286c945b7e45383102d514413",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "6e1c05dec3e7429cedb9acf75dbb23c08364040687b18072909eb8aa1b7c58d6"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-FAILURE-TELEMETRY-UPGRADE",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "86a3588c5d74b8ff6559157b364315d6d21c44fa0c8799e58838f7966e09416f",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "4e5655cfea84af2022566f23da9abc68629ac20a94b42653e72b83160b3c4293"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-IMMUTABILITY",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "6919d134d13e2bfe0e58430a85d053853cdde8e7fd1af4e2c8e043ef8c6f7857",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "6f021aa52d76954161ee2eb1a41d2523b1412b8ed102b75d23b4ee1f662d6805"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-MIGRATION-CRASH",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "b77bcb430963acfd21b16c745f64964c3a556ffcc45d3a2449da6a785e22db3c",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "f6d16893d1f3388a9eb48b00bd85d83a38520a01fc29c889758cc2925175935c"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-READER-BOUND",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "7df40dc3301191875d134c64e3b4357ec6cf7e52ddffcc33e80dc03e07b869e9",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "1e193246822fe67dc060c5ced74b2e795aa3df8b9220dc39acdfe75520c8c623"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-RESTART",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "1d09e36903158c72c31d2a337f4a0a08f5556ef9ffef8b052dd9044413060e78",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "373beff3f189358889861b0f4f3e2022d06e1c3a3716baead336ca172e0cb5a7"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SCHEMA-WRITER-READBACK",
+      "owner_bead": "boring-cdc-m2-schema",
+      "source": "contracts/m2/schema-cases.json",
+      "source_digest": "b8439d1534fb9ee97bd17ab7b92e4e782957120bcde562cac009f1e59e8cb705",
+      "case_binding": {
+        "source": "contracts/m2/schema-cases.json",
+        "source_digest": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+        "case_digest": "5446f0e8b510ff839759c8d9a4fe91c69df0e53c455376cabe918d9357dbb021"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-AGGREGATE-MEMORY",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "a0ccf40d918924f71c6305eac87fe8e8884392eb69e18f334129d163302728cb",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "990c7a344ac86dfb96036767a8792ac4d838d3b6b6a1fe5b41c4fc40ca62643f"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-CHECKSUM",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "969c82a94b9090bc02971fcf5631cce427dc453b2a5db32f3cb092a7c2803acd",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "fb0e506365e1687f2eca3f94e05fb7d63cfde3e76ce2f74197f6678fde332eeb"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-ENOSPC-ADMISSION",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "6f85ff4b690783a7b91b973c77efb81f0eb053d0c3b96d464f9d5e3f33eb1675",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "b6d24b1c43580a8b218361f455b1b04effb83f0d6600f0c3896f0e2e868ec3b0"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-FILESYSTEM-ISOLATION",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "b284cff6d9f90c4c13c81cb8bcefc78acea07ad0d39fe187cc1028d9256b0c19",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "4df66a937ea029de65d5004a7d72a70eb3fe099ec9dd7d0b05941a1ce8f07fcc"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-FILESYSTEM-RESERVE",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "a564d6b5aa8e86a447407ca8f40c31b2070d025dd6d9fff20981ca4b13a6837d",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "12cc8f87ba53255db47e9510f246c7e2084e2de91cf13d186d6566a96ea3e2d2"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-INCREMENTAL-OVERFLOW",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "c8618e525d150e20a858a93009b49b6abfc9698c2ea016c85d5d3207c4848cb1",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "44c8aba5e4c3180a10a9036ebb8ee5db70cdaeab721e6bcc8a0ca7d5a07d8adb"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-LIMIT-SAFE-STOP",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "354bae27c4b6a1ca4a339a9727e1cdc11822073a330325d186f16bf4eb825215",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "b213e42dfd0e6c8f14e86024364141344e277756a1b52723ba13e97b1da910ce"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-NEAR-LIMIT-BURST",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "d93d6d3a11c015842be9099a55e7d76ba76ffa1af0bec226afd9266b0fe29196",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "94e3bdc22abcec283e905314f21843a84371ffffcd9cdf77b52a22f41f6ffbf5"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-ORPHAN-MALFORMED",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "4bdb57a0e989a4ed20755a90b6fade77eb93130707ec041aeb79761b5f85d5e1",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "6ac0e08db38305563e83e3843cf3a86e8a8f5b6c4ac2873b91e4eea66a406b8e"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-OVERSIZED-FINGERPRINT",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "bd2e93e928644f263d06251b89004aebb5af94c9d3da011ef3ce8ae7e379424f",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "3e8e11f2723cc343a87b9baaded9175e0e598b8a319527fb54b86614b2990536"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-POLICY-VECTORS",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "908b849ab3ec897f15c273ee21ef01e702a46566de3c83b8144a5889b2718dcc",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "3d38e4aa7d31a3ef273a7627eba86533166c99be2f6cd2a7c8633f89e5daaae4"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-STARTUP-ACCOUNTING",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "b1412cfc4a5391bafc8c4997d8d946297c829192333920bd4b70290e14ef1c88",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "1120a607bfa6e00c39117a29e9f7c4c66b2428560489c3219ed789f7a6d14d11"
+      }
+    },
+    {
+      "evidence_status": "pending",
+      "id": "SCN-M2-SPOOL-STARTUP-CLASSIFICATION",
+      "owner_bead": "boring-cdc-m2-spool",
+      "source": "contracts/m2/spool-cases.json",
+      "source_digest": "0552ab48fda3681231590986fb7583ef7d2d55b7937f7e27b513449ef4cae75c",
+      "case_binding": {
+        "source": "contracts/m2/spool-cases.json",
+        "source_digest": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b",
+        "case_digest": "b41c7b78250a38f7b8032b08719d287f2f6a31e4e64374c506d7e1b43b9bfa10"
+      }
+    },
+    {
+      "evidence_status": "pending",
       "id": "SCN-MIXED-COMPATIBLE-INCOMPATIBLE-TABLES-IN-ONE-TRANSACTION",
       "owner_bead": "boring-cdc-m6-failure-matrix",
       "source": "docs/PLAN.md",
@@ -2546,7 +4259,12 @@
       "id": "SCN-MULTI-TABLE-TRANSACTION",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "c5f453379ea239bd347788cfeb8223a05e980389189d22ec6d235b1690e90e2a"
+      "source_digest": "c5f453379ea239bd347788cfeb8223a05e980389189d22ec6d235b1690e90e2a",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "37ce103e31ddfe1c4f1f72424bd3eb4232510903e772972b7cd7610af8da3e66"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2581,7 +4299,12 @@
       "id": "SCN-OFFLINE-MUTATION-AND-STATUS-LISTENER-ABUSE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "f3a51774cef4b2de8b692ccc22083600f12acf479581df37bf224a149fb6e482"
+      "source_digest": "f3a51774cef4b2de8b692ccc22083600f12acf479581df37bf224a149fb6e482",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "d39862e641a5e28057fd7311a7e284618dd27e92cae0d04a0d06ce7ca6962f06"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2623,7 +4346,12 @@
       "id": "SCN-PROCESS-JOURNAL-UPGRADE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "4a614b35e474bbf98674a984203027ffb082fcdf2181b21bdca1d1aa4603b628"
+      "source_digest": "4a614b35e474bbf98674a984203027ffb082fcdf2181b21bdca1d1aa4603b628",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "cc291e7517a8c0d85666a6a20cb1ea30893e65ab8af37078115f3e0302732c32"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2672,7 +4400,12 @@
       "id": "SCN-READ-ONLY-CHECK",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "075f5d0b4c8e121f12067bd0a946200d5a77b31011ff3cc1934e321c72f99926"
+      "source_digest": "075f5d0b4c8e121f12067bd0a946200d5a77b31011ff3cc1934e321c72f99926",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "65695e229c048debc700aff928e29c43626fd38d9f574500e6472b6e97472241"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2735,7 +4468,12 @@
       "id": "SCN-SLOT-AHEAD-OF-RESTORED-SQLITE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "94d4eb93c26c24c0f4ef83c95baeb6e73420a68a0b342c77bd76625152b88786"
+      "source_digest": "94d4eb93c26c24c0f4ef83c95baeb6e73420a68a0b342c77bd76625152b88786",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "0696d8216606071b5953a7e4fcc74287f3214d52f80bdb18c9f2022d3623f043"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2770,21 +4508,36 @@
       "id": "SCN-SPOOL-SQLITE-ENOSPC",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "2dfe50cec9242680b497ff9e34086fcd34d10e5ff4a49fc02161130b6117a556"
+      "source_digest": "2dfe50cec9242680b497ff9e34086fcd34d10e5ff4a49fc02161130b6117a556",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "ad98ab4b53d5d76ca6ca7a7b66ea521c245e4f5c29c8556c3e91a84db3b1b2c4"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "SCN-SQLITE-VACUUM-CHECKPOINT-LIFECYCLE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "e6268199faa0d9df90c3c2de9acacf595ff77f14fc7f5f208e840f541e258a6f"
+      "source_digest": "e6268199faa0d9df90c3c2de9acacf595ff77f14fc7f5f208e840f541e258a6f",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "4c7bc2b5a5f1d6ab4335311ace344ce8805c6a73a4ba6b466a21048cb214d4d0"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "SCN-STABLE-IDENTITY-HASH-GOLDEN-VECTORS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "fdb34eb4aa1c3f2c43e0ce7bf3613f4f2da166cafedd74191af01efdce3f7429"
+      "source_digest": "fdb34eb4aa1c3f2c43e0ce7bf3613f4f2da166cafedd74191af01efdce3f7429",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "10c77386daee5e0601167ff73f1c56bbee0ca0ffa51d07265229b817db9e54a3"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2805,7 +4558,12 @@
       "id": "SCN-STALLED-SQLITE-READER-DURING-SUSTAINED-CAPTURE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "83c3ce91ed01d5974fdd278bad31cffb8b6c79a0e04654d123a93735baa1b582"
+      "source_digest": "83c3ce91ed01d5974fdd278bad31cffb8b6c79a0e04654d123a93735baa1b582",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "5f056eff398c805397dfcc5997bc434c2b281dda2282c7540247ba309907b5dd"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2847,14 +4605,24 @@
       "id": "SCN-TWO-RUNTIME-INSTANCES-SAME-SQLITE-PATH",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "3927ccdb3447a5cf50a41c251347b6e1add74a4e1a6d9dcf3cecc0f1a59bba48"
+      "source_digest": "3927ccdb3447a5cf50a41c251347b6e1add74a4e1a6d9dcf3cecc0f1a59bba48",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "5f9cbe1946581f33763d82c34aecccdeec3ee900f4610b636edb5aaff0b4043d"
+      }
     },
     {
       "evidence_status": "pending",
       "id": "SCN-TWO-RUNTIMES-DIFFERENT-SQLITE-PATHS-SAME-SOURCE",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "b6be14ee3b57b29c4cc2186545d51f25d7b9d7796f01d626c5e96c8a0571c0c9"
+      "source_digest": "b6be14ee3b57b29c4cc2186545d51f25d7b9d7796f01d626c5e96c8a0571c0c9",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "b76502de9a82b17d8eb3829ab5fbcd4f74afa387043fd2e888fc7c3fdebf2829"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2868,7 +4636,12 @@
       "id": "SCN-UNSUPPORTED-SQLITE-SETTINGS-FILESYSTEM",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "0f2c38885ca27494824cb7f10e5dd086339a6cdd3882df45f9cedb02b0e75862"
+      "source_digest": "0f2c38885ca27494824cb7f10e5dd086339a6cdd3882df45f9cedb02b0e75862",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "0f2a5dff6e430ba73c265fe1446a9041d34e1ca42b6dbefc8e1d87f548a60b81"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2889,7 +4662,12 @@
       "id": "SCN-WRITER-VERSUS-OBSERVER-SQLITE-SETTINGS",
       "owner_bead": "boring-cdc-m2-journal",
       "source": "docs/PLAN.md",
-      "source_digest": "1ec10a2675f5f9e43f50349850d18ac46579abd77c15565dea3196e3350e1cff"
+      "source_digest": "1ec10a2675f5f9e43f50349850d18ac46579abd77c15565dea3196e3350e1cff",
+      "case_binding": {
+        "source": "contracts/m2/journal-cases.json",
+        "source_digest": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+        "case_digest": "27d6b7e078585479d2db103a2fad05b21edc0f79492e661dcf20d52b75cbd4ca"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2910,7 +4688,12 @@
       "id": "TRANS-CAPTURE-SAFE-STOPPED",
       "owner_bead": "boring-cdc-m2-capture-runtime",
       "source": "docs/PLAN.md",
-      "source_digest": "4ebd7ba44b50d7008f759e32a6a4f40d5bdeed3c2d967746746b135e3cdad1ca"
+      "source_digest": "4ebd7ba44b50d7008f759e32a6a4f40d5bdeed3c2d967746746b135e3cdad1ca",
+      "case_binding": {
+        "source": "contracts/m2/capture-runtime-cases.json",
+        "source_digest": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+        "case_digest": "bef5f00f5a928ec9c38fda66823ef23f17f9f8e32c23361c0ab7c406f53e9337"
+      }
     },
     {
       "evidence_status": "pending",
@@ -2934,5 +4717,5 @@
       "source_digest": "a7af1a28a299ee65255c6b76f6e2289f8f9ab80822e5111094017910c64c5c1e"
     }
   ],
-  "schema_version": "plan-to-beads/v1"
+  "schema_version": "plan-to-beads/v2"
 }

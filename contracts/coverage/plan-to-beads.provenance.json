@@ -1,12 +1,36 @@
 {
   "editable": false,
-  "generated_digest": "5752b973fe64a6d364f8eed2ae622ec173f818473753c37581572f47910d80d7",
+  "generated_digest": "92caeaeb7c989b8f5b78062d7acbec69825abfcd8db032f7080819cc44b16892",
   "generator": "boring-cdc-m0.2",
   "schema_version": "generated-view/v1",
   "source_digests": {
-    "contracts/agent/stable-ids.json": "383f5d61347d71119edf10d511bb4733c164018346f3123dc8cd38205225e80f"
+    "contracts/agent/stable-ids.json": "12519d5bb97e2e5dea7dc7eac49b73dbd1f1fa7a1776146b428c14e3bc62eed2",
+    "contracts/m2/capture-runtime-cases.json": "a56477c3b623285a65f48b860b89c9cd0423da3ed62ba4d1284a395d37c1a22c",
+    "contracts/m2/failure-policy-cases.json": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+    "contracts/m2/fault-status-cases.json": "730a1d8333f4a97621c8d67a5a0eec71c671b0a51ccea7037c75b05a2a069440",
+    "contracts/m2/heartbeat-cases.json": "c94844bb552cd4808c21b8f216b54ac043a58ff5f0dc48d8cac1658088d9a4da",
+    "contracts/m2/init-recovery-cases.json": "4a74f2f39efa3e60f1f6ac7652ef15592a230e6089493cfc273283d4dcd64a35",
+    "contracts/m2/journal-cases.json": "a4a287b48c201160894b6062419b36b28c3173292ce769e46c34bfa53d489846",
+    "contracts/m2/jsonl-cases.json": "d2c4445717cbdd986462caf1970017785f3ab305d93ff835f762e6907e9f2b30",
+    "contracts/m2/leases-cases.json": "9b36106aa4ed158b3335f496f6e9f482dc8c4ce9655ea113ebd9fe0cbe6cbc08",
+    "contracts/m2/ownership-cases.json": "3a78071604a97a51fbc6173f0afb883d016d3500a057ef2b5e594dda933c6fd5",
+    "contracts/m2/pressure-cases.json": "1bffddcdf01601d1e4ee05c531dfb84d7c92a1498699a1396dd284b03d6ef858",
+    "contracts/m2/schema-cases.json": "3942f1e9a9a22786cc66ac35fb8e86171cfdbc3ab8809b417259cbb05859165f",
+    "contracts/m2/spool-cases.json": "c27275e1220abe0041e8807aa0bcd608c44613964769f03649a7551515fa4b3b"
   },
   "sources": [
-    "contracts/agent/stable-ids.json"
+    "contracts/agent/stable-ids.json",
+    "contracts/m2/capture-runtime-cases.json",
+    "contracts/m2/failure-policy-cases.json",
+    "contracts/m2/fault-status-cases.json",
+    "contracts/m2/heartbeat-cases.json",
+    "contracts/m2/init-recovery-cases.json",
+    "contracts/m2/journal-cases.json",
+    "contracts/m2/jsonl-cases.json",
+    "contracts/m2/leases-cases.json",
+    "contracts/m2/ownership-cases.json",
+    "contracts/m2/pressure-cases.json",
+    "contracts/m2/schema-cases.json",
+    "contracts/m2/spool-cases.json"
   ]
 }
