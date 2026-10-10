@@ -435,6 +435,21 @@ pub fn execute_confirmed(
     if slot_count != "0" {
         return Err(InitFailure::at("slot", "M2_INIT_PERMANENT_SLOT_EXISTS"));
     }
+    let existing_controls = scalar(
+        c,
+        "SELECT (to_regclass('boring_cdc_control.heartbeat') IS NOT NULL)::int::text || ':' || (to_regclass('boring_cdc_control.capture_fences') IS NOT NULL)::int::text",
+        "control_cardinality",
+    )?;
+    let seed_controls = match existing_controls.as_str() {
+        "0:0" => true,
+        "1:1" => false,
+        _ => {
+            return Err(InitFailure::at(
+                "control_cardinality",
+                "M2_INIT_CONTROL_PARTIAL_STATE",
+            ));
+        }
+    };
     let publication_exists = scalar(
         c,
         &format!(
@@ -452,14 +467,18 @@ pub fn execute_confirmed(
         ])
         .collect::<Vec<_>>()
         .join(",");
+    let seed_rows = if seed_controls {
+        "INSERT INTO boring_cdc_control.heartbeat VALUES(1,0,'-infinity') ON CONFLICT(id) DO NOTHING;\nINSERT INTO boring_cdc_control.capture_fences VALUES(1,0,0,decode(repeat('00',32),'hex'),decode(repeat('00',16),'hex')) ON CONFLICT(id) DO NOTHING;"
+    } else {
+        ""
+    };
     let setup = format!(
         r#"BEGIN;
 DO $$ BEGIN IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='{ADMIN_ROLE}') THEN CREATE ROLE {ADMIN_ROLE} NOLOGIN; END IF; IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='{CONTROL_ROLE}') THEN CREATE ROLE {CONTROL_ROLE} LOGIN; END IF; END $$;
 CREATE SCHEMA IF NOT EXISTS boring_cdc_control AUTHORIZATION {ADMIN_ROLE};
 CREATE TABLE IF NOT EXISTS boring_cdc_control.heartbeat(id smallint PRIMARY KEY CHECK(id=1),nonce bigint NOT NULL,updated_at timestamptz NOT NULL);
 CREATE TABLE IF NOT EXISTS boring_cdc_control.capture_fences(id smallint PRIMARY KEY CHECK(id=1),capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint bytea NOT NULL CHECK(octet_length(table_set_fingerprint)=32),unique_nonce bytea NOT NULL CHECK(octet_length(unique_nonce)=16));
-INSERT INTO boring_cdc_control.heartbeat VALUES(1,0,'-infinity') ON CONFLICT(id) DO NOTHING;
-INSERT INTO boring_cdc_control.capture_fences VALUES(1,0,0,decode(repeat('00',32),'hex'),decode(repeat('00',16),'hex')) ON CONFLICT(id) DO NOTHING;
+{seed_rows}
 GRANT USAGE ON SCHEMA boring_cdc_control TO {CONTROL_ROLE};
 GRANT SELECT(id),UPDATE(nonce,updated_at) ON boring_cdc_control.heartbeat TO {CONTROL_ROLE};
 GRANT SELECT(id),UPDATE(capture_epoch,generation,table_set_fingerprint,unique_nonce) ON boring_cdc_control.capture_fences TO {CONTROL_ROLE};
