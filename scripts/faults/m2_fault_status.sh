@@ -1,7 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR=/var/tmp; ulimit -c 0
-work=$(mktemp -d /var/tmp/m2-fault-hooks.XXXXXX); trap 'rm -rf "$work"' EXIT INT TERM
+work=$(mktemp -d /var/tmp/m2-fault-hooks.XXXXXX)
+report_failure(){
+  local rc=$?
+  if (( rc != 0 )); then
+    printf 'M2_FAULT_STATUS_FAILED exit=%s\n' "$rc" >&2
+    for log in "$work"/*.err; do
+      [[ -f "$log" ]] || continue
+      printf 'failure_log=%s\n' "${log##*/}" >&2
+      tail -n 35 "$log" | sed -E 's#(postgresql://[^:]+:)[^@]+@#\1[REDACTED]@#g' >&2
+    done
+  fi
+  rm -rf "$work"
+}
+trap report_failure EXIT
 expect_test_abort(){ local hook=$1 test=$2; set +e; BORING_CDC_M2_FAULT_HOOK="$hook" cargo test --quiet --locked "$test" -- --exact >"$work/$hook.out" 2>"$work/$hook.err"; local rc=$?; set -e; [[ $rc -eq 101 ]]; grep -q 'SIGABRT' "$work/$hook.err"; }
 expect_live_abort(){
   local hook=$1 receipt="$work/$1.receipt" rc
