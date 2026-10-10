@@ -6,6 +6,49 @@ on:
 permissions:
   contents: read
 jobs:
+  m2_source_commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update
+      - name: M2 source-commit crash and successor proof
+        timeout-minutes: 17
+        env:
+          TMPDIR: /var/tmp
+        run: |
+          for hook in before_source_commit after_source_commit_before_feedback; do
+            case "$hook" in
+              before_source_commit) scenario=SCN-M2-CAPTURE-CRASH-BEFORE-COMMIT ;;
+              after_source_commit_before_feedback) scenario=SCN-M2-CAPTURE-CRASH-AFTER-COMMIT ;;
+            esac
+            packet="$PWD/artifacts/boring-cdc-m2-capture-runtime/$scenario/current-head"
+            for attempt in 1 2; do
+              M2_SOURCE_COMMIT_PROOF=1 M2_SOURCE_COMMIT_HOOK="$hook" \
+                M2_SOURCE_COMMIT_OUT="$packet/attempt-$attempt" \
+                BORING_CDC_M2_FAULT_HOOK="$hook" \
+                scripts/e2e/m2_capture_runtime.sh \
+                >>"$RUNNER_TEMP/m2-source-commit-$hook.stdout" \
+                2>>"$RUNNER_TEMP/m2-source-commit-$hook.stderr"
+            done
+            python3 scripts/lib/m2_source_commit_evidence.py "$packet" \
+              "$RUNNER_TEMP/m2-source-commit-$hook.stdout" \
+              "$RUNNER_TEMP/m2-source-commit-$hook.stderr" "$hook"
+            python3 scripts/validate/m2_source_commit.py "$packet" "$hook"
+            scripts/validate/evidence.sh "$packet/evidence.json"
+          done
+      - name: Retain M2 source-commit crash packets
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m2-source-commit-crashes
+          path: |
+            artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-CRASH-BEFORE-COMMIT/current-head
+            artifacts/boring-cdc-m2-capture-runtime/SCN-M2-CAPTURE-CRASH-AFTER-COMMIT/current-head
+          if-no-files-found: error
   m2_copyboth_loss:
     runs-on: ubuntu-latest
     timeout-minutes: 15

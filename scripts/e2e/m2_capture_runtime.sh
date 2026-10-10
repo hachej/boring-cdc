@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/var/tmp}"; [[ "$TMPDIR" == /var/tmp ]]
-if [[ ${M2_WIRE_LIMIT_PROOF:-0} != 1 && ${M2_ADVISORY_LOSS_PROOF:-0} != 1 && ${M2_COPYBOTH_LOSS_PROOF:-0} != 1 ]]; then
+if [[ ${M2_WIRE_LIMIT_PROOF:-0} != 1 && ${M2_ADVISORY_LOSS_PROOF:-0} != 1 && ${M2_COPYBOTH_LOSS_PROOF:-0} != 1 && ${M2_SOURCE_COMMIT_PROOF:-0} != 1 ]]; then
   cargo test --locked --workspace --all-targets
 fi
-cargo test --locked m2_capture_runtime::tests
+if [[ ${M2_SOURCE_COMMIT_PROOF:-0} != 1 ]]; then
+  cargo test --locked m2_capture_runtime::tests
+fi
 work=$(mktemp -d /var/tmp/m2-capture-e2e.XXXXXX); project="m2-capture-$RANDOM-$$"; port=$((56000 + $$ % 2000)); bootstrap_pid=; pid=
 record_feedback_abort() {
   local phase=$1 child=$2 rc=$3 observed_feedback=$4 elapsed_ms
@@ -108,6 +110,14 @@ sleep 1; stop_bounded "$bootstrap_pid" INT bootstrap; bootstrap_pid=
 ) & pid=$!
 runtime_started_ms=$(date +%s%3N)
 deadline=$((SECONDS+30)); until [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='runtime_slot'")" == 1 ]]; do (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }; sleep .1; done
+if [[ ${M2_SOURCE_COMMIT_PROOF:-0} == 1 ]]; then
+  ulimit -c 0
+  [[ ${M2_SOURCE_COMMIT_HOOK:-} == before_source_commit || ${M2_SOURCE_COMMIT_HOOK:-} == after_source_commit_before_feedback ]] ||
+    { echo 'E_SOURCE_COMMIT_HOOK_INVALID' >&2; exit 1; }
+  [[ ${BORING_CDC_M2_FAULT_HOOK:-} == "$M2_SOURCE_COMMIT_HOOK" ]] ||
+    { echo 'E_SOURCE_COMMIT_HOOK_MISMATCH' >&2; exit 1; }
+  pre_fault_confirmed=$(psqlc -Atqc "SELECT coalesce(confirmed_flush_lsn::text,'0/0') FROM pg_replication_slots WHERE slot_name='runtime_slot'")
+fi
 python3 - "$work/run/state/journal.sqlite" "$work/sqlite-locked" <<'PY2' & lock_pid=$!
 import pathlib,sqlite3,sys,time
 c=sqlite3.connect(sys.argv[1]); c.execute('BEGIN IMMEDIATE'); pathlib.Path(sys.argv[2]).touch(); time.sleep(2); c.commit()
@@ -123,6 +133,78 @@ PY2
 blocked_feedback=$(psqlc -Atqc "SELECT coalesce(write_lsn::text,'0/0')||','||coalesce(flush_lsn::text,'0/0')||','||coalesce(replay_lsn::text,'0/0') FROM pg_stat_replication ORDER BY pid LIMIT 1")
 [[ "$blocked_transactions" == 0 && "$blocked_feedback" == '0/0,0/0,0/0' ]]
 wait "$lock_pid"
+if [[ ${M2_SOURCE_COMMIT_PROOF:-0} == 1 ]]; then
+  artifact=${M2_SOURCE_COMMIT_OUT:?set M2_SOURCE_COMMIT_OUT for the live source-commit proof}
+  [[ ! -e "$artifact" ]] || { echo 'E_SOURCE_COMMIT_ARTIFACT_EXISTS' >&2; exit 1; }
+  deadline=$((SECONDS+15))
+  while true; do
+    state=$(ps -o stat= -p "$pid" 2>/dev/null || true)
+    [[ -z "$state" || "$state" == Z* ]] && break
+    (( SECONDS < deadline )) || { cat "$work/runtime.err" >&2; exit 1; }
+    sleep .05
+  done
+  child=$pid; set +e; wait "$pid"; rc=$?; set -e; pid=
+  [[ $rc -eq 134 ]] || { echo "E_SOURCE_COMMIT_ABORT_EXIT $rc" >&2; exit 1; }
+  fault_count=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
+PY2
+)
+  expected_count=0
+  [[ "$M2_SOURCE_COMMIT_HOOK" == after_source_commit_before_feedback ]] && expected_count=1
+  [[ "$fault_count" == "$expected_count" ]] || { echo 'E_SOURCE_COMMIT_ATOMICITY' >&2; exit 1; }
+  post_fault_confirmed=$(psqlc -Atqc "SELECT coalesce(confirmed_flush_lsn::text,'0/0') FROM pg_replication_slots WHERE slot_name='runtime_slot'")
+  [[ "$post_fault_confirmed" == "$pre_fault_confirmed" ]] || { echo 'E_SOURCE_COMMIT_FEEDBACK_ADVANCED' >&2; exit 1; }
+  [[ "$(psqlc -Atqc "SELECT active::int FROM pg_replication_slots WHERE slot_name='runtime_slot'")" == 0 ]]
+  (cd "$work/run"; exec env -u BORING_CDC_M2_FAULT_HOOK -u BORING_CDC_POSTGRES_PASSWORD_FILE "$OLDPWD/target/debug/boring-cdc" run >"$work/successor.out" 2>"$work/successor.err") & pid=$!
+  deadline=$((SECONDS+30))
+  while true; do
+    count=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+try: print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transactions').fetchone()[0])
+except Exception: print(0)
+PY2
+)
+    [[ "$count" == 1 ]] && break
+    kill -0 "$pid" 2>/dev/null || { cat "$work/successor.err" >&2; exit 1; }
+    (( SECONDS < deadline )) || { cat "$work/successor.err" >&2; exit 1; }
+    sleep .1
+  done
+  successor_hex=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
+import sqlite3,sys
+print(sqlite3.connect(sys.argv[1]).execute('SELECT durable_transaction_end_lsn FROM source_state WHERE singleton=1').fetchone()[0])
+PY2
+)
+  successor_lsn=$(python3 - "$successor_hex" <<'PY2'
+import sys
+v=int(sys.argv[1],16); print(f'{v>>32:X}/{v&0xffffffff:X}')
+PY2
+)
+  deadline=$((SECONDS+15))
+  while true; do
+    successor_feedback=$(psqlc -Atqc "SELECT coalesce(write_lsn::text,'')||','||coalesce(flush_lsn::text,'')||','||coalesce(replay_lsn::text,'') FROM pg_stat_replication ORDER BY pid LIMIT 1")
+    [[ "$successor_feedback" == "$successor_lsn,$successor_lsn,$successor_lsn" ]] && break
+    kill -0 "$pid" 2>/dev/null || { cat "$work/successor.err" >&2; exit 1; }
+    (( SECONDS < deadline )) || { cat "$work/successor.err" >&2; exit 1; }
+    sleep .05
+  done
+  stop_bounded "$pid" TERM source-commit-successor; pid=
+  mkdir -p "$artifact"
+  python3 - "$artifact" "$version" "$M2_SOURCE_COMMIT_HOOK" "$rc" "$fault_count" "$pre_fault_confirmed" "$post_fault_confirmed" "$successor_lsn" "$successor_feedback" <<'PY2'
+import json,pathlib,sys
+out=pathlib.Path(sys.argv[1])
+(out/'observation.json').write_text(json.dumps({
+ 'schema_version':'m2-source-commit-observation/v1','postgres_version':sys.argv[2],
+ 'fault_hook':sys.argv[3],'fault_exit_code':int(sys.argv[4]),
+ 'durable_transaction_count_after_fault':int(sys.argv[5]),
+ 'slot_confirmed_before_fault':sys.argv[6],'slot_confirmed_after_fault':sys.argv[7],
+ 'durable_transaction_count_after_successor':1,'successor_durable_lsn':sys.argv[8],
+ 'successor_feedback':sys.argv[9],'successor_clean_shutdown':True,
+ },sort_keys=True,indent=2)+'\n')
+PY2
+  printf 'M2_SOURCE_COMMIT_CRASH_OK hook=%s postgres=%s\n' "$M2_SOURCE_COMMIT_HOOK" "$version"
+  exit 0
+fi
 deadline=$((SECONDS+30)); until [[ "$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
 import sqlite3,sys
 try: print(sqlite3.connect(sys.argv[1]).execute('select count(*) from source_transactions').fetchone()[0])
