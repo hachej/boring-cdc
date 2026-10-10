@@ -2491,6 +2491,13 @@ pub mod tests {
         connection
             .execute(
                 "UPDATE processing_failures SET last_failed_at=?1",
+                [format!("invalid;rearm-token={valid_token}")],
+            )
+            .unwrap();
+        assert!(load().is_err());
+        connection
+            .execute(
+                "UPDATE processing_failures SET last_failed_at=?1",
                 [format!("unix-ms:10;rearm-token={valid_token}")],
             )
             .unwrap();

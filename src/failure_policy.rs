@@ -1104,7 +1104,7 @@ fn parse_class(value: &str) -> rusqlite::Result<FailureClass> {
     }
 }
 
-fn parse_timestamp(value: &str) -> rusqlite::Result<u64> {
+pub(crate) fn parse_timestamp(value: &str) -> rusqlite::Result<u64> {
     value
         .split_once(";rearm-token=")
         .map_or(value, |(timestamp, _)| timestamp)

@@ -1112,6 +1112,7 @@ pub(crate) fn capture_startup_gate(
         .into_iter()
         .next()
         .map(|(class, next, last_failed_at)| {
+            crate::failure_policy::parse_timestamp(&last_failed_at)?;
             let class = if crate::failure_policy::parse_rearm_token(&last_failed_at)?.is_some() {
                 "rearmed".to_owned()
             } else {
