@@ -84,6 +84,9 @@ fi
 cargo build --quiet --locked --bin boring-cdc
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 sed -i 's/publication = "boring_publication"/publication = "RuntimePublication"/; s/slot = "boring_slot"/slot = "runtime_slot"/; s#sqlite_path = "state/boring.db"#sqlite_path = "state/journal.sqlite"#' "$work/run/boring-cdc.toml"
+if [[ ${M2_SQLITE_CONTENTION_PROOF:-0} == 1 ]]; then
+  sed -i 's/heartbeat_cadence_ms = 5000/heartbeat_cadence_ms = 300000/' "$work/run/boring-cdc.toml"
+fi
 binary="$PWD/target/debug/boring-cdc"
 admin_dsn=postgresql:"//boring_cdc_admin:${admin_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_ADMIN="$admin_dsn" CH_MAINT='https://unused.invalid'; unset PG_RUNTIME PG_CONTROL CH_RUNTIME || true
@@ -336,10 +339,11 @@ print(sqlite3.connect(sys.argv[1]).execute('SELECT count(*) FROM source_transact
 PY2
 )
     [[ "$successor_count" == 2 ]] && break
-    kill -0 "$pid" 2>/dev/null || { cat "$work/successor.err" >&2; exit 1; }
-    (( SECONDS < deadline )) || { cat "$work/successor.err" >&2; exit 1; }
+    kill -0 "$pid" 2>/dev/null || { echo "E_SQLITE_CONTENTION_SUCCESSOR_EXIT count=$successor_count" >&2; grep -Eo 'E_[A-Z0-9_]+|M2_[A-Z0-9_]+' "$work/successor.out" "$work/successor.err" >&2 || true; exit 1; }
+    (( SECONDS < deadline )) || { echo "E_SQLITE_CONTENTION_SUCCESSOR_TX_TIMEOUT count=$successor_count" >&2; grep -Eo 'E_[A-Z0-9_]+|M2_[A-Z0-9_]+' "$work/successor.out" "$work/successor.err" >&2 || true; exit 1; }
     sleep .1
   done
+  printf 'M2_SQLITE_CONTENTION_PHASE=successor_two_transactions\n'
   successor_hex=$(python3 - "$work/run/state/journal.sqlite" <<'PY2'
 import sqlite3,sys
 print(sqlite3.connect(sys.argv[1]).execute('SELECT durable_transaction_end_lsn FROM source_state WHERE singleton=1').fetchone()[0])
@@ -354,9 +358,10 @@ PY2
   while true; do
     successor_feedback=$(psqlc -Atqc "SELECT coalesce(write_lsn::text,'')||','||coalesce(flush_lsn::text,'')||','||coalesce(replay_lsn::text,'') FROM pg_stat_replication ORDER BY pid LIMIT 1")
     [[ "$successor_feedback" == "$successor_lsn,$successor_lsn,$successor_lsn" ]] && break
-    (( SECONDS < deadline )) || { cat "$work/successor.err" >&2; exit 1; }
+    (( SECONDS < deadline )) || { echo "E_SQLITE_CONTENTION_SUCCESSOR_FEEDBACK_TIMEOUT durable=$successor_lsn feedback=$successor_feedback" >&2; grep -Eo 'E_[A-Z0-9_]+|M2_[A-Z0-9_]+' "$work/successor.out" "$work/successor.err" >&2 || true; exit 1; }
     sleep .05
   done
+  printf 'M2_SQLITE_CONTENTION_PHASE=successor_feedback_equal\n'
   stop_bounded "$pid" TERM sqlite-contention-successor; pid=
   printf 'M2_SQLITE_CONTENTION_PHASE=successor_converged\n'
   mkdir -p "$artifact"
