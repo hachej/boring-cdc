@@ -39,7 +39,20 @@
           "sha256": "0b315aba82f17a9e641f30ef82529df16120973177e6f44839eff16d4c14b457"
         }
       ],
-      "feature_ids": [],
+      "feature_ids": [
+        "INV-IDLE-PROGRESS-IS-PUBLISHED-NOT-INFERRED-INFORMATIONAL",
+        "SCN-HEARTBEAT-PERMISSION-OUTAGE",
+        "SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL",
+        "SCN-INTERNAL-CONTROL-EVENT-ROUTING",
+        "SCN-M2-HEARTBEAT-CADENCE-RETRY",
+        "SCN-M2-HEARTBEAT-CHECKPOINT-ATOMICITY",
+        "SCN-M2-HEARTBEAT-DURABLE-BEFORE-FEEDBACK",
+        "SCN-M2-HEARTBEAT-EXACTLY-ONE-ROW",
+        "SCN-M2-HEARTBEAT-GENERIC-NOOP",
+        "SCN-M2-HEARTBEAT-INCOMPLETE-RANGE",
+        "SCN-M2-HEARTBEAT-JOURNAL-FAILURE",
+        "SCN-M2-HEARTBEAT-MAXIMUM-OPERATION"
+      ],
       "owner_bead": "boring-cdc-m2-heartbeat",
       "structured_log_event_codes": [
         "HEARTBEAT_WRITE_UNAVAILABLE",
@@ -65,7 +78,20 @@
         "m2-init-recovery-cases/v1"
       ],
       "evidence": [],
-      "feature_ids": [],
+      "feature_ids": [
+        "CMD-INIT",
+        "SCN-M2-INIT-AMBIGUOUS",
+        "SCN-M2-INIT-CARDINALITY",
+        "SCN-M2-INIT-CLEAN",
+        "SCN-M2-INIT-CONFIRMATION",
+        "SCN-M2-INIT-IDEMPOTENT",
+        "SCN-M2-INIT-NO-SLOT",
+        "SCN-M2-INIT-OWNERSHIP",
+        "SCN-M2-INIT-PRIVILEGE",
+        "SCN-M2-INIT-PUBLICATION-FLAGS",
+        "SCN-M2-INIT-PUBLICATION-OWNER",
+        "SCN-M2-INIT-PUBLICATION-RELATIONS"
+      ],
       "owner_bead": "boring-cdc-m2-init-recovery",
       "structured_log_event_codes": [
         "M2_INIT_RECONCILIATION_REQUIRED"
@@ -119,7 +145,6 @@
         "CMD-JOURNAL-INSPECT-EVENT-ID-ID-EXPLAIN-JSON",
         "CMD-JOURNAL-VERIFY",
         "INV-DURABLE-BEFORE-FEEDBACK-POSTGRESQL-FLUSHLSN-AND-APPLYLSN",
-        "INV-IDLE-PROGRESS-IS-PUBLISHED-NOT-INFERRED-INFORMATIONAL",
         "INV-JOURNAL-ORDER-IS-NOT-SOURCE-ORDER-JOURNALSEQ",
         "INV-ONE-SQLITE-DATABASE-JOURNALEVENTS-IS-THE-LOGICAL",
         "REQ-DURABLE-JOURNAL-AND-RETENTION-BE-APPEND-ONLY-FOR-CAPTURED-EVENTS",
@@ -143,9 +168,17 @@
         "SCN-CRASH-AFTER-SQLITE-COMMIT-BEFORE-POSTGRESQL-FEEDBACK",
         "SCN-CRASH-BEFORE-SQLITE-COMMIT",
         "SCN-DETERMINISTIC-DESTINATION-POISON-RETRY-EXHAUSTION",
-        "SCN-IDLE-SELECTED-TABLES-WITH-UNRELATED-WAL",
         "SCN-JOURNAL-CORRUPTION-MISSING-SEQUENCE",
         "SCN-JOURNAL-PRESSURE-TRANSITIONS",
+        "SCN-M2-JOURNAL-ATOMIC",
+        "SCN-M2-JOURNAL-CRASH-BOUNDARY",
+        "SCN-M2-JOURNAL-DUPLICATE-CONFLICT",
+        "SCN-M2-JOURNAL-FAIR-SERVICE",
+        "SCN-M2-JOURNAL-FEEDBACK-ORDER",
+        "SCN-M2-JOURNAL-INVALID-LIMIT",
+        "SCN-M2-JOURNAL-RANGE",
+        "SCN-M2-JOURNAL-SCHEMA-CONFLICT",
+        "SCN-M2-JOURNAL-SLOW-STORAGE",
         "SCN-MULTI-TABLE-TRANSACTION",
         "SCN-OFFLINE-MUTATION-AND-STATUS-LISTENER-ABUSE",
         "SCN-PROCESS-JOURNAL-UPGRADE",
@@ -201,7 +234,16 @@
           "sha256": "f5092fbd0f16f07b7db4b562ac6bbfd8d7cdc2883478110256d3d0732653fe2b"
         }
       ],
-      "feature_ids": [],
+      "feature_ids": [
+        "SCN-M2-JSONL-CANDIDATE-INVISIBLE",
+        "SCN-M2-JSONL-CONTIGUOUS-START",
+        "SCN-M2-JSONL-CRASH-BOUNDARIES",
+        "SCN-M2-JSONL-DIRECT-EVIDENCE",
+        "SCN-M2-JSONL-INTENT-RANGE",
+        "SCN-M2-JSONL-PATH-SAFETY",
+        "SCN-M2-JSONL-POLICY-COMPLETION",
+        "SCN-M2-JSONL-SHARED-POLICY"
+      ],
       "owner_bead": "boring-cdc-m2-jsonl",
       "structured_log_event_codes": [
         "SEGMENT_READY"
@@ -237,7 +279,19 @@
           "sha256": "134f1f7020bbbe977275037e2642fd0bf32c9b5df00b9cae5f48c52b9e8ae3d1"
         }
       ],
-      "feature_ids": [],
+      "feature_ids": [
+        "SCN-M2-LEASE-CAS-EXPIRY",
+        "SCN-M2-LEASE-FAIL-CLOSED",
+        "SCN-M2-LEASE-IDENTITY-CYCLE",
+        "SCN-M2-LEASE-INVALID-INPUT",
+        "SCN-M2-LEASE-MIDCALL-EXPIRY",
+        "SCN-M2-LEASE-NAMESPACE",
+        "SCN-M2-LEASE-PAUSE-DETACH",
+        "SCN-M2-LEASE-PROMOTION-INTENT",
+        "SCN-M2-LEASE-RESEED",
+        "SCN-M2-LEASE-SUCCESSOR-REACQUIRE",
+        "SCN-M2-LEASE-TWO-RUNTIME-RACE"
+      ],
       "owner_bead": "boring-cdc-m2-leases",
       "structured_log_event_codes": [
         "M2_EXPLICIT_REARM_REQUIRED"
@@ -288,6 +342,18 @@
       ],
       "feature_ids": [
         "COND-OWNERSHIP-LOSS",
+        "SCN-M2-OWN-ABORT-RESTART",
+        "SCN-M2-OWN-ADMIN-SECRET",
+        "SCN-M2-OWN-CONFIRM-USABILITY",
+        "SCN-M2-OWN-COPYBOTH-LOSS",
+        "SCN-M2-OWN-NONCE-REPLAY",
+        "SCN-M2-OWN-OFFLINE-RACE",
+        "SCN-M2-OWN-RESEED-PHASES",
+        "SCN-M2-OWN-SAME-SOURCE",
+        "SCN-M2-OWN-SAME-STORE",
+        "SCN-M2-OWN-SESSION-LOSS",
+        "SCN-M2-OWN-SOCKET-BOUNDS",
+        "SCN-M2-OWN-SYMLINK-PARENT",
         "TRANS-ABORTED-BY-RESTART"
       ],
       "owner_bead": "boring-cdc-m2-ownership",
@@ -346,7 +412,15 @@
         }
       ],
       "feature_ids": [
-        "COND-JOURNAL-PRESSURE"
+        "COND-JOURNAL-PRESSURE",
+        "SCN-M2-PRESSURE-CHECKPOINT",
+        "SCN-M2-PRESSURE-METADATA",
+        "SCN-M2-PRESSURE-PAUSED-DESTINATION",
+        "SCN-M2-PRESSURE-PIN-GC",
+        "SCN-M2-PRESSURE-RESERVE",
+        "SCN-M2-PRESSURE-RUNTIME-SERVICE",
+        "SCN-M2-PRESSURE-TRANSITIONS",
+        "SCN-M2-PRESSURE-WAL-RISK"
       ],
       "owner_bead": "boring-cdc-m2-pressure",
       "structured_log_event_codes": [
@@ -418,7 +492,23 @@
           "sha256": "519d14f4de8086b1150d1208676d766e6d39e43e569f547dfd5d6b6d3f140061"
         }
       ],
-      "feature_ids": [],
+      "feature_ids": [
+        "SCN-M2-SCHEMA-AUDIT-INCARNATION-UPGRADE",
+        "SCN-M2-SCHEMA-AUDIT-INVALIDATION",
+        "SCN-M2-SCHEMA-CAS",
+        "SCN-M2-SCHEMA-CLEAN-INSTALL",
+        "SCN-M2-SCHEMA-COMMAND-IDENTITY",
+        "SCN-M2-SCHEMA-CONSTRAINTS",
+        "SCN-M2-SCHEMA-CREATION-FLOOR",
+        "SCN-M2-SCHEMA-FAILURE-AUDIT",
+        "SCN-M2-SCHEMA-FAILURE-CHECKPOINT-GUARD",
+        "SCN-M2-SCHEMA-FAILURE-TELEMETRY-UPGRADE",
+        "SCN-M2-SCHEMA-IMMUTABILITY",
+        "SCN-M2-SCHEMA-MIGRATION-CRASH",
+        "SCN-M2-SCHEMA-READER-BOUND",
+        "SCN-M2-SCHEMA-RESTART",
+        "SCN-M2-SCHEMA-WRITER-READBACK"
+      ],
       "owner_bead": "boring-cdc-m2-schema",
       "structured_log_event_codes": [
         "CREATION_FLOOR_NOT_DURABLE_PROGRESS"
@@ -460,7 +550,21 @@
           "sha256": "dd9245ab6ff867908269211079e611a2eb2fa622608b3dd9cca1c246c2c5d8a3"
         }
       ],
-      "feature_ids": [],
+      "feature_ids": [
+        "SCN-M2-SPOOL-AGGREGATE-MEMORY",
+        "SCN-M2-SPOOL-CHECKSUM",
+        "SCN-M2-SPOOL-ENOSPC-ADMISSION",
+        "SCN-M2-SPOOL-FILESYSTEM-ISOLATION",
+        "SCN-M2-SPOOL-FILESYSTEM-RESERVE",
+        "SCN-M2-SPOOL-INCREMENTAL-OVERFLOW",
+        "SCN-M2-SPOOL-LIMIT-SAFE-STOP",
+        "SCN-M2-SPOOL-NEAR-LIMIT-BURST",
+        "SCN-M2-SPOOL-ORPHAN-MALFORMED",
+        "SCN-M2-SPOOL-OVERSIZED-FINGERPRINT",
+        "SCN-M2-SPOOL-POLICY-VECTORS",
+        "SCN-M2-SPOOL-STARTUP-ACCOUNTING",
+        "SCN-M2-SPOOL-STARTUP-CLASSIFICATION"
+      ],
       "owner_bead": "boring-cdc-m2-spool",
       "structured_log_event_codes": [
         "M2_STARTUP_SPOOL_RECONCILIATION_FAILED"
@@ -511,6 +615,21 @@
         }
       ],
       "feature_ids": [
+        "SCN-M2-CAPTURE-ABRUPT-TAKEOVER",
+        "SCN-M2-CAPTURE-CLEAN-SHUTDOWN",
+        "SCN-M2-CAPTURE-CONTROL-NOOP",
+        "SCN-M2-CAPTURE-COPYBOTH-LOSS",
+        "SCN-M2-CAPTURE-CRASH-AFTER-COMMIT",
+        "SCN-M2-CAPTURE-CRASH-BEFORE-COMMIT",
+        "SCN-M2-CAPTURE-GATE-HOLD-RELEASE-STALE",
+        "SCN-M2-CAPTURE-KEEPALIVE-REQUEST",
+        "SCN-M2-CAPTURE-OVERSIZED",
+        "SCN-M2-CAPTURE-PERSISTED-RETRY",
+        "SCN-M2-CAPTURE-RECEIVE-SPOOL-JOURNAL-FEEDBACK",
+        "SCN-M2-CAPTURE-SAFE-STOP-REARM",
+        "SCN-M2-CAPTURE-SLOW-SERVICE",
+        "SCN-M2-CAPTURE-STARTUP-RECONCILE",
+        "SCN-M2-CAPTURE-TWO-STATE-PATHS",
         "TRANS-CAPTURE-SAFE-STOPPED"
       ],
       "owner_bead": "boring-cdc-m2-capture-runtime",
@@ -551,7 +670,22 @@
           "sha256": "fdba5476792576a814aeb787577a537f767e08c4a4a93888a4f289b286b7974e"
         }
       ],
-      "feature_ids": [],
+      "feature_ids": [
+        "SCN-M2-FAILURE-BOUNDED-HARNESS",
+        "SCN-M2-FAILURE-COMPLETE-HARNESS-INVENTORY",
+        "SCN-M2-FAILURE-DUE-RECURRENCE",
+        "SCN-M2-FAILURE-ENUM",
+        "SCN-M2-FAILURE-FINGERPRINT",
+        "SCN-M2-FAILURE-HARNESS-PERSISTENCE-CAS",
+        "SCN-M2-FAILURE-HOOKS",
+        "SCN-M2-FAILURE-JITTER-GOLDEN",
+        "SCN-M2-FAILURE-PERSISTENCE",
+        "SCN-M2-FAILURE-PERSISTENCE-CAS",
+        "SCN-M2-FAILURE-REARM",
+        "SCN-M2-FAILURE-RESTART-SUPPRESS",
+        "SCN-M2-FAILURE-SCHEDULE",
+        "SCN-M2-FAILURE-STALE"
+      ],
       "owner_bead": "boring-cdc-m2.1",
       "structured_log_event_codes": [
         "M2_RETRY_NOT_DUE"
