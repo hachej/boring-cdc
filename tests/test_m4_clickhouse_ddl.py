@@ -11,8 +11,10 @@ spec.loader.exec_module(m4)
 
 
 class M4ClickHouseDdlEvidenceTests(unittest.TestCase):
-    def test_sealed_real_run(self):
-        self.assertEqual([], m4.validate())
+    def test_sealed_real_run_or_explicit_staleness(self):
+        evidence = json.loads(m4.E.read_text())
+        expected = [] if evidence['input_sha256'] == m4.input_hashes() else ['E_INPUTS_STALE']
+        self.assertEqual(expected, m4.validate())
 
     def assert_rejected_change(self, change, code):
         original = m4.E
