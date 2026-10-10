@@ -91,11 +91,22 @@ def capture_observation(stdout):
     if f"test {name} ... ok" not in output or "test result: ok. 1 passed; 0 failed" not in output:
         raise RuntimeError("capture Hard-stop test did not pass")
     records = CAPTURE_MARKER.findall(output)
-    expected = {"reserve_breached": True, "safe_stopped": True,
-                "committed_transactions": 0, "feedback_packets": 0}
-    if len(records) != 1 or json.loads(records[0]) != expected:
+    if len(records) != 1:
         raise RuntimeError("capture Hard-stop observation missing or unexpected")
-    return {"probe": "capture_hard_stop", **expected}
+    observed = json.loads(records[0])
+    if (set(observed) != {"before_free_bytes", "after_free_bytes", "hard_free_bytes",
+                          "physical_fill_bytes", "safe_stopped", "committed_transactions",
+                          "feedback_packets"}
+            or not observed["before_free_bytes"] > observed["hard_free_bytes"]
+            or not observed["after_free_bytes"] <= observed["hard_free_bytes"]
+            or observed["before_free_bytes"] - observed["after_free_bytes"] < 16 << 20
+            or observed["physical_fill_bytes"] not in {32 << 20, 64 << 20, 96 << 20, 128 << 20}
+            or observed["safe_stopped"] is not True
+            or observed["committed_transactions"] != 0
+            or observed["feedback_packets"] != 0):
+        raise RuntimeError("capture Hard-stop observation missing or unexpected")
+    return {"probe": "capture_hard_stop", "physical_threshold_crossed": True,
+            "safe_stopped": True, "committed_transactions": 0, "feedback_packets": 0}
 
 
 def main():
@@ -143,7 +154,9 @@ def main():
     write(out / "state/before.json", encoded(before))
     write(out / "state/after.json", encoded(selected))
     write(out / "fault-timeline.json", encoded(timeline))
-    write(out / "config.json", encoded({"seed": SEED, "test_threads": 1, "command_output_redaction": "checkout root replaced with [REPO]"}))
+    write(out / "config.json", encoded({"seed": SEED, "test_threads": 1,
+                                        "physical_fill_max_bytes": 128 << 20 if mode == "fault" else 0,
+                                        "command_output_redaction": "checkout root replaced with [REPO]"}))
     git_commit = run(["git", "rev-parse", "HEAD"]).stdout.decode().strip()
     rustc = run(["rustc", "--version"]).stdout.decode().strip()
     write(out / "versions.json", encoded({"git_commit": git_commit, "rustc": rustc, "implementation_sha256": implementation}))
@@ -182,7 +195,7 @@ def main():
                                "endurance": False, "full_failure_matrix": False, "clean_clone": False},
                 "result": {"status": "pass", "digest": sha(b"".join(path.read_bytes() for path in result_paths)),
                            "artifacts": [path.relative_to(ROOT).as_posix() for path in result_paths],
-                           "product_faults": "stalled_sqlite_reader_wal_recycling_and_capture_reserve_breach" if mode == "fault" else "none",
+                           "product_faults": "stalled_sqlite_reader_wal_recycling_and_bounded_physical_capture_pressure" if mode == "fault" else "none",
                            "runtime_observed": True, "attempts": ["sqlite-probe-1", "sqlite-probe-2"]}}
     write(out / "manifest.json", encoded(manifest))
     write(out / "evidence.json", encoded(manifest))

@@ -3166,6 +3166,15 @@ pub mod tests {
 
     #[test]
     fn capture_reserve_breach_safe_stops_before_accepting_more_wal() {
+        use std::io::Write;
+
+        struct RemoveOnDrop(PathBuf);
+        impl Drop for RemoveOnDrop {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_file(&self.0);
+            }
+        }
+
         let (path, store) = store("pressure-hard-stop");
         let writer = JournalWriterService::new(store, [2, 2, 1, 1], 1).unwrap();
         let (_, relation) = relation();
@@ -3177,17 +3186,46 @@ pub mod tests {
             None,
         );
         let free = filesystem_free_bytes(&path).unwrap();
-        let hard = free.checked_add(1 << 30).unwrap();
+        assert!(free > 128 << 20, "pressure fault needs 128 MiB of headroom");
+        let hard = free - (16 << 20);
         let thresholds = crate::m2_pressure::PressureThresholds {
-            warning: hard + 3,
-            action: hard + 2,
-            critical: hard + 1,
+            warning: free - (8 << 20),
+            action: free - (10 << 20),
+            critical: free - (12 << 20),
             hard,
             reserve: hard,
         };
-        assert!(free < thresholds.reserve);
         runtime.enable_pressure_service(path.clone(), thresholds, "epoch-a".into(), 0);
         assert_eq!(runtime.state(), RuntimeState::Starting);
+        runtime.service_pressure().unwrap();
+        assert_eq!(runtime.state(), RuntimeState::Starting);
+
+        let before_fill = filesystem_free_bytes(&path).unwrap();
+        assert!(
+            before_fill > hard,
+            "filesystem crossed Hard before the fault"
+        );
+        let fill_path = path.with_extension("pressure-fill");
+        let _cleanup = RemoveOnDrop(fill_path.clone());
+        let mut fill = std::fs::File::create(&fill_path).unwrap();
+        let chunk = vec![0u8; 1 << 20];
+        let mut written = 0u64;
+        let mut after_fill = before_fill;
+        for _ in 0..4 {
+            for _ in 0..32 {
+                fill.write_all(&chunk).unwrap();
+                written += chunk.len() as u64;
+            }
+            fill.sync_all().unwrap();
+            after_fill = filesystem_free_bytes(&path).unwrap();
+            if after_fill <= hard {
+                break;
+            }
+        }
+        assert!(
+            after_fill <= hard,
+            "bounded physical fill did not reach Hard"
+        );
         runtime.service_pressure().unwrap();
         assert_eq!(runtime.state(), RuntimeState::CaptureSafeStopped);
         runtime.receive(&begin(42, 0x10)).unwrap();
@@ -3195,7 +3233,16 @@ pub mod tests {
         assert_eq!(runtime.committed_transactions(), 0);
         assert!(runtime.take_feedback().is_empty());
         println!(
-            "PRESSURE_CAPTURE_OBSERVATION {{\"reserve_breached\":true,\"safe_stopped\":true,\"committed_transactions\":0,\"feedback_packets\":0}}"
+            "PRESSURE_CAPTURE_OBSERVATION {}",
+            serde_json::json!({
+                "before_free_bytes": before_fill,
+                "after_free_bytes": after_fill,
+                "hard_free_bytes": hard,
+                "physical_fill_bytes": written,
+                "safe_stopped": true,
+                "committed_transactions": 0,
+                "feedback_packets": 0,
+            })
         );
         drop(runtime);
         let _ = std::fs::remove_file(path);
