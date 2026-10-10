@@ -57,19 +57,33 @@ jobs:
           TMPDIR: /var/tmp
           CARGO_TARGET_DIR: ${{ github.workspace }}/target
         run: |
+          mkdir -p "$RUNNER_TEMP/m2-init-receipt"
           for attempt in 1 2; do
-            M2_INIT_RECEIPT_DIR="$RUNNER_TEMP/m2-init-receipt/attempt-$attempt" scripts/e2e/m2_init_recovery.sh
+            mkdir -p "$RUNNER_TEMP/m2-init-receipt/attempt-$attempt"
+            M2_INIT_RECEIPT_DIR="$RUNNER_TEMP/m2-init-receipt/attempt-$attempt" scripts/e2e/m2_init_recovery.sh \
+              >"$RUNNER_TEMP/m2-init-receipt/attempt-$attempt/stdout.txt" \
+              2>"$RUNNER_TEMP/m2-init-receipt/attempt-$attempt/stderr.txt"
             python3 scripts/validate/m2_init_receipt.py "$RUNNER_TEMP/m2-init-receipt/attempt-$attempt/receipt.json"
           done
-          scripts/faults/m2_init_recovery.sh
+          scripts/faults/m2_init_recovery.sh \
+            >"$RUNNER_TEMP/m2-init-receipt/fault-stdout.txt" \
+            2>"$RUNNER_TEMP/m2-init-receipt/fault-stderr.txt"
           python3 scripts/validate/m2_init_receipt.py \
             "$RUNNER_TEMP/m2-init-receipt/attempt-1/receipt.json" \
             "$RUNNER_TEMP/m2-init-receipt/attempt-2/receipt.json"
+          python3 scripts/lib/m2_init_component.py "$RUNNER_TEMP/m2-init-receipt"
+          scripts/validate/evidence.sh artifacts/boring-cdc-m2-init-recovery
       - name: Retain M2 init live receipt
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: m2-init-receipt
           path: ${{ runner.temp }}/m2-init-receipt/attempt-*/receipt.json
+          if-no-files-found: error
+      - name: Retain M2 init component packet
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m2-init-component-packet
+          path: ${{ runner.temp }}/m2-init-head/artifacts/boring-cdc-m2-init-recovery
           if-no-files-found: error
       - name: Prepare exact M2 heartbeat evidence input
         env:

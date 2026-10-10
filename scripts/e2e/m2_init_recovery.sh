@@ -4,11 +4,14 @@ cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/tmp}"
 work=$(mktemp -d "${TMPDIR%/}/m2-init-e2e.XXXXXX"); project="m2-init-$RANDOM-$$"; port=$((58000 + $$ % 1000)); bootstrap_pid=; runtime_pid=
 : >"$work/cases.tsv"
 cleanup(){
+  local status=$?
+  trap - EXIT INT TERM
   for child in "$runtime_pid" "$bootstrap_pid"; do
     if [[ -n "$child" ]]; then kill -INT "$child" 2>/dev/null || true; wait "$child" 2>/dev/null || true; fi
   done
-  docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true
-  rm -rf "$work"
+  docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || status=1
+  rm -rf "$work" || status=1
+  exit "$status"
 }; trap cleanup EXIT INT TERM
 printf 'm2-init-password-%s\n' "$project" >"$work/postgres_password"; chmod 600 "$work/postgres_password"; export BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password"; export PGPASSWORD; PGPASSWORD=$(cat "$BORING_CDC_POSTGRES_PASSWORD_FILE")
 cat >"$work/override.yml" <<YAML
