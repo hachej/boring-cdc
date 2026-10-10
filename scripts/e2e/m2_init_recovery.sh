@@ -109,7 +109,24 @@ done
 psqlc -qc "ALTER PUBLICATION boring_publication SET (publish='insert,update,delete,truncate')"
 psqlc -qc 'GRANT SELECT ON boring_cdc_control.heartbeat TO boring_cdc_control_writer'
 expect_init_failure M2_INIT_CONTROL_PRIVILEGE_EXCESS privilege
-psqlc -qc 'REVOKE SELECT ON boring_cdc_control.heartbeat FROM boring_cdc_control_writer; GRANT boring_cdc_runtime TO boring_cdc_control_writer'
+psqlc -qc 'REVOKE SELECT ON boring_cdc_control.heartbeat FROM boring_cdc_control_writer'
+for table in heartbeat capture_fences; do
+  for privilege in INSERT DELETE; do
+    psqlc -qc "GRANT $privilege ON boring_cdc_control.$table TO boring_cdc_control_writer"
+    expect_init_failure M2_INIT_CONTROL_PRIVILEGE_EXCESS "${table}-${privilege,,}"
+    psqlc -qc "REVOKE $privilege ON boring_cdc_control.$table FROM boring_cdc_control_writer"
+  done
+  psqlc -qc "GRANT UPDATE(id) ON boring_cdc_control.$table TO boring_cdc_control_writer"
+  expect_init_failure M2_INIT_CONTROL_PRIVILEGE_EXCESS "${table}-key-update"
+  psqlc -qc "REVOKE UPDATE(id) ON boring_cdc_control.$table FROM boring_cdc_control_writer"
+done
+psqlc -qc 'REVOKE UPDATE(nonce) ON boring_cdc_control.heartbeat FROM boring_cdc_control_writer'
+expect_init_failure M2_INIT_CONTROL_PRIVILEGE_MISSING heartbeat-value-update
+psqlc -qc 'GRANT UPDATE(nonce) ON boring_cdc_control.heartbeat TO boring_cdc_control_writer'
+psqlc -qc 'REVOKE UPDATE(capture_epoch) ON boring_cdc_control.capture_fences FROM boring_cdc_control_writer'
+expect_init_failure M2_INIT_CONTROL_PRIVILEGE_MISSING fence-value-update
+psqlc -qc 'GRANT UPDATE(capture_epoch) ON boring_cdc_control.capture_fences TO boring_cdc_control_writer'
+psqlc -qc 'GRANT boring_cdc_runtime TO boring_cdc_control_writer'
 expect_init_failure M2_INIT_CONTROL_ROLE_MEMBERSHIP_EXCESS membership
 psqlc -qc 'REVOKE boring_cdc_runtime FROM boring_cdc_control_writer'
 
