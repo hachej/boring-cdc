@@ -74,6 +74,11 @@ psqlc -qc "INSERT INTO boring_cdc_control.heartbeat VALUES(1,0,'-infinity')"
 psqlc -qc 'DELETE FROM boring_cdc_control.capture_fences WHERE id=1'
 expect_init_failure M2_INIT_CONTROL_CARDINALITY_INVALID missing-fence-row
 psqlc -qc "INSERT INTO boring_cdc_control.capture_fences VALUES(1,0,0,decode(repeat('00',32),'hex'),decode(repeat('00',16),'hex'))"
+psqlc -qc "ALTER TABLE boring_cdc_control.heartbeat DROP CONSTRAINT heartbeat_id_check; INSERT INTO boring_cdc_control.heartbeat VALUES(2,0,'-infinity')"
+expect_init_failure M2_INIT_CONTROL_CARDINALITY_INVALID multiple-heartbeat-rows
+psqlc -qc 'DELETE FROM boring_cdc_control.heartbeat WHERE id=1'
+expect_init_failure M2_INIT_CONTROL_CARDINALITY_INVALID wrong-heartbeat-key
+psqlc -qc "DELETE FROM boring_cdc_control.heartbeat WHERE id=2; INSERT INTO boring_cdc_control.heartbeat VALUES(1,0,'-infinity'); ALTER TABLE boring_cdc_control.heartbeat ADD CONSTRAINT heartbeat_id_check CHECK(id=1)"
 
 
 # Existing lookalike tables must carry the exact validated byte-length checks.
