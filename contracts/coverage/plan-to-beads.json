@@ -87,7 +87,7 @@
     {
       "evidence_status": "pending",
       "id": "CMD-INIT",
-      "owner_bead": "boring-cdc-m5-ops-cli",
+      "owner_bead": "boring-cdc-m2-init-recovery",
       "source": "docs/PLAN.md",
       "source_digest": "03b9d14115431637ab9116dd99366174e587c39b725a2eca8c57b8dbed1c1b38"
     },

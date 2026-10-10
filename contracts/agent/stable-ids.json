@@ -148,7 +148,7 @@
       "evidence_status": "pending",
       "id": "CMD-INIT",
       "namespace": "CMD",
-      "owner_bead": "boring-cdc-m5-ops-cli",
+      "owner_bead": "boring-cdc-m2-init-recovery",
       "source": "docs/PLAN.md",
       "source_anchor": "boring-cdc check\nboring-cdc init\nboring-cdc run",
       "source_digest": "03b9d14115431637ab9116dd99366174e587c39b725a2eca8c57b8dbed1c1b38",
@@ -5029,7 +5029,7 @@
       "summary": "publication_drift_requires_reseed"
     }
   ],
-  "inventory_digest": "f420f28a44af21578135e8149767673e4c2774ee716f5d84c3add63afb2d4bce",
+  "inventory_digest": "a374e79bd13f0566669bae355c9ace003362e6e25feaea39be2dd8fb1ed3623a",
   "schema_version": "stable-registry/v1",
   "source_files": {
     "docs/PLAN.md": "0e4ebaa072453ea24f0dfc3f22a025b919970fe556eb0d90f026235e8029af4d",
