@@ -4,6 +4,7 @@
 import hashlib
 import json
 import pathlib
+import re
 import sys
 
 from m2_init_receipt import comparable_observation, validate
@@ -46,6 +47,22 @@ def check(packet):
                 findings.append(f"E_PACKET_E2E_OUTPUT_{number}")
         if b"M2_INIT_RECOVERY_FAULTS_OK" not in (packet / "fault-stdout.txt").read_bytes():
             findings.append("E_PACKET_FAULT_OUTPUT")
+        redaction = json.loads((packet / "redaction.json").read_text())
+        streams = redaction.get("streams", [])
+        expected_streams = {f"attempt-{number}/{stream}.txt" for number in (1, 2) for stream in ("stdout", "stderr")}
+        expected_streams.update(("fault-stdout.txt", "fault-stderr.txt"))
+        observed_streams = {
+            pathlib.PurePosixPath(entry.get("path", ""))
+            .relative_to(packet.relative_to(ROOT).as_posix())
+            .as_posix()
+            for entry in streams
+        }
+        if redaction.get("transformation") != "absolute-runner-paths/v1" or observed_streams != expected_streams or len(streams) != len(expected_streams):
+            findings.append("E_PACKET_REDACTION_RECORD")
+        for entry in streams:
+            retained = ROOT / entry["path"]
+            if entry.get("retained_sha256") != sha(retained.read_bytes()) or not re.fullmatch(r"[0-9a-f]{64}", entry.get("raw_sha256", "")):
+                findings.append("E_PACKET_STREAM_DIGEST")
         files = sorted(path for path in packet.rglob("*") if path.is_file() and path.name != "sha256.txt")
         expected_inventory = "".join(f"{sha(path.read_bytes())}  {path.relative_to(packet)}\n" for path in files)
         if (packet / "sha256.txt").read_text() != expected_inventory:
