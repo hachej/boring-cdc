@@ -214,9 +214,204 @@ pub fn server_config(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::m1_config::{Environment, LoadPurpose, load_str_for};
     use rustls::pki_types::ServerName;
     use rustls::{ClientConfig, ClientConnection};
+    use std::collections::BTreeMap;
     use std::io::Cursor;
+    use std::path::PathBuf;
+    use std::process::Command;
+    use std::sync::atomic::AtomicU64;
+
+    static NEXT_FIXTURE: AtomicU64 = AtomicU64::new(0);
+
+    struct TestTlsMaterial {
+        cert: String,
+        key: String,
+        ca: String,
+        client_cert: String,
+        client_key: String,
+        other_key: String,
+        dir: PathBuf,
+    }
+
+    impl Drop for TestTlsMaterial {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.dir);
+        }
+    }
+
+    fn test_tls_material() -> TestTlsMaterial {
+        use std::os::unix::fs::DirBuilderExt;
+        let dir = std::env::temp_dir().join(format!(
+            "boring-cdc-m2-tls-{}-{}",
+            std::process::id(),
+            NEXT_FIXTURE.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::DirBuilder::new().mode(0o700).create(&dir).unwrap();
+        fn openssl(dir: &PathBuf, args: &[&str]) {
+            let result = Command::new("openssl")
+                .args(args)
+                .current_dir(dir)
+                .output()
+                .expect("OpenSSL is required for the TLS boundary test");
+            assert!(
+                result.status.success(),
+                "OpenSSL test fixture generation failed"
+            );
+        }
+        openssl(
+            &dir,
+            &[
+                "ecparam",
+                "-name",
+                "prime256v1",
+                "-genkey",
+                "-noout",
+                "-out",
+                "ca.key",
+            ],
+        );
+        openssl(
+            &dir,
+            &[
+                "req",
+                "-new",
+                "-x509",
+                "-key",
+                "ca.key",
+                "-out",
+                "ca.crt",
+                "-days",
+                "2",
+                "-subj",
+                "/CN=Boring CDC test CA",
+            ],
+        );
+        openssl(
+            &dir,
+            &[
+                "ecparam",
+                "-name",
+                "prime256v1",
+                "-genkey",
+                "-noout",
+                "-out",
+                "server-ec.key",
+            ],
+        );
+        openssl(
+            &dir,
+            &["pkey", "-in", "server-ec.key", "-out", "server.key"],
+        );
+        openssl(
+            &dir,
+            &[
+                "req",
+                "-new",
+                "-key",
+                "server.key",
+                "-out",
+                "server.csr",
+                "-subj",
+                "/CN=localhost",
+            ],
+        );
+        std::fs::write(
+            dir.join("server.ext"),
+            "subjectAltName=DNS:localhost\nextendedKeyUsage=serverAuth\n",
+        )
+        .unwrap();
+        openssl(
+            &dir,
+            &[
+                "x509",
+                "-req",
+                "-in",
+                "server.csr",
+                "-CA",
+                "ca.crt",
+                "-CAkey",
+                "ca.key",
+                "-CAcreateserial",
+                "-out",
+                "server.crt",
+                "-days",
+                "2",
+                "-extfile",
+                "server.ext",
+            ],
+        );
+        openssl(
+            &dir,
+            &[
+                "ecparam",
+                "-name",
+                "prime256v1",
+                "-genkey",
+                "-noout",
+                "-out",
+                "client.key",
+            ],
+        );
+        openssl(
+            &dir,
+            &[
+                "req",
+                "-new",
+                "-key",
+                "client.key",
+                "-out",
+                "client.csr",
+                "-subj",
+                "/CN=Boring CDC test client",
+            ],
+        );
+        std::fs::write(dir.join("client.ext"), "extendedKeyUsage=clientAuth\n").unwrap();
+        openssl(
+            &dir,
+            &[
+                "x509",
+                "-req",
+                "-in",
+                "client.csr",
+                "-CA",
+                "ca.crt",
+                "-CAkey",
+                "ca.key",
+                "-CAcreateserial",
+                "-out",
+                "client.crt",
+                "-days",
+                "2",
+                "-extfile",
+                "client.ext",
+            ],
+        );
+        openssl(
+            &dir,
+            &[
+                "ecparam",
+                "-name",
+                "prime256v1",
+                "-genkey",
+                "-noout",
+                "-out",
+                "other-ec.key",
+            ],
+        );
+        openssl(&dir, &["pkey", "-in", "other-ec.key", "-out", "other.key"]);
+        let read = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap();
+        TestTlsMaterial {
+            cert: read("server.crt"),
+            key: read("server.key"),
+            ca: read("ca.crt"),
+            client_cert: read("client.crt"),
+            client_key: read("client.key"),
+            other_key: read("other.key"),
+            dir,
+        }
+    }
 
     #[test]
     fn malformed_material_is_rejected_with_one_redacted_code() {
@@ -238,19 +433,45 @@ mod tests {
                 Some(TLS_MATERIAL_INVALID)
             );
         }
-        let cert = include_str!("../tests/fixtures/m2_status/server.crt");
-        let key = include_str!("../tests/fixtures/m2_status/server.key");
-        let ca = include_str!("../tests/fixtures/m2_status/ca.crt");
-        assert!(server_config(cert, key, ca).is_ok());
+        let material = test_tls_material();
+        assert!(server_config(&material.cert, &material.key, &material.ca).is_ok());
         assert_eq!(
-            server_config(
-                cert,
-                include_str!("../tests/fixtures/m2_status/other.key"),
-                ca
-            )
-            .err(),
+            server_config(&material.cert, &material.other_key, &material.ca).err(),
             Some(TLS_MATERIAL_INVALID)
         );
+
+        struct Env(BTreeMap<String, String>);
+        impl Environment for Env {
+            fn get(&self, name: &str) -> Option<String> {
+                self.0.get(name).cloned()
+            }
+            fn names(&self) -> Vec<String> {
+                self.0.keys().cloned().collect()
+            }
+        }
+        let fixture = include_str!("../tests/fixtures/m1_config/representative.toml")
+            .replace("authentication = false", "authentication = true")
+            .replace("tls = false", "tls = true");
+        let env = Env(BTreeMap::from([
+            (
+                "PG_RUNTIME".into(),
+                concat!("postgres://runtime:", "secret@source/db").into(),
+            ),
+            (
+                "PG_CONTROL".into(),
+                concat!("postgres://control:", "secret@source/db").into(),
+            ),
+            (
+                "CH_RUNTIME".into(),
+                "https://runtime:secret@clickhouse".into(),
+            ),
+            ("STATUS_TLS_CERT".into(), material.cert.clone()),
+            ("STATUS_TLS_KEY".into(), material.key.clone()),
+            ("STATUS_TLS_CLIENT_CA".into(), material.ca.clone()),
+        ]));
+        let loaded = load_str_for(&fixture, &env, LoadPurpose::Run).unwrap();
+        let (cert, key, ca) = loaded.status_tls_material().unwrap();
+        assert!(server_config(cert, key, ca).is_ok());
     }
 
     #[test]
@@ -295,28 +516,18 @@ mod tests {
 
     #[test]
     fn tls_requires_a_trusted_client_certificate() {
-        let cert = include_str!("../tests/fixtures/m2_status/server.crt");
-        let key = include_str!("../tests/fixtures/m2_status/server.key");
-        let ca = include_str!("../tests/fixtures/m2_status/ca.crt");
-        let server_config = server_config(cert, key, ca).unwrap();
+        let material = test_tls_material();
+        let server_config = server_config(&material.cert, &material.key, &material.ca).unwrap();
         let mut roots = RootCertStore::empty();
         roots
-            .add(CertificateDer::from_pem_slice(ca.as_bytes()).unwrap())
+            .add(CertificateDer::from_pem_slice(material.ca.as_bytes()).unwrap())
             .unwrap();
         let roots = Arc::new(roots);
         let authorized = ClientConfig::builder()
             .with_root_certificates(roots.clone())
             .with_client_auth_cert(
-                vec![
-                    CertificateDer::from_pem_slice(
-                        include_str!("../tests/fixtures/m2_status/client.crt").as_bytes(),
-                    )
-                    .unwrap(),
-                ],
-                PrivateKeyDer::from_pem_slice(
-                    include_str!("../tests/fixtures/m2_status/client.key").as_bytes(),
-                )
-                .unwrap(),
+                vec![CertificateDer::from_pem_slice(material.client_cert.as_bytes()).unwrap()],
+                PrivateKeyDer::from_pem_slice(material.client_key.as_bytes()).unwrap(),
             )
             .unwrap();
         let anonymous = ClientConfig::builder()
