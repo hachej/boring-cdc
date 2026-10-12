@@ -563,4 +563,51 @@ mod tests {
         assert!(handshake(server_config.clone(), authorized));
         assert!(!handshake(server_config, anonymous));
     }
+
+    #[test]
+    fn loopback_listeners_serve_read_only_routes_and_release_ports() {
+        struct EmptyEnv;
+        impl Environment for EmptyEnv {
+            fn get(&self, _: &str) -> Option<String> {
+                None
+            }
+        }
+        fn get(port: u16, path: &str, method: &str) -> String {
+            let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(2)))
+                .unwrap();
+            write!(
+                stream,
+                "{method} {path} HTTP/1.1\r\nHost: localhost\r\n\r\n"
+            )
+            .unwrap();
+            let mut response = String::new();
+            stream.read_to_string(&mut response).unwrap();
+            response
+        }
+        let reservation = TcpListener::bind("127.0.0.1:0").unwrap();
+        let status_port = reservation.local_addr().unwrap().port();
+        let metrics_port = TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        drop(reservation);
+        let fixture = include_str!("../tests/fixtures/m1_config/representative.toml")
+            .replace("127.0.0.1:8787", &format!("127.0.0.1:{status_port}"))
+            .replace("127.0.0.1:8788", &format!("127.0.0.1:{metrics_port}"));
+        let config = load_str_for(&fixture, &EmptyEnv, LoadPurpose::Status).unwrap();
+        let handler: StatusHandler = Arc::new(|| Ok(b"{\"ok\":true}".to_vec()));
+        for _ in 0..2 {
+            let listeners = start(&config, handler.clone()).unwrap();
+            assert!(get(status_port, "/status", "GET").contains("{\"ok\":true}"));
+            assert!(
+                get(metrics_port, "/metrics", "GET").contains("boring_cdc_status_listener_up 1")
+            );
+            assert!(get(status_port, "/status", "POST").starts_with("HTTP/1.1 404"));
+            assert!(get(metrics_port, "/status", "GET").starts_with("HTTP/1.1 404"));
+            drop(listeners);
+        }
+    }
 }
