@@ -140,6 +140,9 @@ status_listen_addr = "127.0.0.1:8787"
 prometheus_listen_addr = "127.0.0.1:8788"
 authentication = false
 tls = false
+status_tls_cert_env = "STATUS_TLS_CERT"
+status_tls_key_env = "STATUS_TLS_KEY"
+status_tls_client_ca_env = "STATUS_TLS_CLIENT_CA"
 
 [operator]
 socket_path = "run/boring-cdc/operator.sock"
