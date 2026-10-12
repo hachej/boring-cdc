@@ -977,6 +977,48 @@ pub fn encode_operator_wire_response(
     Ok(bytes)
 }
 
+/// Decode one complete frame. The socket reader must check the prefix before allocating a body.
+pub fn decode_operator_frame(
+    frame: &[u8],
+    max_request_bytes: usize,
+) -> Result<OperatorWireRequest, CliError> {
+    let prefix: [u8; 4] = frame
+        .get(..4)
+        .and_then(|part| part.try_into().ok())
+        .ok_or_else(|| invalid("CLI_OPERATOR_FRAME_INVALID", "operator frame is invalid"))?;
+    let body_len = u32::from_be_bytes(prefix) as usize;
+    if body_len > max_request_bytes {
+        return Err(invalid(
+            "CLI_OPERATOR_FRAME_TOO_LARGE",
+            "operator request is too large",
+        ));
+    }
+    if body_len == 0 || frame.len() != body_len + 4 {
+        return Err(invalid(
+            "CLI_OPERATOR_FRAME_INVALID",
+            "operator frame is invalid",
+        ));
+    }
+    parse_operator_wire_request(&frame[4..], max_request_bytes)
+}
+
+pub fn encode_operator_response_frame(
+    response: &OperatorWireResponse,
+    max_response_bytes: usize,
+) -> Result<Vec<u8>, CliError> {
+    let body = encode_operator_wire_response(response, max_response_bytes)?;
+    let body_len = u32::try_from(body.len()).map_err(|_| {
+        invalid(
+            "CLI_OPERATOR_FRAME_TOO_LARGE",
+            "operator response is too large",
+        )
+    })?;
+    let mut frame = Vec::with_capacity(4 + body.len());
+    frame.extend_from_slice(&body_len.to_be_bytes());
+    frame.extend_from_slice(&body);
+    Ok(frame)
+}
+
 impl fmt::Debug for OperatorWireRequest {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let kind = match self {
@@ -1809,6 +1851,29 @@ pub mod tests {
                 .map(|error| error.code),
             Some("CLI_OPERATOR_FRAME_TOO_LARGE")
         );
+        let mut frame = Vec::from((valid.len() as u32).to_be_bytes());
+        frame.extend_from_slice(valid);
+        assert_eq!(decode_operator_frame(&frame, valid.len()).unwrap(), request);
+        assert_eq!(
+            decode_operator_frame(&frame[..frame.len() - 1], valid.len())
+                .err()
+                .map(|error| error.code),
+            Some("CLI_OPERATOR_FRAME_INVALID")
+        );
+        let mut extra = frame.clone();
+        extra.push(0);
+        assert_eq!(
+            decode_operator_frame(&extra, valid.len())
+                .err()
+                .map(|error| error.code),
+            Some("CLI_OPERATOR_FRAME_INVALID")
+        );
+        assert_eq!(
+            decode_operator_frame(&frame, valid.len() - 1)
+                .err()
+                .map(|error| error.code),
+            Some("CLI_OPERATOR_FRAME_TOO_LARGE")
+        );
         let response = OperatorWireResponse::Error {
             schema_version: 1,
             code: "CLI_OPERATOR_RESULT_PENDING".into(),
@@ -1820,6 +1885,12 @@ pub mod tests {
             response
         );
         assert!(!format!("{response:?}").contains("result is pending"));
+        let response_frame = encode_operator_response_frame(&response, 4_194_304).unwrap();
+        assert_eq!(
+            u32::from_be_bytes(response_frame[..4].try_into().unwrap()) as usize,
+            response_frame.len() - 4
+        );
+        assert_eq!(&response_frame[4..], bytes);
         assert_eq!(
             encode_operator_wire_response(&response, bytes.len() - 1)
                 .err()
