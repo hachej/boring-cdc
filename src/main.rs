@@ -13,6 +13,7 @@ use boring_cdc::m2_init_recovery::{complete_plan, consume_plan, execute_confirme
 use boring_cdc::m2_journal::journal_inspect_event;
 use boring_cdc::m2_reconcile::{journal_report, recover_report};
 use boring_cdc::m2_schema::open_writer;
+use boring_cdc::m2_status_transport;
 use boring_cdc::m3_bootstrap::{
     BootstrapError, BootstrapRuntime, ImporterAssignment, PrepareIntent, SessionBounds,
     digest_assignment,
@@ -21,6 +22,7 @@ use pg_walstream::CancellationToken;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::{self, Read, Write};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::thread;
@@ -217,6 +219,14 @@ fn run_m2() -> Result<(), ReaderFailure> {
         .map_err(|e| ReaderFailure::unavailable(e.code, "runtime configuration is invalid"))?;
     let mut ownership = acquire_production_ownership(&config, "production-run")
         .map_err(|e| ReaderFailure::unavailable(e.code, "capture ownership unavailable"))?;
+    let _listeners = m2_status_transport::start(
+        &config,
+        Arc::new(|| {
+            let envelope = status_command().map_err(|_| ())?;
+            serde_json::to_vec(&envelope).map_err(|_| ())
+        }),
+    )
+    .map_err(|code| ReaderFailure::unavailable(code, "status listener unavailable"))?;
     let cancellation = cancellation_for_signals();
     let signal_cancellation = cancellation.clone();
     thread::spawn(move || {
@@ -405,10 +415,8 @@ fn scaffold_check() -> io::Result<()> {
     )
 }
 
-fn serve() -> ! {
-    loop {
-        thread::sleep(Duration::from_secs(60));
-    }
+fn serve() -> Result<(), ReaderFailure> {
+    run_m2()
 }
 
 fn write_stdout(bytes: &[u8]) -> Result<(), ()> {
@@ -729,7 +737,13 @@ fn main() {
             }
             return;
         }
-        [command] if command == "serve" => serve(),
+        [command] if command == "serve" => {
+            if let Err(error) = serve() {
+                eprintln!("{}: {}", error.code, error.message);
+                std::process::exit(error.exit as i32);
+            }
+            return;
+        }
         _ => {}
     }
     if argv.is_empty() || matches!(argv.first().map(String::as_str), Some("-h" | "--help")) {

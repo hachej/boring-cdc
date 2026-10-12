@@ -28,6 +28,7 @@ pub mod m2_pressure;
 pub mod m2_reconcile;
 pub mod m2_schema;
 pub mod m2_spool;
+pub mod m2_status_transport;
 
 pub mod m3_bootstrap;
 pub mod m3_fence;
