@@ -610,4 +610,88 @@ mod tests {
             drop(listeners);
         }
     }
+
+    #[test]
+    fn live_tls_listener_requires_a_client_certificate() {
+        struct Env(BTreeMap<String, String>);
+        impl Environment for Env {
+            fn get(&self, name: &str) -> Option<String> {
+                self.0.get(name).cloned()
+            }
+            fn names(&self) -> Vec<String> {
+                self.0.keys().cloned().collect()
+            }
+        }
+        let material = test_tls_material();
+        let reservation = TcpListener::bind("127.0.0.1:0").unwrap();
+        let status_port = reservation.local_addr().unwrap().port();
+        let metrics_port = TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        drop(reservation);
+        let fixture = include_str!("../tests/fixtures/m1_config/representative.toml")
+            .replace("127.0.0.1:8787", &format!("127.0.0.1:{status_port}"))
+            .replace("127.0.0.1:8788", &format!("127.0.0.1:{metrics_port}"))
+            .replace("authentication = false", "authentication = true")
+            .replace("tls = false", "tls = true");
+        let env = Env(BTreeMap::from([
+            (
+                "PG_RUNTIME".into(),
+                concat!("postgres://runtime:", "secret@source/db").into(),
+            ),
+            (
+                "PG_CONTROL".into(),
+                concat!("postgres://control:", "secret@source/db").into(),
+            ),
+            (
+                "CH_RUNTIME".into(),
+                "https://runtime:secret@clickhouse".into(),
+            ),
+            ("STATUS_TLS_CERT".into(), material.cert.clone()),
+            ("STATUS_TLS_KEY".into(), material.key.clone()),
+            ("STATUS_TLS_CLIENT_CA".into(), material.ca.clone()),
+        ]));
+        let config = load_str_for(&fixture, &env, LoadPurpose::Run).unwrap();
+        let _listeners = start(&config, Arc::new(|| Ok(b"{\"ok\":true}".to_vec()))).unwrap();
+        let mut roots = RootCertStore::empty();
+        roots
+            .add(CertificateDer::from_pem_slice(material.ca.as_bytes()).unwrap())
+            .unwrap();
+        let roots = Arc::new(roots);
+        let authorized = ClientConfig::builder()
+            .with_root_certificates(roots.clone())
+            .with_client_auth_cert(
+                vec![CertificateDer::from_pem_slice(material.client_cert.as_bytes()).unwrap()],
+                PrivateKeyDer::from_pem_slice(material.client_key.as_bytes()).unwrap(),
+            )
+            .unwrap();
+        let anonymous = ClientConfig::builder()
+            .with_root_certificates(roots)
+            .with_no_client_auth();
+        fn fetch(port: u16, config: ClientConfig) -> std::io::Result<String> {
+            let stream = TcpStream::connect(("127.0.0.1", port))?;
+            stream.set_read_timeout(Some(Duration::from_secs(2)))?;
+            stream.set_write_timeout(Some(Duration::from_secs(2)))?;
+            let connection =
+                ClientConnection::new(Arc::new(config), ServerName::try_from("localhost").unwrap())
+                    .unwrap();
+            let mut stream = StreamOwned::new(connection, stream);
+            stream.write_all(b"GET /status HTTP/1.1\r\nHost: localhost\r\n\r\n")?;
+            let mut response = String::new();
+            let _ = stream.read_to_string(&mut response);
+            Ok(response)
+        }
+        assert!(
+            fetch(status_port, authorized)
+                .unwrap()
+                .contains("{\"ok\":true}")
+        );
+        assert!(
+            !fetch(status_port, anonymous)
+                .unwrap_or_default()
+                .contains("{\"ok\":true}")
+        );
+    }
 }
