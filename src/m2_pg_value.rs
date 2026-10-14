@@ -24,14 +24,22 @@ pub fn canonical_key(
     tuple: &[TupleValue],
     compact: bool,
 ) -> Result<Vec<CanonicalKeyComponent>, ValueError> {
-    let expected_width = if compact {
-        contract.key_columns.len()
-    } else {
-        contract.relation.columns.len()
-    };
     // The current catalog reader proves only a single-column effective key. The Article 1
     // contract records composite key positions in physical order, not necessarily index order.
-    if tuple.len() != expected_width || contract.key_columns.len() != 1 {
+    if contract.key_columns.len() != 1 {
+        return Err(ValueError::InvalidValue);
+    }
+    let compact_positions = compact
+        && tuple.len() == contract.key_columns.len()
+        && tuple
+            .iter()
+            .all(|value| matches!(value, TupleValue::Text(_)));
+    let full_positions = tuple.len() == contract.relation.columns.len()
+        && (!compact
+            || tuple.iter().enumerate().all(|(index, value)| {
+                contract.key_columns.contains(&index) || matches!(value, TupleValue::Null)
+            }));
+    if !compact_positions && !full_positions {
         return Err(ValueError::InvalidValue);
     }
     contract
@@ -45,7 +53,11 @@ pub fn canonical_key(
                 .get(column_index)
                 .ok_or(ValueError::InvalidValue)?;
             let bytes = match tuple
-                .get(if compact { key_ordinal } else { column_index })
+                .get(if compact_positions {
+                    key_ordinal
+                } else {
+                    column_index
+                })
                 .ok_or(ValueError::InvalidValue)?
             {
                 TupleValue::Text(bytes) => bytes,
@@ -519,6 +531,11 @@ mod tests {
         let full_key = canonical_key(&contract, &full, false).unwrap();
         let compact_key = canonical_key(&contract, &compact, true).unwrap();
         assert_eq!(full_key, compact_key);
+        let relation_width_key = [TupleValue::Text(b"42".to_vec()), TupleValue::Null];
+        assert_eq!(
+            canonical_key(&contract, &relation_width_key, true).unwrap(),
+            full_key
+        );
         assert_eq!(
             canonical_key_encoding(&full_key).unwrap(),
             vec![1, 1, 0, 0, 0, 20, 0, 0, 0, 8, 128, 0, 0, 0, 0, 0, 0, 42]

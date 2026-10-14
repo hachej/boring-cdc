@@ -17,7 +17,7 @@ with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
     print('E_DURABLE_SIMPLE_STATE',dict(db.execute("select coalesce(control_kind,'user'),count(*) from journal_events group by coalesce(control_kind,'user')").fetchall()),'transactions',db.execute("select count(*) from source_transactions where state='committed'").fetchone()[0])
     print('E_DURABLE_SIMPLE_CONTROL_EVENTS',db.execute("select control_kind,count(*) from journal_events group by control_kind").fetchall())
 PY
-    cat "$work/runtime-first.err" "$work/runtime-restart.err" 2>/dev/null >&2 || true
+    cat "$work/runtime-first.err" "$work/runtime-restart.err" "$work/runtime-restart.out" 2>/dev/null >&2 || true
   fi
   [[ -z "$runtime_pid" ]] || kill -KILL "$runtime_pid" >/dev/null 2>&1 || true
   [[ -z "$bootstrap_pid" ]] || kill -KILL "$bootstrap_pid" >/dev/null 2>&1 || true
@@ -219,12 +219,13 @@ sample_feedback_boundary after-catch-up
 
 psqlc -Atqc "select xmin::text||'|'||id::text from public.orders order by id" >"$work/postgres-oracle.txt"
 python3 - "$journal" "$work/postgres-oracle.txt" "$work/feedback-boundaries.jsonl" "$work/result.json" "$version" <<'PY'
-import json,sqlite3,sys
+import hashlib,json,sqlite3,sys
 journal,oracle_path,boundaries_path,result_path,version=sys.argv[1:]
 oracle={tuple(line.strip().split('|')) for line in open(oracle_path) if line.strip()}
 with sqlite3.connect(f"file:{journal}?mode=ro", uri=True) as db:
     transactions=db.execute("select transaction_id,xid,first_seq,last_seq,event_count,end_lsn from source_transactions where state='committed' order by first_seq").fetchall()
-    events=db.execute("select journal_seq,transaction_id,control_kind,cast(payload as text) from journal_events order by journal_seq").fetchall()
+    events=db.execute("select journal_seq,transaction_id,control_kind,cast(payload as text),event_id,relation_schema_fingerprint,payload_hash,canonical_payload,canonical_payload_hash from journal_events order by journal_seq").fetchall()
+    schemas={row[0] for row in db.execute("select schema_fingerprint from relation_schemas")}
     state=db.execute("select durable_transaction_end_lsn,durable_journal_seq,capture_epoch from source_state where singleton=1").fetchone()
 assert len({row[0] for row in transactions})==len(transactions)
 assert len({row[1] for row in transactions})==len(transactions)
@@ -235,8 +236,9 @@ xid_by_transaction={row[0]:row[1] for row in transactions}
 journal_set=set()
 control_events=0
 control_kinds=set()
-for _,transaction_id,control_kind,payload_text in events:
+for seq,transaction_id,control_kind,payload_text,event_id,relation_fp,raw_hash,canonical_preimage,canonical_hash in events:
     payload=json.loads(payload_text)
+    assert hashlib.sha256(payload_text.encode()).hexdigest()==raw_hash
     if control_kind is not None:
         assert control_kind in ('heartbeat','capture_fence')
         assert payload['kind']=='update' and payload['new']
@@ -244,8 +246,16 @@ for _,transaction_id,control_kind,payload_text in events:
         control_events+=1
         control_kinds.add(control_kind)
         continue
-    assert payload['kind']=='insert' and payload['new']
-    key=str(int(bytes(payload['new'][0]['bytes']).decode('ascii')))
+    assert payload['schema_version']=='boring-cdc/event/v1'
+    assert payload['event_type']=='mutation' and payload['operation']=='insert'
+    assert payload['journal_seq']==seq and payload['connector_event_id']==event_id
+    assert payload['source_version']['connector_event_id']==event_id
+    assert payload['source_version']['transaction_ordinal']>=0
+    assert payload['relation_fingerprint']==relation_fp and relation_fp in schemas
+    assert canonical_preimage and hashlib.sha256(canonical_preimage).hexdigest()==canonical_hash
+    assert payload['payload_hash']==canonical_hash
+    assert payload['canonical_key'][0]['kind']=='int64'
+    key=str(payload['canonical_key'][0]['value'])
     journal_set.add((xid_by_transaction[transaction_id],key))
 assert len(journal_set)==6
 assert control_kinds=={'heartbeat','capture_fence'}, control_kinds
@@ -295,6 +305,33 @@ result={
 }
 with open(result_path,'w') as f: json.dump(result,f,indent=2,sort_keys=True); f.write('\n')
 print(json.dumps(result,sort_keys=True))
+PY
+
+psqlc -qc "begin; set local role boring_cdc_app; update public.orders set total=555.25 where id=101; commit"
+wait_for_transactions 7
+psqlc -qc "begin; set local role boring_cdc_app; update public.orders set id=302 where id=102; commit"
+wait_for_transactions 8
+psqlc -qc "begin; set local role boring_cdc_app; delete from public.orders where id=103; commit"
+wait_for_transactions 9
+python3 - "$journal" <<'PY'
+import hashlib,json,sqlite3,sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    rows=db.execute("select journal_seq,event_id,source_row_ordinal,source_mutation_ordinal,cast(payload as text),canonical_payload,canonical_payload_hash from journal_events where control_kind is null and journal_seq>8 order by journal_seq").fetchall()
+assert len(rows)==4,rows
+events=[]
+for seq,event_id,row_ordinal,mutation_ordinal,payload_text,preimage,canonical_hash in rows:
+    event=json.loads(payload_text)
+    assert event['journal_seq']==seq and event['connector_event_id']==event_id
+    assert event['source_version']['transaction_ordinal']==row_ordinal
+    assert event['source_version']['mutation_ordinal']==mutation_ordinal
+    assert hashlib.sha256(preimage).hexdigest()==canonical_hash==event['payload_hash']
+    events.append(event)
+assert [(event['operation'],event['mutation_kind'],event['canonical_key'][0]['value']) for event in events]==[
+    ('update','upsert',101),('update','delete',102),('update','upsert',302),('delete','delete',103)
+],events
+assert events[2]['before_key'][0]['value']==102
+assert rows[1][2:4]==(0,0) and rows[2][2:4]==(0,1)
+print('DURABLE_MUTATIONS_OK update=1 key_change=2 delete=1 canonical_hashes=bound')
 PY
 
 stop_bounded "$runtime_pid" TERM runtime-restart

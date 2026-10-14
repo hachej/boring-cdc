@@ -41,6 +41,22 @@ const PHYSICAL_KEY_DOMAIN: &[u8] = b"boring-cdc/physical-key/v1";
 pub struct Fingerprint([u8; 32]);
 
 impl Fingerprint {
+    /// Parse a persisted lowercase SHA-256 fingerprint without hashing its text again.
+    pub fn from_lower_hex(value: &str) -> Option<Self> {
+        if value.len() != 64
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        {
+            return None;
+        }
+        let mut bytes = [0_u8; 32];
+        for (index, byte) in bytes.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16).ok()?;
+        }
+        Some(Self(bytes))
+    }
+
     #[must_use]
     pub fn digest(bytes: &[u8]) -> Self {
         Self(Sha256::digest(bytes).into())
