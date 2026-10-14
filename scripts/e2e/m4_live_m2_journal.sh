@@ -43,7 +43,8 @@ endpoint=$(docker port "$container" 8123/tcp)
 port=${endpoint##*:}
 export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:$port"
 export BCDC_M4_CLICKHOUSE_USER=bcdc_probe
-export BCDC_M4_CLICKHOUSE_PASSWORD="$password"
+export BCDC_M4_CLICKHOUSE_PASSWORD
+BCDC_M4_CLICKHOUSE_PASSWORD=$password
 cargo test --locked --lib \
   m4_clickhouse_wire::tests::live_contract_inspection_matches_pinned_objects_and_selector \
   -- --ignored --exact >"$work/preflight.log" 2>&1 || {
