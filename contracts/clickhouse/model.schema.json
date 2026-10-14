@@ -78,6 +78,35 @@
         "read_only": {
           "type": "boolean"
         },
+        "selector_fingerprint": {
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": { "type": "string" },
+            "conflict": { "type": "string" },
+            "domain": { "type": "string" },
+            "empty": { "type": "string" },
+            "field_framing": { "type": "string" },
+            "field_order": {
+              "items": { "type": "string" },
+              "type": "array"
+            },
+            "integer_encoding": { "type": "string" },
+            "row_scope": { "type": "string" },
+            "string_encoding": { "type": "string" }
+          },
+          "required": [
+            "algorithm",
+            "conflict",
+            "domain",
+            "empty",
+            "field_framing",
+            "field_order",
+            "integer_encoding",
+            "row_scope",
+            "string_encoding"
+          ],
+          "type": "object"
+        },
         "target": {
           "type": "string"
         }
@@ -95,6 +124,7 @@
         "payload_only_corruption",
         "payload_verification",
         "read_only",
+        "selector_fingerprint",
         "target"
       ],
       "type": "object"
