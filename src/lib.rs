@@ -27,6 +27,7 @@ pub mod m2_ownership;
 pub mod m2_pg_value;
 pub mod m2_pressure;
 pub mod m2_reconcile;
+pub mod m2_relation_contract;
 pub mod m2_schema;
 pub mod m2_spool;
 
