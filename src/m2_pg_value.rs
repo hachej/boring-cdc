@@ -3,7 +3,8 @@
 //! Returned bytes use the closed M0 scalar encoding. Unsupported values fail before a journal
 //! commit; callers must never persist the source text as a substitute for canonical bytes.
 
-use crate::m1_ordering::CanonicalValue;
+use crate::m1_decoder::{Relation, TupleValue};
+use crate::m1_ordering::{CanonicalValue, ColumnState};
 use chrono::{DateTime, NaiveDate, NaiveDateTime};
 
 const MAX_SCALAR_BYTES: usize = 1_048_576;
@@ -13,6 +14,33 @@ pub enum ValueError {
     UnsupportedType,
     InvalidValue,
     Limit,
+}
+
+/// Decode a full pgoutput tuple against the admitted relation's column order. Compact key
+/// tuples have a different shape and must be expanded by the caller before using this entry.
+pub fn canonical_columns(
+    relation: &Relation,
+    tuple: &[TupleValue],
+) -> Result<Vec<ColumnState>, ValueError> {
+    if tuple.len() != relation.columns.len() {
+        return Err(ValueError::InvalidValue);
+    }
+    relation
+        .columns
+        .iter()
+        .zip(tuple)
+        .map(|(column, value)| {
+            Ok(match value {
+                TupleValue::Null => ColumnState::Null,
+                TupleValue::UnchangedToast => ColumnState::UnchangedToast,
+                TupleValue::Text(bytes) => ColumnState::Value(canonical_scalar(
+                    column.type_oid,
+                    column.type_modifier,
+                    bytes,
+                )?),
+            })
+        })
+        .collect()
 }
 
 pub fn canonical_scalar(
@@ -364,6 +392,58 @@ fn decode_hex(hex: &[u8]) -> Result<Vec<u8>, ValueError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::m1_decoder::Column;
+
+    #[test]
+    fn full_tuple_preserves_null_and_toast_without_decoding_them() {
+        let relation = Relation {
+            id: 42,
+            namespace: "public".into(),
+            name: "orders".into(),
+            replica_identity: b'd',
+            columns: vec![
+                Column {
+                    key: true,
+                    name: "id".into(),
+                    type_oid: 20,
+                    type_modifier: -1,
+                },
+                Column {
+                    key: false,
+                    name: "blob".into(),
+                    type_oid: 17,
+                    type_modifier: -1,
+                },
+                Column {
+                    key: false,
+                    name: "memo".into(),
+                    type_oid: 25,
+                    type_modifier: -1,
+                },
+            ],
+        };
+        let tuple = [
+            TupleValue::Text(b"42".to_vec()),
+            TupleValue::UnchangedToast,
+            TupleValue::Null,
+        ];
+        assert_eq!(
+            canonical_columns(&relation, &tuple).unwrap(),
+            vec![
+                ColumnState::Value(CanonicalValue {
+                    type_oid: 20,
+                    type_modifier: -1,
+                    bytes: 42_i64.to_be_bytes().to_vec(),
+                }),
+                ColumnState::UnchangedToast,
+                ColumnState::Null,
+            ]
+        );
+        assert_eq!(
+            canonical_columns(&relation, &tuple[..2]),
+            Err(ValueError::InvalidValue)
+        );
+    }
 
     #[test]
     fn m0_scalar_vectors_match_pg_text_decoding() {
