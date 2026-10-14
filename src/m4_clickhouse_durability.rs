@@ -76,6 +76,7 @@ pub struct PreparedBatch {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RemoteEventIdentity {
+    pub journal_seq: u64,
     pub connector_event_id: String,
     pub payload_hash: String,
     /// Canonical bytes reconstructed from the actual stored key, operation, source-version,
@@ -760,12 +761,24 @@ fn destination_events(events: &[CopiedEvent]) -> Result<Vec<DestinationEvent>, D
 }
 
 fn ordered_event_digest(events: &[DestinationEvent]) -> String {
+    ordered_identity_digest(events.iter().map(|event| {
+        (
+            event.journal_seq,
+            event.connector_event_id.as_str(),
+            event.payload_hash.as_str(),
+        )
+    }))
+}
+
+fn ordered_identity_digest<'a>(
+    events: impl IntoIterator<Item = (u64, &'a str, &'a str)>,
+) -> String {
     let mut digest = Sha256::new();
     hash_part(&mut digest, b"boring-cdc/clickhouse-ordered-events/v1");
-    for event in events {
-        hash_part(&mut digest, &event.journal_seq.to_be_bytes());
-        hash_part(&mut digest, event.connector_event_id.as_bytes());
-        hash_part(&mut digest, event.payload_hash.as_bytes());
+    for (journal_seq, connector_event_id, payload_hash) in events {
+        hash_part(&mut digest, &journal_seq.to_be_bytes());
+        hash_part(&mut digest, connector_event_id.as_bytes());
+        hash_part(&mut digest, payload_hash.as_bytes());
     }
     format!("{:x}", digest.finalize())
 }
@@ -810,8 +823,9 @@ fn verify_remote_events(
         .iter()
         .map(|event| {
             (
-                event.connector_event_id.as_str(),
+                event.journal_seq,
                 (
+                    event.connector_event_id.as_str(),
                     event.payload_hash.as_str(),
                     event.canonical_payload.as_slice(),
                 ),
@@ -820,10 +834,21 @@ fn verify_remote_events(
         .collect::<BTreeMap<_, _>>();
     if expected.len() != batch.events.len() {
         return Err(DurabilityError::Conflict(
+            "duplicate journal sequence in intent",
+        ));
+    }
+    let expected_ids = batch
+        .events
+        .iter()
+        .map(|event| event.connector_event_id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    if expected_ids.len() != batch.events.len() {
+        return Err(DurabilityError::Conflict(
             "duplicate connector event ID in intent",
         ));
     }
-    let mut observed = BTreeMap::<&str, (&str, &[u8])>::new();
+    let mut observed = BTreeMap::<u64, (&str, &str, &[u8])>::new();
+    let mut observed_ids = BTreeMap::<&str, u64>::new();
     for event in remote_events {
         let recomputed = format!("{:x}", Sha256::digest(&event.canonical_payload));
         if recomputed != event.payload_hash {
@@ -832,19 +857,36 @@ fn verify_remote_events(
             ));
         }
         let value = (
+            event.connector_event_id.as_str(),
             event.payload_hash.as_str(),
             event.canonical_payload.as_slice(),
         );
-        match observed.insert(&event.connector_event_id, value) {
+        match observed.insert(event.journal_seq, value) {
             Some(previous) if previous != value => {
                 return Err(DurabilityError::Conflict(
-                    "remote connector event ID has multiple payloads",
+                    "remote journal sequence has multiple events",
+                ));
+            }
+            _ => {}
+        }
+        match observed_ids.insert(&event.connector_event_id, event.journal_seq) {
+            Some(previous) if previous != event.journal_seq => {
+                return Err(DurabilityError::Conflict(
+                    "remote connector event ID has multiple positions",
                 ));
             }
             _ => {}
         }
     }
-    if observed != expected || observed.len() as u64 != batch.marker.event_count {
+    let remote_digest = ordered_identity_digest(
+        observed
+            .iter()
+            .map(|(seq, (id, hash, _))| (*seq, *id, *hash)),
+    );
+    if observed != expected
+        || observed.len() as u64 != batch.marker.event_count
+        || remote_digest != batch.marker.ordered_event_digest
+    {
         return Err(DurabilityError::Conflict(
             "remote event set is incomplete or foreign",
         ));
@@ -954,6 +996,7 @@ mod tests {
                 .events
                 .iter()
                 .map(|event| RemoteEventIdentity {
+                    journal_seq: event.journal_seq,
                     connector_event_id: event.connector_event_id.clone(),
                     payload_hash: event.payload_hash.clone(),
                     canonical_payload: event.canonical_payload.clone(),
@@ -1067,6 +1110,38 @@ mod tests {
         let batch = prepare_batch(&transaction, &context(), range).unwrap();
         transaction.commit().unwrap();
         batch
+    }
+
+    #[test]
+    fn remote_readback_requires_the_committed_journal_positions() {
+        let (_path, mut writer) = writer("remote-order");
+        seed(&mut writer);
+        let batch = prepare(&mut writer, copied(false));
+        let mut remote = batch
+            .events
+            .iter()
+            .map(|event| RemoteEventIdentity {
+                journal_seq: event.journal_seq,
+                connector_event_id: event.connector_event_id.clone(),
+                payload_hash: event.payload_hash.clone(),
+                canonical_payload: event.canonical_payload.clone(),
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(verify_remote_events(&batch, &remote), Ok(()));
+        remote.push(remote[0].clone());
+        assert_eq!(verify_remote_events(&batch, &remote), Ok(()));
+        remote.pop();
+
+        let first_seq = remote[0].journal_seq;
+        remote[0].journal_seq = remote[1].journal_seq;
+        remote[1].journal_seq = first_seq;
+        assert_eq!(
+            verify_remote_events(&batch, &remote),
+            Err(DurabilityError::Conflict(
+                "remote event set is incomplete or foreign"
+            ))
+        );
     }
 
     #[test]
