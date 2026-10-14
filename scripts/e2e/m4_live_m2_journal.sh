@@ -57,12 +57,22 @@ if ! scripts/acceptance/durable_simple_case.sh >"$work/acceptance.log" 2>&1; the
 fi
 grep -q '^M4_LIVE_JOURNAL_OK .*abort_boundaries=5 process_abort=verified' "$work/acceptance.log"
 grep -q '^DURABLE_SIMPLE_CASE_OK ' "$work/acceptance.log"
+read -r expected_events expected_ranges < <(awk '/^M4_LIVE_JOURNAL_OK / { for (i=1; i<=NF; i++) { split($i, field, "="); if (field[1]=="events_per_case") events=field[2]; if (field[1]=="ranges_per_case") ranges=field[2] } } END { print events, ranges }' "$work/acceptance.log")
+[[ "$expected_events" =~ ^[0-9]+$ && "$expected_ranges" =~ ^[0-9]+$ ]]
+history_query='SELECT * FROM boring_cdc.event_history_v1 WHERE capture_epoch=1 AND generation IN (1,2,3,4,5) ORDER BY generation,connector_event_id,batch_id,journal_seq FORMAT JSONEachRow'
+markers_query='SELECT * FROM boring_cdc.batch_markers_v1 WHERE capture_epoch=1 AND generation IN (1,2,3,4,5) ORDER BY generation,batch_id,first_journal_seq,last_journal_seq FORMAT JSONEachRow'
+ch --query "$history_query" >"$work/history-before-restart.jsonl"
+ch --query "$markers_query" >"$work/markers-before-restart.jsonl"
 
 docker restart "$container" >/dev/null
 wait_ready
+ch --query "$history_query" >"$work/history-after-restart.jsonl"
+ch --query "$markers_query" >"$work/markers-after-restart.jsonl"
+cmp -s "$work/history-before-restart.jsonl" "$work/history-after-restart.jsonl"
+cmp -s "$work/markers-before-restart.jsonl" "$work/markers-after-restart.jsonl"
 read -r events distinct_events < <(ch --query 'SELECT count(),uniqExact(tuple(generation,connector_event_id)) FROM boring_cdc.event_history_v1 WHERE capture_epoch=1 AND generation IN (1,2,3,4,5)')
 read -r markers distinct_markers < <(ch --query 'SELECT count(),uniqExact(tuple(generation,batch_id)) FROM boring_cdc.batch_markers_v1 WHERE capture_epoch=1 AND generation IN (1,2,3,4,5)')
 conflicts=$(ch --query 'SELECT count() FROM boring_cdc.event_identity_conflicts_v1 WHERE capture_epoch=1 AND generation IN (1,2,3,4,5)')
-(( distinct_events >= 50 && events > distinct_events && conflicts == 0 ))
-(( markers >= 10 && markers == distinct_markers ))
+(( distinct_events == expected_events * 5 && events == distinct_events + 1 && conflicts == 0 ))
+(( markers == expected_ranges * 5 && markers == distinct_markers ))
 printf 'M4_LIVE_M2_DESTINATION_OK clickhouse=25.8.2.29 physical_events=%s distinct_events=%s markers=%s abort_boundaries=5 process_abort=verified restart=verified\n' "$events" "$distinct_events" "$markers"

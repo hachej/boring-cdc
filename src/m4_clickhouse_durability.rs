@@ -1072,7 +1072,8 @@ mod tests {
         }
         assert!(expected_events >= 10);
         println!(
-            "M4_LIVE_JOURNAL_OK events_per_case={expected_events} abort_boundaries=5 process_abort=verified"
+            "M4_LIVE_JOURNAL_OK events_per_case={expected_events} ranges_per_case={} abort_boundaries=5 process_abort=verified",
+            boundaries.len()
         );
     }
 
@@ -1169,7 +1170,14 @@ mod tests {
                 .unwrap();
             let remote = if state == "dispatched" {
                 assert!(!abort);
-                match reconcile_remote(&mut adapter, &batch).unwrap() {
+                let reconciliation = reconcile_remote(&mut adapter, &batch).unwrap();
+                let expected = if matches!(boundary.as_str(), "marker_inserted" | "marker") {
+                    Reconciliation::Verified
+                } else {
+                    Reconciliation::ReplayRequired
+                };
+                assert_eq!(reconciliation, expected, "{boundary}");
+                match reconciliation {
                     Reconciliation::Verified => adapter.read_batch(&batch.marker).unwrap().unwrap(),
                     Reconciliation::ReplayRequired => {
                         dispatch_and_readback(&mut adapter, &batch).unwrap()
