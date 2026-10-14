@@ -938,7 +938,7 @@ mod tests {
         let mut business = 0;
         let mut controls = 0;
         let mut key_change_pairs = 0;
-        for (first, last, count) in boundaries {
+        for &(first, last, count) in &boundaries {
             let copied = crate::m2_journal::read_complete_range(
                 std::path::Path::new(&path),
                 first - 1,
@@ -975,6 +975,101 @@ mod tests {
         );
         assert!(controls >= 2, "expected both live control kinds");
         assert_eq!(key_change_pairs, 1);
+        if std::env::var_os("BCDC_M4_CLICKHOUSE_URL").is_some() {
+            prove_live_m2_journal_reaches_clickhouse(&path, &boundaries);
+        }
+    }
+
+    fn prove_live_m2_journal_reaches_clickhouse(path: &str, boundaries: &[(u64, u64, usize)]) {
+        use crate::m4_clickhouse_adapter::ProductionClickHouseAdapter;
+        use crate::m4_clickhouse_wire::PinnedClickHouseWire;
+
+        let mut writer =
+            open_writer(std::path::Path::new(path), "article2-destination", 1, 1_000).unwrap();
+        let capture_epoch: String = writer
+            .connection()
+            .query_row(
+                "SELECT capture_epoch FROM source_state WHERE singleton=1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let context = BatchContext {
+            destination_id: "article2-clickhouse".into(),
+            capture_epoch,
+            generation: 1,
+            configuration_fingerprint: "article2-live-journal-v1".into(),
+            lease_id: "article2-lease".into(),
+            run_id: "article2-run".into(),
+        };
+        writer
+            .connection_mut()
+            .execute(
+                "INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES(?1,'clickhouse',?2,?3,?4)",
+                params![context.destination_id, context.configuration_fingerprint, context.capture_epoch, context.generation],
+            )
+            .unwrap();
+        writer
+            .connection_mut()
+            .execute(
+                "INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES(?1,?2,?3,NULL,?4,?5,?6,999999,'held')",
+                params![context.lease_id, context.destination_id, context.capture_epoch, context.generation, context.configuration_fingerprint, context.run_id],
+            )
+            .unwrap();
+        let client = clickhouse::Client::default()
+            .with_url(std::env::var("BCDC_M4_CLICKHOUSE_URL").unwrap())
+            .with_user(std::env::var("BCDC_M4_CLICKHOUSE_USER").unwrap())
+            .with_password(std::env::var("BCDC_M4_CLICKHOUSE_PASSWORD").unwrap());
+        let mut adapter =
+            ProductionClickHouseAdapter::new(PinnedClickHouseWire::new(client).unwrap());
+        let mut expected_events = 0;
+        for &(first, last, count) in boundaries {
+            let copied = crate::m2_journal::read_complete_range(
+                std::path::Path::new(path),
+                first - 1,
+                count,
+                32 * 1024 * 1024,
+                std::time::Duration::from_secs(5),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!((copied.first_seq, copied.last_seq), (first, last));
+            let transaction = writer.connection_mut().transaction().unwrap();
+            let batch = prepare_batch(&transaction, &context, copied).unwrap();
+            transaction.commit().unwrap();
+            let transaction = writer.connection_mut().transaction().unwrap();
+            mark_insert_dispatched(&transaction, &batch).unwrap();
+            transaction.commit().unwrap();
+            let remote = dispatch_and_readback(&mut adapter, &batch).unwrap();
+            assert_eq!(
+                reconcile_remote(&mut adapter, &batch),
+                Ok(Reconciliation::Verified)
+            );
+            expected_events += batch.events.len();
+            let revision = writer
+                .connection()
+                .query_row(
+                    "SELECT revision FROM destination_checkpoints WHERE destination_id=?1",
+                    [&context.destination_id],
+                    |row| row.get::<_, u64>(0),
+                )
+                .optional()
+                .unwrap();
+            let transaction = writer.connection_mut().transaction().unwrap();
+            finalize_checkpoint(&transaction, &context, &batch, &remote, revision).unwrap();
+            transaction.commit().unwrap();
+        }
+        let checkpoint: u64 = writer
+            .connection()
+            .query_row(
+                "SELECT journal_seq FROM destination_checkpoints WHERE destination_id=?1",
+                [&context.destination_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(checkpoint, boundaries.last().unwrap().1);
+        assert!(expected_events >= 10);
+        println!("M4_LIVE_JOURNAL_OK events={expected_events} checkpoint={checkpoint}");
     }
     struct FixedRandomness;
     impl Randomness for FixedRandomness {
