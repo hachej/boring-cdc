@@ -29,6 +29,10 @@ done
 [[ "${version:-}" == 25.8.2.29 ]]
 docker exec -i "$container" clickhouse-client --user bcdc_probe \
   --password "$password" --multiquery < contracts/clickhouse/ddl.sql
+docker exec "$container" clickhouse-client --user bcdc_probe --password "$password" \
+  --query "INSERT INTO boring_cdc.generation_selectors_v1 VALUES (1,9,7,'6666666666666666666666666666666666666666666666666666666666666666','ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff','7777777777777777777777777777777777777777777777777777777777777777')"
+docker exec "$container" clickhouse-client --user bcdc_probe --password "$password" \
+  --query "INSERT INTO boring_cdc.generation_selectors_v1 VALUES (1,8,6,'6666666666666666666666666666666666666666666666666666666666666666','ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff','8888888888888888888888888888888888888888888888888888888888888888')"
 
 endpoint=$(docker port "$container" 8123/tcp)
 port=${endpoint##*:}
@@ -36,6 +40,10 @@ export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:$port"
 export BCDC_M4_CLICKHOUSE_USER=bcdc_probe
 export BCDC_M4_CLICKHOUSE_PASSWORD
 BCDC_M4_CLICKHOUSE_PASSWORD=$password
+
+cargo test --locked --lib \
+  m4_clickhouse_wire::tests::live_contract_inspection_matches_pinned_objects_and_selector \
+  -- --ignored --exact
 
 cargo test --locked --lib \
   m4_clickhouse_wire::tests::live_rowbinary_history_insert_and_fresh_readback \
@@ -55,6 +63,18 @@ done
 http_ready
 cargo test --locked --lib \
   m4_clickhouse_wire::tests::live_rowbinary_history_survives_server_restart \
+  -- --ignored --exact
+
+docker exec "$container" clickhouse-client --user bcdc_probe --password "$password" \
+  --query "INSERT INTO boring_cdc.generation_selectors_v1 VALUES (1,9,8,'6666666666666666666666666666666666666666666666666666666666666666','ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff','8888888888888888888888888888888888888888888888888888888888888888')"
+cargo test --locked --lib \
+  m4_clickhouse_wire::tests::live_contract_inspection_rejects_selector_conflict \
+  -- --ignored --exact
+
+docker exec "$container" clickhouse-client --user bcdc_probe --password "$password" \
+  --query "DROP VIEW boring_cdc.live_generation_v1"
+cargo test --locked --lib \
+  m4_clickhouse_wire::tests::live_contract_inspection_rejects_missing_view \
   -- --ignored --exact
 
 printf 'M4_ROWBINARY_LIVE_OK clickhouse=%s\n' "$version"

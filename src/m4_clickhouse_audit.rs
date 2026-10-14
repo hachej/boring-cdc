@@ -30,6 +30,7 @@ pub struct AuditIdentity {
     pub configuration_fingerprint: String,
     pub capture_epoch: String,
     pub generation: u64,
+    pub promotion_fence: u64,
     pub target_checkpoint: u64,
     pub selector_fingerprint: String,
     pub object_fingerprint: String,
@@ -70,6 +71,7 @@ pub struct StoredAuditBatch {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DestinationContractObservation {
+    pub promotion_fence: u64,
     pub selector_fingerprint: String,
     pub object_fingerprint: String,
     pub settings_fingerprint: String,
@@ -83,7 +85,10 @@ pub struct AuditDispatchError;
 
 /// Production adapters execute fresh server queries and reconstruct payload bytes from columns.
 pub trait ClickHouseAuditExecutor {
-    fn inspect_contract(&mut self) -> Result<DestinationContractObservation, AuditDispatchError>;
+    fn inspect_contract(
+        &mut self,
+        identity: &AuditIdentity,
+    ) -> Result<DestinationContractObservation, AuditDispatchError>;
     fn read_stored_range(
         &mut self,
         identity: &AuditIdentity,
@@ -136,6 +141,7 @@ pub fn round_identity_digest(identity: &AuditIdentity) -> String {
         identity.configuration_fingerprint.as_str(),
         identity.capture_epoch.as_str(),
         &identity.generation.to_string(),
+        &identity.promotion_fence.to_string(),
         &identity.target_checkpoint.to_string(),
         identity.selector_fingerprint.as_str(),
         identity.object_fingerprint.as_str(),
@@ -267,9 +273,10 @@ pub fn run_audit_pass(
     }
 
     let observed = executor
-        .inspect_contract()
+        .inspect_contract(identity)
         .map_err(|_| AuditError::Dispatch)?;
-    if observed.selector_fingerprint != identity.selector_fingerprint
+    if observed.promotion_fence != identity.promotion_fence
+        || observed.selector_fingerprint != identity.selector_fingerprint
         || observed.object_fingerprint != identity.object_fingerprint
         || observed.settings_fingerprint != observed.expected_settings_fingerprint
         || observed.event_identity_conflicts != 0
@@ -500,6 +507,7 @@ fn validate_identity(identity: &AuditIdentity) -> Result<(), AuditError> {
         || identity.configuration_fingerprint.is_empty()
         || identity.capture_epoch.is_empty()
         || identity.generation == 0
+        || identity.promotion_fence == 0
         || identity.selector_fingerprint.is_empty()
         || identity.object_fingerprint.is_empty()
         || identity.contract_digest.is_empty()
@@ -535,8 +543,10 @@ mod tests {
     impl ClickHouseAuditExecutor for Fake {
         fn inspect_contract(
             &mut self,
+            _: &AuditIdentity,
         ) -> Result<DestinationContractObservation, AuditDispatchError> {
             Ok(DestinationContractObservation {
+                promotion_fence: 1,
                 selector_fingerprint: if self.drift { "wrong" } else { "selector" }.into(),
                 object_fingerprint: "objects".into(),
                 settings_fingerprint: "settings".into(),
@@ -631,6 +641,7 @@ mod tests {
             configuration_fingerprint: "cfg".into(),
             capture_epoch: "7".into(),
             generation: 1,
+            promotion_fence: 1,
             target_checkpoint: 1,
             selector_fingerprint: "selector".into(),
             object_fingerprint: "objects".into(),

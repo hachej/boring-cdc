@@ -3,7 +3,8 @@
 use crate::m1_source_identity::{CanonicalKeyComponent, PhysicalKeyHash, canonical_key_encoding};
 use crate::m4_clickhouse_adapter::{ClickHouseWire, RedactedWireError, WireRequest, WireResponse};
 use crate::m4_clickhouse_audit::{
-    AuditIdentity, StoredAuditBatch, StoredAuditEvent, marker_digest,
+    AuditIdentity, DestinationContractObservation, StoredAuditBatch, StoredAuditEvent,
+    marker_digest,
 };
 use crate::m4_clickhouse_durability::RemoteBatch;
 use crate::m4_clickhouse_durability::{BatchMarker, DestinationEvent, RemoteEventIdentity};
@@ -16,7 +17,97 @@ use std::collections::BTreeMap;
 use tokio::runtime::{Builder, Runtime};
 
 use crate::m4_clickhouse_adapter::SYNCHRONOUS_QUERY_SETTINGS;
-use crate::m4_clickhouse_schema::{BATCH_MARKERS, EVENT_HISTORY};
+use crate::m4_clickhouse_schema::{
+    BATCH_MARKERS, EVENT_HISTORY, SERVER_VERSION, object_fingerprint,
+};
+
+const EXPECTED_OBJECTS: [(&str, &str, &str); 6] = [
+    (
+        "batch_markers_v1",
+        "MergeTree",
+        "7f95b63c458fd873cdfd178cc0c3eb93589cb599b18b67ea4b4cc16b284000a6",
+    ),
+    (
+        "event_history_v1",
+        "MergeTree",
+        "e73c8f3d25cc9b492602bcc0c3f5bea8c5c31fe6e018f78450e50ee28b0e7857",
+    ),
+    (
+        "event_identity_conflicts_v1",
+        "View",
+        "e16a288d2fc597d4258b4d7525c4e7d2f67afd1a63fb6f9b49b6af743fe286aa",
+    ),
+    (
+        "generation_selectors_v1",
+        "MergeTree",
+        "51a51f357ca22db39280a8d0c6ca397aa78f63d145df85f85e9b6277792d86ea",
+    ),
+    (
+        "live_generation_v1",
+        "View",
+        "efe75aec390cdb952546d59403a09bec91ee246c4e14b46bf0ed9f45b4fd5caa",
+    ),
+    (
+        "selector_conflicts_v1",
+        "View",
+        "ddbc48206308d80c83e1e9ac8cbd34ea1a215ca436ca3e5d055550ddb124b81a",
+    ),
+];
+const EXPECTED_COLUMNS_DIGEST: &str =
+    "938f3680ed9451d6d24ca72c886cd62c9607dc66540bf7c860873754f55d52ed";
+const EXPECTED_SETTINGS_DIGEST: &str =
+    "8acec9cdf7de939b26e9882f3973a541686fc1ce80ec3e408ceef21e5f492225";
+
+fn framed_hash(digest: &mut Sha256, bytes: &[u8]) {
+    digest.update((bytes.len() as u64).to_be_bytes());
+    digest.update(bytes);
+}
+
+#[derive(Deserialize, Row)]
+struct ServerVersionRow {
+    version: String,
+}
+
+#[derive(Deserialize, Row)]
+struct SystemTableRow {
+    name: String,
+    engine: String,
+    create_table_query: String,
+}
+
+#[derive(Deserialize, Row)]
+struct SystemColumnRow {
+    table: String,
+    name: String,
+    r#type: String,
+    position: u64,
+    is_in_partition_key: u8,
+    is_in_sorting_key: u8,
+}
+
+#[derive(Deserialize, Row)]
+struct SystemSettingRow {
+    name: String,
+    value: String,
+}
+
+#[derive(Deserialize, Row)]
+struct CountRow {
+    count: u64,
+}
+
+#[derive(Deserialize, Row)]
+struct SelectorRow {
+    capture_epoch: u64,
+    promotion_fence: u64,
+    generation: u64,
+    #[serde(with = "fixed64")]
+    table_set_fingerprint: [u8; 64],
+    #[serde(with = "fixed64")]
+    compatible_anchor_id: [u8; 64],
+    #[serde(with = "fixed64")]
+    candidate_digest: [u8; 64],
+}
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Row, Serialize)]
 pub struct EventHistoryRow {
@@ -340,6 +431,186 @@ impl PinnedClickHouseWire {
         Ok(Self { client, runtime })
     }
 
+    fn inspect_server_contract(&mut self) -> Result<(String, String), RedactedWireError> {
+        let (version, tables, columns, settings) = self.runtime.block_on(async {
+            let version = self
+                .client
+                .query("SELECT version() AS version")
+                .fetch_one::<ServerVersionRow>()
+                .await
+                .map_err(|_| RedactedWireError)?;
+            let tables = self
+                .client
+                .query("SELECT name,engine,create_table_query FROM system.tables WHERE database='boring_cdc' ORDER BY name")
+                .fetch_all::<SystemTableRow>()
+                .await
+                .map_err(|_| RedactedWireError)?;
+            let columns = self
+                .client
+                .query("SELECT table,name,type,position,is_in_partition_key,is_in_sorting_key FROM system.columns WHERE database='boring_cdc' ORDER BY table,position")
+                .fetch_all::<SystemColumnRow>()
+                .await
+                .map_err(|_| RedactedWireError)?;
+            let mut insert_client = self.client.clone();
+            for (name, value) in SYNCHRONOUS_QUERY_SETTINGS {
+                insert_client = insert_client.with_option(name, value.to_string());
+            }
+            let settings = insert_client
+                .query("SELECT name,value FROM system.settings WHERE name IN ('async_insert','insert_deduplicate','insert_quorum','wait_for_async_insert') ORDER BY name")
+                .fetch_all::<SystemSettingRow>()
+                .await
+                .map_err(|_| RedactedWireError)?;
+            Ok::<_, RedactedWireError>((version, tables, columns, settings))
+        })?;
+
+        let tables_match = tables.len() == EXPECTED_OBJECTS.len()
+            && tables.iter().zip(EXPECTED_OBJECTS).all(|(row, expected)| {
+                row.name == expected.0
+                    && row.engine == expected.1
+                    && format!("{:x}", Sha256::digest(row.create_table_query.as_bytes()))
+                        == expected.2
+            });
+        let mut columns_hash = Sha256::new();
+        framed_hash(
+            &mut columns_hash,
+            b"boring-cdc/clickhouse-system-columns/v1",
+        );
+        for row in &columns {
+            for field in [
+                row.table.as_str(),
+                row.name.as_str(),
+                row.r#type.as_str(),
+                &row.position.to_string(),
+                &row.is_in_partition_key.to_string(),
+                &row.is_in_sorting_key.to_string(),
+            ] {
+                framed_hash(&mut columns_hash, field.as_bytes());
+            }
+        }
+        let objects_match = version.version == SERVER_VERSION
+            && tables_match
+            && columns.len() == 43
+            && format!("{:x}", columns_hash.finalize()) == EXPECTED_COLUMNS_DIGEST;
+
+        let expected_settings = [
+            ("async_insert", "0"),
+            ("insert_deduplicate", "0"),
+            ("insert_quorum", "1"),
+            ("wait_for_async_insert", "1"),
+        ];
+        let mut settings_hash = Sha256::new();
+        framed_hash(&mut settings_hash, b"boring-cdc/clickhouse-settings/v1");
+        framed_hash(&mut settings_hash, b"wait_end_of_query");
+        framed_hash(&mut settings_hash, b"1");
+        if SYNCHRONOUS_QUERY_SETTINGS
+            != [
+                ("async_insert", 0),
+                ("wait_for_async_insert", 1),
+                ("wait_end_of_query", 1),
+                ("insert_quorum", 1),
+                ("insert_deduplicate", 0),
+            ]
+            || settings.len() != expected_settings.len()
+            || !settings
+                .iter()
+                .zip(expected_settings)
+                .all(|(row, expected)| row.name == expected.0)
+        {
+            return Ok((String::new(), String::new()));
+        }
+        for row in &settings {
+            framed_hash(&mut settings_hash, row.name.as_bytes());
+            framed_hash(&mut settings_hash, row.value.as_bytes());
+        }
+        for table in [
+            "batch_markers_v1",
+            "event_history_v1",
+            "generation_selectors_v1",
+        ] {
+            for field in [
+                table,
+                "fsync_after_insert",
+                "1",
+                "fsync_part_directory",
+                "1",
+            ] {
+                framed_hash(&mut settings_hash, field.as_bytes());
+            }
+        }
+        let observed_settings = format!("{:x}", settings_hash.finalize());
+        Ok((
+            if objects_match {
+                object_fingerprint()
+            } else {
+                String::new()
+            },
+            observed_settings,
+        ))
+    }
+
+    fn inspect_audit_contract(
+        &mut self,
+        identity: &AuditIdentity,
+    ) -> Result<DestinationContractObservation, RedactedWireError> {
+        let (object_fingerprint, settings_fingerprint) = self.inspect_server_contract()?;
+        let epoch = identity
+            .capture_epoch
+            .parse::<u64>()
+            .map_err(|_| RedactedWireError)?;
+        let (selector_conflicts, selectors, event_conflicts, marker_conflicts) =
+            self.runtime.block_on(async {
+                let selector_conflicts = self.client.query("SELECT count() AS count FROM boring_cdc.selector_conflicts_v1 WHERE capture_epoch = ?")
+                    .bind(epoch).fetch_one::<CountRow>().await.map_err(|_| RedactedWireError)?;
+                let selectors = self.client.query("SELECT DISTINCT ?fields FROM boring_cdc.generation_selectors_v1 WHERE capture_epoch = ? AND promotion_fence = (SELECT max(promotion_fence) FROM boring_cdc.generation_selectors_v1 WHERE capture_epoch = ?) LIMIT 2")
+                    .bind(epoch).bind(epoch).fetch_all::<SelectorRow>().await.map_err(|_| RedactedWireError)?;
+                let event_conflicts = self.client.query("SELECT count() AS count FROM boring_cdc.event_identity_conflicts_v1 WHERE capture_epoch = ? AND generation = ?")
+                    .bind(epoch).bind(identity.generation).fetch_one::<CountRow>().await.map_err(|_| RedactedWireError)?;
+                let marker_conflicts = self.client.query("SELECT count() AS count FROM (SELECT batch_id FROM boring_cdc.batch_markers_v1 WHERE capture_epoch = ? AND generation = ? GROUP BY batch_id HAVING uniqExact(tuple(first_journal_seq,last_journal_seq,event_count,ordered_event_digest,object_fingerprint)) > 1)")
+                    .bind(epoch).bind(identity.generation).fetch_one::<CountRow>().await.map_err(|_| RedactedWireError)?;
+                Ok::<_, RedactedWireError>((selector_conflicts, selectors, event_conflicts, marker_conflicts))
+            })?;
+        let mut selector_fingerprint = String::new();
+        let mut promotion_fence = 0;
+        if selector_conflicts.count == 0 && selectors.len() == 1 {
+            let row = &selectors[0];
+            let fixed_fields = [
+                row.table_set_fingerprint,
+                row.compatible_anchor_id,
+                row.candidate_digest,
+            ];
+            if fixed_fields.iter().all(|field| {
+                std::str::from_utf8(field).is_ok_and(|value| value.is_ascii() && hex64(value))
+            }) && row.capture_epoch == epoch
+                && row.generation == identity.generation
+                && row.promotion_fence > 0
+            {
+                let mut hash = Sha256::new();
+                for field in [
+                    b"boring-cdc/clickhouse-selector/v1".as_slice(),
+                    epoch.to_string().as_bytes(),
+                    row.promotion_fence.to_string().as_bytes(),
+                    row.generation.to_string().as_bytes(),
+                    &fixed_fields[0],
+                    &fixed_fields[1],
+                    &fixed_fields[2],
+                ] {
+                    framed_hash(&mut hash, field);
+                }
+                selector_fingerprint = format!("{:x}", hash.finalize());
+                promotion_fence = row.promotion_fence;
+            }
+        }
+        Ok(DestinationContractObservation {
+            promotion_fence,
+            selector_fingerprint,
+            object_fingerprint,
+            settings_fingerprint,
+            expected_settings_fingerprint: EXPECTED_SETTINGS_DIGEST.into(),
+            event_identity_conflicts: event_conflicts.count,
+            marker_identity_conflicts: marker_conflicts.count,
+        })
+    }
+
     fn insert_history_rows(
         &mut self,
         batch_id: &str,
@@ -547,7 +818,16 @@ impl ClickHouseWire for PinnedClickHouseWire {
             } => self
                 .read_audit_range(identity, first_seq, last_seq, max_events)
                 .map(WireResponse::AuditBatch),
-            WireRequest::InspectContractFresh => Err(RedactedWireError),
+            WireRequest::InspectObjectsFresh => {
+                let (object, settings) = self.inspect_server_contract()?;
+                if object.is_empty() || settings != EXPECTED_SETTINGS_DIGEST {
+                    return Err(RedactedWireError);
+                }
+                Ok(WireResponse::ObjectFingerprint(object))
+            }
+            WireRequest::InspectAuditContractFresh { identity } => self
+                .inspect_audit_contract(identity)
+                .map(WireResponse::Contract),
         }
     }
 }
@@ -831,6 +1111,7 @@ mod tests {
             configuration_fingerprint: "config".into(),
             capture_epoch: marker.capture_epoch.to_string(),
             generation: marker.generation,
+            promotion_fence: 1,
             target_checkpoint: marker.last_journal_seq,
             selector_fingerprint: "selector".into(),
             object_fingerprint: marker.object_fingerprint.clone(),
@@ -877,6 +1158,97 @@ mod tests {
         };
         assert_eq!(
             EventHistoryRow::from_destination_event(&malformed, &marker),
+            Err(RedactedWireError)
+        );
+    }
+
+    #[test]
+    fn live_inspection_literals_match_the_m0_contract() {
+        let model: Value =
+            serde_json::from_str(include_str!("../contracts/clickhouse/model.json")).unwrap();
+        let inspection = &model["live_inspection"];
+        assert_eq!(inspection["server_version"].as_str(), Some(SERVER_VERSION));
+        let expected = &inspection["object_metadata"]["expected"];
+        assert_eq!(expected.as_object().unwrap().len(), EXPECTED_OBJECTS.len());
+        for (name, engine, digest) in EXPECTED_OBJECTS {
+            assert_eq!(expected[name]["engine"].as_str(), Some(engine));
+            assert_eq!(expected[name]["create_query_sha256"].as_str(), Some(digest));
+        }
+        assert_eq!(
+            inspection["object_metadata"]["columns_digest_sha256"].as_str(),
+            Some(EXPECTED_COLUMNS_DIGEST)
+        );
+        assert_eq!(
+            inspection["settings"]["expected_fingerprint_sha256"].as_str(),
+            Some(EXPECTED_SETTINGS_DIGEST)
+        );
+        assert_eq!(
+            model["audit"]["selector_fingerprint"]["domain"].as_str(),
+            Some("boring-cdc/clickhouse-selector/v1")
+        );
+    }
+
+    #[test]
+    #[ignore = "requires pinned ClickHouse 25.8.2.29 with M4 DDL and the selector probe row"]
+    fn live_contract_inspection_matches_pinned_objects_and_selector() {
+        let mut wire = PinnedClickHouseWire::new(live_client()).unwrap();
+        assert_eq!(
+            wire.execute(WireRequest::InspectObjectsFresh).unwrap(),
+            WireResponse::ObjectFingerprint(object_fingerprint())
+        );
+        let (_, marker) = golden_event();
+        let mut identity = live_audit_identity(&marker);
+        identity.capture_epoch = "1".into();
+        identity.generation = 7;
+        identity.promotion_fence = 9;
+        identity.selector_fingerprint =
+            "2d3882a0f2ad8eb3c95fc1d98de156a1093a4200a32275c46d926cecd1f8c86e".into();
+        identity.object_fingerprint = object_fingerprint();
+        let WireResponse::Contract(observed) = wire
+            .execute(WireRequest::InspectAuditContractFresh {
+                identity: &identity,
+            })
+            .unwrap()
+        else {
+            panic!("missing contract observation")
+        };
+        assert_eq!(observed.promotion_fence, identity.promotion_fence);
+        assert_eq!(observed.selector_fingerprint, identity.selector_fingerprint);
+        assert_eq!(observed.object_fingerprint, identity.object_fingerprint);
+        assert_eq!(observed.settings_fingerprint, EXPECTED_SETTINGS_DIGEST);
+        assert_eq!(observed.event_identity_conflicts, 0);
+        assert_eq!(observed.marker_identity_conflicts, 0);
+    }
+
+    #[test]
+    #[ignore = "requires a conflicting selector inserted in the pinned ClickHouse probe"]
+    fn live_contract_inspection_rejects_selector_conflict() {
+        let mut wire = PinnedClickHouseWire::new(live_client()).unwrap();
+        let (_, marker) = golden_event();
+        let mut identity = live_audit_identity(&marker);
+        identity.capture_epoch = "1".into();
+        identity.generation = 7;
+        identity.promotion_fence = 9;
+        identity.selector_fingerprint =
+            "2d3882a0f2ad8eb3c95fc1d98de156a1093a4200a32275c46d926cecd1f8c86e".into();
+        let WireResponse::Contract(observed) = wire
+            .execute(WireRequest::InspectAuditContractFresh {
+                identity: &identity,
+            })
+            .unwrap()
+        else {
+            panic!("missing contract observation")
+        };
+        assert!(observed.selector_fingerprint.is_empty());
+        assert_eq!(observed.promotion_fence, 0);
+    }
+
+    #[test]
+    #[ignore = "requires one pinned ClickHouse view removed after positive readback"]
+    fn live_contract_inspection_rejects_missing_view() {
+        let mut wire = PinnedClickHouseWire::new(live_client()).unwrap();
+        assert_eq!(
+            wire.execute(WireRequest::InspectObjectsFresh),
             Err(RedactedWireError)
         );
     }
