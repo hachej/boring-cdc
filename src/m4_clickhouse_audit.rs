@@ -337,21 +337,30 @@ fn verify_range(range: &CopiedRange, remote: &StoredAuditBatch) -> Result<(), &'
     if remote.first_journal_seq != range.first_seq || remote.last_journal_seq != range.last_seq {
         return Err("marker-range-mismatch");
     }
-    let expected = range
+    let mut expected = BTreeMap::new();
+    for event in range
         .events
         .iter()
         .filter(|event| event.control_kind.is_none())
-        .map(|event| {
-            (
-                event.journal_seq,
-                (
-                    event.event_id.as_str(),
-                    event.payload_hash.as_str(),
-                    event.payload.as_slice(),
-                ),
-            )
-        })
-        .collect::<BTreeMap<_, _>>();
+    {
+        let payload = event
+            .canonical_payload
+            .as_deref()
+            .ok_or("journal-canonical-payload-missing")?;
+        let hash = event
+            .canonical_payload_hash
+            .as_deref()
+            .ok_or("journal-canonical-payload-hash-missing")?;
+        if format!("{:x}", Sha256::digest(payload)) != hash {
+            return Err("journal-canonical-payload-hash-mismatch");
+        }
+        if expected
+            .insert(event.journal_seq, (event.event_id.as_str(), hash, payload))
+            .is_some()
+        {
+            return Err("duplicate-journal-event");
+        }
+    }
     if remote.event_count != expected.len() as u64 || remote.events.len() != expected.len() {
         return Err("event-count-mismatch");
     }
@@ -588,10 +597,10 @@ mod tests {
             source_mutation_ordinal: 0,
             relation_schema_fingerprint: None,
             control_kind: None,
-            payload: b"row".to_vec(),
-            payload_hash: sha256(b"row"),
-            canonical_payload: None,
-            canonical_payload_hash: None,
+            payload: b"raw-row".to_vec(),
+            payload_hash: sha256(b"raw-row"),
+            canonical_payload: Some(b"row".to_vec()),
+            canonical_payload_hash: Some(sha256(b"row")),
         }];
         let commit = SourceCommit {
             transaction_id: "tx".into(),
@@ -634,7 +643,7 @@ mod tests {
         (path, writer, identity)
     }
     #[test]
-    fn bounded_round_persists_fresh_coverage_and_completes() {
+    fn bounded_round_compares_canonical_payload_not_raw_journal_envelope() {
         let (path, mut writer, identity) = fixture("complete");
         let outcome = run_audit_pass(
             &path,
