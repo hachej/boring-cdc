@@ -1,7 +1,8 @@
 //! Typed rows at the pinned ClickHouse RowBinary boundary.
 
 use crate::m1_source_identity::{CanonicalKeyComponent, PhysicalKeyHash, canonical_key_encoding};
-use crate::m4_clickhouse_adapter::RedactedWireError;
+use crate::m4_clickhouse_adapter::{ClickHouseWire, RedactedWireError, WireRequest, WireResponse};
+use crate::m4_clickhouse_durability::RemoteBatch;
 use crate::m4_clickhouse_durability::{BatchMarker, DestinationEvent, RemoteEventIdentity};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use clickhouse::{Client, Row};
@@ -262,6 +263,19 @@ impl BatchMarkerRow {
             finalized_at_unix_ms,
         })
     }
+
+    fn to_marker(&self) -> Result<BatchMarker, RedactedWireError> {
+        Ok(BatchMarker {
+            capture_epoch: self.capture_epoch,
+            generation: self.generation,
+            batch_id: ascii_hex(&self.batch_id)?,
+            first_journal_seq: self.first_journal_seq,
+            last_journal_seq: self.last_journal_seq,
+            event_count: self.event_count,
+            ordered_event_digest: ascii_hex(&self.ordered_event_digest)?,
+            object_fingerprint: ascii_hex(&self.object_fingerprint)?,
+        })
+    }
 }
 
 mod fixed64 {
@@ -387,6 +401,75 @@ impl PinnedClickHouseWire {
                 .await
                 .map_err(|_| RedactedWireError)
         })
+    }
+}
+
+impl ClickHouseWire for PinnedClickHouseWire {
+    fn execute(&mut self, request: WireRequest<'_>) -> Result<WireResponse, RedactedWireError> {
+        match request {
+            WireRequest::InsertEvents { batch, settings } => {
+                if settings != SYNCHRONOUS_QUERY_SETTINGS {
+                    return Err(RedactedWireError);
+                }
+                let rows = batch
+                    .events
+                    .iter()
+                    .map(|event| EventHistoryRow::from_destination_event(event, &batch.marker))
+                    .collect::<Result<Vec<_>, _>>()?;
+                self.insert_history_rows(&rows)?;
+                Ok(WireResponse::Acknowledged)
+            }
+            WireRequest::ReadEventsFresh { batch } => {
+                let events = self
+                    .read_history_batch(&batch.marker)?
+                    .iter()
+                    .map(EventHistoryRow::remote_identity)
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(WireResponse::Events(events))
+            }
+            WireRequest::InsertMarker { marker, settings } => {
+                if settings != SYNCHRONOUS_QUERY_SETTINGS {
+                    return Err(RedactedWireError);
+                }
+                let elapsed = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|_| RedactedWireError)?;
+                let finalized_at_unix_ms =
+                    u64::try_from(elapsed.as_millis()).map_err(|_| RedactedWireError)?;
+                self.insert_marker_row(&BatchMarkerRow::from_marker(
+                    marker,
+                    finalized_at_unix_ms,
+                )?)?;
+                Ok(WireResponse::Acknowledged)
+            }
+            WireRequest::ReadBatchFresh { marker } => {
+                let rows = self.read_marker_rows(marker)?;
+                let Some(first) = rows.first() else {
+                    return Ok(WireResponse::Batch(None));
+                };
+                let stored = first.to_marker()?;
+                if stored != *marker
+                    || rows
+                        .iter()
+                        .skip(1)
+                        .any(|row| row.to_marker().ok() != Some(stored.clone()))
+                {
+                    return Err(RedactedWireError);
+                }
+                let events = self
+                    .read_history_batch(marker)?
+                    .iter()
+                    .map(EventHistoryRow::remote_identity)
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(WireResponse::Batch(Some(RemoteBatch {
+                    marker: stored,
+                    events,
+                })))
+            }
+            WireRequest::InspectContractFresh | WireRequest::ReadAuditRangeFresh { .. } => {
+                Err(RedactedWireError)
+            }
+        }
     }
 }
 
@@ -565,6 +648,7 @@ mod tests {
     };
     use crate::m1_transition_kernel::{CaptureEpoch, ReceivedLsn};
     use crate::m2_event_envelope::render_mutation;
+    use crate::m4_clickhouse_durability::PreparedBatch;
     use serde_json::json;
 
     fn golden_preimage() -> Vec<u8> {
@@ -656,7 +740,7 @@ mod tests {
             relation_schema_fingerprint: golden["relation_fingerprint"].as_str().unwrap().into(),
             payload: serde_json::to_vec(&golden).unwrap(),
             payload_hash: golden["payload_hash"].as_str().unwrap().into(),
-            canonical_payload: vec![],
+            canonical_payload: golden_preimage(),
         };
         (event, marker)
     }
@@ -706,17 +790,47 @@ mod tests {
         let (event, marker) = golden_event();
         let row = EventHistoryRow::from_destination_event(&event, &marker).unwrap();
         let mut wire = PinnedClickHouseWire::new(live_client()).unwrap();
-        wire.insert_history_rows(std::slice::from_ref(&row))
-            .unwrap();
+        let batch = PreparedBatch {
+            intent_id: marker.batch_id.clone(),
+            destination_id: "clickhouse".into(),
+            capture_epoch_text: "7".into(),
+            configuration_fingerprint: "config".into(),
+            lease_id: "lease".into(),
+            run_id: "run".into(),
+            complete_transaction_id: "tx".into(),
+            events: vec![event.clone()],
+            marker: marker.clone(),
+        };
+        assert_eq!(
+            wire.execute(WireRequest::InsertEvents {
+                batch: &batch,
+                settings: &SYNCHRONOUS_QUERY_SETTINGS,
+            })
+            .unwrap(),
+            WireResponse::Acknowledged
+        );
         let stored = wire.read_history_batch(&marker).unwrap();
         assert_eq!(stored, vec![row]);
         assert_eq!(
             stored[0].remote_identity().unwrap().payload_hash,
             event.payload_hash
         );
-        let marker_row = BatchMarkerRow::from_marker(&marker, 1).unwrap();
-        wire.insert_marker_row(&marker_row).unwrap();
-        assert_eq!(wire.read_marker_rows(&marker).unwrap(), vec![marker_row]);
+        assert_eq!(
+            wire.execute(WireRequest::InsertMarker {
+                marker: &marker,
+                settings: &SYNCHRONOUS_QUERY_SETTINGS,
+            })
+            .unwrap(),
+            WireResponse::Acknowledged
+        );
+        let WireResponse::Batch(Some(remote)) = wire
+            .execute(WireRequest::ReadBatchFresh { marker: &marker })
+            .unwrap()
+        else {
+            panic!("missing marker readback")
+        };
+        assert_eq!(remote.marker, marker);
+        assert_eq!(remote.events[0].canonical_payload, event.canonical_payload);
     }
 
     #[test]
@@ -731,7 +845,12 @@ mod tests {
             stored[0].remote_identity().unwrap().payload_hash,
             event.payload_hash
         );
-        let marker_row = BatchMarkerRow::from_marker(&marker, 1).unwrap();
-        assert_eq!(wire.read_marker_rows(&marker).unwrap(), vec![marker_row]);
+        let markers = wire.read_marker_rows(&marker).unwrap();
+        assert_eq!(markers.len(), 1);
+        assert_eq!(markers[0].to_marker().unwrap(), marker);
+        assert!(matches!(
+            wire.execute(WireRequest::ReadBatchFresh { marker: &marker }),
+            Ok(WireResponse::Batch(Some(_)))
+        ));
     }
 }
