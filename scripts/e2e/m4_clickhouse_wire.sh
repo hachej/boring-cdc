@@ -74,6 +74,28 @@ cargo test --locked --lib \
   m4_clickhouse_wire::tests::live_coordinator_adopts_marker_after_restart_and_checkpoints \
   -- --ignored --exact
 
+run_coordinator_replay_case() {
+  local generation=$1 before_test=$2
+  export BCDC_M4_COORDINATOR_GENERATION="$generation"
+  export BCDC_M4_COORDINATOR_SQLITE="$work/coordinator-$generation.sqlite"
+  cargo test --locked --lib "m4_clickhouse_wire::tests::$before_test" -- --ignored --exact
+  docker restart "$container" >/dev/null
+  endpoint=$(docker port "$container" 8123/tcp)
+  port=${endpoint##*:}
+  export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:$port"
+  for attempt in {1..120}; do
+    if http_ready; then break; fi
+    sleep 1
+  done
+  http_ready
+  cargo test --locked --lib \
+    m4_clickhouse_wire::tests::live_coordinator_replays_after_restart \
+    -- --ignored --exact
+}
+run_coordinator_replay_case 4 live_coordinator_persists_intent_before_remote_write
+run_coordinator_replay_case 5 live_coordinator_persists_history_before_marker
+unset BCDC_M4_COORDINATOR_GENERATION
+
 docker exec "$container" clickhouse-client --user bcdc_probe --password "$password" \
   --query "INSERT INTO boring_cdc.generation_selectors_v1 VALUES (1,9,8,'6666666666666666666666666666666666666666666666666666666666666666','ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff','8888888888888888888888888888888888888888888888888888888888888888')"
 cargo test --locked --lib \

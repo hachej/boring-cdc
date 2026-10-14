@@ -1085,7 +1085,10 @@ mod tests {
         BatchContext {
             destination_id: "clickhouse".into(),
             capture_epoch: "7".into(),
-            generation: 3,
+            generation: std::env::var("BCDC_M4_COORDINATOR_GENERATION")
+                .ok()
+                .map(|value| value.parse().unwrap())
+                .unwrap_or(3),
             configuration_fingerprint: "cfg".into(),
             lease_id: "lease".into(),
             run_id: "run".into(),
@@ -1124,6 +1127,46 @@ mod tests {
             prepare_batch(&transaction, &coordinator_context(), coordinator_range()).unwrap();
         transaction.commit().unwrap();
         batch
+    }
+
+    fn seed_coordinator(writer: &mut WriterConnection) {
+        let context = coordinator_context();
+        writer.connection_mut().execute("INSERT INTO source_transactions(transaction_id,capture_epoch,source_system_id,database_id,slot_name,xid,end_lsn,first_seq,last_seq,event_count,payload_checksum,state) VALUES('tx-live','7','source','db','slot','1','0000000000000002',1,1,1,'sum','committed')", []).unwrap();
+        writer.connection_mut().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('clickhouse','clickhouse','cfg','7',?1)", [context.generation]).unwrap();
+        writer.connection_mut().execute("INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES('lease','clickhouse','7',NULL,?1,'cfg','run',999999,'held')", [context.generation]).unwrap();
+    }
+
+    fn assert_no_checkpoint(writer: &WriterConnection) {
+        assert_eq!(
+            writer
+                .connection()
+                .query_row("SELECT count() FROM destination_checkpoints", [], |row| row
+                    .get::<_, u64>(0))
+                .unwrap(),
+            0
+        );
+    }
+
+    fn finish_coordinator_batch(
+        writer: &mut WriterConnection,
+        batch: &PreparedBatch,
+        adapter: &mut impl ClickHouseBatchExecutor,
+    ) {
+        let remote = dispatch_and_readback(adapter, batch).unwrap();
+        let transaction = writer.connection_mut().transaction().unwrap();
+        finalize_checkpoint(&transaction, &coordinator_context(), batch, &remote, None).unwrap();
+        transaction.commit().unwrap();
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT journal_seq FROM destination_checkpoints",
+                    [],
+                    |row| row.get::<_, u64>(0)
+                )
+                .unwrap(),
+            1
+        );
     }
 
     fn golden_event() -> (DestinationEvent, BatchMarker) {
@@ -1280,9 +1323,7 @@ mod tests {
     #[ignore = "requires pinned ClickHouse and a fresh coordinator SQLite path"]
     fn live_coordinator_persists_intent_and_marker_before_checkpoint() {
         let mut writer = open_writer(&coordinator_path(), "run", 1, 1_000).unwrap();
-        writer.connection_mut().execute("INSERT INTO source_transactions(transaction_id,capture_epoch,source_system_id,database_id,slot_name,xid,end_lsn,first_seq,last_seq,event_count,payload_checksum,state) VALUES('tx-live','7','source','db','slot','1','0000000000000002',1,1,1,'sum','committed')", []).unwrap();
-        writer.connection_mut().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('clickhouse','clickhouse','cfg','7',3)", []).unwrap();
-        writer.connection_mut().execute("INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES('lease','clickhouse','7',NULL,3,'cfg','run',999999,'held')", []).unwrap();
+        seed_coordinator(&mut writer);
         let batch = coordinator_batch(&mut writer);
         let transaction = writer.connection_mut().transaction().unwrap();
         mark_insert_dispatched(&transaction, &batch).unwrap();
@@ -1302,13 +1343,58 @@ mod tests {
                 .unwrap(),
             "dispatched"
         );
+        assert_no_checkpoint(&writer);
+    }
+
+    #[test]
+    #[ignore = "requires pinned ClickHouse and a fresh coordinator SQLite path"]
+    fn live_coordinator_persists_intent_before_remote_write() {
+        let mut writer = open_writer(&coordinator_path(), "run", 1, 1_000).unwrap();
+        seed_coordinator(&mut writer);
+        let batch = coordinator_batch(&mut writer);
+        let transaction = writer.connection_mut().transaction().unwrap();
+        mark_insert_dispatched(&transaction, &batch).unwrap();
+        transaction.commit().unwrap();
+        assert_no_checkpoint(&writer);
+    }
+
+    #[test]
+    #[ignore = "requires pinned ClickHouse and a fresh coordinator SQLite path"]
+    fn live_coordinator_persists_history_before_marker() {
+        let mut writer = open_writer(&coordinator_path(), "run", 1, 1_000).unwrap();
+        seed_coordinator(&mut writer);
+        let batch = coordinator_batch(&mut writer);
+        let transaction = writer.connection_mut().transaction().unwrap();
+        mark_insert_dispatched(&transaction, &batch).unwrap();
+        transaction.commit().unwrap();
+        let wire = PinnedClickHouseWire::new(live_client()).unwrap();
+        let mut adapter = ProductionClickHouseAdapter::new(wire);
+        adapter.insert_events_synchronously(&batch).unwrap();
+        assert_eq!(adapter.read_events(&batch).unwrap().len(), 1);
+        assert_no_checkpoint(&writer);
+    }
+
+    #[test]
+    #[ignore = "requires a preceding coordinator intent and restarted pinned ClickHouse server"]
+    fn live_coordinator_replays_after_restart() {
+        let mut writer = open_writer(&coordinator_path(), "run", 1, 1_000).unwrap();
+        let batch = coordinator_batch(&mut writer);
+        let wire = PinnedClickHouseWire::new(live_client()).unwrap();
+        let mut adapter = ProductionClickHouseAdapter::new(wire);
         assert_eq!(
-            writer
-                .connection()
-                .query_row("SELECT count() FROM destination_checkpoints", [], |row| row
-                    .get::<_, u64>(0))
-                .unwrap(),
-            0
+            reconcile_remote(&mut adapter, &batch),
+            Ok(Reconciliation::ReplayRequired)
+        );
+        finish_coordinator_batch(&mut writer, &batch, &mut adapter);
+        let physical_count = if coordinator_context().generation == 5 {
+            2
+        } else {
+            1
+        };
+        assert_eq!(adapter.read_events(&batch).unwrap().len(), physical_count);
+        assert_eq!(
+            reconcile_remote(&mut adapter, &batch),
+            Ok(Reconciliation::Verified)
         );
     }
 
