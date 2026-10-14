@@ -9,6 +9,7 @@ use crate::m1_control_fixtures::PublicationSpec;
 use crate::m2_ownership::{OwnerKind, OwnershipError, OwnershipGuard, SourceLockSession};
 use crate::m2_schema::open_writer;
 use pg_walstream::PgReplicationConnection;
+use rusqlite::OptionalExtension;
 use sha2::{Digest, Sha256};
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
@@ -505,17 +506,38 @@ CREATE TABLE IF NOT EXISTS boring_cdc_control.capture_fences(id smallint PRIMARY
         .duration_since(UNIX_EPOCH)
         .map_err(|_| InitFailure::at("clock", "M2_INIT_CLOCK_INVALID"))?
         .as_millis() as i64;
-    let writer = open_writer(
+    let mut writer = open_writer(
         Path::new(&config.public().storage.sqlite_path),
         run_id,
         1,
         now,
     )
     .map_err(|_| InitFailure::at("sqlite", "M2_INIT_SQLITE_FAILED"))?;
-    let epoch = config.fingerprints().runtime.as_str();
-    writer.connection().execute("INSERT OR IGNORE INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,?1,?2,?3,?4,?5,'pgoutput',?6,'pgoutput-v1')",rusqlite::params![epoch,system,timeline,database,config.public().source.slot,publication_fingerprint]).map_err(|_| InitFailure::at("sqlite","M2_INIT_IDENTITY_PERSIST_FAILED"))?;
-    let readback: (String, String, String, String, String, String) = writer
-        .connection()
+    let recovery = crate::m2_capture_runtime::capture_recovery_fingerprints(config.public())
+        .map_err(|_| InitFailure::at("configuration", "M2_INIT_CONFIG_FINGERPRINT_INVALID"))?;
+    let transaction = writer
+        .connection_mut()
+        .transaction()
+        .map_err(|_| InitFailure::at("sqlite", "M2_INIT_IDENTITY_PERSIST_FAILED"))?;
+    let existing_epoch: Option<String> = transaction
+        .query_row(
+            "SELECT capture_epoch FROM source_state WHERE singleton=1",
+            [],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|_| InitFailure::at("sqlite", "M2_INIT_IDENTITY_READBACK_FAILED"))?;
+    let epoch = existing_epoch.unwrap_or_else(|| "1".into());
+    if epoch
+        .parse::<u64>()
+        .ok()
+        .filter(|value| *value > 0)
+        .is_none()
+    {
+        return Err(InitFailure::at("sqlite", "M2_INIT_EPOCH_INVALID"));
+    }
+    transaction.execute("INSERT OR IGNORE INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,?1,?2,?3,?4,?5,'pgoutput',?6,'pgoutput-v1')",rusqlite::params![epoch,system,timeline,database,config.public().source.slot,publication_fingerprint]).map_err(|_| InitFailure::at("sqlite","M2_INIT_IDENTITY_PERSIST_FAILED"))?;
+    let readback: (String, String, String, String, String, String) = transaction
         .query_row(
             "SELECT capture_epoch,source_system_id,timeline_id,database_id,slot_name,publication_fingerprint FROM source_state WHERE singleton=1",
             [],
@@ -524,7 +546,7 @@ CREATE TABLE IF NOT EXISTS boring_cdc_control.capture_fences(id smallint PRIMARY
         .map_err(|_| InitFailure::at("sqlite", "M2_INIT_IDENTITY_READBACK_FAILED"))?;
     if readback
         != (
-            epoch.into(),
+            epoch.clone(),
             system,
             timeline,
             database,
@@ -534,6 +556,21 @@ CREATE TABLE IF NOT EXISTS boring_cdc_control.capture_fences(id smallint PRIMARY
     {
         return Err(InitFailure::at("sqlite", "M2_INIT_IDENTITY_DRIFT"));
     }
+    transaction.execute("INSERT OR IGNORE INTO capture_configuration_receipts(singleton,capture_epoch,runtime_fingerprint,non_limit_fingerprint,limit_fingerprint) VALUES(1,?1,?2,?3,?4)",rusqlite::params![epoch,config.fingerprints().runtime,recovery.non_limit,recovery.limits]).map_err(|_|InitFailure::at("sqlite","M2_INIT_CONFIG_RECEIPT_FAILED"))?;
+    let receipt: (String, String, String, String) = transaction.query_row("SELECT capture_epoch,runtime_fingerprint,non_limit_fingerprint,limit_fingerprint FROM capture_configuration_receipts WHERE singleton=1",[],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).map_err(|_|InitFailure::at("sqlite","M2_INIT_CONFIG_RECEIPT_FAILED"))?;
+    if receipt
+        != (
+            epoch,
+            config.fingerprints().runtime.clone(),
+            recovery.non_limit,
+            recovery.limits,
+        )
+    {
+        return Err(InitFailure::at("sqlite", "M2_INIT_CONFIG_RECEIPT_DRIFT"));
+    }
+    transaction
+        .commit()
+        .map_err(|_| InitFailure::at("sqlite", "M2_INIT_IDENTITY_PERSIST_FAILED"))?;
     Ok(InitReceipt {
         schema_version: "m2-init-recovery/v1",
         outcome: "initialized",

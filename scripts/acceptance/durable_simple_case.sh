@@ -225,7 +225,7 @@ oracle={tuple(line.strip().split('|')) for line in open(oracle_path) if line.str
 with sqlite3.connect(f"file:{journal}?mode=ro", uri=True) as db:
     transactions=db.execute("select transaction_id,xid,first_seq,last_seq,event_count,end_lsn from source_transactions where state='committed' order by first_seq").fetchall()
     events=db.execute("select journal_seq,transaction_id,control_kind,cast(payload as text) from journal_events order by journal_seq").fetchall()
-    state=db.execute("select durable_transaction_end_lsn,durable_journal_seq from source_state where singleton=1").fetchone()
+    state=db.execute("select durable_transaction_end_lsn,durable_journal_seq,capture_epoch from source_state where singleton=1").fetchone()
 assert len({row[0] for row in transactions})==len(transactions)
 assert len({row[1] for row in transactions})==len(transactions)
 assert all(row[4]==1 and row[2]==row[3] for row in transactions)
@@ -251,6 +251,7 @@ assert len(journal_set)==6
 assert control_kinds=={'heartbeat','capture_fence'}, control_kinds
 assert journal_set==oracle, {'postgres':sorted(oracle),'journal':sorted(journal_set)}
 assert state[1]==len(events) and state[0]==transactions[-1][5]
+assert state[2]=='1', ('capture epoch must be an M0 UInt64',state[2])
 boundaries=[json.loads(line) for line in open(boundaries_path)]
 assert boundaries and all(item['bounded'] for item in boundaries)
 # WAL-retention regression guard. restart_lsn is what lets PostgreSQL recycle WAL: a connector
@@ -290,6 +291,7 @@ result={
   'confirmed_flush_never_exceeded_durable_boundary':True,
   'restart_lsn_never_regressed':True,
   'final_durable_lsn':state[0],
+  'capture_epoch':state[2],
 }
 with open(result_path,'w') as f: json.dump(result,f,indent=2,sort_keys=True); f.write('\n')
 print(json.dumps(result,sort_keys=True))

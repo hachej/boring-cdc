@@ -1968,12 +1968,12 @@ impl crate::m2_reconcile::ArchiveReconciler for ProductionArchiveInspection {
     }
 }
 
-struct CaptureRecoveryFingerprints {
-    non_limit: String,
-    limits: String,
+pub(crate) struct CaptureRecoveryFingerprints {
+    pub(crate) non_limit: String,
+    pub(crate) limits: String,
 }
 
-fn capture_recovery_fingerprints(
+pub(crate) fn capture_recovery_fingerprints(
     public: &crate::m1_config::PublicConfig,
 ) -> Result<CaptureRecoveryFingerprints, CaptureFailure> {
     let mut stable = serde_json::to_value(public)
@@ -2309,7 +2309,12 @@ pub async fn run_loaded_config(
                 .connection_mut()
                 .transaction()
                 .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_INIT_FAILED"))?;
-            tx.execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,?1,?2,?3,?4,?5,?6,?7,?8)",rusqlite::params![config.fingerprints().runtime,live_source.source_system_id,live_source.timeline_id,live_source.database_id,live_source.slot_name,live_source.plugin,live_source.publication_fingerprint,live_source.protocol_fingerprint]).map_err(|_|CaptureFailure::at("journal","M2_SOURCE_STATE_INIT_FAILED"))?;
+            tx.execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,?1,?2,?3,?4,?5,?6,?7,?8)",rusqlite::params!["1",live_source.source_system_id,live_source.timeline_id,live_source.database_id,live_source.slot_name,live_source.plugin,live_source.publication_fingerprint,live_source.protocol_fingerprint]).map_err(|_|CaptureFailure::at("journal","M2_SOURCE_STATE_INIT_FAILED"))?;
+            tx.execute(
+                "INSERT INTO capture_configuration_receipts(singleton,capture_epoch,runtime_fingerprint,non_limit_fingerprint,limit_fingerprint) VALUES(1,'1',?1,?2,?3)",
+                rusqlite::params![config.fingerprints().runtime,recovery_fingerprints.non_limit,recovery_fingerprints.limits],
+            )
+            .map_err(|_| CaptureFailure::at("journal", "M2_RECOVERY_RECEIPT_CREATE_FAILED"))?;
             tx.commit()
                 .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_INIT_FAILED"))?;
         } else if source_rows != 1 {
@@ -2326,6 +2331,17 @@ pub async fn run_loaded_config(
                 |row| row.get::<_, String>(0),
             )
             .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_READ_FAILED"))?;
+        if capture_epoch
+            .parse::<u64>()
+            .ok()
+            .filter(|epoch| *epoch > 0)
+            .is_none()
+        {
+            return Err(CaptureFailure::at(
+                "journal",
+                "M2_CAPTURE_EPOCH_NOT_CANONICAL",
+            ));
+        }
         recovery_receipt = load_capture_configuration_receipt(
             &mut initial,
             &capture_epoch,
