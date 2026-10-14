@@ -41,7 +41,12 @@ pub struct RelationSchema {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JournalEvent {
     pub event_id: String,
+    /// Physical zero-based offset among all persisted events in this source transaction.
     pub transaction_ordinal: u32,
+    /// Decoded pgoutput row ordinal, shared by both sides of a key change.
+    pub source_row_ordinal: u32,
+    /// Zero for ordinary rows and old-key deletes, one for new-key upserts.
+    pub source_mutation_ordinal: u8,
     pub relation_schema_fingerprint: Option<String>,
     pub control_kind: Option<String>,
     pub payload: Vec<u8>,
@@ -280,7 +285,7 @@ impl JournalStore {
             let seq = next + offset as i64;
             transaction
                 .execute(
-                    "INSERT INTO journal_events VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+                    "INSERT INTO journal_events(journal_seq,event_id,transaction_id,transaction_ordinal,capture_epoch,relation_schema_fingerprint,control_kind,payload,payload_hash,source_row_ordinal,source_mutation_ordinal) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
                     params![
                         seq,
                         event.event_id,
@@ -290,7 +295,9 @@ impl JournalStore {
                         event.relation_schema_fingerprint,
                         event.control_kind,
                         event.payload,
-                        event.payload_hash
+                        event.payload_hash,
+                        event.source_row_ordinal,
+                        event.source_mutation_ordinal,
                     ],
                 )
                 .map_err(|e| {
@@ -414,10 +421,28 @@ fn validate_commit(commit: &SourceCommit, limits: CommitLimits) -> Result<(), Jo
         return Err(JournalError::Invalid("non-canonical end LSN"));
     }
     let mut bytes = 0usize;
+    let mut previous_source_position: Option<(u32, u8)> = None;
     for (index, event) in commit.events.iter().enumerate() {
         if event.transaction_ordinal as usize != index {
             return Err(JournalError::Invalid("non-contiguous transaction ordinal"));
         }
+        let source_position = (event.source_row_ordinal, event.source_mutation_ordinal);
+        let valid_source_position = match previous_source_position {
+            None => source_position == (0, 0),
+            Some((row, mutation)) if event.source_row_ordinal == row => {
+                mutation == 0 && event.source_mutation_ordinal == 1
+            }
+            Some((row, _)) => {
+                row.checked_add(1) == Some(event.source_row_ordinal)
+                    && event.source_mutation_ordinal == 0
+            }
+        };
+        if !valid_source_position {
+            return Err(JournalError::Invalid(
+                "non-contiguous source mutation position",
+            ));
+        }
+        previous_source_position = Some(source_position);
         if event
             .control_kind
             .as_deref()
@@ -485,12 +510,14 @@ fn verify_duplicate(
             "source transaction positional conflict",
         ));
     }
-    let mut stmt=tx.prepare("SELECT event_id,transaction_ordinal,relation_schema_fingerprint,control_kind,payload,payload_hash FROM journal_events WHERE transaction_id=?1 ORDER BY journal_seq")?;
+    let mut stmt=tx.prepare("SELECT event_id,transaction_ordinal,relation_schema_fingerprint,control_kind,payload,payload_hash,source_row_ordinal,source_mutation_ordinal FROM journal_events WHERE transaction_id=?1 ORDER BY journal_seq")?;
     let stored = stmt
         .query_map([txid], |r| {
             Ok(JournalEvent {
                 event_id: r.get(0)?,
                 transaction_ordinal: r.get(1)?,
+                source_row_ordinal: r.get(6)?,
+                source_mutation_ordinal: r.get(7)?,
                 relation_schema_fingerprint: r.get(2)?,
                 control_kind: r.get(3)?,
                 payload: r.get(4)?,
@@ -525,6 +552,9 @@ pub struct CopiedEvent {
     pub transaction_ordinal: u64,
     /// Original mutation ordinal persisted by capture.
     pub mutation_ordinal: u32,
+    /// Source position from the M0 event ABI; distinct from copied-range grouping offsets.
+    pub source_row_ordinal: u32,
+    pub source_mutation_ordinal: u8,
     pub event_id: String,
     pub relation_schema_fingerprint: Option<String>,
     pub source_relation_id: Option<String>,
@@ -643,7 +673,7 @@ pub fn read_complete_range(
             .max()
             .map_or(0, |v| v + 1);
         let row_count = reader.for_each_bounded_params(
-            "SELECT e.journal_seq,e.transaction_id,e.transaction_ordinal,e.event_id,e.relation_schema_fingerprint,rs.relation_id,e.control_kind,e.payload,e.payload_hash FROM journal_events e LEFT JOIN relation_schemas rs ON rs.schema_fingerprint=e.relation_schema_fingerprint WHERE e.transaction_id=?1 ORDER BY e.journal_seq",
+            "SELECT e.journal_seq,e.transaction_id,e.transaction_ordinal,e.event_id,e.relation_schema_fingerprint,rs.relation_id,e.control_kind,e.payload,e.payload_hash,e.source_row_ordinal,e.source_mutation_ordinal FROM journal_events e LEFT JOIN relation_schemas rs ON rs.schema_fingerprint=e.relation_schema_fingerprint WHERE e.transaction_id=?1 ORDER BY e.journal_seq",
             [txid.as_str()],
             |r| {
                 events.push(CopiedEvent {
@@ -651,6 +681,8 @@ pub fn read_complete_range(
                     transaction_id: r.get(1)?,
                     transaction_ordinal,
                     mutation_ordinal: r.get::<_,i64>(2)? as u32,
+                    source_row_ordinal: r.get(9)?,
+                    source_mutation_ordinal: r.get(10)?,
                     event_id: r.get(3)?,
                     relation_schema_fingerprint: r.get(4)?,
                     source_relation_id: r.get(5)?,
@@ -1297,6 +1329,8 @@ pub mod tests {
         JournalEvent {
             event_id: id.into(),
             transaction_ordinal: ord,
+            source_row_ordinal: ord,
+            source_mutation_ordinal: 0,
             relation_schema_fingerprint: Some("fp".into()),
             control_kind: None,
             payload: payload.into(),
@@ -1318,6 +1352,63 @@ pub mod tests {
             }],
             events,
         }
+    }
+
+    #[test]
+    fn source_position_admits_key_change_pair_and_rejects_gaps() {
+        let mut second = event("new-key", 1, b"new");
+        second.source_row_ordinal = 0;
+        second.source_mutation_ordinal = 1;
+        let pair = commit(
+            "key-change",
+            "0000000000000010",
+            vec![event("old-key", 0, b"old"), second.clone()],
+        );
+        assert!(validate_commit(&pair, limits()).is_ok());
+        second.source_row_ordinal = 2;
+        second.source_mutation_ordinal = 0;
+        let gap = commit(
+            "gap",
+            "0000000000000010",
+            vec![event("old-key", 0, b"old"), second],
+        );
+        assert_eq!(
+            validate_commit(&gap, limits()),
+            Err(JournalError::Invalid(
+                "non-contiguous source mutation position"
+            ))
+        );
+    }
+    #[test]
+    fn key_change_source_position_survives_atomic_commit_and_complete_copy() {
+        let (path, mut store) = store("key-change-position");
+        let mut new_key = event("new-key", 1, b"new");
+        new_key.source_row_ordinal = 0;
+        new_key.source_mutation_ordinal = 1;
+        let commit = commit(
+            "key-change",
+            "0000000000000010",
+            vec![event("old-key", 0, b"old"), new_key],
+        );
+        store.commit_atomic(&commit, CommitFault::None).unwrap();
+        let copied = read_complete_range(&path, 0, 2, 4096, Duration::from_secs(1))
+            .unwrap()
+            .unwrap();
+        assert_eq!(copied.events.len(), 2);
+        assert_eq!(
+            copied
+                .events
+                .iter()
+                .map(|event| (event.source_row_ordinal, event.source_mutation_ordinal))
+                .collect::<Vec<_>>(),
+            [(0, 0), (0, 1)]
+        );
+        assert_eq!(
+            copied.events[0].transaction_ordinal,
+            copied.events[1].transaction_ordinal
+        );
+        assert_eq!(copied.events[0].mutation_ordinal, 0);
+        assert_eq!(copied.events[1].mutation_ordinal, 1);
     }
     fn store(name: &str) -> (std::path::PathBuf, JournalStore) {
         let p = path(name);

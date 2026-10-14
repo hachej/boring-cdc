@@ -727,8 +727,8 @@ fn destination_events(events: &[CopiedEvent]) -> Result<Vec<DestinationEvent>, D
             .ok_or(DurabilityError::Conflict("row event lacks relation schema"))?;
         destination.push(DestinationEvent {
             journal_seq: event.journal_seq,
-            transaction_ordinal: event.transaction_ordinal,
-            mutation_ordinal: event.mutation_ordinal,
+            transaction_ordinal: u64::from(event.source_row_ordinal),
+            mutation_ordinal: u32::from(event.source_mutation_ordinal),
             connector_event_id: event.event_id.clone(),
             relation_schema_fingerprint,
             payload: event.payload.clone(),
@@ -946,6 +946,8 @@ mod tests {
                 transaction_id: "tx-a".into(),
                 transaction_ordinal: 0,
                 mutation_ordinal: index as u32,
+                source_row_ordinal: index as u32,
+                source_mutation_ordinal: 0,
                 event_id: format!("event-{index}"),
                 relation_schema_fingerprint: (!control_only).then(|| "schema-a".into()),
                 source_relation_id: (!control_only).then(|| "relation-a".into()),

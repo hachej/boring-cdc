@@ -858,6 +858,8 @@ mod tests {
             JournalEvent {
                 event_id: "event-z".into(),
                 transaction_ordinal: 0,
+                source_row_ordinal: 0,
+                source_mutation_ordinal: 0,
                 relation_schema_fingerprint: None,
                 control_kind: None,
                 payload: b"{\"z\":1}".to_vec(),
@@ -866,6 +868,8 @@ mod tests {
             JournalEvent {
                 event_id: "event-a".into(),
                 transaction_ordinal: 1,
+                source_row_ordinal: 1,
+                source_mutation_ordinal: 0,
                 relation_schema_fingerprint: None,
                 control_kind: None,
                 payload: b"beta".to_vec(),

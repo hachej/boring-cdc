@@ -834,6 +834,8 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
                 Ok(JournalEvent {
                     event_id: format!("wal:{end_lsn:016X}:{ordinal}"),
                     transaction_ordinal: ordinal as u32,
+                    source_row_ordinal: ordinal as u32,
+                    source_mutation_ordinal: 0,
                     relation_schema_fingerprint: None,
                     control_kind: staged.control_kind,
                     payload: staged.payload,
@@ -3052,6 +3054,8 @@ pub mod tests {
         let e = JournalEvent {
             event_id: "e".into(),
             transaction_ordinal: 0,
+            source_row_ordinal: 0,
+            source_mutation_ordinal: 0,
             relation_schema_fingerprint: None,
             control_kind: None,
             payload: payload.clone(),

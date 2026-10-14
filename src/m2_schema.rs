@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 15;
+pub const SCHEMA_VERSION: i64 = 16;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -495,6 +495,23 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_15_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v16: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=16)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v16 {
+            connection.execute_batch(MIGRATION_16)?;
+            connection.execute("INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(16,'source-mutation-position',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[MIGRATION_16_CHECKSUM])?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=16",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_16_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -983,6 +1000,21 @@ WHEN (OLD.plan_digest IS NOT NULL AND NEW.plan_digest IS NOT OLD.plan_digest)
 BEGIN SELECT RAISE(ABORT,'operator action causal link is immutable'); END;
 "#;
 
+const MIGRATION_16_CHECKSUM: &str =
+    "sha256:46fc8ad2a9f5a485112257fcbda4f93d1a75d37ad0f1ce34cbdddc9dc53148ae";
+const MIGRATION_16: &str = r#"
+ALTER TABLE journal_events ADD COLUMN source_row_ordinal INTEGER NOT NULL DEFAULT 0
+ CHECK(source_row_ordinal>=0 AND source_row_ordinal<=4294967295);
+ALTER TABLE journal_events ADD COLUMN source_mutation_ordinal INTEGER NOT NULL DEFAULT 0
+ CHECK(source_mutation_ordinal IN (0,1));
+DROP TRIGGER journal_events_immutable;
+UPDATE journal_events SET source_row_ordinal=transaction_ordinal;
+CREATE TRIGGER journal_events_immutable BEFORE UPDATE ON journal_events
+ BEGIN SELECT RAISE(ABORT,'journal event is immutable'); END;
+CREATE UNIQUE INDEX journal_source_position
+ ON journal_events(transaction_id,source_row_ordinal,source_mutation_ordinal);
+"#;
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -1134,11 +1166,11 @@ pub mod tests {
             .unwrap();
         w.connection()
             .execute(
-                "INSERT INTO journal_events VALUES(1,'pos','tx1',0,'epoch','fp',NULL,X'01','hash')",
+                "INSERT INTO journal_events(journal_seq,event_id,transaction_id,transaction_ordinal,capture_epoch,relation_schema_fingerprint,control_kind,payload,payload_hash) VALUES(1,'pos','tx1',0,'epoch','fp',NULL,X'01','hash')",
                 [],
             )
             .unwrap();
-        assert!(w.connection().execute("INSERT INTO journal_events VALUES(2,'pos','tx1',1,'epoch','fp',NULL,X'02','different')",[]).is_err());
+        assert!(w.connection().execute("INSERT INTO journal_events(journal_seq,event_id,transaction_id,transaction_ordinal,capture_epoch,relation_schema_fingerprint,control_kind,payload,payload_hash) VALUES(2,'pos','tx1',1,'epoch','fp',NULL,X'02','different')",[]).is_err());
         w.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('d','archive','cfg','epoch',1)",[]).unwrap();
         assert!(w.connection().execute("INSERT INTO destination_checkpoints VALUES('d','epoch',NULL,'cfg',1,'tx1',2,NULL,0)",[]).is_err());
     }
@@ -1409,7 +1441,7 @@ pub mod tests {
                     0
                 ))
                 .unwrap(),
-            15
+            SCHEMA_VERSION
         );
         apply_migrations(writer.connection()).unwrap();
         assert_eq!(
@@ -1502,6 +1534,52 @@ pub mod tests {
             1
         );
         drop(writer);
+        let _ = fs::remove_file(p);
+    }
+
+    #[test]
+    fn v15_event_upgrade_preserves_old_row_positions() {
+        let p = path("v15-event-position-upgrade");
+        let _ = fs::remove_file(&p);
+        let connection = Connection::open(&p).unwrap();
+        for (version, migration, checksum) in [
+            (1, MIGRATION_1, MIGRATION_1_CHECKSUM),
+            (2, MIGRATION_2, MIGRATION_2_CHECKSUM),
+            (3, MIGRATION_3, MIGRATION_3_CHECKSUM),
+            (4, MIGRATION_4, MIGRATION_4_CHECKSUM),
+            (5, MIGRATION_5, MIGRATION_5_CHECKSUM),
+            (6, MIGRATION_6, MIGRATION_6_CHECKSUM),
+            (7, MIGRATION_7, MIGRATION_7_CHECKSUM),
+            (8, MIGRATION_8, MIGRATION_8_CHECKSUM),
+            (9, MIGRATION_9, MIGRATION_9_CHECKSUM),
+            (10, MIGRATION_10, MIGRATION_10_CHECKSUM),
+            (11, MIGRATION_11, MIGRATION_11_CHECKSUM),
+            (12, MIGRATION_12, MIGRATION_12_CHECKSUM),
+            (13, MIGRATION_13, MIGRATION_13_CHECKSUM),
+            (14, MIGRATION_14, MIGRATION_14_CHECKSUM),
+            (15, MIGRATION_15, MIGRATION_15_CHECKSUM),
+        ] {
+            connection.execute_batch(migration).unwrap();
+            connection.execute(
+                "INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(?1,?2,?3,'before-upgrade')",
+                rusqlite::params![version, format!("migration-{version}"), checksum],
+            ).unwrap();
+        }
+        connection.execute("INSERT INTO source_transactions VALUES('tx','epoch','sys','db','slot','42','0000000000000010',1,2,2,'checksum','committed')",[]).unwrap();
+        connection.execute("INSERT INTO journal_events VALUES(1,'old-1','tx',0,'epoch',NULL,NULL,X'01','hash-1')",[]).unwrap();
+        connection.execute("INSERT INTO journal_events VALUES(2,'old-2','tx',1,'epoch',NULL,NULL,X'02','hash-2')",[]).unwrap();
+        apply_migrations(&connection).unwrap();
+        let positions = connection.prepare("SELECT source_row_ordinal,source_mutation_ordinal FROM journal_events ORDER BY journal_seq").unwrap().query_map([], |row| Ok((row.get::<_,i64>(0)?,row.get::<_,i64>(1)?))).unwrap().collect::<Result<Vec<_>,_>>().unwrap();
+        assert_eq!(positions, [(0, 0), (1, 0)]);
+        assert!(
+            connection
+                .execute(
+                    "UPDATE journal_events SET source_row_ordinal=0 WHERE journal_seq=2",
+                    []
+                )
+                .is_err()
+        );
+        drop(connection);
         let _ = fs::remove_file(p);
     }
 
