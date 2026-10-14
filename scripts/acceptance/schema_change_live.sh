@@ -123,8 +123,8 @@ with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro", uri=True) as db:
 keys=[]
 for (text,) in payloads:
     row=json.loads(text)
-    if row.get('kind')=='insert' and row.get('new'):
-        keys.append(int(bytes(row['new'][0]['bytes']).decode()))
+    if row.get('event_type')=='mutation' and row.get('operation')=='insert':
+        keys.append(row['canonical_key'][0]['value'])
 raise SystemExit(0 if int(sys.argv[2]) in keys else 1)
 PY
   do
@@ -157,8 +157,8 @@ journal_set=set()
 keys=[]
 for transaction_id,text in events:
     payload=json.loads(text)
-    if payload.get('kind')=='insert' and payload.get('new'):
-        key=str(int(bytes(payload['new'][0]['bytes']).decode()))
+    if payload.get('event_type')=='mutation' and payload.get('operation')=='insert':
+        key=str(payload['canonical_key'][0]['value'])
         keys.append(int(key)); journal_set.add((xids[transaction_id],key))
 assert journal_set==oracle, {'postgres':sorted(oracle),'journal':sorted(journal_set)}
 assert int(rejected_key) not in keys

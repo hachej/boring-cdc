@@ -537,10 +537,14 @@ pub mod tests {
         let event = JournalEvent {
             event_id: "event".into(),
             transaction_ordinal: 0,
+            source_row_ordinal: 0,
+            source_mutation_ordinal: 0,
             relation_schema_fingerprint: Some("schema".into()),
             control_kind: None,
             payload: b"payload".to_vec(),
             payload_hash: sha256(b"payload"),
+            canonical_payload: None,
+            canonical_payload_hash: None,
         };
         let commit = SourceCommit {
             transaction_id: "tx".into(),

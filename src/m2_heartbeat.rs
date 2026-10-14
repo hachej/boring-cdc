@@ -575,9 +575,13 @@ pub mod tests {
         let event = JournalEvent {
             event_id: "heartbeat-event".into(),
             transaction_ordinal: 0,
+            source_row_ordinal: 0,
+            source_mutation_ordinal: 0,
             relation_schema_fingerprint: None,
             control_kind: Some("heartbeat".into()),
             payload_hash: sha256(&payload),
+            canonical_payload: None,
+            canonical_payload_hash: None,
             payload,
         };
         SourceCommit {
@@ -882,12 +886,16 @@ pub mod tests {
             transaction_id: format!("t{tx}"),
             transaction_ordinal: tx,
             mutation_ordinal: mutation,
+            source_row_ordinal: mutation,
+            source_mutation_ordinal: 0,
             event_id: format!("e{seq}"),
             relation_schema_fingerprint: None,
             source_relation_id: None,
             control_kind: control.map(str::to_owned),
             payload: vec![seq as u8],
             payload_hash: sha256(&[seq as u8]),
+            canonical_payload: None,
+            canonical_payload_hash: None,
         }
     }
 

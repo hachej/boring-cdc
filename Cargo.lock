@@ -81,6 +81,8 @@ dependencies = [
 name = "boring-cdc"
 version = "0.1.0"
 dependencies = [
+ "base64",
+ "chrono",
  "clickhouse",
  "libc",
  "pg_walstream",
