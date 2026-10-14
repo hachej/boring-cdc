@@ -1,15 +1,17 @@
 //! Typed rows at the pinned ClickHouse RowBinary boundary.
 
+use crate::m1_source_identity::{CanonicalKeyComponent, PhysicalKeyHash, canonical_key_encoding};
 use crate::m4_clickhouse_adapter::RedactedWireError;
-use crate::m4_clickhouse_durability::{BatchMarker, DestinationEvent};
+use crate::m4_clickhouse_durability::{BatchMarker, DestinationEvent, RemoteEventIdentity};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use clickhouse::{Client, Row};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use tokio::runtime::{Builder, Runtime};
 
 use crate::m4_clickhouse_adapter::SYNCHRONOUS_QUERY_SETTINGS;
-use crate::m4_clickhouse_schema::EVENT_HISTORY;
+use crate::m4_clickhouse_schema::{BATCH_MARKERS, EVENT_HISTORY};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Row, Serialize)]
 pub struct EventHistoryRow {
@@ -37,6 +39,229 @@ pub struct EventHistoryRow {
     #[serde(with = "fixed64")]
     pub batch_id: [u8; 64],
     pub columns: Vec<(u32, i8, u32, i32, String)>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct StoredKeyComponent {
+    kind: String,
+    type_oid: u32,
+    type_modifier: i32,
+    value: Value,
+}
+
+impl EventHistoryRow {
+    /// Derive the M0 payload bytes from server-returned columns. The stored hash is checked
+    /// against this reconstruction; it is never used as a substitute for the actual fields.
+    pub fn remote_identity(&self) -> Result<RemoteEventIdentity, RedactedWireError> {
+        let canonical_payload = self.canonical_preimage()?;
+        if self.payload_hash != hex64_bytes(&Sha256::digest(&canonical_payload)) {
+            return Err(RedactedWireError);
+        }
+        Ok(RemoteEventIdentity {
+            connector_event_id: ascii_hex(&self.connector_event_id)?,
+            payload_hash: ascii_hex(&self.payload_hash)?,
+            canonical_payload,
+        })
+    }
+
+    fn canonical_preimage(&self) -> Result<Vec<u8>, RedactedWireError> {
+        let event_id = decode_hex32(&self.connector_event_id)?;
+        let relation = decode_hex32(&self.relation_schema_fingerprint)?;
+        let stored_key = decode_key(&self.canonical_key)?;
+        let key = canonical_key_encoding(&stored_key).map_err(|_| RedactedWireError)?;
+        let key_hash = PhysicalKeyHash::derive(&stored_key)
+            .map_err(|_| RedactedWireError)?
+            .bytes();
+        if self.key_hash != hex64_bytes(&key_hash) {
+            return Err(RedactedWireError);
+        }
+        let before_key = if self.before_key.is_empty() {
+            Vec::new()
+        } else {
+            let before = decode_key(&self.before_key)?;
+            canonical_key_encoding(&before).map_err(|_| RedactedWireError)?
+        };
+        let operation = u8::try_from(self.operation).map_err(|_| RedactedWireError)?;
+        let mutation_kind = u8::try_from(self.mutation_kind).map_err(|_| RedactedWireError)?;
+        if operation > 3
+            || mutation_kind > 1
+            || self.origin_rank > 1
+            || (operation == 0) != (self.origin_rank == 0)
+        {
+            return Err(RedactedWireError);
+        }
+        let transaction_ordinal =
+            u32::try_from(self.transaction_ordinal).map_err(|_| RedactedWireError)?;
+        let mut columns = Vec::new();
+        columns.extend((self.columns.len() as u64).to_be_bytes());
+        for (index, (column_id, state, oid, modifier, encoded)) in self.columns.iter().enumerate() {
+            if usize::try_from(*column_id).ok() != Some(index) || !(0..=3).contains(state) {
+                return Err(RedactedWireError);
+            }
+            columns.extend(column_id.to_be_bytes());
+            columns.push(*state as u8);
+            if *state == 3 {
+                let bytes = URL_SAFE_NO_PAD
+                    .decode(encoded)
+                    .map_err(|_| RedactedWireError)?;
+                if URL_SAFE_NO_PAD.encode(&bytes) != *encoded {
+                    return Err(RedactedWireError);
+                }
+                columns.extend(oid.to_be_bytes());
+                columns.extend(modifier.to_be_bytes());
+                columns.extend((bytes.len() as u64).to_be_bytes());
+                columns.extend(bytes);
+            } else if *oid != 0 || *modifier != 0 || !encoded.is_empty() {
+                return Err(RedactedWireError);
+            }
+        }
+        let mut canonical_payload = Vec::new();
+        for field in [
+            b"boring-cdc/mutation-payload/v1".as_slice(),
+            &self.capture_epoch.to_be_bytes(),
+            &self.lsn_u64.to_be_bytes(),
+            &[self.origin_rank],
+            &transaction_ordinal.to_be_bytes(),
+            &[self.mutation_ordinal],
+            &event_id,
+            &relation,
+            &key,
+            &key_hash,
+            &[operation],
+            &before_key,
+            &[mutation_kind],
+            &columns,
+        ] {
+            canonical_payload.extend((field.len() as u64).to_be_bytes());
+            canonical_payload.extend(field);
+        }
+        Ok(canonical_payload)
+    }
+}
+
+fn decode_key(encoded: &str) -> Result<Vec<CanonicalKeyComponent>, RedactedWireError> {
+    let parts: Vec<StoredKeyComponent> =
+        serde_json::from_str(encoded).map_err(|_| RedactedWireError)?;
+    if !(1..=8).contains(&parts.len()) {
+        return Err(RedactedWireError);
+    }
+    parts
+        .into_iter()
+        .map(|part| {
+            if part.type_modifier < -1 {
+                return Err(RedactedWireError);
+            }
+            let bytes = match (part.kind.as_str(), part.type_oid) {
+                ("int64", 21 | 23 | 20) => {
+                    let value = part.value.as_i64().ok_or(RedactedWireError)?;
+                    let mut bytes = match part.type_oid {
+                        21 => i16::try_from(value)
+                            .map_err(|_| RedactedWireError)?
+                            .to_be_bytes()
+                            .to_vec(),
+                        23 => i32::try_from(value)
+                            .map_err(|_| RedactedWireError)?
+                            .to_be_bytes()
+                            .to_vec(),
+                        _ => value.to_be_bytes().to_vec(),
+                    };
+                    bytes[0] ^= 0x80;
+                    bytes
+                }
+                ("text", 25 | 1042 | 1043) => part
+                    .value
+                    .as_str()
+                    .ok_or(RedactedWireError)?
+                    .as_bytes()
+                    .to_vec(),
+                ("bytes", 17 | 2950 | 1700 | 1082 | 1114 | 1184) => {
+                    let encoded = part.value.as_str().ok_or(RedactedWireError)?;
+                    let bytes = URL_SAFE_NO_PAD
+                        .decode(encoded)
+                        .map_err(|_| RedactedWireError)?;
+                    if URL_SAFE_NO_PAD.encode(&bytes) != encoded {
+                        return Err(RedactedWireError);
+                    }
+                    bytes
+                }
+                _ => return Err(RedactedWireError),
+            };
+            CanonicalKeyComponent::from_canonical(part.type_oid, bytes)
+                .map_err(|_| RedactedWireError)
+        })
+        .collect()
+}
+
+fn decode_hex32(ascii: &[u8; 64]) -> Result<[u8; 32], RedactedWireError> {
+    let mut bytes = [0; 32];
+    for (index, byte) in bytes.iter_mut().enumerate() {
+        let pair =
+            std::str::from_utf8(&ascii[index * 2..index * 2 + 2]).map_err(|_| RedactedWireError)?;
+        *byte = u8::from_str_radix(pair, 16).map_err(|_| RedactedWireError)?;
+    }
+    if hex64_bytes(&bytes) != *ascii {
+        return Err(RedactedWireError);
+    }
+    Ok(bytes)
+}
+
+fn hex64_bytes(bytes: &[u8]) -> [u8; 64] {
+    let mut ascii = [0; 64];
+    for (index, byte) in bytes.iter().enumerate() {
+        const DIGITS: &[u8; 16] = b"0123456789abcdef";
+        ascii[index * 2] = DIGITS[usize::from(byte >> 4)];
+        ascii[index * 2 + 1] = DIGITS[usize::from(byte & 15)];
+    }
+    ascii
+}
+
+fn ascii_hex(ascii: &[u8; 64]) -> Result<String, RedactedWireError> {
+    std::str::from_utf8(ascii)
+        .map(str::to_owned)
+        .map_err(|_| RedactedWireError)
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Row, Serialize)]
+pub struct BatchMarkerRow {
+    pub capture_epoch: u64,
+    pub generation: u64,
+    #[serde(with = "fixed64")]
+    pub batch_id: [u8; 64],
+    pub first_journal_seq: u64,
+    pub last_journal_seq: u64,
+    pub event_count: u64,
+    #[serde(with = "fixed64")]
+    pub ordered_event_digest: [u8; 64],
+    #[serde(with = "fixed64")]
+    pub object_fingerprint: [u8; 64],
+    pub finalized_at_unix_ms: u64,
+}
+
+impl BatchMarkerRow {
+    pub fn from_marker(
+        marker: &BatchMarker,
+        finalized_at_unix_ms: u64,
+    ) -> Result<Self, RedactedWireError> {
+        if marker.first_journal_seq == 0
+            || marker.first_journal_seq > marker.last_journal_seq
+            || marker.capture_epoch == 0
+            || marker.generation == 0
+        {
+            return Err(RedactedWireError);
+        }
+        Ok(Self {
+            capture_epoch: marker.capture_epoch,
+            generation: marker.generation,
+            batch_id: fixed_hex(&marker.batch_id)?,
+            first_journal_seq: marker.first_journal_seq,
+            last_journal_seq: marker.last_journal_seq,
+            event_count: marker.event_count,
+            ordered_event_digest: fixed_hex(&marker.ordered_event_digest)?,
+            object_fingerprint: fixed_hex(&marker.object_fingerprint)?,
+            finalized_at_unix_ms,
+        })
+    }
 }
 
 mod fixed64 {
@@ -129,6 +354,36 @@ impl PinnedClickHouseWire {
                 .bind(marker.generation)
                 .bind(&marker.batch_id)
                 .fetch_all::<EventHistoryRow>()
+                .await
+                .map_err(|_| RedactedWireError)
+        })
+    }
+
+    pub fn insert_marker_row(&mut self, row: &BatchMarkerRow) -> Result<(), RedactedWireError> {
+        let mut client = self.client.clone();
+        for (name, value) in SYNCHRONOUS_QUERY_SETTINGS {
+            client = client.with_option(name, value.to_string());
+        }
+        self.runtime.block_on(async {
+            let mut insert = client
+                .insert(BATCH_MARKERS)
+                .map_err(|_| RedactedWireError)?;
+            insert.write(row).await.map_err(|_| RedactedWireError)?;
+            insert.end().await.map_err(|_| RedactedWireError)
+        })
+    }
+
+    pub fn read_marker_rows(
+        &mut self,
+        marker: &BatchMarker,
+    ) -> Result<Vec<BatchMarkerRow>, RedactedWireError> {
+        self.runtime.block_on(async {
+            self.client
+                .query("SELECT ?fields FROM boring_cdc.batch_markers_v1 WHERE capture_epoch = ? AND generation = ? AND batch_id = ?")
+                .bind(marker.capture_epoch)
+                .bind(marker.generation)
+                .bind(&marker.batch_id)
+                .fetch_all::<BatchMarkerRow>()
                 .await
                 .map_err(|_| RedactedWireError)
         })
@@ -300,7 +555,67 @@ fn fixed_hex(value: &str) -> Result<[u8; 64], RedactedWireError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::m1_ordering::{
+        CanonicalValue, ColumnState, MutationKind, MutationPayload, MutationVersion,
+        SourceOperation, SourceSlotIdentity, WalIdentityInput, source_version_for_row,
+    };
+    use crate::m1_source_identity::{
+        Fingerprint, LogicalTableIdentity, RelationSchemaVersion, SourceIdentity,
+        supported_protocol_fingerprint,
+    };
+    use crate::m1_transition_kernel::{CaptureEpoch, ReceivedLsn};
+    use crate::m2_event_envelope::render_mutation;
     use serde_json::json;
+
+    fn golden_preimage() -> Vec<u8> {
+        let source = SourceIdentity {
+            system_identifier: 72_623_859_790_382_856,
+            timeline: 1,
+            database_identity: 16_384,
+            slot_name: "boring_cdc".into(),
+            plugin: "pgoutput".into(),
+            publication_fingerprint: Fingerprint::digest(b"publication"),
+            protocol_fingerprint: supported_protocol_fingerprint(),
+        };
+        let table = LogicalTableIdentity::derive(&source, "public", "orders");
+        let relation = RelationSchemaVersion::derive(
+            table,
+            24_576,
+            include_bytes!("../tests/fixtures/m1_ordering/relation-contract.bin"),
+        )
+        .unwrap();
+        let epoch = CaptureEpoch::from_store(7);
+        let source_version =
+            source_version_for_row(epoch, ReceivedLsn::from_wire(112), 0, 0).unwrap();
+        let version = MutationVersion::from_wal(
+            source_version,
+            WalIdentityInput {
+                capture_epoch: epoch,
+                source_slot_identity: SourceSlotIdentity::derive(&source),
+                transaction_end_lsn: ReceivedLsn::from_wire(120),
+                row_ordinal: 0,
+                mutation_ordinal: 0,
+            },
+        )
+        .unwrap();
+        let mut key_bytes = 42_i64.to_be_bytes();
+        key_bytes[0] ^= 0x80;
+        let payload = MutationPayload {
+            relation,
+            key: vec![CanonicalKeyComponent::from_canonical(20, key_bytes.to_vec()).unwrap()],
+            operation: SourceOperation::Insert,
+            before_key: None,
+            kind: MutationKind::Upsert,
+            columns: vec![ColumnState::Value(CanonicalValue {
+                type_oid: 20,
+                type_modifier: -1,
+                bytes: 42_i64.to_be_bytes().to_vec(),
+            })],
+        };
+        render_mutation(&version, &payload, &[-1], 1)
+            .unwrap()
+            .canonical_preimage
+    }
 
     fn live_client() -> Client {
         let url = std::env::var("BCDC_M4_CLICKHOUSE_URL").unwrap();
@@ -360,6 +675,21 @@ mod tests {
         assert_eq!(row.columns[0].2, 20);
         assert_eq!(row.payload_hash.as_slice(), event.payload_hash.as_bytes());
         assert_eq!(row.batch_id.as_slice(), marker.batch_id.as_bytes());
+        let key = decode_key(&row.canonical_key).unwrap();
+        assert_eq!(
+            hex64_bytes(&PhysicalKeyHash::derive(&key).unwrap().bytes()),
+            row.key_hash
+        );
+        assert_eq!(row.canonical_preimage().unwrap(), golden_preimage());
+        let remote = row.remote_identity().unwrap();
+        assert_eq!(remote.payload_hash, event.payload_hash);
+        assert_eq!(
+            format!("{:x}", Sha256::digest(&remote.canonical_payload)),
+            event.payload_hash
+        );
+        let mut corrupted = row.clone();
+        corrupted.columns[0].4 = "AA".into();
+        assert_eq!(corrupted.remote_identity(), Err(RedactedWireError));
         let malformed = DestinationEvent {
             payload: serde_json::to_vec(&json!({"event_type":"control"})).unwrap(),
             ..event
@@ -380,6 +710,13 @@ mod tests {
             .unwrap();
         let stored = wire.read_history_batch(&marker).unwrap();
         assert_eq!(stored, vec![row]);
+        assert_eq!(
+            stored[0].remote_identity().unwrap().payload_hash,
+            event.payload_hash
+        );
+        let marker_row = BatchMarkerRow::from_marker(&marker, 1).unwrap();
+        wire.insert_marker_row(&marker_row).unwrap();
+        assert_eq!(wire.read_marker_rows(&marker).unwrap(), vec![marker_row]);
     }
 
     #[test]
@@ -388,6 +725,13 @@ mod tests {
         let (event, marker) = golden_event();
         let row = EventHistoryRow::from_destination_event(&event, &marker).unwrap();
         let mut wire = PinnedClickHouseWire::new(live_client()).unwrap();
-        assert_eq!(wire.read_history_batch(&marker).unwrap(), vec![row]);
+        let stored = wire.read_history_batch(&marker).unwrap();
+        assert_eq!(stored, vec![row]);
+        assert_eq!(
+            stored[0].remote_identity().unwrap().payload_hash,
+            event.payload_hash
+        );
+        let marker_row = BatchMarkerRow::from_marker(&marker, 1).unwrap();
+        assert_eq!(wire.read_marker_rows(&marker).unwrap(), vec![marker_row]);
     }
 }
