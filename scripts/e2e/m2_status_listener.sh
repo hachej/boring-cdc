@@ -32,6 +32,22 @@ except urllib.error.HTTPError as error:
     assert error.code == 405
 else:
     raise AssertionError("status listener accepted a mutation method")
+metrics_url = "http://127.0.0.1:8788/metrics"
+with urllib.request.urlopen(metrics_url, timeout=1) as response:
+    assert response.status == 200
+    assert response.headers["Content-Type"].startswith("text/plain; version=0.0.4")
+    metrics = response.read().decode()
+assert "boring_cdc_status_available 1\n" in metrics
+assert "boring_cdc_durable_journal_seq " in metrics
+assert "boring_cdc_sqlite_bytes " in metrics
+assert "boring_cdc_healthy " in metrics
+assert "source_wal_headroom_bytes" not in metrics
+try:
+    urllib.request.urlopen(urllib.request.Request(metrics_url, method="POST"), timeout=1)
+except urllib.error.HTTPError as error:
+    assert error.code == 405
+else:
+    raise AssertionError("metrics listener accepted a mutation method")
 PY
   then
     observed=1
@@ -47,4 +63,4 @@ fi
 acceptance_pid=
 [[ "$observed" == 1 ]]
 grep -q '^DURABLE_SIMPLE_CASE_OK ' "$work/acceptance.log"
-printf 'M2_STATUS_LISTENER_OK postgres=17.6 live_capture=verified read_only=verified\n'
+printf 'M2_STATUS_LISTENER_OK postgres=17.6 live_capture=verified status=read_only metrics=read_only\n'

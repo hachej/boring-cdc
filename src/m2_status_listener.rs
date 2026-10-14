@@ -91,10 +91,52 @@ pub struct StatusListener {
     thread: Option<JoinHandle<()>>,
 }
 
+#[derive(Clone, Copy)]
+enum Route {
+    Status,
+    Metrics,
+}
+
+impl Route {
+    fn request_line(self, line: &[u8]) -> bool {
+        let path = match self {
+            Self::Status => b"GET /status HTTP/1.".as_slice(),
+            Self::Metrics => b"GET /metrics HTTP/1.".as_slice(),
+        };
+        line.starts_with(path)
+            && matches!(line.get(path.len()), Some(b'0' | b'1'))
+            && line.get(path.len() + 1) == Some(&b'\r')
+    }
+
+    fn content_type(self) -> &'static str {
+        match self {
+            Self::Status => "application/json",
+            Self::Metrics => "text/plain; version=0.0.4; charset=utf-8",
+        }
+    }
+}
+
 impl StatusListener {
     pub fn start(
         address: SocketAddr,
         tls: Option<Arc<ServerConfig>>,
+        snapshot: impl Fn() -> Result<Vec<u8>, ()> + Send + 'static,
+    ) -> Result<Self, &'static str> {
+        Self::start_route(address, tls, Route::Status, snapshot)
+    }
+
+    pub fn start_metrics(
+        address: SocketAddr,
+        tls: Option<Arc<ServerConfig>>,
+        metrics: impl Fn() -> Result<Vec<u8>, ()> + Send + 'static,
+    ) -> Result<Self, &'static str> {
+        Self::start_route(address, tls, Route::Metrics, metrics)
+    }
+
+    fn start_route(
+        address: SocketAddr,
+        tls: Option<Arc<ServerConfig>>,
+        route: Route,
         snapshot: impl Fn() -> Result<Vec<u8>, ()> + Send + 'static,
     ) -> Result<Self, &'static str> {
         if tls.is_none() && !address.ip().is_loopback() {
@@ -121,12 +163,12 @@ impl StatusListener {
                             if let Some(config) = &tls {
                                 if let Ok(connection) = ServerConnection::new(Arc::clone(config)) {
                                     let mut secured = StreamOwned::new(connection, stream);
-                                    handle(&mut secured, &snapshot);
+                                    handle(&mut secured, route, &snapshot);
                                     secured.conn.send_close_notify();
                                     let _ = secured.flush();
                                 }
                             } else {
-                                handle(&mut stream, &snapshot);
+                                handle(&mut stream, route, &snapshot);
                             }
                         }
                         Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -158,7 +200,11 @@ impl Drop for StatusListener {
     }
 }
 
-fn handle(stream: &mut (impl Read + Write), snapshot: &impl Fn() -> Result<Vec<u8>, ()>) {
+fn handle(
+    stream: &mut (impl Read + Write),
+    route: Route,
+    snapshot: &impl Fn() -> Result<Vec<u8>, ()>,
+) {
     let mut request = Vec::new();
     let mut chunk = [0_u8; 1024];
     while request.len() < MAX_REQUEST_BYTES {
@@ -176,7 +222,7 @@ fn handle(stream: &mut (impl Read + Write), snapshot: &impl Fn() -> Result<Vec<u
     } else {
         let line = request.split(|byte| *byte == b'\n').next().unwrap_or(&[]);
         match line {
-            b"GET /status HTTP/1.1\r" | b"GET /status HTTP/1.0\r" => match snapshot() {
+            line if route.request_line(line) => match snapshot() {
                 Ok(bytes) => (200, "OK", Some(bytes)),
                 Err(()) => (503, "Service Unavailable", None),
             },
@@ -186,11 +232,12 @@ fn handle(stream: &mut (impl Read + Write), snapshot: &impl Fn() -> Result<Vec<u
             _ => (404, "Not Found", None),
         }
     };
-    let body = response.2.unwrap_or_else(|| b"{}".to_vec());
+    let body = response.2.unwrap_or_default();
     let header = format!(
-        "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
         response.0,
         response.1,
+        route.content_type(),
         body.len()
     );
     let _ = stream.write_all(header.as_bytes());
@@ -266,6 +313,40 @@ mod tests {
             server_tls_config("broken", "broken", "broken").err(),
             Some("M2_STATUS_TLS_MATERIAL_INVALID")
         );
+    }
+
+    #[test]
+    fn metrics_listener_serves_only_read_only_scrapes() {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let metric_calls = Arc::clone(&calls);
+        let server =
+            StatusListener::start_metrics("127.0.0.1:0".parse().unwrap(), None, move || {
+                metric_calls.fetch_add(1, Ordering::Relaxed);
+                Ok(b"boring_cdc_healthy 1\n".to_vec())
+            })
+            .unwrap();
+        for (request, expected) in [
+            ("GET /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n", "200 OK"),
+            (
+                "GET /status HTTP/1.1\r\nHost: localhost\r\n\r\n",
+                "404 Not Found",
+            ),
+            (
+                "POST /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n",
+                "405 Method Not Allowed",
+            ),
+        ] {
+            let mut stream = TcpStream::connect(server.local_addr()).unwrap();
+            stream.write_all(request.as_bytes()).unwrap();
+            let mut response = String::new();
+            stream.read_to_string(&mut response).unwrap();
+            assert!(response.contains(expected));
+            if expected == "200 OK" {
+                assert!(response.contains("Content-Type: text/plain; version=0.0.4"));
+                assert!(response.ends_with("boring_cdc_healthy 1\n"));
+            }
+        }
+        assert_eq!(calls.load(Ordering::Relaxed), 1);
     }
 
     #[test]
