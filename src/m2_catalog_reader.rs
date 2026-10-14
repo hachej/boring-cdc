@@ -154,6 +154,18 @@ fn read_simple_relation_in_snapshot(
         .get(key_index)
         .ok_or(CatalogError::Drift)?
         .name;
+    let key_column = columns
+        .iter()
+        .find(|column| !column.dropped && column.name == *key_name)
+        .ok_or(CatalogError::Drift)?;
+    if matches!(key_column.type_oid, 25 | 1042 | 1043) {
+        let c_collation = connection
+            .exec("SELECT 'C'::regcollation::oid::text")
+            .map_err(|_| CatalogError::Query)?;
+        if key_column.collation_oid != parse::<u32>(&c_collation, 0, 0)? {
+            return Err(CatalogError::Unsupported);
+        }
+    }
     let canonical_key = format!("PRIMARY KEY ({key_name})");
     if value(&keys, 0, 0)? != canonical_key {
         return Err(CatalogError::Unsupported);
