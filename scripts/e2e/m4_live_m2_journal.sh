@@ -55,13 +55,13 @@ if ! scripts/acceptance/durable_simple_case.sh >"$work/acceptance.log" 2>&1; the
   cat "$work/acceptance.log" >&2
   exit 1
 fi
-grep -q '^M4_LIVE_JOURNAL_OK .*process_abort=verified' "$work/acceptance.log"
+grep -q '^M4_LIVE_JOURNAL_OK .*abort_boundaries=3 process_abort=verified' "$work/acceptance.log"
 grep -q '^DURABLE_SIMPLE_CASE_OK ' "$work/acceptance.log"
 
 docker restart "$container" >/dev/null
 wait_ready
-read -r events distinct_events < <(ch --query 'SELECT count(),uniqExact(connector_event_id) FROM boring_cdc.event_history_v1 WHERE capture_epoch=1 AND generation=1')
-read -r markers distinct_markers < <(ch --query 'SELECT count(),uniqExact(batch_id) FROM boring_cdc.batch_markers_v1 WHERE capture_epoch=1 AND generation=1')
-(( events >= 10 && events == distinct_events ))
-(( markers >= 2 && markers == distinct_markers ))
-printf 'M4_LIVE_M2_DESTINATION_OK clickhouse=25.8.2.29 events=%s markers=%s process_abort=verified restart=verified\n' "$events" "$markers"
+read -r events distinct_events < <(ch --query 'SELECT count(),uniqExact(tuple(generation,connector_event_id)) FROM boring_cdc.event_history_v1 WHERE capture_epoch=1 AND generation IN (1,2,3)')
+read -r markers distinct_markers < <(ch --query 'SELECT count(),uniqExact(tuple(generation,batch_id)) FROM boring_cdc.batch_markers_v1 WHERE capture_epoch=1 AND generation IN (1,2,3)')
+(( events >= 30 && events == distinct_events ))
+(( markers >= 6 && markers == distinct_markers ))
+printf 'M4_LIVE_M2_DESTINATION_OK clickhouse=25.8.2.29 events=%s markers=%s abort_boundaries=3 process_abort=verified restart=verified\n' "$events" "$markers"

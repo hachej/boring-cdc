@@ -992,7 +992,7 @@ mod tests {
         use std::os::unix::process::ExitStatusExt;
 
         let executable = std::env::current_exe().unwrap();
-        let run_phase = |phase| {
+        let run_phase = |phase, boundary| {
             std::process::Command::new(&executable)
                 .args([
                     "--ignored",
@@ -1001,54 +1001,72 @@ mod tests {
                     "--nocapture",
                 ])
                 .env("BCDC_M4_LIVE_PHASE", phase)
+                .env("BCDC_M4_ABORT_BOUNDARY", boundary)
                 .output()
                 .unwrap()
         };
-        let aborted = run_phase("abort");
-        assert_eq!(aborted.status.signal(), Some(6));
-        assert!(String::from_utf8_lossy(&aborted.stderr).contains("M4_BOUNDARY_READY"));
-
-        let connection =
-            rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        for boundary in ["prepared", "dispatched", "marker"] {
+            let destination_id = format!("article2-clickhouse-{boundary}");
+            let aborted = run_phase("abort", boundary);
+            assert_eq!(aborted.status.signal(), Some(6), "{boundary}");
+            assert!(
+                String::from_utf8_lossy(&aborted.stderr).contains("M4_BOUNDARY_READY"),
+                "{boundary}"
+            );
+            let connection = rusqlite::Connection::open_with_flags(
+                path,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            )
+            .unwrap();
+            let checkpoint: Option<u64> = connection
+                .query_row(
+                    "SELECT journal_seq FROM destination_checkpoints WHERE destination_id=?1",
+                    [&destination_id],
+                    |row| row.get(0),
+                )
+                .optional()
                 .unwrap();
-        let checkpoint: Option<u64> = connection
-            .query_row(
-                "SELECT journal_seq FROM destination_checkpoints WHERE destination_id='article2-clickhouse'",
-                [],
-                |row| row.get(0),
-            )
-            .optional()
-            .unwrap();
-        let pending_first: u64 = connection
-            .query_row(
-                "SELECT first_seq FROM clickhouse_batch_intents WHERE destination_id='article2-clickhouse' AND state='dispatched'",
-                [],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(checkpoint.unwrap_or(0) + 1, pending_first);
-        drop(connection);
-
-        let resumed = run_phase("resume");
-        assert!(
-            resumed.status.success(),
-            "{}",
-            String::from_utf8_lossy(&resumed.stderr)
-        );
-        let connection =
-            rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+            let (pending_first, state): (u64, String) = connection
+                .query_row(
+                    "SELECT first_seq,state FROM clickhouse_batch_intents WHERE destination_id=?1 AND state IN ('prepared','dispatched')",
+                    [&destination_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
                 .unwrap();
-        let checkpoint: u64 = connection
-            .query_row(
-                "SELECT journal_seq FROM destination_checkpoints WHERE destination_id='article2-clickhouse'",
-                [],
-                |row| row.get(0),
+            assert_eq!(checkpoint.unwrap_or(0) + 1, pending_first, "{boundary}");
+            assert_eq!(
+                state,
+                if boundary == "prepared" {
+                    "prepared"
+                } else {
+                    "dispatched"
+                }
+            );
+            drop(connection);
+
+            let resumed = run_phase("resume", boundary);
+            assert!(
+                resumed.status.success(),
+                "{boundary}: {}",
+                String::from_utf8_lossy(&resumed.stderr)
+            );
+            let connection = rusqlite::Connection::open_with_flags(
+                path,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
             )
             .unwrap();
-        assert_eq!(checkpoint, boundaries.last().unwrap().1);
+            let checkpoint: u64 = connection
+                .query_row(
+                    "SELECT journal_seq FROM destination_checkpoints WHERE destination_id=?1",
+                    [&destination_id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(checkpoint, boundaries.last().unwrap().1, "{boundary}");
+        }
         assert!(expected_events >= 10);
         println!(
-            "M4_LIVE_JOURNAL_OK events={expected_events} checkpoint={checkpoint} process_abort=verified"
+            "M4_LIVE_JOURNAL_OK events_per_case={expected_events} abort_boundaries=3 process_abort=verified"
         );
     }
 
@@ -1066,13 +1084,20 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
+        let boundary = std::env::var("BCDC_M4_ABORT_BOUNDARY").unwrap();
+        let generation = match boundary.as_str() {
+            "prepared" => 1,
+            "dispatched" => 2,
+            "marker" => 3,
+            _ => panic!("unsupported abort boundary"),
+        };
         let context = BatchContext {
-            destination_id: "article2-clickhouse".into(),
+            destination_id: format!("article2-clickhouse-{boundary}"),
             capture_epoch,
-            generation: 1,
+            generation,
             configuration_fingerprint: "article2-live-journal-v1".into(),
-            lease_id: "article2-lease".into(),
-            run_id: "article2-run".into(),
+            lease_id: format!("article2-lease-{boundary}"),
+            run_id: format!("article2-run-{boundary}"),
         };
         if abort {
             writer
@@ -1122,6 +1147,10 @@ mod tests {
             let transaction = writer.connection_mut().transaction().unwrap();
             let batch = prepare_batch(&transaction, &context, copied).unwrap();
             transaction.commit().unwrap();
+            if abort && boundary == "prepared" && !batch.events.is_empty() {
+                eprintln!("M4_BOUNDARY_READY boundary={boundary} first={first} last={last}");
+                std::process::abort();
+            }
             let state: String = writer
                 .connection()
                 .query_row(
@@ -1132,24 +1161,29 @@ mod tests {
                 .unwrap();
             let remote = if state == "dispatched" {
                 assert!(!abort);
-                assert_eq!(
-                    reconcile_remote(&mut adapter, &batch),
-                    Ok(Reconciliation::Verified)
-                );
-                adapter.read_batch(&batch.marker).unwrap().unwrap()
+                match reconcile_remote(&mut adapter, &batch).unwrap() {
+                    Reconciliation::Verified => adapter.read_batch(&batch.marker).unwrap().unwrap(),
+                    Reconciliation::ReplayRequired => {
+                        dispatch_and_readback(&mut adapter, &batch).unwrap()
+                    }
+                }
             } else {
                 assert_eq!(state, "prepared");
                 let transaction = writer.connection_mut().transaction().unwrap();
                 mark_insert_dispatched(&transaction, &batch).unwrap();
                 transaction.commit().unwrap();
+                if abort && boundary == "dispatched" && !batch.events.is_empty() {
+                    eprintln!("M4_BOUNDARY_READY boundary={boundary} first={first} last={last}");
+                    std::process::abort();
+                }
                 dispatch_and_readback(&mut adapter, &batch).unwrap()
             };
             assert_eq!(
                 reconcile_remote(&mut adapter, &batch),
                 Ok(Reconciliation::Verified)
             );
-            if abort && !batch.events.is_empty() {
-                eprintln!("M4_BOUNDARY_READY first={first} last={last}");
+            if abort && boundary == "marker" && !batch.events.is_empty() {
+                eprintln!("M4_BOUNDARY_READY boundary={boundary} first={first} last={last}");
                 std::process::abort();
             }
             let revision = writer
