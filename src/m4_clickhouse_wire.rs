@@ -335,8 +335,9 @@ impl PinnedClickHouseWire {
         Ok(Self { client, runtime })
     }
 
-    pub fn insert_history_rows(
+    fn insert_history_rows(
         &mut self,
+        batch_id: &str,
         rows: &[EventHistoryRow],
     ) -> Result<(), RedactedWireError> {
         if rows.is_empty() {
@@ -346,6 +347,7 @@ impl PinnedClickHouseWire {
         for (name, value) in SYNCHRONOUS_QUERY_SETTINGS {
             client = client.with_option(name, value.to_string());
         }
+        client = client.with_option("query_id", batch_id);
         self.runtime.block_on(async {
             let mut insert = client
                 .insert(EVENT_HISTORY)
@@ -416,7 +418,7 @@ impl ClickHouseWire for PinnedClickHouseWire {
                     .iter()
                     .map(|event| EventHistoryRow::from_destination_event(event, &batch.marker))
                     .collect::<Result<Vec<_>, _>>()?;
-                self.insert_history_rows(&rows)?;
+                self.insert_history_rows(&batch.marker.batch_id, &rows)?;
                 Ok(WireResponse::Acknowledged)
             }
             WireRequest::ReadEventsFresh { batch } => {
