@@ -185,6 +185,9 @@ impl JournalStore {
             |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)),
         ).optional()?;
         if let Some((txid, xid, first, last, count, checksum)) = existing {
+            let bound = bind_sequence_templates(commit, first as u64)?;
+            validate_commit(&bound, self.limits)?;
+            let commit = &bound;
             verify_schemas(&transaction, identity, &commit.schemas)?;
             verify_duplicate(
                 &transaction,
@@ -243,6 +246,9 @@ impl JournalStore {
             [],
             |r| r.get(0),
         )?;
+        let bound = bind_sequence_templates(commit, next as u64)?;
+        validate_commit(&bound, self.limits)?;
+        let commit = &bound;
         let last = next
             .checked_add(commit.events.len() as i64 - 1)
             .ok_or(JournalError::Limit("journal sequence overflow"))?;
@@ -411,6 +417,70 @@ impl JournalStore {
 fn is_constraint(error: &rusqlite::Error) -> bool {
     matches!(error, rusqlite::Error::SqliteFailure(e, _) if e.extended_code & 0xff == rusqlite::ffi::SQLITE_CONSTRAINT)
 }
+
+/// Bind M0 mutation templates only after the sole writer knows the durable sequence. A retry
+/// uses the first sequence already stored for its source transaction, so byte checksums and
+/// duplicate comparison remain stable even when newer transactions have since committed.
+fn bind_sequence_templates(
+    commit: &SourceCommit,
+    first_seq: u64,
+) -> Result<SourceCommit, JournalError> {
+    let mut bound = commit.clone();
+    let mut changed = false;
+    for (offset, event) in bound.events.iter_mut().enumerate() {
+        let Ok(mut payload) = serde_json::from_slice::<serde_json::Value>(&event.payload) else {
+            continue;
+        };
+        if payload
+            .get("event_type")
+            .and_then(serde_json::Value::as_str)
+            != Some("mutation")
+        {
+            continue;
+        }
+        let seq = first_seq
+            .checked_add(offset as u64)
+            .ok_or(JournalError::Limit("journal sequence overflow"))?;
+        let declared_seq = payload
+            .get("journal_seq")
+            .and_then(serde_json::Value::as_u64);
+        if (declared_seq != Some(0) && declared_seq != Some(seq))
+            || event.control_kind.is_some()
+            || event.canonical_payload.is_none()
+            || payload
+                .get("connector_event_id")
+                .and_then(serde_json::Value::as_str)
+                != Some(event.event_id.as_str())
+            || payload
+                .pointer("/source_version/connector_event_id")
+                .and_then(serde_json::Value::as_str)
+                != Some(event.event_id.as_str())
+            || payload
+                .get("payload_hash")
+                .and_then(serde_json::Value::as_str)
+                != event.canonical_payload_hash.as_deref()
+            || payload
+                .get("relation_fingerprint")
+                .and_then(serde_json::Value::as_str)
+                != event.relation_schema_fingerprint.as_deref()
+        {
+            return Err(JournalError::Conflict("mutation template binding mismatch"));
+        }
+        if declared_seq == Some(seq) {
+            continue;
+        }
+        payload["journal_seq"] = serde_json::Value::from(seq);
+        event.payload = serde_json::to_vec(&payload)
+            .map_err(|_| JournalError::Invalid("mutation template encoding"))?;
+        event.payload_hash = sha256(&event.payload);
+        changed = true;
+    }
+    if changed {
+        bound.payload_checksum = transaction_checksum(&bound.events);
+    }
+    Ok(bound)
+}
+
 fn validate_commit(commit: &SourceCommit, limits: CommitLimits) -> Result<(), JournalError> {
     if commit.events.is_empty() {
         return Err(JournalError::Invalid("empty source transaction"));
@@ -1385,6 +1455,54 @@ pub mod tests {
             }],
             events,
         }
+    }
+
+    #[test]
+    fn mutation_template_binds_durable_sequence_and_replays_after_later_commits() {
+        let (path, mut store) = store("sequence-template");
+        let first = commit(
+            "first",
+            "0000000000000001",
+            vec![event("first-event", 0, b"legacy")],
+        );
+        store.commit_atomic(&first, CommitFault::None).unwrap();
+
+        let mut mutation = event("mutation-event", 0, b"");
+        mutation.canonical_payload = Some(b"canonical-preimage".to_vec());
+        mutation.canonical_payload_hash = Some(sha256(b"canonical-preimage"));
+        mutation.payload = serde_json::to_vec(&serde_json::json!({
+            "event_type":"mutation",
+            "journal_seq":0,
+            "connector_event_id":"mutation-event",
+            "source_version":{"connector_event_id":"mutation-event"},
+            "relation_fingerprint":"fp",
+            "payload_hash":mutation.canonical_payload_hash,
+        }))
+        .unwrap();
+        mutation.payload_hash = sha256(&mutation.payload);
+        let second = commit("second", "0000000000000002", vec![mutation]);
+        let published = store.commit_atomic(&second, CommitFault::None).unwrap();
+        assert_eq!((published.first_seq(), published.last_seq()), (2, 2));
+
+        let third = commit(
+            "third",
+            "0000000000000003",
+            vec![event("third-event", 0, b"later")],
+        );
+        store.commit_atomic(&third, CommitFault::None).unwrap();
+        let replay = store.commit_atomic(&second, CommitFault::None).unwrap();
+        assert!(replay.was_duplicate());
+        assert_eq!(replay.first_seq(), 2);
+        let copied = read_complete_range(&path, 1, 1, 4096, Duration::from_secs(1))
+            .unwrap()
+            .unwrap();
+        let persisted: serde_json::Value =
+            serde_json::from_slice(&copied.events[0].payload).unwrap();
+        assert_eq!(persisted["journal_seq"], 2);
+        assert_eq!(
+            sha256(&copied.events[0].payload),
+            copied.events[0].payload_hash
+        );
     }
 
     #[test]

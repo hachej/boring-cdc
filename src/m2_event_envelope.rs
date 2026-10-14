@@ -1,7 +1,8 @@
 //! M0 mutation envelope rendering from admitted M1 identities and canonical values.
 //!
-//! The journal assigns `journal_seq` atomically. Call this after that assignment or when
-//! projecting a copied event; the sequence is excluded from the stable M0 field hash.
+//! The journal assigns `journal_seq` atomically. Use `render_mutation_template` before its
+//! commit; the journal binds the sequence to the stored JSON. The sequence is excluded from
+//! the stable M0 field hash.
 
 use crate::m1_ordering::{
     ColumnState, MutationKind, MutationPayload, MutationVersion, SourceOperation,
@@ -36,6 +37,25 @@ pub fn render_mutation(
     if journal_seq == 0 {
         return Err(EnvelopeError::Invalid);
     }
+    render_mutation_inner(version, payload, key_type_modifiers, journal_seq)
+}
+
+/// Internal journal input. Sequence zero is replaced inside the atomic journal commit and is
+/// never a valid emitted M0 event.
+pub fn render_mutation_template(
+    version: &MutationVersion,
+    payload: &MutationPayload,
+    key_type_modifiers: &[i32],
+) -> Result<MutationEnvelope, EnvelopeError> {
+    render_mutation_inner(version, payload, key_type_modifiers, 0)
+}
+
+fn render_mutation_inner(
+    version: &MutationVersion,
+    payload: &MutationPayload,
+    key_type_modifiers: &[i32],
+    journal_seq: u64,
+) -> Result<MutationEnvelope, EnvelopeError> {
     let key = key_json(&payload.key, key_type_modifiers)?;
     let before_key = payload
         .before_key
