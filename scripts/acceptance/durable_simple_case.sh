@@ -241,8 +241,12 @@ for seq,transaction_id,control_kind,payload_text,event_id,relation_fp,raw_hash,c
     assert hashlib.sha256(payload_text.encode()).hexdigest()==raw_hash
     if control_kind is not None:
         assert control_kind in ('heartbeat','capture_fence')
-        assert payload['kind']=='update' and payload['new']
-        assert bytes(payload['new'][0]['bytes'])==b'1'
+        assert payload['schema_version']=='boring-cdc/event/v1'
+        assert payload['event_type']=='control' and payload['operation']=='control'
+        assert payload['journal_seq']==seq and payload['connector_event_id']==event_id
+        assert payload['control']['kind']==control_kind
+        assert relation_fp is None
+        assert canonical_preimage and hashlib.sha256(canonical_preimage).hexdigest()==canonical_hash==payload['payload_hash']
         control_events+=1
         control_kinds.add(control_kind)
         continue

@@ -883,6 +883,64 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             let staged: StagedEventOwned = serde_json::from_slice(&staged)
                 .map_err(|_| RuntimeError::Protocol("staged_event_corrupt"))?;
             if let Some(canonical) = self.canonical.as_ref()
+                && let Some(kind) = staged.control_kind.as_deref()
+            {
+                let row = decode_staged_row(&staged.payload, active.xid)?;
+                if row.relation_id != staged.relation_id
+                    || row.ordinal != row_ordinal as u64
+                    || row.kind != crate::m1_decoder::RowKind::Update
+                {
+                    return self
+                        .safe_stop(RuntimeError::Protocol("staged_control_position_mismatch"));
+                }
+                let parse_column = |index| {
+                    let bytes = match row.new.as_deref()?.get(index)? {
+                        TupleValue::Text(bytes) => bytes,
+                        _ => return None,
+                    };
+                    std::str::from_utf8(bytes).ok()?.parse::<u64>().ok()
+                };
+                let generation = if kind == "capture_fence" {
+                    if parse_column(1) != Some(canonical.capture_epoch.get()) {
+                        return self.safe_stop(RuntimeError::Protocol("fence_epoch_mismatch"));
+                    }
+                    Some(
+                        parse_column(2)
+                            .ok_or(RuntimeError::Protocol("fence_generation_invalid"))?,
+                    )
+                } else {
+                    None
+                };
+                let (event_id, envelope) = crate::m2_event_envelope::render_control_template(
+                    &canonical.source,
+                    canonical.capture_epoch,
+                    crate::m2_event_envelope::ControlPosition {
+                        kind,
+                        generation,
+                        xid: active.xid,
+                        row_ordinal: row.ordinal,
+                        commit_lsn: crate::m1_transition_kernel::ReceivedLsn::from_wire(commit_lsn),
+                        end_lsn: crate::m1_transition_kernel::ReceivedLsn::from_wire(end_lsn),
+                    },
+                )
+                .map_err(|_| RuntimeError::Protocol("control_canonicalization_failed"))?;
+                let ordinal = u32::try_from(events.len())
+                    .map_err(|_| RuntimeError::Protocol("event_ordinal_overflow"))?;
+                let source_row_ordinal = u32::try_from(row.ordinal)
+                    .map_err(|_| RuntimeError::Protocol("row_ordinal_overflow"))?;
+                events.push(JournalEvent {
+                    event_id,
+                    transaction_ordinal: ordinal,
+                    source_row_ordinal,
+                    source_mutation_ordinal: 0,
+                    relation_schema_fingerprint: None,
+                    control_kind: Some(kind.to_owned()),
+                    payload_hash: format!("{:x}", Sha256::digest(&envelope.json)),
+                    payload: envelope.json,
+                    canonical_payload: Some(envelope.canonical_preimage),
+                    canonical_payload_hash: Some(envelope.canonical_payload_hash),
+                });
+            } else if let Some(canonical) = self.canonical.as_ref()
                 && staged.control_kind.is_none()
             {
                 let row = decode_staged_row(&staged.payload, active.xid)?;

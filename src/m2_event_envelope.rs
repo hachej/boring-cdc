@@ -42,6 +42,99 @@ pub struct WalMutationTemplate {
     pub envelope: MutationEnvelope,
 }
 
+pub struct ControlPosition<'a> {
+    pub kind: &'a str,
+    pub generation: Option<u64>,
+    pub xid: u32,
+    pub row_ordinal: u64,
+    pub commit_lsn: ReceivedLsn,
+    pub end_lsn: ReceivedLsn,
+}
+
+pub fn render_control_template(
+    source: &SourceIdentity,
+    capture_epoch: CaptureEpoch,
+    position: ControlPosition<'_>,
+) -> Result<(String, MutationEnvelope), EnvelopeError> {
+    let ControlPosition {
+        kind,
+        generation,
+        xid,
+        row_ordinal,
+        commit_lsn,
+        end_lsn,
+    } = position;
+    if !matches!(
+        (kind, generation),
+        ("heartbeat", None) | ("capture_fence", Some(1..))
+    ) {
+        return Err(EnvelopeError::Invalid);
+    }
+    let source_version = source_version_for_row(capture_epoch, commit_lsn, xid, row_ordinal)
+        .map_err(|_| EnvelopeError::Invalid)?;
+    let version = MutationVersion::from_wal(
+        source_version,
+        WalIdentityInput {
+            capture_epoch,
+            source_slot_identity: SourceSlotIdentity::derive(source),
+            transaction_end_lsn: end_lsn,
+            row_ordinal,
+            mutation_ordinal: 0,
+        },
+    )
+    .map_err(|_| EnvelopeError::Invalid)?;
+    let event_id = version.connector_event_id().hex();
+    let generation_bytes = generation.map(u64::to_be_bytes);
+    let mut canonical_preimage = Vec::new();
+    for field in [
+        b"boring-cdc/control-payload/v1".as_slice(),
+        version.connector_event_id().bytes().as_slice(),
+        kind.as_bytes(),
+        &end_lsn.get().to_be_bytes(),
+        generation_bytes
+            .as_ref()
+            .map_or(&[][..], |bytes| bytes.as_slice()),
+    ] {
+        canonical_preimage.extend((field.len() as u64).to_be_bytes());
+        canonical_preimage.extend(field);
+    }
+    let canonical_payload_hash = format!("{:x}", Sha256::digest(&canonical_preimage));
+    let event = json!({
+        "schema_version":"boring-cdc/event/v1",
+        "event_type":"control",
+        "connector_event_id":event_id,
+        "journal_seq":0,
+        "capture_epoch":capture_epoch.get(),
+        "source_version":{
+            "lsn_u64":commit_lsn.get(),
+            "origin_rank":1,
+            "transaction_ordinal":source_version.ordinal(),
+            "mutation_ordinal":0,
+            "connector_event_id":event_id,
+        },
+        "routing":"control",
+        "operation":"control",
+        "control":{
+            "kind":kind,
+            "transaction_end_lsn":end_lsn.get(),
+            "generation":generation,
+        },
+        "payload_hash":canonical_payload_hash,
+    });
+    let json = serde_json::to_vec(&event).map_err(|_| EnvelopeError::Invalid)?;
+    if json.len() > MAX_EVENT_BYTES {
+        return Err(EnvelopeError::Limit);
+    }
+    Ok((
+        event_id,
+        MutationEnvelope {
+            json,
+            canonical_preimage,
+            canonical_payload_hash,
+        },
+    ))
+}
+
 /// Convert an admitted pgoutput row to one or two durable M0 mutation templates. The relation
 /// version must come from the catalog, not from the pgoutput Relation message alone.
 pub fn render_wal_row_templates(
@@ -500,5 +593,32 @@ mod tests {
         assert_eq!(new["canonical_key"][0]["value"], 43);
         assert_eq!(new["before_key"][0]["value"], 42);
         assert_ne!(pair[0].event_id, pair[1].event_id);
+
+        for (index, kind, generation, row_ordinal) in [
+            (12, "heartbeat", None, 5),
+            (13, "capture_fence", Some(2), 6),
+        ] {
+            let (_, control) = render_control_template(
+                &source,
+                epoch,
+                ControlPosition {
+                    kind,
+                    generation,
+                    xid: 0,
+                    row_ordinal,
+                    commit_lsn: ReceivedLsn::from_wire(124),
+                    end_lsn: ReceivedLsn::from_wire(128),
+                },
+            )
+            .unwrap();
+            let mut expected = vectors["vectors"][index]["event"].clone();
+            expected.as_object_mut().unwrap().remove("captured_at");
+            expected["journal_seq"] = json!(0);
+            assert_eq!(
+                serde_json::from_slice::<Value>(&control.json).unwrap(),
+                expected
+            );
+            assert_eq!(control.canonical_payload_hash, expected["payload_hash"]);
+        }
     }
 }

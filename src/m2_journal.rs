@@ -431,13 +431,29 @@ fn bind_sequence_templates(
         let Ok(mut payload) = serde_json::from_slice::<serde_json::Value>(&event.payload) else {
             continue;
         };
-        if payload
+        let event_type = payload
             .get("event_type")
-            .and_then(serde_json::Value::as_str)
-            != Some("mutation")
-        {
+            .and_then(serde_json::Value::as_str);
+        if !matches!(event_type, Some("mutation" | "control")) {
             continue;
         }
+        let binding_matches = match event_type {
+            Some("mutation") => {
+                event.control_kind.is_none()
+                    && payload
+                        .get("relation_fingerprint")
+                        .and_then(serde_json::Value::as_str)
+                        == event.relation_schema_fingerprint.as_deref()
+            }
+            Some("control") => {
+                event.relation_schema_fingerprint.is_none()
+                    && payload
+                        .pointer("/control/kind")
+                        .and_then(serde_json::Value::as_str)
+                        == event.control_kind.as_deref()
+            }
+            _ => false,
+        };
         let seq = first_seq
             .checked_add(offset as u64)
             .ok_or(JournalError::Limit("journal sequence overflow"))?;
@@ -445,7 +461,7 @@ fn bind_sequence_templates(
             .get("journal_seq")
             .and_then(serde_json::Value::as_u64);
         if (declared_seq != Some(0) && declared_seq != Some(seq))
-            || event.control_kind.is_some()
+            || !binding_matches
             || event.canonical_payload.is_none()
             || payload
                 .get("connector_event_id")
@@ -459,19 +475,15 @@ fn bind_sequence_templates(
                 .get("payload_hash")
                 .and_then(serde_json::Value::as_str)
                 != event.canonical_payload_hash.as_deref()
-            || payload
-                .get("relation_fingerprint")
-                .and_then(serde_json::Value::as_str)
-                != event.relation_schema_fingerprint.as_deref()
         {
-            return Err(JournalError::Conflict("mutation template binding mismatch"));
+            return Err(JournalError::Conflict("event template binding mismatch"));
         }
         if declared_seq == Some(seq) {
             continue;
         }
         payload["journal_seq"] = serde_json::Value::from(seq);
         event.payload = serde_json::to_vec(&payload)
-            .map_err(|_| JournalError::Invalid("mutation template encoding"))?;
+            .map_err(|_| JournalError::Invalid("event template encoding"))?;
         event.payload_hash = sha256(&event.payload);
         changed = true;
     }
