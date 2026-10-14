@@ -3,8 +3,9 @@
 //! Returned bytes use the closed M0 scalar encoding. Unsupported values fail before a journal
 //! commit; callers must never persist the source text as a substitute for canonical bytes.
 
-use crate::m1_decoder::{Relation, TupleValue};
+use crate::m1_decoder::{Relation, RelationContract, TupleValue};
 use crate::m1_ordering::{CanonicalValue, ColumnState};
+use crate::m1_source_identity::CanonicalKeyComponent;
 use chrono::{DateTime, NaiveDate, NaiveDateTime};
 
 const MAX_SCALAR_BYTES: usize = 1_048_576;
@@ -14,6 +15,95 @@ pub enum ValueError {
     UnsupportedType,
     InvalidValue,
     Limit,
+}
+
+/// Extract a key in effective index order. `compact` selects pgoutput's old-key tuple shape;
+/// full row tuples use relation-column positions. Null and unchanged TOAST cannot name a key.
+pub fn canonical_key(
+    contract: &RelationContract,
+    tuple: &[TupleValue],
+    compact: bool,
+) -> Result<Vec<CanonicalKeyComponent>, ValueError> {
+    let expected_width = if compact {
+        contract.key_columns.len()
+    } else {
+        contract.relation.columns.len()
+    };
+    // The current catalog reader proves only a single-column effective key. The Article 1
+    // contract records composite key positions in physical order, not necessarily index order.
+    if tuple.len() != expected_width || contract.key_columns.len() != 1 {
+        return Err(ValueError::InvalidValue);
+    }
+    contract
+        .key_columns
+        .iter()
+        .enumerate()
+        .map(|(key_ordinal, &column_index)| {
+            let column = contract
+                .relation
+                .columns
+                .get(column_index)
+                .ok_or(ValueError::InvalidValue)?;
+            let bytes = match tuple
+                .get(if compact { key_ordinal } else { column_index })
+                .ok_or(ValueError::InvalidValue)?
+            {
+                TupleValue::Text(bytes) => bytes,
+                _ => return Err(ValueError::InvalidValue),
+            };
+            let value = canonical_scalar(column.type_oid, column.type_modifier, bytes)?;
+            let mut key_bytes = value.bytes;
+            match column.type_oid {
+                21 | 23 | 20 => key_bytes[0] ^= 0x80,
+                1700 => key_bytes = numeric_key(&key_bytes)?,
+                1082 | 1114 | 1184 | 2950 | 25 | 1042 | 1043 | 17 => {}
+                _ => return Err(ValueError::UnsupportedType),
+            }
+            CanonicalKeyComponent::from_canonical(column.type_oid, key_bytes)
+                .map_err(|_| ValueError::InvalidValue)
+        })
+        .collect()
+}
+
+fn numeric_key(decimal: &[u8]) -> Result<Vec<u8>, ValueError> {
+    let text = std::str::from_utf8(decimal).map_err(|_| ValueError::InvalidValue)?;
+    if text == "0" {
+        return Ok(vec![b'+', 0, 0, 1, b'0']);
+    }
+    let (sign, unsigned) = if let Some(rest) = text.strip_prefix('-') {
+        (b'-', rest)
+    } else {
+        (b'+', text)
+    };
+    let integer_len = unsigned.split('.').next().unwrap_or_default().len();
+    let digits = unsigned
+        .bytes()
+        .filter(|byte| *byte != b'.')
+        .collect::<Vec<_>>();
+    let first = digits
+        .iter()
+        .position(|byte| *byte != b'0')
+        .ok_or(ValueError::InvalidValue)?;
+    let last = digits
+        .iter()
+        .rposition(|byte| *byte != b'0')
+        .ok_or(ValueError::InvalidValue)?;
+    let significant = &digits[first..=last];
+    if significant.len() > 100 {
+        return Err(ValueError::Limit);
+    }
+    let exponent = i16::try_from(integer_len)
+        .and_then(|length| i16::try_from(first).map(|first| length - first - 1))
+        .map_err(|_| ValueError::Limit)?;
+    if !(-18..=18).contains(&exponent) {
+        return Err(ValueError::Limit);
+    }
+    let mut bytes = Vec::with_capacity(significant.len() + 4);
+    bytes.push(sign);
+    bytes.extend(exponent.to_be_bytes());
+    bytes.push(significant.len() as u8);
+    bytes.extend(significant);
+    Ok(bytes)
 }
 
 /// Decode a full pgoutput tuple against the admitted relation's column order. Compact key
@@ -393,6 +483,93 @@ fn decode_hex(hex: &[u8]) -> Result<Vec<u8>, ValueError> {
 mod tests {
     use super::*;
     use crate::m1_decoder::Column;
+    use crate::m1_source_identity::{PhysicalKeyHash, canonical_key_encoding};
+
+    #[test]
+    fn full_and_compact_keys_match_m0_physical_identity() {
+        let contract = RelationContract {
+            relation: Relation {
+                id: 42,
+                namespace: "public".into(),
+                name: "orders".into(),
+                replica_identity: b'd',
+                columns: vec![
+                    Column {
+                        key: true,
+                        name: "id".into(),
+                        type_oid: 20,
+                        type_modifier: -1,
+                    },
+                    Column {
+                        key: false,
+                        name: "memo".into(),
+                        type_oid: 25,
+                        type_modifier: -1,
+                    },
+                ],
+            },
+            key_columns: vec![0],
+            control: None,
+        };
+        let full = [
+            TupleValue::Text(b"42".to_vec()),
+            TupleValue::Text(b"memo".to_vec()),
+        ];
+        let compact = [TupleValue::Text(b"42".to_vec())];
+        let full_key = canonical_key(&contract, &full, false).unwrap();
+        let compact_key = canonical_key(&contract, &compact, true).unwrap();
+        assert_eq!(full_key, compact_key);
+        assert_eq!(
+            canonical_key_encoding(&full_key).unwrap(),
+            vec![1, 1, 0, 0, 0, 20, 0, 0, 0, 8, 128, 0, 0, 0, 0, 0, 0, 42]
+        );
+        let actual: String = PhysicalKeyHash::derive(&full_key)
+            .unwrap()
+            .bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/m0/event-format/golden-vectors.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            actual,
+            vectors["vectors"][0]["event"]["key_hash"].as_str().unwrap()
+        );
+        assert_eq!(
+            canonical_key(&contract, &full[..1], false),
+            Err(ValueError::InvalidValue)
+        );
+        assert_eq!(
+            canonical_key(&contract, &[TupleValue::Null], true),
+            Err(ValueError::InvalidValue)
+        );
+    }
+
+    #[test]
+    fn numeric_key_uses_minimal_digits_and_power_of_ten() {
+        assert_eq!(
+            numeric_key(b"0").unwrap(),
+            b"+\0\0\x01"
+                .iter()
+                .copied()
+                .chain(b"0".iter().copied())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            numeric_key(b"123.45").unwrap(),
+            vec![b'+', 0, 2, 5, b'1', b'2', b'3', b'4', b'5']
+        );
+        assert_eq!(
+            numeric_key(b"-0.0012").unwrap(),
+            vec![b'-', 0xff, 0xfd, 2, b'1', b'2']
+        );
+        assert_eq!(
+            numeric_key(b"100000000000000000000").unwrap_err(),
+            ValueError::Limit
+        );
+    }
 
     #[test]
     fn full_tuple_preserves_null_and_toast_without_decoding_them() {
