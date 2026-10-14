@@ -979,6 +979,7 @@ mod tests {
             match std::env::var("BCDC_M4_LIVE_PHASE").as_deref() {
                 Ok("abort") => run_live_destination_phase(&path, &boundaries, true),
                 Ok("resume") => run_live_destination_phase(&path, &boundaries, false),
+                Ok("owned") => run_owned_live_destination_phase(&path, &boundaries),
                 _ => prove_live_m2_journal_reaches_clickhouse(&path, &boundaries, business),
             }
         }
@@ -1070,11 +1071,111 @@ mod tests {
                 .unwrap();
             assert_eq!(checkpoint, boundaries.last().unwrap().1, "{boundary}");
         }
+        let owned = run_phase("owned", "owned");
+        assert!(
+            owned.status.success(),
+            "owned: {}",
+            String::from_utf8_lossy(&owned.stderr)
+        );
+        let connection =
+            rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .unwrap();
+        let owned_checkpoint: u64 = connection
+            .query_row(
+                "SELECT journal_seq FROM destination_checkpoints WHERE destination_id='article2-clickhouse-owned'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(owned_checkpoint, boundaries.last().unwrap().1);
         assert!(expected_events >= 10);
         println!(
-            "M4_LIVE_JOURNAL_OK events_per_case={expected_events} ranges_per_case={} abort_boundaries=5 process_abort=verified",
+            "M4_LIVE_JOURNAL_OK events_per_case={expected_events} ranges_per_case={} abort_boundaries=5 process_abort=verified owned_lease=verified",
             boundaries.len()
         );
+    }
+
+    fn run_owned_live_destination_phase(path: &str, boundaries: &[(u64, u64, usize)]) {
+        use crate::m2_leases::{LeaseIdentity, acquire};
+        use crate::m4_clickhouse_adapter::ProductionClickHouseAdapter;
+        use crate::m4_clickhouse_wire::PinnedClickHouseWire;
+
+        let mut writer = open_writer(
+            std::path::Path::new(path),
+            "article2-owned-destination",
+            1,
+            1_000,
+        )
+        .unwrap();
+        let capture_epoch: String = writer
+            .connection()
+            .query_row(
+                "SELECT capture_epoch FROM source_state WHERE singleton=1",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        writer
+            .connection_mut()
+            .execute(
+                "INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('article2-clickhouse-owned','clickhouse','article2-live-journal-v1',?1,6)",
+                [&capture_epoch],
+            )
+            .unwrap();
+        writer
+            .connection_mut()
+            .execute(
+                "INSERT INTO runtime_ownership(run_id,backend_pid,connection_nonce,ownership_deadline_mono_ms,state,connection_generation,expected_close_token,loss_evidence,takeover_evidence,revision) VALUES('article2-owned-run',1,'article2-owned-nonce',10000,'held',1,NULL,NULL,NULL,0)",
+                [],
+            )
+            .unwrap();
+        let token = acquire(
+            &mut writer,
+            LeaseIdentity {
+                lease_id: "article2-owned-lease".into(),
+                destination_id: "article2-clickhouse-owned".into(),
+                capture_epoch,
+                anchor_id: None,
+                generation: 6,
+                configuration_fingerprint: "article2-live-journal-v1".into(),
+                run_id: "article2-owned-run".into(),
+            },
+            100,
+            1_000,
+        )
+        .unwrap();
+        let client = clickhouse::Client::default()
+            .with_url(std::env::var("BCDC_M4_CLICKHOUSE_URL").unwrap())
+            .with_user(std::env::var("BCDC_M4_CLICKHOUSE_USER").unwrap())
+            .with_password(std::env::var("BCDC_M4_CLICKHOUSE_PASSWORD").unwrap());
+        let mut adapter =
+            ProductionClickHouseAdapter::new(PinnedClickHouseWire::new(client).unwrap());
+        let mut now = || 100;
+        for &(first, last, count) in boundaries {
+            let copied = crate::m2_journal::read_complete_range(
+                std::path::Path::new(path),
+                first - 1,
+                count,
+                32 * 1024 * 1024,
+                std::time::Duration::from_secs(5),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!((copied.first_seq, copied.last_seq), (first, last));
+            let batch = prepare_owned_batch(&mut writer, &token, &mut now, copied).unwrap();
+            let remote =
+                dispatch_owned_batch(&mut writer, &token, &mut now, &mut adapter, &batch).unwrap();
+            let revision = writer
+                .connection()
+                .query_row(
+                    "SELECT revision FROM destination_checkpoints WHERE destination_id='article2-clickhouse-owned'",
+                    [],
+                    |row| row.get::<_, u64>(0),
+                )
+                .optional()
+                .unwrap();
+            finalize_owned_batch(&mut writer, &token, &mut now, &batch, &remote, revision).unwrap();
+        }
     }
 
     fn run_live_destination_phase(path: &str, boundaries: &[(u64, u64, usize)], abort: bool) {
