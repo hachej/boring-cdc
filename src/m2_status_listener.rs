@@ -232,7 +232,10 @@ fn handle(
             _ => (404, "Not Found", None),
         }
     };
-    let body = response.2.unwrap_or_default();
+    let body = response.2.unwrap_or_else(|| match route {
+        Route::Status => b"{}".to_vec(),
+        Route::Metrics => Vec::new(),
+    });
     let header = format!(
         "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
         response.0,
