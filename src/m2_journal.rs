@@ -1684,8 +1684,12 @@ pub mod tests {
             "unknown"
         );
         store.commit_atomic(&second, CommitFault::None).unwrap();
+        let second_observed: u64 = store.writer.connection().query_row(
+            "SELECT observed_at_unix_seconds FROM capture_health_observations WHERE run_id='run-b'",
+            [], |row| row.get(0)
+        ).unwrap();
         assert_eq!(
-            crate::m2_fault_status::snapshot(&path, "cfg", at(observed + 1))
+            crate::m2_fault_status::snapshot(&path, "cfg", at(second_observed + 1))
                 .unwrap()
                 .freshness,
             "fresh"
