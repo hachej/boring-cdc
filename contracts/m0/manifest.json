@@ -107,7 +107,7 @@
       "id": "ART-M0-CLICKHOUSE-MODEL",
       "owner_bead": "boring-cdc-m0-ch-model",
       "path": "contracts/clickhouse/model.json",
-      "sha256": "cf306b686d62e2780892486ec761d7e085eb24a02495b434e590b9456ccf36a9",
+      "sha256": "b4bdb1a62643547cd644c62e249dfc2429d76e208cc647df4af7ae2279336499",
       "status": "complete"
     },
     {

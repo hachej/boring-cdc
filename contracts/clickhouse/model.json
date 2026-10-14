@@ -284,6 +284,85 @@
       "wait_for_async_insert": 1
     }
   },
+  "live_inspection": {
+    "audit_scope": "inspect the audited capture_epoch selector row separately under audit.selector_fingerprint; object/settings metadata are server-wide",
+    "object_fingerprint_rule": "return the source-contract object_fingerprint only after fresh server version, all six exact object queries, 43 physical columns and effective settings match; no cached or source-only value proves live state",
+    "object_metadata": {
+      "columns_digest_domain": "boring-cdc/clickhouse-system-columns/v1",
+      "columns_digest_sha256": "938f3680ed9451d6d24ca72c886cd62c9607dc66540bf7c860873754f55d52ed",
+      "columns_field_order": [
+        "table",
+        "name",
+        "type",
+        "position",
+        "is_in_partition_key",
+        "is_in_sorting_key"
+      ],
+      "columns_framing": "domain and each field in row order use unsigned 64-bit big-endian byte length followed by ASCII bytes; integer fields use unsigned decimal ASCII",
+      "columns_query": "SELECT table,name,type,position,is_in_partition_key,is_in_sorting_key FROM system.columns WHERE database='boring_cdc' ORDER BY table,position",
+      "columns_row_count": 43,
+      "expected": {
+        "batch_markers_v1": {
+          "create_query_sha256": "7f95b63c458fd873cdfd178cc0c3eb93589cb599b18b67ea4b4cc16b284000a6",
+          "engine": "MergeTree"
+        },
+        "event_history_v1": {
+          "create_query_sha256": "e73c8f3d25cc9b492602bcc0c3f5bea8c5c31fe6e018f78450e50ee28b0e7857",
+          "engine": "MergeTree"
+        },
+        "event_identity_conflicts_v1": {
+          "create_query_sha256": "e16a288d2fc597d4258b4d7525c4e7d2f67afd1a63fb6f9b49b6af743fe286aa",
+          "engine": "View"
+        },
+        "generation_selectors_v1": {
+          "create_query_sha256": "51a51f357ca22db39280a8d0c6ca397aa78f63d145df85f85e9b6277792d86ea",
+          "engine": "MergeTree"
+        },
+        "live_generation_v1": {
+          "create_query_sha256": "efe75aec390cdb952546d59403a09bec91ee246c4e14b46bf0ed9f45b4fd5caa",
+          "engine": "View"
+        },
+        "selector_conflicts_v1": {
+          "create_query_sha256": "ddbc48206308d80c83e1e9ac8cbd34ea1a215ca436ca3e5d055550ddb124b81a",
+          "engine": "View"
+        }
+      },
+      "failure": "missing, extra, or changed objects/columns block destination acceptance and audit",
+      "query": "SELECT name,engine,create_table_query FROM system.tables WHERE database='boring_cdc' ORDER BY name"
+    },
+    "server_version": "25.8.2.29",
+    "settings": {
+      "expected_fingerprint_sha256": "8acec9cdf7de939b26e9882f3973a541686fc1ce80ec3e408ceef21e5f492225",
+      "fingerprint_domain": "boring-cdc/clickhouse-settings/v1",
+      "fingerprint_order": "length-frame domain, transport option name/value, query option name/value pairs in lexical name order, then table name and each fsync option name/value in lexical table/option order; all values are ASCII and lengths are unsigned 64-bit big-endian",
+      "query_options": {
+        "async_insert": "0",
+        "insert_deduplicate": "0",
+        "insert_quorum": "1",
+        "wait_for_async_insert": "1"
+      },
+      "query_probe": "SELECT name,value FROM system.settings WHERE name IN ('async_insert','insert_deduplicate','insert_quorum','wait_for_async_insert') ORDER BY name",
+      "table_options": {
+        "batch_markers_v1": {
+          "fsync_after_insert": "1",
+          "fsync_part_directory": "1"
+        },
+        "event_history_v1": {
+          "fsync_after_insert": "1",
+          "fsync_part_directory": "1"
+        },
+        "generation_selectors_v1": {
+          "fsync_after_insert": "1",
+          "fsync_part_directory": "1"
+        }
+      },
+      "table_proof": "each pinned system.tables.create_table_query digest includes its MergeTree fsync settings",
+      "transport_option": {
+        "wait_end_of_query": "1"
+      },
+      "transport_proof": "pin HTTP wait_end_of_query=1 on each history/marker insert, await insert.end() and complete server response; system.settings does not expose this HTTP option"
+    }
+  },
   "lookup_behavior": {
     "canonical_join": "query-time joins only among pinned local ClickHouse objects in the same capture_epoch/generation",
     "display_names": "non-correctness metadata only; logical_table_id and column_id drive grouping",
