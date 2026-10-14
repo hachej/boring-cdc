@@ -1027,6 +1027,16 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         if events.is_empty() {
             return self.safe_stop(RuntimeError::Protocol("empty_transaction"));
         }
+        let control_kind = events
+            .iter()
+            .find_map(|event| event.control_kind.as_deref());
+        if control_kind.is_some()
+            && events
+                .iter()
+                .any(|event| event.control_kind.as_deref() != control_kind)
+        {
+            return self.safe_stop(RuntimeError::Protocol("mixed_control_transaction"));
+        }
         let commit = SourceCommit {
             transaction_id: format!("wal:{end_lsn:016X}"),
             xid: active.xid.to_string(),
