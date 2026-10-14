@@ -266,6 +266,17 @@ pub struct MutationPayload {
 }
 impl MutationPayload {
     pub fn hash(&self, version: &MutationVersion) -> Result<Hash32, OrderingFailure> {
+        Ok(Hash32(
+            Sha256::digest(self.canonical_preimage(version)?).into(),
+        ))
+    }
+
+    /// Exact M0 length-framed bytes hashed for a mutation. Destinations compare this preimage
+    /// with values reconstructed from stored typed columns, never with transport JSON bytes.
+    pub fn canonical_preimage(
+        &self,
+        version: &MutationVersion,
+    ) -> Result<Vec<u8>, OrderingFailure> {
         if (version.origin_rank == SNAPSHOT_ORIGIN_RANK)
             != (self.operation == SourceOperation::Snapshot)
         {
@@ -295,24 +306,27 @@ impl MutationPayload {
                 .map_err(|_| OrderingFailure::contract("COLUMN_ID_OUT_OF_RANGE"))?;
             state.encode_into(column_id, &mut columns);
         }
-        Ok(hash_fields(
+        let mut preimage = Vec::new();
+        for field in [
             PAYLOAD_HASH_DOMAIN,
-            &[
-                &version.source.capture_epoch().get().to_be_bytes(),
-                &version.source.commit_lsn().get().to_be_bytes(),
-                &[version.origin_rank],
-                &version.source.ordinal().to_be_bytes(),
-                &[version.mutation_ordinal],
-                &version.connector_event_id.bytes(),
-                &self.relation.fingerprint().bytes(),
-                &key,
-                &key_hash.bytes(),
-                &[self.operation.tag()],
-                &before_key,
-                &[self.kind.tag()],
-                &columns,
-            ],
-        ))
+            &version.source.capture_epoch().get().to_be_bytes(),
+            &version.source.commit_lsn().get().to_be_bytes(),
+            &[version.origin_rank],
+            &version.source.ordinal().to_be_bytes(),
+            &[version.mutation_ordinal],
+            &version.connector_event_id.bytes(),
+            &self.relation.fingerprint().bytes(),
+            &key,
+            &key_hash.bytes(),
+            &[self.operation.tag()],
+            &before_key,
+            &[self.kind.tag()],
+            &columns,
+        ] {
+            preimage.extend(canonical_length_bytes(field.len()));
+            preimage.extend(field);
+        }
+        Ok(preimage)
     }
 }
 
@@ -855,6 +869,11 @@ mod tests {
                 columns: vec![ColumnState::Value(value(20, &42i64.to_be_bytes()))],
             };
             assert_eq!(payload.hash(&version).unwrap().hex(), event["payload_hash"]);
+            let preimage = payload.canonical_preimage(&version).unwrap();
+            assert_eq!(
+                Hash32::from_bytes(Sha256::digest(preimage).into()).hex(),
+                event["payload_hash"]
+            );
         }
     }
 
