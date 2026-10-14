@@ -4,6 +4,36 @@
 //! catalog facts and bind them to its source identity before persisting this encoding.
 
 use crate::m1_source_identity::LogicalTableIdentity;
+use sha2::{Digest, Sha256};
+
+const COMPONENT_DOMAIN: &[u8] = b"boring-cdc/relation-component/v1";
+
+/// Hash an already-canonical catalog definition using the closed M0 framing.
+pub fn relation_component_hash(kind: &str, definition: &str) -> [u8; 32] {
+    let mut digest = Sha256::new();
+    for field in [COMPONENT_DOMAIN, kind.as_bytes(), definition.as_bytes()] {
+        digest.update((field.len() as u64).to_be_bytes());
+        digest.update(field);
+    }
+    digest.finalize().into()
+}
+
+/// The strict single-column primary-key spelling admitted by the first catalog reader.
+/// Other key definitions require the full catalog deparser and must fail closed there.
+pub fn simple_primary_key_hash(column: &str) -> Result<[u8; 32], RelationContractError> {
+    let mut bytes = column.bytes();
+    let first = bytes.next().ok_or(RelationContractError::InvalidKey)?;
+    if !matches!(first, b'a'..=b'z' | b'_')
+        || !bytes.all(|byte| matches!(byte, b'a'..=b'z' | b'0'..=b'9' | b'_'))
+    {
+        return Err(RelationContractError::InvalidKey);
+    }
+    let definition = format!("primary key ({column})");
+    Ok(relation_component_hash(
+        "effective_key_definition",
+        &definition,
+    ))
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReplicaMode {
@@ -50,6 +80,7 @@ pub struct RelationCatalogContract {
 pub enum RelationContractError {
     InvalidColumn,
     InvalidPublication,
+    InvalidKey,
     TooManyColumns,
 }
 
@@ -195,5 +226,19 @@ mod tests {
             contract.encode().unwrap(),
             include_bytes!("../tests/fixtures/m1_ordering/relation-contract.bin")
         );
+        assert_eq!(
+            contract.effective_key_definition_hash,
+            Some(simple_primary_key_hash("id").unwrap())
+        );
+    }
+
+    #[test]
+    fn noncanonical_primary_key_identifier_fails_closed() {
+        for column in ["", "MixedCase", "two words", "id, role", "é"] {
+            assert_eq!(
+                simple_primary_key_hash(column),
+                Err(RelationContractError::InvalidKey)
+            );
+        }
     }
 }
