@@ -21,6 +21,7 @@
       "capture_epoch",
       "generation",
       "promotion_fence",
+      "selector_fingerprint",
       "target_clickhouse_checkpoint",
       "object_fingerprint",
       "event_contract_sha256"
@@ -32,6 +33,24 @@
     "payload_only_corruption": "must be detected even when connector_event_id, stored payload_hash and batch marker are unchanged",
     "payload_verification": "read actual stored key, operation, full source version, relation schema and tagged column values; recompute canonical payload hash; compare recomputed hash with stored payload_hash and retained journal hash",
     "read_only": true,
+    "selector_fingerprint": {
+      "algorithm": "SHA-256 lowercase hexadecimal",
+      "conflict": "any selector_conflicts_v1 row for the capture_epoch or distinct rows at the greatest promotion_fence blocks inspection",
+      "domain": "boring-cdc/clickhouse-selector/v1",
+      "empty": "no live selector; inspection and audit coverage are unavailable",
+      "field_framing": "domain and each field are framed by an unsigned 64-bit big-endian byte length followed by the bytes",
+      "field_order": [
+        "capture_epoch",
+        "promotion_fence",
+        "generation",
+        "table_set_fingerprint",
+        "compatible_anchor_id",
+        "candidate_digest"
+      ],
+      "integer_encoding": "unsigned decimal ASCII without leading zeroes",
+      "row_scope": "the unique greatest-promotion_fence generation_selectors_v1 row for the audited capture_epoch; identical physical retries collapse and lower-fence rows do not participate",
+      "string_encoding": "the stored 64 ASCII bytes of each FixedString(64) field, without trimming or NUL normalization"
+    },
     "target": "frozen finite checkpoint and selector/object identity"
   },
   "authority": {

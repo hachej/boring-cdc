@@ -15,6 +15,19 @@ def load(p):
  return json.loads(p.read_text(),object_pairs_hook=pairs)
 def digest(p): return hashlib.sha256(p.read_bytes()).hexdigest()
 def add(o,c,p,m): o.append({'code':c,'path':p,'message':m})
+SELECTOR_FIELDS=('capture_epoch','promotion_fence','generation','table_set_fingerprint','compatible_anchor_id','candidate_digest')
+def selector_fingerprint(rows,epoch):
+ selected=[row for row in rows if row['capture_epoch']==epoch]
+ if not selected:return None
+ by_fence={}
+ for row in selected:
+  by_fence.setdefault(row['promotion_fence'],set()).add(tuple(row[field] for field in SELECTOR_FIELDS))
+ if any(len(candidates)!=1 for candidates in by_fence.values()):raise ValueError('selector conflict')
+ greatest=next(iter(by_fence[max(by_fence)]))
+ h=hashlib.sha256()
+ for value in ('boring-cdc/clickhouse-selector/v1',*greatest):
+  encoded=str(value).encode('ascii');h.update(len(encoded).to_bytes(8,'big'));h.update(encoded)
+ return h.hexdigest()
 def resolve_pointer(document,pointer):
  current=document
  for token in pointer.removeprefix('/').split('/'):
@@ -120,6 +133,18 @@ def validate():
  if c['event_projection']['cross_epoch_comparison']!='forbidden' or c['objects']['native_replacement_version']!='forbidden':add(out,'E_VERSION_NARROW','event_projection','epoch/native narrowing enabled')
  audit=c['audit']; b=audit['budgets']
  if audit['checkpoint_moves'] or any(b[k]<=0 for k in b) or 'actual' not in audit['payload_verification'] or 'stored payload_hash' not in audit['payload_only_corruption']:add(out,'E_AUDIT','audit','finite actual-payload audit weakened')
+ selector=audit['selector_fingerprint']
+ if audit['identity']!=['capture_epoch','generation','promotion_fence','selector_fingerprint','target_clickhouse_checkpoint','object_fingerprint','event_contract_sha256'] or selector['domain']!='boring-cdc/clickhouse-selector/v1' or selector['algorithm']!='SHA-256 lowercase hexadecimal' or selector['field_order']!=list(SELECTOR_FIELDS) or 'greatest-promotion_fence' not in selector['row_scope'] or 'selector_conflicts_v1' not in selector['conflict'] or '64-bit big-endian' not in selector['field_framing'] or 'without trimming' not in selector['string_encoding'] or 'without leading zeroes' not in selector['integer_encoding'] or 'no live selector' not in selector['empty']:add(out,'E_SELECTOR_FINGERPRINT','audit/selector_fingerprint','approved greatest-row selector identity changed')
+ golden={'capture_epoch':1,'promotion_fence':9,'generation':7,'table_set_fingerprint':'6'*64,'compatible_anchor_id':'f'*64,'candidate_digest':'7'*64}
+ expected='2d3882a0f2ad8eb3c95fc1d98de156a1093a4200a32275c46d926cecd1f8c86e'
+ lower={**golden,'promotion_fence':8,'candidate_digest':'8'*64}
+ higher={**golden,'promotion_fence':10,'candidate_digest':'9'*64}
+ try:
+  if selector_fingerprint([],1) is not None or selector_fingerprint([golden,golden],1)!=expected or selector_fingerprint([golden,lower],1)!=expected or selector_fingerprint([golden,higher],1)==expected:add(out,'E_SELECTOR_VECTOR','audit/selector_fingerprint','empty, identical, lower, or higher selector behavior changed')
+  try:selector_fingerprint([golden,{**golden,'candidate_digest':'0'*64}],1)
+  except ValueError:pass
+  else:add(out,'E_SELECTOR_VECTOR','audit/selector_fingerprint','same-fence conflict was accepted')
+ except Exception as e:add(out,'E_SELECTOR_VECTOR','audit/selector_fingerprint',str(e))
  quota=c['history_retention']['quota']
  if (quota['warning_history_bytes'],quota['hard_history_bytes'],quota['emergency_free_bytes'])!=(68719476736,85899345920,10737418240):add(out,'E_QUOTA','history_retention/quota','confirmed quota changed')
  if c['history_retention']['retirement_grace_seconds']!=86400 or c['history_retention']['ttl']!='forbidden':add(out,'E_RETENTION','history_retention','retention safety changed')
