@@ -62,6 +62,7 @@ control_credential='control-durable-simple'
 application_credential='application-durable-simple'
 psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_credential" -v "control_password=$control_credential" -v "application_password=$application_credential" \
   < scripts/setup/durable_simple_prerequisites.sql >"$work/prerequisites.out"
+psqlc -qc "alter table public.orders add column memo text; alter table public.orders alter column memo set storage external"
 
 cargo build --quiet --locked --bin boring-cdc
 binary="$PWD/target/debug/boring-cdc"
@@ -338,7 +339,26 @@ assert rows[1][2:4]==(0,0) and rows[2][2:4]==(0,1)
 print('DURABLE_MUTATIONS_OK update=1 key_change=2 delete=1 canonical_hashes=bound')
 PY
 
+psqlc -qc "begin; set local role boring_cdc_app; update public.orders set memo=repeat('x',10000) where id=201; commit"
+wait_for_transactions 10
+psqlc -qc "begin; set local role boring_cdc_app; update public.orders set total=777.25 where id=201; commit"
+wait_for_transactions 11
+python3 - "$journal" <<'PY'
+import hashlib,json,sqlite3,sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    rows=db.execute("select cast(payload as text),canonical_payload,canonical_payload_hash from journal_events where control_kind is null order by journal_seq desc limit 2").fetchall()
+assert len(rows)==2
+latest,earlier=[json.loads(row[0]) for row in rows]
+assert latest['operation']=='update' and earlier['operation']=='update'
+assert latest['canonical_key'][0]['value']==201==earlier['canonical_key'][0]['value']
+assert latest['columns'][2]['state']=='unchanged_toast',latest['columns']
+assert earlier['columns'][2]['state']=='explicit_value',earlier['columns']
+for payload_text,preimage,canonical_hash in rows:
+    assert preimage and hashlib.sha256(preimage).hexdigest()==canonical_hash==json.loads(payload_text)['payload_hash']
+print('DURABLE_TOAST_OK explicit_value=1 unchanged_toast=1 canonical_hashes=bound')
+PY
+
 stop_bounded "$runtime_pid" TERM runtime-restart
 runtime_pid=
 [[ ! -s "$work/runtime-restart.err" ]]
-echo "DURABLE_SIMPLE_CASE_OK postgres=$version user_transactions=6 heartbeat_and_fence=classified crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"
+echo "DURABLE_SIMPLE_CASE_OK postgres=$version inserts=6 update=1 key_change=2 delete=1 toast=preserved heartbeat_and_fence=canonical crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"
