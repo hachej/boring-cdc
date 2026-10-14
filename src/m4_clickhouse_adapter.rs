@@ -47,6 +47,7 @@ pub enum WireRequest<'a> {
         identity: &'a AuditIdentity,
         first_seq: u64,
         last_seq: u64,
+        max_events: usize,
     },
 }
 
@@ -128,11 +129,13 @@ impl<W: ClickHouseWire> ClickHouseAuditExecutor for ProductionClickHouseAdapter<
         identity: &AuditIdentity,
         first_seq: u64,
         last_seq: u64,
+        max_events: usize,
     ) -> Result<StoredAuditBatch, AuditDispatchError> {
         match self.wire.execute(WireRequest::ReadAuditRangeFresh {
             identity,
             first_seq,
             last_seq,
+            max_events,
         }) {
             Ok(WireResponse::AuditBatch(batch)) => Ok(batch),
             _ => Err(AuditDispatchError),

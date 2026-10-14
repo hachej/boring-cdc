@@ -2,6 +2,9 @@
 
 use crate::m1_source_identity::{CanonicalKeyComponent, PhysicalKeyHash, canonical_key_encoding};
 use crate::m4_clickhouse_adapter::{ClickHouseWire, RedactedWireError, WireRequest, WireResponse};
+use crate::m4_clickhouse_audit::{
+    AuditIdentity, StoredAuditBatch, StoredAuditEvent, marker_digest,
+};
 use crate::m4_clickhouse_durability::RemoteBatch;
 use crate::m4_clickhouse_durability::{BatchMarker, DestinationEvent, RemoteEventIdentity};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -9,6 +12,7 @@ use clickhouse::{Client, Row};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeMap;
 use tokio::runtime::{Builder, Runtime};
 
 use crate::m4_clickhouse_adapter::SYNCHRONOUS_QUERY_SETTINGS;
@@ -404,6 +408,72 @@ impl PinnedClickHouseWire {
                 .map_err(|_| RedactedWireError)
         })
     }
+
+    fn read_audit_range(
+        &mut self,
+        identity: &AuditIdentity,
+        first_seq: u64,
+        last_seq: u64,
+        max_events: usize,
+    ) -> Result<StoredAuditBatch, RedactedWireError> {
+        if first_seq > last_seq || max_events == 0 {
+            return Err(RedactedWireError);
+        }
+        let capture_epoch = identity
+            .capture_epoch
+            .parse::<u64>()
+            .map_err(|_| RedactedWireError)?;
+        let limit = u64::try_from(max_events.checked_add(1).ok_or(RedactedWireError)?)
+            .map_err(|_| RedactedWireError)?;
+        let rows = self.runtime.block_on(async {
+            self.client
+                .query("SELECT ?fields FROM boring_cdc.event_history_v1 WHERE capture_epoch = ? AND generation = ? AND journal_seq >= ? AND journal_seq <= ? ORDER BY journal_seq LIMIT ?")
+                .bind(capture_epoch)
+                .bind(identity.generation)
+                .bind(first_seq)
+                .bind(last_seq)
+                .bind(limit)
+                .fetch_all::<EventHistoryRow>()
+                .await
+                .map_err(|_| RedactedWireError)
+        })?;
+        if rows.len() > max_events {
+            return Err(RedactedWireError);
+        }
+        let mut events = Vec::with_capacity(rows.len());
+        for row in rows {
+            let remote = row.remote_identity()?;
+            events.push(StoredAuditEvent {
+                journal_seq: row.journal_seq,
+                connector_event_id: remote.connector_event_id,
+                stored_payload_hash: remote.payload_hash,
+                reconstructed_payload: remote.canonical_payload,
+            });
+        }
+        let indexed = events
+            .iter()
+            .map(|event| {
+                (
+                    event.journal_seq,
+                    (
+                        event.connector_event_id.as_str(),
+                        event.stored_payload_hash.as_str(),
+                        event.reconstructed_payload.as_slice(),
+                    ),
+                )
+            })
+            .collect::<BTreeMap<_, _>>();
+        if indexed.len() != events.len() {
+            return Err(RedactedWireError);
+        }
+        Ok(StoredAuditBatch {
+            first_journal_seq: first_seq,
+            last_journal_seq: last_seq,
+            event_count: u64::try_from(events.len()).map_err(|_| RedactedWireError)?,
+            marker_digest: marker_digest(first_seq, last_seq, &indexed),
+            events,
+        })
+    }
 }
 
 impl ClickHouseWire for PinnedClickHouseWire {
@@ -468,9 +538,15 @@ impl ClickHouseWire for PinnedClickHouseWire {
                     events,
                 })))
             }
-            WireRequest::InspectContractFresh | WireRequest::ReadAuditRangeFresh { .. } => {
-                Err(RedactedWireError)
-            }
+            WireRequest::ReadAuditRangeFresh {
+                identity,
+                first_seq,
+                last_seq,
+                max_events,
+            } => self
+                .read_audit_range(identity, first_seq, last_seq, max_events)
+                .map(WireResponse::AuditBatch),
+            WireRequest::InspectContractFresh => Err(RedactedWireError),
         }
     }
 }
@@ -747,6 +823,24 @@ mod tests {
         (event, marker)
     }
 
+    fn live_audit_identity(marker: &BatchMarker) -> AuditIdentity {
+        AuditIdentity {
+            audit_id: "wire-live".into(),
+            destination_id: "clickhouse".into(),
+            configuration_fingerprint: "config".into(),
+            capture_epoch: marker.capture_epoch.to_string(),
+            generation: marker.generation,
+            target_checkpoint: marker.last_journal_seq,
+            selector_fingerprint: "selector".into(),
+            object_fingerprint: marker.object_fingerprint.clone(),
+            contract_digest: "contract".into(),
+            freshness_started_at: "2026-10-14T00:00:00Z".into(),
+            freshness_expires_at: "2026-10-15T00:00:00Z".into(),
+            retained_history_start_seq: marker.first_journal_seq,
+            expected_current_incarnation: None,
+        }
+    }
+
     #[test]
     fn golden_m0_mutation_maps_to_the_closed_history_columns() {
         let (event, marker) = golden_event();
@@ -833,6 +927,22 @@ mod tests {
         };
         assert_eq!(remote.marker, marker);
         assert_eq!(remote.events[0].canonical_payload, event.canonical_payload);
+        let WireResponse::AuditBatch(audit) = wire
+            .execute(WireRequest::ReadAuditRangeFresh {
+                identity: &live_audit_identity(&marker),
+                first_seq: 1,
+                last_seq: 1,
+                max_events: 1,
+            })
+            .unwrap()
+        else {
+            panic!("missing audit range")
+        };
+        assert_eq!(audit.event_count, 1);
+        assert_eq!(
+            audit.events[0].reconstructed_payload,
+            event.canonical_payload
+        );
     }
 
     #[test]
@@ -850,6 +960,21 @@ mod tests {
         let markers = wire.read_marker_rows(&marker).unwrap();
         assert_eq!(markers.len(), 1);
         assert_eq!(markers[0].to_marker().unwrap(), marker);
+        let WireResponse::AuditBatch(audit) = wire
+            .execute(WireRequest::ReadAuditRangeFresh {
+                identity: &live_audit_identity(&marker),
+                first_seq: 1,
+                last_seq: 1,
+                max_events: 1,
+            })
+            .unwrap()
+        else {
+            panic!("missing audit range")
+        };
+        assert_eq!(
+            audit.events[0].reconstructed_payload,
+            event.canonical_payload
+        );
         assert!(matches!(
             wire.execute(WireRequest::ReadBatchFresh { marker: &marker }),
             Ok(WireResponse::Batch(Some(_)))

@@ -89,6 +89,7 @@ pub trait ClickHouseAuditExecutor {
         identity: &AuditIdentity,
         first_seq: u64,
         last_seq: u64,
+        max_events: usize,
     ) -> Result<StoredAuditBatch, AuditDispatchError>;
 }
 
@@ -304,7 +305,7 @@ pub fn run_audit_pass(
         return persist_mismatch(writer, identity, "frozen-target-splits-transaction");
     }
     let remote = executor
-        .read_stored_range(identity, range.first_seq, range.last_seq)
+        .read_stored_range(identity, range.first_seq, range.last_seq, budget.max_events)
         .map_err(|_| AuditError::Dispatch)?;
     if let Err(code) = verify_range(&range, &remote) {
         return persist_mismatch(writer, identity, code);
@@ -384,7 +385,11 @@ fn verify_range(range: &CopiedRange, remote: &StoredAuditBatch) -> Result<(), &'
     Ok(())
 }
 
-fn marker_digest(first: u64, last: u64, events: &BTreeMap<u64, (&str, &str, &[u8])>) -> String {
+pub(crate) fn marker_digest(
+    first: u64,
+    last: u64,
+    events: &BTreeMap<u64, (&str, &str, &[u8])>,
+) -> String {
     let mut digest = Sha256::new();
     hash_part(&mut digest, b"boring-cdc/clickhouse-audit-marker/v1");
     hash_part(&mut digest, &first.to_be_bytes());
@@ -536,6 +541,7 @@ mod tests {
             _: &AuditIdentity,
             first: u64,
             last: u64,
+            _: usize,
         ) -> Result<StoredAuditBatch, AuditDispatchError> {
             let payload = if self.corrupt {
                 b"evil".to_vec()
