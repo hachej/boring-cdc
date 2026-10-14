@@ -4,10 +4,16 @@
 //! commit; the journal binds the sequence to the stored JSON. The sequence is excluded from
 //! the stable M0 field hash.
 
+use crate::m1_decoder::{OldTupleKind, RelationContract, RowChange, RowKind};
 use crate::m1_ordering::{
     ColumnState, MutationKind, MutationPayload, MutationVersion, SourceOperation,
+    SourceSlotIdentity, WalIdentityInput, expand_key_change, source_version_for_row,
 };
-use crate::m1_source_identity::{CanonicalKeyComponent, PhysicalKeyHash};
+use crate::m1_source_identity::{
+    CanonicalKeyComponent, PhysicalKeyHash, RelationSchemaVersion, SourceIdentity,
+};
+use crate::m1_transition_kernel::{CaptureEpoch, ReceivedLsn};
+use crate::m2_pg_value::{canonical_columns, canonical_key};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -26,6 +32,139 @@ pub struct MutationEnvelope {
     pub json: Vec<u8>,
     pub canonical_preimage: Vec<u8>,
     pub canonical_payload_hash: String,
+}
+
+pub struct WalMutationTemplate {
+    pub event_id: String,
+    pub source_row_ordinal: u32,
+    pub source_mutation_ordinal: u8,
+    pub relation_fingerprint: String,
+    pub envelope: MutationEnvelope,
+}
+
+/// Convert an admitted pgoutput row to one or two durable M0 mutation templates. The relation
+/// version must come from the catalog, not from the pgoutput Relation message alone.
+pub fn render_wal_row_templates(
+    source: &SourceIdentity,
+    capture_epoch: CaptureEpoch,
+    contract: &RelationContract,
+    relation: RelationSchemaVersion,
+    row: &RowChange,
+    commit_lsn: ReceivedLsn,
+    end_lsn: ReceivedLsn,
+) -> Result<Vec<WalMutationTemplate>, EnvelopeError> {
+    if row.relation_id != contract.relation.id || contract.control.is_some() {
+        return Err(EnvelopeError::Invalid);
+    }
+    let source_version = source_version_for_row(capture_epoch, commit_lsn, row.xid, row.ordinal)
+        .map_err(|_| EnvelopeError::Invalid)?;
+    let position = WalIdentityInput {
+        capture_epoch,
+        source_slot_identity: SourceSlotIdentity::derive(source),
+        transaction_end_lsn: end_lsn,
+        row_ordinal: row.ordinal,
+        mutation_ordinal: 0,
+    };
+    let key_modifiers = contract
+        .key_columns
+        .iter()
+        .map(|&index| {
+            contract
+                .relation
+                .columns
+                .get(index)
+                .map(|column| column.type_modifier)
+                .ok_or(EnvelopeError::Invalid)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let new = row.new.as_deref();
+    let old = row.old.as_deref();
+    let old_key = match (old, row.old_kind) {
+        (Some(tuple), Some(kind)) => Some(
+            canonical_key(contract, tuple, kind == OldTupleKind::Key)
+                .map_err(|_| EnvelopeError::Invalid)?,
+        ),
+        (None, None) => None,
+        _ => return Err(EnvelopeError::Invalid),
+    };
+    let mut mutations = Vec::new();
+    match row.kind {
+        RowKind::Insert if old.is_none() => {
+            let tuple = new.ok_or(EnvelopeError::Invalid)?;
+            let key = canonical_key(contract, tuple, false).map_err(|_| EnvelopeError::Invalid)?;
+            let columns =
+                canonical_columns(&contract.relation, tuple).map_err(|_| EnvelopeError::Invalid)?;
+            mutations.push((
+                MutationVersion::from_wal(source_version, position)
+                    .map_err(|_| EnvelopeError::Invalid)?,
+                MutationPayload {
+                    relation,
+                    key,
+                    operation: SourceOperation::Insert,
+                    before_key: None,
+                    kind: MutationKind::Upsert,
+                    columns,
+                },
+            ));
+        }
+        RowKind::Update => {
+            let tuple = new.ok_or(EnvelopeError::Invalid)?;
+            let key = canonical_key(contract, tuple, false).map_err(|_| EnvelopeError::Invalid)?;
+            let columns =
+                canonical_columns(&contract.relation, tuple).map_err(|_| EnvelopeError::Invalid)?;
+            if let Some(previous) = old_key.filter(|previous| *previous != key) {
+                for mutation in
+                    expand_key_change(position, source_version, relation, previous, key, columns)
+                        .map_err(|_| EnvelopeError::Invalid)?
+                {
+                    mutations.push((mutation.version().clone(), mutation.payload().clone()));
+                }
+            } else {
+                mutations.push((
+                    MutationVersion::from_wal(source_version, position)
+                        .map_err(|_| EnvelopeError::Invalid)?,
+                    MutationPayload {
+                        relation,
+                        key,
+                        operation: SourceOperation::Update,
+                        before_key: None,
+                        kind: MutationKind::Upsert,
+                        columns,
+                    },
+                ));
+            }
+        }
+        RowKind::Delete if new.is_none() => {
+            let key = old_key.ok_or(EnvelopeError::Invalid)?;
+            mutations.push((
+                MutationVersion::from_wal(source_version, position)
+                    .map_err(|_| EnvelopeError::Invalid)?,
+                MutationPayload {
+                    relation,
+                    key,
+                    operation: SourceOperation::Delete,
+                    before_key: None,
+                    kind: MutationKind::Delete,
+                    columns: Vec::new(),
+                },
+            ));
+        }
+        _ => return Err(EnvelopeError::Invalid),
+    }
+    let source_row_ordinal = u32::try_from(row.ordinal).map_err(|_| EnvelopeError::Limit)?;
+    mutations
+        .into_iter()
+        .map(|(version, payload)| {
+            let envelope = render_mutation_template(&version, &payload, &key_modifiers)?;
+            Ok(WalMutationTemplate {
+                event_id: version.connector_event_id().hex(),
+                source_row_ordinal,
+                source_mutation_ordinal: version.mutation_ordinal(),
+                relation_fingerprint: hex(&relation.fingerprint().bytes()),
+                envelope,
+            })
+        })
+        .collect()
 }
 
 pub fn render_mutation(
@@ -204,6 +343,7 @@ fn hex(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::m1_decoder::{Column, Relation, TupleValue};
     use crate::m1_ordering::{
         CanonicalValue, SourceSlotIdentity, WalIdentityInput, source_version_for_row,
     };
@@ -286,5 +426,79 @@ mod tests {
             render_mutation(&version, &payload, &[], 1),
             Err(EnvelopeError::Invalid)
         ));
+
+        let contract = RelationContract {
+            relation: Relation {
+                id: 24_576,
+                namespace: "public".into(),
+                name: "orders".into(),
+                replica_identity: b'd',
+                columns: vec![Column {
+                    key: true,
+                    name: "id".into(),
+                    type_oid: 20,
+                    type_modifier: -1,
+                }],
+            },
+            key_columns: vec![0],
+            control: None,
+        };
+        let row = RowChange {
+            xid: 0,
+            ordinal: 0,
+            relation_id: 24_576,
+            kind: RowKind::Insert,
+            old_kind: None,
+            old: None,
+            new: Some(vec![TupleValue::Text(b"42".to_vec())]),
+        };
+        let templates = render_wal_row_templates(
+            &source,
+            epoch,
+            &contract,
+            relation,
+            &row,
+            ReceivedLsn::from_wire(112),
+            ReceivedLsn::from_wire(120),
+        )
+        .unwrap();
+        assert_eq!(templates.len(), 1);
+        let mut from_row: Value = serde_json::from_slice(&templates[0].envelope.json).unwrap();
+        assert_eq!(from_row["journal_seq"], 0);
+        from_row["journal_seq"] = json!(1);
+        assert_eq!(from_row, expected);
+
+        let changed = RowChange {
+            kind: RowKind::Update,
+            old_kind: Some(OldTupleKind::Key),
+            old: Some(vec![TupleValue::Text(b"42".to_vec())]),
+            new: Some(vec![TupleValue::Text(b"43".to_vec())]),
+            ..row
+        };
+        let pair = render_wal_row_templates(
+            &source,
+            epoch,
+            &contract,
+            relation,
+            &changed,
+            ReceivedLsn::from_wire(112),
+            ReceivedLsn::from_wire(120),
+        )
+        .unwrap();
+        assert_eq!(pair.len(), 2);
+        assert_eq!(
+            pair.iter()
+                .map(|mutation| mutation.source_mutation_ordinal)
+                .collect::<Vec<_>>(),
+            [0, 1]
+        );
+        let old: Value = serde_json::from_slice(&pair[0].envelope.json).unwrap();
+        let new: Value = serde_json::from_slice(&pair[1].envelope.json).unwrap();
+        assert_eq!(old["mutation_kind"], "delete");
+        assert_eq!(old["canonical_key"][0]["value"], 42);
+        assert_eq!(new["mutation_kind"], "upsert");
+        assert_eq!(new["canonical_key"][0]["value"], 43);
+        assert_eq!(new["before_key"][0]["value"], 42);
+        assert_ne!(pair[0].event_id, pair[1].event_id);
     }
 }
