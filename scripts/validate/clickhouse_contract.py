@@ -133,6 +133,28 @@ def validate():
  if c['event_projection']['cross_epoch_comparison']!='forbidden' or c['objects']['native_replacement_version']!='forbidden':add(out,'E_VERSION_NARROW','event_projection','epoch/native narrowing enabled')
  audit=c['audit']; b=audit['budgets']
  if audit['checkpoint_moves'] or any(b[k]<=0 for k in b) or 'actual' not in audit['payload_verification'] or 'stored payload_hash' not in audit['payload_only_corruption']:add(out,'E_AUDIT','audit','finite actual-payload audit weakened')
+ inspection=c['live_inspection']; metadata=inspection['object_metadata']; observed_settings=inspection['settings']
+ expected_queries={
+  'batch_markers_v1':('MergeTree','7f95b63c458fd873cdfd178cc0c3eb93589cb599b18b67ea4b4cc16b284000a6'),
+  'event_history_v1':('MergeTree','e73c8f3d25cc9b492602bcc0c3f5bea8c5c31fe6e018f78450e50ee28b0e7857'),
+  'event_identity_conflicts_v1':('View','e16a288d2fc597d4258b4d7525c4e7d2f67afd1a63fb6f9b49b6af743fe286aa'),
+  'generation_selectors_v1':('MergeTree','51a51f357ca22db39280a8d0c6ca397aa78f63d145df85f85e9b6277792d86ea'),
+  'live_generation_v1':('View','efe75aec390cdb952546d59403a09bec91ee246c4e14b46bf0ed9f45b4fd5caa'),
+  'selector_conflicts_v1':('View','ddbc48206308d80c83e1e9ac8cbd34ea1a215ca436ca3e5d055550ddb124b81a'),
+ }
+ if inspection['server_version']!=c['pins']['server'] or {name:(row['engine'],row['create_query_sha256']) for name,row in metadata['expected'].items()}!=expected_queries or metadata['columns_row_count']!=43 or metadata['columns_digest_domain']!='boring-cdc/clickhouse-system-columns/v1' or metadata['columns_digest_sha256']!='938f3680ed9451d6d24ca72c886cd62c9607dc66540bf7c860873754f55d52ed' or metadata['columns_field_order']!=['table','name','type','position','is_in_partition_key','is_in_sorting_key'] or 'system.tables' not in metadata['query'] or 'system.columns' not in metadata['columns_query'] or '64-bit big-endian' not in metadata['columns_framing'] or 'only after fresh' not in inspection['object_fingerprint_rule']:add(out,'E_LIVE_OBJECT_INSPECTION','live_inspection/object_metadata','pinned live metadata projection changed')
+ expected_query_options={'async_insert':'0','insert_deduplicate':'0','insert_quorum':'1','wait_for_async_insert':'1'}
+ tables=('batch_markers_v1','event_history_v1','generation_selectors_v1')
+ expected_table_options={table:{'fsync_after_insert':'1','fsync_part_directory':'1'} for table in tables}
+ parts=['boring-cdc/clickhouse-settings/v1','wait_end_of_query','1']
+ for name,value in sorted(expected_query_options.items()):parts.extend((name,value))
+ for table in tables:
+  parts.append(table)
+  for name,value in sorted(expected_table_options[table].items()):parts.extend((name,value))
+ settings_hash=hashlib.sha256()
+ for part in parts:
+  encoded=part.encode('ascii');settings_hash.update(len(encoded).to_bytes(8,'big'));settings_hash.update(encoded)
+ if observed_settings['query_options']!=expected_query_options or observed_settings['transport_option']!={'wait_end_of_query':'1'} or observed_settings['table_options']!=expected_table_options or observed_settings['fingerprint_domain']!=parts[0] or observed_settings['expected_fingerprint_sha256']!=settings_hash.hexdigest() or 'system.settings' not in observed_settings['query_probe'] or 'system.settings does not expose' not in observed_settings['transport_proof'] or 'create_table_query' not in observed_settings['table_proof']:add(out,'E_LIVE_SETTINGS_INSPECTION','live_inspection/settings','effective query, transport, or table setting proof changed')
  selector=audit['selector_fingerprint']
  if audit['identity']!=['capture_epoch','generation','promotion_fence','selector_fingerprint','target_clickhouse_checkpoint','object_fingerprint','event_contract_sha256'] or selector['domain']!='boring-cdc/clickhouse-selector/v1' or selector['algorithm']!='SHA-256 lowercase hexadecimal' or selector['field_order']!=list(SELECTOR_FIELDS) or 'greatest-promotion_fence' not in selector['row_scope'] or 'selector_conflicts_v1' not in selector['conflict'] or '64-bit big-endian' not in selector['field_framing'] or 'without trimming' not in selector['string_encoding'] or 'without leading zeroes' not in selector['integer_encoding'] or 'no live selector' not in selector['empty']:add(out,'E_SELECTOR_FINGERPRINT','audit/selector_fingerprint','approved greatest-row selector identity changed')
  golden={'capture_epoch':1,'promotion_fence':9,'generation':7,'table_set_fingerprint':'6'*64,'compatible_anchor_id':'f'*64,'candidate_digest':'7'*64}

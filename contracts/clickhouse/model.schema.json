@@ -81,18 +81,36 @@
         "selector_fingerprint": {
           "additionalProperties": false,
           "properties": {
-            "algorithm": { "type": "string" },
-            "conflict": { "type": "string" },
-            "domain": { "type": "string" },
-            "empty": { "type": "string" },
-            "field_framing": { "type": "string" },
+            "algorithm": {
+              "type": "string"
+            },
+            "conflict": {
+              "type": "string"
+            },
+            "domain": {
+              "type": "string"
+            },
+            "empty": {
+              "type": "string"
+            },
+            "field_framing": {
+              "type": "string"
+            },
             "field_order": {
-              "items": { "type": "string" },
+              "items": {
+                "type": "string"
+              },
               "type": "array"
             },
-            "integer_encoding": { "type": "string" },
-            "row_scope": { "type": "string" },
-            "string_encoding": { "type": "string" }
+            "integer_encoding": {
+              "type": "string"
+            },
+            "row_scope": {
+              "type": "string"
+            },
+            "string_encoding": {
+              "type": "string"
+            }
           },
           "required": [
             "algorithm",
@@ -576,6 +594,312 @@
       ],
       "type": "object"
     },
+    "live_inspection": {
+      "additionalProperties": false,
+      "properties": {
+        "audit_scope": {
+          "type": "string"
+        },
+        "object_fingerprint_rule": {
+          "type": "string"
+        },
+        "object_metadata": {
+          "additionalProperties": false,
+          "properties": {
+            "columns_digest_domain": {
+              "type": "string"
+            },
+            "columns_digest_sha256": {
+              "type": "string"
+            },
+            "columns_field_order": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "columns_framing": {
+              "type": "string"
+            },
+            "columns_query": {
+              "type": "string"
+            },
+            "columns_row_count": {
+              "type": "integer"
+            },
+            "expected": {
+              "additionalProperties": false,
+              "properties": {
+                "batch_markers_v1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "create_query_sha256": {
+                      "type": "string"
+                    },
+                    "engine": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "create_query_sha256",
+                    "engine"
+                  ],
+                  "type": "object"
+                },
+                "event_history_v1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "create_query_sha256": {
+                      "type": "string"
+                    },
+                    "engine": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "create_query_sha256",
+                    "engine"
+                  ],
+                  "type": "object"
+                },
+                "event_identity_conflicts_v1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "create_query_sha256": {
+                      "type": "string"
+                    },
+                    "engine": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "create_query_sha256",
+                    "engine"
+                  ],
+                  "type": "object"
+                },
+                "generation_selectors_v1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "create_query_sha256": {
+                      "type": "string"
+                    },
+                    "engine": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "create_query_sha256",
+                    "engine"
+                  ],
+                  "type": "object"
+                },
+                "live_generation_v1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "create_query_sha256": {
+                      "type": "string"
+                    },
+                    "engine": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "create_query_sha256",
+                    "engine"
+                  ],
+                  "type": "object"
+                },
+                "selector_conflicts_v1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "create_query_sha256": {
+                      "type": "string"
+                    },
+                    "engine": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "create_query_sha256",
+                    "engine"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "batch_markers_v1",
+                "event_history_v1",
+                "event_identity_conflicts_v1",
+                "generation_selectors_v1",
+                "live_generation_v1",
+                "selector_conflicts_v1"
+              ],
+              "type": "object"
+            },
+            "failure": {
+              "type": "string"
+            },
+            "query": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "columns_digest_domain",
+            "columns_digest_sha256",
+            "columns_field_order",
+            "columns_framing",
+            "columns_query",
+            "columns_row_count",
+            "expected",
+            "failure",
+            "query"
+          ],
+          "type": "object"
+        },
+        "server_version": {
+          "type": "string"
+        },
+        "settings": {
+          "additionalProperties": false,
+          "properties": {
+            "expected_fingerprint_sha256": {
+              "type": "string"
+            },
+            "fingerprint_domain": {
+              "type": "string"
+            },
+            "fingerprint_order": {
+              "type": "string"
+            },
+            "query_options": {
+              "additionalProperties": false,
+              "properties": {
+                "async_insert": {
+                  "type": "string"
+                },
+                "insert_deduplicate": {
+                  "type": "string"
+                },
+                "insert_quorum": {
+                  "type": "string"
+                },
+                "wait_for_async_insert": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "async_insert",
+                "insert_deduplicate",
+                "insert_quorum",
+                "wait_for_async_insert"
+              ],
+              "type": "object"
+            },
+            "query_probe": {
+              "type": "string"
+            },
+            "table_options": {
+              "additionalProperties": false,
+              "properties": {
+                "batch_markers_v1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "fsync_after_insert": {
+                      "type": "string"
+                    },
+                    "fsync_part_directory": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "fsync_after_insert",
+                    "fsync_part_directory"
+                  ],
+                  "type": "object"
+                },
+                "event_history_v1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "fsync_after_insert": {
+                      "type": "string"
+                    },
+                    "fsync_part_directory": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "fsync_after_insert",
+                    "fsync_part_directory"
+                  ],
+                  "type": "object"
+                },
+                "generation_selectors_v1": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "fsync_after_insert": {
+                      "type": "string"
+                    },
+                    "fsync_part_directory": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "fsync_after_insert",
+                    "fsync_part_directory"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "batch_markers_v1",
+                "event_history_v1",
+                "generation_selectors_v1"
+              ],
+              "type": "object"
+            },
+            "table_proof": {
+              "type": "string"
+            },
+            "transport_option": {
+              "additionalProperties": false,
+              "properties": {
+                "wait_end_of_query": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "wait_end_of_query"
+              ],
+              "type": "object"
+            },
+            "transport_proof": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "expected_fingerprint_sha256",
+            "fingerprint_domain",
+            "fingerprint_order",
+            "query_options",
+            "query_probe",
+            "table_options",
+            "table_proof",
+            "transport_option",
+            "transport_proof"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "audit_scope",
+        "object_fingerprint_rule",
+        "object_metadata",
+        "server_version",
+        "settings"
+      ],
+      "type": "object"
+    },
     "lookup_behavior": {
       "additionalProperties": false,
       "properties": {
@@ -801,7 +1125,8 @@
     "schema_evolution",
     "schema_version",
     "fixture_fault_abi",
-    "provisional_markers"
+    "provisional_markers",
+    "live_inspection"
   ],
   "type": "object"
 }

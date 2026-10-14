@@ -22,6 +22,10 @@ For an exact complete-transaction journal range, the worker persists an immutabl
 
 The fixed settings are `async_insert=0`, `wait_for_async_insert=1`, `wait_end_of_query=1`, `insert_quorum=1`, `fsync_after_insert=1`, `fsync_part_directory=1`, and `insert_deduplicate=0`. They and every correctness-bearing object/query form the object fingerprint. Drift blocks only ClickHouse.
 
+Fresh inspection must prove the pinned server version, all six objects in `system.tables`, and all 43 physical columns in `system.columns` before it returns the source-contract object fingerprint. `contracts/clickhouse/model.json` stores the exact queries, each normalized `create_table_query` SHA-256, and the length-framed column projection digest observed twice on ClickHouse 25.8.2.29. An extra, missing, or changed object or column blocks acceptance. The three MergeTree object definitions include `fsync_after_insert=1` and `fsync_part_directory=1`.
+
+The four effective query settings are read through a client configured with the same options used for inserts. `wait_end_of_query=1` is an HTTP option; ClickHouse 25.8.2.29 does not expose it in `system.settings`. The client must set it on every history and marker insert and await `insert.end()` and the full response. The settings fingerprint length-frames the transport option, four effective query settings, and the three tables' two fsync values in the order frozen in `model.json`. Inspection compares that digest with its pinned expected value. Object and settings inspection is server-wide; audit additionally inspects the selected row for its capture epoch.
+
 ## Promotion and schema evolution
 
 A candidate is promotable only with a compatible complete anchor, post-copy fence, every selected logical table, exact table-set fingerprint and watermark, and no selector conflict. Selectors are append-only. Greatest fence wins; lower fences are no-ops; an identical same-fence retry is harmless; a distinct candidate at the same fence is corruption. External state above restored SQLite blocks until maintenance verifies/adopts the unique high fence or rejects it. No DDL switches live generations.
