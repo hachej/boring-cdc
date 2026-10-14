@@ -18,9 +18,10 @@ use crate::m4_clickhouse_schema::INSERT_SETTINGS;
 /// Query-scoped members of the full fingerprinted insert contract. The fsync members are
 /// MergeTree table settings installed by DDL and are verified through contract inspection; sending
 /// them as query settings is rejected by ClickHouse 25.8.
-pub const SYNCHRONOUS_QUERY_SETTINGS: [(&str, u8); 4] = [
+pub const SYNCHRONOUS_QUERY_SETTINGS: [(&str, u8); 5] = [
     ("async_insert", 0),
     ("wait_for_async_insert", 1),
+    ("wait_end_of_query", 1),
     ("insert_quorum", 1),
     ("insert_deduplicate", 0),
 ];

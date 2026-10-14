@@ -19,9 +19,10 @@ pub const CURRENT_VIEW_INPUT_SIGNATURE: &str = "capture_epoch UInt64";
 pub const CURRENT_VIEW_OUTPUT_SIGNATURE: &str = "canonical_key String, explicit_cells Array(Tuple(column_id UInt32,state String,type_oid UInt32,typmod Int32,value_base64 String))";
 
 /// Settings that are part of the object fingerprint and must accompany every history insert.
-pub const INSERT_SETTINGS: [(&str, u8); 6] = [
+pub const INSERT_SETTINGS: [(&str, u8); 7] = [
     ("async_insert", 0),
     ("wait_for_async_insert", 1),
+    ("wait_end_of_query", 1),
     ("insert_quorum", 1),
     ("fsync_after_insert", 1),
     ("fsync_part_directory", 1),
@@ -795,6 +796,15 @@ mod m4_ddl {
 
         #[test]
         fn fingerprint_is_stable_and_covers_interfaces_and_settings() {
+            let contract: serde_json::Value =
+                serde_json::from_str(include_str!("../contracts/clickhouse/model.json")).unwrap();
+            let expected = contract["insert_acceptance"]["settings"]
+                .as_object()
+                .unwrap();
+            assert_eq!(INSERT_SETTINGS.len(), expected.len());
+            for (name, value) in INSERT_SETTINGS {
+                assert_eq!(expected[name].as_u64(), Some(u64::from(value)));
+            }
             let fingerprint = object_fingerprint();
             assert_eq!(fingerprint.len(), 64);
             assert!(fingerprint.bytes().all(|byte| byte.is_ascii_hexdigit()));
