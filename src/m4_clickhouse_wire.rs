@@ -1147,6 +1147,12 @@ mod tests {
         );
     }
 
+    fn abort_at_persisted_boundary() {
+        if std::env::var_os("BCDC_M4_ABORT_AT_BOUNDARY").is_some() {
+            std::process::abort();
+        }
+    }
+
     fn finish_coordinator_batch(
         writer: &mut WriterConnection,
         batch: &PreparedBatch,
@@ -1344,6 +1350,7 @@ mod tests {
             "dispatched"
         );
         assert_no_checkpoint(&writer);
+        abort_at_persisted_boundary();
     }
 
     #[test]
@@ -1356,6 +1363,7 @@ mod tests {
         mark_insert_dispatched(&transaction, &batch).unwrap();
         transaction.commit().unwrap();
         assert_no_checkpoint(&writer);
+        abort_at_persisted_boundary();
     }
 
     #[test]
@@ -1372,6 +1380,7 @@ mod tests {
         adapter.insert_events_synchronously(&batch).unwrap();
         assert_eq!(adapter.read_events(&batch).unwrap().len(), 1);
         assert_no_checkpoint(&writer);
+        abort_at_persisted_boundary();
     }
 
     #[test]

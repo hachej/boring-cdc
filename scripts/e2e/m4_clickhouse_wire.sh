@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+ulimit -c 0
 cd "$(dirname "$0")/../.."
 
 container="m4-wire-$RANDOM-$$"
@@ -44,6 +45,20 @@ export BCDC_M4_CLICKHOUSE_PASSWORD
 BCDC_M4_CLICKHOUSE_PASSWORD=$password
 export BCDC_M4_COORDINATOR_SQLITE="$work/coordinator.sqlite"
 
+expect_boundary_abort() {
+  local test_name=$1 code
+  set +e
+  BCDC_M4_ABORT_AT_BOUNDARY=1 cargo test --locked --lib \
+    "m4_clickhouse_wire::tests::$test_name" -- --ignored --exact \
+    >"$work/$test_name.out" 2>"$work/$test_name.err"
+  code=$?
+  set -e
+  if [[ "$code" != 101 ]] || ! grep -q SIGABRT "$work/$test_name.err"; then
+    printf 'M4_BOUNDARY_ABORT_FAILED test=%s exit=%s\n' "$test_name" "$code" >&2
+    return 1
+  fi
+}
+
 cargo test --locked --lib \
   m4_clickhouse_wire::tests::live_contract_inspection_matches_pinned_objects_and_selector \
   -- --ignored --exact
@@ -51,9 +66,7 @@ cargo test --locked --lib \
 cargo test --locked --lib \
   m4_clickhouse_wire::tests::live_rowbinary_history_insert_and_fresh_readback \
   -- --ignored --exact
-cargo test --locked --lib \
-  m4_clickhouse_wire::tests::live_coordinator_persists_intent_and_marker_before_checkpoint \
-  -- --ignored --exact
+expect_boundary_abort live_coordinator_persists_intent_and_marker_before_checkpoint
 docker restart "$container" >/dev/null
 endpoint=$(docker port "$container" 8123/tcp)
 port=${endpoint##*:}
@@ -78,7 +91,7 @@ run_coordinator_replay_case() {
   local generation=$1 before_test=$2
   export BCDC_M4_COORDINATOR_GENERATION="$generation"
   export BCDC_M4_COORDINATOR_SQLITE="$work/coordinator-$generation.sqlite"
-  cargo test --locked --lib "m4_clickhouse_wire::tests::$before_test" -- --ignored --exact
+  expect_boundary_abort "$before_test"
   docker restart "$container" >/dev/null
   endpoint=$(docker port "$container" 8123/tcp)
   port=${endpoint##*:}
