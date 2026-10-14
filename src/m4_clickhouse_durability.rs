@@ -866,6 +866,72 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    #[test]
+    #[ignore = "requires BCDC_LIVE_JOURNAL_PATH from pinned PostgreSQL acceptance"]
+    fn live_m2_copied_transactions_are_admitted_by_m4() {
+        let path = std::env::var("BCDC_LIVE_JOURNAL_PATH").expect("live journal path");
+        let connection = rusqlite::Connection::open_with_flags(
+            &path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let mut statement = connection
+            .prepare("SELECT first_seq,last_seq,event_count FROM source_transactions WHERE state='committed' ORDER BY first_seq")
+            .unwrap();
+        let boundaries = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, u64>(0)?,
+                    row.get::<_, u64>(1)?,
+                    row.get::<_, usize>(2)?,
+                ))
+            })
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        drop(statement);
+        drop(connection);
+        let mut business = 0;
+        let mut controls = 0;
+        let mut key_change_pairs = 0;
+        for (first, last, count) in boundaries {
+            let copied = crate::m2_journal::read_complete_range(
+                std::path::Path::new(&path),
+                first - 1,
+                count,
+                32 * 1024 * 1024,
+                std::time::Duration::from_secs(5),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!((copied.first_seq, copied.last_seq), (first, last));
+            let accepted = destination_events(&copied.events).unwrap();
+            if copied.events[0].control_kind.is_some() {
+                assert!(accepted.is_empty());
+                controls += 1;
+            } else {
+                assert_eq!(accepted.len(), count);
+                if count == 2 {
+                    assert_eq!(
+                        accepted[0].transaction_ordinal,
+                        accepted[1].transaction_ordinal
+                    );
+                    assert_eq!(
+                        (accepted[0].mutation_ordinal, accepted[1].mutation_ordinal),
+                        (0, 1)
+                    );
+                    key_change_pairs += 1;
+                }
+                business += count;
+            }
+        }
+        assert!(
+            business >= 10,
+            "expected live insert/update/delete/TOAST events"
+        );
+        assert!(controls >= 2, "expected both live control kinds");
+        assert_eq!(key_change_pairs, 1);
+    }
     struct FixedRandomness;
     impl Randomness for FixedRandomness {
         fn next_u64(&mut self) -> u64 {

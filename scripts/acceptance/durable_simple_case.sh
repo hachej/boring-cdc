@@ -361,4 +361,5 @@ PY
 stop_bounded "$runtime_pid" TERM runtime-restart
 runtime_pid=
 [[ ! -s "$work/runtime-restart.err" ]]
+BCDC_LIVE_JOURNAL_PATH="$journal" cargo test --locked live_m2_copied_transactions_are_admitted_by_m4 --lib -- --ignored --nocapture
 echo "DURABLE_SIMPLE_CASE_OK postgres=$version inserts=6 update=1 key_change=2 delete=1 toast=preserved heartbeat_and_fence=canonical crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"
