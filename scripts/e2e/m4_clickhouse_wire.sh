@@ -3,10 +3,12 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 container="m4-wire-$RANDOM-$$"
+work=$(mktemp -d /var/tmp/m4-coordinator.XXXXXX)
 password=$(python3 -c 'import secrets; print(secrets.token_hex(16))')
 cleanup() {
   if [[ "${KEEP:-0}" == 1 ]]; then return; fi
   docker rm -f "$container" >/dev/null 2>&1 || true
+  rm -rf "$work"
 }
 trap cleanup EXIT INT TERM
 
@@ -40,6 +42,7 @@ export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:$port"
 export BCDC_M4_CLICKHOUSE_USER=bcdc_probe
 export BCDC_M4_CLICKHOUSE_PASSWORD
 BCDC_M4_CLICKHOUSE_PASSWORD=$password
+export BCDC_M4_COORDINATOR_SQLITE="$work/coordinator.sqlite"
 
 cargo test --locked --lib \
   m4_clickhouse_wire::tests::live_contract_inspection_matches_pinned_objects_and_selector \
@@ -47,6 +50,9 @@ cargo test --locked --lib \
 
 cargo test --locked --lib \
   m4_clickhouse_wire::tests::live_rowbinary_history_insert_and_fresh_readback \
+  -- --ignored --exact
+cargo test --locked --lib \
+  m4_clickhouse_wire::tests::live_coordinator_persists_intent_and_marker_before_checkpoint \
   -- --ignored --exact
 docker restart "$container" >/dev/null
 endpoint=$(docker port "$container" 8123/tcp)
@@ -63,6 +69,9 @@ done
 http_ready
 cargo test --locked --lib \
   m4_clickhouse_wire::tests::live_rowbinary_history_survives_server_restart \
+  -- --ignored --exact
+cargo test --locked --lib \
+  m4_clickhouse_wire::tests::live_coordinator_adopts_marker_after_restart_and_checkpoints \
   -- --ignored --exact
 
 docker exec "$container" clickhouse-client --user bcdc_probe --password "$password" \
