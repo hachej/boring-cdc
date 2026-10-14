@@ -1005,7 +1005,7 @@ mod tests {
                 .output()
                 .unwrap()
         };
-        for boundary in ["prepared", "dispatched", "marker"] {
+        for boundary in ["prepared", "dispatched", "history", "marker"] {
             let destination_id = format!("article2-clickhouse-{boundary}");
             let aborted = run_phase("abort", boundary);
             assert_eq!(aborted.status.signal(), Some(6), "{boundary}");
@@ -1066,7 +1066,7 @@ mod tests {
         }
         assert!(expected_events >= 10);
         println!(
-            "M4_LIVE_JOURNAL_OK events_per_case={expected_events} abort_boundaries=3 process_abort=verified"
+            "M4_LIVE_JOURNAL_OK events_per_case={expected_events} abort_boundaries=4 process_abort=verified"
         );
     }
 
@@ -1088,7 +1088,8 @@ mod tests {
         let generation = match boundary.as_str() {
             "prepared" => 1,
             "dispatched" => 2,
-            "marker" => 3,
+            "history" => 3,
+            "marker" => 4,
             _ => panic!("unsupported abort boundary"),
         };
         let context = BatchContext {
@@ -1173,6 +1174,14 @@ mod tests {
                 mark_insert_dispatched(&transaction, &batch).unwrap();
                 transaction.commit().unwrap();
                 if abort && boundary == "dispatched" && !batch.events.is_empty() {
+                    eprintln!("M4_BOUNDARY_READY boundary={boundary} first={first} last={last}");
+                    std::process::abort();
+                }
+                if abort && boundary == "history" && !batch.events.is_empty() {
+                    verify_live_object_fingerprint(&mut adapter, &batch).unwrap();
+                    adapter.insert_events_synchronously(&batch).unwrap();
+                    let events = adapter.read_events(&batch).unwrap();
+                    verify_remote_events(&batch, &events).unwrap();
                     eprintln!("M4_BOUNDARY_READY boundary={boundary} first={first} last={last}");
                     std::process::abort();
                 }
