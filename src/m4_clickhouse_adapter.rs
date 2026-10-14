@@ -18,9 +18,10 @@ use crate::m4_clickhouse_schema::INSERT_SETTINGS;
 /// Query-scoped members of the full fingerprinted insert contract. The fsync members are
 /// MergeTree table settings installed by DDL and are verified through contract inspection; sending
 /// them as query settings is rejected by ClickHouse 25.8.
-pub const SYNCHRONOUS_QUERY_SETTINGS: [(&str, u8); 4] = [
+pub const SYNCHRONOUS_QUERY_SETTINGS: [(&str, u8); 5] = [
     ("async_insert", 0),
     ("wait_for_async_insert", 1),
+    ("wait_end_of_query", 1),
     ("insert_quorum", 1),
     ("insert_deduplicate", 0),
 ];
@@ -46,6 +47,7 @@ pub enum WireRequest<'a> {
         identity: &'a AuditIdentity,
         first_seq: u64,
         last_seq: u64,
+        max_events: usize,
     },
 }
 
@@ -127,11 +129,13 @@ impl<W: ClickHouseWire> ClickHouseAuditExecutor for ProductionClickHouseAdapter<
         identity: &AuditIdentity,
         first_seq: u64,
         last_seq: u64,
+        max_events: usize,
     ) -> Result<StoredAuditBatch, AuditDispatchError> {
         match self.wire.execute(WireRequest::ReadAuditRangeFresh {
             identity,
             first_seq,
             last_seq,
+            max_events,
         }) {
             Ok(WireResponse::AuditBatch(batch)) => Ok(batch),
             _ => Err(AuditDispatchError),

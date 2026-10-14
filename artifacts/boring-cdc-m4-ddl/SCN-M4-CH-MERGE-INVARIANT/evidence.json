@@ -1,6 +1,6 @@
 {
   "credentials_recorded": false,
-  "git_commit": "56feb93815974213bc32929aa4e3dde6fb840d9e",
+  "git_commit": "aa73f66fa768d963f02b0d5c36f6169351ac92d3",
   "history_interface": {
     "ordered_without_final": true,
     "rows": 4
@@ -10,16 +10,16 @@
     "postgres": "17.6"
   },
   "input_sha256": {
-    "Cargo.lock": "aa3eb1b2c55f71db2536437638395124aadf94e7859c673db7986ff744d74bf3",
+    "Cargo.lock": "e34df483be713a43c6d2ecc2e488a13dd40693eccb0f4a5c1de4a8fc5ff2b642",
     "compose.yaml": "a011b2853414ee065dfacd2f42cf3e3ac0d218ffa01b1d44061705f4757edeec",
     "contracts/clickhouse/canonical-query.sql": "0c1a0008e94cc1104e2b6964d39cc9aae26cddb76ba1f38372dc7c5d5442c8df",
     "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
-    "contracts/clickhouse/model.json": "4ca8932dcddc5714790f3e924930f76f8ce29fa1ae47bad3fd7667ff3c7edb3e",
-    "docs/CLICKHOUSE_MODEL.md": "a42b361438fd557dd35ff333b8c2f4efeabe84eb4f6582f55de02efbb1bedee5",
+    "contracts/clickhouse/model.json": "5ea14005823212a3cac5b9d5a6031c1b6420a0d879fcd6a65c17f0cea620dd29",
+    "docs/CLICKHOUSE_MODEL.md": "f601f9b1e6342d7574238c7c8670be51cec1b26dc2bac24db4ff688f8fccca98",
     "examples/m4_clickhouse_schema_probe.rs": "102c0b92ad3b26a86a9294f0fb5fac1b45fdac31002874dc9273b572ec55a2fd",
     "scripts/e2e/m4_clickhouse_ddl.sh": "23d42b40e066707e1c736733630bb8ac084c67ec6c5800a4af1d5f7e912f2e4b",
     "scripts/validate/m4_clickhouse_ddl.py": "e76310653aca439895137ad0baf42d437990812bce459ae155cfbcfdc52b41da",
-    "src/m4_clickhouse_schema.rs": "bb3ddc626512f2a980f94d4622960f824f659cf442522a1cdccfebe625072a44"
+    "src/m4_clickhouse_schema.rs": "4c2bcd005cf840d7a01a5ca1c2a5557c44de19d4f2881d24b355a65e71b2c17b"
   },
   "merge_invariant": {
     "active_parts_after": 1,
@@ -29,7 +29,7 @@
     "stopped_sha256": "5f1bf8cbf6c4ef9a3034c3386c653c657882912ed72b51409eed55142e94c596",
     "system_merges_observed": true
   },
-  "object_fingerprint": "96300f6ff1e503e82bef1856c39a1f2276b17014d3ee5778cf4f6cb54824a97a",
+  "object_fingerprint": "2cc2798030e93ad1a0518c85daee857a59fc974ff95db2e9cc3cd4c9ef8b455b",
   "objects_verified": 6,
   "observed_versions": {
     "clickhouse": "25.8.2.29",
