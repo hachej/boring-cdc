@@ -580,6 +580,8 @@ pub mod tests {
             relation_schema_fingerprint: None,
             control_kind: Some("heartbeat".into()),
             payload_hash: sha256(&payload),
+            canonical_payload: None,
+            canonical_payload_hash: None,
             payload,
         };
         SourceCommit {
@@ -892,6 +894,8 @@ pub mod tests {
             control_kind: control.map(str::to_owned),
             payload: vec![seq as u8],
             payload_hash: sha256(&[seq as u8]),
+            canonical_payload: None,
+            canonical_payload_hash: None,
         }
     }
 

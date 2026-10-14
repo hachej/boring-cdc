@@ -864,6 +864,8 @@ mod tests {
                 control_kind: None,
                 payload: b"{\"z\":1}".to_vec(),
                 payload_hash: sha256(b"{\"z\":1}"),
+                canonical_payload: None,
+                canonical_payload_hash: None,
             },
             JournalEvent {
                 event_id: "event-a".into(),
@@ -874,6 +876,8 @@ mod tests {
                 control_kind: None,
                 payload: b"beta".to_vec(),
                 payload_hash: sha256(b"beta"),
+                canonical_payload: None,
+                canonical_payload_hash: None,
             },
         ];
         let c = SourceCommit {

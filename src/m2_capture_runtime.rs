@@ -840,6 +840,8 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
                     control_kind: staged.control_kind,
                     payload: staged.payload,
                     payload_hash,
+                    canonical_payload: None,
+                    canonical_payload_hash: None,
                 })
             })
             .collect::<Result<Vec<_>, RuntimeError>>()?;
@@ -3076,6 +3078,8 @@ pub mod tests {
             control_kind: None,
             payload: payload.clone(),
             payload_hash: crate::m2_journal::sha256(&payload),
+            canonical_payload: None,
+            canonical_payload_hash: None,
         };
         let c = SourceCommit {
             transaction_id: "t".into(),

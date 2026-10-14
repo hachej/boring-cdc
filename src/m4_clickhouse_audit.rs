@@ -584,6 +584,8 @@ mod tests {
             control_kind: None,
             payload: b"row".to_vec(),
             payload_hash: sha256(b"row"),
+            canonical_payload: None,
+            canonical_payload_hash: None,
         }];
         let commit = SourceCommit {
             transaction_id: "tx".into(),

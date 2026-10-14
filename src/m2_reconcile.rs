@@ -543,6 +543,8 @@ pub mod tests {
             control_kind: None,
             payload: b"payload".to_vec(),
             payload_hash: sha256(b"payload"),
+            canonical_payload: None,
+            canonical_payload_hash: None,
         };
         let commit = SourceCommit {
             transaction_id: "tx".into(),

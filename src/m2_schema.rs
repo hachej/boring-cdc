@@ -4,7 +4,7 @@ use rusqlite::{Connection, OpenFlags};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-pub const SCHEMA_VERSION: i64 = 16;
+pub const SCHEMA_VERSION: i64 = 17;
 pub const WRITER_BUSY_TIMEOUT: Duration = Duration::from_secs(5);
 // M0-PROVISIONAL: boring-cdc-m2-schema
 pub const READER_MAX_AGE: Duration = Duration::from_secs(30);
@@ -512,6 +512,23 @@ pub fn apply_migrations(connection: &Connection) -> rusqlite::Result<()> {
         if checksum != MIGRATION_16_CHECKSUM {
             return Err(rusqlite::Error::InvalidQuery);
         }
+        let has_v17: bool = connection.query_row(
+            "SELECT EXISTS(SELECT 1 FROM schema_migrations WHERE version=17)",
+            [],
+            |r| r.get(0),
+        )?;
+        if !has_v17 {
+            connection.execute_batch(MIGRATION_17)?;
+            connection.execute("INSERT INTO schema_migrations(version,name,checksum,applied_at) VALUES(17,'canonical-payload-hash',?1,strftime('%Y-%m-%dT%H:%M:%fZ','now'))",[MIGRATION_17_CHECKSUM])?;
+        }
+        let checksum: String = connection.query_row(
+            "SELECT checksum FROM schema_migrations WHERE version=17",
+            [],
+            |r| r.get(0),
+        )?;
+        if checksum != MIGRATION_17_CHECKSUM {
+            return Err(rusqlite::Error::InvalidQuery);
+        }
         Ok(())
     })();
     match result {
@@ -1013,6 +1030,15 @@ CREATE TRIGGER journal_events_immutable BEFORE UPDATE ON journal_events
  BEGIN SELECT RAISE(ABORT,'journal event is immutable'); END;
 CREATE UNIQUE INDEX journal_source_position
  ON journal_events(transaction_id,source_row_ordinal,source_mutation_ordinal);
+"#;
+
+const MIGRATION_17_CHECKSUM: &str =
+    "sha256:3904cb9e51327b88831892153f17909e57ae803ad9500cd58e2638d40ec06143";
+const MIGRATION_17: &str = r#"
+ALTER TABLE journal_events ADD COLUMN canonical_payload BLOB;
+ALTER TABLE journal_events ADD COLUMN canonical_payload_hash TEXT
+ CHECK(canonical_payload_hash IS NULL OR
+       (length(canonical_payload_hash)=64 AND canonical_payload_hash NOT GLOB '*[^0-9a-f]*'));
 "#;
 
 #[cfg(test)]
@@ -1571,6 +1597,10 @@ pub mod tests {
         apply_migrations(&connection).unwrap();
         let positions = connection.prepare("SELECT source_row_ordinal,source_mutation_ordinal FROM journal_events ORDER BY journal_seq").unwrap().query_map([], |row| Ok((row.get::<_,i64>(0)?,row.get::<_,i64>(1)?))).unwrap().collect::<Result<Vec<_>,_>>().unwrap();
         assert_eq!(positions, [(0, 0), (1, 0)]);
+        let legacy_canonical_count: i64 = connection
+            .query_row("SELECT count(*) FROM journal_events WHERE canonical_payload IS NULL AND canonical_payload_hash IS NULL", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(legacy_canonical_count, 2);
         assert!(
             connection
                 .execute(
