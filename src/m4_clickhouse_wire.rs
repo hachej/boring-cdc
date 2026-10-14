@@ -64,6 +64,7 @@ impl EventHistoryRow {
             return Err(RedactedWireError);
         }
         Ok(RemoteEventIdentity {
+            journal_seq: self.journal_seq,
             connector_event_id: ascii_hex(&self.connector_event_id)?,
             payload_hash: ascii_hex(&self.payload_hash)?,
             canonical_payload,
