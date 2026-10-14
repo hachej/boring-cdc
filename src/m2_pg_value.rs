@@ -23,6 +23,13 @@ pub fn canonical_scalar(
     if wire.len() > MAX_SCALAR_BYTES {
         return Err(ValueError::Limit);
     }
+    if let Some(element_oid) = array_element_oid(type_oid) {
+        return Ok(CanonicalValue {
+            type_oid,
+            type_modifier,
+            bytes: canonical_array(element_oid, wire)?,
+        });
+    }
     let text = std::str::from_utf8(wire).map_err(|_| ValueError::InvalidValue)?;
     let bytes = match type_oid {
         16 => match text {
@@ -83,6 +90,124 @@ pub fn canonical_scalar(
         type_modifier,
         bytes,
     })
+}
+
+fn array_element_oid(array_oid: u32) -> Option<u32> {
+    Some(match array_oid {
+        1000 => 16,
+        1005 => 21,
+        1007 => 23,
+        1016 => 20,
+        1028 => 26,
+        1021 => 700,
+        1022 => 701,
+        1231 => 1700,
+        1182 => 1082,
+        1115 => 1114,
+        1185 => 1184,
+        2951 => 2950,
+        1009 => 25,
+        1015 => 1043,
+        1014 => 1042,
+        1003 => 19,
+        1001 => 17,
+        _ => return None,
+    })
+}
+
+fn canonical_array(element_oid: u32, wire: &[u8]) -> Result<Vec<u8>, ValueError> {
+    let (expected_count, body) = if wire.first() == Some(&b'[') {
+        let end = wire
+            .iter()
+            .position(|&byte| byte == b']')
+            .ok_or(ValueError::InvalidValue)?;
+        if wire.get(end + 1) != Some(&b'=') {
+            return Err(ValueError::InvalidValue);
+        }
+        let bounds = std::str::from_utf8(&wire[1..end]).map_err(|_| ValueError::InvalidValue)?;
+        let (lower, upper) = bounds.split_once(':').ok_or(ValueError::InvalidValue)?;
+        if lower != "1" {
+            return Err(ValueError::InvalidValue);
+        }
+        let upper = upper.parse::<i64>().map_err(|_| ValueError::InvalidValue)?;
+        if upper < 0 || upper > MAX_SCALAR_BYTES as i64 {
+            return Err(ValueError::Limit);
+        }
+        (Some(upper as usize), &wire[end + 2..])
+    } else {
+        (None, wire)
+    };
+    if body.len() < 2 || body.first() != Some(&b'{') || body.last() != Some(&b'}') {
+        return Err(ValueError::InvalidValue);
+    }
+    let body = &body[1..body.len() - 1];
+    let mut values = Vec::new();
+    let mut at = 0;
+    while at < body.len() {
+        let quoted = body[at] == b'"';
+        if quoted {
+            at += 1;
+        }
+        let mut value = Vec::new();
+        let mut closed = !quoted;
+        while at < body.len() {
+            let byte = body[at];
+            at += 1;
+            if byte == b'\\' {
+                let next = *body.get(at).ok_or(ValueError::InvalidValue)?;
+                value.push(next);
+                at += 1;
+            } else if quoted && byte == b'"' {
+                closed = true;
+                break;
+            } else if !quoted && byte == b',' {
+                at -= 1;
+                break;
+            } else if !quoted && matches!(byte, b'{' | b'}' | b'"') {
+                return Err(ValueError::InvalidValue);
+            } else {
+                value.push(byte);
+            }
+        }
+        if !closed || (!quoted && value.is_empty()) {
+            return Err(ValueError::InvalidValue);
+        }
+        values.push(if !quoted && value == b"NULL" {
+            None
+        } else {
+            Some(value)
+        });
+        if at == body.len() {
+            break;
+        }
+        if body[at] != b',' || at + 1 == body.len() {
+            return Err(ValueError::InvalidValue);
+        }
+        at += 1;
+    }
+    if expected_count.is_some_and(|expected| expected != values.len()) {
+        return Err(ValueError::InvalidValue);
+    }
+    let count = u32::try_from(values.len()).map_err(|_| ValueError::Limit)?;
+    let mut encoded = Vec::new();
+    encoded.extend(count.to_be_bytes());
+    for value in values {
+        match value {
+            None => encoded.push(1),
+            Some(value) => {
+                let element = canonical_scalar(element_oid, -1, &value)?;
+                encoded.push(3);
+                encoded.extend(element_oid.to_be_bytes());
+                encoded.extend((-1_i32).to_be_bytes());
+                encoded.extend((element.bytes.len() as u64).to_be_bytes());
+                encoded.extend(element.bytes);
+            }
+        }
+        if encoded.len() > MAX_SCALAR_BYTES {
+            return Err(ValueError::Limit);
+        }
+    }
+    Ok(encoded)
 }
 
 fn canonical_numeric(text: &str) -> Result<String, ValueError> {
@@ -261,6 +386,11 @@ mod tests {
             ),
             (25, "abc", "616263"),
             (17, "\\x00ff", "00ff"),
+            (
+                1007,
+                "{1,NULL}",
+                "000000020300000017ffffffff00000000000000040000000101",
+            ),
         ];
         for (oid, wire, expected) in cases {
             let value = canonical_scalar(oid, -1, wire.as_bytes()).unwrap();
@@ -283,6 +413,9 @@ mod tests {
             (1082, "not a date"),
             (2950, "short"),
             (17, "\\x0"),
+            (1007, "{{1}}"),
+            (1007, "[0:0]={1}"),
+            (1007, "{1,}"),
         ] {
             assert!(canonical_scalar(oid, -1, wire.as_bytes()).is_err());
         }
@@ -293,6 +426,34 @@ mod tests {
         assert_eq!(
             canonical_numeric("1e-9223372036854775808"),
             Err(ValueError::Limit)
+        );
+    }
+
+    #[test]
+    fn array_text_preserves_quoted_delimiters_and_null_distinction() {
+        let value = canonical_scalar(1009, -1, br#"{"a,b","NULL",NULL,"a\"b"}"#).unwrap();
+        let mut expected = Vec::from(4_u32.to_be_bytes());
+        for element in [
+            Some(&b"a,b"[..]),
+            Some(&b"NULL"[..]),
+            None,
+            Some(&b"a\"b"[..]),
+        ] {
+            match element {
+                Some(bytes) => {
+                    expected.push(3);
+                    expected.extend(25_u32.to_be_bytes());
+                    expected.extend((-1_i32).to_be_bytes());
+                    expected.extend((bytes.len() as u64).to_be_bytes());
+                    expected.extend(bytes);
+                }
+                None => expected.push(1),
+            }
+        }
+        assert_eq!(value.bytes, expected);
+        assert_eq!(
+            canonical_scalar(1007, -1, b"[1:2]={1,2}").unwrap().bytes,
+            canonical_scalar(1007, -1, b"{1,2}").unwrap().bytes
         );
     }
 }
