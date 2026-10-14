@@ -162,6 +162,42 @@ pub struct M2SystemSnapshot {
     pub action_causality: Vec<Value>,
     pub evidence_digest: String,
 }
+
+/// A bounded, label-free projection of the same fresh snapshot served by status.
+/// Unknown source headroom is omitted rather than represented as zero.
+pub fn prometheus_metrics(snapshot: &M2SystemSnapshot) -> String {
+    let mut output =
+        String::from("# TYPE boring_cdc_status_available gauge\nboring_cdc_status_available 1\n");
+    if let Some(sequence) = snapshot.boundaries["durable_journal_seq"].as_u64() {
+        output.push_str(&format!(
+            "# TYPE boring_cdc_durable_journal_seq gauge\nboring_cdc_durable_journal_seq {sequence}\n"
+        ));
+    }
+    if let Some(bytes) = snapshot.budgets["sqlite_bytes"].as_u64() {
+        output.push_str(&format!(
+            "# TYPE boring_cdc_sqlite_bytes gauge\nboring_cdc_sqlite_bytes {bytes}\n"
+        ));
+    }
+    output.push_str(&format!(
+        "# TYPE boring_cdc_destination_count gauge\nboring_cdc_destination_count {}\n",
+        snapshot.destinations.len()
+    ));
+    if let Some(lowest) = snapshot
+        .destinations
+        .iter()
+        .filter_map(|destination| destination["checkpoint_seq"].as_u64())
+        .min()
+    {
+        output.push_str(&format!(
+            "# TYPE boring_cdc_destination_min_checkpoint_seq gauge\nboring_cdc_destination_min_checkpoint_seq {lowest}\n"
+        ));
+    }
+    let healthy = u8::from(snapshot.overall_health == "healthy");
+    output.push_str(&format!(
+        "# TYPE boring_cdc_healthy gauge\nboring_cdc_healthy {healthy}\n"
+    ));
+    output
+}
 #[derive(Debug)]
 pub enum StatusError {
     Sqlite(rusqlite::Error),
@@ -657,6 +693,18 @@ pub mod tests {
         let w = open_writer(&p, "status-test", 1, 0).unwrap();
         w.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch','secret-system','tl','secret-db','secret-slot','pgoutput','pub','proto')",[]).unwrap();
         (p, w)
+    }
+    #[test]
+    fn metrics_project_only_known_numeric_facts() {
+        let (path, writer) = fixture();
+        drop(writer);
+        let report = snapshot(&path, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        let metrics = prometheus_metrics(&report);
+        assert!(metrics.contains("boring_cdc_status_available 1\n"));
+        assert!(metrics.contains("boring_cdc_destination_count 0\n"));
+        assert!(!metrics.contains("source_wal_headroom_bytes"));
+        assert!(!metrics.contains("secret-system"));
+        assert!(!metrics.contains("secret-slot"));
     }
     #[test]
     fn stable_restart_projection_redacts() {

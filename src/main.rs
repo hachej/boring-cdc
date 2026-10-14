@@ -8,7 +8,9 @@ use boring_cdc::m1_preflight::{
     CheckStatus, PreflightObservation, envelope, evaluate_untrusted, input_failure,
 };
 use boring_cdc::m2_capture_runtime::{acquire_production_ownership, run_loaded_config};
-use boring_cdc::m2_fault_status::snapshot as status_snapshot;
+use boring_cdc::m2_fault_status::{
+    M2SystemSnapshot, prometheus_metrics, snapshot as status_snapshot,
+};
 use boring_cdc::m2_init_recovery::{complete_plan, consume_plan, execute_confirmed, issue_plan};
 use boring_cdc::m2_journal::journal_inspect_event;
 use boring_cdc::m2_reconcile::{journal_report, recover_report};
@@ -238,10 +240,20 @@ fn run_m2() -> Result<(), ReaderFailure> {
     } else {
         None
     };
-    let _status_listener = StatusListener::start(status_address, status_tls, || {
+    let _status_listener = StatusListener::start(status_address, status_tls.clone(), || {
         serde_json::to_vec(&status_command().map_err(|_| ())?).map_err(|_| ())
     })
     .map_err(|code| ReaderFailure::unavailable(code, "status listener unavailable"))?;
+    let metrics_address = config
+        .public()
+        .observability
+        .prometheus_listen_addr
+        .parse()
+        .map_err(|_| ReaderFailure::unavailable("M2_STATUS_BIND_FAILED", "invalid metrics bind"))?;
+    let _metrics_listener = StatusListener::start_metrics(metrics_address, status_tls, || {
+        Ok(prometheus_metrics(&fresh_status_report().map_err(|_| ())?).into_bytes())
+    })
+    .map_err(|code| ReaderFailure::unavailable(code, "metrics listener unavailable"))?;
     let cancellation = cancellation_for_signals();
     let signal_cancellation = cancellation.clone();
     thread::spawn(move || {
@@ -521,7 +533,7 @@ fn read_only_journal_command(
         mutation_trace: None,
     })
 }
-fn status_command() -> Result<CliEnvelope, ReaderFailure> {
+fn fresh_status_report() -> Result<M2SystemSnapshot, ReaderFailure> {
     let text = std::fs::read_to_string("boring-cdc.toml").map_err(|_| {
         ReaderFailure::unavailable(
             "M2_STATUS_CONFIG_UNAVAILABLE",
@@ -530,7 +542,7 @@ fn status_command() -> Result<CliEnvelope, ReaderFailure> {
     })?;
     let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Status)
         .map_err(|e| ReaderFailure::unavailable(e.code, "status configuration is invalid"))?;
-    let report = status_snapshot(
+    status_snapshot(
         std::path::Path::new(&config.public().storage.sqlite_path),
         &config.fingerprints().runtime,
         std::time::SystemTime::now(),
@@ -539,7 +551,11 @@ fn status_command() -> Result<CliEnvelope, ReaderFailure> {
         code: "M2_STATUS_UNAVAILABLE",
         message: "fresh status evidence is unavailable",
         exit: ExitCode::Unavailable,
-    })?;
+    })
+}
+
+fn status_command() -> Result<CliEnvelope, ReaderFailure> {
+    let report = fresh_status_report()?;
     let mut extensions = std::collections::BTreeMap::new();
     extensions.insert(
         "overall_health".into(),
