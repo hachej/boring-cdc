@@ -614,11 +614,16 @@ mod tests {
         relation_for("accounts")
     }
     fn relation_for(table: &str) -> RelationSchemaVersion {
-        RelationSchemaVersion::derive(
-            LogicalTableIdentity::derive(&source_identity(), "public", table),
-            42,
-            b"id:bytea,value:text",
-        )
+        let logical = LogicalTableIdentity::derive(&source_identity(), "public", table);
+        let mut contract = Vec::from(32_u64.to_be_bytes());
+        contract.extend(logical.fingerprint().bytes());
+        contract.extend(42_u32.to_be_bytes());
+        contract.extend(0_u32.to_be_bytes());
+        contract.push(0); // default replica identity
+        contract.extend_from_slice(&[0; 6 * 8]);
+        contract.extend([0, 0]); // publication actions and membership
+        contract.extend_from_slice(&[0; 2 * 8]);
+        RelationSchemaVersion::derive(logical, 42, &contract).unwrap()
     }
     fn source(lsn: u64, xid: u32, ordinal: u32) -> SourceVersion {
         source_version_for_row(EPOCH, ReceivedLsn::from_wire(lsn), xid, u64::from(ordinal)).unwrap()

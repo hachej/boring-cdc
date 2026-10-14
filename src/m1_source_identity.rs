@@ -596,25 +596,122 @@ impl RelationSchemaVersion {
         self.schema_fingerprint
     }
 
-    #[must_use]
     pub fn derive(
         logical_table: LogicalTableIdentity,
         relation_id: u32,
         canonical_schema: &[u8],
-    ) -> Self {
-        Self {
+    ) -> Result<Self, RelationEncodingError> {
+        if canonical_schema.len() < 44 {
+            return Err(RelationEncodingError::Truncated);
+        }
+        let table_length =
+            u64::from_be_bytes(canonical_schema[..8].try_into().expect("eight-byte slice"));
+        if table_length != 32
+            || canonical_schema[8..40] != logical_table.fingerprint().bytes()
+            || canonical_schema[40..44] != relation_id.to_be_bytes()
+        {
+            return Err(RelationEncodingError::BindingMismatch);
+        }
+        validate_relation_encoding(&canonical_schema[44..])?;
+        Ok(Self {
             logical_table,
             relation_id,
-            schema_fingerprint: Fingerprint::canonical(
-                RELATION_SCHEMA_DOMAIN,
-                &[
-                    &logical_table.0.bytes(),
-                    &relation_id.to_be_bytes(),
-                    canonical_schema,
-                ],
-            ),
+            schema_fingerprint: Fingerprint::canonical(RELATION_SCHEMA_DOMAIN, &[canonical_schema]),
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RelationEncodingError {
+    Truncated,
+    BindingMismatch,
+    InvalidEncoding,
+}
+
+fn validate_relation_encoding(bytes: &[u8]) -> Result<(), RelationEncodingError> {
+    struct Reader<'a> {
+        bytes: &'a [u8],
+    }
+    impl<'a> Reader<'a> {
+        fn take(&mut self, length: usize) -> Result<&'a [u8], RelationEncodingError> {
+            let (head, tail) = self
+                .bytes
+                .split_at_checked(length)
+                .ok_or(RelationEncodingError::Truncated)?;
+            self.bytes = tail;
+            Ok(head)
+        }
+        fn number(&mut self, length: usize) -> Result<u32, RelationEncodingError> {
+            let mut value = 0_u32;
+            for byte in self.take(length)? {
+                value = (value << 8) | u32::from(*byte);
+            }
+            Ok(value)
+        }
+        fn field(&mut self) -> Result<&'a [u8], RelationEncodingError> {
+            let length = u64::from_be_bytes(self.take(8)?.try_into().expect("eight-byte slice"));
+            let length =
+                usize::try_from(length).map_err(|_| RelationEncodingError::InvalidEncoding)?;
+            self.take(length)
+        }
+        fn optional_hash(&mut self) -> Result<(), RelationEncodingError> {
+            if !matches!(self.field()?.len(), 0 | 32) {
+                return Err(RelationEncodingError::InvalidEncoding);
+            }
+            Ok(())
+        }
+        fn flag(&mut self) -> Result<(), RelationEncodingError> {
+            if self.number(1)? > 1 {
+                return Err(RelationEncodingError::InvalidEncoding);
+            }
+            Ok(())
         }
     }
+
+    let mut reader = Reader { bytes };
+    let column_count = reader.number(4)?;
+    let mut previous_attnum = None;
+    for _ in 0..column_count {
+        let attnum = i16::from_be_bytes(reader.take(2)?.try_into().expect("two-byte slice"));
+        if attnum <= 0 || previous_attnum.is_some_and(|previous| attnum <= previous) {
+            return Err(RelationEncodingError::InvalidEncoding);
+        }
+        previous_attnum = Some(attnum);
+        let ordinal = reader.number(4)?;
+        let name = reader.field()?;
+        let dropped = reader.number(1)?;
+        if dropped > 1
+            || (dropped == 1) != (ordinal == u32::MAX)
+            || (dropped == 1) != name.is_empty()
+            || std::str::from_utf8(name).is_err()
+        {
+            return Err(RelationEncodingError::InvalidEncoding);
+        }
+        reader.take(4)?; // type OID
+        reader.take(4)?; // typmod
+        reader.take(4)?; // collation OID
+        reader.flag()?; // nullable
+        for _ in 0..3 {
+            reader.optional_hash()?;
+        }
+    }
+    if reader.number(1)? > 3 {
+        return Err(RelationEncodingError::InvalidEncoding);
+    }
+    for _ in 0..6 {
+        reader.optional_hash()?;
+    }
+    if reader.number(1)? > 15 {
+        return Err(RelationEncodingError::InvalidEncoding);
+    }
+    reader.flag()?; // publication member
+    for _ in 0..2 {
+        reader.optional_hash()?;
+    }
+    if !reader.bytes.is_empty() {
+        return Err(RelationEncodingError::InvalidEncoding);
+    }
+    Ok(())
 }
 
 /// A validated key component contains the PostgreSQL type OID and its contract-canonical bytes.
@@ -1138,8 +1235,35 @@ mod tests {
     #[test]
     fn table_schema_and_row_identities_are_distinct_dimensions() {
         let table = LogicalTableIdentity::derive(&identity(), "public", "accounts");
-        let schema_v1 = RelationSchemaVersion::derive(table, 12, b"id:int8,name:text");
-        let schema_v2 = RelationSchemaVersion::derive(table, 13, b"id:int8,name:text,email:text");
+        let contract = |relation_id: u32, columns: &[u8]| {
+            let mut bytes = Vec::from(32_u64.to_be_bytes());
+            bytes.extend(table.fingerprint().bytes());
+            bytes.extend(relation_id.to_be_bytes());
+            bytes.extend(1_u32.to_be_bytes());
+            bytes.extend(1_i16.to_be_bytes());
+            bytes.extend(0_u32.to_be_bytes());
+            bytes.extend((columns.len() as u64).to_be_bytes());
+            bytes.extend(columns);
+            bytes.extend([0]);
+            bytes.extend(20_u32.to_be_bytes());
+            bytes.extend((-1_i32).to_be_bytes());
+            bytes.extend(0_u32.to_be_bytes());
+            bytes.extend([0]);
+            bytes.extend_from_slice(&[0; 3 * 8]);
+            bytes.extend([0]);
+            bytes.extend_from_slice(&[0; 6 * 8]);
+            bytes.extend([0, 0]);
+            bytes.extend_from_slice(&[0; 2 * 8]);
+            bytes
+        };
+        let schema_v1 =
+            RelationSchemaVersion::derive(table, 12, &contract(12, b"id:int8,name:text")).unwrap();
+        let schema_v2 = RelationSchemaVersion::derive(
+            table,
+            13,
+            &contract(13, b"id:int8,name:text,email:text"),
+        )
+        .unwrap();
         let key = PhysicalKeyHash::derive(&[int8_key(42), text_key("tenant-a")]).unwrap();
         let row = CanonicalRowIdentity::derive(table, key);
         assert_ne!(schema_v1, schema_v2);
@@ -1147,6 +1271,45 @@ mod tests {
         assert_ne!(
             key,
             PhysicalKeyHash::derive(&[text_key("tenant-a"), int8_key(42)]).unwrap()
+        );
+    }
+
+    #[test]
+    fn relation_fingerprint_matches_m0_binary_contract_vector() {
+        let vectors: serde_json::Value = serde_json::from_str(include_str!(
+            "../fixtures/m0/event-format/golden-vectors.json"
+        ))
+        .unwrap();
+        let relation = &vectors["identity_primitives"]["relation_fingerprint"];
+        let mut source = identity();
+        source.system_identifier =
+            vectors["identity_primitives"]["logical_table"]["input"]["system_identifier"]
+                .as_u64()
+                .unwrap();
+        let table = LogicalTableIdentity::derive(&source, "public", "orders");
+        let relation_id = relation["input"]["relation_id"].as_u64().unwrap() as u32;
+        let canonical = include_bytes!("../tests/fixtures/m1_ordering/relation-contract.bin");
+        let version = RelationSchemaVersion::derive(table, relation_id, canonical).unwrap();
+        let actual: String = version
+            .fingerprint()
+            .bytes()
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect();
+        assert_eq!(actual, relation["expected_sha256"].as_str().unwrap());
+        assert_eq!(
+            RelationSchemaVersion::derive(table, relation_id + 1, canonical),
+            Err(RelationEncodingError::BindingMismatch)
+        );
+        assert_eq!(
+            RelationSchemaVersion::derive(table, relation_id, &canonical[..40]),
+            Err(RelationEncodingError::Truncated)
+        );
+        let mut malformed = canonical.to_vec();
+        malformed.push(0);
+        assert_eq!(
+            RelationSchemaVersion::derive(table, relation_id, &malformed),
+            Err(RelationEncodingError::InvalidEncoding)
         );
     }
 
