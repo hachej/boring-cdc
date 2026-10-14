@@ -976,11 +976,83 @@ mod tests {
         assert!(controls >= 2, "expected both live control kinds");
         assert_eq!(key_change_pairs, 1);
         if std::env::var_os("BCDC_M4_CLICKHOUSE_URL").is_some() {
-            prove_live_m2_journal_reaches_clickhouse(&path, &boundaries);
+            match std::env::var("BCDC_M4_LIVE_PHASE").as_deref() {
+                Ok("abort") => run_live_destination_phase(&path, &boundaries, true),
+                Ok("resume") => run_live_destination_phase(&path, &boundaries, false),
+                _ => prove_live_m2_journal_reaches_clickhouse(&path, &boundaries, business),
+            }
         }
     }
 
-    fn prove_live_m2_journal_reaches_clickhouse(path: &str, boundaries: &[(u64, u64, usize)]) {
+    fn prove_live_m2_journal_reaches_clickhouse(
+        path: &str,
+        boundaries: &[(u64, u64, usize)],
+        expected_events: usize,
+    ) {
+        use std::os::unix::process::ExitStatusExt;
+
+        let executable = std::env::current_exe().unwrap();
+        let run_phase = |phase| {
+            std::process::Command::new(&executable)
+                .args([
+                    "--ignored",
+                    "--exact",
+                    "m4_clickhouse_durability::tests::live_m2_copied_transactions_are_admitted_by_m4",
+                    "--nocapture",
+                ])
+                .env("BCDC_M4_LIVE_PHASE", phase)
+                .output()
+                .unwrap()
+        };
+        let aborted = run_phase("abort");
+        assert_eq!(aborted.status.signal(), Some(6));
+        assert!(String::from_utf8_lossy(&aborted.stderr).contains("M4_BOUNDARY_READY"));
+
+        let connection =
+            rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .unwrap();
+        let checkpoint: Option<u64> = connection
+            .query_row(
+                "SELECT journal_seq FROM destination_checkpoints WHERE destination_id='article2-clickhouse'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()
+            .unwrap();
+        let pending_first: u64 = connection
+            .query_row(
+                "SELECT first_seq FROM clickhouse_batch_intents WHERE destination_id='article2-clickhouse' AND state='dispatched'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(checkpoint.unwrap_or(0) + 1, pending_first);
+        drop(connection);
+
+        let resumed = run_phase("resume");
+        assert!(
+            resumed.status.success(),
+            "{}",
+            String::from_utf8_lossy(&resumed.stderr)
+        );
+        let connection =
+            rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                .unwrap();
+        let checkpoint: u64 = connection
+            .query_row(
+                "SELECT journal_seq FROM destination_checkpoints WHERE destination_id='article2-clickhouse'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(checkpoint, boundaries.last().unwrap().1);
+        assert!(expected_events >= 10);
+        println!(
+            "M4_LIVE_JOURNAL_OK events={expected_events} checkpoint={checkpoint} process_abort=verified"
+        );
+    }
+
+    fn run_live_destination_phase(path: &str, boundaries: &[(u64, u64, usize)], abort: bool) {
         use crate::m4_clickhouse_adapter::ProductionClickHouseAdapter;
         use crate::m4_clickhouse_wire::PinnedClickHouseWire;
 
@@ -1002,28 +1074,41 @@ mod tests {
             lease_id: "article2-lease".into(),
             run_id: "article2-run".into(),
         };
-        writer
-            .connection_mut()
-            .execute(
-                "INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES(?1,'clickhouse',?2,?3,?4)",
-                params![context.destination_id, context.configuration_fingerprint, context.capture_epoch, context.generation],
-            )
-            .unwrap();
-        writer
-            .connection_mut()
-            .execute(
-                "INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES(?1,?2,?3,NULL,?4,?5,?6,999999,'held')",
-                params![context.lease_id, context.destination_id, context.capture_epoch, context.generation, context.configuration_fingerprint, context.run_id],
-            )
-            .unwrap();
+        if abort {
+            writer
+                .connection_mut()
+                .execute(
+                    "INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES(?1,'clickhouse',?2,?3,?4)",
+                    params![context.destination_id, context.configuration_fingerprint, context.capture_epoch, context.generation],
+                )
+                .unwrap();
+            writer
+                .connection_mut()
+                .execute(
+                    "INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES(?1,?2,?3,NULL,?4,?5,?6,999999,'held')",
+                    params![context.lease_id, context.destination_id, context.capture_epoch, context.generation, context.configuration_fingerprint, context.run_id],
+                )
+                .unwrap();
+        }
         let client = clickhouse::Client::default()
             .with_url(std::env::var("BCDC_M4_CLICKHOUSE_URL").unwrap())
             .with_user(std::env::var("BCDC_M4_CLICKHOUSE_USER").unwrap())
             .with_password(std::env::var("BCDC_M4_CLICKHOUSE_PASSWORD").unwrap());
         let mut adapter =
             ProductionClickHouseAdapter::new(PinnedClickHouseWire::new(client).unwrap());
-        let mut expected_events = 0;
         for &(first, last, count) in boundaries {
+            let checkpoint: Option<u64> = writer
+                .connection()
+                .query_row(
+                    "SELECT journal_seq FROM destination_checkpoints WHERE destination_id=?1",
+                    [&context.destination_id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .unwrap();
+            if checkpoint.is_some_and(|seq| last <= seq) {
+                continue;
+            }
             let copied = crate::m2_journal::read_complete_range(
                 std::path::Path::new(path),
                 first - 1,
@@ -1037,15 +1122,36 @@ mod tests {
             let transaction = writer.connection_mut().transaction().unwrap();
             let batch = prepare_batch(&transaction, &context, copied).unwrap();
             transaction.commit().unwrap();
-            let transaction = writer.connection_mut().transaction().unwrap();
-            mark_insert_dispatched(&transaction, &batch).unwrap();
-            transaction.commit().unwrap();
-            let remote = dispatch_and_readback(&mut adapter, &batch).unwrap();
+            let state: String = writer
+                .connection()
+                .query_row(
+                    "SELECT state FROM clickhouse_batch_intents WHERE intent_id=?1",
+                    [&batch.intent_id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            let remote = if state == "dispatched" {
+                assert!(!abort);
+                assert_eq!(
+                    reconcile_remote(&mut adapter, &batch),
+                    Ok(Reconciliation::Verified)
+                );
+                adapter.read_batch(&batch.marker).unwrap().unwrap()
+            } else {
+                assert_eq!(state, "prepared");
+                let transaction = writer.connection_mut().transaction().unwrap();
+                mark_insert_dispatched(&transaction, &batch).unwrap();
+                transaction.commit().unwrap();
+                dispatch_and_readback(&mut adapter, &batch).unwrap()
+            };
             assert_eq!(
                 reconcile_remote(&mut adapter, &batch),
                 Ok(Reconciliation::Verified)
             );
-            expected_events += batch.events.len();
+            if abort && !batch.events.is_empty() {
+                eprintln!("M4_BOUNDARY_READY first={first} last={last}");
+                std::process::abort();
+            }
             let revision = writer
                 .connection()
                 .query_row(
@@ -1059,6 +1165,7 @@ mod tests {
             finalize_checkpoint(&transaction, &context, &batch, &remote, revision).unwrap();
             transaction.commit().unwrap();
         }
+        assert!(!abort, "no business batch reached the abort boundary");
         let checkpoint: u64 = writer
             .connection()
             .query_row(
@@ -1068,8 +1175,6 @@ mod tests {
             )
             .unwrap();
         assert_eq!(checkpoint, boundaries.last().unwrap().1);
-        assert!(expected_events >= 10);
-        println!("M4_LIVE_JOURNAL_OK events={expected_events} checkpoint={checkpoint}");
     }
     struct FixedRandomness;
     impl Randomness for FixedRandomness {

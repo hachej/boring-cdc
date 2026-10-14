@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+ulimit -c 0
 cd "$(dirname "$0")/../.."
 export TMPDIR=/var/tmp
 
@@ -53,7 +54,7 @@ if ! scripts/acceptance/durable_simple_case.sh >"$work/acceptance.log" 2>&1; the
   cat "$work/acceptance.log" >&2
   exit 1
 fi
-grep -q '^M4_LIVE_JOURNAL_OK ' "$work/acceptance.log"
+grep -q '^M4_LIVE_JOURNAL_OK .*process_abort=verified' "$work/acceptance.log"
 grep -q '^DURABLE_SIMPLE_CASE_OK ' "$work/acceptance.log"
 
 docker restart "$container" >/dev/null
@@ -62,4 +63,4 @@ read -r events distinct_events < <(ch --query 'SELECT count(),uniqExact(connecto
 read -r markers distinct_markers < <(ch --query 'SELECT count(),uniqExact(batch_id) FROM boring_cdc.batch_markers_v1 WHERE capture_epoch=1 AND generation=1')
 (( events >= 10 && events == distinct_events ))
 (( markers >= 2 && markers == distinct_markers ))
-printf 'M4_LIVE_M2_DESTINATION_OK clickhouse=25.8.2.29 events=%s markers=%s restart=verified\n' "$events" "$markers"
+printf 'M4_LIVE_M2_DESTINATION_OK clickhouse=25.8.2.29 events=%s markers=%s process_abort=verified restart=verified\n' "$events" "$markers"
