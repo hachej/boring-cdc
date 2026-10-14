@@ -13,7 +13,7 @@ use boring_cdc::m2_init_recovery::{complete_plan, consume_plan, execute_confirme
 use boring_cdc::m2_journal::journal_inspect_event;
 use boring_cdc::m2_reconcile::{journal_report, recover_report};
 use boring_cdc::m2_schema::open_writer;
-use boring_cdc::m2_status_listener::StatusListener;
+use boring_cdc::m2_status_listener::{StatusListener, server_tls_config};
 use boring_cdc::m3_bootstrap::{
     BootstrapError, BootstrapRuntime, ImporterAssignment, PrepareIntent, SessionBounds,
     digest_assignment,
@@ -224,11 +224,24 @@ fn run_m2() -> Result<(), ReaderFailure> {
         .status_listen_addr
         .parse()
         .map_err(|_| ReaderFailure::unavailable("M2_STATUS_BIND_FAILED", "invalid status bind"))?;
-    let _status_listener =
-        StatusListener::start(status_address, config.public().observability.tls, || {
-            serde_json::to_vec(&status_command().map_err(|_| ())?).map_err(|_| ())
-        })
-        .map_err(|code| ReaderFailure::unavailable(code, "status listener unavailable"))?;
+    let status_tls = if config.public().observability.tls {
+        let (cert, key, client_ca) = config.status_tls_material().ok_or_else(|| {
+            ReaderFailure::unavailable(
+                "M2_STATUS_TLS_MATERIAL_INVALID",
+                "status TLS material unavailable",
+            )
+        })?;
+        Some(
+            server_tls_config(cert, key, client_ca)
+                .map_err(|code| ReaderFailure::unavailable(code, "status TLS material invalid"))?,
+        )
+    } else {
+        None
+    };
+    let _status_listener = StatusListener::start(status_address, status_tls, || {
+        serde_json::to_vec(&status_command().map_err(|_| ())?).map_err(|_| ())
+    })
+    .map_err(|code| ReaderFailure::unavailable(code, "status listener unavailable"))?;
     let cancellation = cancellation_for_signals();
     let signal_cancellation = cancellation.clone();
     thread::spawn(move || {
