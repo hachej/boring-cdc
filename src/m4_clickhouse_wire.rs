@@ -3,21 +3,30 @@
 use crate::m4_clickhouse_adapter::RedactedWireError;
 use crate::m4_clickhouse_durability::{BatchMarker, DestinationEvent};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use clickhouse::Row;
+use clickhouse::{Client, Row};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tokio::runtime::{Builder, Runtime};
+
+use crate::m4_clickhouse_adapter::SYNCHRONOUS_QUERY_SETTINGS;
+use crate::m4_clickhouse_schema::EVENT_HISTORY;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Row, Serialize)]
 pub struct EventHistoryRow {
     pub capture_epoch: u64,
     pub generation: u64,
-    pub logical_table_id: String,
-    pub relation_schema_fingerprint: String,
+    #[serde(with = "fixed64")]
+    pub logical_table_id: [u8; 64],
+    #[serde(with = "fixed64")]
+    pub relation_schema_fingerprint: [u8; 64],
     pub canonical_key: String,
-    pub key_hash: String,
+    #[serde(with = "fixed64")]
+    pub key_hash: [u8; 64],
     pub before_key: String,
-    pub connector_event_id: String,
-    pub payload_hash: String,
+    #[serde(with = "fixed64")]
+    pub connector_event_id: [u8; 64],
+    #[serde(with = "fixed64")]
+    pub payload_hash: [u8; 64],
     pub operation: i8,
     pub mutation_kind: i8,
     pub lsn_u64: u64,
@@ -25,8 +34,105 @@ pub struct EventHistoryRow {
     pub transaction_ordinal: u64,
     pub mutation_ordinal: u8,
     pub journal_seq: u64,
-    pub batch_id: String,
+    #[serde(with = "fixed64")]
+    pub batch_id: [u8; 64],
     pub columns: Vec<(u32, i8, u32, i32, String)>,
+}
+
+mod fixed64 {
+    use serde::de::{Error as _, SeqAccess, Visitor};
+    use serde::ser::SerializeTuple;
+    use serde::{Deserializer, Serializer};
+    use std::fmt;
+
+    pub fn serialize<S: Serializer>(value: &[u8; 64], serializer: S) -> Result<S::Ok, S::Error> {
+        let mut tuple = serializer.serialize_tuple(64)?;
+        for byte in value {
+            tuple.serialize_element(byte)?;
+        }
+        tuple.end()
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<[u8; 64], D::Error> {
+        struct Fixed64;
+        impl<'de> Visitor<'de> for Fixed64 {
+            type Value = [u8; 64];
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("exactly 64 fixed bytes")
+            }
+
+            fn visit_seq<A: SeqAccess<'de>>(
+                self,
+                mut sequence: A,
+            ) -> Result<Self::Value, A::Error> {
+                let mut value = [0; 64];
+                for (index, byte) in value.iter_mut().enumerate() {
+                    *byte = sequence
+                        .next_element()?
+                        .ok_or_else(|| A::Error::invalid_length(index, &self))?;
+                }
+                Ok(value)
+            }
+        }
+        deserializer.deserialize_tuple(64, Fixed64)
+    }
+}
+
+/// The pinned RowBinary HTTP client. The synchronous outer boundary returns only after
+/// `insert.end().await` has completed, so the M4 coordinator can keep its existing lease and
+/// checkpoint order around the remote call.
+pub struct PinnedClickHouseWire {
+    client: Client,
+    runtime: Runtime,
+}
+
+impl PinnedClickHouseWire {
+    pub fn new(client: Client) -> Result<Self, RedactedWireError> {
+        let runtime = Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|_| RedactedWireError)?;
+        Ok(Self { client, runtime })
+    }
+
+    pub fn insert_history_rows(
+        &mut self,
+        rows: &[EventHistoryRow],
+    ) -> Result<(), RedactedWireError> {
+        if rows.is_empty() {
+            return Ok(());
+        }
+        let mut client = self.client.clone();
+        for (name, value) in SYNCHRONOUS_QUERY_SETTINGS {
+            client = client.with_option(name, value.to_string());
+        }
+        self.runtime.block_on(async {
+            let mut insert = client
+                .insert(EVENT_HISTORY)
+                .map_err(|_| RedactedWireError)?;
+            for row in rows {
+                insert.write(row).await.map_err(|_| RedactedWireError)?;
+            }
+            insert.end().await.map_err(|_| RedactedWireError)
+        })
+    }
+
+    pub fn read_history_batch(
+        &mut self,
+        marker: &BatchMarker,
+    ) -> Result<Vec<EventHistoryRow>, RedactedWireError> {
+        self.runtime.block_on(async {
+            self.client
+                .query("SELECT ?fields FROM boring_cdc.event_history_v1 WHERE capture_epoch = ? AND generation = ? AND batch_id = ?")
+                .bind(marker.capture_epoch)
+                .bind(marker.generation)
+                .bind(&marker.batch_id)
+                .fetch_all::<EventHistoryRow>()
+                .await
+                .map_err(|_| RedactedWireError)
+        })
+    }
 }
 
 #[derive(Deserialize)]
@@ -157,13 +263,13 @@ impl EventHistoryRow {
         Ok(Self {
             capture_epoch: envelope.capture_epoch,
             generation: marker.generation,
-            logical_table_id: envelope.logical_table_id,
-            relation_schema_fingerprint: envelope.relation_fingerprint,
+            logical_table_id: fixed_hex(&envelope.logical_table_id)?,
+            relation_schema_fingerprint: fixed_hex(&envelope.relation_fingerprint)?,
             canonical_key,
-            key_hash: envelope.key_hash,
+            key_hash: fixed_hex(&envelope.key_hash)?,
             before_key,
-            connector_event_id: envelope.connector_event_id,
-            payload_hash: envelope.payload_hash,
+            connector_event_id: fixed_hex(&envelope.connector_event_id)?,
+            payload_hash: fixed_hex(&envelope.payload_hash)?,
             operation,
             mutation_kind,
             lsn_u64: version.lsn_u64,
@@ -171,7 +277,7 @@ impl EventHistoryRow {
             transaction_ordinal: version.transaction_ordinal,
             mutation_ordinal: version.mutation_ordinal,
             journal_seq: event.journal_seq,
-            batch_id: marker.batch_id.clone(),
+            batch_id: fixed_hex(&marker.batch_id)?,
             columns,
         })
     }
@@ -184,13 +290,29 @@ fn hex64(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+fn fixed_hex(value: &str) -> Result<[u8; 64], RedactedWireError> {
+    if !hex64(value) {
+        return Err(RedactedWireError);
+    }
+    value.as_bytes().try_into().map_err(|_| RedactedWireError)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde_json::json;
 
-    #[test]
-    fn golden_m0_mutation_maps_to_the_closed_history_columns() {
+    fn live_client() -> Client {
+        let url = std::env::var("BCDC_M4_CLICKHOUSE_URL").unwrap();
+        let user = std::env::var("BCDC_M4_CLICKHOUSE_USER").unwrap();
+        let password = std::env::var("BCDC_M4_CLICKHOUSE_PASSWORD").unwrap();
+        Client::default()
+            .with_url(&url)
+            .with_user(user)
+            .with_password(password)
+    }
+
+    fn golden_event() -> (DestinationEvent, BatchMarker) {
         let fixture: Value = serde_json::from_str(include_str!(
             "../fixtures/m0/event-format/golden-vectors.json"
         ))
@@ -221,6 +343,12 @@ mod tests {
             payload_hash: golden["payload_hash"].as_str().unwrap().into(),
             canonical_payload: vec![],
         };
+        (event, marker)
+    }
+
+    #[test]
+    fn golden_m0_mutation_maps_to_the_closed_history_columns() {
+        let (event, marker) = golden_event();
         let row = EventHistoryRow::from_destination_event(&event, &marker).unwrap();
         assert_eq!(row.capture_epoch, 7);
         assert_eq!(row.generation, 2);
@@ -230,8 +358,8 @@ mod tests {
         assert_eq!(row.columns[0].0, 0);
         assert_eq!(row.columns[0].1, 3);
         assert_eq!(row.columns[0].2, 20);
-        assert_eq!(row.payload_hash, event.payload_hash);
-        assert_eq!(row.batch_id, marker.batch_id);
+        assert_eq!(row.payload_hash.as_slice(), event.payload_hash.as_bytes());
+        assert_eq!(row.batch_id.as_slice(), marker.batch_id.as_bytes());
         let malformed = DestinationEvent {
             payload: serde_json::to_vec(&json!({"event_type":"control"})).unwrap(),
             ..event
@@ -240,5 +368,26 @@ mod tests {
             EventHistoryRow::from_destination_event(&malformed, &marker),
             Err(RedactedWireError)
         );
+    }
+
+    #[test]
+    #[ignore = "requires a pinned ClickHouse 25.8.2.29 instance with the M4 DDL"]
+    fn live_rowbinary_history_insert_and_fresh_readback() {
+        let (event, marker) = golden_event();
+        let row = EventHistoryRow::from_destination_event(&event, &marker).unwrap();
+        let mut wire = PinnedClickHouseWire::new(live_client()).unwrap();
+        wire.insert_history_rows(std::slice::from_ref(&row))
+            .unwrap();
+        let stored = wire.read_history_batch(&marker).unwrap();
+        assert_eq!(stored, vec![row]);
+    }
+
+    #[test]
+    #[ignore = "requires the preceding live insert and a restarted pinned ClickHouse server"]
+    fn live_rowbinary_history_survives_server_restart() {
+        let (event, marker) = golden_event();
+        let row = EventHistoryRow::from_destination_event(&event, &marker).unwrap();
+        let mut wire = PinnedClickHouseWire::new(live_client()).unwrap();
+        assert_eq!(wire.read_history_batch(&marker).unwrap(), vec![row]);
     }
 }
