@@ -398,6 +398,7 @@ pub fn dispatch_and_readback(
     executor: &mut impl ClickHouseBatchExecutor,
     batch: &PreparedBatch,
 ) -> Result<RemoteBatch, DurabilityError> {
+    verify_live_object_fingerprint(executor, batch)?;
     executor
         .insert_events_synchronously(batch)
         .map_err(|DispatchError| DurabilityError::Dispatch)?;
@@ -412,14 +413,7 @@ pub fn dispatch_and_readback(
         .read_batch(&batch.marker)
         .map_err(|DispatchError| DurabilityError::Dispatch)?
         .ok_or(DurabilityError::ReadbackMissing)?;
-    let live_fingerprint = executor
-        .inspect_object_fingerprint()
-        .map_err(|DispatchError| DurabilityError::Dispatch)?;
-    if live_fingerprint != batch.marker.object_fingerprint {
-        return Err(DurabilityError::Conflict(
-            "ClickHouse object fingerprint drift",
-        ));
-    }
+    verify_live_object_fingerprint(executor, batch)?;
     verify_remote_batch(batch, &remote)?;
     Ok(remote)
 }
@@ -436,6 +430,15 @@ pub fn reconcile_remote(
     else {
         return Ok(Reconciliation::ReplayRequired);
     };
+    verify_live_object_fingerprint(executor, batch)?;
+    verify_remote_batch(batch, &remote)?;
+    Ok(Reconciliation::Verified)
+}
+
+fn verify_live_object_fingerprint(
+    executor: &mut impl ClickHouseBatchExecutor,
+    batch: &PreparedBatch,
+) -> Result<(), DurabilityError> {
     let live_fingerprint = executor
         .inspect_object_fingerprint()
         .map_err(|DispatchError| DurabilityError::Dispatch)?;
@@ -444,8 +447,7 @@ pub fn reconcile_remote(
             "ClickHouse object fingerprint drift",
         ));
     }
-    verify_remote_batch(batch, &remote)?;
-    Ok(Reconciliation::Verified)
+    Ok(())
 }
 
 /// Atomically mark the intent verified and move the checkpoint to the complete transaction at the
@@ -985,6 +987,7 @@ mod tests {
         remote: Option<RemoteBatch>,
         event_inserts: usize,
         marker_inserts: usize,
+        object_drift: bool,
     }
     impl ClickHouseBatchExecutor for FakeClickHouse {
         fn insert_events_synchronously(
@@ -1033,7 +1036,11 @@ mod tests {
             Ok(self.remote.clone())
         }
         fn inspect_object_fingerprint(&mut self) -> Result<String, DispatchError> {
-            Ok(object_fingerprint())
+            Ok(if self.object_drift {
+                "drift".into()
+            } else {
+                object_fingerprint()
+            })
         }
     }
 
@@ -1216,6 +1223,7 @@ mod tests {
             remote: None,
             event_inserts: 0,
             marker_inserts: 0,
+            object_drift: false,
         };
         let remote =
             dispatch_owned_batch(&mut writer, &token, &mut now, &mut clickhouse, &batch).unwrap();
@@ -1243,6 +1251,7 @@ mod tests {
             remote: None,
             event_inserts: 0,
             marker_inserts: 0,
+            object_drift: false,
         };
         assert_eq!(
             dispatch_owned_batch(
@@ -1258,6 +1267,28 @@ mod tests {
     }
 
     #[test]
+    fn object_drift_blocks_dispatch_before_remote_insert() {
+        let (_path, mut writer) = writer("object-drift");
+        seed(&mut writer);
+        let batch = prepare(&mut writer, copied(false));
+        mark(&mut writer, &batch);
+        let mut clickhouse = FakeClickHouse {
+            remote: None,
+            event_inserts: 0,
+            marker_inserts: 0,
+            object_drift: true,
+        };
+        assert_eq!(
+            dispatch_and_readback(&mut clickhouse, &batch),
+            Err(DurabilityError::Conflict(
+                "ClickHouse object fingerprint drift"
+            ))
+        );
+        assert_eq!(clickhouse.event_inserts, 0);
+        assert_eq!(clickhouse.marker_inserts, 0);
+    }
+
+    #[test]
     fn synchronous_readback_then_atomic_checkpoint_is_idempotent() {
         let (_path, mut writer) = writer("happy");
         seed(&mut writer);
@@ -1267,6 +1298,7 @@ mod tests {
             remote: None,
             event_inserts: 0,
             marker_inserts: 0,
+            object_drift: false,
         };
         let remote = dispatch_and_readback(&mut clickhouse, &batch).unwrap();
         assert_eq!(
@@ -1312,6 +1344,7 @@ mod tests {
             remote: None,
             event_inserts: 0,
             marker_inserts: 0,
+            object_drift: false,
         };
         let remote = dispatch_and_readback(&mut clickhouse, &batch).unwrap();
         assert_eq!(
@@ -1365,6 +1398,7 @@ mod tests {
                 remote: None,
                 event_inserts: 0,
                 marker_inserts: 0,
+                object_drift: false,
             };
             let remote = dispatch_and_readback(&mut clickhouse, &batch).unwrap();
             let transaction = writer.connection_mut().transaction().unwrap();
@@ -1410,6 +1444,7 @@ mod tests {
             remote: None,
             event_inserts: 0,
             marker_inserts: 0,
+            object_drift: false,
         };
         let remote = dispatch_and_readback(&mut clickhouse, &batch).unwrap();
         writer.connection_mut().execute("UPDATE destination_generation_leases SET state='fenced',revision=revision+1 WHERE lease_id='lease-a'", []).unwrap();

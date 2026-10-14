@@ -42,7 +42,10 @@ pub enum WireRequest<'a> {
     ReadBatchFresh {
         marker: &'a BatchMarker,
     },
-    InspectContractFresh,
+    InspectObjectsFresh,
+    InspectAuditContractFresh {
+        identity: &'a AuditIdentity,
+    },
     ReadAuditRangeFresh {
         identity: &'a AuditIdentity,
         first_seq: u64,
@@ -54,6 +57,7 @@ pub enum WireRequest<'a> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WireResponse {
     Acknowledged,
+    ObjectFingerprint(String),
     Events(Vec<RemoteEventIdentity>),
     Batch(Option<RemoteBatch>),
     Contract(DestinationContractObservation),
@@ -110,16 +114,22 @@ impl<W: ClickHouseWire> ClickHouseBatchExecutor for ProductionClickHouseAdapter<
         }
     }
     fn inspect_object_fingerprint(&mut self) -> Result<String, DispatchError> {
-        match self.wire.execute(WireRequest::InspectContractFresh) {
-            Ok(WireResponse::Contract(observation)) => Ok(observation.object_fingerprint),
+        match self.wire.execute(WireRequest::InspectObjectsFresh) {
+            Ok(WireResponse::ObjectFingerprint(fingerprint)) => Ok(fingerprint),
             _ => Err(DispatchError),
         }
     }
 }
 
 impl<W: ClickHouseWire> ClickHouseAuditExecutor for ProductionClickHouseAdapter<W> {
-    fn inspect_contract(&mut self) -> Result<DestinationContractObservation, AuditDispatchError> {
-        match self.wire.execute(WireRequest::InspectContractFresh) {
+    fn inspect_contract(
+        &mut self,
+        identity: &AuditIdentity,
+    ) -> Result<DestinationContractObservation, AuditDispatchError> {
+        match self
+            .wire
+            .execute(WireRequest::InspectAuditContractFresh { identity })
+        {
             Ok(WireResponse::Contract(observation)) => Ok(observation),
             _ => Err(AuditDispatchError),
         }
@@ -171,7 +181,8 @@ mod tests {
                 }
                 WireRequest::ReadEventsFresh { .. }
                 | WireRequest::ReadBatchFresh { .. }
-                | WireRequest::InspectContractFresh
+                | WireRequest::InspectObjectsFresh
+                | WireRequest::InspectAuditContractFresh { .. }
                 | WireRequest::ReadAuditRangeFresh { .. } => self.fresh_reads_seen += 1,
             }
             self.responses.pop_front().ok_or(RedactedWireError)
@@ -214,14 +225,7 @@ mod tests {
                 WireResponse::Events(vec![]),
                 WireResponse::Acknowledged,
                 WireResponse::Batch(Some(remote)),
-                WireResponse::Contract(DestinationContractObservation {
-                    selector_fingerprint: "s".into(),
-                    object_fingerprint: "objects".into(),
-                    settings_fingerprint: "x".into(),
-                    expected_settings_fingerprint: "x".into(),
-                    event_identity_conflicts: 0,
-                    marker_identity_conflicts: 0,
-                }),
+                WireResponse::ObjectFingerprint("objects".into()),
             ]),
             ..Default::default()
         };
