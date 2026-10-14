@@ -858,18 +858,26 @@ mod tests {
             JournalEvent {
                 event_id: "event-z".into(),
                 transaction_ordinal: 0,
+                source_row_ordinal: 0,
+                source_mutation_ordinal: 0,
                 relation_schema_fingerprint: None,
                 control_kind: None,
                 payload: b"{\"z\":1}".to_vec(),
                 payload_hash: sha256(b"{\"z\":1}"),
+                canonical_payload: None,
+                canonical_payload_hash: None,
             },
             JournalEvent {
                 event_id: "event-a".into(),
                 transaction_ordinal: 1,
+                source_row_ordinal: 1,
+                source_mutation_ordinal: 0,
                 relation_schema_fingerprint: None,
                 control_kind: None,
                 payload: b"beta".to_vec(),
                 payload_hash: sha256(b"beta"),
+                canonical_payload: None,
+                canonical_payload_hash: None,
             },
         ];
         let c = SourceCommit {

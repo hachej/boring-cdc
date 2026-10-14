@@ -17,7 +17,7 @@ with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
     print('E_DURABLE_SIMPLE_STATE',dict(db.execute("select coalesce(control_kind,'user'),count(*) from journal_events group by coalesce(control_kind,'user')").fetchall()),'transactions',db.execute("select count(*) from source_transactions where state='committed'").fetchone()[0])
     print('E_DURABLE_SIMPLE_CONTROL_EVENTS',db.execute("select control_kind,count(*) from journal_events group by control_kind").fetchall())
 PY
-    cat "$work/runtime-first.err" "$work/runtime-restart.err" 2>/dev/null >&2 || true
+    cat "$work/runtime-first.err" "$work/runtime-restart.err" "$work/runtime-restart.out" 2>/dev/null >&2 || true
   fi
   [[ -z "$runtime_pid" ]] || kill -KILL "$runtime_pid" >/dev/null 2>&1 || true
   [[ -z "$bootstrap_pid" ]] || kill -KILL "$bootstrap_pid" >/dev/null 2>&1 || true
@@ -62,6 +62,7 @@ control_credential='control-durable-simple'
 application_credential='application-durable-simple'
 psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_credential" -v "control_password=$control_credential" -v "application_password=$application_credential" \
   < scripts/setup/durable_simple_prerequisites.sql >"$work/prerequisites.out"
+psqlc -qc "alter table public.orders add column memo text; alter table public.orders alter column memo set storage external"
 
 cargo build --quiet --locked --bin boring-cdc
 binary="$PWD/target/debug/boring-cdc"
@@ -219,13 +220,14 @@ sample_feedback_boundary after-catch-up
 
 psqlc -Atqc "select xmin::text||'|'||id::text from public.orders order by id" >"$work/postgres-oracle.txt"
 python3 - "$journal" "$work/postgres-oracle.txt" "$work/feedback-boundaries.jsonl" "$work/result.json" "$version" <<'PY'
-import json,sqlite3,sys
+import hashlib,json,sqlite3,sys
 journal,oracle_path,boundaries_path,result_path,version=sys.argv[1:]
 oracle={tuple(line.strip().split('|')) for line in open(oracle_path) if line.strip()}
 with sqlite3.connect(f"file:{journal}?mode=ro", uri=True) as db:
     transactions=db.execute("select transaction_id,xid,first_seq,last_seq,event_count,end_lsn from source_transactions where state='committed' order by first_seq").fetchall()
-    events=db.execute("select journal_seq,transaction_id,control_kind,cast(payload as text) from journal_events order by journal_seq").fetchall()
-    state=db.execute("select durable_transaction_end_lsn,durable_journal_seq from source_state where singleton=1").fetchone()
+    events=db.execute("select journal_seq,transaction_id,control_kind,cast(payload as text),event_id,relation_schema_fingerprint,payload_hash,canonical_payload,canonical_payload_hash from journal_events order by journal_seq").fetchall()
+    schemas={row[0] for row in db.execute("select schema_fingerprint from relation_schemas")}
+    state=db.execute("select durable_transaction_end_lsn,durable_journal_seq,capture_epoch from source_state where singleton=1").fetchone()
 assert len({row[0] for row in transactions})==len(transactions)
 assert len({row[1] for row in transactions})==len(transactions)
 assert all(row[4]==1 and row[2]==row[3] for row in transactions)
@@ -235,22 +237,36 @@ xid_by_transaction={row[0]:row[1] for row in transactions}
 journal_set=set()
 control_events=0
 control_kinds=set()
-for _,transaction_id,control_kind,payload_text in events:
+for seq,transaction_id,control_kind,payload_text,event_id,relation_fp,raw_hash,canonical_preimage,canonical_hash in events:
     payload=json.loads(payload_text)
+    assert hashlib.sha256(payload_text.encode()).hexdigest()==raw_hash
     if control_kind is not None:
         assert control_kind in ('heartbeat','capture_fence')
-        assert payload['kind']=='update' and payload['new']
-        assert bytes(payload['new'][0]['bytes'])==b'1'
+        assert payload['schema_version']=='boring-cdc/event/v1'
+        assert payload['event_type']=='control' and payload['operation']=='control'
+        assert payload['journal_seq']==seq and payload['connector_event_id']==event_id
+        assert payload['control']['kind']==control_kind
+        assert relation_fp is None
+        assert canonical_preimage and hashlib.sha256(canonical_preimage).hexdigest()==canonical_hash==payload['payload_hash']
         control_events+=1
         control_kinds.add(control_kind)
         continue
-    assert payload['kind']=='insert' and payload['new']
-    key=str(int(bytes(payload['new'][0]['bytes']).decode('ascii')))
+    assert payload['schema_version']=='boring-cdc/event/v1'
+    assert payload['event_type']=='mutation' and payload['operation']=='insert'
+    assert payload['journal_seq']==seq and payload['connector_event_id']==event_id
+    assert payload['source_version']['connector_event_id']==event_id
+    assert payload['source_version']['transaction_ordinal']>=0
+    assert payload['relation_fingerprint']==relation_fp and relation_fp in schemas
+    assert canonical_preimage and hashlib.sha256(canonical_preimage).hexdigest()==canonical_hash
+    assert payload['payload_hash']==canonical_hash
+    assert payload['canonical_key'][0]['kind']=='int64'
+    key=str(payload['canonical_key'][0]['value'])
     journal_set.add((xid_by_transaction[transaction_id],key))
 assert len(journal_set)==6
 assert control_kinds=={'heartbeat','capture_fence'}, control_kinds
 assert journal_set==oracle, {'postgres':sorted(oracle),'journal':sorted(journal_set)}
 assert state[1]==len(events) and state[0]==transactions[-1][5]
+assert state[2]=='1', ('capture epoch must be an M0 UInt64',state[2])
 boundaries=[json.loads(line) for line in open(boundaries_path)]
 assert boundaries and all(item['bounded'] for item in boundaries)
 # WAL-retention regression guard. restart_lsn is what lets PostgreSQL recycle WAL: a connector
@@ -290,12 +306,60 @@ result={
   'confirmed_flush_never_exceeded_durable_boundary':True,
   'restart_lsn_never_regressed':True,
   'final_durable_lsn':state[0],
+  'capture_epoch':state[2],
 }
 with open(result_path,'w') as f: json.dump(result,f,indent=2,sort_keys=True); f.write('\n')
 print(json.dumps(result,sort_keys=True))
 PY
 
+psqlc -qc "begin; set local role boring_cdc_app; update public.orders set total=555.25 where id=101; commit"
+wait_for_transactions 7
+psqlc -qc "begin; set local role boring_cdc_app; update public.orders set id=302 where id=102; commit"
+wait_for_transactions 8
+psqlc -qc "begin; set local role boring_cdc_app; delete from public.orders where id=103; commit"
+wait_for_transactions 9
+python3 - "$journal" <<'PY'
+import hashlib,json,sqlite3,sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    rows=db.execute("select journal_seq,event_id,source_row_ordinal,source_mutation_ordinal,cast(payload as text),canonical_payload,canonical_payload_hash from journal_events where control_kind is null and journal_seq>8 order by journal_seq").fetchall()
+assert len(rows)==4,rows
+events=[]
+for seq,event_id,row_ordinal,mutation_ordinal,payload_text,preimage,canonical_hash in rows:
+    event=json.loads(payload_text)
+    assert event['journal_seq']==seq and event['connector_event_id']==event_id
+    assert event['source_version']['transaction_ordinal']==row_ordinal
+    assert event['source_version']['mutation_ordinal']==mutation_ordinal
+    assert hashlib.sha256(preimage).hexdigest()==canonical_hash==event['payload_hash']
+    events.append(event)
+assert [(event['operation'],event['mutation_kind'],event['canonical_key'][0]['value']) for event in events]==[
+    ('update','upsert',101),('update','delete',102),('update','upsert',302),('delete','delete',103)
+],events
+assert events[2]['before_key'][0]['value']==102
+assert rows[1][2:4]==(0,0) and rows[2][2:4]==(0,1)
+print('DURABLE_MUTATIONS_OK update=1 key_change=2 delete=1 canonical_hashes=bound')
+PY
+
+psqlc -qc "begin; set local role boring_cdc_app; update public.orders set memo=repeat('x',10000) where id=201; commit"
+wait_for_transactions 10
+psqlc -qc "begin; set local role boring_cdc_app; update public.orders set total=777.25 where id=201; commit"
+wait_for_transactions 11
+python3 - "$journal" <<'PY'
+import hashlib,json,sqlite3,sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    rows=db.execute("select cast(payload as text),canonical_payload,canonical_payload_hash from journal_events where control_kind is null order by journal_seq desc limit 2").fetchall()
+assert len(rows)==2
+latest,earlier=[json.loads(row[0]) for row in rows]
+assert latest['operation']=='update' and earlier['operation']=='update'
+assert latest['canonical_key'][0]['value']==201==earlier['canonical_key'][0]['value']
+assert latest['columns'][2]['state']=='unchanged_toast',latest['columns']
+assert earlier['columns'][2]['state']=='explicit_value',earlier['columns']
+for payload_text,preimage,canonical_hash in rows:
+    assert preimage and hashlib.sha256(preimage).hexdigest()==canonical_hash==json.loads(payload_text)['payload_hash']
+print('DURABLE_TOAST_OK explicit_value=1 unchanged_toast=1 canonical_hashes=bound')
+PY
+
 stop_bounded "$runtime_pid" TERM runtime-restart
 runtime_pid=
 [[ ! -s "$work/runtime-restart.err" ]]
-echo "DURABLE_SIMPLE_CASE_OK postgres=$version user_transactions=6 heartbeat_and_fence=classified crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"
+BCDC_LIVE_JOURNAL_PATH="$journal" cargo test --locked live_m2_copied_transactions_are_admitted_by_m4 --lib -- --ignored --nocapture
+echo "DURABLE_SIMPLE_CASE_OK postgres=$version inserts=6 update=1 key_change=2 delete=1 toast=preserved heartbeat_and_fence=canonical crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"

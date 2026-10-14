@@ -17,6 +17,8 @@ pub mod m1_workload;
 pub mod m1_cli_contract;
 
 pub mod m2_capture_runtime;
+pub mod m2_catalog_reader;
+pub mod m2_event_envelope;
 pub mod m2_fault_status;
 pub mod m2_heartbeat;
 pub mod m2_init_recovery;
@@ -24,8 +26,10 @@ pub mod m2_journal;
 pub mod m2_jsonl;
 pub mod m2_leases;
 pub mod m2_ownership;
+pub mod m2_pg_value;
 pub mod m2_pressure;
 pub mod m2_reconcile;
+pub mod m2_relation_contract;
 pub mod m2_schema;
 pub mod m2_spool;
 

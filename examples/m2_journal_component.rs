@@ -12,10 +12,14 @@ fn event(id: &str, ordinal: u32, payload: &[u8]) -> JournalEvent {
     JournalEvent {
         event_id: id.into(),
         transaction_ordinal: ordinal,
+        source_row_ordinal: ordinal,
+        source_mutation_ordinal: 0,
         relation_schema_fingerprint: Some("schema-v1".into()),
         control_kind: None,
         payload: payload.into(),
         payload_hash: sha256(payload),
+        canonical_payload: None,
+        canonical_payload_hash: None,
     }
 }
 fn source_commit() -> SourceCommit {

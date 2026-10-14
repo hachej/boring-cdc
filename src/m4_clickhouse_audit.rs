@@ -578,10 +578,14 @@ mod tests {
         let events = vec![JournalEvent {
             event_id: "event".into(),
             transaction_ordinal: 0,
+            source_row_ordinal: 0,
+            source_mutation_ordinal: 0,
             relation_schema_fingerprint: None,
             control_kind: None,
             payload: b"row".to_vec(),
             payload_hash: sha256(b"row"),
+            canonical_payload: None,
+            canonical_payload_hash: None,
         }];
         let commit = SourceCommit {
             transaction_id: "tx".into(),

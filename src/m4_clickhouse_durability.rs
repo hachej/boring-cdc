@@ -46,6 +46,7 @@ pub struct DestinationEvent {
     pub relation_schema_fingerprint: String,
     pub payload: Vec<u8>,
     pub payload_hash: String,
+    pub canonical_payload: Vec<u8>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -725,14 +726,34 @@ fn destination_events(events: &[CopiedEvent]) -> Result<Vec<DestinationEvent>, D
             .relation_schema_fingerprint
             .clone()
             .ok_or(DurabilityError::Conflict("row event lacks relation schema"))?;
+        let canonical_payload_hash =
+            event
+                .canonical_payload_hash
+                .clone()
+                .ok_or(DurabilityError::Conflict(
+                    "row event lacks canonical payload hash",
+                ))?;
+        let canonical_payload =
+            event
+                .canonical_payload
+                .clone()
+                .ok_or(DurabilityError::Conflict(
+                    "row event lacks canonical payload",
+                ))?;
+        if format!("{:x}", Sha256::digest(&canonical_payload)) != canonical_payload_hash {
+            return Err(DurabilityError::Conflict(
+                "canonical payload binding mismatch",
+            ));
+        }
         destination.push(DestinationEvent {
             journal_seq: event.journal_seq,
-            transaction_ordinal: event.transaction_ordinal,
-            mutation_ordinal: event.mutation_ordinal,
+            transaction_ordinal: u64::from(event.source_row_ordinal),
+            mutation_ordinal: u32::from(event.source_mutation_ordinal),
             connector_event_id: event.event_id.clone(),
             relation_schema_fingerprint,
             payload: event.payload.clone(),
-            payload_hash: event.payload_hash.clone(),
+            payload_hash: canonical_payload_hash,
+            canonical_payload,
         });
     }
     Ok(destination)
@@ -790,7 +811,10 @@ fn verify_remote_events(
         .map(|event| {
             (
                 event.connector_event_id.as_str(),
-                (event.payload_hash.as_str(), event.payload.as_slice()),
+                (
+                    event.payload_hash.as_str(),
+                    event.canonical_payload.as_slice(),
+                ),
             )
         })
         .collect::<BTreeMap<_, _>>();
@@ -842,6 +866,72 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    #[test]
+    #[ignore = "requires BCDC_LIVE_JOURNAL_PATH from pinned PostgreSQL acceptance"]
+    fn live_m2_copied_transactions_are_admitted_by_m4() {
+        let path = std::env::var("BCDC_LIVE_JOURNAL_PATH").expect("live journal path");
+        let connection = rusqlite::Connection::open_with_flags(
+            &path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let mut statement = connection
+            .prepare("SELECT first_seq,last_seq,event_count FROM source_transactions WHERE state='committed' ORDER BY first_seq")
+            .unwrap();
+        let boundaries = statement
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, u64>(0)?,
+                    row.get::<_, u64>(1)?,
+                    row.get::<_, usize>(2)?,
+                ))
+            })
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        drop(statement);
+        drop(connection);
+        let mut business = 0;
+        let mut controls = 0;
+        let mut key_change_pairs = 0;
+        for (first, last, count) in boundaries {
+            let copied = crate::m2_journal::read_complete_range(
+                std::path::Path::new(&path),
+                first - 1,
+                count,
+                32 * 1024 * 1024,
+                std::time::Duration::from_secs(5),
+            )
+            .unwrap()
+            .unwrap();
+            assert_eq!((copied.first_seq, copied.last_seq), (first, last));
+            let accepted = destination_events(&copied.events).unwrap();
+            if copied.events[0].control_kind.is_some() {
+                assert!(accepted.is_empty());
+                controls += 1;
+            } else {
+                assert_eq!(accepted.len(), count);
+                if count == 2 {
+                    assert_eq!(
+                        accepted[0].transaction_ordinal,
+                        accepted[1].transaction_ordinal
+                    );
+                    assert_eq!(
+                        (accepted[0].mutation_ordinal, accepted[1].mutation_ordinal),
+                        (0, 1)
+                    );
+                    key_change_pairs += 1;
+                }
+                business += count;
+            }
+        }
+        assert!(
+            business >= 10,
+            "expected live insert/update/delete/TOAST events"
+        );
+        assert!(controls >= 2, "expected both live control kinds");
+        assert_eq!(key_change_pairs, 1);
+    }
     struct FixedRandomness;
     impl Randomness for FixedRandomness {
         fn next_u64(&mut self) -> u64 {
@@ -866,7 +956,7 @@ mod tests {
                 .map(|event| RemoteEventIdentity {
                     connector_event_id: event.connector_event_id.clone(),
                     payload_hash: event.payload_hash.clone(),
-                    canonical_payload: event.payload.clone(),
+                    canonical_payload: event.canonical_payload.clone(),
                 })
                 .collect();
             self.remote = Some(RemoteBatch {
@@ -946,12 +1036,22 @@ mod tests {
                 transaction_id: "tx-a".into(),
                 transaction_ordinal: 0,
                 mutation_ordinal: index as u32,
+                source_row_ordinal: index as u32,
+                source_mutation_ordinal: 0,
                 event_id: format!("event-{index}"),
                 relation_schema_fingerprint: (!control_only).then(|| "schema-a".into()),
                 source_relation_id: (!control_only).then(|| "relation-a".into()),
                 control_kind: control_only.then(|| "heartbeat".into()),
                 payload: payload.to_vec(),
                 payload_hash: format!("{:x}", Sha256::digest(payload)),
+                canonical_payload: (!control_only)
+                    .then(|| format!("canonical-{index}").into_bytes()),
+                canonical_payload_hash: (!control_only).then(|| {
+                    format!(
+                        "{:x}",
+                        Sha256::digest(format!("canonical-{index}").as_bytes())
+                    )
+                }),
             })
             .collect();
         CopiedRange {
@@ -967,6 +1067,38 @@ mod tests {
         let batch = prepare_batch(&transaction, &context(), range).unwrap();
         transaction.commit().unwrap();
         batch
+    }
+
+    #[test]
+    fn destination_rejects_legacy_or_unbound_canonical_payload() {
+        let range = copied(false);
+        let accepted = destination_events(&range.events).unwrap();
+        assert_ne!(accepted[0].payload_hash, range.events[0].payload_hash);
+
+        let mut legacy = range.events.clone();
+        legacy[0].canonical_payload_hash = None;
+        assert_eq!(
+            destination_events(&legacy),
+            Err(DurabilityError::Conflict(
+                "row event lacks canonical payload hash"
+            ))
+        );
+        let mut missing_preimage = range.events.clone();
+        missing_preimage[0].canonical_payload = None;
+        assert_eq!(
+            destination_events(&missing_preimage),
+            Err(DurabilityError::Conflict(
+                "row event lacks canonical payload"
+            ))
+        );
+        let mut changed_preimage = range.events;
+        changed_preimage[0].canonical_payload = Some(b"different".to_vec());
+        assert_eq!(
+            destination_events(&changed_preimage),
+            Err(DurabilityError::Conflict(
+                "canonical payload binding mismatch"
+            ))
+        );
     }
 
     fn mark(writer: &mut WriterConnection, batch: &PreparedBatch) {

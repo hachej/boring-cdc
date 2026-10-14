@@ -41,11 +41,20 @@ pub struct RelationSchema {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct JournalEvent {
     pub event_id: String,
+    /// Physical zero-based offset among all persisted events in this source transaction.
     pub transaction_ordinal: u32,
+    /// Decoded pgoutput row ordinal, shared by both sides of a key change.
+    pub source_row_ordinal: u32,
+    /// Zero for ordinary rows and old-key deletes, one for new-key upserts.
+    pub source_mutation_ordinal: u8,
     pub relation_schema_fingerprint: Option<String>,
     pub control_kind: Option<String>,
     pub payload: Vec<u8>,
     pub payload_hash: String,
+    /// Exact framed preimage for the M0 field hash; absent on legacy raw events.
+    pub canonical_payload: Option<Vec<u8>>,
+    /// M0's canonical field hash. Legacy raw events have no canonical hash.
+    pub canonical_payload_hash: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -176,6 +185,9 @@ impl JournalStore {
             |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?)),
         ).optional()?;
         if let Some((txid, xid, first, last, count, checksum)) = existing {
+            let bound = bind_sequence_templates(commit, first as u64)?;
+            validate_commit(&bound, self.limits)?;
+            let commit = &bound;
             verify_schemas(&transaction, identity, &commit.schemas)?;
             verify_duplicate(
                 &transaction,
@@ -234,6 +246,9 @@ impl JournalStore {
             [],
             |r| r.get(0),
         )?;
+        let bound = bind_sequence_templates(commit, next as u64)?;
+        validate_commit(&bound, self.limits)?;
+        let commit = &bound;
         let last = next
             .checked_add(commit.events.len() as i64 - 1)
             .ok_or(JournalError::Limit("journal sequence overflow"))?;
@@ -280,7 +295,7 @@ impl JournalStore {
             let seq = next + offset as i64;
             transaction
                 .execute(
-                    "INSERT INTO journal_events VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+                    "INSERT INTO journal_events(journal_seq,event_id,transaction_id,transaction_ordinal,capture_epoch,relation_schema_fingerprint,control_kind,payload,payload_hash,source_row_ordinal,source_mutation_ordinal,canonical_payload,canonical_payload_hash) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)",
                     params![
                         seq,
                         event.event_id,
@@ -290,7 +305,11 @@ impl JournalStore {
                         event.relation_schema_fingerprint,
                         event.control_kind,
                         event.payload,
-                        event.payload_hash
+                        event.payload_hash,
+                        event.source_row_ordinal,
+                        event.source_mutation_ordinal,
+                        event.canonical_payload,
+                        event.canonical_payload_hash,
                     ],
                 )
                 .map_err(|e| {
@@ -398,6 +417,82 @@ impl JournalStore {
 fn is_constraint(error: &rusqlite::Error) -> bool {
     matches!(error, rusqlite::Error::SqliteFailure(e, _) if e.extended_code & 0xff == rusqlite::ffi::SQLITE_CONSTRAINT)
 }
+
+/// Bind M0 mutation templates only after the sole writer knows the durable sequence. A retry
+/// uses the first sequence already stored for its source transaction, so byte checksums and
+/// duplicate comparison remain stable even when newer transactions have since committed.
+fn bind_sequence_templates(
+    commit: &SourceCommit,
+    first_seq: u64,
+) -> Result<SourceCommit, JournalError> {
+    let mut bound = commit.clone();
+    let mut changed = false;
+    for (offset, event) in bound.events.iter_mut().enumerate() {
+        let Ok(mut payload) = serde_json::from_slice::<serde_json::Value>(&event.payload) else {
+            continue;
+        };
+        let event_type = payload
+            .get("event_type")
+            .and_then(serde_json::Value::as_str);
+        if !matches!(event_type, Some("mutation" | "control")) {
+            continue;
+        }
+        let binding_matches = match event_type {
+            Some("mutation") => {
+                event.control_kind.is_none()
+                    && payload
+                        .get("relation_fingerprint")
+                        .and_then(serde_json::Value::as_str)
+                        == event.relation_schema_fingerprint.as_deref()
+            }
+            Some("control") => {
+                event.relation_schema_fingerprint.is_none()
+                    && payload
+                        .pointer("/control/kind")
+                        .and_then(serde_json::Value::as_str)
+                        == event.control_kind.as_deref()
+            }
+            _ => false,
+        };
+        let seq = first_seq
+            .checked_add(offset as u64)
+            .ok_or(JournalError::Limit("journal sequence overflow"))?;
+        let declared_seq = payload
+            .get("journal_seq")
+            .and_then(serde_json::Value::as_u64);
+        if (declared_seq != Some(0) && declared_seq != Some(seq))
+            || !binding_matches
+            || event.canonical_payload.is_none()
+            || payload
+                .get("connector_event_id")
+                .and_then(serde_json::Value::as_str)
+                != Some(event.event_id.as_str())
+            || payload
+                .pointer("/source_version/connector_event_id")
+                .and_then(serde_json::Value::as_str)
+                != Some(event.event_id.as_str())
+            || payload
+                .get("payload_hash")
+                .and_then(serde_json::Value::as_str)
+                != event.canonical_payload_hash.as_deref()
+        {
+            return Err(JournalError::Conflict("event template binding mismatch"));
+        }
+        if declared_seq == Some(seq) {
+            continue;
+        }
+        payload["journal_seq"] = serde_json::Value::from(seq);
+        event.payload = serde_json::to_vec(&payload)
+            .map_err(|_| JournalError::Invalid("event template encoding"))?;
+        event.payload_hash = sha256(&event.payload);
+        changed = true;
+    }
+    if changed {
+        bound.payload_checksum = transaction_checksum(&bound.events);
+    }
+    Ok(bound)
+}
+
 fn validate_commit(commit: &SourceCommit, limits: CommitLimits) -> Result<(), JournalError> {
     if commit.events.is_empty() {
         return Err(JournalError::Invalid("empty source transaction"));
@@ -414,10 +509,28 @@ fn validate_commit(commit: &SourceCommit, limits: CommitLimits) -> Result<(), Jo
         return Err(JournalError::Invalid("non-canonical end LSN"));
     }
     let mut bytes = 0usize;
+    let mut previous_source_position: Option<(u32, u8)> = None;
     for (index, event) in commit.events.iter().enumerate() {
         if event.transaction_ordinal as usize != index {
             return Err(JournalError::Invalid("non-contiguous transaction ordinal"));
         }
+        let source_position = (event.source_row_ordinal, event.source_mutation_ordinal);
+        let valid_source_position = match previous_source_position {
+            None => source_position == (0, 0),
+            Some((row, mutation)) if event.source_row_ordinal == row => {
+                mutation == 0 && event.source_mutation_ordinal == 1
+            }
+            Some((row, _)) => {
+                row.checked_add(1) == Some(event.source_row_ordinal)
+                    && event.source_mutation_ordinal == 0
+            }
+        };
+        if !valid_source_position {
+            return Err(JournalError::Invalid(
+                "non-contiguous source mutation position",
+            ));
+        }
+        previous_source_position = Some(source_position);
         if event
             .control_kind
             .as_deref()
@@ -427,6 +540,19 @@ fn validate_commit(commit: &SourceCommit, limits: CommitLimits) -> Result<(), Jo
         }
         if sha256(&event.payload) != event.payload_hash {
             return Err(JournalError::Conflict("payload hash mismatch"));
+        }
+        if event.canonical_payload_hash.as_deref().is_some_and(|hash| {
+            hash.len() != 64
+                || !hash
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        }) {
+            return Err(JournalError::Invalid("non-canonical payload hash"));
+        }
+        match (&event.canonical_payload, &event.canonical_payload_hash) {
+            (Some(payload), Some(hash)) if sha256(payload) == *hash => {}
+            (None, None) => {}
+            _ => return Err(JournalError::Conflict("canonical payload binding mismatch")),
         }
         bytes = bytes
             .checked_add(event.payload.len())
@@ -485,12 +611,16 @@ fn verify_duplicate(
             "source transaction positional conflict",
         ));
     }
-    let mut stmt=tx.prepare("SELECT event_id,transaction_ordinal,relation_schema_fingerprint,control_kind,payload,payload_hash FROM journal_events WHERE transaction_id=?1 ORDER BY journal_seq")?;
+    let mut stmt=tx.prepare("SELECT event_id,transaction_ordinal,relation_schema_fingerprint,control_kind,payload,payload_hash,source_row_ordinal,source_mutation_ordinal,canonical_payload,canonical_payload_hash FROM journal_events WHERE transaction_id=?1 ORDER BY journal_seq")?;
     let stored = stmt
         .query_map([txid], |r| {
             Ok(JournalEvent {
                 event_id: r.get(0)?,
                 transaction_ordinal: r.get(1)?,
+                source_row_ordinal: r.get(6)?,
+                source_mutation_ordinal: r.get(7)?,
+                canonical_payload: r.get(8)?,
+                canonical_payload_hash: r.get(9)?,
                 relation_schema_fingerprint: r.get(2)?,
                 control_kind: r.get(3)?,
                 payload: r.get(4)?,
@@ -525,12 +655,17 @@ pub struct CopiedEvent {
     pub transaction_ordinal: u64,
     /// Original mutation ordinal persisted by capture.
     pub mutation_ordinal: u32,
+    /// Source position from the M0 event ABI; distinct from copied-range grouping offsets.
+    pub source_row_ordinal: u32,
+    pub source_mutation_ordinal: u8,
     pub event_id: String,
     pub relation_schema_fingerprint: Option<String>,
     pub source_relation_id: Option<String>,
     pub control_kind: Option<String>,
     pub payload: Vec<u8>,
     pub payload_hash: String,
+    pub canonical_payload: Option<Vec<u8>>,
+    pub canonical_payload_hash: Option<String>,
 }
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CopiedRange {
@@ -610,7 +745,7 @@ pub fn read_complete_range(
             break;
         }
         let measure: Option<(i64, i64, Option<i64>, Option<i64>)> = reader.query_one_bounded_params(
-            "SELECT count(*),coalesce(sum(length(payload)+length(CAST(transaction_id AS BLOB))+length(CAST(event_id AS BLOB))+length(CAST(payload_hash AS BLOB))+coalesce(length(CAST(relation_schema_fingerprint AS BLOB)),0)+coalesce(length(CAST(control_kind AS BLOB)),0)+coalesce((SELECT length(CAST(rs.relation_id AS BLOB)) FROM relation_schemas rs WHERE rs.schema_fingerprint=journal_events.relation_schema_fingerprint),0)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id=?1",
+            "SELECT count(*),coalesce(sum(length(payload)+length(CAST(transaction_id AS BLOB))+length(CAST(event_id AS BLOB))+length(CAST(payload_hash AS BLOB))+coalesce(length(canonical_payload),0)+coalesce(length(CAST(canonical_payload_hash AS BLOB)),0)+coalesce(length(CAST(relation_schema_fingerprint AS BLOB)),0)+coalesce(length(CAST(control_kind AS BLOB)),0)+coalesce((SELECT length(CAST(rs.relation_id AS BLOB)) FROM relation_schemas rs WHERE rs.schema_fingerprint=journal_events.relation_schema_fingerprint),0)),0),min(journal_seq),max(journal_seq) FROM journal_events WHERE transaction_id=?1",
             [txid.as_str()],
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )?;
@@ -643,7 +778,7 @@ pub fn read_complete_range(
             .max()
             .map_or(0, |v| v + 1);
         let row_count = reader.for_each_bounded_params(
-            "SELECT e.journal_seq,e.transaction_id,e.transaction_ordinal,e.event_id,e.relation_schema_fingerprint,rs.relation_id,e.control_kind,e.payload,e.payload_hash FROM journal_events e LEFT JOIN relation_schemas rs ON rs.schema_fingerprint=e.relation_schema_fingerprint WHERE e.transaction_id=?1 ORDER BY e.journal_seq",
+            "SELECT e.journal_seq,e.transaction_id,e.transaction_ordinal,e.event_id,e.relation_schema_fingerprint,rs.relation_id,e.control_kind,e.payload,e.payload_hash,e.source_row_ordinal,e.source_mutation_ordinal,e.canonical_payload,e.canonical_payload_hash FROM journal_events e LEFT JOIN relation_schemas rs ON rs.schema_fingerprint=e.relation_schema_fingerprint WHERE e.transaction_id=?1 ORDER BY e.journal_seq",
             [txid.as_str()],
             |r| {
                 events.push(CopiedEvent {
@@ -651,12 +786,16 @@ pub fn read_complete_range(
                     transaction_id: r.get(1)?,
                     transaction_ordinal,
                     mutation_ordinal: r.get::<_,i64>(2)? as u32,
+                    source_row_ordinal: r.get(9)?,
+                    source_mutation_ordinal: r.get(10)?,
                     event_id: r.get(3)?,
                     relation_schema_fingerprint: r.get(4)?,
                     source_relation_id: r.get(5)?,
                     control_kind: r.get(6)?,
                     payload: r.get(7)?,
                     payload_hash: r.get(8)?,
+                    canonical_payload: r.get(11)?,
+                    canonical_payload_hash: r.get(12)?,
                 });
                 Ok(())
             },
@@ -793,11 +932,17 @@ pub fn journal_verify(
     let mut seen_transactions = 0i64;
     let mut active: Option<(String, i64, i64, i64, String, Sha256)> = None;
     reader.for_each_bounded(
-        "SELECT t.transaction_id,t.first_seq,t.last_seq,t.event_count,t.payload_checksum,e.journal_seq,e.transaction_ordinal,e.payload,e.payload_hash FROM source_transactions t JOIN journal_events e ON e.transaction_id=t.transaction_id WHERE t.state='committed' ORDER BY e.journal_seq",
+        "SELECT t.transaction_id,t.first_seq,t.last_seq,t.event_count,t.payload_checksum,e.journal_seq,e.transaction_ordinal,e.payload,e.payload_hash,e.canonical_payload,e.canonical_payload_hash FROM source_transactions t JOIN journal_events e ON e.transaction_id=t.transaction_id WHERE t.state='committed' ORDER BY e.journal_seq",
         |r| {
             let txid:String=r.get(0)?; let first:i64=r.get(1)?; let last:i64=r.get(2)?; let count:i64=r.get(3)?; let checksum:String=r.get(4)?;
             let seq:i64=r.get(5)?; let ordinal:i64=r.get(6)?; let payload:Vec<u8>=r.get(7)?; let payload_hash:String=r.get(8)?;
+            let canonical_payload:Option<Vec<u8>>=r.get(9)?; let canonical_hash:Option<String>=r.get(10)?;
             if seq!=global_seq || seq<first || seq>last || ordinal!=seq-first || sha256(&payload)!=payload_hash { return Err(rusqlite::Error::InvalidQuery); }
+            match (&canonical_payload,&canonical_hash) {
+                (Some(bytes),Some(hash)) if sha256(bytes)==*hash => {},
+                (None,None) => {},
+                _ => return Err(rusqlite::Error::InvalidQuery),
+            }
             if active.as_ref().is_none_or(|a|a.0!=txid) {
                 if let Some((_,old_first,old_last,old_count,old_checksum,hasher))=active.take()
                     && (old_last-old_first+1!=old_count || format!("{:x}",hasher.finalize())!=old_checksum) { return Err(rusqlite::Error::InvalidQuery); }
@@ -808,7 +953,7 @@ pub fn journal_verify(
             hasher.update((payload_hash.len() as u64).to_be_bytes()); hasher.update(payload_hash.as_bytes());
             global_seq+=1; seen_events+=1; Ok(())
         },
-    ).map_err(|_| JournalError::Conflict("journal event sequence, boundary, payload hash, or transaction checksum mismatch"))?;
+    ).map_err(|_| JournalError::Conflict("journal event sequence, boundary, raw/canonical payload hash, or transaction checksum mismatch"))?;
     if let Some((_, first, last, count, checksum, hasher)) = active.take()
         && (last - first + 1 != count || format!("{:x}", hasher.finalize()) != checksum)
     {
@@ -1297,10 +1442,14 @@ pub mod tests {
         JournalEvent {
             event_id: id.into(),
             transaction_ordinal: ord,
+            source_row_ordinal: ord,
+            source_mutation_ordinal: 0,
             relation_schema_fingerprint: Some("fp".into()),
             control_kind: None,
             payload: payload.into(),
             payload_hash: sha256(payload),
+            canonical_payload: None,
+            canonical_payload_hash: None,
         }
     }
     fn commit(id: &str, lsn: &str, events: Vec<JournalEvent>) -> SourceCommit {
@@ -1318,6 +1467,126 @@ pub mod tests {
             }],
             events,
         }
+    }
+
+    #[test]
+    fn mutation_template_binds_durable_sequence_and_replays_after_later_commits() {
+        let (path, mut store) = store("sequence-template");
+        let first = commit(
+            "first",
+            "0000000000000001",
+            vec![event("first-event", 0, b"legacy")],
+        );
+        store.commit_atomic(&first, CommitFault::None).unwrap();
+
+        let mut mutation = event("mutation-event", 0, b"");
+        mutation.canonical_payload = Some(b"canonical-preimage".to_vec());
+        mutation.canonical_payload_hash = Some(sha256(b"canonical-preimage"));
+        mutation.payload = serde_json::to_vec(&serde_json::json!({
+            "event_type":"mutation",
+            "journal_seq":0,
+            "connector_event_id":"mutation-event",
+            "source_version":{"connector_event_id":"mutation-event"},
+            "relation_fingerprint":"fp",
+            "payload_hash":mutation.canonical_payload_hash,
+        }))
+        .unwrap();
+        mutation.payload_hash = sha256(&mutation.payload);
+        let second = commit("second", "0000000000000002", vec![mutation]);
+        let published = store.commit_atomic(&second, CommitFault::None).unwrap();
+        assert_eq!((published.first_seq(), published.last_seq()), (2, 2));
+
+        let third = commit(
+            "third",
+            "0000000000000003",
+            vec![event("third-event", 0, b"later")],
+        );
+        store.commit_atomic(&third, CommitFault::None).unwrap();
+        let replay = store.commit_atomic(&second, CommitFault::None).unwrap();
+        assert!(replay.was_duplicate());
+        assert_eq!(replay.first_seq(), 2);
+        let copied = read_complete_range(&path, 1, 1, 4096, Duration::from_secs(1))
+            .unwrap()
+            .unwrap();
+        let persisted: serde_json::Value =
+            serde_json::from_slice(&copied.events[0].payload).unwrap();
+        assert_eq!(persisted["journal_seq"], 2);
+        assert_eq!(
+            sha256(&copied.events[0].payload),
+            copied.events[0].payload_hash
+        );
+    }
+
+    #[test]
+    fn source_position_admits_key_change_pair_and_rejects_gaps() {
+        let mut second = event("new-key", 1, b"new");
+        second.source_row_ordinal = 0;
+        second.source_mutation_ordinal = 1;
+        let pair = commit(
+            "key-change",
+            "0000000000000010",
+            vec![event("old-key", 0, b"old"), second.clone()],
+        );
+        assert!(validate_commit(&pair, limits()).is_ok());
+        second.source_row_ordinal = 2;
+        second.source_mutation_ordinal = 0;
+        let gap = commit(
+            "gap",
+            "0000000000000010",
+            vec![event("old-key", 0, b"old"), second],
+        );
+        assert_eq!(
+            validate_commit(&gap, limits()),
+            Err(JournalError::Invalid(
+                "non-contiguous source mutation position"
+            ))
+        );
+        let mut unbound = event("unbound", 0, b"raw");
+        unbound.canonical_payload = Some(b"canonical".to_vec());
+        unbound.canonical_payload_hash = Some(sha256(b"different"));
+        let unbound = commit("unbound", "0000000000000010", vec![unbound]);
+        assert_eq!(
+            validate_commit(&unbound, limits()),
+            Err(JournalError::Conflict("canonical payload binding mismatch"))
+        );
+    }
+    #[test]
+    fn key_change_source_position_survives_atomic_commit_and_complete_copy() {
+        let (path, mut store) = store("key-change-position");
+        let mut old_key = event("old-key", 0, b"old");
+        old_key.canonical_payload = Some(b"canonical-old".to_vec());
+        old_key.canonical_payload_hash = Some(sha256(b"canonical-old"));
+        let mut new_key = event("new-key", 1, b"new");
+        new_key.source_row_ordinal = 0;
+        new_key.source_mutation_ordinal = 1;
+        let commit = commit("key-change", "0000000000000010", vec![old_key, new_key]);
+        store.commit_atomic(&commit, CommitFault::None).unwrap();
+        let copied = read_complete_range(&path, 0, 2, 4096, Duration::from_secs(1))
+            .unwrap()
+            .unwrap();
+        assert_eq!(copied.events.len(), 2);
+        assert_eq!(
+            copied
+                .events
+                .iter()
+                .map(|event| (event.source_row_ordinal, event.source_mutation_ordinal))
+                .collect::<Vec<_>>(),
+            [(0, 0), (0, 1)]
+        );
+        assert_eq!(
+            copied.events[0].transaction_ordinal,
+            copied.events[1].transaction_ordinal
+        );
+        assert_eq!(copied.events[0].mutation_ordinal, 0);
+        assert_eq!(copied.events[1].mutation_ordinal, 1);
+        assert_eq!(
+            copied.events[0].canonical_payload.as_deref(),
+            Some(&b"canonical-old"[..])
+        );
+        assert_eq!(
+            copied.events[0].canonical_payload_hash.as_deref(),
+            Some(sha256(b"canonical-old").as_str())
+        );
     }
     fn store(name: &str) -> (std::path::PathBuf, JournalStore) {
         let p = path(name);
@@ -1415,8 +1684,12 @@ pub mod tests {
             "unknown"
         );
         store.commit_atomic(&second, CommitFault::None).unwrap();
+        let second_observed: u64 = store.writer.connection().query_row(
+            "SELECT observed_at_unix_seconds FROM capture_health_observations WHERE run_id='run-b'",
+            [], |row| row.get(0)
+        ).unwrap();
         assert_eq!(
-            crate::m2_fault_status::snapshot(&path, "cfg", at(observed + 1))
+            crate::m2_fault_status::snapshot(&path, "cfg", at(second_observed + 1))
                 .unwrap()
                 .freshness,
             "fresh"

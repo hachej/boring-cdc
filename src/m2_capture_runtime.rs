@@ -483,6 +483,19 @@ struct RuntimePressureConfig {
     replay_window_ms: u64,
 }
 
+struct CanonicalRelation {
+    version: crate::m1_source_identity::RelationSchemaVersion,
+    schema: crate::m2_journal::RelationSchema,
+}
+
+struct CanonicalCaptureContext {
+    source: crate::m1_source_identity::SourceIdentity,
+    capture_epoch: crate::m1_transition_kernel::CaptureEpoch,
+    publication: String,
+    catalog: PgReplicationConnection,
+    relations: BTreeMap<u32, CanonicalRelation>,
+}
+
 pub struct CaptureRuntime<J, S, G> {
     decoder: Decoder,
     contracts: BTreeMap<u32, RelationContract>,
@@ -500,6 +513,7 @@ pub struct CaptureRuntime<J, S, G> {
     last_failure_telemetry: Option<crate::failure_policy::CaptureFailureTelemetry>,
     active_failure: Option<crate::failure_policy::FailureRecord>,
     pressure: Option<RuntimePressureConfig>,
+    canonical: Option<CanonicalCaptureContext>,
 }
 
 impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G> {
@@ -527,6 +541,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             last_failure_telemetry: None,
             active_failure: None,
             pressure: None,
+            canonical: None,
         }
     }
     pub fn state(&self) -> RuntimeState {
@@ -757,6 +772,44 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
                     .filter(|c| c.relation == relation)
                     .cloned()
                     .ok_or(RuntimeError::SchemaChange("relation_contract_mismatch"))?;
+                if contract.control.is_none()
+                    && let Some(canonical) = self.canonical.as_mut()
+                {
+                    let catalog = crate::m2_catalog_reader::read_simple_relation(
+                        &mut canonical.catalog,
+                        &canonical.publication,
+                        &canonical.source,
+                        &contract,
+                    )
+                    .map_err(|_| RuntimeError::SchemaChange("catalog_relation_not_admitted"))?;
+                    let bytes = catalog
+                        .encode()
+                        .map_err(|_| RuntimeError::SchemaChange("catalog_relation_invalid"))?;
+                    let version = crate::m1_source_identity::RelationSchemaVersion::derive(
+                        catalog.logical_table,
+                        catalog.relation_id,
+                        &bytes,
+                    )
+                    .map_err(|_| RuntimeError::SchemaChange("catalog_relation_invalid"))?;
+                    let fingerprint = version
+                        .fingerprint()
+                        .bytes()
+                        .iter()
+                        .map(|byte| format!("{byte:02x}"))
+                        .collect();
+                    canonical.relations.insert(
+                        relation.id,
+                        CanonicalRelation {
+                            version,
+                            schema: crate::m2_journal::RelationSchema {
+                                fingerprint,
+                                relation_id: relation.id.to_string(),
+                                checksum: format!("{:x}", Sha256::digest(&bytes)),
+                                canonical_schema: bytes,
+                            },
+                        },
+                    );
+                }
                 self.decoder
                     .admit_relation(contract)
                     .map_err(|failure| RuntimeError::Decode(failure.fingerprint))
@@ -824,32 +877,172 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
         if payloads.len() as u64 != row_count {
             return self.safe_stop(RuntimeError::Protocol("row_count_mismatch"));
         }
-        let events = payloads
-            .into_iter()
-            .enumerate()
-            .map(|(ordinal, staged)| {
-                let staged: StagedEventOwned = serde_json::from_slice(&staged)
-                    .map_err(|_| RuntimeError::Protocol("staged_event_corrupt"))?;
+        let mut events = Vec::new();
+        let mut schemas = BTreeMap::new();
+        for (row_ordinal, staged) in payloads.into_iter().enumerate() {
+            let staged: StagedEventOwned = serde_json::from_slice(&staged)
+                .map_err(|_| RuntimeError::Protocol("staged_event_corrupt"))?;
+            if let Some(canonical) = self.canonical.as_ref()
+                && let Some(kind) = staged.control_kind.as_deref()
+            {
+                let row = decode_staged_row(&staged.payload, active.xid)?;
+                if row.relation_id != staged.relation_id
+                    || row.ordinal != row_ordinal as u64
+                    || row.kind != crate::m1_decoder::RowKind::Update
+                {
+                    return self
+                        .safe_stop(RuntimeError::Protocol("staged_control_position_mismatch"));
+                }
+                let parse_column = |index| {
+                    let bytes = match row.new.as_deref()?.get(index)? {
+                        TupleValue::Text(bytes) => bytes,
+                        _ => return None,
+                    };
+                    std::str::from_utf8(bytes).ok()?.parse::<u64>().ok()
+                };
+                let generation = if kind == "capture_fence" {
+                    if parse_column(1) != Some(canonical.capture_epoch.get()) {
+                        return self.safe_stop(RuntimeError::Protocol("fence_epoch_mismatch"));
+                    }
+                    Some(
+                        parse_column(2)
+                            .ok_or(RuntimeError::Protocol("fence_generation_invalid"))?,
+                    )
+                } else {
+                    None
+                };
+                let (event_id, envelope) = crate::m2_event_envelope::render_control_template(
+                    &canonical.source,
+                    canonical.capture_epoch,
+                    crate::m2_event_envelope::ControlPosition {
+                        kind,
+                        generation,
+                        xid: active.xid,
+                        row_ordinal: row.ordinal,
+                        commit_lsn: crate::m1_transition_kernel::ReceivedLsn::from_wire(commit_lsn),
+                        end_lsn: crate::m1_transition_kernel::ReceivedLsn::from_wire(end_lsn),
+                    },
+                )
+                .map_err(|_| RuntimeError::Protocol("control_canonicalization_failed"))?;
+                let ordinal = u32::try_from(events.len())
+                    .map_err(|_| RuntimeError::Protocol("event_ordinal_overflow"))?;
+                let source_row_ordinal = u32::try_from(row.ordinal)
+                    .map_err(|_| RuntimeError::Protocol("row_ordinal_overflow"))?;
+                events.push(JournalEvent {
+                    event_id,
+                    transaction_ordinal: ordinal,
+                    source_row_ordinal,
+                    source_mutation_ordinal: 0,
+                    relation_schema_fingerprint: None,
+                    control_kind: Some(kind.to_owned()),
+                    payload_hash: format!("{:x}", Sha256::digest(&envelope.json)),
+                    payload: envelope.json,
+                    canonical_payload: Some(envelope.canonical_preimage),
+                    canonical_payload_hash: Some(envelope.canonical_payload_hash),
+                });
+            } else if let Some(canonical) = self.canonical.as_ref()
+                && staged.control_kind.is_none()
+            {
+                let row = decode_staged_row(&staged.payload, active.xid)?;
+                if row.relation_id != staged.relation_id || row.ordinal != row_ordinal as u64 {
+                    return self.safe_stop(RuntimeError::Protocol("staged_row_position_mismatch"));
+                }
+                let contract = self
+                    .contracts
+                    .get(&row.relation_id)
+                    .ok_or(RuntimeError::SchemaChange("row_relation_unadmitted"))?;
+                let relation = canonical
+                    .relations
+                    .get(&row.relation_id)
+                    .ok_or(RuntimeError::SchemaChange("row_catalog_unadmitted"))?;
+                let templates = crate::m2_event_envelope::render_wal_row_templates(
+                    &canonical.source,
+                    canonical.capture_epoch,
+                    contract,
+                    relation.version,
+                    &row,
+                    crate::m1_transition_kernel::ReceivedLsn::from_wire(commit_lsn),
+                    crate::m1_transition_kernel::ReceivedLsn::from_wire(end_lsn),
+                )
+                .map_err(|error| {
+                    let shape = |tuple: Option<&Vec<TupleValue>>| {
+                        tuple.map(|values| {
+                            values
+                                .iter()
+                                .map(|value| match value {
+                                    TupleValue::Null => 'N',
+                                    TupleValue::UnchangedToast => 'U',
+                                    TupleValue::Text(_) => 'T',
+                                })
+                                .collect::<String>()
+                        })
+                    };
+                    eprintln!(
+                        "M2_ROW_CANONICALIZATION_REJECTED kind={:?} old_kind={:?} old_shape={:?} new_shape={:?} error={error:?}",
+                        row.kind,
+                        row.old_kind,
+                        shape(row.old.as_ref()),
+                        shape(row.new.as_ref()),
+                    );
+                    RuntimeError::SchemaChange("row_canonicalization_failed")
+                })?;
+                schemas.insert(relation.schema.fingerprint.clone(), relation.schema.clone());
+                for template in templates {
+                    let ordinal = u32::try_from(events.len())
+                        .map_err(|_| RuntimeError::Protocol("event_ordinal_overflow"))?;
+                    let payload_hash = format!("{:x}", Sha256::digest(&template.envelope.json));
+                    events.push(JournalEvent {
+                        event_id: template.event_id,
+                        transaction_ordinal: ordinal,
+                        source_row_ordinal: template.source_row_ordinal,
+                        source_mutation_ordinal: template.source_mutation_ordinal,
+                        relation_schema_fingerprint: Some(template.relation_fingerprint),
+                        control_kind: None,
+                        payload: template.envelope.json,
+                        payload_hash,
+                        canonical_payload: Some(template.envelope.canonical_preimage),
+                        canonical_payload_hash: Some(template.envelope.canonical_payload_hash),
+                    });
+                }
+            } else {
+                let ordinal = u32::try_from(events.len())
+                    .map_err(|_| RuntimeError::Protocol("event_ordinal_overflow"))?;
+                let source_row_ordinal = u32::try_from(row_ordinal)
+                    .map_err(|_| RuntimeError::Protocol("row_ordinal_overflow"))?;
                 let payload_hash = format!("{:x}", Sha256::digest(&staged.payload));
-                Ok(JournalEvent {
-                    event_id: format!("wal:{end_lsn:016X}:{ordinal}"),
-                    transaction_ordinal: ordinal as u32,
+                events.push(JournalEvent {
+                    event_id: format!("wal:{end_lsn:016X}:{row_ordinal}"),
+                    transaction_ordinal: ordinal,
+                    source_row_ordinal,
+                    source_mutation_ordinal: 0,
                     relation_schema_fingerprint: None,
                     control_kind: staged.control_kind,
                     payload: staged.payload,
                     payload_hash,
-                })
-            })
-            .collect::<Result<Vec<_>, RuntimeError>>()?;
+                    canonical_payload: None,
+                    canonical_payload_hash: None,
+                });
+            }
+        }
         if events.is_empty() {
             return self.safe_stop(RuntimeError::Protocol("empty_transaction"));
+        }
+        let control_kind = events
+            .iter()
+            .find_map(|event| event.control_kind.as_deref());
+        if control_kind.is_some()
+            && events
+                .iter()
+                .any(|event| event.control_kind.as_deref() != control_kind)
+        {
+            return self.safe_stop(RuntimeError::Protocol("mixed_control_transaction"));
         }
         let commit = SourceCommit {
             transaction_id: format!("wal:{end_lsn:016X}"),
             xid: active.xid.to_string(),
             end_lsn: format!("{end_lsn:016X}"),
             payload_checksum: transaction_checksum(&events),
-            schemas: Vec::new(),
+            schemas: schemas.into_values().collect(),
             events,
         };
         let durable = self.journal.commit(&commit).map_err(|error| {
@@ -921,6 +1114,7 @@ struct StagedEvent<'a> {
 }
 #[derive(Deserialize)]
 struct StagedEventOwned {
+    relation_id: u32,
     control_kind: Option<String>,
     payload: Vec<u8>,
 }
@@ -936,12 +1130,64 @@ struct EncodedRow<'a> {
     origin_lsn: Option<u64>,
     origin_name: Option<&'a str>,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(tag = "state", content = "bytes", rename_all = "snake_case")]
 enum EncodedTuple {
     Null,
     UnchangedToast,
     Text(Vec<u8>),
+}
+#[derive(Deserialize)]
+struct EncodedRowOwned {
+    kind: String,
+    relation_id: u32,
+    ordinal: u64,
+    old_kind: Option<String>,
+    old: Option<Vec<EncodedTuple>>,
+    new: Option<Vec<EncodedTuple>>,
+    origin_lsn: Option<u64>,
+    origin_name: Option<String>,
+}
+
+fn decode_staged_row(bytes: &[u8], xid: u32) -> Result<RowChange, RuntimeError> {
+    let encoded: EncodedRowOwned =
+        serde_json::from_slice(bytes).map_err(|_| RuntimeError::Protocol("staged_row_corrupt"))?;
+    if encoded.origin_lsn.is_some() || encoded.origin_name.is_some() {
+        return Err(RuntimeError::Protocol("origin_row_not_admitted"));
+    }
+    let kind = match encoded.kind.as_str() {
+        "insert" => crate::m1_decoder::RowKind::Insert,
+        "update" => crate::m1_decoder::RowKind::Update,
+        "delete" => crate::m1_decoder::RowKind::Delete,
+        _ => return Err(RuntimeError::Protocol("staged_row_kind_invalid")),
+    };
+    let old_kind = match encoded.old_kind.as_deref() {
+        Some("key") => Some(crate::m1_decoder::OldTupleKind::Key),
+        Some("full") => Some(crate::m1_decoder::OldTupleKind::Full),
+        None => None,
+        _ => return Err(RuntimeError::Protocol("staged_old_kind_invalid")),
+    };
+    let values = |tuple: Option<Vec<EncodedTuple>>| {
+        tuple.map(|items| {
+            items
+                .into_iter()
+                .map(|item| match item {
+                    EncodedTuple::Null => TupleValue::Null,
+                    EncodedTuple::UnchangedToast => TupleValue::UnchangedToast,
+                    EncodedTuple::Text(bytes) => TupleValue::Text(bytes),
+                })
+                .collect()
+        })
+    };
+    Ok(RowChange {
+        xid,
+        ordinal: encoded.ordinal,
+        relation_id: encoded.relation_id,
+        kind,
+        old_kind,
+        old: values(encoded.old),
+        new: values(encoded.new),
+    })
 }
 fn tuples(value: Option<Vec<TupleValue>>) -> Option<Vec<EncodedTuple>> {
     value.map(|values| {
@@ -1466,6 +1712,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         };
         admission.validate(frame.len())?;
         if let Err(error) = runtime.receive(&frame) {
+            eprintln!("M2_CAPTURE_RUNTIME_ERROR detail={error}");
             let (class, code, supervisor_retry) = classify_runtime_failure(&error);
             let schema_change_detail = match &error {
                 RuntimeError::SchemaChange(detail) => Some(*detail),
@@ -1966,12 +2213,12 @@ impl crate::m2_reconcile::ArchiveReconciler for ProductionArchiveInspection {
     }
 }
 
-struct CaptureRecoveryFingerprints {
-    non_limit: String,
-    limits: String,
+pub(crate) struct CaptureRecoveryFingerprints {
+    pub(crate) non_limit: String,
+    pub(crate) limits: String,
 }
 
-fn capture_recovery_fingerprints(
+pub(crate) fn capture_recovery_fingerprints(
     public: &crate::m1_config::PublicConfig,
 ) -> Result<CaptureRecoveryFingerprints, CaptureFailure> {
     let mut stable = serde_json::to_value(public)
@@ -2307,7 +2554,12 @@ pub async fn run_loaded_config(
                 .connection_mut()
                 .transaction()
                 .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_INIT_FAILED"))?;
-            tx.execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,?1,?2,?3,?4,?5,?6,?7,?8)",rusqlite::params![config.fingerprints().runtime,live_source.source_system_id,live_source.timeline_id,live_source.database_id,live_source.slot_name,live_source.plugin,live_source.publication_fingerprint,live_source.protocol_fingerprint]).map_err(|_|CaptureFailure::at("journal","M2_SOURCE_STATE_INIT_FAILED"))?;
+            tx.execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,?1,?2,?3,?4,?5,?6,?7,?8)",rusqlite::params!["1",live_source.source_system_id,live_source.timeline_id,live_source.database_id,live_source.slot_name,live_source.plugin,live_source.publication_fingerprint,live_source.protocol_fingerprint]).map_err(|_|CaptureFailure::at("journal","M2_SOURCE_STATE_INIT_FAILED"))?;
+            tx.execute(
+                "INSERT INTO capture_configuration_receipts(singleton,capture_epoch,runtime_fingerprint,non_limit_fingerprint,limit_fingerprint) VALUES(1,'1',?1,?2,?3)",
+                rusqlite::params![config.fingerprints().runtime,recovery_fingerprints.non_limit,recovery_fingerprints.limits],
+            )
+            .map_err(|_| CaptureFailure::at("journal", "M2_RECOVERY_RECEIPT_CREATE_FAILED"))?;
             tx.commit()
                 .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_INIT_FAILED"))?;
         } else if source_rows != 1 {
@@ -2324,6 +2576,17 @@ pub async fn run_loaded_config(
                 |row| row.get::<_, String>(0),
             )
             .map_err(|_| CaptureFailure::at("journal", "M2_SOURCE_STATE_READ_FAILED"))?;
+        if capture_epoch
+            .parse::<u64>()
+            .ok()
+            .filter(|epoch| *epoch > 0)
+            .is_none()
+        {
+            return Err(CaptureFailure::at(
+                "journal",
+                "M2_CAPTURE_EPOCH_NOT_CANONICAL",
+            ));
+        }
         recovery_receipt = load_capture_configuration_receipt(
             &mut initial,
             &capture_epoch,
@@ -2432,6 +2695,37 @@ pub async fn run_loaded_config(
         },
     )
     .map_err(|_| CaptureFailure::at("reconciliation", "M2_STARTUP_SPOOL_RECONCILIATION_FAILED"))?;
+    let canonical_source = crate::m1_source_identity::SourceIdentity {
+        system_identifier: live_source
+            .source_system_id
+            .parse()
+            .map_err(|_| CaptureFailure::at("reconciliation", "M2_SOURCE_IDENTITY_INVALID"))?,
+        timeline: live_source
+            .timeline_id
+            .parse()
+            .map_err(|_| CaptureFailure::at("reconciliation", "M2_SOURCE_IDENTITY_INVALID"))?,
+        database_identity: live_source
+            .database_id
+            .parse()
+            .map_err(|_| CaptureFailure::at("reconciliation", "M2_SOURCE_IDENTITY_INVALID"))?,
+        slot_name: live_source.slot_name.clone(),
+        plugin: live_source.plugin.clone(),
+        publication_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(
+            &live_source.publication_fingerprint,
+        )
+        .ok_or_else(|| CaptureFailure::at("reconciliation", "M2_SOURCE_IDENTITY_INVALID"))?,
+        protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
+    };
+    canonical_source
+        .validate()
+        .map_err(|_| CaptureFailure::at("reconciliation", "M2_SOURCE_IDENTITY_INVALID"))?;
+    let numeric_epoch = capture_epoch
+        .parse::<u64>()
+        .ok()
+        .filter(|value| *value > 0)
+        .ok_or_else(|| CaptureFailure::at("journal", "M2_CAPTURE_EPOCH_NOT_CANONICAL"))?;
+    let catalog = PgReplicationConnection::connect(&dsn)
+        .map_err(|_| CaptureFailure::at("catalog", "M2_CATALOG_CONNECT_FAILED"))?;
     let store = JournalStore::new(
         writer,
         SourceIdentity {
@@ -2517,6 +2811,13 @@ pub async fn run_loaded_config(
         Default::default(),
         durable,
     );
+    runtime.canonical = Some(CanonicalCaptureContext {
+        source: canonical_source,
+        capture_epoch: crate::m1_transition_kernel::CaptureEpoch::from_store(numeric_epoch),
+        publication: public.source.publication.clone(),
+        catalog,
+        relations: BTreeMap::new(),
+    });
     runtime.enable_failure_policy(capture_epoch.clone(), config.fingerprints().runtime.clone());
     runtime.enable_capture_limits(
         recovery_fingerprints.limits.clone(),
@@ -3052,10 +3353,14 @@ pub mod tests {
         let e = JournalEvent {
             event_id: "e".into(),
             transaction_ordinal: 0,
+            source_row_ordinal: 0,
+            source_mutation_ordinal: 0,
             relation_schema_fingerprint: None,
             control_kind: None,
             payload: payload.clone(),
             payload_hash: crate::m2_journal::sha256(&payload),
+            canonical_payload: None,
+            canonical_payload_hash: None,
         };
         let c = SourceCommit {
             transaction_id: "t".into(),

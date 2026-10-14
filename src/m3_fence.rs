@@ -718,7 +718,7 @@ mod tests {
         s.writer
             .connection()
             .execute(
-                "INSERT INTO journal_events VALUES(6,?1,?2,0,'1',NULL,'capture_fence',?3,?4)",
+                "INSERT INTO journal_events(journal_seq,event_id,transaction_id,transaction_ordinal,capture_epoch,relation_schema_fingerprint,control_kind,payload,payload_hash) VALUES(6,?1,?2,0,'1',NULL,'capture_fence',?3,?4)",
                 params![format!("event-{txid}"), txid, payload, hash],
             )
             .unwrap();
@@ -1128,7 +1128,7 @@ mod tests {
         let payload = fence_payload(1, 1, [0xaa; 32], nonce());
         let hash = crate::m2_journal::sha256(&payload);
         s.writer.connection().execute("INSERT INTO source_transactions VALUES('tx2','1','sys','db','slot','8','0000000000000020',7,7,1,'sum2','committed')", []).unwrap();
-        s.writer.connection().execute("INSERT INTO journal_events VALUES(7,'event-tx2','tx2',0,'1',NULL,'capture_fence',?1,?2)", params![payload,hash]).unwrap();
+        s.writer.connection().execute("INSERT INTO journal_events(journal_seq,event_id,transaction_id,transaction_ordinal,capture_epoch,relation_schema_fingerprint,control_kind,payload,payload_hash) VALUES(7,'event-tx2','tx2',0,'1',NULL,'capture_fence',?1,?2)", params![payload,hash]).unwrap();
         let duplicate = s.observe_durable("intent", "tx2").unwrap();
         assert!(!duplicate.first_proof);
         assert_eq!(duplicate.transaction_id, first.transaction_id);

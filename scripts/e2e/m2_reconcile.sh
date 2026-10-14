@@ -47,7 +47,8 @@ PY
 python3 - "$work/run/state/boring.db" <<'PY'
 import sqlite3,sys
 c=sqlite3.connect(sys.argv[1]); c.execute('pragma foreign_keys=on')
-c.execute('delete from reseed_intents'); c.execute('delete from startup_reconciliations'); c.execute('delete from source_state')
+c.execute('delete from reseed_intents'); c.execute('delete from startup_reconciliations')
+c.execute('delete from capture_configuration_receipts'); c.execute('delete from source_state')
 c.execute("create trigger fail_source_receipt before insert on source_state begin select raise(abort,'fault after migration'); end")
 c.commit()
 PY
