@@ -581,6 +581,7 @@ impl FenceStore {
         )?;
         if first {
             tx.execute("INSERT INTO durable_capture_fences(fence_id,capture_epoch,generation,nonce,transaction_id,post_copy_fence_lsn,post_copy_fence_seq,first_proof) VALUES(?1,?2,?3,?4,?5,?6,?7,1)",params![format!("fence:{}",intent_id),intent.2,intent.3,intent.4,transaction_id,lsn,seq])?;
+            materialize_imported_schemas(&tx, &intent.1, &intent.2, seq)?;
             let snapshot:Option<(String,i64,String,String,i64)>=tx.query_row("SELECT x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint,json_group_array(DISTINCT i.snapshot_schema_fingerprint),x.start_seq FROM m3_bootstrap_runtime x JOIN m3_planner_runs p ON p.bootstrap_intent_id=x.intent_id AND p.generation_id=?2 JOIN backfill_generations g ON g.generation_id=p.generation_id AND g.generation=?6 AND g.intended_fence_nonce=?9 AND g.state='fencing' JOIN backfill_runs b ON b.run_id=g.run_id AND b.destination_id=?4 AND b.capture_epoch=?5 JOIN destinations d ON d.destination_id=?4 AND d.capture_epoch=?5 AND d.generation=?6 AND d.configuration_fingerprint=?7 JOIN bootstrap_imports bi ON bi.import_id=?3 AND bi.intent_id=x.intent_id AND bi.destination_id=?4 AND bi.state='acknowledged' JOIN m3_canonical_import_proofs q ON q.import_id=?3 AND q.destination_id=?4 AND q.capture_epoch=?5 AND q.generation=?6 AND q.configuration_fingerprint=?7 JOIN m3_bootstrap_importers i ON i.intent_id=x.intent_id WHERE x.intent_id=?1 AND x.generation=?6 AND x.configuration_fingerprint=?7 AND x.table_set_fingerprint=?8 GROUP BY x.consistent_lsn,p.next_snapshot_seq,x.table_set_fingerprint",params![intent.1,intent.0,intent.9,intent.10,intent.2,intent.3,intent.11,intent.5,intent.4],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).optional()?;
             let Some(snapshot) = snapshot else {
                 return Err(FenceError::Conflict("M3_FENCE_DESTINATION_BINDING_STALE"));
@@ -605,6 +606,140 @@ impl FenceStore {
             first_proof: first,
         })
     }
+}
+
+fn materialize_imported_schemas(
+    tx: &Transaction<'_>,
+    bootstrap_intent_id: &str,
+    capture_epoch: &str,
+    fence_seq: i64,
+) -> Result<(), FenceError> {
+    let installed: bool = tx.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='m3_snapshot_schema_proofs')",
+        [],
+        |row| row.get(0),
+    )?;
+    if !installed {
+        return Ok(());
+    }
+    let proof_count: i64 = tx.query_row(
+        "SELECT count(*) FROM m3_snapshot_schema_proofs WHERE intent_id=?1",
+        [bootstrap_intent_id],
+        |row| row.get(0),
+    )?;
+    if proof_count == 0 {
+        return Ok(());
+    }
+    let importer_count: i64 = tx.query_row(
+        "SELECT count(*) FROM m3_bootstrap_importers WHERE intent_id=?1",
+        [bootstrap_intent_id],
+        |row| row.get(0),
+    )?;
+    if proof_count != importer_count {
+        return Err(FenceError::Conflict("M3_IMPORTED_SCHEMA_PROOF_INCOMPLETE"));
+    }
+    let (system_id,timeline_id,database_id,slot_name,plugin,publication_fp,protocol_fp): (String,String,String,String,String,String,String) = tx.query_row(
+        "SELECT source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint FROM source_state WHERE singleton=1 AND capture_epoch=?1",
+        [capture_epoch],
+        |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?,row.get(6)?)),
+    )?;
+    let source = crate::m1_source_identity::SourceIdentity {
+        system_identifier: system_id
+            .parse()
+            .map_err(|_| FenceError::Conflict("M3_IMPORTED_SOURCE_IDENTITY_INVALID"))?,
+        timeline: timeline_id
+            .parse()
+            .map_err(|_| FenceError::Conflict("M3_IMPORTED_SOURCE_IDENTITY_INVALID"))?,
+        database_identity: database_id
+            .parse()
+            .map_err(|_| FenceError::Conflict("M3_IMPORTED_SOURCE_IDENTITY_INVALID"))?,
+        slot_name,
+        plugin,
+        publication_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(
+            &publication_fp,
+        )
+        .ok_or(FenceError::Conflict("M3_IMPORTED_SOURCE_IDENTITY_INVALID"))?,
+        protocol_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(&protocol_fp)
+            .ok_or(FenceError::Conflict("M3_IMPORTED_SOURCE_IDENTITY_INVALID"))?,
+    };
+    source
+        .validate()
+        .map_err(|_| FenceError::Conflict("M3_IMPORTED_SOURCE_IDENTITY_INVALID"))?;
+    let mut statement = tx.prepare("SELECT p.capture_epoch,p.relation_id,p.namespace,p.relation_name,p.schema_fingerprint,p.canonical_schema,p.schema_checksum,i.snapshot_schema_fingerprint FROM m3_snapshot_schema_proofs p JOIN m3_bootstrap_importers i ON i.intent_id=p.intent_id AND i.importer_id=p.importer_id WHERE p.intent_id=?1 AND i.state IN ('acknowledged','reads_complete')")?;
+    let proofs = statement
+        .query_map([bootstrap_intent_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+                row.get::<_, String>(4)?,
+                row.get::<_, Vec<u8>>(5)?,
+                row.get::<_, String>(6)?,
+                row.get::<_, String>(7)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    drop(statement);
+    for (
+        epoch,
+        relation_id,
+        namespace,
+        name,
+        fingerprint,
+        canonical,
+        checksum,
+        importer_fingerprint,
+    ) in proofs
+    {
+        let proof = crate::m3_bootstrap::SnapshotSchemaProof {
+            capture_epoch: epoch.clone(),
+            relation_id: relation_id.clone(),
+            namespace,
+            relation_name: name,
+            schema_fingerprint: fingerprint.clone(),
+            canonical_schema: canonical.clone(),
+            schema_checksum: checksum.clone(),
+        };
+        verify_imported_schema_proof(&source, capture_epoch, &proof, &importer_fingerprint)?;
+        tx.execute("INSERT OR IGNORE INTO relation_schemas(schema_fingerprint,capture_epoch,relation_id,canonical_schema,schema_checksum,created_seq) VALUES(?1,?2,?3,?4,?5,?6)", params![fingerprint,epoch,relation_id,canonical,checksum,fence_seq])?;
+        let matches: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM relation_schemas WHERE schema_fingerprint=?1 AND capture_epoch=?2 AND relation_id=?3 AND canonical_schema=?4 AND schema_checksum=?5)",params![fingerprint,epoch,relation_id,canonical,checksum],|row|row.get(0))?;
+        if !matches {
+            return Err(FenceError::Conflict("M3_IMPORTED_SCHEMA_PROOF_MISMATCH"));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn verify_imported_schema_proof(
+    source: &crate::m1_source_identity::SourceIdentity,
+    capture_epoch: &str,
+    proof: &crate::m3_bootstrap::SnapshotSchemaProof,
+    importer_fingerprint: &str,
+) -> Result<(), FenceError> {
+    let relation_id = proof
+        .relation_id
+        .parse::<u32>()
+        .map_err(|_| FenceError::Conflict("M3_IMPORTED_SCHEMA_INVALID"))?;
+    let logical = crate::m1_source_identity::LogicalTableIdentity::derive(
+        source,
+        &proof.namespace,
+        &proof.relation_name,
+    );
+    let version = crate::m1_source_identity::RelationSchemaVersion::derive(
+        logical,
+        relation_id,
+        &proof.canonical_schema,
+    )
+    .map_err(|_| FenceError::Conflict("M3_IMPORTED_SCHEMA_INVALID"))?;
+    if proof.capture_epoch != capture_epoch
+        || proof.schema_fingerprint != hex(&version.fingerprint().bytes())
+        || proof.schema_fingerprint != importer_fingerprint
+        || proof.schema_checksum != format!("{:x}", Sha256::digest(&proof.canonical_schema))
+    {
+        return Err(FenceError::Conflict("M3_IMPORTED_SCHEMA_PROOF_MISMATCH"));
+    }
+    Ok(())
 }
 
 fn hex(bytes: &[u8]) -> String {

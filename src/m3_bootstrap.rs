@@ -15,6 +15,10 @@ pub const OWNER_BEAD: &str = "boring-cdc-m3-bootstrap";
 const MAX_ID_BYTES: usize = 256;
 const MAX_TOKEN_BYTES: usize = 1_024;
 
+fn hex(bytes: &[u8]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
 const INSTALL_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS m3_bootstrap_runtime(
  intent_id TEXT PRIMARY KEY REFERENCES bootstrap_intents(intent_id),
@@ -47,6 +51,23 @@ CREATE TABLE IF NOT EXISTS m3_bootstrap_importers(
  revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0),
  PRIMARY KEY(intent_id,importer_id)
 ) STRICT;
+CREATE TABLE IF NOT EXISTS m3_snapshot_schema_proofs(
+ intent_id TEXT NOT NULL,
+ importer_id TEXT NOT NULL,
+ capture_epoch TEXT NOT NULL,
+ relation_id TEXT NOT NULL,
+ namespace TEXT NOT NULL,
+ relation_name TEXT NOT NULL,
+ schema_fingerprint TEXT NOT NULL,
+ canonical_schema BLOB NOT NULL,
+ schema_checksum TEXT NOT NULL,
+ PRIMARY KEY(intent_id,importer_id),
+ FOREIGN KEY(intent_id,importer_id) REFERENCES m3_bootstrap_importers(intent_id,importer_id)
+) STRICT;
+CREATE TRIGGER IF NOT EXISTS m3_snapshot_schema_proofs_immutable_update BEFORE UPDATE ON m3_snapshot_schema_proofs
+ BEGIN SELECT RAISE(ABORT,'imported schema proof is immutable'); END;
+CREATE TRIGGER IF NOT EXISTS m3_snapshot_schema_proofs_immutable_delete BEFORE DELETE ON m3_snapshot_schema_proofs
+ BEGIN SELECT RAISE(ABORT,'imported schema proof is immutable'); END;
 CREATE TRIGGER IF NOT EXISTS m3_bootstrap_runtime_revision BEFORE UPDATE ON m3_bootstrap_runtime
  WHEN NEW.revision!=OLD.revision+1 BEGIN SELECT RAISE(ABORT,'stale m3 bootstrap revision'); END;
 CREATE TRIGGER IF NOT EXISTS m3_bootstrap_importer_revision BEFORE UPDATE ON m3_bootstrap_importers
@@ -92,6 +113,16 @@ pub struct ImporterAssignment {
     pub importer_id: String,
     /// Digest of the immutable assigned half-open ranges. Canonical key values are never stored.
     pub assigned_ranges_digest: String,
+}
+#[derive(Clone, Debug)]
+pub(crate) struct SnapshotSchemaProof {
+    pub capture_epoch: String,
+    pub relation_id: String,
+    pub namespace: String,
+    pub relation_name: String,
+    pub schema_fingerprint: String,
+    pub canonical_schema: Vec<u8>,
+    pub schema_checksum: String,
 }
 #[derive(Clone, Debug)]
 pub struct ExportResponse {
@@ -270,6 +301,21 @@ impl BootstrapStore {
             None,
             Some(schema_fingerprint),
         )
+    }
+    pub(crate) fn bind_imported_schema(
+        &mut self,
+        intent_id: &str,
+        importer_id: &str,
+        proof: &SnapshotSchemaProof,
+    ) -> Result<(), BootstrapError> {
+        let tx = self.writer.connection_mut().transaction()?;
+        let changed = tx.execute("UPDATE m3_bootstrap_importers SET state='contract_bound',snapshot_schema_fingerprint=?3,revision=revision+1 WHERE intent_id=?1 AND importer_id=?2 AND state='snapshot_set_first' AND NOT EXISTS(SELECT 1 FROM m3_snapshot_schema_proofs WHERE intent_id=?1 AND importer_id=?2)",params![intent_id,importer_id,proof.schema_fingerprint])?;
+        if changed != 1 {
+            return Err(BootstrapError::Conflict("M3_IMPORTED_SCHEMA_STALE"));
+        }
+        tx.execute("INSERT INTO m3_snapshot_schema_proofs(intent_id,importer_id,capture_epoch,relation_id,namespace,relation_name,schema_fingerprint,canonical_schema,schema_checksum) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",params![intent_id,importer_id,proof.capture_epoch,proof.relation_id,proof.namespace,proof.relation_name,proof.schema_fingerprint,proof.canonical_schema,proof.schema_checksum])?;
+        tx.commit()?;
+        Ok(())
     }
     pub fn acknowledge_import(
         &mut self,
@@ -537,7 +583,6 @@ impl GuardSession {
         }
         Ok(())
     }
-
     pub fn keepalive(&mut self) -> Result<(), BootstrapError> {
         self.connection
             .exec("SELECT 1")
@@ -670,6 +715,39 @@ impl ImporterSession {
                 .map_err(|_| BootstrapError::Conflict("M3_IMPORTED_CONTRACT_FAILED"))?;
         }
         Ok(())
+    }
+    pub(crate) fn canonical_schema(
+        &mut self,
+        publication: &str,
+        source: &crate::m1_source_identity::SourceIdentity,
+        expected: &crate::m1_decoder::RelationContract,
+        capture_epoch: &str,
+    ) -> Result<SnapshotSchemaProof, BootstrapError> {
+        let catalog = crate::m2_catalog_reader::read_simple_relation_in_snapshot(
+            &mut self.connection,
+            publication,
+            source,
+            expected,
+        )
+        .map_err(|_| BootstrapError::Conflict("M3_IMPORTED_CATALOG_INVALID"))?;
+        let canonical_schema = catalog
+            .encode()
+            .map_err(|_| BootstrapError::Conflict("M3_IMPORTED_SCHEMA_INVALID"))?;
+        let version = crate::m1_source_identity::RelationSchemaVersion::derive(
+            catalog.logical_table,
+            catalog.relation_id,
+            &canonical_schema,
+        )
+        .map_err(|_| BootstrapError::Conflict("M3_IMPORTED_SCHEMA_INVALID"))?;
+        Ok(SnapshotSchemaProof {
+            capture_epoch: capture_epoch.to_owned(),
+            relation_id: catalog.relation_id.to_string(),
+            namespace: expected.relation.namespace.clone(),
+            relation_name: expected.relation.name.clone(),
+            schema_fingerprint: hex(&version.fingerprint().bytes()),
+            schema_checksum: format!("{:x}", Sha256::digest(&canonical_schema)),
+            canonical_schema,
+        })
     }
 
     pub(crate) fn into_acknowledged(
@@ -876,6 +954,11 @@ impl BootstrapRuntime {
         bounds: SessionBounds,
         start_seq: u64,
     ) -> Result<Self, BootstrapError> {
+        if relations.len() != 1 {
+            return Err(BootstrapError::Invalid(
+                "M3_SINGLE_RELATION_PROFILE_REQUIRED",
+            ));
+        }
         let mut store = BootstrapStore::open(writer)?;
         store.prepare(&intent)?;
         let mut guard = GuardSession::acquire(
@@ -899,6 +982,55 @@ impl BootstrapRuntime {
         let capture =
             CaptureSession::start(dsn, &intent.slot_name, exporter.consistent_lsn, publication)?;
         store.record_capture_started(&intent.intent_id, capture.backend_pid)?;
+        let config = crate::article1_capture::CaptureConfig::production(
+            dsn,
+            publication,
+            &intent.slot_name,
+            relations.iter().cloned(),
+        )
+        .map_err(|_| BootstrapError::Invalid("M3_CAPTURE_CONFIG_INVALID"))?;
+        let contracts =
+            crate::article1_capture::preflight_active_capture(&config, capture.backend_pid)
+                .map_err(|_| BootstrapError::Conflict("M3_CAPTURE_PREFLIGHT_FAILED"))?;
+        let (system_id,timeline_id,database_id,plugin,publication_fp,protocol_fp): (String,String,String,String,String,String) = store.writer.connection().query_row(
+            "SELECT source_system_id,timeline_id,database_id,plugin,publication_fingerprint,protocol_fingerprint FROM source_state WHERE singleton=1 AND capture_epoch=?1 AND slot_name=?2",
+            params![intent.capture_epoch,intent.slot_name],
+            |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?)),
+        )?;
+        let source = crate::m1_source_identity::SourceIdentity {
+            system_identifier: system_id
+                .parse()
+                .map_err(|_| BootstrapError::Conflict("M3_SOURCE_IDENTITY_INVALID"))?,
+            timeline: timeline_id
+                .parse()
+                .map_err(|_| BootstrapError::Conflict("M3_SOURCE_IDENTITY_INVALID"))?,
+            database_identity: database_id
+                .parse()
+                .map_err(|_| BootstrapError::Conflict("M3_SOURCE_IDENTITY_INVALID"))?,
+            slot_name: intent.slot_name.clone(),
+            plugin,
+            publication_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(
+                &publication_fp,
+            )
+            .ok_or(BootstrapError::Conflict("M3_SOURCE_IDENTITY_INVALID"))?,
+            protocol_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(
+                &protocol_fp,
+            )
+            .ok_or(BootstrapError::Conflict("M3_SOURCE_IDENTITY_INVALID"))?,
+        };
+        source
+            .validate()
+            .map_err(|_| BootstrapError::Conflict("M3_SOURCE_IDENTITY_INVALID"))?;
+        if system_id != intent.source_system_id || database_id != intent.database_id {
+            return Err(BootstrapError::Conflict("M3_SOURCE_IDENTITY_MISMATCH"));
+        }
+        let relation = &relations[0];
+        let expected = contracts
+            .values()
+            .find(|contract| {
+                format!("{}.{}", contract.relation.namespace, contract.relation.name) == *relation
+            })
+            .ok_or(BootstrapError::Conflict("M3_RELATION_CONTRACT_MISSING"))?;
         let mut importers = Vec::with_capacity(intent.importers.len());
         for assignment in &intent.importers {
             let mut importer = ImporterSession::import(
@@ -913,18 +1045,16 @@ impl BootstrapRuntime {
                 importer.backend_pid,
             )?;
             importer.verify_relations(relations)?;
-            store.bind_importer_contract(
-                &intent.intent_id,
-                &assignment.importer_id,
-                &intent.table_set_fingerprint,
-            )?;
+            let proof =
+                importer.canonical_schema(publication, &source, expected, &intent.capture_epoch)?;
+            store.bind_imported_schema(&intent.intent_id, &assignment.importer_id, &proof)?;
             store.acknowledge_import(&intent.intent_id, &assignment.importer_id)?;
             importers.push((
                 assignment.importer_id.clone(),
                 importer.into_acknowledged(
                     assignment.importer_id.clone(),
                     assignment.assigned_ranges_digest.clone(),
-                    intent.table_set_fingerprint.clone(),
+                    proof.schema_fingerprint,
                     relations.to_vec(),
                 ),
             ));
@@ -1019,6 +1149,33 @@ fn quote_relation(v: &str) -> Result<String, BootstrapError> {
 #[cfg(test)]
 mod live_tests {
     use super::*;
+    fn live_identity(
+        dsn: &str,
+        publication: &str,
+        relation: &str,
+    ) -> (String, String, String, String, String) {
+        let mut replication =
+            pg_walstream::PgReplicationConnection::connect(&append_replication(dsn)).unwrap();
+        let identified = replication.exec("IDENTIFY_SYSTEM").unwrap();
+        let mut sql = pg_walstream::PgReplicationConnection::connect(dsn).unwrap();
+        let database = sql
+            .exec("SELECT oid::text FROM pg_database WHERE datname=current_database()")
+            .unwrap();
+        let owner = sql.exec("SELECT current_user").unwrap();
+        let fingerprint = crate::m1_control_fixtures::PublicationSpec::new(
+            publication,
+            &owner.get_value(0, 0).unwrap(),
+            [relation.to_owned()],
+        )
+        .fingerprint();
+        (
+            identified.get_value(0, 0).unwrap(),
+            identified.get_value(0, 1).unwrap(),
+            database.get_value(0, 0).unwrap(),
+            fingerprint,
+            hex(&crate::m1_source_identity::supported_protocol_fingerprint().bytes()),
+        )
+    }
     #[test]
     #[ignore = "requires pinned PostgreSQL 17.6 Compose"]
     fn bounded_ddl_waiter_releases_only_guarded_relation_lock() {
@@ -1032,20 +1189,19 @@ mod live_tests {
         admin
             .exec(&format!("CREATE TABLE {relation}(id bigint PRIMARY KEY)"))
             .unwrap();
-        admin
-            .exec(&format!(
-                "CREATE PUBLICATION {publication} FOR TABLE {relation}"
-            ))
-            .unwrap();
+        admin.exec("CREATE SCHEMA IF NOT EXISTS boring_cdc_control; CREATE TABLE boring_cdc_control.heartbeat(id smallint PRIMARY KEY CHECK(id=1),nonce bigint NOT NULL,updated_at timestamptz NOT NULL); CREATE TABLE boring_cdc_control.capture_fences(id smallint PRIMARY KEY CHECK(id=1),capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint bytea NOT NULL,unique_nonce bytea NOT NULL)").unwrap();
+        admin.exec(&format!("CREATE PUBLICATION {publication} FOR TABLE {relation},boring_cdc_control.heartbeat,boring_cdc_control.capture_fences")).unwrap();
         let path =
             std::env::temp_dir().join(format!("m3-guard-waiter-{}.sqlite", std::process::id()));
         let writer = open_writer(&path, "guard-live", 1, 0).unwrap();
-        writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch','system','1','database',?1,'pgoutput','publication','protocol')",[&slot]).unwrap();
+        let (system_id, timeline_id, database_id, publication_fp, protocol_fp) =
+            live_identity(&dsn, &publication, &relation);
+        writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch',?1,?2,?3,?4,'pgoutput',?5,?6)",rusqlite::params![system_id,timeline_id,database_id,slot,publication_fp,protocol_fp]).unwrap();
         let intent = PrepareIntent {
             intent_id: "guard-live-intent".into(),
             capture_epoch: "epoch".into(),
-            source_system_id: "system".into(),
-            database_id: "database".into(),
+            source_system_id: system_id.clone(),
+            database_id: database_id.clone(),
             slot_name: slot.clone(),
             generation: 1,
             table_set_fingerprint: "guard-live-schema".into(),
@@ -1105,6 +1261,9 @@ mod live_tests {
             .exec(&format!("DROP PUBLICATION {publication}"))
             .unwrap();
         admin.exec(&format!("DROP TABLE {relation}")).unwrap();
+        admin
+            .exec("DROP SCHEMA boring_cdc_control CASCADE")
+            .unwrap();
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(format!("{}-wal", path.display()));
         let _ = std::fs::remove_file(format!("{}-shm", path.display()));
@@ -1122,15 +1281,17 @@ mod live_tests {
         let path =
             std::env::temp_dir().join(format!("m3-live-{}-{}.sqlite", std::process::id(), slot));
         let writer = open_writer(&path, "m3-live", 1, 0).unwrap();
-        writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'1','system','1','database',?1,'pgoutput','publication','protocol')",[&slot]).unwrap();
+        let (system_id, timeline_id, database_id, publication_fp, protocol_fp) =
+            live_identity(&dsn, "boring_cdc_m3_pub", "public.m3_bootstrap_fixture");
+        writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'1',?1,?2,?3,?4,'pgoutput',?5,?6)",rusqlite::params![system_id,timeline_id,database_id,slot,publication_fp,protocol_fp]).unwrap();
         writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('snapshot-probe','archive','live-config','1',1)",[]).unwrap();
         let relations = vec!["public.m3_bootstrap_fixture".to_string()];
         let assignment_digest = digest_assignment(&[0; 8]);
         let intent = PrepareIntent {
             intent_id: "live-intent".into(),
             capture_epoch: "1".into(),
-            source_system_id: "system".into(),
-            database_id: "database".into(),
+            source_system_id: system_id.clone(),
+            database_id: database_id.clone(),
             slot_name: slot.clone(),
             generation: 1,
             table_set_fingerprint: "aa".repeat(32),
@@ -1172,6 +1333,54 @@ mod live_tests {
             runtime.store.status("live-intent").unwrap().state,
             "exporter_released"
         );
+        let snapshot_schema_fingerprint: String = runtime.store.writer.connection().query_row(
+            "SELECT snapshot_schema_fingerprint FROM m3_bootstrap_importers WHERE intent_id='live-intent' AND importer_id='worker-0'",
+            [], |row| row.get(0),
+        ).unwrap();
+        assert_eq!(snapshot_schema_fingerprint.len(), 64);
+        let imported_proof: SnapshotSchemaProof = runtime.store.writer.connection().query_row(
+            "SELECT capture_epoch,relation_id,namespace,relation_name,schema_fingerprint,canonical_schema,schema_checksum FROM m3_snapshot_schema_proofs WHERE intent_id='live-intent' AND importer_id='worker-0'",
+            [], |row| Ok(SnapshotSchemaProof {
+                capture_epoch: row.get(0)?, relation_id: row.get(1)?, namespace: row.get(2)?,
+                relation_name: row.get(3)?, schema_fingerprint: row.get(4)?,
+                canonical_schema: row.get(5)?, schema_checksum: row.get(6)?,
+            }),
+        ).unwrap();
+        let canonical_source = crate::m1_source_identity::SourceIdentity {
+            system_identifier: system_id.parse().unwrap(),
+            timeline: timeline_id.parse().unwrap(),
+            database_identity: database_id.parse().unwrap(),
+            slot_name: slot.clone(),
+            plugin: "pgoutput".into(),
+            publication_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(
+                &publication_fp,
+            )
+            .unwrap(),
+            protocol_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(
+                &protocol_fp,
+            )
+            .unwrap(),
+        };
+        crate::m3_fence::verify_imported_schema_proof(
+            &canonical_source,
+            "1",
+            &imported_proof,
+            &snapshot_schema_fingerprint,
+        )
+        .unwrap();
+        let mut altered_proof = imported_proof;
+        altered_proof.schema_checksum = "wrong".into();
+        assert!(matches!(
+            crate::m3_fence::verify_imported_schema_proof(
+                &canonical_source,
+                "1",
+                &altered_proof,
+                &snapshot_schema_fingerprint,
+            ),
+            Err(crate::m3_fence::FenceError::Conflict(
+                "M3_IMPORTED_SCHEMA_PROOF_MISMATCH"
+            ))
+        ));
         let (writer, mut sessions) = runtime.into_planner_handoff();
         assert!(sessions.capture_alive());
         sessions.keepalive().unwrap();
@@ -1213,7 +1422,7 @@ mod live_tests {
                     generation: 1,
                     bootstrap_intent_id: "live-intent".into(),
                     importer_id: "worker-0".into(),
-                    snapshot_schema_fingerprint: "aa".repeat(32),
+                    snapshot_schema_fingerprint: snapshot_schema_fingerprint.clone(),
                     key_schema: vec![crate::m3_planner::KeyPartType::I64],
                     boundaries: vec![],
                     estimated_rows: 1,
@@ -1228,7 +1437,7 @@ mod live_tests {
             imported,
             "worker-0",
             &assignment_digest,
-            &"aa".repeat(32),
+            &snapshot_schema_fingerprint,
             "public.m3_bootstrap_fixture",
             &["id"],
         )
@@ -1387,12 +1596,12 @@ mod live_tests {
             writer,
             SourceIdentity {
                 capture_epoch: "1".into(),
-                source_system_id: "system".into(),
-                timeline_id: "1".into(),
-                database_id: "database".into(),
+                source_system_id: system_id.clone(),
+                timeline_id: timeline_id.clone(),
+                database_id: database_id.clone(),
                 slot_name: slot.clone(),
-                publication_fingerprint: "publication".into(),
-                protocol_fingerprint: "protocol".into(),
+                publication_fingerprint: publication_fp.clone(),
+                protocol_fingerprint: protocol_fp.clone(),
             },
             CommitLimits {
                 max_events: 16,
@@ -1441,13 +1650,13 @@ mod live_tests {
         );
         let durable_end_lsn = capture.durable_end_lsn().unwrap();
         let writer = capture.into_journal().unwrap().into_writer();
-        let (end_lsn, journal_seq, control_kind, payload, source_lsn):
-            (String, i64, String, Vec<u8>, String) = writer
+        let (transaction_id, end_lsn, journal_seq, control_kind, payload, source_lsn):
+            (String, String, i64, String, Vec<u8>, String) = writer
             .connection()
             .query_row(
-                "SELECT t.end_lsn,e.journal_seq,e.control_kind,e.payload,s.durable_transaction_end_lsn FROM source_transactions t JOIN journal_events e ON e.transaction_id=t.transaction_id AND e.journal_seq=t.last_seq CROSS JOIN source_state s WHERE e.control_kind='capture_fence'",
+                "SELECT t.transaction_id,t.end_lsn,e.journal_seq,e.control_kind,e.payload,s.durable_transaction_end_lsn FROM source_transactions t JOIN journal_events e ON e.transaction_id=t.transaction_id AND e.journal_seq=t.last_seq CROSS JOIN source_state s WHERE e.control_kind='capture_fence'",
                 [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
             )
             .unwrap();
         assert_eq!(u64::from_str_radix(&end_lsn, 16).unwrap(), durable_end_lsn);
@@ -1460,19 +1669,31 @@ mod live_tests {
             captured["new"][4]["bytes"],
             serde_json::json!(b"\\x17171717171717171717171717171717".as_slice())
         );
-        assert_eq!(
-            writer
-                .connection()
-                .query_row(
-                    "SELECT count(*) FROM bootstrap_anchors WHERE state='complete'",
-                    [],
-                    |row| row.get::<_, i64>(0),
-                )
-                .unwrap(),
-            0
-        );
-        let runtime = sessions.resume(writer).unwrap();
-        runtime.invalidate("importer").unwrap();
+        let mut fence = crate::m3_fence::FenceStore::open(writer).unwrap();
+        let proof = fence
+            .observe_durable("snapshot-fence", &transaction_id)
+            .unwrap();
+        assert_eq!(proof.post_copy_fence_lsn, end_lsn);
+        assert_eq!(proof.post_copy_fence_seq, journal_seq as u64);
+        assert!(proof.first_proof);
+        let repeated = fence
+            .observe_durable("snapshot-fence", &transaction_id)
+            .unwrap();
+        assert!(!repeated.first_proof);
+        let writer = fence.into_writer();
+        let anchor: (String,String,String) = writer.connection().query_row(
+            "SELECT a.state,a.snapshot_schema_fingerprints,r.schema_fingerprint FROM bootstrap_anchors a JOIN relation_schemas r ON r.capture_epoch=a.capture_epoch WHERE a.anchor_id='snapshot-anchor'",
+            [], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
+        ).unwrap();
+        assert_eq!(anchor.0, "complete");
+        assert_eq!(anchor.1, format!("[\"{snapshot_schema_fingerprint}\"]"));
+        assert_eq!(anchor.2, snapshot_schema_fingerprint);
+        assert!(writer.connection().execute(
+            "UPDATE m3_snapshot_schema_proofs SET schema_checksum='wrong' WHERE intent_id='live-intent'",
+            [],
+        ).is_err());
+        drop(sessions);
+        drop(writer);
         let mut cleanup = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
         cleanup
             .exec(&format!("SELECT pg_drop_replication_slot('{slot}')"))
@@ -1540,6 +1761,28 @@ mod tests {
             }],
             created_at: "unix-ms:0".into(),
         }
+    }
+    #[test]
+    fn multi_relation_bootstrap_is_rejected_before_source_effects() {
+        let (_path, store) = store();
+        let result = BootstrapRuntime::start(
+            store.into_writer(),
+            intent(),
+            "invalid dsn",
+            &["public.first".into(), "public.second".into()],
+            "publication",
+            SessionBounds {
+                statement_timeout_ms: 1_000,
+                idle_timeout_ms: 2_000,
+            },
+            0,
+        );
+        assert!(matches!(
+            result,
+            Err(BootstrapError::Invalid(
+                "M3_SINGLE_RELATION_PROFILE_REQUIRED"
+            ))
+        ));
     }
     fn exported(s: &mut BootstrapStore) {
         s.prepare(&intent()).unwrap();

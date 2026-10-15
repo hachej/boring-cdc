@@ -8,6 +8,7 @@
     {"scenario_id":"SCN-M3-BOOTSTRAP-INVALIDATE","unit_test":"invalidation_atomically_releases_feedback_gate","expected":"snapshot non-promotable and durable WAL gate open atomically"},
     {"scenario_id":"SCN-M3-BOOTSTRAP-LOST-TOKEN","unit_test":"lost_response_never_recreates_or_drops_slot","expected":"ambiguous then proof-based retained-slot path"},
     {"scenario_id":"SCN-M3-BOOTSTRAP-CONTINUITY-AMBIGUOUS","unit_test":"ambiguous_continuity_requires_full_reseed","expected":"explicit new-epoch full reseed required"},
-    {"scenario_id":"SCN-M3-BOOTSTRAP-LIVE-SESSIONS","unit_test":"exported_snapshot_uses_distinct_command_idle_sessions","expected":"guard before export; distinct exporter/capture/importer PIDs; first-statement import"}
+    {"scenario_id":"SCN-M3-BOOTSTRAP-LIVE-SESSIONS","unit_test":"exported_snapshot_uses_distinct_command_idle_sessions","expected":"guard before export; distinct exporter/capture/importer PIDs; first-statement import; canonical imported schema proof and complete anchor from durable M2 fence"},
+    {"scenario_id":"SCN-M3-BOOTSTRAP-SINGLE-RELATION","unit_test":"multi_relation_bootstrap_is_rejected_before_source_effects","expected":"unsupported multi-relation generation is rejected before slot creation"}
   ]
 }

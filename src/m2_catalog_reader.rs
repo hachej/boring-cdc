@@ -38,7 +38,7 @@ pub fn read_simple_relation(
     result
 }
 
-fn read_simple_relation_in_snapshot(
+pub(crate) fn read_simple_relation_in_snapshot(
     connection: &mut PgReplicationConnection,
     publication: &str,
     source: &SourceIdentity,
