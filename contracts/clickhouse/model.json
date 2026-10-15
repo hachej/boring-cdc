@@ -262,6 +262,18 @@
     ],
     "ttl": "forbidden"
   },
+  "initial_load": {
+    "scope": "initial slot, one admitted relation, complete anchor with start_seq=0; existing-slot reseed is outside this version",
+    "source": "only m3_snapshot_events in the complete anchor generation, with every chunk complete and the acknowledged imported relation schema fingerprint",
+    "identity": "M1 snapshot connector_event_id from capture epoch, generation, logical table identity, persisted numeric chunk ordinal and canonical key; the snapshot row payload is rendered through the M0 mutation envelope",
+    "source_version": "anchor snapshot_boundary_lsn, origin_rank=0, transaction_ordinal=0, mutation_ordinal=0; WAL uses origin_rank=1 and wins at an equal source position",
+    "delivery": "snapshot event_history_v1 rows use journal_seq=0; M2 journal sequences remain positive and contiguous from 1; snapshot batch_markers_v1 rows use first_journal_seq=last_journal_seq=0",
+    "intent": "before any remote write persist an immutable destination-local snapshot batch intent binding destination, capture epoch, generation, complete anchor ID, schema fingerprint, inclusive snapshot sequence range, ordered event digest, configuration fingerprint and live object fingerprint",
+    "acceptance": "reuse the pinned synchronous history insert, fresh event readback, marker insert and fresh marker readback; only then mark the snapshot intent verified; replay/adopt the deterministic batch ID and block on conflicting remote state",
+    "checkpoint": "snapshot rows never create or advance a destination checkpoint; first M2 complete transaction starts at journal_seq=1, and its checkpoint binds the complete anchor ID after every snapshot batch is verified; subsequent complete M2 transactions advance contiguously",
+    "visibility": "no selector or promotion before every snapshot batch and M2 suffix through the anchor post-copy fence are verified in the same destination generation under a held lease",
+    "invalidates": "prior ClickHouse component evidence does not prove initial-load compatibility or same-stream snapshot-to-WAL convergence"
+  },
   "insert_acceptance": {
     "ambiguous": "no marker means replay exact intent; valid marker means adopt; conflicting marker/history blocks",
     "checkpoint": "never advances before marker readback and never skips a failed journal transaction",
@@ -425,5 +437,5 @@
     "migration": "maintenance creates versioned objects; dual-read verifies before contract-fingerprint adoption",
     "mutation_commands": "UPDATE, DELETE, OPTIMIZE FINAL CLEANUP and TTL on history are forbidden"
   },
-  "schema_version": "clickhouse-contract/v1"
+  "schema_version": "clickhouse-contract/v2"
 }
