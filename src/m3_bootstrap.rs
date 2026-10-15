@@ -134,6 +134,10 @@ impl BootstrapStore {
         Ok(Self { writer })
     }
 
+    pub fn into_writer(self) -> WriterConnection {
+        self.writer
+    }
+
     pub fn prepare(&mut self, input: &PrepareIntent) -> Result<(), BootstrapError> {
         validate_prepare(input)?;
         let tx = self.writer.connection_mut().transaction()?;
@@ -741,7 +745,88 @@ pub struct BootstrapRuntime {
     _capture: CaptureSession,
     importers: Vec<(String, ImportedSnapshotSession)>,
 }
+/// PostgreSQL snapshot sessions remain owned while the sole SQLite writer is in the planner.
+pub struct BootstrapSessions {
+    intent_id: String,
+    writer_attestation: crate::m2_schema::WriterAttestation,
+    guard: GuardSession,
+    capture: CaptureSession,
+    importers: Vec<(String, ImportedSnapshotSession)>,
+}
+impl BootstrapSessions {
+    pub fn keepalive(&mut self) -> Result<(), BootstrapError> {
+        self.guard.keepalive()
+    }
+
+    pub fn capture_alive(&self) -> bool {
+        self.capture.alive()
+    }
+
+    pub fn conflicting_ddl_waiter_exceeded(
+        &mut self,
+        bound_ms: u64,
+    ) -> Result<bool, BootstrapError> {
+        self.guard.conflicting_waiter_exceeded(bound_ms)
+    }
+
+    pub fn take_importer(
+        &mut self,
+        importer_id: &str,
+    ) -> Result<ImportedSnapshotSession, BootstrapError> {
+        take_importer(&mut self.importers, importer_id)
+    }
+
+    pub fn resume(self, writer: WriterConnection) -> Result<BootstrapRuntime, BootstrapError> {
+        if writer.attestation() != &self.writer_attestation {
+            return Err(BootstrapError::Conflict(
+                "M3_WRITER_HANDOFF_IDENTITY_MISMATCH",
+            ));
+        }
+        Ok(BootstrapRuntime {
+            store: BootstrapStore { writer },
+            intent_id: self.intent_id,
+            guard: self.guard,
+            _capture: self.capture,
+            importers: self.importers,
+        })
+    }
+}
+fn take_importer(
+    importers: &mut Vec<(String, ImportedSnapshotSession)>,
+    importer_id: &str,
+) -> Result<ImportedSnapshotSession, BootstrapError> {
+    let position = importers
+        .iter()
+        .position(|(id, _)| id == importer_id)
+        .ok_or(BootstrapError::Conflict(
+            "M3_IMPORTER_CAPABILITY_UNAVAILABLE",
+        ))?;
+    Ok(importers.swap_remove(position).1)
+}
 impl BootstrapRuntime {
+    /// Move, rather than reopen, the only SQLite writer into the planner. A caller must return
+    /// that writer with `BootstrapSessions::resume` before using the canonical invalidation path.
+    pub fn into_planner_handoff(self) -> (WriterConnection, BootstrapSessions) {
+        let Self {
+            store,
+            intent_id,
+            guard,
+            _capture,
+            importers,
+        } = self;
+        let writer = store.into_writer();
+        let writer_attestation = writer.attestation().clone();
+        (
+            writer,
+            BootstrapSessions {
+                intent_id,
+                writer_attestation,
+                guard,
+                capture: _capture,
+                importers,
+            },
+        )
+    }
     pub fn start(
         writer: WriterConnection,
         intent: PrepareIntent,
@@ -822,14 +907,7 @@ impl BootstrapRuntime {
         &mut self,
         importer_id: &str,
     ) -> Result<ImportedSnapshotSession, BootstrapError> {
-        let position = self
-            .importers
-            .iter()
-            .position(|(id, _)| id == importer_id)
-            .ok_or(BootstrapError::Conflict(
-                "M3_IMPORTER_CAPABILITY_UNAVAILABLE",
-            ))?;
-        Ok(self.importers.swap_remove(position).1)
+        take_importer(&mut self.importers, importer_id)
     }
 
     pub fn keepalive(&mut self) -> Result<(), BootstrapError> {
@@ -1052,6 +1130,56 @@ mod live_tests {
             runtime.store.status("live-intent").unwrap().state,
             "exporter_released"
         );
+        let (writer, mut sessions) = runtime.into_planner_handoff();
+        assert!(sessions.capture_alive());
+        sessions.keepalive().unwrap();
+        let limits = crate::m3_planner::PlannerLimits {
+            chunk_rows: 4,
+            chunk_bytes: 1024,
+            chunk_duration: std::time::Duration::from_secs(1),
+            writer_hold: std::time::Duration::from_secs(1),
+            concurrency: 1,
+            source_impact_bytes: 2048,
+            max_rows_per_second: 1000,
+        };
+        let (failure, writer) = match crate::m3_planner::PlannerStore::open_recoverable(
+            writer,
+            crate::m3_planner::PlannerLimits {
+                chunk_rows: 0,
+                ..limits
+            },
+        ) {
+            Ok(_) => panic!("invalid planner bound must return the bootstrap writer"),
+            Err(result) => result,
+        };
+        assert!(matches!(
+            failure,
+            crate::m3_planner::PlannerError::Invalid("M3_ZERO_BOUND")
+        ));
+        assert!(sessions.capture_alive());
+        let planner = match crate::m3_planner::PlannerStore::open_recoverable(*writer, limits) {
+            Ok(planner) => planner,
+            Err((error, _)) => panic!("planner handoff failed: {error}"),
+        };
+        let imported = sessions.take_importer("worker-0").unwrap();
+        let mut imported = imported
+            .into_planner_connection(
+                "worker-0",
+                &digest_assignment(b"all"),
+                "live-schema",
+                "public.m3_bootstrap_fixture",
+            )
+            .unwrap();
+        assert_eq!(
+            imported
+                .exec("SELECT payload FROM public.m3_bootstrap_fixture WHERE id=1")
+                .unwrap()
+                .get_value(0, 0),
+            Some("before".into()),
+        );
+        drop(imported);
+        let writer = planner.into_writer();
+        let runtime = sessions.resume(writer).unwrap();
         runtime.invalidate("importer").unwrap();
         let mut cleanup = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
         cleanup

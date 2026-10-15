@@ -533,3 +533,24 @@ jobs:
           name: m4-live-journal-convergence
           path: artifacts/boring-cdc-m4-live-journal/SCN-M4-CURRENT-STATE/current-head
           if-no-files-found: error
+  m3_bootstrap_writer_handoff:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --target x86_64-unknown-linux-gnu --no-self-update
+      - name: Live bootstrap writer and snapshot handoff
+        timeout-minutes: 10
+        env:
+          TMPDIR: /var/tmp
+        run: scripts/e2e/m3_bootstrap.sh
+      - name: Retain bootstrap handoff component packet
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m3-bootstrap-writer-handoff
+          path: artifacts/boring-cdc-m3-bootstrap/SCN-M3-BOOTSTRAP-LIVE-SESSIONS/bootstrap-pg17-v1
+          if-no-files-found: error
