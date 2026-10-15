@@ -510,11 +510,36 @@ fn run_m3_bootstrap() -> Result<(), ReaderFailure> {
     )
     .map_err(bootstrap_failure)?;
     let cancellation = cancellation_for_signals();
+    let keepalive_interval = Duration::from_millis(config.public().backfill.guard_keepalive_ms.0);
+    let waiter_poll_interval = keepalive_interval.min(Duration::from_millis(250));
+    let mut next_keepalive = std::time::Instant::now() + keepalive_interval;
     while !signal_received() {
-        thread::sleep(Duration::from_millis(
-            config.public().backfill.guard_keepalive_ms.0,
-        ));
-        runtime.keepalive().map_err(bootstrap_failure)?;
+        thread::sleep(waiter_poll_interval);
+        match runtime
+            .conflicting_ddl_waiter_exceeded(config.public().backfill.ddl_waiter_bound_ms.0)
+        {
+            Ok(true) => {
+                runtime
+                    .invalidate_for_ddl_waiter()
+                    .map_err(bootstrap_failure)?;
+                return Err(ReaderFailure::unavailable(
+                    "M3_DDL_WAITER",
+                    "snapshot generation was invalidated after a conflicting DDL waiter",
+                ));
+            }
+            Ok(false) => {}
+            Err(error) => {
+                runtime.invalidate("guard").map_err(bootstrap_failure)?;
+                return Err(bootstrap_failure(error));
+            }
+        }
+        if std::time::Instant::now() >= next_keepalive {
+            if let Err(error) = runtime.keepalive() {
+                runtime.invalidate("guard").map_err(bootstrap_failure)?;
+                return Err(bootstrap_failure(error));
+            }
+            next_keepalive = std::time::Instant::now() + keepalive_interval;
+        }
     }
     cancellation.cancel();
     runtime.invalidate("importer").map_err(bootstrap_failure)

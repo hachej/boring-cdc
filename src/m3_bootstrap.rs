@@ -486,6 +486,7 @@ impl ExportedSlotSession {
 pub struct GuardSession {
     connection: pg_walstream::PgReplicationConnection,
     pub backend_pid: i32,
+    guarded_relations: Vec<String>,
 }
 impl GuardSession {
     pub fn acquire(
@@ -519,6 +520,7 @@ impl GuardSession {
         Ok(Self {
             connection,
             backend_pid,
+            guarded_relations: locked,
         })
     }
     /// Verifies every guarded relation while the ACCESS SHARE locks are already held.
@@ -537,6 +539,60 @@ impl GuardSession {
             .exec("SELECT 1")
             .map(|_| ())
             .map_err(|_| BootstrapError::Conflict("M3_GUARD_KEEPALIVE_FAILED"))
+    }
+
+    /// `pg_locks.waitstart` is the server clock for this actual blocked DDL request. Checking
+    /// the held relation OIDs avoids treating unrelated database waiters as source impact.
+    pub fn conflicting_waiter_exceeded(&mut self, bound_ms: u64) -> Result<bool, BootstrapError> {
+        if bound_ms == 0 || self.guarded_relations.is_empty() {
+            return Err(BootstrapError::Invalid("M3_DDL_WAITER_BOUND_INVALID"));
+        }
+        let relations = self
+            .guarded_relations
+            .iter()
+            .map(|relation| format!("to_regclass('{relation}')::oid"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "SELECT EXISTS(SELECT 1 FROM pg_locks WHERE NOT granted AND mode='AccessExclusiveLock' AND relation=ANY(ARRAY[{relations}]) AND waitstart IS NOT NULL AND extract(epoch FROM (clock_timestamp()-waitstart))*1000 >= {bound_ms})::text"
+        );
+        let value = self
+            .connection
+            .exec(&sql)
+            .map_err(|_| BootstrapError::Conflict("M3_DDL_WAITER_PROBE_FAILED"))?
+            .get_value(0, 0)
+            .ok_or(BootstrapError::Conflict("M3_DDL_WAITER_PROBE_FAILED"))?;
+        match value.as_str() {
+            "t" | "true" => Ok(true),
+            "f" | "false" => Ok(false),
+            _ => Err(BootstrapError::Conflict("M3_DDL_WAITER_PROBE_FAILED")),
+        }
+    }
+
+    fn release_and_verify(&mut self) -> Result<(), BootstrapError> {
+        self.connection
+            .exec("ROLLBACK")
+            .map_err(|_| BootstrapError::Conflict("M3_GUARD_RELEASE_UNVERIFIED"))?;
+        let relations = self
+            .guarded_relations
+            .iter()
+            .map(|relation| format!("to_regclass('{relation}')::oid"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "SELECT EXISTS(SELECT 1 FROM pg_locks WHERE pid=pg_backend_pid() AND granted AND mode='AccessShareLock' AND relation=ANY(ARRAY[{relations}]))::text"
+        );
+        let value = self
+            .connection
+            .exec(&sql)
+            .map_err(|_| BootstrapError::Conflict("M3_GUARD_RELEASE_UNVERIFIED"))?
+            .get_value(0, 0)
+            .ok_or(BootstrapError::Conflict("M3_GUARD_RELEASE_UNVERIFIED"))?;
+        if matches!(value.as_str(), "f" | "false") {
+            Ok(())
+        } else {
+            Err(BootstrapError::Conflict("M3_GUARD_RELEASE_UNVERIFIED"))
+        }
     }
 }
 
@@ -780,6 +836,18 @@ impl BootstrapRuntime {
         self.guard.keepalive()
     }
 
+    pub fn conflicting_ddl_waiter_exceeded(
+        &mut self,
+        bound_ms: u64,
+    ) -> Result<bool, BootstrapError> {
+        self.guard.conflicting_waiter_exceeded(bound_ms)
+    }
+
+    pub fn invalidate_for_ddl_waiter(mut self) -> Result<(), BootstrapError> {
+        self.store.invalidate_generation(&self.intent_id, "guard")?;
+        self.guard.release_and_verify()
+    }
+
     pub fn invalidate(mut self, lost_session: &str) -> Result<(), BootstrapError> {
         self.store
             .invalidate_generation(&self.intent_id, lost_session)
@@ -833,6 +901,96 @@ fn quote_relation(v: &str) -> Result<String, BootstrapError> {
 #[cfg(test)]
 mod live_tests {
     use super::*;
+    #[test]
+    #[ignore = "requires pinned PostgreSQL 17.6 Compose"]
+    fn bounded_ddl_waiter_releases_only_guarded_relation_lock() {
+        use crate::m2_schema::open_writer;
+        let dsn = std::env::var("BORING_CDC_M3_DSN").expect("BORING_CDC_M3_DSN");
+        let table = format!("m3_guard_waiter_{}", std::process::id());
+        let publication = format!("m3_guard_waiter_pub_{}", std::process::id());
+        let slot = format!("m3_guard_waiter_slot_{}", std::process::id());
+        let relation = format!("public.{table}");
+        let mut admin = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
+        admin
+            .exec(&format!("CREATE TABLE {relation}(id bigint PRIMARY KEY)"))
+            .unwrap();
+        admin
+            .exec(&format!(
+                "CREATE PUBLICATION {publication} FOR TABLE {relation}"
+            ))
+            .unwrap();
+        let path =
+            std::env::temp_dir().join(format!("m3-guard-waiter-{}.sqlite", std::process::id()));
+        let writer = open_writer(&path, "guard-live", 1, 0).unwrap();
+        writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch','system','1','database',?1,'pgoutput','publication','protocol')",[&slot]).unwrap();
+        let intent = PrepareIntent {
+            intent_id: "guard-live-intent".into(),
+            capture_epoch: "epoch".into(),
+            source_system_id: "system".into(),
+            database_id: "database".into(),
+            slot_name: slot.clone(),
+            generation: 1,
+            table_set_fingerprint: "guard-live-schema".into(),
+            configuration_fingerprint: "guard-live-config".into(),
+            importers: vec![ImporterAssignment {
+                importer_id: "worker-0".into(),
+                assigned_ranges_digest: digest_assignment(b"all"),
+            }],
+            created_at: "unix-ms:0".into(),
+        };
+        let mut runtime = BootstrapRuntime::start(
+            writer,
+            intent,
+            &dsn,
+            std::slice::from_ref(&relation),
+            &publication,
+            SessionBounds {
+                statement_timeout_ms: 10_000,
+                idle_timeout_ms: 30_000,
+            },
+            0,
+        )
+        .unwrap();
+        assert!(!runtime.conflicting_ddl_waiter_exceeded(100).unwrap());
+        let worker_dsn = dsn.clone();
+        let worker_relation = relation.clone();
+        let worker = std::thread::spawn(move || {
+            let mut ddl = pg_walstream::PgReplicationConnection::connect(&worker_dsn).unwrap();
+            ddl.exec(&format!(
+                "ALTER TABLE {worker_relation} ADD COLUMN changed bigint"
+            ))
+            .unwrap();
+        });
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            if runtime.conflicting_ddl_waiter_exceeded(100).unwrap() {
+                break;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "DDL waiter was not detected"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(25));
+        }
+        runtime.invalidate_for_ddl_waiter().unwrap();
+        worker.join().unwrap();
+        let connection = rusqlite::Connection::open(&path).unwrap();
+        let state: (String, String, i64, i64) = connection.query_row(
+            "SELECT state,guard_liveness,snapshot_promotable,feedback_gate_open FROM m3_bootstrap_runtime WHERE intent_id='guard-live-intent'",
+            [], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?))).unwrap();
+        assert_eq!(state, ("snapshot_unusable".into(), "lost".into(), 0, 1));
+        drop(connection);
+        admin
+            .exec(&format!("SELECT pg_drop_replication_slot('{slot}')"))
+            .unwrap();
+        admin
+            .exec(&format!("DROP PUBLICATION {publication}"))
+            .unwrap();
+        admin.exec(&format!("DROP TABLE {relation}")).unwrap();
+        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(format!("{}-wal", path.display()));
+        let _ = std::fs::remove_file(format!("{}-shm", path.display()));
+    }
     #[test]
     #[ignore = "requires pinned PostgreSQL 17.6 Compose"]
     fn exported_snapshot_uses_distinct_command_idle_sessions() {
