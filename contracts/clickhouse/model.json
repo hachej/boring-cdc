@@ -270,7 +270,7 @@
     "delivery": "snapshot event_history_v1 rows use journal_seq=0; M2 journal sequences remain positive and contiguous from 1; snapshot batch_markers_v1 rows use first_journal_seq=last_journal_seq=0",
     "intent": "before any remote write persist an immutable destination-local snapshot batch intent binding destination, capture epoch, generation, complete anchor ID, schema fingerprint, inclusive snapshot sequence range, ordered event digest, configuration fingerprint and live object fingerprint",
     "acceptance": "reuse the pinned synchronous history insert, fresh event readback, marker insert and fresh marker readback; only then mark the snapshot intent verified; replay/adopt the deterministic batch ID and block on conflicting remote state",
-    "checkpoint": "snapshot rows never create or advance a destination checkpoint; first M2 complete transaction starts at journal_seq=1, and its checkpoint binds the complete anchor ID after every snapshot batch and contiguous post-copy-fence suffix is verified",
+    "checkpoint": "snapshot rows never create or advance a destination checkpoint; first M2 complete transaction starts at journal_seq=1, and its checkpoint binds the complete anchor ID after every snapshot batch is verified; subsequent complete M2 transactions advance contiguously",
     "visibility": "no selector or promotion before every snapshot batch and M2 suffix through the anchor post-copy fence are verified in the same destination generation under a held lease",
     "invalidates": "prior ClickHouse component evidence does not prove initial-load compatibility or same-stream snapshot-to-WAL convergence"
   },
