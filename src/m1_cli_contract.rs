@@ -1019,6 +1019,26 @@ pub fn encode_operator_response_frame(
     Ok(frame)
 }
 
+/// Builds the one request frame that the client must finish with a write-half shutdown.
+pub fn encode_operator_request_frame(
+    request: &OperatorWireRequest,
+    max_request_bytes: usize,
+) -> Result<Vec<u8>, CliError> {
+    let body = serde_json::to_vec(request)
+        .map_err(|_| invalid("CLI_OPERATOR_WIRE_INVALID", "operator request is invalid"))?;
+    parse_operator_wire_request(&body, max_request_bytes)?;
+    let body_len = u32::try_from(body.len()).map_err(|_| {
+        invalid(
+            "CLI_OPERATOR_FRAME_TOO_LARGE",
+            "operator request is too large",
+        )
+    })?;
+    let mut frame = Vec::with_capacity(4 + body.len());
+    frame.extend_from_slice(&body_len.to_be_bytes());
+    frame.extend_from_slice(&body);
+    Ok(frame)
+}
+
 impl fmt::Debug for OperatorWireRequest {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let kind = match self {
@@ -1858,6 +1878,16 @@ pub mod tests {
         );
         let mut frame = Vec::from((valid.len() as u32).to_be_bytes());
         frame.extend_from_slice(valid);
+        assert_eq!(
+            encode_operator_request_frame(&request, valid.len()).unwrap(),
+            frame
+        );
+        assert_eq!(
+            encode_operator_request_frame(&request, valid.len() - 1)
+                .err()
+                .map(|error| error.code),
+            Some("CLI_OPERATOR_FRAME_TOO_LARGE")
+        );
         assert_eq!(decode_operator_frame(&frame, valid.len()).unwrap(), request);
         assert_eq!(
             decode_operator_frame(&frame[..frame.len() - 1], valid.len())
