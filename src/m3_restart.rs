@@ -238,6 +238,8 @@ pub fn prepare_lower_stitch(
          FROM source_state s JOIN source_transactions t
          ON t.transaction_id=s.durable_transaction_id AND t.capture_epoch=s.capture_epoch
          AND t.last_seq=s.durable_journal_seq AND t.end_lsn=s.durable_transaction_end_lsn
+         AND t.slot_name=s.slot_name AND t.source_system_id=s.source_system_id
+         AND t.database_id=s.database_id
          WHERE s.singleton=1 AND s.capture_epoch=?1 AND s.slot_name=?2 AND t.state='committed'
          AND s.durable_journal_seq>0",
             params![request.capture_epoch, request.slot_name],
@@ -479,5 +481,23 @@ mod tests {
             })
             .unwrap();
         assert_eq!((generations, intents), (0, 0));
+    }
+
+    #[test]
+    fn durable_pair_from_another_slot_is_rejected() {
+        let mut writer = fixture();
+        writer
+            .connection()
+            .execute(
+                "UPDATE source_state SET slot_name='other-slot',control_revision=control_revision+1 WHERE singleton=1",
+                [],
+            )
+            .unwrap();
+        let mut input = request();
+        input.slot_name = "other-slot";
+        assert!(matches!(
+            prepare_lower_stitch(&mut writer, input),
+            Err(RestartError::Stale)
+        ));
     }
 }
