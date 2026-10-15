@@ -309,6 +309,8 @@ jobs:
         run: cargo test --locked --workspace --all-targets
       - name: Python contract tests
         run: python3 -m unittest discover -s tests
+      - name: Article 2 capture packet
+        run: python3 scripts/validate/article2_capture_packet.py
       - name: Package boundary
         run: scripts/validate/scaffold_package.sh
       - name: Scaffold contract
