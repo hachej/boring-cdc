@@ -299,13 +299,13 @@ fn pin_id(restart_id: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::m2_pressure::{GC_MAX_HOLD, automatic_gc};
     use crate::m2_schema::open_writer;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn fixture() -> WriterConnection {
+    pub(crate) fn fixture() -> WriterConnection {
         let path = std::env::temp_dir().join(format!(
             "m3-lower-{}-{}.db",
             std::process::id(),
@@ -335,7 +335,7 @@ mod tests {
         writer
     }
 
-    fn request() -> LowerStitchRequest<'static> {
+    pub(crate) fn request() -> LowerStitchRequest<'static> {
         LowerStitchRequest {
             restart_id: "restart",
             owner_run_id: "owner",
