@@ -521,11 +521,34 @@ jobs:
           packet="$PWD/artifacts/boring-cdc-m4-live-journal/SCN-M4-CURRENT-STATE/current-head"
           M4_CONVERGENCE_OUT="$packet/observation.json" scripts/e2e/m4_live_journal_convergence.sh
           python3 - "$packet/observation.json" <<'PY'
-          import json,sys
+          import hashlib,json,pathlib,sys
           report=json.load(open(sys.argv[1]))
           assert report['status']=='pass'
           assert report['physical_replay_rows']>report['logical_event_ids']
           assert all(report['checks'].values())
+          capture=json.load(open(sys.argv[1].replace('observation.json','capture-observation.json')))
+          assert capture['schema_version']=='article2-capture-observation/v1'
+          assert capture['git_commit']==report['git_commit']
+          assert capture['counts']['source_user_transactions']==6
+          assert all(capture['checks'].values())
+          inputs={
+              'scenario':'scripts/acceptance/durable_simple_case.sh',
+              'configuration':'tests/fixtures/m1_config/representative.toml',
+              'compose':'compose.yaml',
+              'cargo_lock':'Cargo.lock',
+              'binary':'target/debug/boring-cdc',
+          }
+          for name,path in inputs.items():
+              assert capture['input_sha256'][name]==hashlib.sha256(pathlib.Path(path).read_bytes()).hexdigest()
+          forbidden={'feedback_boundaries','committed_oracle','final_durable_lsn','first_run_id','dsn','password','xid'}
+          def keys(value):
+              if isinstance(value,dict):
+                  for key,item in value.items():
+                      yield key
+                      yield from keys(item)
+              elif isinstance(value,list):
+                  for item in value: yield from keys(item)
+          assert not forbidden.intersection(keys(capture))
           PY
       - name: Retain live current-state observation
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

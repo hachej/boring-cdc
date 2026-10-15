@@ -429,4 +429,40 @@ stop_bounded "$runtime_pid" TERM runtime-restart
 runtime_pid=
 [[ ! -s "$work/runtime-restart.err" ]]
 BCDC_LIVE_JOURNAL_PATH="$journal" cargo test --locked live_m2_copied_transactions_are_admitted_by_m4 --lib -- --ignored --nocapture
+if [[ -n "${M2_CAPTURE_OBSERVATION_OUT:-}" ]]; then
+  [[ ! -e "$M2_CAPTURE_OBSERVATION_OUT" ]]
+  python3 - "$work/result.json" "$M2_CAPTURE_OBSERVATION_OUT" "$work/run/boring-cdc.toml" "$binary" <<'PY'
+import hashlib,json,pathlib,subprocess,sys
+result_path,out_path,config_path,binary_path=map(pathlib.Path,sys.argv[1:])
+result=json.loads(result_path.read_text())
+assert result['hard_kill_status']==137
+assert result['user_transactions']==6 and result['journal_sequence_gap_free']
+assert result['postgres_oracle_equals_journal']
+assert result['confirmed_flush_never_exceeded_durable_boundary']
+assert result['restart_lsn_never_regressed']
+def digest(path): return hashlib.sha256(path.read_bytes()).hexdigest()
+oracle=json.dumps(result['committed_oracle'],sort_keys=True,separators=(',',':')).encode()
+report={
+  'schema_version':'article2-capture-observation/v1',
+  'git_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+  'command':'scripts/acceptance/durable_simple_case.sh',
+  'versions':{'postgres':'17.6','postgres_image':'docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929'},
+  'input_sha256':{
+    'scenario':digest(pathlib.Path('scripts/acceptance/durable_simple_case.sh')),
+    'configuration':digest(config_path),
+    'compose':digest(pathlib.Path('compose.yaml')),
+    'cargo_lock':digest(pathlib.Path('Cargo.lock')),
+    'binary':digest(binary_path),
+  },
+  'profile':'durable-simple-six-transaction-crash/v1',
+  'source_oracle_sha256':hashlib.sha256(oracle).hexdigest(),
+  'counts':{'source_user_transactions':6,'journal_user_transactions':result['user_transactions'],'journal_events_at_oracle':result['journal_events'],'feedback_samples':len(result['feedback_boundaries'])},
+  'checks':{'sigkill_exit_137':True,'distinct_startup_run_ids':True,'source_oracle_equals_journal':True,'journal_sequence_gap_free':True,'confirmed_flush_bounded_by_durable_journal':True,'restart_lsn_nonregressing':True,'update_key_change_delete':True,'toast_inheritance':True},
+  'scope':'M2 source-to-durable-SQLite capture only; no M3 anchor, ClickHouse import, or managed-system result',
+  'status':'pass',
+}
+out_path.parent.mkdir(parents=True,exist_ok=True)
+out_path.write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')
+PY
+fi
 echo "DURABLE_SIMPLE_CASE_OK postgres=$version inserts=6 update=1 key_change=2 delete=1 toast=preserved heartbeat_and_fence=canonical crash=kill-9 oracle=set-equality sequence=gap-free feedback=bounded"
