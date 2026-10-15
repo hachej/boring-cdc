@@ -49,5 +49,6 @@ pub mod m4_clickhouse_audit;
 pub mod m4_clickhouse_durability;
 pub mod m4_clickhouse_schema;
 pub mod m4_clickhouse_wire;
+pub mod m4_initial_load;
 
 pub mod failure_policy;

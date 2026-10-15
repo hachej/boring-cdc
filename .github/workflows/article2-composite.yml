@@ -1,0 +1,65 @@
+name: Article 2 anchored ClickHouse candidate
+on:
+  pull_request:
+    paths:
+      - .github/workflows/article2-composite.yml
+      - scripts/e2e/article2_anchored_clickhouse.sh
+      - src/m2_capture_runtime.rs
+      - src/m2_event_envelope.rs
+      - src/m3_bootstrap.rs
+      - src/m4_initial_load.rs
+      - src/m4_clickhouse_durability.rs
+      - src/m4_clickhouse_wire.rs
+      - contracts/clickhouse/**
+  push:
+    branches: [master]
+    paths:
+      - .github/workflows/article2-composite.yml
+      - scripts/e2e/article2_anchored_clickhouse.sh
+      - src/m2_capture_runtime.rs
+      - src/m2_event_envelope.rs
+      - src/m3_bootstrap.rs
+      - src/m4_initial_load.rs
+      - src/m4_clickhouse_durability.rs
+      - src/m4_clickhouse_wire.rs
+      - contracts/clickhouse/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  anchored_candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TMPDIR: /var/tmp
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --component clippy,rustfmt --target x86_64-unknown-linux-gnu --no-self-update
+      - name: Validate ClickHouse contract
+        run: python3 scripts/validate/clickhouse_contract.py
+      - name: Run same-stream candidate twice
+        env:
+          BCDC_ARTICLE2_OBSERVATION_OUT: /var/tmp/article2-anchored-clickhouse-observation.json
+        run: scripts/e2e/article2_anchored_clickhouse.sh
+      - name: Summarize exact-head observation
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          path=pathlib.Path('/var/tmp/article2-anchored-clickhouse-observation.json')
+          packet=json.loads(path.read_text())
+          head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
+          assert packet['status']=='pass' and packet['git_commit']==head and packet['repeats']==2
+          assert packet['checks']['child_abort_after_remote_before_checkpoint']
+          print(json.dumps({'head':head,'observation_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'status':packet['status'],'scope':packet['scope']},sort_keys=True))
+          PY
+      - name: Preserve exact-head observation
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: article2-anchored-clickhouse-${{ github.event.pull_request.head.sha || github.sha }}
+          path: /var/tmp/article2-anchored-clickhouse-observation.json
+          if-no-files-found: warn

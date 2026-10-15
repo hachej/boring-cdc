@@ -1272,6 +1272,66 @@ mod live_tests {
     #[ignore = "requires pinned PostgreSQL 17.6 Compose"]
     fn exported_snapshot_uses_distinct_command_idle_sessions() {
         use crate::m2_schema::open_writer;
+        if let Some(path) = std::env::var_os("BCDC_ARTICLE2_ABORT_CHILD_PATH") {
+            use crate::m4_clickhouse_adapter::ProductionClickHouseAdapter;
+            use crate::m4_clickhouse_durability::{
+                BatchContext, dispatch_and_readback, prepare_batch,
+            };
+            use crate::m4_clickhouse_wire::PinnedClickHouseWire;
+            let path = std::path::PathBuf::from(path);
+            let first = std::env::var("BCDC_ARTICLE2_ABORT_CHILD_FIRST")
+                .unwrap()
+                .parse::<u64>()
+                .unwrap();
+            let count = std::env::var("BCDC_ARTICLE2_ABORT_CHILD_COUNT")
+                .unwrap()
+                .parse::<usize>()
+                .unwrap();
+            let mut writer = open_writer(&path, "m3-live", 1, 0).unwrap();
+            let copied = crate::m2_journal::read_complete_range(
+                &path,
+                first - 1,
+                count,
+                32 * 1024 * 1024,
+                std::time::Duration::from_secs(5),
+            )
+            .unwrap()
+            .unwrap();
+            let context = BatchContext {
+                destination_id: "snapshot-probe".into(),
+                capture_epoch: "1".into(),
+                generation: 1,
+                configuration_fingerprint: "live-config".into(),
+                lease_id: "article2-anchor-lease".into(),
+                run_id: "article2-same-stream".into(),
+            };
+            let batch = {
+                let tx = writer.connection_mut().transaction().unwrap();
+                let batch = prepare_batch(&tx, &context, copied).unwrap();
+                tx.commit().unwrap();
+                batch
+            };
+            assert!(!batch.events.is_empty());
+            let state: String = writer
+                .connection()
+                .query_row(
+                    "SELECT state FROM clickhouse_batch_intents WHERE intent_id=?1",
+                    [&batch.intent_id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(state, "dispatched");
+            let client = clickhouse::Client::default()
+                .with_url(std::env::var("BCDC_M4_CLICKHOUSE_URL").unwrap())
+                .with_user(std::env::var("BCDC_M4_CLICKHOUSE_USER").unwrap())
+                .with_password(std::env::var("BCDC_M4_CLICKHOUSE_PASSWORD").unwrap());
+            let mut adapter =
+                ProductionClickHouseAdapter::new(PinnedClickHouseWire::new(client).unwrap());
+            dispatch_and_readback(&mut adapter, &batch).unwrap();
+            eprintln!("M4_BOUNDARY_READY same_stream=1 after_remote_before_checkpoint=1");
+            std::process::abort();
+        }
+        let article2_same_stream = std::env::var_os("BCDC_ARTICLE2_SAME_STREAM").is_some();
         let dsn = std::env::var("BORING_CDC_M3_DSN").expect("BORING_CDC_M3_DSN");
         let slot = std::env::var("BORING_CDC_M3_SLOT")
             .unwrap_or_else(|_| "boring_cdc_m3_bootstrap_test".into());
@@ -1284,7 +1344,7 @@ mod live_tests {
         let (system_id, timeline_id, database_id, publication_fp, protocol_fp) =
             live_identity(&dsn, "boring_cdc_m3_pub", "public.m3_bootstrap_fixture");
         writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'1',?1,?2,?3,?4,'pgoutput',?5,?6)",rusqlite::params![system_id,timeline_id,database_id,slot,publication_fp,protocol_fp]).unwrap();
-        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('snapshot-probe','archive','live-config','1',1)",[]).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('snapshot-probe',?1,'live-config','1',1)",[if article2_same_stream {"clickhouse"} else {"archive"}]).unwrap();
         let relations = vec!["public.m3_bootstrap_fixture".to_string()];
         let assignment_digest = digest_assignment(&[0; 8]);
         let intent = PrepareIntent {
@@ -1492,7 +1552,7 @@ mod live_tests {
                 generation: 1,
                 nonce: [0x17; 16],
                 table_set_fingerprint: [0xaa; 32],
-                anchor_id: "snapshot-anchor".into(),
+                anchor_id: "b".repeat(64),
                 expires_at: "future".into(),
             })
             .unwrap();
@@ -1515,15 +1575,27 @@ mod live_tests {
             result.get_value(0, 3).as_deref(),
             Some("17171717171717171717171717171717")
         );
-        control
-            .exec("DELETE FROM boring_cdc_control.capture_fences WHERE id=1")
-            .unwrap();
-        assert!(matches!(
-            fence.dispatch_source("snapshot-fence", &mut control),
-            Err(crate::m3_fence::FenceError::Conflict(
-                "M3_FENCE_CONTROL_CARDINALITY"
-            ))
-        ));
+        if article2_same_stream {
+            admin
+                .exec("UPDATE public.m3_bootstrap_fixture SET payload='after' WHERE id=1")
+                .unwrap();
+            admin
+                .exec("INSERT INTO public.m3_bootstrap_fixture VALUES(2,'temporary')")
+                .unwrap();
+            admin
+                .exec("DELETE FROM public.m3_bootstrap_fixture WHERE id=2")
+                .unwrap();
+        } else {
+            control
+                .exec("DELETE FROM boring_cdc_control.capture_fences WHERE id=1")
+                .unwrap();
+            assert!(matches!(
+                fence.dispatch_source("snapshot-fence", &mut control),
+                Err(crate::m3_fence::FenceError::Conflict(
+                    "M3_FENCE_CONTROL_CARDINALITY"
+                ))
+            ));
+        }
         assert!(sessions.capture_alive());
         sessions.keepalive().unwrap();
         let writer = fence.into_writer();
@@ -1607,13 +1679,55 @@ mod live_tests {
             },
         )
         .unwrap();
+        let mut contracts = std::collections::BTreeMap::new();
+        if article2_same_stream {
+            use crate::m1_decoder::{Column, Relation, RelationContract};
+            let relation_id = altered_proof.relation_id.parse::<u32>().unwrap();
+            contracts.insert(
+                relation_id,
+                RelationContract {
+                    relation: Relation {
+                        id: relation_id,
+                        namespace: "public".into(),
+                        name: "m3_bootstrap_fixture".into(),
+                        replica_identity: b'd',
+                        columns: vec![
+                            Column {
+                                key: true,
+                                name: "id".into(),
+                                type_oid: 20,
+                                type_modifier: -1,
+                            },
+                            Column {
+                                key: false,
+                                name: "payload".into(),
+                                type_oid: 25,
+                                type_modifier: -1,
+                            },
+                        ],
+                    },
+                    key_columns: vec![0],
+                    control: None,
+                },
+            );
+        }
         let mut capture = CaptureRuntime::new(
             journal,
             spools,
             crate::m3_fence::PersistedFeedbackGate::new(&gate_reader, "live-intent", 1),
-            std::collections::BTreeMap::new(),
+            contracts,
             None,
         );
+        if article2_same_stream {
+            capture
+                .enable_canonical_bootstrap_capture(
+                    canonical_source.clone(),
+                    crate::m1_transition_kernel::CaptureEpoch::from_store(1),
+                    "boring_cdc_m3_pub".into(),
+                    pg_walstream::PgReplicationConnection::connect(&dsn).unwrap(),
+                )
+                .unwrap();
+        }
         let config = crate::article1_capture::CaptureConfig::production(
             dsn.clone(),
             "boring_cdc_m3_pub",
@@ -1630,12 +1744,15 @@ mod live_tests {
                 &config,
                 &pg_walstream::CancellationToken::new(),
                 &mut capture,
-                1,
+                if article2_same_stream { 4 } else { 1 },
                 5_000,
                 |_| Ok(true),
             ))
             .unwrap();
-        assert_eq!(capture.committed_transactions(), 1);
+        assert_eq!(
+            capture.committed_transactions(),
+            if article2_same_stream { 4 } else { 1 }
+        );
         let slot_owner = admin
             .exec(&format!(
                 "SELECT active_pid::text FROM pg_replication_slots WHERE slot_name='{slot}'"
@@ -1656,8 +1773,12 @@ mod live_tests {
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
             )
             .unwrap();
-        assert_eq!(u64::from_str_radix(&end_lsn, 16).unwrap(), durable_end_lsn);
-        assert_eq!(source_lsn, end_lsn);
+        if article2_same_stream {
+            assert!(u64::from_str_radix(&end_lsn, 16).unwrap() < durable_end_lsn);
+        } else {
+            assert_eq!(u64::from_str_radix(&end_lsn, 16).unwrap(), durable_end_lsn);
+            assert_eq!(source_lsn, end_lsn);
+        }
         assert_eq!(journal_seq, 1);
         assert_eq!(control_kind, "capture_fence");
         let captured: serde_json::Value = serde_json::from_slice(&payload).unwrap();
@@ -1677,14 +1798,193 @@ mod live_tests {
             .observe_durable("snapshot-fence", &transaction_id)
             .unwrap();
         assert!(!repeated.first_proof);
-        let writer = fence.into_writer();
+        let mut writer = fence.into_writer();
         let anchor: (String,String,String) = writer.connection().query_row(
-            "SELECT a.state,a.snapshot_schema_fingerprints,r.schema_fingerprint FROM bootstrap_anchors a JOIN relation_schemas r ON r.capture_epoch=a.capture_epoch WHERE a.anchor_id='snapshot-anchor'",
-            [], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
+            "SELECT a.state,a.snapshot_schema_fingerprints,r.schema_fingerprint FROM bootstrap_anchors a JOIN relation_schemas r ON r.capture_epoch=a.capture_epoch WHERE a.anchor_id=?1",
+            ["b".repeat(64)], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
         ).unwrap();
         assert_eq!(anchor.0, "complete");
         assert_eq!(anchor.1, format!("[\"{snapshot_schema_fingerprint}\"]"));
         assert_eq!(anchor.2, snapshot_schema_fingerprint);
+        if article2_same_stream {
+            use crate::m1_decoder::{Column, Relation, RelationContract};
+            use crate::m1_source_identity::{LogicalTableIdentity, RelationSchemaVersion};
+            use crate::m4_clickhouse_adapter::ProductionClickHouseAdapter;
+            use crate::m4_clickhouse_durability::{
+                BatchContext, ClickHouseBatchExecutor, Reconciliation, dispatch_and_readback,
+                finalize_checkpoint, mark_insert_dispatched, prepare_batch, reconcile_remote,
+            };
+            use crate::m4_clickhouse_wire::PinnedClickHouseWire;
+            use rusqlite::OptionalExtension;
+
+            let (canonical_schema, relation_id): (Vec<u8>, String) = writer.connection().query_row(
+                "SELECT canonical_schema,relation_id FROM relation_schemas WHERE schema_fingerprint=?1",
+                [&snapshot_schema_fingerprint],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            ).unwrap();
+            let table =
+                LogicalTableIdentity::derive(&canonical_source, "public", "m3_bootstrap_fixture");
+            let relation = RelationSchemaVersion::derive(
+                table,
+                relation_id.parse().unwrap(),
+                &canonical_schema,
+            )
+            .unwrap();
+            let contract = RelationContract {
+                relation: Relation {
+                    id: relation_id.parse().unwrap(),
+                    namespace: "public".into(),
+                    name: "m3_bootstrap_fixture".into(),
+                    replica_identity: b'd',
+                    columns: vec![
+                        Column {
+                            key: true,
+                            name: "id".into(),
+                            type_oid: 20,
+                            type_modifier: -1,
+                        },
+                        Column {
+                            key: false,
+                            name: "payload".into(),
+                            type_oid: 25,
+                            type_modifier: -1,
+                        },
+                    ],
+                },
+                key_columns: vec![0],
+                control: None,
+            };
+            let context = BatchContext {
+                destination_id: "snapshot-probe".into(),
+                capture_epoch: "1".into(),
+                generation: 1,
+                configuration_fingerprint: "live-config".into(),
+                lease_id: "article2-anchor-lease".into(),
+                run_id: "article2-same-stream".into(),
+            };
+            writer.connection().execute(
+                "INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES(?1,?2,'1',?3,1,'live-config',?4,999999,'held')",
+                rusqlite::params![context.lease_id,context.destination_id,"b".repeat(64),context.run_id],
+            ).unwrap();
+            crate::m4_initial_load::install(writer.connection()).unwrap();
+            let client = clickhouse::Client::default()
+                .with_url(std::env::var("BCDC_M4_CLICKHOUSE_URL").unwrap())
+                .with_user(std::env::var("BCDC_M4_CLICKHOUSE_USER").unwrap())
+                .with_password(std::env::var("BCDC_M4_CLICKHOUSE_PASSWORD").unwrap());
+            let mut adapter =
+                ProductionClickHouseAdapter::new(PinnedClickHouseWire::new(client).unwrap());
+            let snapshot = {
+                let tx = writer.connection_mut().transaction().unwrap();
+                let prepared = crate::m4_initial_load::prepare_snapshot_batch(
+                    &tx,
+                    &context,
+                    &"b".repeat(64),
+                    &contract,
+                    relation,
+                    1,
+                    1,
+                )
+                .unwrap();
+                tx.commit().unwrap();
+                prepared
+            };
+            {
+                let tx = writer.connection_mut().transaction().unwrap();
+                crate::m4_initial_load::mark_dispatched(&tx, &context, &snapshot).unwrap();
+                tx.commit().unwrap();
+            }
+            let remote_snapshot = dispatch_and_readback(&mut adapter, &snapshot.batch).unwrap();
+            assert_eq!(
+                reconcile_remote(&mut adapter, &snapshot.batch).unwrap(),
+                Reconciliation::Verified
+            );
+            assert!(!writer.connection().query_row("SELECT EXISTS(SELECT 1 FROM destination_checkpoints WHERE destination_id='snapshot-probe')",[],|row|row.get::<_,bool>(0)).unwrap());
+            // The remote marker exists; dropping and reopening SQLite crosses the ambiguous window.
+            drop(writer);
+            writer = open_writer(&path, "m3-live", 1, 0).unwrap();
+            {
+                let tx = writer.connection_mut().transaction().unwrap();
+                crate::m4_initial_load::finalize_verified(
+                    &tx,
+                    &context,
+                    &snapshot,
+                    &remote_snapshot,
+                )
+                .unwrap();
+                tx.commit().unwrap();
+            }
+            let boundaries:Vec<(u64,u64,usize)>=writer.connection().prepare(
+                "SELECT first_seq,last_seq,event_count FROM source_transactions WHERE capture_epoch='1' AND state='committed' ORDER BY first_seq"
+            ).unwrap().query_map([],|row|Ok((row.get(0)?,row.get(1)?,row.get(2)?))).unwrap().map(|row|row.unwrap()).collect();
+            assert_eq!(boundaries.len(), 4);
+            let mut saw_user_crash_window = false;
+            for (first, last, count) in boundaries {
+                let copied = crate::m2_journal::read_complete_range(
+                    &path,
+                    first - 1,
+                    count,
+                    32 * 1024 * 1024,
+                    std::time::Duration::from_secs(5),
+                )
+                .unwrap()
+                .unwrap();
+                assert_eq!((copied.first_seq, copied.last_seq), (first, last));
+                let batch = {
+                    let tx = writer.connection_mut().transaction().unwrap();
+                    let batch = prepare_batch(&tx, &context, copied).unwrap();
+                    tx.commit().unwrap();
+                    batch
+                };
+                {
+                    let tx = writer.connection_mut().transaction().unwrap();
+                    mark_insert_dispatched(&tx, &batch).unwrap();
+                    tx.commit().unwrap();
+                }
+                let remote = if !batch.events.is_empty() && !saw_user_crash_window {
+                    use std::os::unix::process::ExitStatusExt;
+                    saw_user_crash_window = true;
+                    let before:Option<u64>=writer.connection().query_row("SELECT journal_seq FROM destination_checkpoints WHERE destination_id='snapshot-probe'",[],|row|row.get(0)).optional().unwrap();
+                    assert!(before.is_some_and(|seq| seq < last));
+                    drop(writer);
+                    let child=std::process::Command::new(std::env::current_exe().unwrap())
+                        .arg("m3_bootstrap::live_tests::exported_snapshot_uses_distinct_command_idle_sessions")
+                        .arg("--ignored").arg("--exact").arg("--nocapture")
+                        .env("BCDC_ARTICLE2_ABORT_CHILD_PATH",&path)
+                        .env("BCDC_ARTICLE2_ABORT_CHILD_FIRST",first.to_string())
+                        .env("BCDC_ARTICLE2_ABORT_CHILD_COUNT",count.to_string())
+                        .output().unwrap();
+                    assert_eq!(child.status.signal(), Some(6));
+                    assert!(String::from_utf8_lossy(&child.stderr).contains(
+                        "M4_BOUNDARY_READY same_stream=1 after_remote_before_checkpoint=1"
+                    ));
+                    writer = open_writer(&path, "m3-live", 1, 0).unwrap();
+                    assert_eq!(
+                        reconcile_remote(&mut adapter, &batch).unwrap(),
+                        Reconciliation::Verified
+                    );
+                    adapter.read_batch(&batch.marker).unwrap().unwrap()
+                } else {
+                    dispatch_and_readback(&mut adapter, &batch).unwrap()
+                };
+                let revision:Option<u64>=writer.connection().query_row("SELECT revision FROM destination_checkpoints WHERE destination_id='snapshot-probe'",[],|row|row.get(0)).optional().unwrap();
+                let tx = writer.connection_mut().transaction().unwrap();
+                finalize_checkpoint(&tx, &context, &batch, &remote, revision).unwrap();
+                tx.commit().unwrap();
+            }
+            assert!(saw_user_crash_window);
+            let (checkpoint,checkpoint_anchor):(u64,String)=writer.connection().query_row("SELECT journal_seq,anchor_id FROM destination_checkpoints WHERE destination_id='snapshot-probe'",[],|row|Ok((row.get(0)?,row.get(1)?))).unwrap();
+            assert_eq!(checkpoint, 4);
+            assert_eq!(checkpoint_anchor, "b".repeat(64));
+            let oracle = admin
+                .exec("SELECT id::text,payload FROM public.m3_bootstrap_fixture ORDER BY id")
+                .unwrap();
+            assert_eq!(oracle.ntuples(), 1);
+            assert_eq!(oracle.get_value(0, 0).as_deref(), Some("1"));
+            assert_eq!(oracle.get_value(0, 1).as_deref(), Some("after"));
+            if let Some(path) = std::env::var_os("BCDC_ARTICLE2_ORACLE_OUT") {
+                std::fs::write(path,serde_json::to_vec(&serde_json::json!({"id":1,"payload":"after","anchor_id":checkpoint_anchor,"generation":1,"checkpoint":checkpoint})).unwrap()).unwrap();
+            }
+        }
         assert!(writer.connection().execute(
             "UPDATE m3_snapshot_schema_proofs SET schema_checksum='wrong' WHERE intent_id='live-intent'",
             [],
