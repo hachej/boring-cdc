@@ -367,13 +367,17 @@ class KickoffContracts(unittest.TestCase):
             self.assertIn(phrase, self.series)
         self.assertIn("No managed resource", self.series)
 
-    def test_series_records_unsafe_content_checkout_blocker(self):
+    def test_series_preserves_unsafe_checkout_and_records_source_note_resolution(self):
         self.assertIn("335ada9", self.series)
         self.assertIn("62c02e13110820d3289fc36932c80dc42ced774c721ce237a868df1b3d872ff4",
                       self.series)
         self.assertIn("checkout was therefore unsafe and was left untouched", self.series)
-        self.assertIn("keeps `boring-cdc-v01.5` open", self.series)
-        self.assertIn("no comparison may be commissioned", self.series)
+        self.assertIn("619e26b1d237a9ada0d796d83939a2217e4f6274", self.series)
+        self.assertIn("6c3cde74f303c75d9d103203aef73668b98510dfd7955afd4a035f124b168c32",
+                      self.series)
+        self.assertIn("Source-note reconciliation is complete", self.series)
+        self.assertIn("remains open for access, budget, sponsor disclosure, client review, and editorial inputs",
+                      self.series)
 
     def test_document_bead_links_resolve(self):
         for name in ["docs/PLAN.md", "docs/AGENT_SYSTEM.md", "docs/SERIES_EXECUTION.md"]:

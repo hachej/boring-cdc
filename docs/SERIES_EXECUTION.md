@@ -2,7 +2,7 @@
 
 This schedule connects the five Boring CDC articles to real implementation evidence. It does not change product scope, approve a technical decision, promise publication dates, or replace Beads readiness. Product obligations remain in [REQUIREMENTS.md](REQUIREMENTS.md), architecture and milestone exits in [PLAN.md](PLAN.md), and live ownership/dependencies in `br`.
 
-The source editorial context is `boring-content/research/clients/estuary/boring-cdc-series.md`. Its older Debezium-only/optional-extra-vendor notes conflict with the current CDC requirements. The policy for this experiment is **Estuary for externally visible comparisons; Debezium for capture/offset explanation only; no additional benchmark vendors**. The preparation owner must reconcile the source note before comparison commissioning or publication. No sponsor/client approval is inferred from this engineering schedule.
+The source editorial context is `boring-content/research/clients/estuary/boring-cdc-series.md`. Its comparison policy now agrees with the CDC requirements: **Estuary for externally visible comparisons; Debezium for capture/offset explanation only; no additional benchmark vendors**. The source-note correction is recorded below. No sponsor/client approval is inferred from this engineering schedule.
 
 ## Owners and preparation
 
@@ -94,11 +94,13 @@ Access evidence must classify each operation/result as `verified`, `manual`, or 
 
 Every article requires Julien's explicit editorial approval, sponsor approval/date, the approved one-sentence disclosure, completed client review window, its local evidence boundary, and either a measured matching external result or a prominently labeled unavailable result. None is currently publication-ready, no date is inferred, and no approval is automatic.
 
-### Source-note reconciliation blocker
+### Source-note reconciliation record
 
 Read-only inspection on 2026-09-17 found the separate `boring-content` checkout on `main` at `335ada9`, one commit ahead of `origin/main`, with modified `research/ideas.md` and unrelated untracked `.boring/`, image, client-output and draft-output paths. The source note `research/clients/estuary/boring-cdc-series.md` had SHA-256 `62c02e13110820d3289fc36932c80dc42ced774c721ce237a868df1b3d872ff4` and still contains conflicting Debezium-only and optional-extra-vendor directions. The checkout was therefore unsafe and was left untouched: no source-note edit, stage, commit or push occurred.
 
-This exact blocker keeps `boring-cdc-v01.5` open. Reconciliation requires an explicitly authorized, clean, isolated content branch/worktree that changes only the source note to Estuary-only external comparison and Debezium design-reference policy. Until a narrow content commit and its resulting note digest are recorded, no comparison may be commissioned and no article may be published. The canonical CDC requirements remain unambiguous and unchanged.
+This exact blocker kept `boring-cdc-v01.5` open at the 2026-09-17 snapshot. The canonical CDC requirements remained unambiguous.
+
+On 2026-10-15, narrow content PRs #2 and #4 merged the source-note correction without changing the unsafe checkout or unrelated content. The corrected note at `boring-content` main `619e26b1d237a9ada0d796d83939a2217e4f6274` has SHA-256 `6c3cde74f303c75d9d103203aef73668b98510dfd7955afd4a035f124b168c32`. It names Estuary as the only external comparison and Debezium as a design reference. Source-note reconciliation is complete. `boring-cdc-v01.5` remains open for access, budget, sponsor disclosure, client review, and editorial inputs; no managed comparison or publication is approved by this correction.
 
 ## Preserve the implementation story
 
