@@ -218,7 +218,20 @@ fn run_m2() -> Result<(), ReaderFailure> {
     })?;
     let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Run)
         .map_err(|e| ReaderFailure::unavailable(e.code, "runtime configuration is invalid"))?;
-    let mut ownership = acquire_production_ownership(&config, "production-run")
+    let mut random = [0u8; 16];
+    std::fs::File::open("/dev/urandom")
+        .and_then(|mut source| source.read_exact(&mut random))
+        .map_err(|_| {
+            ReaderFailure::unavailable("M2_RUN_ID_UNAVAILABLE", "run identity unavailable")
+        })?;
+    let run_id = format!(
+        "production-{}",
+        random
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>()
+    );
+    let mut ownership = acquire_production_ownership(&config, &run_id)
         .map_err(|e| ReaderFailure::unavailable(e.code, "capture ownership unavailable"))?;
     let status_address = config
         .public()
