@@ -476,14 +476,22 @@ pub fn finalize_checkpoint(
         return Err(DurabilityError::Conflict("batch was not dispatched"));
     }
 
+    let anchor_id = lease_anchor(transaction, context)?;
+    if let Some(anchor) = anchor_id.as_deref()
+        && !crate::m4_initial_load::baseline_verified(transaction, context, anchor)?
+    {
+        return Err(DurabilityError::Conflict(
+            "snapshot baseline is not verified",
+        ));
+    }
     let changed = match expected_checkpoint_revision {
         Some(revision) => transaction.execute(
-            "UPDATE destination_checkpoints SET complete_transaction_id=?1,journal_seq=?2,revision=revision+1 WHERE destination_id=?3 AND capture_epoch=?4 AND configuration_fingerprint=?5 AND generation=?6 AND journal_seq=?7 AND revision=?8 AND current_failure_id IS NULL",
-            params![batch.complete_transaction_id, batch.marker.last_journal_seq, context.destination_id, context.capture_epoch, context.configuration_fingerprint, context.generation, batch.marker.first_journal_seq - 1, revision],
+            "UPDATE destination_checkpoints SET complete_transaction_id=?1,journal_seq=?2,revision=revision+1 WHERE destination_id=?3 AND capture_epoch=?4 AND configuration_fingerprint=?5 AND generation=?6 AND journal_seq=?7 AND revision=?8 AND anchor_id IS ?9 AND current_failure_id IS NULL",
+            params![batch.complete_transaction_id, batch.marker.last_journal_seq, context.destination_id, context.capture_epoch, context.configuration_fingerprint, context.generation, batch.marker.first_journal_seq - 1, revision, anchor_id],
         )?,
         None if batch.marker.first_journal_seq == 1 => transaction.execute(
-            "INSERT INTO destination_checkpoints(destination_id,capture_epoch,anchor_id,configuration_fingerprint,generation,complete_transaction_id,journal_seq,current_failure_id,revision) SELECT ?1,?2,NULL,?3,?4,?5,?6,NULL,0 WHERE NOT EXISTS(SELECT 1 FROM destination_checkpoints WHERE destination_id=?1)",
-            params![context.destination_id, context.capture_epoch, context.configuration_fingerprint, context.generation, batch.complete_transaction_id, batch.marker.last_journal_seq],
+            "INSERT INTO destination_checkpoints(destination_id,capture_epoch,anchor_id,configuration_fingerprint,generation,complete_transaction_id,journal_seq,current_failure_id,revision) SELECT ?1,?2,?3,?4,?5,?6,?7,NULL,0 WHERE NOT EXISTS(SELECT 1 FROM destination_checkpoints WHERE destination_id=?1)",
+            params![context.destination_id, context.capture_epoch, anchor_id, context.configuration_fingerprint, context.generation, batch.complete_transaction_id, batch.marker.last_journal_seq],
         )?,
         None => 0,
     };
@@ -628,24 +636,46 @@ fn validate_destination_and_lease(
     }
 }
 
+fn lease_anchor(
+    transaction: &Transaction<'_>,
+    context: &BatchContext,
+) -> Result<Option<String>, DurabilityError> {
+    transaction
+        .query_row(
+            "SELECT anchor_id FROM destination_generation_leases WHERE lease_id=?1 AND destination_id=?2 AND capture_epoch=?3 AND generation=?4 AND configuration_fingerprint=?5 AND run_id=?6 AND state='held'",
+            params![context.lease_id, context.destination_id, context.capture_epoch, context.generation, context.configuration_fingerprint, context.run_id],
+            |row| row.get(0),
+        )
+        .map_err(DurabilityError::from)
+}
+
 fn validate_checkpoint_cursor(
     transaction: &Transaction<'_>,
     context: &BatchContext,
     first_seq: u64,
 ) -> Result<(), DurabilityError> {
-    let checkpoint: Option<(String, u64, String, u64)> = transaction
+    let anchor_id = lease_anchor(transaction, context)?;
+    if let Some(anchor) = anchor_id.as_deref()
+        && !crate::m4_initial_load::baseline_verified(transaction, context, anchor)?
+    {
+        return Err(DurabilityError::Conflict(
+            "snapshot baseline is not verified",
+        ));
+    }
+    let checkpoint: Option<(String, u64, String, u64, Option<String>)> = transaction
         .query_row(
-            "SELECT capture_epoch,generation,configuration_fingerprint,journal_seq FROM destination_checkpoints WHERE destination_id=?1",
+            "SELECT capture_epoch,generation,configuration_fingerprint,journal_seq,anchor_id FROM destination_checkpoints WHERE destination_id=?1",
             [&context.destination_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
         )
         .optional()?;
     match checkpoint {
         None if first_seq == 1 => Ok(()),
-        Some((epoch, generation, fingerprint, journal_seq))
+        Some((epoch, generation, fingerprint, journal_seq, checkpoint_anchor))
             if epoch == context.capture_epoch
                 && generation == context.generation
                 && fingerprint == context.configuration_fingerprint
+                && checkpoint_anchor == anchor_id
                 && journal_seq.checked_add(1) == Some(first_seq) =>
         {
             Ok(())
@@ -762,7 +792,7 @@ fn destination_events(events: &[CopiedEvent]) -> Result<Vec<DestinationEvent>, D
     Ok(destination)
 }
 
-fn ordered_event_digest(events: &[DestinationEvent]) -> String {
+pub(crate) fn ordered_event_digest(events: &[DestinationEvent]) -> String {
     ordered_identity_digest(events.iter().map(|event| {
         (
             event.journal_seq,
@@ -809,7 +839,10 @@ fn batch_id(
     format!("{:x}", digest.finalize())
 }
 
-fn verify_remote_batch(batch: &PreparedBatch, remote: &RemoteBatch) -> Result<(), DurabilityError> {
+pub(crate) fn verify_remote_batch(
+    batch: &PreparedBatch,
+    remote: &RemoteBatch,
+) -> Result<(), DurabilityError> {
     if remote.marker != batch.marker {
         return Err(DurabilityError::Conflict("remote batch marker mismatch"));
     }

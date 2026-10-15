@@ -340,7 +340,8 @@ impl BatchMarkerRow {
         marker: &BatchMarker,
         finalized_at_unix_ms: u64,
     ) -> Result<Self, RedactedWireError> {
-        if marker.first_journal_seq == 0
+        if (marker.first_journal_seq == 0
+            && (marker.last_journal_seq != 0 || marker.event_count == 0))
             || marker.first_journal_seq > marker.last_journal_seq
             || marker.capture_epoch == 0
             || marker.generation == 0
@@ -1207,6 +1208,20 @@ mod tests {
             canonical_payload: golden_preimage(),
         };
         (event, marker)
+    }
+
+    #[test]
+    fn snapshot_marker_uses_zero_sequence_only_with_snapshot_events() {
+        let (_, mut marker) = golden_event();
+        marker.first_journal_seq = 0;
+        marker.last_journal_seq = 0;
+        let row = BatchMarkerRow::from_marker(&marker, 1).unwrap();
+        assert_eq!(row.to_marker().unwrap(), marker);
+        marker.event_count = 0;
+        assert!(BatchMarkerRow::from_marker(&marker, 1).is_err());
+        marker.event_count = 1;
+        marker.last_journal_seq = 1;
+        assert!(BatchMarkerRow::from_marker(&marker, 1).is_err());
     }
 
     fn live_audit_identity(marker: &BatchMarker) -> AuditIdentity {

@@ -6,13 +6,14 @@
 
 use crate::m1_decoder::{OldTupleKind, RelationContract, RowChange, RowKind};
 use crate::m1_ordering::{
-    ColumnState, MutationKind, MutationPayload, MutationVersion, SourceOperation,
-    SourceSlotIdentity, WalIdentityInput, expand_key_change, source_version_for_row,
+    ColumnState, MutationKind, MutationPayload, MutationVersion, SnapshotIdentityInput,
+    SourceOperation, SourceSlotIdentity, WalIdentityInput, expand_key_change,
+    source_version_for_row,
 };
 use crate::m1_source_identity::{
     CanonicalKeyComponent, PhysicalKeyHash, RelationSchemaVersion, SourceIdentity,
 };
-use crate::m1_transition_kernel::{CaptureEpoch, ReceivedLsn};
+use crate::m1_transition_kernel::{CaptureEpoch, DestinationGeneration, ReceivedLsn};
 use crate::m2_pg_value::{canonical_columns, canonical_key};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::{Value, json};
@@ -40,6 +41,69 @@ pub struct WalMutationTemplate {
     pub source_mutation_ordinal: u8,
     pub relation_fingerprint: String,
     pub envelope: MutationEnvelope,
+}
+
+/// Render one row copied from an admitted M3 snapshot. The caller must verify the complete
+/// anchor, persisted chunk identity and relation schema before supplying this tuple.
+pub fn render_snapshot_row(
+    capture_epoch: CaptureEpoch,
+    generation: DestinationGeneration,
+    contract: &RelationContract,
+    relation: RelationSchemaVersion,
+    snapshot_boundary_lsn: ReceivedLsn,
+    chunk_ordinal: u64,
+    tuple: &[crate::m1_decoder::TupleValue],
+) -> Result<(String, MutationEnvelope), EnvelopeError> {
+    if contract.control.is_some() {
+        return Err(EnvelopeError::Invalid);
+    }
+    let key = canonical_key(contract, tuple, false).map_err(|_| EnvelopeError::Invalid)?;
+    let columns =
+        canonical_columns(&contract.relation, tuple).map_err(|_| EnvelopeError::Invalid)?;
+    if columns
+        .iter()
+        .any(|column| matches!(column, ColumnState::UnchangedToast))
+    {
+        return Err(EnvelopeError::Invalid);
+    }
+    let source_version = source_version_for_row(capture_epoch, snapshot_boundary_lsn, 0, 0)
+        .map_err(|_| EnvelopeError::Invalid)?;
+    let version = MutationVersion::from_snapshot(
+        source_version,
+        SnapshotIdentityInput {
+            capture_epoch,
+            generation,
+            logical_table_id: relation.logical_table,
+            chunk_id: chunk_ordinal,
+            key: key.clone(),
+        },
+    )
+    .map_err(|_| EnvelopeError::Invalid)?;
+    let key_modifiers = contract
+        .key_columns
+        .iter()
+        .map(|&index| {
+            contract
+                .relation
+                .columns
+                .get(index)
+                .map(|column| column.type_modifier)
+                .ok_or(EnvelopeError::Invalid)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let envelope = render_mutation_template(
+        &version,
+        &MutationPayload {
+            relation,
+            key,
+            operation: SourceOperation::Snapshot,
+            before_key: None,
+            kind: MutationKind::Upsert,
+            columns,
+        },
+        &key_modifiers,
+    )?;
+    Ok((version.connector_event_id().hex(), envelope))
 }
 
 pub struct ControlPosition<'a> {
@@ -620,5 +684,83 @@ mod tests {
             );
             assert_eq!(control.canonical_payload_hash, expected["payload_hash"]);
         }
+    }
+
+    #[test]
+    fn snapshot_row_uses_m1_identity_and_precedes_equal_lsn_wal() {
+        let source = SourceIdentity {
+            system_identifier: 72_623_859_790_382_856,
+            timeline: 1,
+            database_identity: 16_384,
+            slot_name: "boring_cdc".into(),
+            plugin: "pgoutput".into(),
+            publication_fingerprint: Fingerprint::digest(b"publication"),
+            protocol_fingerprint: supported_protocol_fingerprint(),
+        };
+        let table = LogicalTableIdentity::derive(&source, "public", "orders");
+        let relation = RelationSchemaVersion::derive(
+            table,
+            24_576,
+            include_bytes!("../tests/fixtures/m1_ordering/relation-contract.bin"),
+        )
+        .unwrap();
+        let contract = RelationContract {
+            relation: Relation {
+                id: 24_576,
+                namespace: "public".into(),
+                name: "orders".into(),
+                replica_identity: b'd',
+                columns: vec![Column {
+                    key: true,
+                    name: "id".into(),
+                    type_oid: 20,
+                    type_modifier: -1,
+                }],
+            },
+            key_columns: vec![0],
+            control: None,
+        };
+        let tuple = [TupleValue::Text(b"42".to_vec())];
+        let epoch = CaptureEpoch::from_store(7);
+        let lsn = ReceivedLsn::from_wire(112);
+        let (id, envelope) = render_snapshot_row(
+            epoch,
+            DestinationGeneration::from_store(3),
+            &contract,
+            relation,
+            lsn,
+            5,
+            &tuple,
+        )
+        .unwrap();
+        let event: Value = serde_json::from_slice(&envelope.json).unwrap();
+        let key = canonical_key(&contract, &tuple, false).unwrap();
+        let expected_id = crate::m1_ordering::snapshot_connector_event_id(&SnapshotIdentityInput {
+            capture_epoch: epoch,
+            generation: DestinationGeneration::from_store(3),
+            logical_table_id: table,
+            chunk_id: 5,
+            key,
+        })
+        .unwrap()
+        .hex();
+        assert_eq!(id, expected_id);
+        assert_eq!(event["operation"], "snapshot");
+        assert_eq!(event["journal_seq"], 0);
+        assert_eq!(event["source_version"]["lsn_u64"], 112);
+        assert_eq!(event["source_version"]["origin_rank"], 0);
+        assert_eq!(event["source_version"]["transaction_ordinal"], 0);
+        assert_eq!(event["payload_hash"], envelope.canonical_payload_hash);
+        let (other_id, _) = render_snapshot_row(
+            epoch,
+            DestinationGeneration::from_store(3),
+            &contract,
+            relation,
+            lsn,
+            6,
+            &tuple,
+        )
+        .unwrap();
+        assert_ne!(id, other_id);
     }
 }

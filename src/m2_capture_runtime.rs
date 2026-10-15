@@ -514,6 +514,7 @@ pub struct CaptureRuntime<J, S, G> {
     active_failure: Option<crate::failure_policy::FailureRecord>,
     pressure: Option<RuntimePressureConfig>,
     canonical: Option<CanonicalCaptureContext>,
+    bootstrap_raw_control_rows: bool,
 }
 
 impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G> {
@@ -542,7 +543,33 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             active_failure: None,
             pressure: None,
             canonical: None,
+            bootstrap_raw_control_rows: false,
         }
+    }
+
+    /// Activate M0 event rendering for a bootstrap-owned capture connection after the imported
+    /// snapshot schema and source identity have been proved. Relation messages still trigger a
+    /// fresh catalog read before any row reaches the journal.
+    pub fn enable_canonical_bootstrap_capture(
+        &mut self,
+        source: crate::m1_source_identity::SourceIdentity,
+        capture_epoch: crate::m1_transition_kernel::CaptureEpoch,
+        publication: String,
+        catalog: PgReplicationConnection,
+    ) -> Result<(), RuntimeError> {
+        if self.state != RuntimeState::Starting || self.active.is_some() || self.canonical.is_some()
+        {
+            return Err(RuntimeError::Protocol("canonical_capture_already_started"));
+        }
+        self.canonical = Some(CanonicalCaptureContext {
+            source,
+            capture_epoch,
+            publication,
+            catalog,
+            relations: BTreeMap::new(),
+        });
+        self.bootstrap_raw_control_rows = true;
+        Ok(())
     }
     pub fn state(&self) -> RuntimeState {
         self.state
@@ -893,6 +920,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             let staged: StagedEventOwned = serde_json::from_slice(&staged)
                 .map_err(|_| RuntimeError::Protocol("staged_event_corrupt"))?;
             if let Some(canonical) = self.canonical.as_ref()
+                && !self.bootstrap_raw_control_rows
                 && let Some(kind) = staged.control_kind.as_deref()
             {
                 let row = decode_staged_row(&staged.payload, active.xid)?;
