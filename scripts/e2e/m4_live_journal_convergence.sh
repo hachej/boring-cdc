@@ -34,12 +34,12 @@ port=${endpoint##*:}
 export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:$port" BCDC_M4_CLICKHOUSE_USER=bcdc_probe BCDC_M4_CLICKHOUSE_PASSWORD=$password
 export M4_CONVERGENCE_ORACLE_OUT="$work/oracle.json"
 if ! scripts/acceptance/durable_simple_case.sh >"$work/capture.log" 2>&1; then
-  rg -o 'M[0-9]_[A-Z0-9_]+|E_[A-Z0-9_]+' "$work/capture.log" | tail -n 20 >&2 || true
+  grep -Eo 'M[0-9]_[A-Z0-9_]+|E_[A-Z0-9_]+' "$work/capture.log" | tail -n 20 >&2 || true
   echo M4_LIVE_JOURNAL_CAPTURE_FAILED >&2
   exit 1
 fi
-rg -q '^M4_LIVE_JOURNAL_OK ' "$work/capture.log"
-rg -q '^DURABLE_SIMPLE_CASE_OK ' "$work/capture.log"
+grep -q '^M4_LIVE_JOURNAL_OK ' "$work/capture.log"
+grep -q '^DURABLE_SIMPLE_CASE_OK ' "$work/capture.log"
 [[ "$(ch --query 'SELECT count() FROM boring_cdc.live_generation_v1 WHERE capture_epoch=1')" == 0 ]]
 logical_table_id=$(ch --query 'SELECT DISTINCT logical_table_id FROM boring_cdc.event_history_v1 WHERE capture_epoch=1 AND generation=6')
 [[ "$logical_table_id" =~ ^[0-9a-f]{64}$ ]]
@@ -89,7 +89,7 @@ if docker exec -i "$container" clickhouse-client --user bcdc_probe --password "$
   echo M4_EVENT_CONFLICT_NOT_REJECTED >&2
   exit 1
 fi
-rg -q 'BCDC_CH_INTEGRITY_CONFLICT' "$work/conflict.err"
+grep -q 'BCDC_CH_INTEGRITY_CONFLICT' "$work/conflict.err"
 ch --query "INSERT INTO boring_cdc.generation_selectors_v1 VALUES (1,2,5,'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd')"
 [[ "$(ch --query 'SELECT count() FROM boring_cdc.selector_conflicts_v1 WHERE capture_epoch=1 AND promotion_fence=2')" == 1 ]]
 [[ "$(ch --query 'SELECT count() FROM boring_cdc.live_generation_v1 WHERE capture_epoch=1')" == 0 ]]
