@@ -612,7 +612,7 @@ impl ImporterSession {
         Ok(())
     }
 
-    fn into_acknowledged(
+    pub(crate) fn into_acknowledged(
         self,
         importer_id: String,
         assigned_ranges_digest: String,

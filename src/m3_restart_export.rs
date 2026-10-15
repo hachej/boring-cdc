@@ -53,12 +53,12 @@ impl fmt::Debug for ExportError {
 }
 
 pub struct GuardReceipt {
-    restart_id: String,
-    owner_run_id: String,
-    generation_id: String,
-    lower_stitch_lsn: String,
-    lower_stitch_seq: u64,
-    guard_backend_pid: i32,
+    pub(crate) restart_id: String,
+    pub(crate) owner_run_id: String,
+    pub(crate) generation_id: String,
+    pub(crate) lower_stitch_lsn: String,
+    pub(crate) lower_stitch_seq: u64,
+    pub(crate) guard_backend_pid: i32,
 }
 
 /// Records the held DDL guard only while the original lower pin and sole writer remain valid.
@@ -115,6 +115,17 @@ fn record_guard_pid(
     })
 }
 
+#[cfg(test)]
+pub(crate) fn record_guard_for_test(
+    writer: &mut WriterConnection,
+    lower: &LowerStitch,
+    owner_run_id: &str,
+    guard_backend_pid: i32,
+    now_mono_ms: u64,
+) -> Result<GuardReceipt, ExportError> {
+    record_guard_pid(writer, lower, owner_run_id, guard_backend_pid, now_mono_ms)
+}
+
 pub struct ExistingSlotExporter {
     connection: pg_walstream::PgReplicationConnection,
     backend_pid: i32,
@@ -126,6 +137,7 @@ impl ExistingSlotExporter {
     /// another replication stream. The caller retains the guard and the existing capture session.
     pub fn open(
         dsn: &str,
+        writer: &WriterConnection,
         guard: &mut GuardSession,
         receipt: &GuardReceipt,
     ) -> Result<Self, ExportError> {
@@ -133,6 +145,14 @@ impl ExistingSlotExporter {
             return Err(ExportError::Stale);
         }
         guard.keepalive().map_err(ExportError::Source)?;
+        let assigned: bool = writer.connection().query_row(
+            "SELECT EXISTS(SELECT 1 FROM m3_restart_importers WHERE restart_id=?1 AND state='assigned')",
+            [&receipt.restart_id],
+            |r| r.get(0),
+        )?;
+        if !assigned {
+            return Err(ExportError::Stale);
+        }
         let mut connection = pg_walstream::PgReplicationConnection::connect(dsn).map_err(|_| {
             ExportError::Source(BootstrapError::Conflict("M3_RESTART_EXPORT_CONNECT_FAILED"))
         })?;
@@ -351,8 +371,12 @@ mod tests {
 #[cfg(test)]
 mod live_tests {
     use super::*;
-    use crate::m3_bootstrap::{ImporterSession, SessionBounds};
+    use crate::m3_bootstrap::{SessionBounds, digest_assignment};
     use crate::m3_restart::{prepare_lower_stitch, tests as lower_fixture};
+    use crate::m3_restart_import::{
+        ImportRequest, ImporterAssignment, exporter_release_permitted, import_and_acknowledge,
+        prepare_assignments,
+    };
 
     #[test]
     #[ignore = "requires isolated PostgreSQL 17.6 with logical replication"]
@@ -383,20 +407,39 @@ mod live_tests {
         .unwrap();
         guard.verify_relations(&relations).unwrap();
         let receipt = record_guard_acquired(&mut writer, &lower, "owner", &mut guard, 1).unwrap();
-        let mut exporter = ExistingSlotExporter::open(&dsn, &mut guard, &receipt).unwrap();
+        let digest = digest_assignment(b"all");
+        prepare_assignments(
+            &mut writer,
+            &receipt,
+            &[ImporterAssignment {
+                importer_id: "worker",
+                assigned_ranges_digest: &digest,
+            }],
+            1,
+        )
+        .unwrap();
+        let mut exporter = ExistingSlotExporter::open(&dsn, &writer, &mut guard, &receipt).unwrap();
         assert!(matches!(exporter.snapshot_token(), Err(ExportError::Stale)));
         exporter
             .persist(&mut writer, &mut guard, &receipt, 1)
             .unwrap();
-        let token = exporter.snapshot_token().unwrap();
-        let mut importer = ImporterSession::import(
-            &dsn,
-            token,
-            bounds.statement_timeout_ms,
-            bounds.idle_timeout_ms,
+        assert!(!exporter_release_permitted(&writer, &receipt, &mut guard, &exporter, 1).unwrap());
+        let importer = import_and_acknowledge(
+            &mut writer,
+            &receipt,
+            &mut guard,
+            &exporter,
+            ImportRequest {
+                dsn: &dsn,
+                importer_id: "worker",
+                relations: &relations,
+                schema_fingerprint: "schema",
+                bounds,
+                now_mono_ms: 1,
+            },
         )
         .unwrap();
-        importer.verify_relations(&relations).unwrap();
+        assert!(exporter_release_permitted(&writer, &receipt, &mut guard, &exporter, 1).unwrap());
         let slot_count = admin
             .exec(&format!(
                 "SELECT count(*)::text FROM pg_replication_slots WHERE slot_name='{slot}'"
