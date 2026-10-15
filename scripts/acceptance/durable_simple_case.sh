@@ -133,11 +133,21 @@ wait_for_active_slot() {
 }
 assert_operator_result_socket() {
   python3 - "$work/run/run/boring-cdc/operator.sock" <<'PY'
-import json,socket,struct,sys
+import json,socket,struct,sys,time
 request=json.dumps({'kind':'result','schema_version':1,'expected_run_id':'missing-run','request_id':'missing-request','canonical_payload_digest':'missing-digest'},separators=(',',':')).encode()
-with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
-    peer.settimeout(3)
-    peer.connect(sys.argv[1])
+deadline=time.monotonic()+5
+while True:
+    try:
+        peer=socket.socket(socket.AF_UNIX,socket.SOCK_STREAM)
+        peer.settimeout(3)
+        peer.connect(sys.argv[1])
+        break
+    except (FileNotFoundError,ConnectionRefusedError):
+        peer.close()
+        if time.monotonic()>=deadline:
+            raise
+        time.sleep(.05)
+with peer:
     peer.sendall(struct.pack('!I',len(request))+request)
     peer.shutdown(socket.SHUT_WR)
     header=peer.recv(4)
@@ -410,6 +420,10 @@ for payload_text,preimage,canonical_hash in rows:
     assert preimage and hashlib.sha256(preimage).hexdigest()==canonical_hash==json.loads(payload_text)['payload_hash']
 print('DURABLE_TOAST_OK explicit_value=1 unchanged_toast=1 canonical_hashes=bound')
 PY
+
+if [[ -n "${M4_CONVERGENCE_ORACLE_OUT:-}" ]]; then
+  psqlc -Atqc "SELECT json_agg(json_build_object('id',id,'total',total::text,'memo',memo) ORDER BY id) FROM public.orders" >"$M4_CONVERGENCE_ORACLE_OUT"
+fi
 
 stop_bounded "$runtime_pid" TERM runtime-restart
 runtime_pid=

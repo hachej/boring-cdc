@@ -503,3 +503,33 @@ jobs:
         env:
           TMPDIR: /var/tmp
         run: scripts/acceptance/schema_change_live.sh
+  m4_live_journal_convergence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --target x86_64-unknown-linux-gnu --no-self-update
+      - name: Live M2 journal to ClickHouse current-state proof
+        timeout-minutes: 15
+        env:
+          TMPDIR: /var/tmp
+        run: |
+          packet="$PWD/artifacts/boring-cdc-m4-live-journal/SCN-M4-CURRENT-STATE/current-head"
+          M4_CONVERGENCE_OUT="$packet/observation.json" scripts/e2e/m4_live_journal_convergence.sh
+          python3 - "$packet/observation.json" <<'PY'
+          import json,sys
+          report=json.load(open(sys.argv[1]))
+          assert report['status']=='pass'
+          assert report['physical_replay_rows']>report['logical_event_ids']
+          assert all(report['checks'].values())
+          PY
+      - name: Retain live current-state observation
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: m4-live-journal-convergence
+          path: artifacts/boring-cdc-m4-live-journal/SCN-M4-CURRENT-STATE/current-head
+          if-no-files-found: error
