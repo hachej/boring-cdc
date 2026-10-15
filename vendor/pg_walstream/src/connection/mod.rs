@@ -24,6 +24,13 @@ mod libpq;
 #[cfg(all(feature = "libpq", not(feature = "rustls-tls")))]
 pub use libpq::{PgReplicationConnection, PgResult};
 
+/// Owned parameter bytes for a PostgreSQL extended-protocol query.
+#[derive(Clone)]
+pub enum PgParameter {
+    Text(String),
+    Binary(Vec<u8>),
+}
+
 // ── rustls-tls backend ──────────────────────────────────────────────────────
 
 #[cfg(feature = "rustls-tls")]

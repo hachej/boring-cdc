@@ -7,6 +7,7 @@
 
 use crate::m2_capture_runtime::{FeedbackGate, FeedbackPermit};
 use crate::m2_schema::WriterConnection;
+use pg_walstream::{PgParameter, PgReplicationConnection, ReplicationError};
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -51,12 +52,14 @@ pub enum FenceError {
     Invalid(&'static str),
     Conflict(&'static str),
     Sqlite(rusqlite::Error),
+    Source(ReplicationError),
 }
 impl fmt::Display for FenceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Invalid(v) | Self::Conflict(v) => f.write_str(v),
             Self::Sqlite(_) => f.write_str("M3_FENCE_STORE_FAILED"),
+            Self::Source(_) => f.write_str("M3_FENCE_SOURCE_FAILED"),
         }
     }
 }
@@ -64,6 +67,11 @@ impl std::error::Error for FenceError {}
 impl From<rusqlite::Error> for FenceError {
     fn from(value: rusqlite::Error) -> Self {
         Self::Sqlite(value)
+    }
+}
+impl From<ReplicationError> for FenceError {
+    fn from(value: ReplicationError) -> Self {
+        Self::Source(value)
     }
 }
 
@@ -348,6 +356,34 @@ impl FenceStore {
         Ok(Self { writer })
     }
 
+    pub fn into_writer(self) -> WriterConnection {
+        self.writer
+    }
+
+    /// Dispatch only the persisted intent. A crash after the source UPDATE retries the same nonce.
+    pub fn dispatch_source(
+        &mut self,
+        intent_id: &str,
+        source: &mut PgReplicationConnection,
+    ) -> Result<(), FenceError> {
+        let dispatch = self.load_dispatch(intent_id)?;
+        let epoch = dispatch.capture_epoch.to_string();
+        let generation = dispatch.generation.to_string();
+        let result = source.exec_params(
+            &dispatch.sql,
+            &[
+                PgParameter::Text(epoch),
+                PgParameter::Text(generation),
+                PgParameter::Binary(dispatch.table_set_fingerprint.to_vec()),
+                PgParameter::Binary(dispatch.nonce.to_vec()),
+            ],
+        )?;
+        if result.ntuples() != 1 || result.get_value(0, 0).as_deref() != Some("1") {
+            return Err(FenceError::Conflict("M3_FENCE_CONTROL_CARDINALITY"));
+        }
+        self.mark_dispatched(intent_id, 1)
+    }
+
     /// Persists the unique nonce before returning the one-row source UPDATE dispatch.
     pub fn prepare_after_copy(
         &mut self,
@@ -595,7 +631,7 @@ fn dispatch(
     table_set_fingerprint: [u8; 32],
     nonce: [u8; 16],
 ) -> FenceDispatch {
-    FenceDispatch{sql:"UPDATE boring_cdc_control.capture_fences SET capture_epoch=$1,generation=$2,table_set_fingerprint=$3,unique_nonce=$4 WHERE id=1".into(),capture_epoch,generation,table_set_fingerprint,nonce}
+    FenceDispatch{sql:"UPDATE boring_cdc_control.capture_fences SET capture_epoch=$1,generation=$2,table_set_fingerprint=$3,unique_nonce=$4 WHERE id=1 RETURNING id".into(),capture_epoch,generation,table_set_fingerprint,nonce}
 }
 pub fn fence_payload(
     capture_epoch: i64,
@@ -1167,7 +1203,7 @@ mod tests {
         assert_eq!(dispatch.generation, 1);
         assert_eq!(dispatch.table_set_fingerprint, [0xaa; 32]);
         assert_eq!(dispatch.nonce, nonce());
-        assert!(dispatch.sql.ends_with("WHERE id=1"));
+        assert!(dispatch.sql.ends_with("WHERE id=1 RETURNING id"));
         assert!(s.mark_dispatched("intent", 0).is_err());
         assert!(s.mark_dispatched("intent", 2).is_err());
         s.mark_dispatched("intent", 1).unwrap();

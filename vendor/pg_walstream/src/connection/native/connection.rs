@@ -17,6 +17,7 @@ use super::conninfo::ConnInfo;
 use super::startup::{self, Transport};
 use super::{copy, query, wire};
 use super::{NativePgResult, NativeResultStatus, ReceiveBufferStats};
+use super::super::PgParameter;
 
 use crate::buffer::BufferWriter;
 use crate::error::{ReplicationError, Result};
@@ -40,6 +41,11 @@ enum Command {
     /// status and `is_ok`, so this stays a thin I/O primitive.
     Query {
         sql: String,
+        reply: std_mpsc::Sender<Result<NativePgResult>>,
+    },
+    ParameterizedQuery {
+        sql: String,
+        params: Vec<PgParameter>,
         reply: std_mpsc::Sender<Result<NativePgResult>>,
     },
     /// Run a simple query using one fixed-capacity receive allocation.
@@ -96,6 +102,10 @@ struct Worker {
 impl Worker {
     async fn query(&mut self, sql: &str) -> Result<NativePgResult> {
         query::simple_query(&mut self.transport, &mut self.read_buf, sql).await
+    }
+
+    async fn parameterized_query(&mut self, sql: &str, params: &[PgParameter]) -> Result<NativePgResult> {
+        query::parameterized_query(&mut self.transport, &mut self.read_buf, sql, params).await
     }
 
     async fn bounded_query(
@@ -176,6 +186,10 @@ impl Worker {
             }
             Some(Command::Query { sql, reply }) => {
                 let _ = reply.send(self.query(&sql).await);
+                StreamCmd::Continue
+            }
+            Some(Command::ParameterizedQuery { sql, params, reply }) => {
+                let _ = reply.send(self.parameterized_query(&sql, &params).await);
                 StreamCmd::Continue
             }
             Some(Command::BoundedQuery { sql, limits, reply }) => {
@@ -321,6 +335,9 @@ fn run_worker(
             match cmd {
                 Command::Query { sql, reply } => {
                     let _ = reply.send(worker.query(&sql).await);
+                }
+                Command::ParameterizedQuery { sql, params, reply } => {
+                    let _ = reply.send(worker.parameterized_query(&sql, &params).await);
                 }
                 Command::BoundedQuery { sql, limits, reply } => {
                     let _ = reply.send(worker.bounded_query(&sql, limits).await);
@@ -548,6 +565,25 @@ impl NativeConnection {
         }
     }
 
+    fn run_parameterized_query(&mut self, sql: &str, params: &[PgParameter]) -> Result<NativePgResult> {
+        match &mut self.driver {
+            Driver::Inline { worker, handle, .. } => {
+                run_sync(handle, worker.parameterized_query(sql, params))
+            }
+            Driver::Threaded { cmd_tx, .. } => {
+                let (reply_tx, reply_rx) = std_mpsc::channel();
+                cmd_tx
+                    .send(Command::ParameterizedQuery {
+                        sql: sql.to_string(),
+                        params: params.to_vec(),
+                        reply: reply_tx,
+                    })
+                    .map_err(|_| Self::worker_gone())?;
+                reply_rx.recv().map_err(|_| Self::worker_gone())?
+            }
+        }
+    }
+
     #[cold]
     fn worker_gone() -> ReplicationError {
         ReplicationError::backend("native worker thread is gone")
@@ -637,6 +673,19 @@ impl NativeConnection {
             )));
         }
 
+        Ok(result)
+    }
+
+    /// Execute an extended-protocol query with bound parameters.
+    pub fn exec_params(&mut self, sql: &str, params: &[PgParameter]) -> Result<NativePgResult> {
+        let result = self.run_parameterized_query(sql, params)?;
+        if !result.is_ok() {
+            return Err(ReplicationError::protocol(
+                result
+                    .error_message()
+                    .unwrap_or_else(|| "Parameterized query failed".to_string()),
+            ));
+        }
         Ok(result)
     }
 
