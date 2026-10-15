@@ -33,6 +33,7 @@ endpoint=$(docker port "$container" 8123/tcp)
 port=${endpoint##*:}
 export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:$port" BCDC_M4_CLICKHOUSE_USER=bcdc_probe BCDC_M4_CLICKHOUSE_PASSWORD=$password
 export M4_CONVERGENCE_ORACLE_OUT="$work/oracle.json"
+export M2_CAPTURE_OBSERVATION_OUT="$work/capture-observation.json"
 if ! scripts/acceptance/durable_simple_case.sh >"$work/capture.log" 2>&1; then
   grep -Eo 'M[0-9]_[A-Z0-9_]+|E_[A-Z0-9_]+' "$work/capture.log" | tail -n 20 >&2 || true
   echo M4_LIVE_JOURNAL_CAPTURE_FAILED >&2
@@ -125,5 +126,6 @@ report={
 pathlib.Path(out).parent.mkdir(parents=True,exist_ok=True)
 pathlib.Path(out).write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')
 PY
+  cp -f "$M2_CAPTURE_OBSERVATION_OUT" "$(dirname "$M4_CONVERGENCE_OUT")/capture-observation.json"
 fi
 printf 'M4_LIVE_JOURNAL_CONVERGENCE_OK postgres=17.6 clickhouse=25.8.2.29 replay_physical=%s replay_logical=%s selector=synthetic_component_only\n' "$physical_replays" "$logical_events"
