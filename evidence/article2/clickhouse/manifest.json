@@ -1,0 +1,14 @@
+{
+  "schema_version": "article2-clickhouse-component-packet/v1",
+  "owner_bead": "boring-cdc-m4.2",
+  "source_commit": "c894dd25d56957f2997db31b51d8d08eb9af6e41",
+  "source_ci_run": "https://github.com/hachej/boring-cdc/actions/runs/38737982759",
+  "source_ci_job": "m4_live_journal_convergence",
+  "artifact_name": "m4-live-journal-convergence",
+  "observation_path": "evidence/article2/clickhouse/observation.json",
+  "observation_sha256": "23a17fd5e440813771ff923e6ddc272bc83106e6280b254e950d203bcb02548f",
+  "abort_test": "m4_clickhouse_durability::tests::live_m2_copied_transactions_are_admitted_by_m4",
+  "abort_test_source_sha256": "f8617bce8af96446cbe84cfd3218f985cdfd4f27d86f726cea8e1c112dfdcb6b",
+  "evidence_tier": "component",
+  "scope": "Live PostgreSQL 17.6 M2 journal to ClickHouse 25.8.2.29 with synthetic selector; no M3 snapshot import or production promotion"
+}
