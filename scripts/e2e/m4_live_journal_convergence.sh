@@ -31,7 +31,7 @@ done
 docker exec -i "$container" clickhouse-client --user bcdc_probe --password "$password" --multiquery < contracts/clickhouse/ddl.sql
 endpoint=$(docker port "$container" 8123/tcp)
 port=${endpoint##*:}
-export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:$port" BCDC_M4_CLICKHOUSE_USER=bcdc_probe BCDC_M4_CLICKHOUSE_PASSWORD="$password"
+export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:$port" BCDC_M4_CLICKHOUSE_USER=bcdc_probe BCDC_M4_CLICKHOUSE_PASSWORD=$password
 export M4_CONVERGENCE_ORACLE_OUT="$work/oracle.json"
 if ! scripts/acceptance/durable_simple_case.sh >"$work/capture.log" 2>&1; then
   rg -o 'M[0-9]_[A-Z0-9_]+|E_[A-Z0-9_]+' "$work/capture.log" | tail -n 20 >&2 || true
