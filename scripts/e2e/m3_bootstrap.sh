@@ -5,7 +5,7 @@ set +e
 bootstrap_dispatch=$(cargo run --locked --quiet -- run --bootstrap 2>&1)
 bootstrap_dispatch_status=$?
 set -e
-[[ $bootstrap_dispatch_status -eq 75 && "$bootstrap_dispatch" == M3_CONFIG_UNAVAILABLE:* ]]
+[[ $bootstrap_dispatch_status -eq 4 && "$bootstrap_dispatch" == M3_CONFIG_UNAVAILABLE:* ]]
 work=$(mktemp -d /var/tmp/m3-bootstrap-e2e.XXXXXX);project="m3-bootstrap-$RANDOM-$$";port=$((54000+$$%1000))
 cleanup(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1||true;rm -rf "$work";};trap cleanup EXIT INT TERM
 python3 - <<'PY' >"$work/postgres_password"

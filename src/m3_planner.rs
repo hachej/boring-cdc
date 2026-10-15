@@ -320,9 +320,27 @@ pub struct PlannerStore {
 }
 impl PlannerStore {
     pub fn open(writer: WriterConnection, limits: PlannerLimits) -> Result<Self, PlannerError> {
-        let limits = limits.validate()?;
-        writer.connection().execute_batch(INSTALL_SQL)?;
+        Self::open_recoverable(writer, limits).map_err(|(error, _writer)| error)
+    }
+
+    /// Return the same writer on admission failure so a bootstrap owner can invalidate its
+    /// generation without opening a competing SQLite writer.
+    pub fn open_recoverable(
+        writer: WriterConnection,
+        limits: PlannerLimits,
+    ) -> Result<Self, (PlannerError, Box<WriterConnection>)> {
+        let limits = match limits.validate() {
+            Ok(limits) => limits,
+            Err(error) => return Err((error, Box::new(writer))),
+        };
+        if let Err(error) = writer.connection().execute_batch(INSTALL_SQL) {
+            return Err((PlannerError::Sqlite(error), Box::new(writer)));
+        }
         Ok(Self { writer, limits })
+    }
+
+    pub fn into_writer(self) -> WriterConnection {
+        self.writer
     }
 
     pub fn persist_plan(&mut self, input: &PlanInput) -> Result<usize, PlannerError> {
