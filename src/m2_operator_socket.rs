@@ -52,11 +52,19 @@ impl OperatorSocket {
         }
         let response_limit = usize::try_from(config.max_response_bytes.0)
             .map_err(|_| "M2_OPERATOR_CONFIG_INVALID")?;
-        encode_operator_response_frame(
-            &response_error("CLI_OPERATOR_FRAME_INVALID", "operator frame is invalid"),
-            response_limit,
-        )
-        .map_err(|_| "M2_OPERATOR_CONFIG_INVALID")?;
+        let request_limit = usize::try_from(config.max_request_bytes.0)
+            .map_err(|_| "M2_OPERATOR_CONFIG_INVALID")?;
+        for (code, message) in [
+            ("CLI_OPERATOR_FRAME_INVALID", "operator frame is invalid"),
+            (
+                "CLI_OPERATOR_FRAME_TOO_LARGE",
+                "operator response is too large",
+            ),
+            ("CLI_OPERATOR_PEER_DENIED", "operator peer is denied"),
+        ] {
+            encode_operator_response_frame(&response_error(code, message), response_limit)
+                .map_err(|_| "M2_OPERATOR_CONFIG_INVALID")?;
+        }
         let path = prepare_path(root, Path::new(&config.socket_path))?;
         let listener = UnixListener::bind(&path).map_err(|_| "M2_OPERATOR_BIND_FAILED")?;
         if fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).is_err() {
@@ -71,16 +79,15 @@ impl OperatorSocket {
             let _ = fs::remove_file(&path);
             return Err("M2_OPERATOR_BIND_FAILED");
         }
-        listener
-            .set_nonblocking(true)
-            .map_err(|_| "M2_OPERATOR_BIND_FAILED")?;
+        if listener.set_nonblocking(true).is_err() {
+            let _ = fs::remove_file(&path);
+            return Err("M2_OPERATOR_BIND_FAILED");
+        }
         let stop = Arc::new(AtomicBool::new(false));
         let requested_stop = Arc::clone(&stop);
         let dispatch = Arc::new(dispatch);
         let read_timeout = Duration::from_millis(config.read_timeout_ms.0);
         let write_timeout = Duration::from_millis(config.write_timeout_ms.0);
-        let request_limit = usize::try_from(config.max_request_bytes.0)
-            .map_err(|_| "M2_OPERATOR_CONFIG_INVALID")?;
         let worker = thread::Builder::new()
             .name("m2-operator-socket".into())
             .spawn(move || {
@@ -100,8 +107,14 @@ impl OperatorSocket {
                         Err(_) => break,
                     }
                 }
-            })
-            .map_err(|_| "M2_OPERATOR_LISTENER_START_FAILED")?;
+            });
+        let worker = match worker {
+            Ok(worker) => worker,
+            Err(_) => {
+                let _ = fs::remove_file(&path);
+                return Err("M2_OPERATOR_LISTENER_START_FAILED");
+            }
+        };
         Ok(Self {
             path,
             device: metadata.dev(),
@@ -445,6 +458,12 @@ mod tests {
     #[test]
     fn oversized_prefix_and_unsafe_path_fail_before_dispatch() {
         let path = TestPath::new();
+        let mut short_response = path.config();
+        short_response.max_response_bytes = Bytes(1);
+        assert!(matches!(
+            OperatorSocket::start_at(&path.root, &short_response, |_| response_error("X", "Y")),
+            Err("M2_OPERATOR_CONFIG_INVALID")
+        ));
         let calls = Arc::new(AtomicUsize::new(0));
         let observed = Arc::clone(&calls);
         let server = OperatorSocket::start_at(&path.root, &path.config(), move |_| {
