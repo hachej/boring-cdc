@@ -643,6 +643,9 @@ fn materialize_imported_schemas(
         [capture_epoch],
         |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?,row.get(6)?)),
     )?;
+    if protocol_fp != "pgoutput-v1" {
+        return Err(FenceError::Conflict("M3_IMPORTED_SOURCE_IDENTITY_INVALID"));
+    }
     let source = crate::m1_source_identity::SourceIdentity {
         system_identifier: system_id
             .parse()
@@ -659,8 +662,7 @@ fn materialize_imported_schemas(
             &publication_fp,
         )
         .ok_or(FenceError::Conflict("M3_IMPORTED_SOURCE_IDENTITY_INVALID"))?,
-        protocol_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(&protocol_fp)
-            .ok_or(FenceError::Conflict("M3_IMPORTED_SOURCE_IDENTITY_INVALID"))?,
+        protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
     };
     source
         .validate()

@@ -997,6 +997,9 @@ impl BootstrapRuntime {
             params![intent.capture_epoch,intent.slot_name],
             |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?)),
         )?;
+        if protocol_fp != "pgoutput-v1" {
+            return Err(BootstrapError::Conflict("M3_SOURCE_IDENTITY_INVALID"));
+        }
         let source = crate::m1_source_identity::SourceIdentity {
             system_identifier: system_id
                 .parse()
@@ -1013,10 +1016,7 @@ impl BootstrapRuntime {
                 &publication_fp,
             )
             .ok_or(BootstrapError::Conflict("M3_SOURCE_IDENTITY_INVALID"))?,
-            protocol_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(
-                &protocol_fp,
-            )
-            .ok_or(BootstrapError::Conflict("M3_SOURCE_IDENTITY_INVALID"))?,
+            protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
         };
         source
             .validate()
@@ -1173,7 +1173,7 @@ mod live_tests {
             identified.get_value(0, 1).unwrap(),
             database.get_value(0, 0).unwrap(),
             fingerprint,
-            hex(&crate::m1_source_identity::supported_protocol_fingerprint().bytes()),
+            "pgoutput-v1".into(),
         )
     }
     #[test]
@@ -1356,10 +1356,7 @@ mod live_tests {
                 &publication_fp,
             )
             .unwrap(),
-            protocol_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(
-                &protocol_fp,
-            )
-            .unwrap(),
+            protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
         };
         crate::m3_fence::verify_imported_schema_proof(
             &canonical_source,
