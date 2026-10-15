@@ -133,6 +133,22 @@ fn persist(
     if receipt.outcome == StartupOutcome::RequiresReseed {
         tx.execute("INSERT INTO reseed_intents(intent_id,destination_id,capture_epoch,state,revision,evidence_digest) VALUES('startup-'||?1,NULL,?2,'blocked',0,?3)", params![run_id,local.capture_epoch,receipt.reason_code])?;
     }
+    if matches!(
+        receipt.outcome,
+        StartupOutcome::Ready
+            | StartupOutcome::DuplicateReplayExpected
+            | StartupOutcome::CreationFloorOnly
+    ) {
+        // A durable external intent needs its domain reconciler before an abort result.
+        tx.execute(
+            "UPDATE operator_command_requests SET state='aborted_by_restart',request_revision=request_revision+1 WHERE run_id!=?1 AND state IN ('accepted','reconciling') AND immutable_intent_id IS NULL",
+            [run_id],
+        )?;
+        tx.execute(
+            "UPDATE runtime_ownership SET state='lost',revision=revision+1 WHERE run_id!=?1 AND state IN ('held','expected_close')",
+            [run_id],
+        )?;
+    }
     tx.commit()?;
     if receipt.outcome == StartupOutcome::BootstrapAmbiguousRequiresRestart {
         crate::m2_fault_status::fault_hook(
@@ -620,6 +636,69 @@ pub mod tests {
                 .as_deref(),
             Some("ready")
         );
+    }
+    #[test]
+    fn successor_aborts_prior_requests_only_after_compatible_reconciliation() {
+        for (name, blocked) in [("operator-ready", false), ("operator-blocked", true)] {
+            let path = db(name);
+            seed_durable(&path);
+            let writer = open_writer(&path, "old-run", 1, 0).unwrap();
+            writer.connection().execute_batch(
+                "INSERT INTO runtime_ownership(run_id,backend_pid,connection_nonce,ownership_deadline_mono_ms,state,connection_generation) VALUES('old-run',1,'old-nonce',100,'held',1);
+                 INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,observation_revision,control_revision,expires_at) VALUES('pending','nonce-1',X'01','digest-1','old-run','uid:1000','accepted',1,1,'later');
+                 INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,observation_revision,control_revision,expires_at) VALUES('reconciling','nonce-2',X'02','digest-2','old-run','uid:1000','reconciling',1,1,'later');
+                 INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,observation_revision,control_revision,expires_at,plan_digest,immutable_intent_id) VALUES('external','nonce-4',X'04','digest-4','old-run','uid:1000','reconciling',1,1,'later','plan-4','intent-4');
+                 INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at) VALUES('terminal','nonce-3',X'03','digest-3','old-run','uid:1000','completed',X'01',1,1,'later');",
+            ).unwrap();
+            drop(writer);
+            let mut observation = live();
+            if blocked {
+                observation.timeline_id = "different".into();
+            }
+            let receipt = run(&path, &observation);
+            assert_eq!(receipt.outcome == StartupOutcome::Blocked, blocked);
+            let reader = rusqlite::Connection::open(&path).unwrap();
+            let states = reader
+                .prepare("SELECT state,request_revision FROM operator_command_requests ORDER BY request_id")
+                .unwrap()
+                .query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)))
+                .unwrap()
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap();
+            assert_eq!(
+                states,
+                if blocked {
+                    vec![
+                        ("reconciling".into(), 0),
+                        ("accepted".into(), 0),
+                        ("reconciling".into(), 0),
+                        ("completed".into(), 0),
+                    ]
+                } else {
+                    vec![
+                        ("reconciling".into(), 0),
+                        ("aborted_by_restart".into(), 1),
+                        ("aborted_by_restart".into(), 1),
+                        ("completed".into(), 0),
+                    ]
+                }
+            );
+            let owner: (String, i64) = reader
+                .query_row(
+                    "SELECT state,revision FROM runtime_ownership WHERE run_id='old-run'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            assert_eq!(
+                owner,
+                if blocked {
+                    ("held".into(), 0)
+                } else {
+                    ("lost".into(), 1)
+                }
+            );
+        }
     }
     #[test]
     fn identity_mismatch_blocks() {
