@@ -1280,7 +1280,7 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
         runtime,
         stop_after_commits,
         std::time::Duration::from_millis(250),
-        |_| true,
+        |_| Ok(true),
         || Ok(()),
     )
     .await
@@ -1589,13 +1589,43 @@ fn bind_production_control_contracts(
     Ok(())
 }
 
+fn enforce_capture_ownership<J: DurableJournal, S: SpoolFactory, G: FeedbackGate>(
+    runtime: &mut CaptureRuntime<J, S, G>,
+    probe: &mut impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<bool, JournalError>,
+) -> Result<(), CaptureFailure> {
+    match probe(runtime) {
+        Ok(true) => Ok(()),
+        Ok(false) => {
+            runtime.ownership_lost();
+            runtime
+                .persist_if_enabled(
+                    crate::failure_policy::FailureClass::OwnershipLost,
+                    crate::failure_policy::StableErrorCode::TransportUnavailable,
+                )
+                .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
+            Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"))
+        }
+        Err(_) => {
+            // A locked journal cannot renew the lease. Fence feedback and let the
+            // persisted transient retry own the failure once the lock clears.
+            runtime
+                .persist_if_enabled(
+                    crate::failure_policy::FailureClass::TransientIo,
+                    crate::failure_policy::StableErrorCode::TransportUnavailable,
+                )
+                .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
+            Err(CaptureFailure::at("ownership", "M2_CAPTURE_FAILED"))
+        }
+    }
+}
+
 async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G: FeedbackGate>(
     config: &CaptureConfig,
     cancellation: &CancellationToken,
     runtime: &mut CaptureRuntime<J, S, G>,
     stop_after_commits: u64,
     control_cadence: std::time::Duration,
-    mut ownership_probe: impl FnMut(&mut CaptureRuntime<J, S, G>) -> bool,
+    mut ownership_probe: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<bool, JournalError>,
     on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
 ) -> Result<(), CaptureFailure> {
     if runtime.state() == RuntimeState::ExpectedClose {
@@ -1621,16 +1651,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         runtime
             .service_pressure()
             .map_err(|_| CaptureFailure::at("pressure", "M2_PRESSURE_SERVICE_FAILED"))?;
-        if !ownership_probe(runtime) {
-            runtime.ownership_lost();
-            runtime
-                .persist_if_enabled(
-                    crate::failure_policy::FailureClass::OwnershipLost,
-                    crate::failure_policy::StableErrorCode::TransportUnavailable,
-                )
-                .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
-            return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
-        }
+        enforce_capture_ownership(runtime, &mut ownership_probe)?;
         if cancellation.is_cancelled() {
             runtime.graceful_shutdown().map_err(|_| {
                 CaptureFailure::at("runtime", "M2_SHUTDOWN_RECONCILIATION_REQUIRED")
@@ -1654,14 +1675,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                 read_cancellation.cancel();
                 let result = read.as_mut().await;
                 if cancellation.is_cancelled() { Some(result) } else {
-                    if !ownership_probe(runtime) {
-                        runtime.ownership_lost();
-                        runtime.persist_if_enabled(
-                            crate::failure_policy::FailureClass::OwnershipLost,
-                            crate::failure_policy::StableErrorCode::TransportUnavailable,
-                        ).map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED"))?;
-                        return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
-                    }
+                    enforce_capture_ownership(runtime, &mut ownership_probe)?;
                     match result {
                         Ok(frame) => Some(Ok(frame)),
                         Err(pg_walstream::ReplicationError::Cancelled(_)) => None,
@@ -1742,18 +1756,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
             continue;
         }
         for packet in runtime.take_feedback() {
-            if !ownership_probe(runtime) {
-                runtime.ownership_lost();
-                runtime
-                    .persist_if_enabled(
-                        crate::failure_policy::FailureClass::OwnershipLost,
-                        crate::failure_policy::StableErrorCode::TransportUnavailable,
-                    )
-                    .map_err(|_| {
-                        CaptureFailure::at("failure_policy", "M2_FAILURE_PERSIST_FAILED")
-                    })?;
-                return Err(CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"));
-            }
+            enforce_capture_ownership(runtime, &mut ownership_probe)?;
             crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::BeforeFeedback);
             if connection
                 .send_standby_status_update(
@@ -2849,10 +2852,17 @@ pub async fn run_loaded_config(
         u64::MAX,
         Duration::from_millis(public.source.lock_probe_interval_ms.0),
         |runtime| {
-            control_lane.ownership_live()
-                && ownership
-                    .refreshed_lease(1, owner_deadline)
-                    .is_ok_and(|lease| runtime.journal.refresh_owner_lease(&lease).is_ok())
+            if !control_lane.ownership_live() {
+                return Ok(false);
+            }
+            let Ok(lease) = ownership.refreshed_lease(1, owner_deadline) else {
+                return Ok(false);
+            };
+            match runtime.journal.refresh_owner_lease(&lease) {
+                Ok(()) => Ok(true),
+                Err(JournalError::Conflict(_)) => Ok(false),
+                Err(error) => Err(error),
+            }
         },
         || {
             let cadence_ms = public.source.heartbeat_cadence_ms.0;
@@ -3247,7 +3257,7 @@ pub mod tests {
             &mut capture,
             1,
             Duration::from_millis(10),
-            |_| true,
+            |_| Ok(true),
             || {
                 started.set(true);
                 Ok(())
@@ -3285,7 +3295,7 @@ pub mod tests {
             &mut capture,
             1,
             Duration::from_millis(10),
-            |_| true,
+            |_| Ok(true),
             || panic!("old generation must not become ready"),
         ));
         assert_eq!(result.unwrap_err().code, "M2_SUPERVISED_RESTART_REQUIRED");
