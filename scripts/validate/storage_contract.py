@@ -2,8 +2,8 @@
 import hashlib, importlib.util, json, re, sqlite3, subprocess, tempfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; OWNER='boring-cdc-m0-storage-model'
-C=ROOT/'contracts/storage/storage-model.json'; S=ROOT/'contracts/storage/storage-model.schema.json'; Q=ROOT/'contracts/storage/sqlite-schema.sql'; F=ROOT/'fixtures/m0/storage/scenarios.json'; FS=ROOT/'contracts/storage/storage-fixtures.schema.json'; R=ROOT/'contracts/storage/storage-result.schema.json'; E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence.json'; V=Path(__file__); M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
-EXPECTED_CONTRACT_SHA256='c27dae8e706f2f454665c5dcc98b85ea85a1f7bca0179affc97b8951b2cc5ef3'
+C=ROOT/'contracts/storage/storage-model.json'; S=ROOT/'contracts/storage/storage-model.schema.json'; Q=ROOT/'contracts/storage/sqlite-schema.sql'; F=ROOT/'fixtures/m0/storage/scenarios.json'; FS=ROOT/'contracts/storage/storage-fixtures.schema.json'; R=ROOT/'contracts/storage/storage-result.schema.json'; OLD_E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence.json'; E=ROOT/'artifacts/boring-cdc-m0-storage-model/spec/evidence-v2.json'; V=Path(__file__); M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
+EXPECTED_CONTRACT_SHA256='b051d9204a09c4d2d2e5585fe86060a26534ee29ebd7c543e8e956d73a7c3345'
 EXPECTED_FIXTURES_SHA256='1cd91668950293580ab810814f948501b4dcbe90e40951bfcb99617ee9ef3e8b'
 core_spec=importlib.util.spec_from_file_location('core_validator',ROOT/'scripts/lib/core_validator.py'); core=importlib.util.module_from_spec(core_spec); core_spec.loader.exec_module(core)
 def load(p):
@@ -87,8 +87,19 @@ def validate():
    con.executescript(Q.read_text())
    observed=(con.execute('PRAGMA journal_mode').fetchone()[0],con.execute('PRAGMA synchronous').fetchone()[0],con.execute('PRAGMA auto_vacuum').fetchone()[0],con.execute('PRAGMA foreign_keys').fetchone()[0],con.execute('PRAGMA trusted_schema').fetchone()[0],con.execute('PRAGMA wal_autocheckpoint').fetchone()[0],con.execute('PRAGMA temp_store').fetchone()[0],con.execute('PRAGMA journal_size_limit').fetchone()[0],con.execute('PRAGMA mmap_size').fetchone()[0],con.execute('PRAGMA secure_delete').fetchone()[0])
    if observed!=('wal',2,2,1,0,0,1,268435456,0,2):add(fs,'E_ACTUAL_ATTESTATION','sqlite-schema.sql',repr(observed))
-   tables={x[0] for x in con.execute("SELECT name FROM sqlite_schema WHERE type='table'")}; required_tables={'journal_events','source_transactions','source_state','runtime_ownership','writer_attestations','operator_command_requests','relation_schemas','destinations','destination_checkpoints','backfill_runs','backfill_generations','backfill_chunks','bootstrap_intents','bootstrap_imports','durable_capture_fences','bootstrap_anchors','reseed_intents','destination_generation_leases','destination_promotion_intents','clickhouse_batch_intents','archive_generations','archive_segment_intents','archive_segments','archive_generation_markers','processing_failures','destination_audits','logical_range_pins','condition_hysteresis','alerts','schema_migrations'}
-   if not required_tables<=tables:add(fs,'E_SQL_SCHEMA','sqlite-schema.sql',','.join(sorted(required_tables-tables)))
+   materialized=sqlite3.connect(':memory:')
+   runtime_source=(ROOT/p['materialized_migration_source']).read_text()
+   for version in range(1,p['materialized_migration_version']+1):
+    match=re.search(rf'const MIGRATION_{version}: &str = r#"(.*?)"#;',runtime_source,re.S)
+    if match is None:raise ValueError(f'missing runtime migration {version}')
+    materialized.executescript(match.group(1))
+   objects=lambda db:{(kind,name,sql) for kind,name,sql in db.execute("SELECT type,name,sql FROM sqlite_schema WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%'")}
+   contracted=objects(con); actual=objects(materialized)
+   if contracted!=actual:
+    missing=sorted((kind,name) for kind,name,sql in actual-contracted)
+    extra=sorted((kind,name) for kind,name,sql in contracted-actual)
+    add(fs,'E_SQL_SCHEMA_DRIFT','sqlite-schema.sql',f'missing or changed: {missing}; extra or changed: {extra}')
+   materialized.close()
    con.close()
  except Exception as e:add(fs,'E_SQL_EXEC','sqlite-schema.sql',str(e))
  if hashlib.sha256(C.read_bytes()).hexdigest()!=EXPECTED_CONTRACT_SHA256:add(fs,'E_CONTRACT_DIGEST','storage-model.json','entire provisional contract changed without validator reconciliation')
@@ -97,7 +108,7 @@ def validate():
   manifest=load(M); artifacts=load(A); mr=next(x for x in manifest['artifacts'] if x['owner_bead']==OWNER)
   if mr['path']!='contracts/storage/storage-model.json' or mr['sha256']!=hashlib.sha256(C.read_bytes()).hexdigest() or mr['fixture_ids']!=c['fixture_ids'] or mr['executor_ids']!=c['executors']:add(fs,'E_MANIFEST_BINDING','contracts/m0/manifest.json','storage row does not bind contract, fixtures, and executors')
   rows=[x for x in artifacts['artifacts'] if x['owner_bead']==OWNER]
-  expected_paths={str(x.relative_to(ROOT)) for x in (C,S,Q,F,FS,R,V,E)}
+  expected_paths={str(x.relative_to(ROOT)) for x in (C,S,Q,F,FS,R,V,OLD_E,E)}
   if {x['path'] for x in rows}!=expected_paths:add(fs,'E_ARTIFACT_INVENTORY','contracts/m0/artifacts.json','storage artifact path inventory differs')
   for x in rows:
    q=ROOT/x['path']
@@ -127,6 +138,6 @@ def main():
  fs,inputs=validate(); prior=load(E) if E.exists() else {}; validator_sha256=hashlib.sha256(V.read_bytes()).hexdigest(); parent,error=resolve_source_parent(prior,inputs,validator_sha256)
  if error:add(fs,'E_EVIDENCE_PROVENANCE','evidence/source_parent_git_commit',error)
  material=''.join(k+'\0'+v+'\n' for k,v in sorted(inputs.items())).encode()
- ev={'schema_version':'m0-storage-contract-evidence/v1','owner_bead':OWNER,'status':'pass' if not fs else 'fail','validator':'scripts/validate/storage_contract.py','validator_sha256':validator_sha256,'source_parent_git_commit':parent,'input_tree_sha256':hashlib.sha256(material).hexdigest(),'inputs':inputs,'fixture_count':len(load(F)['cases']),'actual_connection_attestation':True,'runtime_observed':False,'product_faults':'fault_not_applicable','findings':fs}
+ ev={'schema_version':'m0-storage-contract-evidence/v2','owner_bead':OWNER,'status':'pass' if not fs else 'fail','validator':'scripts/validate/storage_contract.py','validator_sha256':validator_sha256,'source_parent_git_commit':parent,'input_tree_sha256':hashlib.sha256(material).hexdigest(),'inputs':inputs,'fixture_count':len(load(F)['cases']),'actual_connection_attestation':True,'runtime_observed':False,'product_faults':'fault_not_applicable','findings':fs}
  E.parent.mkdir(parents=True,exist_ok=True); E.write_text(json.dumps(ev,indent=2,sort_keys=True)+'\n'); print(json.dumps(ev,sort_keys=True,separators=(',',':'))); return 0 if not fs else 1
 if __name__=='__main__': raise SystemExit(main())

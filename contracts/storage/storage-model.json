@@ -256,7 +256,7 @@
       "writer_queue_depth"
     ]
   },
-  "schema_version": "storage-contract/v1",
+  "schema_version": "storage-contract/v2",
   "spool": {
     "lifecycle": [
       "reserve full canonical transaction before create",
@@ -392,6 +392,8 @@
       "owner": "single run-owned maintenance scheduler",
       "wal_autocheckpoint_pages": 0
     },
+    "materialized_migration_source": "src/m2_schema.rs",
+    "materialized_migration_version": 17,
     "migration": {
       "directory_sync_edges": [
         "new database creation",

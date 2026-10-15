@@ -564,7 +564,7 @@
       "type": "object"
     },
     "schema_version": {
-      "const": "storage-contract/v1"
+      "const": "storage-contract/v2"
     },
     "spool": {
       "additionalProperties": false,
@@ -626,6 +626,15 @@
                 "journal_mode": {
                   "type": "string"
                 },
+                "journal_size_limit": {
+                  "type": "integer"
+                },
+                "mmap_size": {
+                  "type": "integer"
+                },
+                "secure_delete": {
+                  "type": "integer"
+                },
                 "synchronous": {
                   "type": "integer"
                 },
@@ -636,15 +645,6 @@
                   "type": "integer"
                 },
                 "wal_autocheckpoint": {
-                  "type": "integer"
-                },
-                "journal_size_limit": {
-                  "type": "integer"
-                },
-                "mmap_size": {
-                  "type": "integer"
-                },
-                "secure_delete": {
                   "type": "integer"
                 }
               },
@@ -691,6 +691,15 @@
             "foreign_keys": {
               "type": "string"
             },
+            "journal_size_limit_bytes": {
+              "type": "integer"
+            },
+            "mmap_size_bytes": {
+              "type": "integer"
+            },
+            "secure_delete": {
+              "type": "string"
+            },
             "synchronous": {
               "type": "string"
             },
@@ -702,15 +711,6 @@
             },
             "wal_autocheckpoint_pages": {
               "type": "integer"
-            },
-            "journal_size_limit_bytes": {
-              "type": "integer"
-            },
-            "mmap_size_bytes": {
-              "type": "integer"
-            },
-            "secure_delete": {
-              "type": "string"
             }
           },
           "required": [
@@ -781,6 +781,25 @@
             "covered",
             "excluded",
             "feedback_boundary"
+          ],
+          "type": "object"
+        },
+        "filesystem_attestation": {
+          "additionalProperties": false,
+          "properties": {
+            "invalidate_on": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "validity_seconds": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "invalidate_on",
+            "validity_seconds"
           ],
           "type": "object"
         },
@@ -874,6 +893,12 @@
           ],
           "type": "object"
         },
+        "materialized_migration_source": {
+          "const": "src/m2_schema.rs"
+        },
+        "materialized_migration_version": {
+          "const": 17
+        },
         "migration": {
           "additionalProperties": false,
           "properties": {
@@ -942,25 +967,6 @@
         },
         "version": {
           "type": "string"
-        },
-        "filesystem_attestation": {
-          "additionalProperties": false,
-          "properties": {
-            "invalidate_on": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "validity_seconds": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "invalidate_on",
-            "validity_seconds"
-          ],
-          "type": "object"
         }
       },
       "required": [
@@ -978,7 +984,9 @@
         "schema_path",
         "single_database",
         "version",
-        "filesystem_attestation"
+        "filesystem_attestation",
+        "materialized_migration_version",
+        "materialized_migration_source"
       ],
       "type": "object"
     },
