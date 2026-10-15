@@ -893,6 +893,257 @@ pub struct ParsedCommand {
     pub help: bool,
 }
 
+/// JSON body inside one length-prefixed Unix owner frame. The peer UID is never client-supplied.
+#[derive(Clone, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum OperatorWireRequest {
+    Invoke {
+        schema_version: u32,
+        expected_run_id: String,
+        argv: Vec<String>,
+    },
+    Apply {
+        schema_version: u32,
+        expected_run_id: String,
+        request_id: String,
+        canonical_payload_digest: String,
+        plan_digest: String,
+        confirm_token: String,
+    },
+    Result {
+        schema_version: u32,
+        expected_run_id: String,
+        request_id: String,
+        canonical_payload_digest: String,
+    },
+}
+
+#[derive(Clone, Deserialize, PartialEq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+pub enum OperatorWireResponse {
+    Plan {
+        schema_version: u32,
+        plan: ActionPlan,
+    },
+    Result {
+        schema_version: u32,
+        result: CliEnvelope,
+    },
+    Error {
+        schema_version: u32,
+        code: String,
+        message: String,
+    },
+}
+
+impl fmt::Debug for OperatorWireResponse {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let kind = match self {
+            Self::Plan { .. } => "plan",
+            Self::Result { .. } => "result",
+            Self::Error { .. } => "error",
+        };
+        formatter
+            .debug_struct("OperatorWireResponse")
+            .field("kind", &kind)
+            .field("fields", &"[REDACTED]")
+            .finish()
+    }
+}
+
+pub fn encode_operator_wire_response(
+    response: &OperatorWireResponse,
+    max_response_bytes: usize,
+) -> Result<Vec<u8>, CliError> {
+    let version = match response {
+        OperatorWireResponse::Plan { schema_version, .. }
+        | OperatorWireResponse::Result { schema_version, .. }
+        | OperatorWireResponse::Error { schema_version, .. } => *schema_version,
+    };
+    if version != 1 {
+        return Err(invalid(
+            "CLI_OPERATOR_WIRE_VERSION",
+            "operator wire version is unsupported",
+        ));
+    }
+    let bytes = serde_json::to_vec(response)
+        .map_err(|_| invalid("CLI_OPERATOR_WIRE_INVALID", "operator response is invalid"))?;
+    if bytes.len() > max_response_bytes || max_response_bytes == 0 {
+        return Err(invalid(
+            "CLI_OPERATOR_FRAME_TOO_LARGE",
+            "operator response is too large",
+        ));
+    }
+    Ok(bytes)
+}
+
+/// Decode one complete frame. The socket reader must check the prefix before allocating a body.
+pub fn decode_operator_frame(
+    frame: &[u8],
+    max_request_bytes: usize,
+) -> Result<OperatorWireRequest, CliError> {
+    let prefix: [u8; 4] = frame
+        .get(..4)
+        .and_then(|part| part.try_into().ok())
+        .ok_or_else(|| invalid("CLI_OPERATOR_FRAME_INVALID", "operator frame is invalid"))?;
+    let body_len = u32::from_be_bytes(prefix) as usize;
+    if body_len > max_request_bytes {
+        return Err(invalid(
+            "CLI_OPERATOR_FRAME_TOO_LARGE",
+            "operator request is too large",
+        ));
+    }
+    if body_len == 0 || frame.len() != body_len + 4 {
+        return Err(invalid(
+            "CLI_OPERATOR_FRAME_INVALID",
+            "operator frame is invalid",
+        ));
+    }
+    parse_operator_wire_request(&frame[4..], max_request_bytes)
+}
+
+pub fn encode_operator_response_frame(
+    response: &OperatorWireResponse,
+    max_response_bytes: usize,
+) -> Result<Vec<u8>, CliError> {
+    let body = encode_operator_wire_response(response, max_response_bytes)?;
+    let body_len = u32::try_from(body.len()).map_err(|_| {
+        invalid(
+            "CLI_OPERATOR_FRAME_TOO_LARGE",
+            "operator response is too large",
+        )
+    })?;
+    let mut frame = Vec::with_capacity(4 + body.len());
+    frame.extend_from_slice(&body_len.to_be_bytes());
+    frame.extend_from_slice(&body);
+    Ok(frame)
+}
+
+impl fmt::Debug for OperatorWireRequest {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let kind = match self {
+            Self::Invoke { .. } => "invoke",
+            Self::Apply { .. } => "apply",
+            Self::Result { .. } => "result",
+        };
+        formatter
+            .debug_struct("OperatorWireRequest")
+            .field("kind", &kind)
+            .field("fields", &"[REDACTED]")
+            .finish()
+    }
+}
+
+pub fn parse_operator_wire_request(
+    bytes: &[u8],
+    max_request_bytes: usize,
+) -> Result<OperatorWireRequest, CliError> {
+    if bytes.is_empty() || max_request_bytes == 0 {
+        return Err(invalid(
+            "CLI_OPERATOR_WIRE_INVALID",
+            "operator request is invalid",
+        ));
+    }
+    if bytes.len() > max_request_bytes {
+        return Err(invalid(
+            "CLI_OPERATOR_FRAME_TOO_LARGE",
+            "operator request is too large",
+        ));
+    }
+    let request: OperatorWireRequest = serde_json::from_slice(bytes)
+        .map_err(|_| invalid("CLI_OPERATOR_WIRE_INVALID", "operator request is invalid"))?;
+    let (version, run_id) = match &request {
+        OperatorWireRequest::Invoke {
+            schema_version,
+            expected_run_id,
+            ..
+        }
+        | OperatorWireRequest::Apply {
+            schema_version,
+            expected_run_id,
+            ..
+        }
+        | OperatorWireRequest::Result {
+            schema_version,
+            expected_run_id,
+            ..
+        } => (*schema_version, expected_run_id),
+    };
+    if version != 1 {
+        return Err(invalid(
+            "CLI_OPERATOR_WIRE_VERSION",
+            "operator wire version is unsupported",
+        ));
+    }
+    if !wire_field(run_id, 256) {
+        return Err(invalid(
+            "CLI_OPERATOR_WIRE_INVALID",
+            "operator request is invalid",
+        ));
+    }
+    match &request {
+        OperatorWireRequest::Invoke { argv, .. } => {
+            if argv.is_empty() || argv.len() > 64 || argv.iter().any(|part| !wire_field(part, 4096))
+            {
+                return Err(invalid(
+                    "CLI_OPERATOR_WIRE_INVALID",
+                    "operator request is invalid",
+                ));
+            }
+            let parsed = parse(argv)?;
+            let routable = parsed.spec.id == "CMD-DESTINATION-VERIFY"
+                || (parsed.spec.class == CommandClass::Mutation
+                    && matches!(
+                        parsed.spec.ownership,
+                        Ownership::LiveOwner | Ownership::OfflineEligible
+                    )
+                    && argv.iter().any(|part| part == "--dry-run")
+                    && !matches!(parsed.spec.id, "CMD-RUN" | "CMD-RUN-BOOTSTRAP"));
+            if parsed.help || !routable {
+                return Err(invalid(
+                    "CLI_OPERATOR_COMMAND_NOT_ROUTABLE",
+                    "command is not available through the owner socket",
+                ));
+            }
+        }
+        OperatorWireRequest::Apply {
+            request_id,
+            canonical_payload_digest,
+            plan_digest,
+            confirm_token,
+            ..
+        } => {
+            if !wire_field(request_id, 256)
+                || !wire_field(canonical_payload_digest, 256)
+                || !wire_field(plan_digest, 256)
+                || !wire_field(confirm_token, 512)
+            {
+                return Err(invalid(
+                    "CLI_OPERATOR_WIRE_INVALID",
+                    "operator request is invalid",
+                ));
+            }
+        }
+        OperatorWireRequest::Result {
+            request_id,
+            canonical_payload_digest,
+            ..
+        } => {
+            if !wire_field(request_id, 256) || !wire_field(canonical_payload_digest, 256) {
+                return Err(invalid(
+                    "CLI_OPERATOR_WIRE_INVALID",
+                    "operator request is invalid",
+                ));
+            }
+        }
+    }
+    Ok(request)
+}
+
+fn wire_field(value: &str, max_bytes: usize) -> bool {
+    !value.is_empty() && value.len() <= max_bytes && !value.chars().any(char::is_control)
+}
+
 pub fn parse(argv: &[String]) -> Result<ParsedCommand, CliError> {
     if argv.is_empty() {
         return Err(invalid("CLI_COMMAND_REQUIRED", "a command is required"));
@@ -1569,6 +1820,83 @@ pub mod tests {
         let input = serde_json::json!({"schema_version":1,"snapshot_id":"s","state_revision":1,"observed_at":"a","fresh_until":"b","freshness":"fresh","source_identity":null,"capture_epoch":null,"run_id":null,"ownership":{},"fingerprints":{},"durability_boundaries":{},"budgets":{},"destinations":[],"conditions":[],"blocked_by":[],"allowed_actions":[],"next_commands":[],"evidence_digest":"d","future_field":{"x":1}});
         let parsed: SystemSnapshot = serde_json::from_value(input).unwrap();
         assert!(parsed.extensions.contains_key("future_field"));
+    }
+
+    #[test]
+    fn operator_wire_fixture_rejects_unsafe_or_unknown_requests() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/m1_cli/operator_wire.json"))
+                .unwrap();
+        assert_eq!(fixture["owner_bead"], "boring-cdc-tpma");
+        for case in fixture["cases"].as_array().unwrap() {
+            let bytes = serde_json::to_vec(&case["request"]).unwrap();
+            let result = parse_operator_wire_request(&bytes, 1_048_576);
+            if let Some(code) = case["code"].as_str() {
+                assert_eq!(
+                    result.err().map(|error| error.code),
+                    Some(code),
+                    "{}",
+                    case["name"]
+                );
+            } else {
+                assert!(result.is_ok(), "{}", case["name"]);
+            }
+        }
+        let valid = br#"{"kind":"apply","schema_version":1,"expected_run_id":"run-7","request_id":"req-7","canonical_payload_digest":"payload-7","plan_digest":"plan-7","confirm_token":"secret-token"}"#;
+        let request = parse_operator_wire_request(valid, valid.len()).unwrap();
+        assert!(!format!("{request:?}").contains("secret-token"));
+        assert_eq!(
+            parse_operator_wire_request(valid, valid.len() - 1)
+                .err()
+                .map(|error| error.code),
+            Some("CLI_OPERATOR_FRAME_TOO_LARGE")
+        );
+        let mut frame = Vec::from((valid.len() as u32).to_be_bytes());
+        frame.extend_from_slice(valid);
+        assert_eq!(decode_operator_frame(&frame, valid.len()).unwrap(), request);
+        assert_eq!(
+            decode_operator_frame(&frame[..frame.len() - 1], valid.len())
+                .err()
+                .map(|error| error.code),
+            Some("CLI_OPERATOR_FRAME_INVALID")
+        );
+        let mut extra = frame.clone();
+        extra.push(0);
+        assert_eq!(
+            decode_operator_frame(&extra, valid.len())
+                .err()
+                .map(|error| error.code),
+            Some("CLI_OPERATOR_FRAME_INVALID")
+        );
+        assert_eq!(
+            decode_operator_frame(&frame, valid.len() - 1)
+                .err()
+                .map(|error| error.code),
+            Some("CLI_OPERATOR_FRAME_TOO_LARGE")
+        );
+        let response = OperatorWireResponse::Error {
+            schema_version: 1,
+            code: "CLI_OPERATOR_RESULT_PENDING".into(),
+            message: "result is pending".into(),
+        };
+        let bytes = encode_operator_wire_response(&response, 4_194_304).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<OperatorWireResponse>(&bytes).unwrap(),
+            response
+        );
+        assert!(!format!("{response:?}").contains("result is pending"));
+        let response_frame = encode_operator_response_frame(&response, 4_194_304).unwrap();
+        assert_eq!(
+            u32::from_be_bytes(response_frame[..4].try_into().unwrap()) as usize,
+            response_frame.len() - 4
+        );
+        assert_eq!(&response_frame[4..], bytes);
+        assert_eq!(
+            encode_operator_wire_response(&response, bytes.len() - 1)
+                .err()
+                .map(|error| error.code),
+            Some("CLI_OPERATOR_FRAME_TOO_LARGE")
+        );
     }
     #[test]
     fn machine_envelope_has_frozen_fields_and_no_color() {
