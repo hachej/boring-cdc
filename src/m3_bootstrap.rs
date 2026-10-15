@@ -793,7 +793,7 @@ fn append_replication(dsn: &str) -> String {
         format!("{dsn}?replication=database")
     }
 }
-fn query_pid(
+pub(crate) fn query_pid(
     connection: &mut pg_walstream::PgReplicationConnection,
 ) -> Result<i32, BootstrapError> {
     connection

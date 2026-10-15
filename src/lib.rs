@@ -39,6 +39,7 @@ pub mod m3_controls;
 pub mod m3_fence;
 pub mod m3_planner;
 pub mod m3_restart;
+pub mod m3_restart_export;
 pub mod m4_clickhouse_adapter;
 pub mod m4_clickhouse_audit;
 pub mod m4_clickhouse_durability;
