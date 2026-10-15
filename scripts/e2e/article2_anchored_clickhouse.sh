@@ -52,7 +52,8 @@ for attempt in 1 2; do
   docker exec -i "$container" clickhouse-client --user bcdc_probe --password "$password" --multiquery < contracts/clickhouse/ddl.sql
   endpoint=$(docker port "$container" 8123/tcp)
   export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:${endpoint##*:}"
-  export BCDC_M4_CLICKHOUSE_USER=bcdc_probe BCDC_M4_CLICKHOUSE_PASSWORD="$password"
+  export BCDC_M4_CLICKHOUSE_USER=bcdc_probe BCDC_M4_CLICKHOUSE_PASSWORD
+  BCDC_M4_CLICKHOUSE_PASSWORD=$password
   export BCDC_ARTICLE2_SAME_STREAM=1 BORING_CDC_M3_SLOT="boring_cdc_article2_$attempt"
   export BCDC_ARTICLE2_ORACLE_OUT="$work/oracle-$attempt.json"
   cargo test --locked m3_bootstrap::live_tests::exported_snapshot_uses_distinct_command_idle_sessions -- --ignored --exact
