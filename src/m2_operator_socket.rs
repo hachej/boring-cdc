@@ -160,13 +160,18 @@ fn prepare_path(root: &Path, path: &Path) -> Result<PathBuf, &'static str> {
     if !root.is_absolute() {
         return Err("M2_OPERATOR_PATH_UNSAFE");
     }
-    let root_metadata = fs::symlink_metadata(root).map_err(|_| "M2_OPERATOR_PATH_UNSAFE")?;
-    if !root_metadata.is_dir()
-        || root_metadata.file_type().is_symlink()
-        || root_metadata.uid() != owner
-        || root_metadata.mode() & 0o022 != 0
-    {
-        return Err("M2_OPERATOR_PATH_UNSAFE");
+    for ancestor in root.ancestors() {
+        let metadata = fs::symlink_metadata(ancestor).map_err(|_| "M2_OPERATOR_PATH_UNSAFE")?;
+        let writable = metadata.mode() & 0o022 != 0;
+        let protected_sticky = metadata.uid() == 0 && metadata.mode() & 0o1000 != 0;
+        if !metadata.is_dir()
+            || metadata.file_type().is_symlink()
+            || (metadata.uid() != 0 && metadata.uid() != owner)
+            || (writable && !protected_sticky)
+            || (ancestor == root && metadata.uid() != owner)
+        {
+            return Err("M2_OPERATOR_PATH_UNSAFE");
+        }
     }
     let mut dir = root.to_path_buf();
     for (index, part) in parts[..parts.len() - 1].iter().enumerate() {
@@ -458,6 +463,15 @@ mod tests {
     #[test]
     fn oversized_prefix_and_unsafe_path_fail_before_dispatch() {
         let path = TestPath::new();
+        let unsafe_parent = path.root.join("unsafe");
+        let nested_root = unsafe_parent.join("safe");
+        fs::create_dir_all(&nested_root).unwrap();
+        fs::set_permissions(&unsafe_parent, fs::Permissions::from_mode(0o777)).unwrap();
+        fs::set_permissions(&nested_root, fs::Permissions::from_mode(0o700)).unwrap();
+        assert!(matches!(
+            OperatorSocket::start_at(&nested_root, &path.config(), |_| response_error("X", "Y")),
+            Err("M2_OPERATOR_PATH_UNSAFE")
+        ));
         let mut short_response = path.config();
         short_response.max_response_bytes = Bytes(1);
         assert!(matches!(
