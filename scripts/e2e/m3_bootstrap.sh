@@ -22,6 +22,7 @@ services:
 YAML
 docker compose -p "$project" -f compose.yaml -f "$work/override.yml" up -d --wait postgres >/dev/null
 export BORING_CDC_M3_DSN; BORING_CDC_M3_DSN=$(printf 'postgresql://%s@127.0.0.1:%s/boring_cdc?sslmode=disable' "boring_cdc:${PGPASSWORD}" "$port")
+CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-target} cargo test --locked m3_bootstrap::live_tests::bounded_ddl_waiter_releases_only_guarded_relation_lock -- --ignored --exact
 for attempt in 1 2;do BORING_CDC_M3_SLOT="boring_cdc_m3_bootstrap_${attempt}" cargo test --locked m3_bootstrap::live_tests::exported_snapshot_uses_distinct_command_idle_sessions -- --ignored --exact;done
 [[ "$(docker compose -p "$project" -f compose.yaml -f "$work/override.yml" exec -T postgres psql -At -U boring_cdc -d boring_cdc -c 'show server_version')" == 17.6* ]]
 python3 scripts/lib/m3_bootstrap_evidence.py e2e
