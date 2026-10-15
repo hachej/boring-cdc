@@ -28,6 +28,14 @@ The four effective query settings are read through a client configured with the 
 
 ## Promotion and schema evolution
 
+### Initial-slot snapshot admission (contract v2)
+
+For the bounded one-relation initial slot, a complete M3 anchor with `start_seq=0` supplies the snapshot baseline. Each row in its generation is rendered with the M1 snapshot identity and M0 mutation envelope at the anchor's snapshot-boundary LSN. The persisted numeric chunk ordinal participates in identity. Snapshot rows have `origin_rank=0`, zero transaction and mutation ordinals, and `journal_seq=0`; retained M2 WAL begins at sequence 1 and wins at an equal source position.
+
+Before ClickHouse receives a snapshot batch, SQLite records an immutable intent bound to destination, epoch, generation, complete anchor, relation schema, snapshot sequence range, ordered event digest, configuration, and live object fingerprint. The existing synchronous history insert, fresh event readback, marker insert, and fresh marker readback protocol applies; snapshot markers have both journal sequence fields set to zero. A restart adopts the exact marker and events or replays the same deterministic batch ID. A conflict blocks the destination. Snapshot verification creates no destination checkpoint. The first complete M2 transaction may create a checkpoint only after the snapshot is verified, and that checkpoint records the anchor ID. Selector promotion waits for all snapshot batches and the contiguous M2 suffix through the post-copy fence. Existing-slot reseed requires a separate lower-boundary rule.
+
+This version extends the acceptance contract. Earlier M2-only ClickHouse component evidence remains valid for its original boundary but cannot establish initial-load compatibility or same-stream convergence.
+
 A candidate is promotable only with a compatible complete anchor, post-copy fence, every selected logical table, exact table-set fingerprint and watermark, and no selector conflict. Selectors are append-only. Greatest fence wins; lower fences are no-ops; an identical same-fence retry is harmless; a distinct candidate at the same fence is corruption. External state above restored SQLite blocks until maintenance verifies/adopts the unique high fence or rejects it. No DDL switches live generations.
 
 Only a nullable, non-generated, no-default addition outside active backfill is compatible. Active-backfill change invalidates the candidate. Type/key/default/generated/non-null/removal changes block the whole destination at the failed transaction and require a complete fresh generation/re-seed. Migration creates versioned objects, dual-reads and verifies them, then adopts their fingerprint; it never mutates published history.

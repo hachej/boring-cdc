@@ -1,24 +1,24 @@
 {
   "findings": [],
   "fixture_count": 41,
-  "input_tree_sha256": "d00884faeef979c1dec73c93901eba2ec05d6be01a5f38ef6821ccaf241d3911",
+  "input_tree_sha256": "14b327928e52783b6d98d58da3108c5a549b575412b8fabd730ffe669eaba6ed",
   "inputs": {
     "contracts/clickhouse/canonical-query.sql": "0c1a0008e94cc1104e2b6964d39cc9aae26cddb76ba1f38372dc7c5d5442c8df",
     "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
     "contracts/clickhouse/fixtures.schema.json": "894bed006fdc7b5b162024b68aed22e8d7e7b691b57a509bb33c2179b71bec81",
-    "contracts/clickhouse/model.json": "f9928d14757af8c4a3985a9b7b17acc784c25f18ae8b645007c9b0deb18b333e",
-    "contracts/clickhouse/model.schema.json": "a5b24c338cf376c3c1f601c36f17cb453474e835323bf2fa21a58ccc6ba28697",
+    "contracts/clickhouse/model.json": "c007e104533166233fe7da99a956d9814ab0790afb457b62edd7c63479068261",
+    "contracts/clickhouse/model.schema.json": "ccb507c42df7a332328473a0342a774e7dfe771e10e49f0c8720a4f5c201a37b",
     "contracts/clickhouse/result.schema.json": "80ad19fb794e6b6caba1dd45bbcfe63f75c83f6ae7c2d0b81b16da404b8ace8e",
     "contracts/clickhouse/retire-generation.sql": "0f18d6679a6b6bbf58fde38f6c35b09c3c8dca3e2b99a75f8623b0176fb9ae06",
-    "docs/CLICKHOUSE_MODEL.md": "072d3ca17f4d62d0aec9824517b3b951313b222dd82d549482b1eb139573d0d2",
+    "docs/CLICKHOUSE_MODEL.md": "3a95f4a40c78b2904247b0f228f18c221b978546b2e598f085ae825f189d13dd",
     "fixtures/m0/clickhouse/scenarios.json": "97ab46e31b40031018571eed96fbb11cdae7bf1064406696f52a1bbcb12a5df8"
   },
   "owner_bead": "boring-cdc-m0-ch-model",
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-clickhouse-contract-evidence/v2",
-  "source_parent_git_commit": "cabbb10a6a6c04d17b340b70840e36452a32ed41",
+  "source_parent_git_commit": "57b85a5b4391641b7d361d01aa6bf5d9efaf6fc3",
   "status": "pass",
   "validator": "scripts/validate/clickhouse_contract.py",
-  "validator_sha256": "284088534d41c54eba35a5b11afefdf8fadeb8d735366aa7808b615caf781953"
+  "validator_sha256": "4026df900dcec73b5a2ac005fa44771f3b309de6b7639c7ced070b6186e946a6"
 }

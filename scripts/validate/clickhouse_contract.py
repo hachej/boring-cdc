@@ -92,6 +92,20 @@ def validate():
  if c['objects']['materialized_views']!=[] or not c['objects']['materialized_view_policy'].startswith('none:'):add(out,'E_MATERIALIZED_VIEW','objects','materialized-view policy changed')
  if c['pins']['client_protocol']!='HTTP RowBinary' or c['pins']['rust_client_crate']!='clickhouse 0.13.3':add(out,'E_CLIENT_TRANSPORT','pins','pinned crate requires HTTP RowBinary transport')
  if c['insert_acceptance']['settings'].get('wait_end_of_query')!=1 or 'insert.end()' not in ' '.join(c['insert_acceptance']['ordered_steps']):add(out,'E_INSERT_FINALIZATION','insert_acceptance','HTTP insert must await complete response and end() before readback')
+ initial=c.get('initial_load',{})
+ initial_checks={
+  'scope':('start_seq=0','one admitted relation'),
+  'source':('m3_snapshot_events','complete anchor','schema fingerprint'),
+  'identity':('M1 snapshot connector_event_id','numeric chunk ordinal','M0 mutation envelope'),
+  'source_version':('snapshot_boundary_lsn','origin_rank=0','transaction_ordinal=0','mutation_ordinal=0'),
+  'delivery':('journal_seq=0','first_journal_seq=last_journal_seq=0','positive and contiguous'),
+  'intent':('before any remote write','complete anchor ID','ordered event digest','object fingerprint'),
+  'acceptance':('synchronous history insert','fresh event readback','fresh marker readback','deterministic batch ID'),
+  'checkpoint':('never create or advance','journal_seq=1','anchor ID'),
+  'visibility':('no selector or promotion','post-copy fence','held lease'),
+  'invalidates':('does not prove initial-load compatibility',),
+ }
+ if c.get('schema_version')!='clickhouse-contract/v2' or any(any(token not in initial.get(field,'') for token in tokens) for field,tokens in initial_checks.items()):add(out,'E_INITIAL_LOAD','initial_load','initial-slot snapshot admission contract incomplete')
  if c['lookup_behavior']['external_dictionaries']!='forbidden for correctness and TOAST reconstruction' or c['lookup_behavior']['postgres_joins']!='forbidden':add(out,'E_LOOKUP','lookup_behavior','dictionary/source join would weaken reconstruction')
  provisional=[]
  if c.get('provisional_markers')!=provisional:add(out,'E_PROVISIONAL','provisional_markers','owner-card provisional inventory changed')

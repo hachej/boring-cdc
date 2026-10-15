@@ -534,6 +534,23 @@
       ],
       "type": "object"
     },
+    "initial_load": {
+      "additionalProperties": false,
+      "properties": {
+        "scope": {"type": "string"},
+        "source": {"type": "string"},
+        "identity": {"type": "string"},
+        "source_version": {"type": "string"},
+        "delivery": {"type": "string"},
+        "intent": {"type": "string"},
+        "acceptance": {"type": "string"},
+        "checkpoint": {"type": "string"},
+        "visibility": {"type": "string"},
+        "invalidates": {"type": "string"}
+      },
+      "required": ["scope", "source", "identity", "source_version", "delivery", "intent", "acceptance", "checkpoint", "visibility", "invalidates"],
+      "type": "object"
+    },
     "insert_acceptance": {
       "additionalProperties": false,
       "properties": {
@@ -1099,7 +1116,7 @@
       "type": "object"
     },
     "schema_version": {
-      "const": "clickhouse-contract/v1"
+      "const": "clickhouse-contract/v2"
     }
   },
   "required": [
@@ -1115,6 +1132,7 @@
     "fixture_ids",
     "fixture_path",
     "history_retention",
+    "initial_load",
     "insert_acceptance",
     "lookup_behavior",
     "objects",
