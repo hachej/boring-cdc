@@ -2522,7 +2522,7 @@ pub async fn run_loaded_config(
         .duration_since(UNIX_EPOCH)
         .map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?;
     let now = elapsed.as_millis() as i64;
-    let startup_run_id = format!("production-startup-{}", elapsed.as_nanos());
+    let startup_run_id = ownership.run_id.clone();
     let live_source = observe_live_source(&dsn, &public.source.publication, &public.source.slot)?;
     let recovery_fingerprints = capture_recovery_fingerprints(public)?;
     let capture_epoch;
@@ -2643,7 +2643,7 @@ pub async fn run_loaded_config(
             &live_source,
         )?;
     }
-    let writer = open_writer(&journal_path, "production-run", 1, now)
+    let writer = open_writer(&journal_path, &startup_run_id, 1, now)
         .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_OPEN_FAILED"))?;
     let durable = writer
         .connection()

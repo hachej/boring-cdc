@@ -65,7 +65,7 @@ psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_creden
 psqlc -qc "alter table public.orders add column memo text; alter table public.orders alter column memo set storage external"
 
 cargo build --quiet --locked --bin boring-cdc
-binary="$PWD/target/debug/boring-cdc"
+binary="${CARGO_TARGET_DIR:-$PWD/target}/debug/boring-cdc"
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"
 chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
 cp -f "${M2_STATUS_FIXTURE_CONFIG:-tests/fixtures/m1_config/representative.toml}" "$work/run/boring-cdc.toml"
@@ -172,6 +172,14 @@ for key in 101 102 103; do
   wait_for_transactions "$((key-100))"
   sample_feedback_boundary "before-crash-$key"
 done
+python3 - "$journal" "$work/first-run-id" <<'PY'
+import sqlite3,sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    rows=db.execute("select run_id from startup_reconciliations order by reconciliation_id").fetchall()
+assert len(rows)==1 and rows[0][0].startswith('production-'),rows
+with open(sys.argv[2],'w') as out:
+    out.write(rows[0][0])
+PY
 wait_for_control_event heartbeat
 fence_updates=$(psqlc -Atqc "begin; set local role boring_cdc_control_writer; with updated as (update boring_cdc_control.capture_fences set capture_epoch=1,generation=1,table_set_fingerprint=decode(repeat('ff',32),'hex'),unique_nonce=decode('0102030405060708090a0b0c0d0e0f10','hex') where id=1 returning 1) select count(*) from updated; commit")
 [[ "$fence_updates" == 1 ]]
@@ -193,6 +201,14 @@ sample_feedback_boundary connector-down
 runtime_pid=$!
 wait_for_active_slot || { cat "$work/runtime-restart.err" >&2; exit 1; }
 wait_for_transactions 6
+python3 - "$journal" "$work/first-run-id" <<'PY'
+import sqlite3,sys
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    rows=db.execute("select run_id from startup_reconciliations order by reconciliation_id").fetchall()
+first=open(sys.argv[2]).read()
+assert len(rows)==2 and rows[0][0]==first and rows[1][0].startswith('production-') and rows[1][0]!=first,rows
+print('DURABLE_RUN_ID_OK restart=distinct startup_receipts=2')
+PY
 if [[ -n "${M2_STATUS_FRESHNESS_PROOF_OUT:-}" ]]; then
   sleep 35
   (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u M2_STATUS_FRESHNESS_PROOF_OUT "$binary" status --json) >"$work/status-freshness.json"
