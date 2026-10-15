@@ -1,0 +1,1 @@
+{"postgres_image":"17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929","secret_source":"compose-secret-file","seed":"bootstrap-pg17-v1","tmpdir":"/var/tmp"}
