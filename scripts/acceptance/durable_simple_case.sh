@@ -67,7 +67,7 @@ psqlc -qc "alter table public.orders add column memo text; alter table public.or
 cargo build --quiet --locked --bin boring-cdc
 binary="${CARGO_TARGET_DIR:-$PWD/target}/debug/boring-cdc"
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"
-chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
+chmod 700 "$work/run" "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
 cp -f "${M2_STATUS_FIXTURE_CONFIG:-tests/fixtures/m1_config/representative.toml}" "$work/run/boring-cdc.toml"
 
 admin_dsn=postgresql:"//boring_cdc_admin:${admin_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
@@ -131,6 +131,27 @@ wait_for_active_slot() {
     sleep .1
   done
 }
+assert_operator_result_socket() {
+  python3 - "$work/run/run/boring-cdc/operator.sock" <<'PY'
+import json,socket,struct,sys
+request=json.dumps({'kind':'result','schema_version':1,'expected_run_id':'missing-run','request_id':'missing-request','canonical_payload_digest':'missing-digest'},separators=(',',':')).encode()
+with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as peer:
+    peer.settimeout(3)
+    peer.connect(sys.argv[1])
+    peer.sendall(struct.pack('!I',len(request))+request)
+    peer.shutdown(socket.SHUT_WR)
+    header=peer.recv(4)
+    assert len(header)==4,header
+    length=struct.unpack('!I',header)[0]
+    body=b''
+    while len(body)<length:
+        chunk=peer.recv(length-len(body))
+        assert chunk
+        body+=chunk
+response=json.loads(body)
+assert response=={'kind':'error','schema_version':1,'code':'M2_OPERATOR_RESULT_STALE','message':'operator result is unavailable'},response
+PY
+}
 sample_feedback_boundary() {
   local stage=$1 confirmed durable restart
   confirmed=$(psqlc -Atqc "select coalesce(confirmed_flush_lsn::text,'0/0') from pg_replication_slots where slot_name='boring_slot'")
@@ -167,6 +188,7 @@ commit_order() {
 (cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/runtime-first.out" 2>"$work/runtime-first.err") &
 runtime_pid=$!
 wait_for_active_slot || { cat "$work/runtime-first.err" >&2; exit 1; }
+assert_operator_result_socket
 for key in 101 102 103; do
   commit_order "$key"
   wait_for_transactions "$((key-100))"
@@ -203,6 +225,7 @@ sample_feedback_boundary connector-down
 (cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/runtime-restart.out" 2>"$work/runtime-restart.err") &
 runtime_pid=$!
 wait_for_active_slot || { cat "$work/runtime-restart.err" >&2; exit 1; }
+assert_operator_result_socket
 wait_for_transactions 6
 python3 - "$journal" "$work/first-run-id" <<'PY'
 import sqlite3,sys,time

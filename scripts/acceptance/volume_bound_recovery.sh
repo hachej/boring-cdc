@@ -58,7 +58,7 @@ psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_creden
 cargo build --quiet --locked --bin boring-cdc
 binary="$PWD/target/debug/boring-cdc"
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"
-chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
+chmod 700 "$work/run" "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
 cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 python3 - "$work/run/boring-cdc.toml" <<'PYC'
 from pathlib import Path

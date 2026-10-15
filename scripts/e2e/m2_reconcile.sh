@@ -24,7 +24,7 @@ SQL
 [[ "$(psqlc -Atqc 'show server_version')" == 17.6* ]]
 cargo build --quiet --locked --bin boring-cdc
 binary="$(realpath "${CARGO_TARGET_DIR:-target}/debug/boring-cdc")"
-mkdir -p "$work/run/state/spool"; chmod 700 "$work/run/state" "$work/run/state/spool"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
+mkdir -p "$work/run/state/spool"; chmod 700 "$work/run" "$work/run/state" "$work/run/state/spool"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 sed -i 's/publication = "boring_publication"/publication = "article1_publication"/; s/slot = "boring_slot"/slot = "article1_slot"/' "$work/run/boring-cdc.toml"
 runtime_dsn="postgresql://cdc_runtime@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 admin_dsn="postgresql://boring_cdc@127.0.0.1:${port}/boring_cdc?sslmode=disable"

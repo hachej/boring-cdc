@@ -82,7 +82,7 @@ if [[ ${M2_WIRE_LIMIT_PROOF:-0} == 1 ]]; then
   psqlc -c 'ALTER TABLE public.orders ADD COLUMN payload text' >/dev/null
 fi
 cargo build --quiet --locked --bin boring-cdc
-mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
+mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run" "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 sed -i 's/publication = "boring_publication"/publication = "RuntimePublication"/; s/slot = "boring_slot"/slot = "runtime_slot"/; s#sqlite_path = "state/boring.db"#sqlite_path = "state/journal.sqlite"#' "$work/run/boring-cdc.toml"
 if [[ ${M2_SQLITE_CONTENTION_PROOF:-0} == 1 || ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} == 1 ]]; then
   sed -i 's/heartbeat_cadence_ms = 5000/heartbeat_cadence_ms = 300000/' "$work/run/boring-cdc.toml"
