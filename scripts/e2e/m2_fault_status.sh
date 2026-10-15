@@ -7,7 +7,7 @@ work=$(mktemp -d /var/tmp/m2-fault-status.XXXXXX); trap 'rm -rf "$work"' EXIT IN
 # process/boundary receipt when an evidence caller requests it.
 M2_RECONCILE_PROOF_OUT="${M2_FAULT_STATUS_PROOF_OUT:-$work/reconcile-crash-proof.json}" scripts/e2e/m2_reconcile.sh
 [[ -s "${M2_FAULT_STATUS_PROOF_OUT:-$work/reconcile-crash-proof.json}" ]]
-mkdir -p "$work/run/state/spool"; chmod 700 "$work/run/state" "$work/run/state/spool"
+mkdir -p "$work/run/state/spool"; chmod 700 "$work/run" "$work/run/state" "$work/run/state/spool"
 cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 TMPDIR=/var/tmp cargo run --quiet --locked --example m2_fault_status_fixture -- "$work/run/state/boring.db"
 TMPDIR=/var/tmp cargo build --quiet --locked --bin boring-cdc

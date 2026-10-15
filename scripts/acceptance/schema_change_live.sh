@@ -65,7 +65,7 @@ reset_source() {
   psqlc -qc 'drop publication if exists boring_publication; drop schema if exists boring_cdc_control cascade; drop table if exists public.orders cascade'
   rm -rf "$work/run"
   mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"
-  chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
+  chmod 700 "$work/run" "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
   cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
   if [[ -n ${M2_SCHEMA_SAFE_STOP_OUT:-} || -n ${M2_SCHEMA_UNMATCHED_EOF_OUT:-} ]]; then
     sed -i 's/heartbeat_cadence_ms = 5000/heartbeat_cadence_ms = 300000/' "$work/run/boring-cdc.toml"

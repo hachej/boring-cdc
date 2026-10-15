@@ -1,8 +1,9 @@
 //! Read-only lookup of durable operator results by the live owner.
 
 use crate::m1_cli_contract::CliEnvelope;
-use crate::m2_schema::WriterConnection;
+use crate::m2_schema::{WriterConnection, open_reader};
 use rusqlite::{OptionalExtension, params};
+use std::path::Path;
 
 #[derive(Debug, PartialEq)]
 pub enum StoredResult {
@@ -16,6 +17,16 @@ pub enum ResultLookupError {
     Stale,
     Corrupt,
     Store,
+}
+
+pub struct ResultLookup<'a> {
+    pub current_run_id: &'a str,
+    pub connection_generation: u64,
+    pub expected_run_id: &'a str,
+    pub request_id: &'a str,
+    pub canonical_payload_digest: &'a str,
+    pub peer_identity: &'a str,
+    pub now_mono_ms: u64,
 }
 
 struct RequestRow {
@@ -96,6 +107,69 @@ pub fn lookup_result(
     {
         return Err(ResultLookupError::Stale);
     }
+    decode_result(stored, expected_run_id, request_id)
+}
+
+/// The socket owns no writer connection. Each lookup opens a bounded read-only handle and
+/// checks the current run lease in the same SQLite statement as the request row.
+pub fn lookup_result_readonly(
+    path: &Path,
+    lookup: ResultLookup<'_>,
+) -> Result<StoredResult, ResultLookupError> {
+    if [
+        lookup.current_run_id,
+        lookup.expected_run_id,
+        lookup.request_id,
+        lookup.canonical_payload_digest,
+        lookup.peer_identity,
+    ]
+    .iter()
+    .any(|value| !valid_field(value))
+    {
+        return Err(ResultLookupError::Stale);
+    }
+    let now = i64::try_from(lookup.now_mono_ms).map_err(|_| ResultLookupError::Stale)?;
+    let generation =
+        i64::try_from(lookup.connection_generation).map_err(|_| ResultLookupError::Stale)?;
+    let reader = open_reader(path).map_err(|_| ResultLookupError::Store)?;
+    let stored: Option<RequestRow> = reader
+        .query_one_bounded_params(
+            "SELECT request.run_id,request.peer_identity,request.payload_digest,request.state,request.request_id,request.result,request.plan_digest
+             FROM operator_command_requests AS request
+             JOIN runtime_ownership AS owner ON owner.run_id=?1 AND owner.connection_generation=?2
+             WHERE request.request_id=?3 AND owner.state='held' AND owner.ownership_deadline_mono_ms>=?4",
+            params![lookup.current_run_id, generation, lookup.request_id, now],
+            |row| {
+                Ok(RequestRow {
+                    run_id: row.get(0)?,
+                    peer: row.get(1)?,
+                    digest: row.get(2)?,
+                    state: row.get(3)?,
+                    id: row.get(4)?,
+                    result: row.get(5)?,
+                    plan_digest: row.get(6)?,
+                })
+            },
+        )
+        .map_err(|_| ResultLookupError::Store)?;
+    let Some(stored) = stored else {
+        return Err(ResultLookupError::Stale);
+    };
+    if stored.run_id != lookup.expected_run_id
+        || stored.peer != lookup.peer_identity
+        || stored.digest != lookup.canonical_payload_digest
+        || stored.id != lookup.request_id
+    {
+        return Err(ResultLookupError::Stale);
+    }
+    decode_result(stored, lookup.expected_run_id, lookup.request_id)
+}
+
+fn decode_result(
+    stored: RequestRow,
+    expected_run_id: &str,
+    request_id: &str,
+) -> Result<StoredResult, ResultLookupError> {
     match (stored.state.as_str(), stored.result) {
         ("accepted" | "reconciling", None) => Ok(StoredResult::Pending),
         ("aborted_by_restart", None) => Ok(StoredResult::AbortedByRestart),
@@ -153,9 +227,35 @@ mod tests {
         };
         let bytes = serde_json::to_vec(&envelope).unwrap();
         writer.connection().execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at,plan_digest) VALUES('request','dry-nonce',X'01','payload','old-run','uid:1000','completed',?1,1,1,'later','plan')",[bytes]).unwrap();
+        let read = |generation, request_id, peer_identity| {
+            lookup_result_readonly(
+                &path,
+                ResultLookup {
+                    current_run_id: "new-run",
+                    connection_generation: generation,
+                    expected_run_id: "old-run",
+                    request_id,
+                    canonical_payload_digest: "payload",
+                    peer_identity,
+                    now_mono_ms: 10,
+                },
+            )
+        };
         assert_eq!(
             lookup_result(&writer, "old-run", "request", "payload", "uid:1000", 10),
+            Ok(StoredResult::Terminal(Box::new(envelope.clone())))
+        );
+        assert_eq!(
+            read(2, "request", "uid:1000"),
             Ok(StoredResult::Terminal(Box::new(envelope)))
+        );
+        assert_eq!(
+            read(3, "request", "uid:1000"),
+            Err(ResultLookupError::Stale)
+        );
+        assert_eq!(
+            read(2, "request", "uid:1001"),
+            Err(ResultLookupError::Stale)
         );
         assert_eq!(
             lookup_result(&writer, "old-run", "request", "changed", "uid:1000", 10),
@@ -174,9 +274,14 @@ mod tests {
             lookup_result(&writer, "old-run", "pending", "payload", "uid:1000", 10),
             Ok(StoredResult::Pending)
         );
+        assert_eq!(read(2, "pending", "uid:1000"), Ok(StoredResult::Pending));
         writer.connection().execute("UPDATE operator_command_requests SET state='aborted_by_restart',request_revision=request_revision+1 WHERE request_id='pending'",[]).unwrap();
         assert_eq!(
             lookup_result(&writer, "old-run", "pending", "payload", "uid:1000", 10),
+            Ok(StoredResult::AbortedByRestart)
+        );
+        assert_eq!(
+            read(2, "pending", "uid:1000"),
             Ok(StoredResult::AbortedByRestart)
         );
         writer.connection().execute("INSERT INTO operator_command_requests(request_id,dry_run_nonce,canonical_payload,payload_digest,run_id,peer_identity,state,result,observation_revision,control_revision,expires_at) VALUES('corrupt','corrupt-nonce',X'03','payload','old-run','uid:1000','completed',X'00',1,1,'later')",[]).unwrap();

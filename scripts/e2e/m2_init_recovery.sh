@@ -32,7 +32,7 @@ psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_creden
   < scripts/setup/durable_simple_prerequisites.sql >/dev/null
 [[ "$(psqlc -Atqc "select has_schema_privilege('boring_cdc_app','public','CREATE')::int,has_table_privilege('boring_cdc_runtime','public.orders','UPDATE')::int,(select count(*) from pg_auth_members where member='boring_cdc_runtime'::regrole)::int")" == '0|0|0' ]]
 cargo build --quiet --locked --bin boring-cdc
-mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
+mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run" "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
 admin_dsn=postgresql:"//boring_cdc_admin:${admin_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_ADMIN="$admin_dsn" CH_MAINT='https://unused.invalid'; unset PG_RUNTIME PG_CONTROL CH_RUNTIME || true
 binary="${CARGO_TARGET_DIR:-$PWD/target}/debug/boring-cdc"

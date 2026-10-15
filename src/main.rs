@@ -1,7 +1,8 @@
 use boring_cdc::article1_capture::{CaptureConfig, CaptureFailure, capture_jsonl};
 use boring_cdc::m1_cli_contract::{
     CLI_SCHEMA_VERSION, CliEnvelope, Condition, ExitCode, MutationTerminal, MutationTrace,
-    NextCommand, SystemSnapshot, command_help, error_envelope, parse, root_help, unavailable,
+    NextCommand, OperatorWireRequest, OperatorWireResponse, SystemSnapshot, command_help,
+    error_envelope, parse, root_help, unavailable,
 };
 use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
 use boring_cdc::m1_preflight::{
@@ -13,6 +14,10 @@ use boring_cdc::m2_fault_status::{
 };
 use boring_cdc::m2_init_recovery::{complete_plan, consume_plan, execute_confirmed, issue_plan};
 use boring_cdc::m2_journal::journal_inspect_event;
+use boring_cdc::m2_operator_requests::{
+    ResultLookup, ResultLookupError, StoredResult, lookup_result_readonly,
+};
+use boring_cdc::m2_operator_socket::OperatorSocket;
 use boring_cdc::m2_reconcile::{journal_report, recover_report};
 use boring_cdc::m2_schema::open_writer;
 use boring_cdc::m2_status_listener::{StatusListener, server_tls_config};
@@ -233,6 +238,12 @@ fn run_m2() -> Result<(), ReaderFailure> {
     );
     let mut ownership = acquire_production_ownership(&config, &run_id)
         .map_err(|e| ReaderFailure::unavailable(e.code, "capture ownership unavailable"))?;
+    let journal_path = std::path::PathBuf::from(&config.public().storage.sqlite_path);
+    let owner_run_id = run_id.clone();
+    let _operator_socket = OperatorSocket::start(&config.public().operator, move |request| {
+        operator_result_dispatch(&journal_path, &owner_run_id, request)
+    })
+    .map_err(|code| ReaderFailure::unavailable(code, "operator socket unavailable"))?;
     let status_address = config
         .public()
         .observability
@@ -284,6 +295,104 @@ fn run_m2() -> Result<(), ReaderFailure> {
     runtime
         .block_on(run_loaded_config(&config, &cancellation, &mut ownership))
         .map_err(|e| ReaderFailure::unavailable(e.code, "capture runtime failed"))
+}
+
+fn operator_error(code: &str, message: &str) -> OperatorWireResponse {
+    OperatorWireResponse::Error {
+        schema_version: 1,
+        code: code.into(),
+        message: message.into(),
+    }
+}
+
+fn operator_result_dispatch(
+    journal_path: &std::path::Path,
+    current_run_id: &str,
+    request: OperatorWireRequest,
+) -> OperatorWireResponse {
+    let OperatorWireRequest::Result {
+        expected_run_id,
+        request_id,
+        canonical_payload_digest,
+        ..
+    } = request
+    else {
+        return operator_error(
+            "CLI_OPERATOR_COMMAND_NOT_ROUTABLE",
+            "operator command is unavailable",
+        );
+    };
+    let mut time = std::mem::MaybeUninit::<libc::timespec>::uninit();
+    if unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, time.as_mut_ptr()) } != 0 {
+        return operator_error(
+            "M2_OPERATOR_CLOCK_UNAVAILABLE",
+            "operator result is unavailable",
+        );
+    }
+    let time = unsafe { time.assume_init() };
+    let now = u64::try_from(time.tv_sec)
+        .ok()
+        .and_then(|seconds| seconds.checked_mul(1000))
+        .and_then(|millis| {
+            u64::try_from(time.tv_nsec / 1_000_000)
+                .ok()
+                .and_then(|fraction| millis.checked_add(fraction))
+        });
+    let Some(now) = now else {
+        return operator_error(
+            "M2_OPERATOR_CLOCK_UNAVAILABLE",
+            "operator result is unavailable",
+        );
+    };
+    let peer_identity = format!("uid:{}", unsafe { libc::geteuid() });
+    match lookup_result_readonly(
+        journal_path,
+        ResultLookup {
+            current_run_id,
+            connection_generation: 1,
+            expected_run_id: &expected_run_id,
+            request_id: &request_id,
+            canonical_payload_digest: &canonical_payload_digest,
+            peer_identity: &peer_identity,
+            now_mono_ms: now,
+        },
+    ) {
+        Ok(StoredResult::Terminal(result)) => OperatorWireResponse::Result {
+            schema_version: 1,
+            result: *result,
+        },
+        Ok(StoredResult::Pending) => {
+            operator_error("CLI_OPERATOR_RESULT_PENDING", "operator result is pending")
+        }
+        Ok(StoredResult::AbortedByRestart) => OperatorWireResponse::Result {
+            schema_version: 1,
+            result: CliEnvelope {
+                schema_version: 1,
+                command: "operator result".into(),
+                outcome: "aborted_by_restart".into(),
+                code: "M2_OPERATOR_ABORTED_BY_RESTART".into(),
+                message: "operator request was aborted by restart".into(),
+                request_id: Some(request_id),
+                run_id: Some(expected_run_id),
+                capture_epoch: None,
+                condition: None,
+                runbook_id: None,
+                data: serde_json::Value::Null,
+                warnings: Vec::new(),
+                next_commands: Vec::new(),
+                plan_digest: None,
+                postcondition_evidence_digest: None,
+                mutation_trace: None,
+            },
+        },
+        Err(ResultLookupError::Stale) => {
+            operator_error("M2_OPERATOR_RESULT_STALE", "operator result is unavailable")
+        }
+        Err(ResultLookupError::Corrupt | ResultLookupError::Store) => operator_error(
+            "M2_OPERATOR_RESULT_UNAVAILABLE",
+            "operator result is unavailable",
+        ),
+    }
 }
 
 fn bootstrap_failure(error: BootstrapError) -> ReaderFailure {
