@@ -5,7 +5,7 @@ set +e
 bootstrap_dispatch=$(cargo run --locked --quiet -- run --bootstrap 2>&1)
 bootstrap_dispatch_status=$?
 set -e
-if [[ $bootstrap_dispatch_status -ne 4 || "$bootstrap_dispatch" != M3_CONFIG_UNAVAILABLE:* ]]; then
+if [[ $bootstrap_dispatch_status -ne 4 ]] || ! printf '%s\n' "$bootstrap_dispatch" | grep -q '^M3_CONFIG_UNAVAILABLE:'; then
   printf 'E_M3_BOOTSTRAP_DISPATCH status=%s output_sha256=%s\n' "$bootstrap_dispatch_status" "$(printf '%s' "$bootstrap_dispatch" | sha256sum | cut -d' ' -f1)" >&2
   exit 1
 fi
