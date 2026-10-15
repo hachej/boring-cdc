@@ -1,0 +1,12 @@
+{
+  "schema_version": "article2-composite-packet/v1",
+  "owner_bead": "boring-cdc-m4.1",
+  "source_commit": "d31f59ef2fd36eca928ac1a8a321582defdbfe34",
+  "source_ci_run": "https://github.com/hachej/boring-cdc/actions/runs/38789897606",
+  "source_ci_job": "anchored_candidate",
+  "artifact_name": "article2-anchored-clickhouse-d31f59ef2fd36eca928ac1a8a321582defdbfe34",
+  "observation_path": "evidence/article2/composite/observation.json",
+  "observation_sha256": "cb32155c40a4442cdf65823cbdf16444d3b800fbb1fdfa1000592b18c543ba5f",
+  "evidence_tier": "component",
+  "scope": "One-relation initial-slot anchored ClickHouse candidate with post-copy M2 replay and final source oracle; no selector promotion or existing-slot reseed"
+}
