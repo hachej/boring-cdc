@@ -19,7 +19,7 @@ EVIDENCE = ROOT / "artifacts/boring-cdc-m0-complete/gate/evidence.json"
 SUMMARY = EVIDENCE.with_name("completion-summary.json")
 
 # primary manifest ID -> (artifact registry ID, canonical owner)
-EXPECTED_ARTIFACTS_SHA256 = "19dbb98a243f15838dcdd011a4469ec8862dd31dbca1f497571a4854239b3bf1"
+EXPECTED_ARTIFACTS_SHA256 = "7b55334b8ba538ef439a4fe9ef5db11c264f2cfe2e344936a70d88473219d5e0"
 
 PRIMARY_ARTIFACTS = {
     "ART-M0-ARCHIVE-MODEL": ("ART-M0-ARCHIVE-MODEL", "boring-cdc-m0-archive-model"),
@@ -232,7 +232,12 @@ def aggregate_findings(root: Path = ROOT) -> list[str]:
     for _, owner in PRIMARY_ARTIFACTS.values():
         if owner == "boring-cdc-m0-scaffold":
             continue
-        evidence = root / "artifacts" / owner / "spec/evidence.json"
+        version = "evidence-v2.json" if owner in {
+            "boring-cdc-m0-storage-model",
+            "boring-cdc-m0-archive-model",
+            "boring-cdc-m0-ch-model",
+        } else "evidence.json"
+        evidence = root / "artifacts" / owner / "spec" / version
         try:
             value = load(evidence)
             if value.get("runtime_observed") is not False:

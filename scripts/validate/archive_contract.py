@@ -15,9 +15,10 @@ FS = ROOT / "contracts/archive/archive-fixtures.schema.json"
 RS = ROOT / "contracts/archive/archive-result.schema.json"
 SMS = ROOT / "contracts/archive/segment-manifest.schema.json"
 GMS = ROOT / "contracts/archive/generation-manifest.schema.json"
-EXPECTED_CONTRACT_SHA256='473a931d6072ba49c55f1958d165ef64b2542c6ffd0976dbfba309a0729ffe2b'
+EXPECTED_CONTRACT_SHA256='410522dbceda67bd84958c01bbe5efc403f3e4ff992376aad25d8ac60e150e5a'
 EXPECTED_FIXTURES_SHA256 = "8b1f4f0561d9d06037f9985327064ec63c1c90afa1ab08705d3d6224bc0b8e69"
-E = ROOT / "artifacts/boring-cdc-m0-archive-model/spec/evidence.json"
+OLD_E = ROOT / "artifacts/boring-cdc-m0-archive-model/spec/evidence.json"
+E = ROOT / "artifacts/boring-cdc-m0-archive-model/spec/evidence-v2.json"
 M = ROOT / "contracts/m0/manifest.json"
 A = ROOT / "contracts/m0/artifacts.json"
 V = Path(__file__)
@@ -208,7 +209,7 @@ def validate():
             if row["path"] != str(C.relative_to(ROOT)) or row["sha256"] != digest(C) or row["fixture_ids"] != ids or row["executor_ids"] != contract["executors"]:
                 finding(out, "E_MANIFEST_BINDING", "contracts/m0/manifest.json", "archive row does not bind contract, fixtures and executors")
         rows = [row for row in artifacts["artifacts"] if row["owner_bead"] == OWNER]
-        expected_paths = {str(path.relative_to(ROOT)) for path in (C, S, F, FS, RS, SMS, GMS, V, E)}
+        expected_paths = {str(path.relative_to(ROOT)) for path in (C, S, F, FS, RS, SMS, GMS, V, OLD_E, E)}
         if {row["path"] for row in rows} != expected_paths:
             finding(out, "E_ARTIFACT_INVENTORY", "contracts/m0/artifacts.json", "archive artifact inventory differs")
         for row in rows:
@@ -250,7 +251,7 @@ def main():
     if provenance_error:
         finding(findings, "E_EVIDENCE_PROVENANCE", "evidence/source_parent_git_commit", provenance_error)
     material = "".join(key + "\0" + value + "\n" for key, value in sorted(inputs.items())).encode()
-    evidence = {"schema_version": "m0-archive-contract-evidence/v1", "owner_bead": OWNER, "status": "pass" if not findings else "fail", "validator": str(V.relative_to(ROOT)), "validator_sha256": validator_sha256, "source_parent_git_commit": parent, "input_tree_sha256": hashlib.sha256(material).hexdigest(), "inputs": inputs, "fixture_count": len(load(F)["cases"]), "runtime_observed": False, "product_faults": "fault_not_applicable", "findings": findings}
+    evidence = {"schema_version": "m0-archive-contract-evidence/v2", "owner_bead": OWNER, "status": "pass" if not findings else "fail", "validator": str(V.relative_to(ROOT)), "validator_sha256": validator_sha256, "source_parent_git_commit": parent, "input_tree_sha256": hashlib.sha256(material).hexdigest(), "inputs": inputs, "fixture_count": len(load(F)["cases"]), "runtime_observed": False, "product_faults": "fault_not_applicable", "findings": findings}
     E.parent.mkdir(parents=True, exist_ok=True)
     E.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n")
     print(json.dumps(evidence, sort_keys=True, separators=(",", ":")))

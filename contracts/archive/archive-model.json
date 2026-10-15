@@ -135,7 +135,7 @@
       "confirmed_projection_source": "contracts/storage/storage-model.json",
       "decision_id": "boring-cdc-d-promotion",
       "projection": "strictly increasing destination fence; lower no-op; same-fence conflict; external-ahead maintenance adoption",
-      "source_sha256": "c27dae8e706f2f454665c5dcc98b85ea85a1f7bca0179affc97b8951b2cc5ef3"
+      "source_sha256": "b051d9204a09c4d2d2e5585fe86060a26534ee29ebd7c543e8e956d73a7c3345"
     }
   },
   "executors": [

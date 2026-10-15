@@ -3,7 +3,7 @@ import hashlib, importlib.util, json, re, subprocess
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[2]; OWNER='boring-cdc-m0-ch-model'
 C=ROOT/'contracts/clickhouse/model.json'; S=ROOT/'contracts/clickhouse/model.schema.json'; F=ROOT/'fixtures/m0/clickhouse/scenarios.json'; FS=ROOT/'contracts/clickhouse/fixtures.schema.json'; RS=ROOT/'contracts/clickhouse/result.schema.json'
-DDL=ROOT/'contracts/clickhouse/ddl.sql'; Q=ROOT/'contracts/clickhouse/canonical-query.sql'; R=ROOT/'contracts/clickhouse/retire-generation.sql'; D=ROOT/'docs/CLICKHOUSE_MODEL.md'; V=Path(__file__); E=ROOT/'artifacts/boring-cdc-m0-ch-model/spec/evidence.json'; M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
+DDL=ROOT/'contracts/clickhouse/ddl.sql'; Q=ROOT/'contracts/clickhouse/canonical-query.sql'; R=ROOT/'contracts/clickhouse/retire-generation.sql'; D=ROOT/'docs/CLICKHOUSE_MODEL.md'; V=Path(__file__); OLD_E=ROOT/'artifacts/boring-cdc-m0-ch-model/spec/evidence.json'; E=ROOT/'artifacts/boring-cdc-m0-ch-model/spec/evidence-v2.json'; M=ROOT/'contracts/m0/manifest.json'; A=ROOT/'contracts/m0/artifacts.json'
 spec=importlib.util.spec_from_file_location('core',ROOT/'scripts/lib/core_validator.py'); core=importlib.util.module_from_spec(spec); spec.loader.exec_module(core)
 def load(p):
  def pairs(xs):
@@ -215,7 +215,7 @@ def validate():
  try:
   manifest=load(M); artifacts=load(A); row=[x for x in manifest['artifacts'] if x['owner_bead']==OWNER]
   if len(row)!=1 or row[0]['path']!=str(C.relative_to(ROOT)) or row[0]['sha256']!=digest(C) or row[0]['fixture_ids']!=ids or row[0]['executor_ids']!=c['executors']:add(out,'E_MANIFEST','contracts/m0/manifest.json','manifest binding mismatch')
-  expected={str(p.relative_to(ROOT)) for p in paths+[E]}
+  expected={str(p.relative_to(ROOT)) for p in paths+[OLD_E,E]}
   rows=[x for x in artifacts['artifacts'] if x['owner_bead']==OWNER]
   if {x['path'] for x in rows}!=expected:add(out,'E_ARTIFACT_INVENTORY','contracts/m0/artifacts.json','artifact inventory mismatch')
   for x in rows:
@@ -227,6 +227,6 @@ def main():
  findings,inputs=validate(); previous=load(E) if E.exists() else {}; current=subprocess.check_output(['git','rev-parse','HEAD'],cwd=ROOT,text=True).strip(); validator_sha=digest(V); material=''.join(k+'\0'+v+'\n' for k,v in sorted(inputs.items())).encode()
  parent=previous.get('source_parent_git_commit') or current
  if previous.get('inputs')!=inputs or previous.get('validator_sha256')!=validator_sha: parent=current
- evidence={'schema_version':'m0-clickhouse-contract-evidence/v1','owner_bead':OWNER,'status':'pass' if not findings else 'fail','validator':str(V.relative_to(ROOT)),'validator_sha256':validator_sha,'source_parent_git_commit':parent,'input_tree_sha256':hashlib.sha256(material).hexdigest(),'inputs':inputs,'fixture_count':len(load(F)['cases']),'runtime_observed':False,'product_faults':'fault_not_applicable','findings':findings}
+ evidence={'schema_version':'m0-clickhouse-contract-evidence/v2','owner_bead':OWNER,'status':'pass' if not findings else 'fail','validator':str(V.relative_to(ROOT)),'validator_sha256':validator_sha,'source_parent_git_commit':parent,'input_tree_sha256':hashlib.sha256(material).hexdigest(),'inputs':inputs,'fixture_count':len(load(F)['cases']),'runtime_observed':False,'product_faults':'fault_not_applicable','findings':findings}
  E.parent.mkdir(parents=True,exist_ok=True); E.write_text(json.dumps(evidence,indent=2,sort_keys=True)+'\n'); print(json.dumps(evidence,sort_keys=True,separators=(',',':'))); return 0 if not findings else 1
 if __name__=='__main__':raise SystemExit(main())
