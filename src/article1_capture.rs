@@ -286,7 +286,7 @@ where
 pub(crate) fn setup_runtime(
     config: &CaptureConfig,
 ) -> Result<(PgReplicationConnection, BTreeMap<u32, RelationContract>), CaptureFailure> {
-    let contracts = preflight(config, &config.expectations())?;
+    let contracts = preflight(config, &config.expectations(), None)?;
     let replication_dsn = if config.dsn.contains('?') {
         format!("{}&replication=database", config.dsn)
     } else {
@@ -309,9 +309,18 @@ pub(crate) fn setup_runtime(
     Ok((connection, contracts))
 }
 
+/// Verify the catalog for a bootstrap-owned CopyBoth session without opening another stream.
+pub(crate) fn preflight_active_capture(
+    config: &CaptureConfig,
+    expected_backend_pid: i32,
+) -> Result<BTreeMap<u32, RelationContract>, CaptureFailure> {
+    preflight(config, &config.expectations(), Some(expected_backend_pid))
+}
+
 fn preflight(
     config: &CaptureConfig,
     expected: &Expectations<'_>,
+    expected_active_pid: Option<i32>,
 ) -> Result<BTreeMap<u32, RelationContract>, CaptureFailure> {
     let mut connection = PgReplicationConnection::connect(&config.dsn)
         .map_err(|error| classify_connection(&error.to_string()))?;
@@ -346,17 +355,23 @@ fn preflight(
         ));
     }
     let slot_query = format!(
-        "SELECT plugin || ',' || slot_type || ',' || database || ',' || active::int, (restart_lsn IS NOT NULL AND invalidation_reason IS NULL AND wal_status IN ('reserved','extended'))::int FROM pg_replication_slots WHERE slot_name = '{}'",
+        "SELECT plugin || ',' || slot_type || ',' || database || ',' || active::int, (restart_lsn IS NOT NULL AND invalidation_reason IS NULL AND wal_status IN ('reserved','extended'))::int,active_pid::text FROM pg_replication_slots WHERE slot_name = '{}'",
         expected.slot
     );
     let slot = connection
         .exec(&slot_query)
         .map_err(|_| CaptureFailure::at("slot", "ARTICLE1_SLOT_QUERY_FAILED"))?;
     let expected_slot_identity = connection
-        .exec("SELECT 'pgoutput,logical,' || current_database() || ',0'")
+        .exec(&format!(
+            "SELECT 'pgoutput,logical,' || current_database() || ',{}'",
+            u8::from(expected_active_pid.is_some())
+        ))
         .map_err(|_| CaptureFailure::at("slot", "ARTICLE1_SLOT_QUERY_FAILED"))?
         .get_value(0, 0);
     if slot.ntuples() != 1 || slot.get_value(0, 0) != expected_slot_identity {
+        return Err(CaptureFailure::at("slot", "ARTICLE1_SLOT_MISMATCH"));
+    }
+    if slot.get_value(0, 2) != expected_active_pid.map(|pid| pid.to_string()) {
         return Err(CaptureFailure::at("slot", "ARTICLE1_SLOT_MISMATCH"));
     }
     if (slot.get_value(0, 1).as_deref() == Some("1")) != expected.continuity_available {
@@ -726,7 +741,7 @@ mod tests {
                 "ARTICLE1_CONTINUITY_UNAVAILABLE",
             ),
         ] {
-            let error = preflight(&config, &expected).unwrap_err();
+            let error = preflight(&config, &expected, None).unwrap_err();
             assert_eq!((error.boundary, error.code), (boundary, code));
         }
     }
