@@ -356,8 +356,8 @@ mod tests {
             Err(ImportError::Stale)
         ));
         writer.connection().execute(
-            "UPDATE m3_restart_exports SET exporter_backend_pid=42,snapshot_token='snapshot-token',state='exported' WHERE restart_id='restart'",
-            [],
+            "UPDATE m3_restart_exports SET exporter_backend_pid=42,snapshot_token=?1,state='exported' WHERE restart_id='restart'",
+            ["snapshot-token"],
         ).unwrap();
         assert!(matches!(
             record_acknowledgement(&mut writer, &receipt, "worker-a", DIGEST_B, 43, "schema", 1),
