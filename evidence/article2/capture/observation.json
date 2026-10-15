@@ -1,0 +1,36 @@
+{
+  "checks": {
+    "confirmed_flush_bounded_by_durable_journal": true,
+    "distinct_startup_run_ids": true,
+    "journal_sequence_gap_free": true,
+    "restart_lsn_nonregressing": true,
+    "sigkill_exit_137": true,
+    "source_oracle_equals_journal": true,
+    "toast_inheritance": true,
+    "update_key_change_delete": true
+  },
+  "command": "scripts/acceptance/durable_simple_case.sh",
+  "counts": {
+    "feedback_samples": 5,
+    "journal_events_at_oracle": 8,
+    "journal_user_transactions": 6,
+    "source_user_transactions": 6
+  },
+  "git_commit": "fa054019e64387467509e0b01d6027033f343fec",
+  "input_sha256": {
+    "binary": "7b02de1941596d4fd1c0768ec990c3e26c3899baec9b090e24648634daa2e688",
+    "cargo_lock": "69d838a0779f54bca805141df7100be612786d562ead692dd0cf20beffd0c921",
+    "compose": "a011b2853414ee065dfacd2f42cf3e3ac0d218ffa01b1d44061705f4757edeec",
+    "configuration": "0d93f200019fc65b5f27bc36234b7491f97b38699cc7346694569e36cd63ca5d",
+    "scenario": "4044d43241770f52fca90f7fb5af0b5c2ff7917b1364e36f32a2d4c914583df5"
+  },
+  "profile": "durable-simple-six-transaction-crash/v1",
+  "schema_version": "article2-capture-observation/v1",
+  "scope": "M2 source-to-durable-SQLite capture only; no M3 anchor, ClickHouse import, or managed-system result",
+  "source_oracle_sha256": "64468698b756ab5b3ff23b2fb019203d1082f71d7e76a252cc0c76c89bbfe083",
+  "status": "pass",
+  "versions": {
+    "postgres": "17.6",
+    "postgres_image": "docker.io/library/postgres:17.6@sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schema_version": "article2-capture-packet/v1",
+  "owner_bead": "boring-cdc-m2-fault-status.8",
+  "source_commit": "fa054019e64387467509e0b01d6027033f343fec",
+  "source_ci_run": "https://github.com/hachej/boring-cdc/actions/runs/38750001126",
+  "source_ci_job": "m4_live_journal_convergence",
+  "artifact_name": "m4-live-journal-convergence",
+  "ci_command": "scripts/e2e/m4_live_journal_convergence.sh",
+  "capture_command": "scripts/acceptance/durable_simple_case.sh",
+  "observation_path": "evidence/article2/capture/observation.json",
+  "observation_sha256": "c4cace633a1ecf6cc22e61b3ae6afbad299342f9b24a665f5b11e91228109964",
+  "evidence_tier": "component",
+  "status": "pass",
+  "scope": "PostgreSQL 17.6 source-to-durable-SQLite capture only; no M3 anchor, ClickHouse snapshot import, or managed-system result"
+}
