@@ -315,6 +315,8 @@ jobs:
         run: python3 scripts/validate/article2_anchor_packet.py
       - name: Article 2 ClickHouse component packet
         run: python3 scripts/validate/article2_clickhouse_packet.py
+      - name: Article 2 same-stream candidate packet
+        run: python3 scripts/validate/article2_composite_packet.py
       - name: Package boundary
         run: scripts/validate/scaffold_package.sh
       - name: Scaffold contract
