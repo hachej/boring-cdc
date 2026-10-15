@@ -22,6 +22,31 @@ pub const COMMAND_READ_TIMEOUT: Duration = Duration::from_secs(10);
 pub const COMMAND_WRITE_TIMEOUT: Duration = Duration::from_secs(30);
 // v0.1 supports named Linux filesystems only; libc flags are used descriptor-relative.
 
+#[derive(Clone)]
+pub struct OwnerLease {
+    pub run_id: String,
+    pub backend_pid: i32,
+    pub connection_nonce: String,
+    pub connection_generation: u64,
+    pub deadline_mono_ms: i64,
+    pub observed_mono_ms: i64,
+}
+
+fn monotonic_ms() -> Result<i64, OwnershipError> {
+    let mut time = std::mem::MaybeUninit::<libc::timespec>::uninit();
+    if unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, time.as_mut_ptr()) } != 0 {
+        return Err(OwnershipError::Io("monotonic clock unavailable".into()));
+    }
+    let time = unsafe { time.assume_init() };
+    if time.tv_sec < 0 || !(0..1_000_000_000).contains(&time.tv_nsec) {
+        return Err(OwnershipError::Io("monotonic clock invalid".into()));
+    }
+    time.tv_sec
+        .checked_mul(1000)
+        .and_then(|ms| ms.checked_add(time.tv_nsec / 1_000_000))
+        .ok_or_else(|| OwnershipError::Io("monotonic clock overflow".into()))
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OwnerKind {
     Runtime,
@@ -292,6 +317,30 @@ impl<S: SourceLockSession> OwnershipGuard<S> {
         }
         self.deadline = Instant::now() + extension;
         Ok(())
+    }
+    pub fn refreshed_lease(
+        &mut self,
+        connection_generation: u64,
+        extension: Duration,
+    ) -> Result<OwnerLease, OwnershipError> {
+        if !self.reconciled || connection_generation == 0 || extension.is_zero() {
+            return Err(OwnershipError::ReconciliationRequired);
+        }
+        let observed_mono_ms = monotonic_ms()?;
+        self.probe(extension)?;
+        let extension_ms =
+            i64::try_from(extension.as_millis()).map_err(|_| OwnershipError::DeadlineCannotFit)?;
+        let deadline_mono_ms = observed_mono_ms
+            .checked_add(extension_ms)
+            .ok_or(OwnershipError::DeadlineCannotFit)?;
+        Ok(OwnerLease {
+            run_id: self.run_id.clone(),
+            backend_pid: self.backend_pid,
+            connection_nonce: self.connection_nonce.clone(),
+            connection_generation,
+            deadline_mono_ms,
+            observed_mono_ms,
+        })
     }
     /// Any unexpected CopyBoth EOF is process ownership loss even if advisory health remains.
     pub fn unexpected_transport_loss(&mut self) -> OwnershipError {

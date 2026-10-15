@@ -1206,6 +1206,47 @@ impl JournalWriterService {
             scheduler: CapturePriorityScheduler::new(queue_caps, capture_burst)?,
         })
     }
+    pub fn insert_owner_lease(
+        &mut self,
+        lease: &crate::m2_ownership::OwnerLease,
+    ) -> Result<(), JournalError> {
+        let generation = i64::try_from(lease.connection_generation)
+            .map_err(|_| JournalError::Invalid("owner generation overflow"))?;
+        if self.store.writer.attestation().run_id != lease.run_id
+            || self.store.writer.attestation().connection_generation != lease.connection_generation
+            || lease.backend_pid <= 0
+            || lease.connection_nonce.is_empty()
+            || lease.deadline_mono_ms <= lease.observed_mono_ms
+        {
+            return Err(JournalError::Invalid("owner lease identity invalid"));
+        }
+        self.store.writer.connection().execute(
+            "INSERT INTO runtime_ownership(run_id,backend_pid,connection_nonce,ownership_deadline_mono_ms,state,connection_generation) VALUES(?1,?2,?3,?4,'held',?5)",
+            params![lease.run_id, lease.backend_pid, lease.connection_nonce, lease.deadline_mono_ms, generation],
+        )?;
+        Ok(())
+    }
+    pub fn refresh_owner_lease(
+        &mut self,
+        lease: &crate::m2_ownership::OwnerLease,
+    ) -> Result<(), JournalError> {
+        let generation = i64::try_from(lease.connection_generation)
+            .map_err(|_| JournalError::Invalid("owner generation overflow"))?;
+        if self.store.writer.attestation().run_id != lease.run_id
+            || self.store.writer.attestation().connection_generation != lease.connection_generation
+            || lease.deadline_mono_ms <= lease.observed_mono_ms
+        {
+            return Err(JournalError::Invalid("owner lease identity invalid"));
+        }
+        let changed = self.store.writer.connection().execute(
+            "UPDATE runtime_ownership SET ownership_deadline_mono_ms=?1,revision=revision+1 WHERE run_id=?2 AND backend_pid=?3 AND connection_nonce=?4 AND connection_generation=?5 AND state='held' AND ownership_deadline_mono_ms>=?6 AND ownership_deadline_mono_ms<=?1",
+            params![lease.deadline_mono_ms, lease.run_id, lease.backend_pid, lease.connection_nonce, generation, lease.observed_mono_ms],
+        )?;
+        if changed != 1 {
+            return Err(JournalError::Conflict("owner lease stale"));
+        }
+        Ok(())
+    }
     pub(crate) fn pressure_tick_reserved(
         &mut self,
         thresholds: crate::m2_pressure::PressureThresholds,
@@ -1952,6 +1993,40 @@ pub mod tests {
             service.service_next().unwrap().unwrap(),
             WorkOutcome::Durable(_)
         ));
+    }
+    #[test]
+    fn owner_lease_renews_only_the_live_writer_identity() {
+        let (_path, store) = store("owner-lease");
+        let mut service = JournalWriterService::new(store, [4, 2, 2, 2], 1).unwrap();
+        let lease = crate::m2_ownership::OwnerLease {
+            run_id: "run".into(),
+            backend_pid: 1,
+            connection_nonce: "nonce".into(),
+            connection_generation: 1,
+            observed_mono_ms: 100,
+            deadline_mono_ms: 110,
+        };
+        service.insert_owner_lease(&lease).unwrap();
+        let mut renewed = lease.clone();
+        renewed.observed_mono_ms = 105;
+        renewed.deadline_mono_ms = 120;
+        service.refresh_owner_lease(&renewed).unwrap();
+        assert_eq!(
+            service.store.writer.connection().query_row(
+                "SELECT state,ownership_deadline_mono_ms,revision FROM runtime_ownership WHERE run_id='run'",
+                [],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, i64>(2)?)),
+            ).unwrap(),
+            ("held".into(), 120, 1)
+        );
+        let mut stale = renewed.clone();
+        stale.observed_mono_ms = 121;
+        stale.deadline_mono_ms = 130;
+        assert!(service.refresh_owner_lease(&stale).is_err());
+        let mut impostor = renewed;
+        impostor.connection_nonce = "other".into();
+        impostor.deadline_mono_ms = 130;
+        assert!(service.refresh_owner_lease(&impostor).is_err());
     }
     #[test]
     fn slow_storage_hold_bound_rolls_back_without_partial_visibility() {

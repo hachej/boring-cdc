@@ -173,10 +173,13 @@ for key in 101 102 103; do
   sample_feedback_boundary "before-crash-$key"
 done
 python3 - "$journal" "$work/first-run-id" <<'PY'
-import sqlite3,sys
+import sqlite3,sys,time
 with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
     rows=db.execute("select run_id from startup_reconciliations order by reconciliation_id").fetchall()
 assert len(rows)==1 and rows[0][0].startswith('production-'),rows
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    owner=db.execute("select state,backend_pid,connection_generation,ownership_deadline_mono_ms from runtime_ownership where run_id=?",(rows[0][0],)).fetchone()
+assert owner is not None and owner[0]=='held' and owner[1]>0 and owner[2]==1 and owner[3]>time.clock_gettime_ns(time.CLOCK_MONOTONIC)//1_000_000,owner
 with open(sys.argv[2],'w') as out:
     out.write(rows[0][0])
 PY
@@ -202,11 +205,22 @@ runtime_pid=$!
 wait_for_active_slot || { cat "$work/runtime-restart.err" >&2; exit 1; }
 wait_for_transactions 6
 python3 - "$journal" "$work/first-run-id" <<'PY'
-import sqlite3,sys
+import sqlite3,sys,time
 with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
     rows=db.execute("select run_id from startup_reconciliations order by reconciliation_id").fetchall()
 first=open(sys.argv[2]).read()
 assert len(rows)==2 and rows[0][0]==first and rows[1][0].startswith('production-') and rows[1][0]!=first,rows
+with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+    old=db.execute("select state from runtime_ownership where run_id=?",(rows[0][0],)).fetchone()
+assert old==('lost',),old
+for _ in range(30):
+    with sqlite3.connect(f"file:{sys.argv[1]}?mode=ro",uri=True) as db:
+        current=db.execute("select state,backend_pid,connection_generation,ownership_deadline_mono_ms,revision from runtime_ownership where run_id=?",(rows[1][0],)).fetchone()
+    if current is not None and current[0]=='held' and current[1]>0 and current[2]==1 and current[3]>time.clock_gettime_ns(time.CLOCK_MONOTONIC)//1_000_000 and current[4]>0:
+        break
+    time.sleep(.5)
+else:
+    raise AssertionError(('owner lease did not renew',current))
 print('DURABLE_RUN_ID_OK restart=distinct startup_receipts=2')
 PY
 if [[ -n "${M2_STATUS_FRESHNESS_PROOF_OUT:-}" ]]; then
