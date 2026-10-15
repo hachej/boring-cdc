@@ -1,0 +1,10 @@
+{
+  "schema_version": "article2-anchor-packet/v1",
+  "owner_bead": "boring-cdc-m3.8",
+  "source_commit": "6aaadad690b78197239646d16d7d0c19912621e7",
+  "source_ci_run": "https://github.com/hachej/boring-cdc/actions/runs/38748581460",
+  "source_ci_job": "m3_bootstrap_writer_handoff",
+  "artifact_name": "m3-bootstrap-writer-handoff",
+  "original_manifest_sha256": "86c535f8869d1a77d87ac2c5c83f909adfbf84441d78b3f244824a4303e72018",
+  "scope": "PostgreSQL 17.6 imported snapshot and durable M2 fence to complete SQLite anchor; no ClickHouse snapshot import or managed-system result"
+}

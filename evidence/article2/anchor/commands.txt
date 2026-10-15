@@ -1,0 +1,1 @@
+scripts/e2e/m3_bootstrap.sh
