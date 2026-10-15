@@ -35,6 +35,7 @@ pub mod m2_spool;
 pub mod m2_status_listener;
 
 pub mod m3_bootstrap;
+pub mod m3_controls;
 pub mod m3_fence;
 pub mod m3_planner;
 pub mod m4_clickhouse_adapter;

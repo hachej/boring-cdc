@@ -7,7 +7,7 @@
 
 use crate::m2_capture_runtime::{FeedbackGate, FeedbackPermit};
 use crate::m2_schema::WriterConnection;
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fmt;
@@ -248,10 +248,25 @@ pub(crate) fn invalidate_and_release(
     generation: u64,
     lost_session: &str,
 ) -> Result<(), FenceError> {
-    if !matches!(lost_session, "exporter" | "importer" | "guard") {
+    let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    invalidate_and_release_in_transaction(&tx, intent_id, generation, lost_session)?;
+    tx.commit()?;
+    Ok(())
+}
+
+/// Lets a domain transition commit its own state change with the fence-owned invalidation.
+pub(crate) fn invalidate_and_release_in_transaction(
+    tx: &Transaction<'_>,
+    intent_id: &str,
+    generation: u64,
+    lost_session: &str,
+) -> Result<(), FenceError> {
+    if !matches!(
+        lost_session,
+        "exporter" | "importer" | "guard" | "operator_pause"
+    ) {
         return Err(FenceError::Invalid("M3_LOST_SESSION_INVALID"));
     }
-    let tx = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
     let planner_installed: bool = tx.query_row(
         "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='m3_planner_runs')",
         [],
@@ -284,7 +299,6 @@ pub(crate) fn invalidate_and_release(
     if gate != 1 {
         return Err(FenceError::Conflict("M3_FEEDBACK_GATE_STALE_GENERATION"));
     }
-    tx.commit()?;
     Ok(())
 }
 
