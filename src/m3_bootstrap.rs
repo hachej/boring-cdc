@@ -1078,22 +1078,22 @@ mod live_tests {
             .unwrap_or_else(|_| "boring_cdc_m3_bootstrap_test".into());
         let mut admin = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
         let _=admin.exec(&format!("SELECT pg_drop_replication_slot('{slot}') WHERE EXISTS(SELECT 1 FROM pg_replication_slots WHERE slot_name='{slot}')"));
-        admin.exec("DROP PUBLICATION IF EXISTS boring_cdc_m3_pub; DROP TABLE IF EXISTS public.m3_bootstrap_fixture; CREATE TABLE public.m3_bootstrap_fixture(id bigint PRIMARY KEY,payload text); INSERT INTO public.m3_bootstrap_fixture VALUES(1,'before'); CREATE PUBLICATION boring_cdc_m3_pub FOR TABLE public.m3_bootstrap_fixture").unwrap();
+        admin.exec("DROP PUBLICATION IF EXISTS boring_cdc_m3_pub; DROP TABLE IF EXISTS public.m3_bootstrap_fixture; DROP SCHEMA IF EXISTS boring_cdc_control CASCADE; CREATE TABLE public.m3_bootstrap_fixture(id bigint PRIMARY KEY,payload text); INSERT INTO public.m3_bootstrap_fixture VALUES(1,'before'); CREATE SCHEMA boring_cdc_control; CREATE TABLE boring_cdc_control.capture_fences(id smallint PRIMARY KEY CHECK(id=1),capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint bytea NOT NULL CHECK(octet_length(table_set_fingerprint)=32),unique_nonce bytea NOT NULL CHECK(octet_length(unique_nonce)=16)); INSERT INTO boring_cdc_control.capture_fences VALUES(1,0,0,decode(repeat('00',32),'hex'),decode(repeat('00',16),'hex')); CREATE PUBLICATION boring_cdc_m3_pub FOR TABLE public.m3_bootstrap_fixture,boring_cdc_control.capture_fences").unwrap();
         let path =
             std::env::temp_dir().join(format!("m3-live-{}-{}.sqlite", std::process::id(), slot));
         let writer = open_writer(&path, "m3-live", 1, 0).unwrap();
-        writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch','system','1','database',?1,'pgoutput','publication','protocol')",[&slot]).unwrap();
-        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('snapshot-probe','archive','live-config','epoch',1)",[]).unwrap();
+        writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'1','system','1','database',?1,'pgoutput','publication','protocol')",[&slot]).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('snapshot-probe','archive','live-config','1',1)",[]).unwrap();
         let relations = vec!["public.m3_bootstrap_fixture".to_string()];
         let assignment_digest = digest_assignment(&[0; 8]);
         let intent = PrepareIntent {
             intent_id: "live-intent".into(),
-            capture_epoch: "epoch".into(),
+            capture_epoch: "1".into(),
             source_system_id: "system".into(),
             database_id: "database".into(),
             slot_name: slot.clone(),
             generation: 1,
-            table_set_fingerprint: "live-schema".into(),
+            table_set_fingerprint: "aa".repeat(32),
             configuration_fingerprint: "live-config".into(),
             importers: vec![ImporterAssignment {
                 importer_id: "worker-0".into(),
@@ -1169,11 +1169,11 @@ mod live_tests {
                     run_id: "snapshot-run".into(),
                     generation_id: "snapshot-generation".into(),
                     destination_id: "snapshot-probe".into(),
-                    capture_epoch: "epoch".into(),
+                    capture_epoch: "1".into(),
                     generation: 1,
                     bootstrap_intent_id: "live-intent".into(),
                     importer_id: "worker-0".into(),
-                    snapshot_schema_fingerprint: "live-schema".into(),
+                    snapshot_schema_fingerprint: "aa".repeat(32),
                     key_schema: vec![crate::m3_planner::KeyPartType::I64],
                     boundaries: vec![],
                     estimated_rows: 1,
@@ -1188,7 +1188,7 @@ mod live_tests {
             imported,
             "worker-0",
             &assignment_digest,
-            "live-schema",
+            &"aa".repeat(32),
             "public.m3_bootstrap_fixture",
             &["id"],
         )
@@ -1236,6 +1236,60 @@ mod live_tests {
         assert_eq!(copied["id"], 1);
         assert_eq!(copied["payload"], "before");
         assert_eq!(payload_hash, format!("{:x}", Sha256::digest(&payload)));
+        let mut fence = crate::m3_fence::FenceStore::open(writer).unwrap();
+        let prepared = fence
+            .prepare_after_copy(&crate::m3_fence::FenceIntentInput {
+                intent_id: "snapshot-fence".into(),
+                generation_id: "snapshot-generation".into(),
+                bootstrap_intent_id: "live-intent".into(),
+                capture_epoch: 1,
+                generation: 1,
+                nonce: [0x17; 16],
+                table_set_fingerprint: [0xaa; 32],
+                anchor_id: "snapshot-anchor".into(),
+                expires_at: "future".into(),
+            })
+            .unwrap();
+        assert_eq!(fence.load_dispatch("snapshot-fence").unwrap(), prepared);
+        let mut control = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
+        fence
+            .dispatch_source("snapshot-fence", &mut control)
+            .unwrap();
+        let result = control
+            .exec("SELECT capture_epoch::text,generation::text,encode(table_set_fingerprint,'hex'),encode(unique_nonce,'hex') FROM boring_cdc_control.capture_fences WHERE id=1")
+            .unwrap();
+        assert_eq!(result.ntuples(), 1);
+        assert_eq!(result.get_value(0, 0).as_deref(), Some("1"));
+        assert_eq!(result.get_value(0, 1).as_deref(), Some("1"));
+        assert_eq!(
+            result.get_value(0, 2).as_deref(),
+            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        );
+        assert_eq!(
+            result.get_value(0, 3).as_deref(),
+            Some("17171717171717171717171717171717")
+        );
+        control
+            .exec("DELETE FROM boring_cdc_control.capture_fences WHERE id=1")
+            .unwrap();
+        assert!(matches!(
+            fence.dispatch_source("snapshot-fence", &mut control),
+            Err(crate::m3_fence::FenceError::Conflict(
+                "M3_FENCE_CONTROL_CARDINALITY"
+            ))
+        ));
+        assert!(sessions.capture_alive());
+        sessions.keepalive().unwrap();
+        let writer = fence.into_writer();
+        let dispatch_state: String = writer
+            .connection()
+            .query_row(
+                "SELECT state FROM m3_fence_intents WHERE intent_id='snapshot-fence'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(dispatch_state, "dispatched");
         let runtime = sessions.resume(writer).unwrap();
         runtime.invalidate("importer").unwrap();
         let mut cleanup = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();

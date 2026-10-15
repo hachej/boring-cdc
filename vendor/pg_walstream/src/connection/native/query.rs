@@ -5,11 +5,14 @@
 //! or `ErrorResponse ('E')` or `CopyBothResponse ('W')`.
 
 use bytes::BytesMut;
+use bytes::BufMut;
+use postgres_protocol::{IsNull, message::frontend};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
 use super::result::{NativePgResult, NativeResultStatus};
 use super::wire;
 use crate::error::ReplicationError;
+use super::super::PgParameter;
 
 /// Physical receive-buffer observations from a bounded simple query.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -268,6 +271,67 @@ pub async fn simple_query<S: AsyncRead + AsyncWrite + Unpin>(
         }
     }
 
+    Ok(result)
+}
+
+/// Execute one extended-protocol statement with text or byte-exact binary parameters.
+pub async fn parameterized_query<S: AsyncRead + AsyncWrite + Unpin>(
+    stream: &mut S,
+    buf: &mut BytesMut,
+    sql: &str,
+    params: &[PgParameter],
+) -> Result<NativePgResult, ReplicationError> {
+    let mut send = BytesMut::new();
+    frontend::parse("", sql, std::iter::empty::<u32>(), &mut send)
+        .map_err(|_| ReplicationError::protocol("Invalid parameterized query"))?;
+    frontend::bind(
+        "",
+        "",
+        params.iter().map(|param| match param {
+            PgParameter::Text(_) => 0,
+            PgParameter::Binary(_) => 1,
+        }),
+        params.iter(),
+        |param, out| {
+            match param {
+                PgParameter::Text(value) => out.put_slice(value.as_bytes()),
+                PgParameter::Binary(value) => out.put_slice(value),
+            }
+            Ok(IsNull::No)
+        },
+        std::iter::empty::<i16>(),
+        &mut send,
+    )
+    .map_err(|_| ReplicationError::protocol("Invalid query parameters"))?;
+    frontend::execute("", 0, &mut send)
+        .map_err(|_| ReplicationError::protocol("Invalid parameterized query"))?;
+    frontend::sync(&mut send);
+    wire::write_all(stream, &send).await?;
+    wire::flush(stream).await?;
+
+    let mut result = NativePgResult::new();
+    loop {
+        let message = wire::read_message(stream, buf).await?;
+        if message.is_empty() {
+            continue;
+        }
+        match message[0] {
+            b'T' => result.parse_row_description(&message[5..]),
+            b'D' => result.parse_data_row(&message[5..]),
+            b'C' => {
+                if result.status == NativeResultStatus::Empty {
+                    result.status = NativeResultStatus::CommandOk;
+                }
+            }
+            b'E' => {
+                result.status = NativeResultStatus::FatalError;
+                result.error_msg = Some(format!("{}", super::error::parse_error_fields(&message[5..])));
+            }
+            b'Z' => break,
+            b'1' | b'2' | b'N' => {}
+            _ => return Err(ReplicationError::protocol("Unexpected parameterized query response")),
+        }
+    }
     Ok(result)
 }
 
