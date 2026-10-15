@@ -1090,7 +1090,12 @@ pub fn parse_operator_wire_request(
                     "operator request is invalid",
                 ));
             }
-            let parsed = parse(argv)?;
+            let parsed = parse(argv).map_err(|_| {
+                invalid(
+                    "CLI_OPERATOR_COMMAND_NOT_ROUTABLE",
+                    "command is not available through the owner socket",
+                )
+            })?;
             let routable = parsed.spec.id == "CMD-DESTINATION-VERIFY"
                 || (parsed.spec.class == CommandClass::Mutation
                     && matches!(
