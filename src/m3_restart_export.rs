@@ -371,12 +371,17 @@ mod tests {
 #[cfg(test)]
 mod live_tests {
     use super::*;
+    use crate::m1_ordering::SnapshotIdentityInput;
+    use crate::m1_source_identity::{CanonicalKeyComponent, LogicalTableIdentity};
+    use crate::m1_transition_kernel::{CaptureEpoch, DestinationGeneration};
     use crate::m3_bootstrap::{SessionBounds, digest_assignment};
-    use crate::m3_restart::{prepare_lower_stitch, tests as lower_fixture};
+    use crate::m3_restart::{LowerStitchRequest, prepare_lower_stitch};
     use crate::m3_restart_import::{
         ImportRequest, ImporterAssignment, exporter_release_permitted, import_and_acknowledge,
         prepare_assignments,
     };
+    use crate::m3_restart_version::tests as version_fixture;
+    use crate::m3_restart_version::version_for_snapshot_row;
 
     #[test]
     #[ignore = "requires isolated PostgreSQL 17.6 with logical replication"]
@@ -391,8 +396,24 @@ mod live_tests {
                 "SELECT pg_create_logical_replication_slot('{slot}','pgoutput')"
             ))
             .unwrap();
-        let mut writer = lower_fixture::fixture();
-        let lower = prepare_lower_stitch(&mut writer, lower_fixture::request()).unwrap();
+        let mut writer = version_fixture::numeric_fixture();
+        let lower = prepare_lower_stitch(
+            &mut writer,
+            LowerStitchRequest {
+                restart_id: "restart",
+                owner_run_id: "owner",
+                backfill_run_id: "backfill",
+                generation_id: "new",
+                destination_id: "dest",
+                capture_epoch: "1",
+                generation: 2,
+                slot_name: "slot",
+                configuration_fingerprint: "cfg",
+                table_set_fingerprint: "tables",
+                now_mono_ms: 1,
+            },
+        )
+        .unwrap();
         let relations = vec!["public.m3_restart_export_fixture".to_string()];
         let bounds = SessionBounds {
             statement_timeout_ms: 10_000,
@@ -440,6 +461,28 @@ mod live_tests {
         )
         .unwrap();
         assert!(exporter_release_permitted(&writer, &receipt, &mut guard, &exporter, 1).unwrap());
+        let version = version_for_snapshot_row(
+            &writer,
+            "restart",
+            "worker",
+            SnapshotIdentityInput {
+                capture_epoch: CaptureEpoch::from_store(1),
+                generation: DestinationGeneration::from_store(2),
+                logical_table_id: LogicalTableIdentity::derive(
+                    &version_fixture::source_identity(),
+                    "public",
+                    "m3_restart_export_fixture",
+                ),
+                chunk_id: 1,
+                key: vec![
+                    CanonicalKeyComponent::from_canonical(20, 1i64.to_be_bytes().to_vec()).unwrap(),
+                ],
+            },
+            1,
+        )
+        .unwrap();
+        assert_eq!(version.source().commit_lsn().get(), 32);
+        assert_eq!(version.origin_rank(), 0);
         let slot_count = admin
             .exec(&format!(
                 "SELECT count(*)::text FROM pg_replication_slots WHERE slot_name='{slot}'"

@@ -99,7 +99,7 @@ pub fn version_for_snapshot_row(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::m1_ordering::{
         SourceSlotIdentity, VersionComparison, WalIdentityInput, compare_versions,
@@ -115,7 +115,7 @@ mod tests {
     use crate::m3_restart_import::{ImporterAssignment, prepare_assignments};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn prepared() -> WriterConnection {
+    pub(crate) fn numeric_fixture() -> WriterConnection {
         let path = std::env::temp_dir().join(format!(
             "m3-restart-version-{}-{}.db",
             std::process::id(),
@@ -124,7 +124,7 @@ mod tests {
                 .unwrap()
                 .as_nanos()
         ));
-        let mut writer = crate::m2_schema::open_writer(&path, "owner", 1, 1).unwrap();
+        let writer = crate::m2_schema::open_writer(&path, "owner", 1, 1).unwrap();
         writer.connection().execute_batch(
             "INSERT INTO source_transactions VALUES('tx1','1','sys','db','slot','1','0000000000000010',1,1,1,'sum1','committed');
              INSERT INTO source_transactions VALUES('tx2','1','sys','db','slot','2','0000000000000020',2,2,1,'sum2','committed');
@@ -136,6 +136,11 @@ mod tests {
              INSERT INTO backfill_runs(run_id,destination_id,capture_epoch,state) VALUES('backfill','dest','1','paused');
              INSERT INTO backfill_generations(generation_id,run_id,generation,state) VALUES('old','backfill',1,'invalidated');",
         ).unwrap();
+        writer
+    }
+
+    fn prepared() -> WriterConnection {
+        let mut writer = numeric_fixture();
         let lower = prepare_lower_stitch(
             &mut writer,
             LowerStitchRequest {
@@ -163,7 +168,7 @@ mod tests {
         writer
     }
 
-    fn source_identity() -> SourceIdentity {
+    pub(crate) fn source_identity() -> SourceIdentity {
         SourceIdentity {
             system_identifier: 42,
             timeline: 1,
