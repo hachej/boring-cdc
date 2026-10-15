@@ -547,6 +547,16 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
     pub fn state(&self) -> RuntimeState {
         self.state
     }
+    /// Return the sole journal after a clean transaction boundary and expected close.
+    pub fn into_journal(self) -> Result<J, RuntimeError> {
+        if self.state != RuntimeState::ExpectedClose
+            || self.active.is_some()
+            || !self.feedback.is_empty()
+        {
+            return Err(RuntimeError::ReconciliationRequired);
+        }
+        Ok(self.journal)
+    }
     pub fn durable_end_lsn(&self) -> Option<u64> {
         self.durable_end_lsn
     }
@@ -1625,6 +1635,84 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     runtime: &mut CaptureRuntime<J, S, G>,
     stop_after_commits: u64,
     control_cadence: std::time::Duration,
+    ownership_probe: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<bool, JournalError>,
+    on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
+) -> Result<(), CaptureFailure> {
+    if runtime.state() == RuntimeState::ExpectedClose {
+        return Err(CaptureFailure::at(
+            "runtime",
+            "M2_SUPERVISED_RESTART_REQUIRED",
+        ));
+    }
+    let (mut connection, contracts) = setup_runtime(config)?;
+    capture_copyboth_on_connection_until_with_probe(
+        &mut connection,
+        contracts,
+        cancellation,
+        runtime,
+        CaptureLoopBounds {
+            stop_after_commits,
+            control_cadence,
+        },
+        ownership_probe,
+        on_ready,
+    )
+    .await
+}
+
+/// Consume a bootstrap-owned CopyBoth generation after an active-slot catalog preflight.
+/// The caller retains the connection and owns its source lock for this entire future.
+pub(crate) async fn capture_existing_copyboth_until<
+    J: DurableJournal,
+    S: SpoolFactory,
+    G: FeedbackGate,
+>(
+    config: &CaptureConfig,
+    connection: &mut PgReplicationConnection,
+    expected_backend_pid: i32,
+    cancellation: &CancellationToken,
+    runtime: &mut CaptureRuntime<J, S, G>,
+    stop_after_commits: u64,
+    ownership_probe: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<bool, JournalError>,
+) -> Result<(), CaptureFailure> {
+    if runtime.state() == RuntimeState::ExpectedClose {
+        return Err(CaptureFailure::at(
+            "runtime",
+            "M2_SUPERVISED_RESTART_REQUIRED",
+        ));
+    }
+    let contracts =
+        crate::article1_capture::preflight_active_capture(config, expected_backend_pid)?;
+    capture_copyboth_on_connection_until_with_probe(
+        connection,
+        contracts,
+        cancellation,
+        runtime,
+        CaptureLoopBounds {
+            stop_after_commits,
+            control_cadence: std::time::Duration::from_millis(250),
+        },
+        ownership_probe,
+        || Ok(()),
+    )
+    .await
+}
+
+struct CaptureLoopBounds {
+    stop_after_commits: u64,
+    control_cadence: std::time::Duration,
+}
+
+async fn capture_copyboth_on_connection_until_with_probe<
+    J: DurableJournal,
+    S: SpoolFactory,
+    G: FeedbackGate,
+>(
+    connection: &mut PgReplicationConnection,
+    mut contracts: BTreeMap<u32, RelationContract>,
+    cancellation: &CancellationToken,
+    runtime: &mut CaptureRuntime<J, S, G>,
+    bounds: CaptureLoopBounds,
     mut ownership_probe: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<bool, JournalError>,
     on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
 ) -> Result<(), CaptureFailure> {
@@ -1634,7 +1722,6 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
             "M2_SUPERVISED_RESTART_REQUIRED",
         ));
     }
-    let (mut connection, mut contracts) = setup_runtime(config)?;
     connection
         .set_copy_data_limit(WireLimits::default().max_copy_data_bytes)
         .map_err(|_| CaptureFailure::at("admission", "M2_RECEIVE_ADMISSION_INVALID"))?;
@@ -1667,7 +1754,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         }
         let read_cancellation = cancellation.child_token();
         let mut read = Box::pin(connection.get_copy_data_async(&read_cancellation));
-        let control_tick = tokio::time::sleep(control_cadence);
+        let control_tick = tokio::time::sleep(bounds.control_cadence);
         tokio::pin!(control_tick);
         let received = tokio::select! {
             result = &mut read => Some(result),
@@ -1781,7 +1868,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
             }
             crate::m2_fault_status::fault_hook(crate::m2_fault_status::FaultHook::AfterFeedback);
         }
-        if runtime.committed_transactions() >= stop_after_commits {
+        if runtime.committed_transactions() >= bounds.stop_after_commits {
             runtime.graceful_shutdown().map_err(|_| {
                 CaptureFailure::at("runtime", "M2_SHUTDOWN_RECONCILIATION_REQUIRED")
             })?;

@@ -762,6 +762,46 @@ impl BootstrapSessions {
         self.capture.alive()
     }
 
+    /// Consume the original CopyBoth generation with M2 durability while the guard stays live.
+    pub async fn capture_until<J, S, G>(
+        &mut self,
+        config: &crate::article1_capture::CaptureConfig,
+        cancellation: &pg_walstream::CancellationToken,
+        runtime: &mut crate::m2_capture_runtime::CaptureRuntime<J, S, G>,
+        stop_after_commits: u64,
+        ddl_waiter_bound_ms: u64,
+        mut ownership_probe: impl FnMut(
+            &mut crate::m2_capture_runtime::CaptureRuntime<J, S, G>,
+        ) -> Result<bool, crate::m2_journal::JournalError>,
+    ) -> Result<(), crate::article1_capture::CaptureFailure>
+    where
+        J: crate::m2_capture_runtime::DurableJournal,
+        S: crate::m2_capture_runtime::SpoolFactory,
+        G: crate::m2_capture_runtime::FeedbackGate,
+    {
+        let guard = &mut self.guard;
+        let capture_pid = self.capture.backend_pid;
+        crate::m2_capture_runtime::capture_existing_copyboth_until(
+            config,
+            &mut self.capture.connection,
+            capture_pid,
+            cancellation,
+            runtime,
+            stop_after_commits,
+            |runtime| {
+                if guard.keepalive().is_err()
+                    || guard
+                        .conflicting_waiter_exceeded(ddl_waiter_bound_ms)
+                        .unwrap_or(true)
+                {
+                    return Ok(false);
+                }
+                ownership_probe(runtime)
+            },
+        )
+        .await
+    }
+
     pub fn conflicting_ddl_waiter_exceeded(
         &mut self,
         bound_ms: u64,
@@ -1078,7 +1118,7 @@ mod live_tests {
             .unwrap_or_else(|_| "boring_cdc_m3_bootstrap_test".into());
         let mut admin = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
         let _=admin.exec(&format!("SELECT pg_drop_replication_slot('{slot}') WHERE EXISTS(SELECT 1 FROM pg_replication_slots WHERE slot_name='{slot}')"));
-        admin.exec("DROP PUBLICATION IF EXISTS boring_cdc_m3_pub; DROP TABLE IF EXISTS public.m3_bootstrap_fixture; DROP SCHEMA IF EXISTS boring_cdc_control CASCADE; CREATE TABLE public.m3_bootstrap_fixture(id bigint PRIMARY KEY,payload text); INSERT INTO public.m3_bootstrap_fixture VALUES(1,'before'); CREATE SCHEMA boring_cdc_control; CREATE TABLE boring_cdc_control.capture_fences(id smallint PRIMARY KEY CHECK(id=1),capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint bytea NOT NULL CHECK(octet_length(table_set_fingerprint)=32),unique_nonce bytea NOT NULL CHECK(octet_length(unique_nonce)=16)); INSERT INTO boring_cdc_control.capture_fences VALUES(1,0,0,decode(repeat('00',32),'hex'),decode(repeat('00',16),'hex')); CREATE PUBLICATION boring_cdc_m3_pub FOR TABLE public.m3_bootstrap_fixture,boring_cdc_control.capture_fences").unwrap();
+        admin.exec("DROP PUBLICATION IF EXISTS boring_cdc_m3_pub; DROP TABLE IF EXISTS public.m3_bootstrap_fixture; DROP SCHEMA IF EXISTS boring_cdc_control CASCADE; CREATE TABLE public.m3_bootstrap_fixture(id bigint PRIMARY KEY,payload text); INSERT INTO public.m3_bootstrap_fixture VALUES(1,'before'); CREATE SCHEMA boring_cdc_control; CREATE TABLE boring_cdc_control.heartbeat(id smallint PRIMARY KEY CHECK(id=1),nonce bigint NOT NULL,updated_at timestamptz NOT NULL); INSERT INTO boring_cdc_control.heartbeat VALUES(1,0,'-infinity'); CREATE TABLE boring_cdc_control.capture_fences(id smallint PRIMARY KEY CHECK(id=1),capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint bytea NOT NULL CHECK(octet_length(table_set_fingerprint)=32),unique_nonce bytea NOT NULL CHECK(octet_length(unique_nonce)=16)); INSERT INTO boring_cdc_control.capture_fences VALUES(1,0,0,decode(repeat('00',32),'hex'),decode(repeat('00',16),'hex')); CREATE PUBLICATION boring_cdc_m3_pub FOR TABLE public.m3_bootstrap_fixture,boring_cdc_control.heartbeat,boring_cdc_control.capture_fences").unwrap();
         let path =
             std::env::temp_dir().join(format!("m3-live-{}-{}.sqlite", std::process::id(), slot));
         let writer = open_writer(&path, "m3-live", 1, 0).unwrap();
@@ -1114,7 +1154,7 @@ mod live_tests {
             0,
         )
         .unwrap();
-        let (guard, exporter, capture, importer): (i32, i32, i32, i32) = runtime
+        let (guard, exporter, capture_pid, importer): (i32, i32, i32, i32) = runtime
             .store
             .writer
             .connection()
@@ -1124,7 +1164,7 @@ mod live_tests {
                 |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .unwrap();
-        let mut pids = vec![guard, exporter, capture, importer];
+        let mut pids = vec![guard, exporter, capture_pid, importer];
         pids.sort_unstable();
         pids.dedup();
         assert_eq!(pids.len(), 4);
@@ -1290,6 +1330,147 @@ mod live_tests {
             )
             .unwrap();
         assert_eq!(dispatch_state, "dispatched");
+        use crate::m2_capture_runtime::{CaptureRuntime, RuntimeError, RuntimeSpool};
+        use crate::m2_journal::{CommitLimits, JournalStore, SourceIdentity};
+        use crate::m2_spool::{
+            DiskAdmission, FilesystemAdmissionController, FilesystemLimit, MemoryBudget,
+            MemoryLimits, PosixAllocation, SpoolLimits, StatvfsSpace, TxnBuffer,
+        };
+        use std::os::unix::fs::MetadataExt;
+        let spool_path = path.with_extension("spool");
+        std::fs::create_dir_all(&spool_path).unwrap();
+        let spool_cleanup = spool_path.clone();
+        let disk = FilesystemAdmissionController::new(DiskAdmission::default());
+        disk.configure(
+            std::fs::metadata(&spool_path).unwrap().dev(),
+            FilesystemLimit {
+                total_budget: 32 * 1024 * 1024,
+                emergency_reserve: 1024 * 1024,
+            },
+        )
+        .unwrap();
+        let spools = move |xid: u32| -> Result<Box<dyn RuntimeSpool>, RuntimeError> {
+            let memory = MemoryBudget::new(MemoryLimits {
+                process_limit: 24 * 1024 * 1024,
+                runtime_fixed: 1,
+                receive: 8 * 1024 * 1024,
+                decoder: 4 * 1024 * 1024,
+                staging: 8 * 1024 * 1024,
+            })
+            .map_err(|_| RuntimeError::Spool("M3_TEST_MEMORY_ADMISSION".into()))?;
+            TxnBuffer::new(
+                spool_path.clone(),
+                "1".into(),
+                xid.to_string(),
+                "m3-live-capture".into(),
+                SpoolLimits {
+                    max_frame_bytes: 8 * 1024 * 1024,
+                    max_event_bytes: 4 * 1024 * 1024,
+                    max_transaction_bytes: 8 * 1024 * 1024,
+                    max_transaction_events: 16,
+                    memory_prefix_bytes: 4 * 1024 * 1024,
+                },
+                memory,
+                disk.clone(),
+                Box::new(StatvfsSpace),
+                Box::new(PosixAllocation),
+            )
+            .map(|spool| Box::new(spool) as Box<dyn RuntimeSpool>)
+            .map_err(|_| RuntimeError::Spool("M3_TEST_SPOOL_ADMISSION".into()))
+        };
+        let gate_reader = rusqlite::Connection::open_with_flags(
+            &path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .unwrap();
+        let journal = JournalStore::new(
+            writer,
+            SourceIdentity {
+                capture_epoch: "1".into(),
+                source_system_id: "system".into(),
+                timeline_id: "1".into(),
+                database_id: "database".into(),
+                slot_name: slot.clone(),
+                publication_fingerprint: "publication".into(),
+                protocol_fingerprint: "protocol".into(),
+            },
+            CommitLimits {
+                max_events: 16,
+                max_copied_bytes: 1024 * 1024,
+                max_writer_hold: std::time::Duration::from_secs(2),
+            },
+        )
+        .unwrap();
+        let mut capture = CaptureRuntime::new(
+            journal,
+            spools,
+            crate::m3_fence::PersistedFeedbackGate::new(&gate_reader, "live-intent", 1),
+            std::collections::BTreeMap::new(),
+            None,
+        );
+        let config = crate::article1_capture::CaptureConfig::production(
+            dsn.clone(),
+            "boring_cdc_m3_pub",
+            slot.clone(),
+            ["public.m3_bootstrap_fixture".to_string()],
+        )
+        .unwrap();
+        let executor = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        executor
+            .block_on(sessions.capture_until(
+                &config,
+                &pg_walstream::CancellationToken::new(),
+                &mut capture,
+                1,
+                5_000,
+                |_| Ok(true),
+            ))
+            .unwrap();
+        assert_eq!(capture.committed_transactions(), 1);
+        let slot_owner = admin
+            .exec(&format!(
+                "SELECT active_pid::text FROM pg_replication_slots WHERE slot_name='{slot}'"
+            ))
+            .unwrap();
+        assert_eq!(
+            slot_owner.get_value(0, 0).unwrap().parse::<i32>().unwrap(),
+            capture_pid
+        );
+        let durable_end_lsn = capture.durable_end_lsn().unwrap();
+        let writer = capture.into_journal().unwrap().into_writer();
+        let (end_lsn, journal_seq, control_kind, payload, source_lsn):
+            (String, i64, String, Vec<u8>, String) = writer
+            .connection()
+            .query_row(
+                "SELECT t.end_lsn,e.journal_seq,e.control_kind,e.payload,s.durable_transaction_end_lsn FROM source_transactions t JOIN journal_events e ON e.transaction_id=t.transaction_id AND e.journal_seq=t.last_seq CROSS JOIN source_state s WHERE e.control_kind='capture_fence'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
+            )
+            .unwrap();
+        assert_eq!(u64::from_str_radix(&end_lsn, 16).unwrap(), durable_end_lsn);
+        assert_eq!(source_lsn, end_lsn);
+        assert_eq!(journal_seq, 1);
+        assert_eq!(control_kind, "capture_fence");
+        let captured: serde_json::Value = serde_json::from_slice(&payload).unwrap();
+        assert_eq!(captured["kind"], "update");
+        assert_eq!(
+            captured["new"][4]["bytes"],
+            serde_json::json!(b"\\x17171717171717171717171717171717".as_slice())
+        );
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT count(*) FROM bootstrap_anchors WHERE state='complete'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap(),
+            0
+        );
         let runtime = sessions.resume(writer).unwrap();
         runtime.invalidate("importer").unwrap();
         let mut cleanup = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
@@ -1299,6 +1480,7 @@ mod live_tests {
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_file(format!("{}-wal", path.display()));
         let _ = std::fs::remove_file(format!("{}-shm", path.display()));
+        let _ = std::fs::remove_dir_all(spool_cleanup);
     }
 }
 

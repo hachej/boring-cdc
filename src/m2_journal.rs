@@ -163,6 +163,10 @@ impl JournalStore {
         })
     }
 
+    pub fn into_writer(self) -> WriterConnection {
+        self.writer
+    }
+
     /// Publishes schemas, transaction metadata, events and durable end LSN in one SQLite commit.
     /// The returned value is the only feedback-eligible token; an after-commit fault is ambiguous
     /// and must be reconciled by replaying the same positional transaction.
