@@ -1,17 +1,6 @@
 {
   "actual_connection_attestation": true,
-  "findings": [
-    {
-      "code": "E_ARTIFACT_HASH",
-      "message": "artifact hash mismatch",
-      "path": "artifacts/boring-cdc-m0-storage-model/spec/evidence-v2.json"
-    },
-    {
-      "code": "E_EVIDENCE_PROVENANCE",
-      "message": "stored source parent blob hash differs for contracts/storage/storage-model.json",
-      "path": "evidence/source_parent_git_commit"
-    }
-  ],
+  "findings": [],
   "fixture_count": 36,
   "input_tree_sha256": "001e64a49b119d7fa97d3dc180dae5cda6da60a0d8aeca113f35bd2de81b179a",
   "inputs": {
@@ -26,8 +15,8 @@
   "product_faults": "fault_not_applicable",
   "runtime_observed": false,
   "schema_version": "m0-storage-contract-evidence/v2",
-  "source_parent_git_commit": "db11de043f46dd6715c19695dabf7f66b33875e0",
-  "status": "fail",
+  "source_parent_git_commit": "6ccca7279a9b7ce58e24f9fb7060c756e1e92acc",
+  "status": "pass",
   "validator": "scripts/validate/storage_contract.py",
   "validator_sha256": "ddfaea14a69cffdec7418d0b7d1bc19a1135d8245c13c699fc30bfe4528a1c88"
 }
