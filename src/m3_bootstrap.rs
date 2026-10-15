@@ -1083,7 +1083,9 @@ mod live_tests {
             std::env::temp_dir().join(format!("m3-live-{}-{}.sqlite", std::process::id(), slot));
         let writer = open_writer(&path, "m3-live", 1, 0).unwrap();
         writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch','system','1','database',?1,'pgoutput','publication','protocol')",[&slot]).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('snapshot-probe','archive','live-config','epoch',1)",[]).unwrap();
         let relations = vec!["public.m3_bootstrap_fixture".to_string()];
+        let assignment_digest = digest_assignment(&[0; 8]);
         let intent = PrepareIntent {
             intent_id: "live-intent".into(),
             capture_epoch: "epoch".into(),
@@ -1095,7 +1097,7 @@ mod live_tests {
             configuration_fingerprint: "live-config".into(),
             importers: vec![ImporterAssignment {
                 importer_id: "worker-0".into(),
-                assigned_ranges_digest: digest_assignment(b"all"),
+                assigned_ranges_digest: assignment_digest.clone(),
             }],
             created_at: "unix-ms:0".into(),
         };
@@ -1135,11 +1137,11 @@ mod live_tests {
         sessions.keepalive().unwrap();
         let limits = crate::m3_planner::PlannerLimits {
             chunk_rows: 4,
-            chunk_bytes: 1024,
+            chunk_bytes: 16 * 1024,
             chunk_duration: std::time::Duration::from_secs(1),
             writer_hold: std::time::Duration::from_secs(1),
             concurrency: 1,
-            source_impact_bytes: 2048,
+            source_impact_bytes: 128 * 1024,
             max_rows_per_second: 1000,
         };
         let (failure, writer) = match crate::m3_planner::PlannerStore::open_recoverable(
@@ -1157,28 +1159,83 @@ mod live_tests {
             crate::m3_planner::PlannerError::Invalid("M3_ZERO_BOUND")
         ));
         assert!(sessions.capture_alive());
-        let planner = match crate::m3_planner::PlannerStore::open_recoverable(*writer, limits) {
+        let mut planner = match crate::m3_planner::PlannerStore::open_recoverable(*writer, limits) {
             Ok(planner) => planner,
             Err((error, _)) => panic!("planner handoff failed: {error}"),
         };
+        assert_eq!(
+            planner
+                .persist_plan(&crate::m3_planner::PlanInput {
+                    run_id: "snapshot-run".into(),
+                    generation_id: "snapshot-generation".into(),
+                    destination_id: "snapshot-probe".into(),
+                    capture_epoch: "epoch".into(),
+                    generation: 1,
+                    bootstrap_intent_id: "live-intent".into(),
+                    importer_id: "worker-0".into(),
+                    snapshot_schema_fingerprint: "live-schema".into(),
+                    key_schema: vec![crate::m3_planner::KeyPartType::I64],
+                    boundaries: vec![],
+                    estimated_rows: 1,
+                    start_seq: 0,
+                    started_mono_ms: 100,
+                })
+                .unwrap(),
+            1
+        );
         let imported = sessions.take_importer("worker-0").unwrap();
-        let mut imported = imported
-            .into_planner_connection(
+        let mut source = crate::m3_planner::PostgresRangeSource::from_imported(
+            imported,
+            "worker-0",
+            &assignment_digest,
+            "live-schema",
+            "public.m3_bootstrap_fixture",
+            &["id"],
+        )
+        .unwrap();
+        let claim = planner
+            .claim_next(
+                "snapshot-generation",
                 "worker-0",
-                &digest_assignment(b"all"),
-                "live-schema",
-                "public.m3_bootstrap_fixture",
+                101,
+                std::time::Duration::from_secs(5),
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(planner.execute_claim(&claim, &mut source, 102).unwrap(), 1);
+        planner.finish_copy("snapshot-generation").unwrap();
+        assert!(sessions.capture_alive());
+        sessions.keepalive().unwrap();
+        drop(source);
+        let writer = planner.into_writer();
+        let (copied_rows, generation_state): (i64, String) = writer.connection().query_row(
+            "SELECT c.row_count,g.state FROM m3_chunk_commits c JOIN backfill_chunks b USING(chunk_id) JOIN backfill_generations g USING(generation_id) WHERE g.generation_id='snapshot-generation'",
+            [],
+            |row| Ok((row.get(0)?,row.get(1)?)),
+        ).unwrap();
+        assert_eq!((copied_rows, generation_state.as_str()), (1, "fencing"));
+        let (snapshot_seq, key, payload, payload_hash): (i64, Vec<u8>, Vec<u8>, String) = writer
+            .connection()
+            .query_row(
+                "SELECT snapshot_seq,canonical_key,payload,payload_hash FROM m3_snapshot_events WHERE generation_id='snapshot-generation'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .unwrap();
+        assert_eq!(snapshot_seq, 1);
         assert_eq!(
-            imported
-                .exec("SELECT payload FROM public.m3_bootstrap_fixture WHERE id=1")
-                .unwrap()
-                .get_value(0, 0),
-            Some("before".into()),
+            key,
+            crate::m3_planner::CanonicalKey::encode(
+                &[crate::m3_planner::KeyPartType::I64],
+                &[crate::m3_planner::KeyPart::I64(1)],
+            )
+            .unwrap()
+            .as_bytes(),
         );
-        drop(imported);
-        let writer = planner.into_writer();
+        let copied: serde_json::Value = serde_json::from_slice(&payload).unwrap();
+        assert_eq!(copied["id"], 1);
+        assert_eq!(copied["payload"], "before");
+        assert_eq!(payload_hash, format!("{:x}", Sha256::digest(&payload)));
         let runtime = sessions.resume(writer).unwrap();
         runtime.invalidate("importer").unwrap();
         let mut cleanup = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
