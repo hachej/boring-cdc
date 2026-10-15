@@ -5,7 +5,10 @@ set +e
 bootstrap_dispatch=$(cargo run --locked --quiet -- run --bootstrap 2>&1)
 bootstrap_dispatch_status=$?
 set -e
-[[ $bootstrap_dispatch_status -eq 4 && "$bootstrap_dispatch" == M3_CONFIG_UNAVAILABLE:* ]]
+if [[ $bootstrap_dispatch_status -ne 4 || "$bootstrap_dispatch" != M3_CONFIG_UNAVAILABLE:* ]]; then
+  printf 'E_M3_BOOTSTRAP_DISPATCH status=%s output_sha256=%s\n' "$bootstrap_dispatch_status" "$(printf '%s' "$bootstrap_dispatch" | sha256sum | cut -d' ' -f1)" >&2
+  exit 1
+fi
 work=$(mktemp -d /var/tmp/m3-bootstrap-e2e.XXXXXX);project="m3-bootstrap-$RANDOM-$$";port=$((54000+$$%1000))
 cleanup(){ docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1||true;rm -rf "$work";};trap cleanup EXIT INT TERM
 python3 - <<'PY' >"$work/postgres_password"
