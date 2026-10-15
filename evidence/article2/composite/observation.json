@@ -1,0 +1,44 @@
+{
+  "candidate_query_sha256": [
+    "6670968e0ca9f46840fdaa5031e6ade1cbf2738ff69a1a17a0d7884a89e04390",
+    "6670968e0ca9f46840fdaa5031e6ade1cbf2738ff69a1a17a0d7884a89e04390"
+  ],
+  "checks": {
+    "anchor_bound_checkpoint": true,
+    "child_abort_after_remote_before_checkpoint": true,
+    "complete_anchor": true,
+    "independent_source_oracle": true,
+    "restart_adoption": true,
+    "same_stream_m3_snapshot_and_m2_tail": true,
+    "selector_absent": true,
+    "snapshot_batch_readback": true
+  },
+  "command": "scripts/e2e/article2_anchored_clickhouse.sh",
+  "evidence_tier": "component",
+  "git_commit": "d31f59ef2fd36eca928ac1a8a321582defdbfe34",
+  "input_sha256": {
+    "contracts/clickhouse/canonical-query.sql": "0c1a0008e94cc1104e2b6964d39cc9aae26cddb76ba1f38372dc7c5d5442c8df",
+    "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
+    "contracts/clickhouse/model.json": "ecf79c94352b95b46f268dc1a61419722dfc4d5bfcb909130390fac506886c9c",
+    "scripts/e2e/article2_anchored_clickhouse.sh": "ad6719805524fe316eb1816becc1463eed2e7654f3404ec1228967d143c88ca4",
+    "src/m2_capture_runtime.rs": "020e2b96a493327335441d9a4f77d23f06e766c7b2ac3319fb04cbdbe3e3118e",
+    "src/m2_event_envelope.rs": "13ef3678d854eccf7f70e32f0963bd0187d53fc49c54f2e17e8a53581b62eb63",
+    "src/m3_bootstrap.rs": "41f567994a1ff307e9130561e6a8ab5daea626db52806fa35d8de6b99468bac4",
+    "src/m4_clickhouse_durability.rs": "1b5569cf1ad31c8c04305bf5fdcc4b1e6cb6fb0387638bfd8cfb40f1299ac696",
+    "src/m4_clickhouse_wire.rs": "9f1c79bea582eb2ff96070f4019aed6fb5a077a52f0e1ec3e0e14a739671baab",
+    "src/m4_initial_load.rs": "91a62dbcc86127baa72070b3df753113faa1d6ead84ee43105b81de680f73e47"
+  },
+  "oracle_sha256": [
+    "abd46c9a772f2a96b29f6de5b4741ff935a8cf07575046f72a97b3a9ee71160e",
+    "abd46c9a772f2a96b29f6de5b4741ff935a8cf07575046f72a97b3a9ee71160e"
+  ],
+  "repeats": 2,
+  "runtime_observed": true,
+  "schema_version": "article2-anchored-clickhouse-observation/v1",
+  "scope": "one-relation initial-slot ClickHouse candidate; no selector promotion or existing-slot reseed",
+  "status": "pass",
+  "versions": {
+    "clickhouse": "25.8.2.29",
+    "postgres": "17.6"
+  }
+}

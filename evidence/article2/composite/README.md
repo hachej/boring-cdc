@@ -1,0 +1,7 @@
+# Article 2 same-stream candidate packet
+
+The [manifest](manifest.json) binds the [redacted observation](observation.json) to PR #153's exact-head [CI run `38789897606`](https://github.com/hachej/boring-cdc/actions/runs/38789897606), job `anchored_candidate`. That job ran `scripts/e2e/article2_anchored_clickhouse.sh` twice against PostgreSQL 17.6 and ClickHouse 25.8.2.29. Each attempt used a fresh ClickHouse container and the same one-table PostgreSQL source profile.
+
+The test admitted the completed M3 snapshot into a generation-1 ClickHouse candidate, read back its zero-sequence history and marker, then dispatched the contiguous post-copy M2 suffix. A child destination worker aborted after a user batch was written and read back remotely but before the SQLite checkpoint. The restarted worker adopted that batch; the final keyed candidate query matched an independent PostgreSQL oracle. The observation records the two oracle and query result digests, input source digests, and checked boundaries. Run `python3 scripts/validate/article2_composite_packet.py` from the repository root to verify the packet against the exact source commit.
+
+No generation selector was published. The query fixed generation 1 to inspect the isolated candidate, so this packet does not prove reader-visible promotion, a production promotion controller, or an existing-slot re-seed. The earlier [anchor](../anchor/README.md) and [ClickHouse](../clickhouse/README.md) component packets remain separate historical claims.
