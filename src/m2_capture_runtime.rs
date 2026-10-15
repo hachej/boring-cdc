@@ -1280,7 +1280,7 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
         runtime,
         stop_after_commits,
         std::time::Duration::from_millis(250),
-        || true,
+        |_| true,
         || Ok(()),
     )
     .await
@@ -1595,7 +1595,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     runtime: &mut CaptureRuntime<J, S, G>,
     stop_after_commits: u64,
     control_cadence: std::time::Duration,
-    mut ownership_probe: impl FnMut() -> bool,
+    mut ownership_probe: impl FnMut(&mut CaptureRuntime<J, S, G>) -> bool,
     on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
 ) -> Result<(), CaptureFailure> {
     if runtime.state() == RuntimeState::ExpectedClose {
@@ -1621,7 +1621,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         runtime
             .service_pressure()
             .map_err(|_| CaptureFailure::at("pressure", "M2_PRESSURE_SERVICE_FAILED"))?;
-        if !ownership_probe() {
+        if !ownership_probe(runtime) {
             runtime.ownership_lost();
             runtime
                 .persist_if_enabled(
@@ -1654,7 +1654,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
                 read_cancellation.cancel();
                 let result = read.as_mut().await;
                 if cancellation.is_cancelled() { Some(result) } else {
-                    if !ownership_probe() {
+                    if !ownership_probe(runtime) {
                         runtime.ownership_lost();
                         runtime.persist_if_enabled(
                             crate::failure_policy::FailureClass::OwnershipLost,
@@ -1742,7 +1742,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
             continue;
         }
         for packet in runtime.take_feedback() {
-            if !ownership_probe() {
+            if !ownership_probe(runtime) {
                 runtime.ownership_lost();
                 runtime
                     .persist_if_enabled(
@@ -2797,13 +2797,20 @@ pub async fn run_loaded_config(
         .map_err(spool_runtime_error)
     };
     // M0-PROVISIONAL: boring-cdc-m2-capture-runtime.1 (writer queue caps and capture burst).
-    let writer_service = JournalWriterService::new(store, [8, 4, 2, 1], 4)
+    let mut writer_service = JournalWriterService::new(store, [8, 4, 2, 1], 4)
         .map_err(|_| CaptureFailure::at("journal", "M2_WRITER_SERVICE_INVALID"))?;
     let gate = writer_service
         .capture_startup_gate()
         .map_err(|_| CaptureFailure::at("failure_policy", "M2_FAILURE_LOAD_FAILED"))?;
     let now_ms = u64::try_from(now).map_err(|_| CaptureFailure::at("clock", "M2_CLOCK_INVALID"))?;
     enforce_capture_startup_gate(gate, now_ms)?;
+    let owner_deadline = Duration::from_millis(public.source.ownership_deadline_ms.0);
+    let lease = ownership
+        .refreshed_lease(1, owner_deadline)
+        .map_err(|_| CaptureFailure::at("ownership", "M2_OWNERSHIP_LOST"))?;
+    writer_service
+        .insert_owner_lease(&lease)
+        .map_err(|_| CaptureFailure::at("ownership", "M2_OWNER_LEASE_STORE_FAILED"))?;
     let mut runtime = CaptureRuntime::new(
         writer_service,
         factory,
@@ -2841,13 +2848,11 @@ pub async fn run_loaded_config(
         &mut runtime,
         u64::MAX,
         Duration::from_millis(public.source.lock_probe_interval_ms.0),
-        || {
+        |runtime| {
             control_lane.ownership_live()
                 && ownership
-                    .probe(std::time::Duration::from_millis(
-                        public.source.ownership_deadline_ms.0,
-                    ))
-                    .is_ok()
+                    .refreshed_lease(1, owner_deadline)
+                    .is_ok_and(|lease| runtime.journal.refresh_owner_lease(&lease).is_ok())
         },
         || {
             let cadence_ms = public.source.heartbeat_cadence_ms.0;
@@ -3242,7 +3247,7 @@ pub mod tests {
             &mut capture,
             1,
             Duration::from_millis(10),
-            || true,
+            |_| true,
             || {
                 started.set(true);
                 Ok(())
@@ -3280,7 +3285,7 @@ pub mod tests {
             &mut capture,
             1,
             Duration::from_millis(10),
-            || true,
+            |_| true,
             || panic!("old generation must not become ready"),
         ));
         assert_eq!(result.unwrap_err().code, "M2_SUPERVISED_RESTART_REQUIRED");
