@@ -91,6 +91,35 @@ def value(column):
 assert (value(0),value(1))==(oracle['id'],oracle['payload'])
 assert oracle['checkpoint']==4 and oracle['anchor_id']=='b'*64 and oracle['generation']==1
 PY
+  if [[ "${BCDC_ARTICLE2_SELECTOR_PROBE:-0}" == 1 ]]; then
+    # This is a reader probe. The production promotion intent/lease controller is not invoked.
+    candidate_digest=$(sha256sum "$work/oracle-$attempt.json" | cut -d' ' -f1)
+    selector="(1,1,1,'$(printf 'a%.0s' {1..64})','$(printf 'b%.0s' {1..64})','$candidate_digest')"
+    ch --query "INSERT INTO boring_cdc.generation_selectors_v1 VALUES $selector"
+    [[ "$(ch --query 'SELECT count() FROM boring_cdc.live_generation_v1 WHERE capture_epoch=1 AND generation=1 AND promotion_fence=1')" == 1 ]]
+    docker exec -i "$container" clickhouse-client --user bcdc_probe --password "$password" \
+      --param_capture_epoch=1 --param_logical_table_id="$logical_table_id" --format JSONEachRow \
+      --queries-file /dev/stdin < contracts/clickhouse/canonical-query.sql >"$work/selected-$attempt.jsonl"
+    cmp "$work/current-$attempt.jsonl" "$work/selected-$attempt.jsonl"
+    ch --query "INSERT INTO boring_cdc.generation_selectors_v1 VALUES $selector"
+    ch --query "INSERT INTO boring_cdc.generation_selectors_v1 VALUES (1,0,2,'$(printf 'a%.0s' {1..64})','$(printf 'b%.0s' {1..64})','$candidate_digest')"
+    [[ "$(ch --query 'SELECT count() FROM boring_cdc.selector_conflicts_v1 WHERE capture_epoch=1')" == 0 ]]
+    [[ "$(ch --query 'SELECT count() FROM boring_cdc.live_generation_v1 WHERE capture_epoch=1 AND generation=1 AND promotion_fence=1')" == 1 ]]
+    ch --query "INSERT INTO boring_cdc.generation_selectors_v1 VALUES (1,1,2,'$(printf 'a%.0s' {1..64})','$(printf 'b%.0s' {1..64})','$candidate_digest')"
+    [[ "$(ch --query 'SELECT count() FROM boring_cdc.selector_conflicts_v1 WHERE capture_epoch=1 AND promotion_fence=1')" == 1 ]]
+    [[ "$(ch --query 'SELECT count() FROM boring_cdc.live_generation_v1 WHERE capture_epoch=1')" == 0 ]]
+    if docker exec -i "$container" clickhouse-client --user bcdc_probe --password "$password" \
+      --param_capture_epoch=1 --param_logical_table_id="$logical_table_id" --format JSONEachRow \
+      --queries-file /dev/stdin < contracts/clickhouse/canonical-query.sql >"$work/conflict-$attempt.jsonl" 2>"$work/conflict-$attempt.err"; then
+      echo 'Conflicting selector was accepted by the canonical query' >&2
+      exit 1
+    fi
+    python3 - "$work/conflict-$attempt.err" <<'PY'
+from pathlib import Path
+import sys
+assert 'BCDC_CH_INTEGRITY_CONFLICT' in Path(sys.argv[1]).read_text()
+PY
+  fi
   docker rm -f "$container" >/dev/null
   container=""
 done
@@ -102,8 +131,9 @@ import hashlib,json,pathlib,subprocess,sys
 work,out=map(pathlib.Path,sys.argv[1:])
 def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
 inputs=['scripts/e2e/article2_anchored_clickhouse.sh','src/m2_capture_runtime.rs','src/m2_event_envelope.rs','src/m3_bootstrap.rs','src/m4_initial_load.rs','src/m4_clickhouse_durability.rs','src/m4_clickhouse_wire.rs','contracts/clickhouse/model.json','contracts/clickhouse/ddl.sql','contracts/clickhouse/canonical-query.sql']
+selector_probe=__import__('os').environ.get('BCDC_ARTICLE2_SELECTOR_PROBE')=='1'
 report={
- 'schema_version':'article2-anchored-clickhouse-observation/v1',
+ 'schema_version':'article2-anchored-clickhouse-observation/v2' if selector_probe else 'article2-anchored-clickhouse-observation/v1',
  'git_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
  'command':'scripts/e2e/article2_anchored_clickhouse.sh',
  'status':'pass','runtime_observed':True,'evidence_tier':'component',
@@ -112,11 +142,11 @@ report={
  'input_sha256':{path:digest(pathlib.Path(path)) for path in inputs},
  'oracle_sha256':[digest(work/f'oracle-{attempt}.json') for attempt in (1,2)],
  'candidate_query_sha256':[digest(work/f'current-{attempt}.jsonl') for attempt in (1,2)],
- 'checks':{'complete_anchor':True,'same_stream_m3_snapshot_and_m2_tail':True,'snapshot_batch_readback':True,'child_abort_after_remote_before_checkpoint':True,'restart_adoption':True,'anchor_bound_checkpoint':True,'independent_source_oracle':True,'selector_absent':True},
- 'scope':'one-relation initial-slot ClickHouse candidate; no selector promotion or existing-slot reseed',
+ 'checks':{'complete_anchor':True,'same_stream_m3_snapshot_and_m2_tail':True,'snapshot_batch_readback':True,'child_abort_after_remote_before_checkpoint':True,'restart_adoption':True,'anchor_bound_checkpoint':True,'independent_source_oracle':True,**({'selector_absent_before_probe':True,'reader_selector_probe':True} if selector_probe else {'selector_absent':True})},
+ 'scope':'one-relation initial-slot ClickHouse candidate with direct test selector; production promotion and existing-slot reseed untested' if selector_probe else 'one-relation initial-slot ClickHouse candidate; no selector promotion or existing-slot reseed',
 }
 out.parent.mkdir(parents=True,exist_ok=True)
 out.write_text(json.dumps(report,sort_keys=True,indent=2)+'\n')
 PY
 fi
-printf 'ARTICLE2_ANCHORED_CLICKHOUSE_OK postgres=17.6 clickhouse=25.8.2.29 repeats=2 selector=candidate_only\n'
+printf 'ARTICLE2_ANCHORED_CLICKHOUSE_OK postgres=17.6 clickhouse=25.8.2.29 repeats=2 selector_probe=%s\n' "${BCDC_ARTICLE2_SELECTOR_PROBE:-0}"
