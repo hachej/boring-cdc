@@ -44,6 +44,7 @@ jobs:
       - name: Run same-stream candidate twice
         env:
           BCDC_ARTICLE2_OBSERVATION_OUT: /var/tmp/article2-anchored-clickhouse-observation.json
+          BCDC_ARTICLE2_SELECTOR_PROBE: '1'
         run: scripts/e2e/article2_anchored_clickhouse.sh
       - name: Summarize exact-head observation
         run: |
@@ -54,6 +55,8 @@ jobs:
           head=subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip()
           assert packet['status']=='pass' and packet['git_commit']==head and packet['repeats']==2
           assert packet['checks']['child_abort_after_remote_before_checkpoint']
+          assert packet['schema_version']=='article2-anchored-clickhouse-observation/v2'
+          assert packet['checks']['reader_selector_probe']
           print(json.dumps({'head':head,'observation_sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'status':packet['status'],'scope':packet['scope']},sort_keys=True))
           PY
       - name: Preserve exact-head observation
