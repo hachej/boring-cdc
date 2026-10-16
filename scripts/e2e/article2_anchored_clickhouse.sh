@@ -114,7 +114,11 @@ PY
       echo 'Conflicting selector was accepted by the canonical query' >&2
       exit 1
     fi
-    rg -q 'BCDC_CH_INTEGRITY_CONFLICT' "$work/conflict-$attempt.err"
+    python3 - "$work/conflict-$attempt.err" <<'PY'
+from pathlib import Path
+import sys
+assert 'BCDC_CH_INTEGRITY_CONFLICT' in Path(sys.argv[1]).read_text()
+PY
   fi
   docker rm -f "$container" >/dev/null
   container=""
