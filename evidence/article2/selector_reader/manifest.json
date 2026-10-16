@@ -1,0 +1,12 @@
+{
+  "artifact_name": "article2-anchored-clickhouse-50c6194ce6a57a3e9e8a0712e411aeca3058dfe8",
+  "evidence_tier": "component",
+  "observation_path": "evidence/article2/selector_reader/observation.json",
+  "observation_sha256": "dcc5e9bd096b79e44c26850af0c5e000af5ba9cef2a2a5e04dd48518b498e689",
+  "owner_bead": "boring-cdc-m4.1",
+  "schema_version": "article2-selector-reader-packet/v1",
+  "scope": "One-relation initial-slot same-stream ClickHouse reader selector probe; direct synthetic selector insertion, no production promotion controller or existing-slot reseed",
+  "source_ci_job": "anchored_candidate",
+  "source_ci_run": "https://github.com/hachej/boring-cdc/actions/runs/38857713727",
+  "source_commit": "50c6194ce6a57a3e9e8a0712e411aeca3058dfe8"
+}
