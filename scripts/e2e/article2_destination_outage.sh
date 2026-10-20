@@ -128,6 +128,8 @@ anchor=db.execute("SELECT state,start_seq FROM bootstrap_anchors WHERE anchor_id
 assert anchor==('complete',0),anchor
 baseline=db.execute("SELECT count(*) FROM m4_snapshot_batch_intents WHERE destination_id='snapshot-probe' AND state='verified'").fetchone()[0]
 assert baseline>0,baseline
+lease=db.execute("SELECT state FROM destination_generation_leases WHERE lease_id='article2-anchor-lease'").fetchone()
+assert lease==('released',),lease
 PY
 cargo build --locked --bin boring-cdc
 unset BORING_CDC_M3_DSN BORING_CDC_M3_SLOT BORING_CDC_POSTGRES_PASSWORD_FILE

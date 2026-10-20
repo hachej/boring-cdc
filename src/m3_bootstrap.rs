@@ -2053,6 +2053,13 @@ mod live_tests {
             [],
         ).is_err());
         drop(sessions);
+        if handoff_out.is_some() {
+            let released = writer.connection().execute(
+                "UPDATE destination_generation_leases SET state='released',revision=revision+1 WHERE lease_id='article2-anchor-lease' AND run_id='article2-same-stream' AND state='held'",
+                [],
+            ).unwrap();
+            assert_eq!(released, 1);
+        }
         drop(writer);
         if let Some(output) = handoff_out {
             std::fs::write(
