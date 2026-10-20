@@ -5,7 +5,7 @@ ulimit -c 0
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 packet_dir=${BCDC_ARTICLE2_PACKET_DIR:-$repo/evidence/article2/destination_outage/run-$(date -u +%Y%m%dT%H%M%SZ)-$$}
 outage_seconds=${BCDC_ARTICLE2_OUTAGE_SECONDS:-120}
-workload_transactions=${BCDC_ARTICLE2_WORKLOAD_TRANSACTIONS:-60}
+workload_transactions=${BCDC_ARTICLE2_WORKLOAD_TRANSACTIONS:-24}
 recovery_wait_seconds=${BCDC_ARTICLE2_RECOVERY_WAIT_SECONDS:-120}
 work=$(mktemp -d /var/tmp/article2-destination-outage.XXXXXX)
 project="article2-outage-$RANDOM-$$"
@@ -152,18 +152,20 @@ PY
 }
 python3 "$repo/scripts/e2e/article2_destination_sample.py" "$work" "$pg_port" "$slot" "$binary" "$start_ns" >"$work/sampler.log" 2>&1 &
 sampler_pid=$!
-python3 - "$pg_port" "$work" "$workload_transactions" <<'PY' >"$work/workload.log" 2>&1 &
+run_workload() {
+python3 - "$pg_port" "$work" "$1" "$2" "$3" <<'PY'
 import os,subprocess,sys,time
-port,work,total=sys.argv[1:]
-for number in range(2,int(total)+2):
+port,work,total,first,marker=sys.argv[1:]
+for number in range(int(first),int(first)+int(total)):
     sql=(f"BEGIN; INSERT INTO public.m3_bootstrap_fixture(id,payload) VALUES({number},'value-{number}'); "
          f"UPDATE public.m3_bootstrap_fixture SET payload='tick-{number}' WHERE id=1; COMMIT;")
     subprocess.run(['psql','-v','ON_ERROR_STOP=1','-q','-h','127.0.0.1','-p',port,'-U','boring_cdc','-d','boring_cdc','-c',sql],
                    check=True,stdout=subprocess.DEVNULL)
     time.sleep(5)
-open(os.path.join(work,'workload-complete'),'w').write(total+'\n')
+open(os.path.join(work,marker),'w').write(total+'\n')
 PY
-workload_pid=$!
+}
+run_workload 3 2 prelude-complete >"$work/prelude.log" 2>&1
 
 in_sync=false
 for _ in $(seq 1 90); do
@@ -184,6 +186,8 @@ done
 [[ "$in_sync" == true ]]
 docker stop "$clickhouse_container" >/dev/null
 stopped_ms=$(elapsed_ms)
+run_workload "$workload_transactions" 5 workload-complete >"$work/workload.log" 2>&1 &
+workload_pid=$!
 sleep "$outage_seconds"
 docker start "$clickhouse_container" >/dev/null
 restarted_ms=$(elapsed_ms)
