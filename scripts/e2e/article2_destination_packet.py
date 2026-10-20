@@ -28,6 +28,7 @@ def main():
     stopped_ms = int(sys.argv[4])
     restarted_ms = int(sys.argv[5])
     caught_up_ms = int(sys.argv[6]) if sys.argv[6] else None
+    catch_up_probe = json.loads((work / "catch-up-probe.json").read_text()) if caught_up_ms is not None else None
     outage_seconds = int(sys.argv[7])
     recovery_wait_seconds = int(sys.argv[8])
     packet.mkdir(parents=True, exist_ok=False)
@@ -85,7 +86,7 @@ def main():
         "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip(),
         "images": {"postgres": "17.6", "clickhouse": "25.8.2.29"},
         "profile": {"sample_interval_seconds": 5, "workload_interval_seconds": 5, "prelude_transactions": int((work / "prelude-complete").read_text()), "outage_seconds": outage_seconds, "recovery_allowance_seconds": recovery_wait_seconds, "workload_transactions": int((work / "workload-complete").read_text()), "retained_wal_limit_bytes": 268435456},
-        "timeline": {"clickhouse_stopped_ms": stopped_ms, "clickhouse_restarted_ms": restarted_ms, "caught_up_ms": caught_up_ms, "catch_up_ms": caught_up_ms - restarted_ms if caught_up_ms is not None else None},
+        "timeline": {"clickhouse_stopped_ms": stopped_ms, "clickhouse_restarted_ms": restarted_ms, "caught_up_ms": caught_up_ms, "catch_up_ms": caught_up_ms - restarted_ms if caught_up_ms is not None else None, "catch_up_probe": catch_up_probe},
         "samples": samples,
         "outcome": {"oracle_match": oracle_match, "lost_event_ids": lost, "foreign_event_ids": extra, "remote_physical_rows": physical, "remote_distinct_event_ids": len(distinct_remote), "duplicate_rows": duplicates, "operator_steps": []},
         "destination_failures": failures,

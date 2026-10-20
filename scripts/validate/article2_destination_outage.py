@@ -124,7 +124,11 @@ def validate(observation):
     require(isinstance(outcome.get("operator_steps"), list), "operator steps", errors)
     if samples and isinstance(caught_up, int):
         require(samples[-1].get("elapsed_ms", -1) >= caught_up, "sampling covers catch-up", errors)
-        require(any(s.get("elapsed_ms", -1) >= caught_up and s.get("destination", {}).get("lag_events") == 0 for s in samples), "observed catch-up checkpoint", errors)
+        probe = timeline.get("catch_up_probe")
+        require(isinstance(probe, dict), "direct catch-up probe", errors)
+        if isinstance(probe, dict):
+            require(isinstance(probe.get("journal_head_seq"), int) and probe["journal_head_seq"] > 0, "catch-up journal head", errors)
+            require(probe.get("checkpoint_seq") == probe.get("journal_head_seq"), "direct catch-up checkpoint equals journal head", errors)
     require(observation.get("result") == ("pass" if not errors else "fail"), "result agrees with measurements", errors)
     return errors
 

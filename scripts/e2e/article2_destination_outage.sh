@@ -224,12 +224,15 @@ wait "$workload_pid"
 catch_up_ms=""
 for _ in $(seq 1 "$recovery_wait_seconds"); do
   kill -0 "$connector_pid"
-  if python3 - "$work/state/boring.db" 2>/dev/null <<'PY'
-import sqlite3,sys
+  if python3 - "$work/state/boring.db" "$work/catch-up-probe.json" 2>/dev/null <<'PY'
+import json,sqlite3,sys
 db=sqlite3.connect(sys.argv[1])
+db.execute('BEGIN')
 head=db.execute('SELECT durable_journal_seq FROM source_state').fetchone()[0]
 checkpoint=db.execute("SELECT journal_seq FROM destination_checkpoints WHERE destination_id='snapshot-probe'").fetchone()[0]
 assert head is not None and checkpoint==head,(head,checkpoint)
+with open(sys.argv[2],'w') as stream:
+    json.dump({'journal_head_seq':head,'checkpoint_seq':checkpoint},stream,sort_keys=True)
 PY
   then catch_up_ms=$(elapsed_ms); break; fi
   sleep 1
