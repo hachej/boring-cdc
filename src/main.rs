@@ -2,7 +2,7 @@ use boring_cdc::article1_capture::{CaptureConfig, CaptureFailure, capture_jsonl}
 use boring_cdc::m1_cli_contract::{
     CLI_SCHEMA_VERSION, CliEnvelope, Condition, ExitCode, MutationTerminal, MutationTrace,
     NextCommand, OperatorWireRequest, OperatorWireResponse, SystemSnapshot, command_help,
-    error_envelope, parse, root_help, unavailable,
+    encode_operator_request_frame, error_envelope, parse, root_help, unavailable,
 };
 use boring_cdc::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
 use boring_cdc::m1_preflight::{
@@ -29,6 +29,7 @@ use pg_walstream::CancellationToken;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::io::{self, Read, Write};
+use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::thread;
@@ -240,10 +241,16 @@ fn run_m2() -> Result<(), ReaderFailure> {
         .map_err(|e| ReaderFailure::unavailable(e.code, "capture ownership unavailable"))?;
     let journal_path = std::path::PathBuf::from(&config.public().storage.sqlite_path);
     let owner_run_id = run_id.clone();
-    let _operator_socket = OperatorSocket::start(&config.public().operator, move |request| {
-        operator_result_dispatch(&journal_path, &owner_run_id, request)
-    })
-    .map_err(|code| ReaderFailure::unavailable(code, "operator socket unavailable"))?;
+    let (destination_writer, destination_inbox) = boring_cdc::m5_clickhouse_loop::writer_channel();
+    let operator_writer = destination_writer.clone();
+    let _operator_socket =
+        OperatorSocket::start(&config.public().operator, move |request| match request {
+            request @ (OperatorWireRequest::Invoke { .. } | OperatorWireRequest::Apply { .. }) => {
+                operator_mutation_dispatch(&operator_writer, &owner_run_id, request)
+            }
+            request => operator_result_dispatch(&journal_path, &owner_run_id, request),
+        })
+        .map_err(|code| ReaderFailure::unavailable(code, "operator socket unavailable"))?;
     let status_address = config
         .public()
         .observability
@@ -293,7 +300,13 @@ fn run_m2() -> Result<(), ReaderFailure> {
             ReaderFailure::unavailable("M2_RUNTIME_UNAVAILABLE", "capture runtime is unavailable")
         })?;
     runtime
-        .block_on(run_loaded_config(&config, &cancellation, &mut ownership))
+        .block_on(run_loaded_config(
+            &config,
+            &cancellation,
+            &mut ownership,
+            destination_writer,
+            destination_inbox,
+        ))
         .map_err(|e| ReaderFailure::unavailable(e.code, "capture runtime failed"))
 }
 
@@ -302,6 +315,136 @@ fn operator_error(code: &str, message: &str) -> OperatorWireResponse {
         schema_version: 1,
         code: code.into(),
         message: message.into(),
+    }
+}
+
+fn operator_mutation_dispatch(
+    writer: &boring_cdc::m5_clickhouse_loop::DestinationWriterClient,
+    current_run_id: &str,
+    request: OperatorWireRequest,
+) -> OperatorWireResponse {
+    let run_id = current_run_id.to_owned();
+    writer
+        .service_destination(Duration::from_secs(5), move |owner| {
+            Ok(boring_cdc::m2_destination_rearm::handle(
+                owner, &run_id, request,
+            ))
+        })
+        .unwrap_or_else(|_| {
+            operator_error(
+                "M2_OPERATOR_OWNER_UNAVAILABLE",
+                "operator owner is unavailable",
+            )
+        })
+}
+
+fn destination_rearm_command(parsed: &boring_cdc::m1_cli_contract::ParsedCommand) {
+    let report = match fresh_status_report() {
+        Ok(report) => report,
+        Err(error) => {
+            eprintln!("{}: {}", error.code, error.message);
+            std::process::exit(error.exit as i32);
+        }
+    };
+    let Some(run_id) = report.run_id else {
+        eprintln!("M2_OPERATOR_OWNER_UNAVAILABLE: operator owner is unavailable");
+        std::process::exit(ExitCode::Unavailable as i32);
+    };
+    let config_text = std::fs::read_to_string("boring-cdc.toml").unwrap_or_default();
+    let config = match load_str_for(&config_text, &ProcessEnvironment, LoadPurpose::Status) {
+        Ok(config) => config,
+        Err(_) => {
+            eprintln!("M2_STATUS_CONFIG_UNAVAILABLE: status configuration is unavailable");
+            std::process::exit(ExitCode::Unavailable as i32);
+        }
+    };
+    let request = if parsed.argv.iter().any(|part| part == "--dry-run") {
+        OperatorWireRequest::Invoke {
+            schema_version: 1,
+            expected_run_id: run_id,
+            argv: parsed.argv.clone(),
+        }
+    } else {
+        let Some(token) = parsed
+            .argv
+            .iter()
+            .position(|part| part == "--confirm-token")
+            .and_then(|index| parsed.argv.get(index + 1))
+        else {
+            eprintln!("CLI_ARGUMENT_VALUE_REQUIRED: confirmation token required");
+            std::process::exit(ExitCode::Invalid as i32);
+        };
+        let parts: Vec<_> = token.split('.').collect();
+        let target_digest = format!("sha256:{:x}", Sha256::digest(parsed.argv[2].as_bytes()));
+        if parts.len() != 5
+            || parts.iter().any(|part| !part.starts_with("sha256:"))
+            || parts[0] != target_digest
+        {
+            eprintln!("CLI_INVALID_CONFIRMATION: confirmation token is invalid");
+            std::process::exit(ExitCode::Invalid as i32);
+        }
+        OperatorWireRequest::Apply {
+            schema_version: 1,
+            expected_run_id: run_id,
+            request_id: parts[1].into(),
+            canonical_payload_digest: parts[2].into(),
+            plan_digest: parts[3].into(),
+            confirm_token: token.clone(),
+        }
+    };
+    let response = (|| -> Result<OperatorWireResponse, ()> {
+        let root = std::env::current_dir().map_err(|_| ())?;
+        let path = root.join(&config.public().operator.socket_path);
+        let mut stream = UnixStream::connect(path).map_err(|_| ())?;
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .map_err(|_| ())?;
+        stream
+            .set_write_timeout(Some(Duration::from_secs(10)))
+            .map_err(|_| ())?;
+        let limit =
+            usize::try_from(config.public().operator.max_request_bytes.0).map_err(|_| ())?;
+        let frame = encode_operator_request_frame(&request, limit).map_err(|_| ())?;
+        stream.write_all(&frame).map_err(|_| ())?;
+        stream.shutdown(std::net::Shutdown::Write).map_err(|_| ())?;
+        let mut prefix = [0u8; 4];
+        stream.read_exact(&mut prefix).map_err(|_| ())?;
+        let size = u32::from_be_bytes(prefix) as usize;
+        let max = usize::try_from(config.public().operator.max_response_bytes.0).map_err(|_| ())?;
+        if size == 0 || size > max {
+            return Err(());
+        }
+        let mut body = vec![0u8; size];
+        stream.read_exact(&mut body).map_err(|_| ())?;
+        serde_json::from_slice(&body).map_err(|_| ())
+    })();
+    match response {
+        Ok(OperatorWireResponse::Plan { plan, .. }) => {
+            if parsed.json {
+                println!("{}", serde_json::to_string(&plan).expect("plan"));
+            } else {
+                println!(
+                    "destination retry plan: {}\nconfirm token: {}",
+                    plan.plan_id,
+                    plan.confirmation.confirm_token.as_deref().unwrap_or("")
+                );
+            }
+        }
+        Ok(OperatorWireResponse::Result { result, .. }) => {
+            if parsed.json {
+                println!("{}", serde_json::to_string(&result).expect("result"));
+            } else {
+                println!("{}: {}", result.code, result.message);
+            }
+        }
+        Ok(OperatorWireResponse::Error { code, message, .. }) => {
+            eprintln!("{code}: {message}");
+            std::process::exit(ExitCode::Unavailable as i32);
+        }
+        Err(()) => {
+            eprintln!("M2_OPERATOR_OWNER_UNAVAILABLE: operator owner is unavailable");
+            std::process::exit(ExitCode::Unavailable as i32);
+        }
     }
 }
 
@@ -931,6 +1074,10 @@ fn main() {
             let _ = write_stdout(command_help(parsed.spec).as_bytes());
         }
         Ok(parsed) => {
+            if parsed.spec.id == "CMD-DESTINATION-REARM" {
+                destination_rearm_command(&parsed);
+                return;
+            }
             if parsed.spec.id == "CMD-STATUS" {
                 match status_command() {
                     Ok(result) => {

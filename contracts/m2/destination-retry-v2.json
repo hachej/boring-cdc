@@ -30,7 +30,7 @@
     "authorization": "local owner endpoint, dry-run then explicit confirmation with a fresh nonce",
     "fences": ["run_id", "capture_epoch", "generation", "destination_id", "failure_id", "fingerprint", "attempt", "failed_boundary"],
     "effect": "consume the confirmation nonce, keep the attempt and failed boundary, persist an immediate retry timestamp, and wake the destination worker",
-    "stale_or_duplicate": "reject stale identity; repeat of the same confirmed request returns its recorded result without a second mutation",
+    "stale_or_duplicate": "reject stale identity; repeat of the same confirmed request in the current owner run returns its recorded result without a second mutation",
     "other_classes": "unchanged class-specific recovery proofs"
   },
   "evidence": {

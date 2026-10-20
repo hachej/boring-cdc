@@ -2614,6 +2614,8 @@ pub async fn run_loaded_config(
     config: &crate::m1_config::LoadedConfig,
     cancellation: &CancellationToken,
     ownership: &mut crate::m2_ownership::OwnershipGuard<PgSourceLock>,
+    mut destination_writer: crate::m5_clickhouse_loop::DestinationWriterClient,
+    mut destination_inbox: crate::m5_clickhouse_loop::DestinationWriterInbox,
 ) -> Result<(), CaptureFailure> {
     use crate::m2_journal::{CommitLimits, SourceIdentity};
     use crate::m2_schema::open_writer;
@@ -2943,8 +2945,6 @@ pub async fn run_loaded_config(
     writer_service
         .insert_owner_lease(&lease)
         .map_err(|_| CaptureFailure::at("ownership", "M2_OWNER_LEASE_STORE_FAILED"))?;
-    let (mut destination_writer, mut destination_inbox) =
-        crate::m5_clickhouse_loop::writer_channel();
     let destination_start = crate::m5_clickhouse_loop::PumpStart {
         journal_path: journal_path.clone(),
         capture_epoch: capture_epoch.clone(),

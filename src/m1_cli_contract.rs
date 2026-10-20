@@ -55,6 +55,7 @@ pub enum Grammar {
     DestinationAdd,
     DestinationPause,
     DestinationResume,
+    DestinationRearm,
     DestinationDetach,
     DestinationPromote,
     DestinationRetire,
@@ -99,6 +100,9 @@ impl Grammar {
             }
             Grammar::DestinationResume => {
                 "destination resume DESTINATION (--dry-run|--confirm --confirm-token TOKEN) [--json]"
+            }
+            Grammar::DestinationRearm => {
+                "destination rearm DESTINATION (--dry-run|--confirm --confirm-token TOKEN) [--json]"
             }
             Grammar::DestinationDetach => {
                 "destination detach DESTINATION --confirm --confirm-token TOKEN [--json]"
@@ -411,6 +415,19 @@ pub static COMMANDS: &[CommandSpec] = &[
         OWNER,
         SAFE,
         DestinationResume,
+    ),
+    spec!(
+        "CMD-DESTINATION-REARM",
+        &["destination", "rearm"],
+        "base",
+        "boring-cdc-m5-loops.1",
+        Mutation,
+        LiveOwner,
+        DryRunThenConfirm,
+        true,
+        OWNER_DEST,
+        SAFE,
+        DestinationRearm,
     ),
     spec!(
         "CMD-DESTINATION-DETACH",
@@ -1275,7 +1292,7 @@ impl Grammar {
                 ],
                 1,
             ),
-            Grammar::DestinationPause | Grammar::DestinationResume => {
+            Grammar::DestinationPause | Grammar::DestinationResume | Grammar::DestinationRearm => {
                 (&["--dry-run", "--confirm", "--confirm-token", "--json"], 1)
             }
             Grammar::DestinationDetach => (&["--confirm", "--confirm-token", "--json"], 1),
@@ -1401,7 +1418,7 @@ impl Grammar {
                     && value_after(a, "--from-seq")
                     && dry_or_confirmed(a, "--dry-run", "--confirm-data-gap")
             }
-            Grammar::DestinationPause | Grammar::DestinationResume => {
+            Grammar::DestinationPause | Grammar::DestinationResume | Grammar::DestinationRearm => {
                 positional_after_path(spec, a) && dry_or_confirmed(a, "--dry-run", "--confirm")
             }
             Grammar::DestinationDetach => {
@@ -1613,7 +1630,7 @@ pub mod tests {
             .collect();
         assert_eq!(ids.len(), COMMANDS.len());
         assert_eq!(keys.len(), COMMANDS.len());
-        assert_eq!(COMMANDS.len(), 28);
+        assert_eq!(COMMANDS.len(), 29);
         for s in COMMANDS {
             assert!(s.id.starts_with("CMD-"));
             assert!(s.owner_bead.starts_with("boring-cdc-"));
@@ -1622,11 +1639,11 @@ pub mod tests {
         }
     }
     #[test]
-    fn generated_registry_matches_compatibility_golden() {
+    fn generated_registry_matches_v2_compatibility_golden() {
         let generated = serde_json::to_string_pretty(COMMANDS).unwrap() + "\n";
         assert_eq!(
             generated,
-            include_str!("../tests/fixtures/m1_cli/registry-v1.json")
+            include_str!("../tests/fixtures/m1_cli/registry-v2.json")
         );
     }
 
