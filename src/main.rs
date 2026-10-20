@@ -482,7 +482,9 @@ fn run_m3_bootstrap() -> Result<(), ReaderFailure> {
         slot_name,
         generation: 1,
         table_set_fingerprint: config.fingerprints().table_set.clone(),
-        configuration_fingerprint: config.fingerprints().runtime.clone(),
+        // M3 binds this intent to the destination row and M4 generation lease. The source
+        // runtime fingerprint is tracked separately in capture_configuration_receipts.
+        configuration_fingerprint: config.fingerprints().destination.clone(),
         importers: vec![ImporterAssignment {
             importer_id: "bootstrap-worker-0".into(),
             assigned_ranges_digest: digest_assignment(b"all-configured-relations"),
