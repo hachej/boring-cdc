@@ -455,7 +455,26 @@ pub fn snapshot(
             },
         })
     }
+    let journal_head = s.6.unwrap_or(0);
+    let mut destinations = Vec::new();
+    let mut destination_query = c.prepare("SELECT d.destination_id,d.kind,d.capture_epoch,d.generation,d.highest_external_fence,coalesce(cp.journal_seq,0),coalesce(cp.revision,0) FROM destinations d LEFT JOIN destination_checkpoints cp USING(destination_id) ORDER BY d.destination_id LIMIT 100")?;
+    for row in destination_query.query_map([], |r| {
+        let id: String = r.get(0)?;
+        let capture_epoch: String = r.get(2)?;
+        let checkpoint_seq: u64 = r.get(5)?;
+        let lag_events = (capture_epoch == s.0).then(|| journal_head.saturating_sub(checkpoint_seq));
+        Ok(json!({"destination_fingerprint":hash(&[&id]),"kind":r.get::<_,String>(1)?,"generation":r.get::<_,u64>(3)?,"highest_external_fence":r.get::<_,u64>(4)?,"checkpoint_seq":checkpoint_seq,"checkpoint_revision":r.get::<_,u64>(6)?,"lag_events":lag_events}))
+    })? {
+        destinations.push(row?);
+    }
     let mut raw = Vec::new();
+    if destinations.iter().any(|destination| {
+        destination["lag_events"]
+            .as_u64()
+            .is_some_and(|lag| lag > 0)
+    }) {
+        add(&mut raw, "degraded", "degraded", "DESTINATION_LAG", None);
+    }
     if freshness != "fresh" {
         add(
             &mut raw,
@@ -615,9 +634,7 @@ pub fn snapshot(
         .map(|x| x.severity.clone())
         .unwrap_or_else(|| "healthy".into());
     let db_bytes = std::fs::metadata(path).map(|x| x.len()).unwrap_or(0);
-    let mut dest = Vec::new();
-    let mut dq=c.prepare("SELECT d.destination_id,d.kind,d.generation,d.highest_external_fence,coalesce(cp.journal_seq,0),coalesce(cp.revision,0) FROM destinations d LEFT JOIN destination_checkpoints cp USING(destination_id) ORDER BY d.destination_id LIMIT 100")?;
-    for row in dq.query_map([],|r|{let id:String=r.get(0)?;Ok(json!({"destination_fingerprint":hash(&[&id]),"kind":r.get::<_,String>(1)?,"generation":r.get::<_,u64>(2)?,"highest_external_fence":r.get::<_,u64>(3)?,"checkpoint_seq":r.get::<_,u64>(4)?,"checkpoint_revision":r.get::<_,u64>(5)?}))})?{dest.push(row?)}
+    let dest = destinations;
     let mut action_causality = Vec::new();
     let mut aq = c.prepare("SELECT request_id,payload_digest,run_id,state,observation_revision,control_revision,plan_digest,immutable_intent_id,external_effect_evidence_digest,postcondition_evidence_digest FROM operator_command_requests ORDER BY request_id LIMIT 100")?;
     for row in aq.query_map([], |r| Ok(json!({"request_id":r.get::<_,String>(0)?,"canonical_payload_digest":r.get::<_,String>(1)?,"plan_digest":public_causal_digest(r.get::<_,Option<String>>(6)?),"immutable_intent_id":public_causal_digest(r.get::<_,Option<String>>(7)?),"external_effect_evidence_digest":public_causal_digest(r.get::<_,Option<String>>(8)?),"postcondition_evidence_digest":public_causal_digest(r.get::<_,Option<String>>(9)?),"run_id":r.get::<_,String>(2)?,"terminal_state":r.get::<_,String>(3)?,"before_state_revision":r.get::<_,u64>(4)?,"bound_control_revision":r.get::<_,u64>(5)?})))? { action_causality.push(row?); }
@@ -705,6 +722,35 @@ pub mod tests {
         assert!(!metrics.contains("source_wal_headroom_bytes"));
         assert!(!metrics.contains("secret-system"));
         assert!(!metrics.contains("secret-slot"));
+    }
+    #[test]
+    fn destination_backlog_is_visible_until_checkpoint_catches_up() {
+        let (path, writer) = fixture();
+        for seq in 1..=2 {
+            writer.connection().execute("INSERT INTO source_transactions(transaction_id,capture_epoch,source_system_id,database_id,slot_name,xid,end_lsn,first_seq,last_seq,event_count,payload_checksum,state) VALUES(?1,'epoch','secret-system','secret-db','secret-slot',?2,?3,?4,?4,0,'checksum','committed')",rusqlite::params![format!("transaction-{seq}"),seq.to_string(),format!("{seq:016X}"),seq]).unwrap();
+        }
+        writer.connection().execute("UPDATE source_state SET durable_transaction_id='transaction-2',durable_transaction_end_lsn='0000000000000002',durable_journal_seq=2,control_revision=control_revision+1 WHERE singleton=1",[]).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('clickhouse','clickhouse','cfg','epoch',1)",[]).unwrap();
+        writer.connection().execute("INSERT INTO destination_checkpoints(destination_id,capture_epoch,configuration_fingerprint,generation,complete_transaction_id,journal_seq) VALUES('clickhouse','epoch','cfg',1,'transaction-1',1)",[]).unwrap();
+        let lagging = snapshot(&path, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        assert_eq!(lagging.destinations[0]["lag_events"], 1);
+        assert!(
+            lagging
+                .conditions
+                .iter()
+                .any(|condition| condition.condition == "degraded"
+                    && condition.reason == "DESTINATION_LAG")
+        );
+        assert_ne!(lagging.overall_health, "healthy");
+        writer.connection().execute("UPDATE destination_checkpoints SET complete_transaction_id='transaction-2',journal_seq=2,revision=revision+1 WHERE destination_id='clickhouse'",[]).unwrap();
+        let caught_up = snapshot(&path, "cfg", UNIX_EPOCH + Duration::from_secs(10)).unwrap();
+        assert_eq!(caught_up.destinations[0]["lag_events"], 0);
+        assert!(
+            !caught_up
+                .conditions
+                .iter()
+                .any(|condition| condition.reason == "DESTINATION_LAG")
+        );
     }
     #[test]
     fn stable_restart_projection_redacts() {
