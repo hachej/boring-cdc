@@ -1,0 +1,5298 @@
+{
+  "destination_failures": [
+    {
+      "armed": false,
+      "attempt": 15,
+      "class": "transient_destination",
+      "component": "clickhouse",
+      "retry_class": "exhausted"
+    }
+  ],
+  "failure_codes": [
+    "DESTINATION_DID_NOT_CATCH_UP"
+  ],
+  "git_commit": "c39e12b889b95d7dc679af6c2eaf96814f10e08a",
+  "images": {
+    "clickhouse": "25.8.2.29",
+    "postgres": "17.6"
+  },
+  "outcome": {
+    "duplicate_rows": 0,
+    "foreign_event_ids": 0,
+    "lost_event_ids": 0,
+    "operator_steps": [],
+    "oracle_match": true,
+    "remote_distinct_event_ids": 57,
+    "remote_physical_rows": 57
+  },
+  "peak_destination_lag_events": 74,
+  "peak_retained_wal_bytes": 287760,
+  "profile": {
+    "outage_seconds": 120,
+    "prelude_transactions": 3,
+    "retained_wal_limit_bytes": 268435456,
+    "sample_interval_seconds": 5,
+    "workload_interval_seconds": 5,
+    "workload_transactions": 24
+  },
+  "result": "fail",
+  "samples": [
+    {
+      "destination": {
+        "checkpoint_seq": 4,
+        "lag_events": 0
+      },
+      "elapsed_ms": 177,
+      "journal": {
+        "head_lsn": "000000000194DC68",
+        "head_seq": 4
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 856912
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/194DC68",
+        "restart_lsn": "0/194D9B8",
+        "retained_bytes": 960
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "STATUS_PROVENANCE_UNKNOWN",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 4,
+        "lag_events": 3
+      },
+      "elapsed_ms": 5076,
+      "journal": {
+        "head_lsn": "000000000194DE08",
+        "head_seq": 7
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 996992
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/194DE08",
+        "restart_lsn": "0/194D9B8",
+        "retained_bytes": 1104
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 7,
+        "lag_events": 3
+      },
+      "elapsed_ms": 10073,
+      "journal": {
+        "head_lsn": "000000000194DFA8",
+        "head_seq": 10
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 1219472
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/194DFA8",
+        "restart_lsn": "0/194D9B8",
+        "retained_bytes": 1520
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 9,
+        "lag_events": 4
+      },
+      "elapsed_ms": 15076,
+      "journal": {
+        "head_lsn": "000000000194E198",
+        "head_seq": 13
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 1483152
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/194E198",
+        "restart_lsn": "0/194E0D0",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 10,
+        "lag_events": 4
+      },
+      "elapsed_ms": 20075,
+      "journal": {
+        "head_lsn": "000000000194E228",
+        "head_seq": 14
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 1623232
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/194E228",
+        "restart_lsn": "0/194E0D0",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 13,
+        "lag_events": 2
+      },
+      "elapsed_ms": 25081,
+      "journal": {
+        "head_lsn": "0000000001994450",
+        "head_seq": 15
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 1874552
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/1994450",
+        "restart_lsn": "0/194E0D0",
+        "retained_bytes": 287616
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 15,
+        "lag_events": 1
+      },
+      "elapsed_ms": 30079,
+      "journal": {
+        "head_lsn": "00000000019944E0",
+        "head_seq": 16
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 2018752
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19944E0",
+        "restart_lsn": "0/194E0D0",
+        "retained_bytes": 287760
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 1
+      },
+      "elapsed_ms": 35074,
+      "journal": {
+        "head_lsn": "00000000019945A8",
+        "head_seq": 17
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 2179432
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19945A8",
+        "restart_lsn": "0/19944E0",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 4
+      },
+      "elapsed_ms": 40075,
+      "journal": {
+        "head_lsn": "0000000001994748",
+        "head_seq": 20
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 2422512
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/1994748",
+        "restart_lsn": "0/19944E0",
+        "retained_bytes": 616
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 7
+      },
+      "elapsed_ms": 45074,
+      "journal": {
+        "head_lsn": "00000000019948E8",
+        "head_seq": 23
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 2669712
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19948E8",
+        "restart_lsn": "0/19944E0",
+        "retained_bytes": 1032
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 10
+      },
+      "elapsed_ms": 50075,
+      "journal": {
+        "head_lsn": "0000000001994A88",
+        "head_seq": 26
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 2888072
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/1994A88",
+        "restart_lsn": "0/19944E0",
+        "retained_bytes": 1448
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 13
+      },
+      "elapsed_ms": 55073,
+      "journal": {
+        "head_lsn": "0000000001994C60",
+        "head_seq": 29
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 3118792
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/1994C60",
+        "restart_lsn": "0/1994B98",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 16
+      },
+      "elapsed_ms": 60074,
+      "journal": {
+        "head_lsn": "0000000001994E00",
+        "head_seq": 32
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 3324792
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/1994E00",
+        "restart_lsn": "0/1994B98",
+        "retained_bytes": 616
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 19
+      },
+      "elapsed_ms": 65074,
+      "journal": {
+        "head_lsn": "0000000001994FA0",
+        "head_seq": 35
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 3551392
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/1994FA0",
+        "restart_lsn": "0/1994B98",
+        "retained_bytes": 1032
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 22
+      },
+      "elapsed_ms": 70074,
+      "journal": {
+        "head_lsn": "0000000001995140",
+        "head_seq": 38
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 3757392
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/1995140",
+        "restart_lsn": "0/1994B98",
+        "retained_bytes": 1448
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 25
+      },
+      "elapsed_ms": 75074,
+      "journal": {
+        "head_lsn": "0000000001995318",
+        "head_seq": 41
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 3979872
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/1995318",
+        "restart_lsn": "0/1995250",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 28
+      },
+      "elapsed_ms": 80074,
+      "journal": {
+        "head_lsn": "00000000019954B8",
+        "head_seq": 44
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 4206472
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19954B8",
+        "restart_lsn": "0/1995250",
+        "retained_bytes": 616
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 31
+      },
+      "elapsed_ms": 85074,
+      "journal": {
+        "head_lsn": "000000000199AFF8",
+        "head_seq": 47
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 4437192
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199AFF8",
+        "restart_lsn": "0/1995250",
+        "retained_bytes": 23976
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 34
+      },
+      "elapsed_ms": 90074,
+      "journal": {
+        "head_lsn": "000000000199B198",
+        "head_seq": 50
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 4643192
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199B198",
+        "restart_lsn": "0/1995250",
+        "retained_bytes": 24392
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 37
+      },
+      "elapsed_ms": 95073,
+      "journal": {
+        "head_lsn": "000000000199B370",
+        "head_seq": 53
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 4861552
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199B370",
+        "restart_lsn": "0/199B198",
+        "retained_bytes": 472
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 40
+      },
+      "elapsed_ms": 100075,
+      "journal": {
+        "head_lsn": "000000000199B510",
+        "head_seq": 56
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 5075792
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199B510",
+        "restart_lsn": "0/199B198",
+        "retained_bytes": 888
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 43
+      },
+      "elapsed_ms": 105075,
+      "journal": {
+        "head_lsn": "000000000199B6B0",
+        "head_seq": 59
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 5306512
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199B6B0",
+        "restart_lsn": "0/199B198",
+        "retained_bytes": 1304
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 46
+      },
+      "elapsed_ms": 110075,
+      "journal": {
+        "head_lsn": "000000000199B850",
+        "head_seq": 62
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 5524872
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199B850",
+        "restart_lsn": "0/199B198",
+        "retained_bytes": 1720
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 49
+      },
+      "elapsed_ms": 115075,
+      "journal": {
+        "head_lsn": "000000000199BA28",
+        "head_seq": 65
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 5755592
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199BA28",
+        "restart_lsn": "0/199B850",
+        "retained_bytes": 472
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 52
+      },
+      "elapsed_ms": 120075,
+      "journal": {
+        "head_lsn": "000000000199BBC8",
+        "head_seq": 68
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 5965712
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199BBC8",
+        "restart_lsn": "0/199B850",
+        "retained_bytes": 888
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 55
+      },
+      "elapsed_ms": 125074,
+      "journal": {
+        "head_lsn": "000000000199BD68",
+        "head_seq": 71
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 6196432
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199BD68",
+        "restart_lsn": "0/199B850",
+        "retained_bytes": 1304
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 58
+      },
+      "elapsed_ms": 130074,
+      "journal": {
+        "head_lsn": "000000000199BF08",
+        "head_seq": 74
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 6402432
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199BF08",
+        "restart_lsn": "0/199B850",
+        "retained_bytes": 1720
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 61
+      },
+      "elapsed_ms": 135075,
+      "journal": {
+        "head_lsn": "000000000199C0F8",
+        "head_seq": 77
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 6633152
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199C0F8",
+        "restart_lsn": "0/199BF08",
+        "retained_bytes": 496
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 64
+      },
+      "elapsed_ms": 140075,
+      "journal": {
+        "head_lsn": "000000000199C298",
+        "head_seq": 80
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 6847392
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199C298",
+        "restart_lsn": "0/199BF08",
+        "retained_bytes": 912
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 67
+      },
+      "elapsed_ms": 145074,
+      "journal": {
+        "head_lsn": "000000000199C438",
+        "head_seq": 83
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 7061632
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199C438",
+        "restart_lsn": "0/199BF08",
+        "retained_bytes": 1328
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 70
+      },
+      "elapsed_ms": 150074,
+      "journal": {
+        "head_lsn": "000000000199C5D8",
+        "head_seq": 86
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 7275872
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199C5D8",
+        "restart_lsn": "0/199BF08",
+        "retained_bytes": 1744
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 73
+      },
+      "elapsed_ms": 155075,
+      "journal": {
+        "head_lsn": "000000000199C7B0",
+        "head_seq": 89
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 7498352
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199C7B0",
+        "restart_lsn": "0/199C6E8",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 16,
+        "lag_events": 74
+      },
+      "elapsed_ms": 160075,
+      "journal": {
+        "head_lsn": "000000000199C840",
+        "head_seq": 90
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 7609592
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199C840",
+        "restart_lsn": "0/199C6E8",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          },
+          {
+            "reason": "transient_destination",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 17,
+        "lag_events": 74
+      },
+      "elapsed_ms": 165080,
+      "journal": {
+        "head_lsn": "000000000199E660",
+        "head_seq": 91
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 7757912
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199E660",
+        "restart_lsn": "0/199C6E8",
+        "retained_bytes": 8056
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 19,
+        "lag_events": 73
+      },
+      "elapsed_ms": 170076,
+      "journal": {
+        "head_lsn": "000000000199E6F0",
+        "head_seq": 92
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 7897992
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199E6F0",
+        "restart_lsn": "0/199C6E8",
+        "retained_bytes": 8200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 20,
+        "lag_events": 73
+      },
+      "elapsed_ms": 175075,
+      "journal": {
+        "head_lsn": "000000000199E7B8",
+        "head_seq": 93
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 8054552
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199E7B8",
+        "restart_lsn": "0/199E6F0",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 22,
+        "lag_events": 72
+      },
+      "elapsed_ms": 180076,
+      "journal": {
+        "head_lsn": "000000000199E848",
+        "head_seq": 94
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 8206992
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199E848",
+        "restart_lsn": "0/199E6F0",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 25,
+        "lag_events": 70
+      },
+      "elapsed_ms": 185077,
+      "journal": {
+        "head_lsn": "000000000199E8D8",
+        "head_seq": 95
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 8355312
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199E8D8",
+        "restart_lsn": "0/199E6F0",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 26,
+        "lag_events": 70
+      },
+      "elapsed_ms": 190076,
+      "journal": {
+        "head_lsn": "000000000199E968",
+        "head_seq": 96
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 8491272
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199E968",
+        "restart_lsn": "0/199E6F0",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 29,
+        "lag_events": 68
+      },
+      "elapsed_ms": 195075,
+      "journal": {
+        "head_lsn": "000000000199EA30",
+        "head_seq": 97
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 8672552
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199EA30",
+        "restart_lsn": "0/199E968",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 31,
+        "lag_events": 67
+      },
+      "elapsed_ms": 200075,
+      "journal": {
+        "head_lsn": "000000000199EAC0",
+        "head_seq": 98
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 8812632
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199EAC0",
+        "restart_lsn": "0/199E968",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 32,
+        "lag_events": 67
+      },
+      "elapsed_ms": 205081,
+      "journal": {
+        "head_lsn": "000000000199F410",
+        "head_seq": 99
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 8981552
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199F410",
+        "restart_lsn": "0/199E968",
+        "retained_bytes": 2728
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 35,
+        "lag_events": 65
+      },
+      "elapsed_ms": 210077,
+      "journal": {
+        "head_lsn": "000000000199F4A0",
+        "head_seq": 100
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 9125752
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199F4A0",
+        "restart_lsn": "0/199E968",
+        "retained_bytes": 2872
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 37,
+        "lag_events": 64
+      },
+      "elapsed_ms": 215075,
+      "journal": {
+        "head_lsn": "000000000199F618",
+        "head_seq": 101
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 9307032
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199F618",
+        "restart_lsn": "0/199F4D8",
+        "retained_bytes": 320
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 38,
+        "lag_events": 64
+      },
+      "elapsed_ms": 220075,
+      "journal": {
+        "head_lsn": "000000000199F6A8",
+        "head_seq": 102
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 9447112
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199F6A8",
+        "restart_lsn": "0/199F4D8",
+        "retained_bytes": 464
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 41,
+        "lag_events": 62
+      },
+      "elapsed_ms": 225077,
+      "journal": {
+        "head_lsn": "000000000199F738",
+        "head_seq": 103
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 9599552
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199F738",
+        "restart_lsn": "0/199F4D8",
+        "retained_bytes": 608
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 43,
+        "lag_events": 61
+      },
+      "elapsed_ms": 230075,
+      "journal": {
+        "head_lsn": "000000000199F7C8",
+        "head_seq": 104
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 9735512
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199F7C8",
+        "restart_lsn": "0/199F4D8",
+        "retained_bytes": 752
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 44,
+        "lag_events": 61
+      },
+      "elapsed_ms": 235075,
+      "journal": {
+        "head_lsn": "000000000199F890",
+        "head_seq": 105
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 9912672
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199F890",
+        "restart_lsn": "0/199F7C8",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 47,
+        "lag_events": 59
+      },
+      "elapsed_ms": 240075,
+      "journal": {
+        "head_lsn": "000000000199F920",
+        "head_seq": 106
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 10056872
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199F920",
+        "restart_lsn": "0/199F7C8",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 49,
+        "lag_events": 58
+      },
+      "elapsed_ms": 245075,
+      "journal": {
+        "head_lsn": "000000000199F9B0",
+        "head_seq": 107
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 10192832
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199F9B0",
+        "restart_lsn": "0/199F7C8",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 50,
+        "lag_events": 58
+      },
+      "elapsed_ms": 250076,
+      "journal": {
+        "head_lsn": "000000000199FA40",
+        "head_seq": 108
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 10332912
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199FA40",
+        "restart_lsn": "0/199F7C8",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 53,
+        "lag_events": 56
+      },
+      "elapsed_ms": 255075,
+      "journal": {
+        "head_lsn": "000000000199FB08",
+        "head_seq": 109
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 10514192
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199FB08",
+        "restart_lsn": "0/199FA40",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 55,
+        "lag_events": 55
+      },
+      "elapsed_ms": 260076,
+      "journal": {
+        "head_lsn": "000000000199FB98",
+        "head_seq": 110
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 10650152
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199FB98",
+        "restart_lsn": "0/199FA40",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 56,
+        "lag_events": 55
+      },
+      "elapsed_ms": 265075,
+      "journal": {
+        "head_lsn": "000000000199FC28",
+        "head_seq": 111
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 10790232
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199FC28",
+        "restart_lsn": "0/199FA40",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 58,
+        "lag_events": 54
+      },
+      "elapsed_ms": 270081,
+      "journal": {
+        "head_lsn": "000000000199FCB8",
+        "head_seq": 112
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 10955032
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199FCB8",
+        "restart_lsn": "0/199FA40",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 61,
+        "lag_events": 52
+      },
+      "elapsed_ms": 275076,
+      "journal": {
+        "head_lsn": "000000000199FD80",
+        "head_seq": 113
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 11128072
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199FD80",
+        "restart_lsn": "0/199FCB8",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 62,
+        "lag_events": 52
+      },
+      "elapsed_ms": 280074,
+      "journal": {
+        "head_lsn": "000000000199FE10",
+        "head_seq": 114
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 11268152
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/199FE10",
+        "restart_lsn": "0/199FCB8",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 65,
+        "lag_events": 50
+      },
+      "elapsed_ms": 285074,
+      "journal": {
+        "head_lsn": "00000000019A9460",
+        "head_seq": 115
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 11461792
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9460",
+        "restart_lsn": "0/199FCB8",
+        "retained_bytes": 38824
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 67,
+        "lag_events": 49
+      },
+      "elapsed_ms": 290076,
+      "journal": {
+        "head_lsn": "00000000019A94F0",
+        "head_seq": 116
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 11605992
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A94F0",
+        "restart_lsn": "0/199FCB8",
+        "retained_bytes": 38968
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 68,
+        "lag_events": 49
+      },
+      "elapsed_ms": 295075,
+      "journal": {
+        "head_lsn": "00000000019A95B8",
+        "head_seq": 117
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 11795512
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A95B8",
+        "restart_lsn": "0/19A94F0",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 71,
+        "lag_events": 47
+      },
+      "elapsed_ms": 300075,
+      "journal": {
+        "head_lsn": "00000000019A9648",
+        "head_seq": 118
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 11939712
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9648",
+        "restart_lsn": "0/19A94F0",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 73,
+        "lag_events": 46
+      },
+      "elapsed_ms": 305074,
+      "journal": {
+        "head_lsn": "00000000019A96D8",
+        "head_seq": 119
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 12075672
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A96D8",
+        "restart_lsn": "0/19A94F0",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 74,
+        "lag_events": 46
+      },
+      "elapsed_ms": 310077,
+      "journal": {
+        "head_lsn": "00000000019A9768",
+        "head_seq": 120
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 12215752
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9768",
+        "restart_lsn": "0/19A94F0",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 76,
+        "lag_events": 45
+      },
+      "elapsed_ms": 315073,
+      "journal": {
+        "head_lsn": "00000000019A9830",
+        "head_seq": 121
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 12380552
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9830",
+        "restart_lsn": "0/19A9768",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 79,
+        "lag_events": 43
+      },
+      "elapsed_ms": 320073,
+      "journal": {
+        "head_lsn": "00000000019A98C0",
+        "head_seq": 122
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 12532992
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A98C0",
+        "restart_lsn": "0/19A9768",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 80,
+        "lag_events": 43
+      },
+      "elapsed_ms": 325074,
+      "journal": {
+        "head_lsn": "00000000019A9950",
+        "head_seq": 123
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 12673072
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9950",
+        "restart_lsn": "0/19A9768",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 82,
+        "lag_events": 42
+      },
+      "elapsed_ms": 330074,
+      "journal": {
+        "head_lsn": "00000000019A99E0",
+        "head_seq": 124
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 12825512
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A99E0",
+        "restart_lsn": "0/19A9768",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 85,
+        "lag_events": 40
+      },
+      "elapsed_ms": 335076,
+      "journal": {
+        "head_lsn": "00000000019A9AA8",
+        "head_seq": 125
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 13015032
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9AA8",
+        "restart_lsn": "0/19A99E0",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 86,
+        "lag_events": 40
+      },
+      "elapsed_ms": 340075,
+      "journal": {
+        "head_lsn": "00000000019A9B38",
+        "head_seq": 126
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 13155112
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9B38",
+        "restart_lsn": "0/19A99E0",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 88,
+        "lag_events": 39
+      },
+      "elapsed_ms": 345076,
+      "journal": {
+        "head_lsn": "00000000019A9BC8",
+        "head_seq": 127
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 13311672
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9BC8",
+        "restart_lsn": "0/19A99E0",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 89,
+        "lag_events": 39
+      },
+      "elapsed_ms": 350077,
+      "journal": {
+        "head_lsn": "00000000019A9C58",
+        "head_seq": 128
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 13464112
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9C58",
+        "restart_lsn": "0/19A99E0",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 91,
+        "lag_events": 38
+      },
+      "elapsed_ms": 355075,
+      "journal": {
+        "head_lsn": "00000000019A9D20",
+        "head_seq": 129
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 13633032
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9D20",
+        "restart_lsn": "0/19A9C58",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 92,
+        "lag_events": 38
+      },
+      "elapsed_ms": 360076,
+      "journal": {
+        "head_lsn": "00000000019A9DB0",
+        "head_seq": 130
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 13768992
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9DB0",
+        "restart_lsn": "0/19A9C58",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 93,
+        "lag_events": 38
+      },
+      "elapsed_ms": 365075,
+      "journal": {
+        "head_lsn": "00000000019A9E40",
+        "head_seq": 131
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 13921432
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9E40",
+        "restart_lsn": "0/19A9C58",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 95,
+        "lag_events": 37
+      },
+      "elapsed_ms": 370078,
+      "journal": {
+        "head_lsn": "00000000019A9ED0",
+        "head_seq": 132
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 14069752
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9ED0",
+        "restart_lsn": "0/19A9C58",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 96,
+        "lag_events": 37
+      },
+      "elapsed_ms": 375075,
+      "journal": {
+        "head_lsn": "00000000019A9F98",
+        "head_seq": 133
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 14230432
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19A9F98",
+        "restart_lsn": "0/19A9ED0",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 97,
+        "lag_events": 37
+      },
+      "elapsed_ms": 380076,
+      "journal": {
+        "head_lsn": "00000000019AA040",
+        "head_seq": 134
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 14382872
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA040",
+        "restart_lsn": "0/19A9ED0",
+        "retained_bytes": 368
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 99,
+        "lag_events": 36
+      },
+      "elapsed_ms": 385079,
+      "journal": {
+        "head_lsn": "00000000019AA0D0",
+        "head_seq": 135
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 14531192
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA0D0",
+        "restart_lsn": "0/19A9ED0",
+        "retained_bytes": 512
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 100,
+        "lag_events": 36
+      },
+      "elapsed_ms": 390074,
+      "journal": {
+        "head_lsn": "00000000019AA160",
+        "head_seq": 136
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 14679512
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA160",
+        "restart_lsn": "0/19A9ED0",
+        "retained_bytes": 656
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 102,
+        "lag_events": 35
+      },
+      "elapsed_ms": 395075,
+      "journal": {
+        "head_lsn": "00000000019AA228",
+        "head_seq": 137
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 14860792
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA228",
+        "restart_lsn": "0/19AA160",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 103,
+        "lag_events": 35
+      },
+      "elapsed_ms": 400075,
+      "journal": {
+        "head_lsn": "00000000019AA2B8",
+        "head_seq": 138
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 15000872
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA2B8",
+        "restart_lsn": "0/19AA160",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 104,
+        "lag_events": 35
+      },
+      "elapsed_ms": 405076,
+      "journal": {
+        "head_lsn": "00000000019AA348",
+        "head_seq": 139
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 15153312
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA348",
+        "restart_lsn": "0/19AA160",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 106,
+        "lag_events": 34
+      },
+      "elapsed_ms": 410074,
+      "journal": {
+        "head_lsn": "00000000019AA3D8",
+        "head_seq": 140
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 15297512
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA3D8",
+        "restart_lsn": "0/19AA160",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 107,
+        "lag_events": 34
+      },
+      "elapsed_ms": 415075,
+      "journal": {
+        "head_lsn": "00000000019AA4A0",
+        "head_seq": 141
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 15466432
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA4A0",
+        "restart_lsn": "0/19AA3D8",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 108,
+        "lag_events": 34
+      },
+      "elapsed_ms": 420081,
+      "journal": {
+        "head_lsn": "00000000019AA530",
+        "head_seq": 142
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 15618872
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA530",
+        "restart_lsn": "0/19AA3D8",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 110,
+        "lag_events": 33
+      },
+      "elapsed_ms": 425074,
+      "journal": {
+        "head_lsn": "00000000019AA5C0",
+        "head_seq": 143
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 15763072
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA5C0",
+        "restart_lsn": "0/19AA3D8",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 111,
+        "lag_events": 33
+      },
+      "elapsed_ms": 430074,
+      "journal": {
+        "head_lsn": "00000000019AA650",
+        "head_seq": 144
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 15903152
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA650",
+        "restart_lsn": "0/19AA3D8",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 112,
+        "lag_events": 33
+      },
+      "elapsed_ms": 435080,
+      "journal": {
+        "head_lsn": "00000000019AA6E0",
+        "head_seq": 145
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 16067952
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA6E0",
+        "restart_lsn": "0/19AA3D8",
+        "retained_bytes": 776
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 114,
+        "lag_events": 32
+      },
+      "elapsed_ms": 440073,
+      "journal": {
+        "head_lsn": "00000000019AA7A8",
+        "head_seq": 146
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 16236872
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA7A8",
+        "restart_lsn": "0/19AA6E0",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 115,
+        "lag_events": 32
+      },
+      "elapsed_ms": 445076,
+      "journal": {
+        "head_lsn": "00000000019AA838",
+        "head_seq": 147
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 16389312
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA838",
+        "restart_lsn": "0/19AA6E0",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 116,
+        "lag_events": 32
+      },
+      "elapsed_ms": 450075,
+      "journal": {
+        "head_lsn": "00000000019AA8C8",
+        "head_seq": 148
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 16529392
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA8C8",
+        "restart_lsn": "0/19AA6E0",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 118,
+        "lag_events": 31
+      },
+      "elapsed_ms": 455075,
+      "journal": {
+        "head_lsn": "00000000019AA958",
+        "head_seq": 149
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 16685952
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AA958",
+        "restart_lsn": "0/19AA6E0",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 119,
+        "lag_events": 31
+      },
+      "elapsed_ms": 460074,
+      "journal": {
+        "head_lsn": "00000000019AAA20",
+        "head_seq": 150
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 16842512
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AAA20",
+        "restart_lsn": "0/19AA958",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 120,
+        "lag_events": 31
+      },
+      "elapsed_ms": 465075,
+      "journal": {
+        "head_lsn": "00000000019AAAB0",
+        "head_seq": 151
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 16999072
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AAAB0",
+        "restart_lsn": "0/19AA958",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 121,
+        "lag_events": 31
+      },
+      "elapsed_ms": 470083,
+      "journal": {
+        "head_lsn": "00000000019AAB40",
+        "head_seq": 152
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 17151512
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AAB40",
+        "restart_lsn": "0/19AA958",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 123,
+        "lag_events": 30
+      },
+      "elapsed_ms": 475082,
+      "journal": {
+        "head_lsn": "00000000019AABD0",
+        "head_seq": 153
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 17320432
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AABD0",
+        "restart_lsn": "0/19AA958",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 124,
+        "lag_events": 30
+      },
+      "elapsed_ms": 480077,
+      "journal": {
+        "head_lsn": "00000000019AAC98",
+        "head_seq": 154
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 17526240
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AABD0",
+        "restart_lsn": "0/19AABD0",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 125,
+        "lag_events": 29
+      },
+      "elapsed_ms": 485088,
+      "journal": {
+        "head_lsn": "00000000019AAC98",
+        "head_seq": 154
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 17604520
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AAC98",
+        "restart_lsn": "0/19AABD0",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 126,
+        "lag_events": 29
+      },
+      "elapsed_ms": 490076,
+      "journal": {
+        "head_lsn": "00000000019AAD28",
+        "head_seq": 155
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 17736360
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AAD28",
+        "restart_lsn": "0/19AABD0",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 127,
+        "lag_events": 29
+      },
+      "elapsed_ms": 495075,
+      "journal": {
+        "head_lsn": "00000000019AADB8",
+        "head_seq": 156
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 17884680
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AADB8",
+        "restart_lsn": "0/19AABD0",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 129,
+        "lag_events": 28
+      },
+      "elapsed_ms": 500077,
+      "journal": {
+        "head_lsn": "00000000019AAE48",
+        "head_seq": 157
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 18045360
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AAE48",
+        "restart_lsn": "0/19AAE48",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 130,
+        "lag_events": 28
+      },
+      "elapsed_ms": 505076,
+      "journal": {
+        "head_lsn": "00000000019AAF10",
+        "head_seq": 158
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 18222520
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AAF10",
+        "restart_lsn": "0/19AAE48",
+        "retained_bytes": 408
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 131,
+        "lag_events": 28
+      },
+      "elapsed_ms": 510074,
+      "journal": {
+        "head_lsn": "00000000019ABA10",
+        "head_seq": 159
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 18366720
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19ABA10",
+        "restart_lsn": "0/19AAF30",
+        "retained_bytes": 2784
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 133,
+        "lag_events": 27
+      },
+      "elapsed_ms": 515074,
+      "journal": {
+        "head_lsn": "00000000019ABAA0",
+        "head_seq": 160
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 18510920
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19ABAA0",
+        "restart_lsn": "0/19AAF30",
+        "retained_bytes": 2928
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 134,
+        "lag_events": 27
+      },
+      "elapsed_ms": 520075,
+      "journal": {
+        "head_lsn": "00000000019ABB30",
+        "head_seq": 161
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 18688080
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19ABB30",
+        "restart_lsn": "0/19ABB30",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 135,
+        "lag_events": 27
+      },
+      "elapsed_ms": 525073,
+      "journal": {
+        "head_lsn": "00000000019ABBF8",
+        "head_seq": 162
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 18832280
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19ABBF8",
+        "restart_lsn": "0/19ABB30",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 137,
+        "lag_events": 26
+      },
+      "elapsed_ms": 530075,
+      "journal": {
+        "head_lsn": "00000000019ABC88",
+        "head_seq": 163
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 18988840
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19ABC88",
+        "restart_lsn": "0/19ABB30",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 138,
+        "lag_events": 26
+      },
+      "elapsed_ms": 535072,
+      "journal": {
+        "head_lsn": "00000000019ABD18",
+        "head_seq": 164
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 19124800
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19ABD18",
+        "restart_lsn": "0/19ABB30",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 139,
+        "lag_events": 26
+      },
+      "elapsed_ms": 540075,
+      "journal": {
+        "head_lsn": "00000000019ABDA8",
+        "head_seq": 165
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 19310200
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19ABDA8",
+        "restart_lsn": "0/19ABDA8",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 141,
+        "lag_events": 25
+      },
+      "elapsed_ms": 545077,
+      "journal": {
+        "head_lsn": "00000000019ABE70",
+        "head_seq": 166
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 19491480
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19ABE70",
+        "restart_lsn": "0/19ABDA8",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 142,
+        "lag_events": 25
+      },
+      "elapsed_ms": 550075,
+      "journal": {
+        "head_lsn": "00000000019ABF00",
+        "head_seq": 167
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 19627440
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19ABF00",
+        "restart_lsn": "0/19ABDA8",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 143,
+        "lag_events": 25
+      },
+      "elapsed_ms": 555075,
+      "journal": {
+        "head_lsn": "00000000019ABF90",
+        "head_seq": 168
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 19792240
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19ABF90",
+        "restart_lsn": "0/19ABDA8",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 145,
+        "lag_events": 24
+      },
+      "elapsed_ms": 560080,
+      "journal": {
+        "head_lsn": "00000000019AC038",
+        "head_seq": 169
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 19957040
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AC038",
+        "restart_lsn": "0/19AC038",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 146,
+        "lag_events": 24
+      },
+      "elapsed_ms": 565075,
+      "journal": {
+        "head_lsn": "00000000019AC100",
+        "head_seq": 170
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 20097120
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AC100",
+        "restart_lsn": "0/19AC038",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 147,
+        "lag_events": 24
+      },
+      "elapsed_ms": 570075,
+      "journal": {
+        "head_lsn": "00000000019AC190",
+        "head_seq": 171
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 20274280
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AC190",
+        "restart_lsn": "0/19AC038",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 149,
+        "lag_events": 23
+      },
+      "elapsed_ms": 575074,
+      "journal": {
+        "head_lsn": "00000000019AC220",
+        "head_seq": 172
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 20447320
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AC220",
+        "restart_lsn": "0/19AC038",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 150,
+        "lag_events": 23
+      },
+      "elapsed_ms": 580082,
+      "journal": {
+        "head_lsn": "00000000019AC2B0",
+        "head_seq": 173
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 20603880
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AC2B0",
+        "restart_lsn": "0/19AC2B0",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 152,
+        "lag_events": 22
+      },
+      "elapsed_ms": 585073,
+      "journal": {
+        "head_lsn": "00000000019AC378",
+        "head_seq": 174
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 20781040
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19AC378",
+        "restart_lsn": "0/19AC2B0",
+        "retained_bytes": 60656
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 153,
+        "lag_events": 22
+      },
+      "elapsed_ms": 590079,
+      "journal": {
+        "head_lsn": "00000000019BB030",
+        "head_seq": 175
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 20941720
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB030",
+        "restart_lsn": "0/19AC2B0",
+        "retained_bytes": 60800
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 154,
+        "lag_events": 22
+      },
+      "elapsed_ms": 595074,
+      "journal": {
+        "head_lsn": "00000000019BB0C0",
+        "head_seq": 176
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 21106520
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB0C0",
+        "restart_lsn": "0/19AC2B0",
+        "retained_bytes": 60944
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 156,
+        "lag_events": 21
+      },
+      "elapsed_ms": 600075,
+      "journal": {
+        "head_lsn": "00000000019BB150",
+        "head_seq": 177
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 21287800
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB150",
+        "restart_lsn": "0/19AC2B0",
+        "retained_bytes": 61088
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 157,
+        "lag_events": 21
+      },
+      "elapsed_ms": 605075,
+      "journal": {
+        "head_lsn": "00000000019BB1E0",
+        "head_seq": 178
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 21456720
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB1E0",
+        "restart_lsn": "0/19BB1E0",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 158,
+        "lag_events": 21
+      },
+      "elapsed_ms": 610073,
+      "journal": {
+        "head_lsn": "00000000019BB2E0",
+        "head_seq": 179
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 21613280
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB2E0",
+        "restart_lsn": "0/19BB1E0",
+        "retained_bytes": 256
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 160,
+        "lag_events": 20
+      },
+      "elapsed_ms": 615076,
+      "journal": {
+        "head_lsn": "00000000019BB370",
+        "head_seq": 180
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 21757480
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB370",
+        "restart_lsn": "0/19BB1E0",
+        "retained_bytes": 400
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 161,
+        "lag_events": 20
+      },
+      "elapsed_ms": 620075,
+      "journal": {
+        "head_lsn": "00000000019BB400",
+        "head_seq": 181
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 21909920
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB400",
+        "restart_lsn": "0/19BB1E0",
+        "retained_bytes": 544
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 162,
+        "lag_events": 20
+      },
+      "elapsed_ms": 625075,
+      "journal": {
+        "head_lsn": "00000000019BB490",
+        "head_seq": 182
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 22066480
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB490",
+        "restart_lsn": "0/19BB490",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 164,
+        "lag_events": 19
+      },
+      "elapsed_ms": 630074,
+      "journal": {
+        "head_lsn": "00000000019BB558",
+        "head_seq": 183
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 22214800
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB558",
+        "restart_lsn": "0/19BB490",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 165,
+        "lag_events": 19
+      },
+      "elapsed_ms": 635075,
+      "journal": {
+        "head_lsn": "00000000019BB5E8",
+        "head_seq": 184
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 22354880
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB5E8",
+        "restart_lsn": "0/19BB490",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 166,
+        "lag_events": 19
+      },
+      "elapsed_ms": 640074,
+      "journal": {
+        "head_lsn": "00000000019BB678",
+        "head_seq": 185
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 22503200
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB678",
+        "restart_lsn": "0/19BB490",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 167,
+        "lag_events": 19
+      },
+      "elapsed_ms": 645074,
+      "journal": {
+        "head_lsn": "00000000019BB708",
+        "head_seq": 186
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 22651520
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB708",
+        "restart_lsn": "0/19BB708",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 169,
+        "lag_events": 18
+      },
+      "elapsed_ms": 650075,
+      "journal": {
+        "head_lsn": "00000000019BB7D0",
+        "head_seq": 187
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 22812200
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB7D0",
+        "restart_lsn": "0/19BB708",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 170,
+        "lag_events": 18
+      },
+      "elapsed_ms": 655074,
+      "journal": {
+        "head_lsn": "00000000019BB860",
+        "head_seq": 188
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 22977000
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB860",
+        "restart_lsn": "0/19BB708",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 171,
+        "lag_events": 18
+      },
+      "elapsed_ms": 660075,
+      "journal": {
+        "head_lsn": "00000000019BB8F0",
+        "head_seq": 189
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 23154160
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB8F0",
+        "restart_lsn": "0/19BB708",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 173,
+        "lag_events": 17
+      },
+      "elapsed_ms": 665074,
+      "journal": {
+        "head_lsn": "00000000019BB980",
+        "head_seq": 190
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 23306600
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BB980",
+        "restart_lsn": "0/19BB980",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 174,
+        "lag_events": 17
+      },
+      "elapsed_ms": 670074,
+      "journal": {
+        "head_lsn": "00000000019BBA48",
+        "head_seq": 191
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 23446680
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BBA48",
+        "restart_lsn": "0/19BB980",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 175,
+        "lag_events": 17
+      },
+      "elapsed_ms": 675075,
+      "journal": {
+        "head_lsn": "00000000019BBAD8",
+        "head_seq": 192
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 23611480
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BBAD8",
+        "restart_lsn": "0/19BB980",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 176,
+        "lag_events": 17
+      },
+      "elapsed_ms": 680076,
+      "journal": {
+        "head_lsn": "00000000019BBB68",
+        "head_seq": 193
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 23772160
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BBB68",
+        "restart_lsn": "0/19BB980",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 178,
+        "lag_events": 16
+      },
+      "elapsed_ms": 685074,
+      "journal": {
+        "head_lsn": "00000000019BBBF8",
+        "head_seq": 194
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 23920480
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BBBF8",
+        "restart_lsn": "0/19BBBF8",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 179,
+        "lag_events": 16
+      },
+      "elapsed_ms": 690074,
+      "journal": {
+        "head_lsn": "00000000019BBCC0",
+        "head_seq": 195
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 24081160
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BBCC0",
+        "restart_lsn": "0/19BBBF8",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 180,
+        "lag_events": 16
+      },
+      "elapsed_ms": 695078,
+      "journal": {
+        "head_lsn": "00000000019BBD50",
+        "head_seq": 196
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 24258320
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BBD50",
+        "restart_lsn": "0/19BBBF8",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 182,
+        "lag_events": 15
+      },
+      "elapsed_ms": 700074,
+      "journal": {
+        "head_lsn": "00000000019BBDE0",
+        "head_seq": 197
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 24431360
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BBDE0",
+        "restart_lsn": "0/19BBBF8",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 183,
+        "lag_events": 15
+      },
+      "elapsed_ms": 705087,
+      "journal": {
+        "head_lsn": "00000000019BBE70",
+        "head_seq": 198
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 24571440
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BBE70",
+        "restart_lsn": "0/19BBE70",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 184,
+        "lag_events": 15
+      },
+      "elapsed_ms": 710084,
+      "journal": {
+        "head_lsn": "00000000019BBF38",
+        "head_seq": 199
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 24728000
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BBF38",
+        "restart_lsn": "0/19BBE70",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 186,
+        "lag_events": 14
+      },
+      "elapsed_ms": 715075,
+      "journal": {
+        "head_lsn": "00000000019BBFC8",
+        "head_seq": 200
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 24876320
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BBFC8",
+        "restart_lsn": "0/19BBE70",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 187,
+        "lag_events": 14
+      },
+      "elapsed_ms": 720076,
+      "journal": {
+        "head_lsn": "00000000019BC070",
+        "head_seq": 201
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 25053480
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC070",
+        "restart_lsn": "0/19BBE70",
+        "retained_bytes": 512
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 188,
+        "lag_events": 14
+      },
+      "elapsed_ms": 725076,
+      "journal": {
+        "head_lsn": "00000000019BC100",
+        "head_seq": 202
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 25214160
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC100",
+        "restart_lsn": "0/19BC100",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 190,
+        "lag_events": 13
+      },
+      "elapsed_ms": 730075,
+      "journal": {
+        "head_lsn": "00000000019BC1C8",
+        "head_seq": 203
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 25374840
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC1C8",
+        "restart_lsn": "0/19BC100",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 191,
+        "lag_events": 13
+      },
+      "elapsed_ms": 735074,
+      "journal": {
+        "head_lsn": "00000000019BC258",
+        "head_seq": 204
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 25510800
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC258",
+        "restart_lsn": "0/19BC100",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 192,
+        "lag_events": 13
+      },
+      "elapsed_ms": 740077,
+      "journal": {
+        "head_lsn": "00000000019BC2E8",
+        "head_seq": 205
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 25700320
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC2E8",
+        "restart_lsn": "0/19BC100",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 194,
+        "lag_events": 12
+      },
+      "elapsed_ms": 745074,
+      "journal": {
+        "head_lsn": "00000000019BC378",
+        "head_seq": 206
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 25848640
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC378",
+        "restart_lsn": "0/19BC100",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 195,
+        "lag_events": 12
+      },
+      "elapsed_ms": 750075,
+      "journal": {
+        "head_lsn": "00000000019BC440",
+        "head_seq": 207
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 26009320
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC440",
+        "restart_lsn": "0/19BC378",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 197,
+        "lag_events": 11
+      },
+      "elapsed_ms": 755074,
+      "journal": {
+        "head_lsn": "00000000019BC4D0",
+        "head_seq": 208
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 26165880
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC4D0",
+        "restart_lsn": "0/19BC378",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 198,
+        "lag_events": 11
+      },
+      "elapsed_ms": 760075,
+      "journal": {
+        "head_lsn": "00000000019BC560",
+        "head_seq": 209
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 26343040
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC560",
+        "restart_lsn": "0/19BC378",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 199,
+        "lag_events": 11
+      },
+      "elapsed_ms": 765076,
+      "journal": {
+        "head_lsn": "00000000019BC5F0",
+        "head_seq": 210
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 26495480
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC5F0",
+        "restart_lsn": "0/19BC378",
+        "retained_bytes": 632
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 201,
+        "lag_events": 10
+      },
+      "elapsed_ms": 770076,
+      "journal": {
+        "head_lsn": "00000000019BC680",
+        "head_seq": 211
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 26652040
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC680",
+        "restart_lsn": "0/19BC680",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 202,
+        "lag_events": 10
+      },
+      "elapsed_ms": 775076,
+      "journal": {
+        "head_lsn": "00000000019BC748",
+        "head_seq": 212
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 26796240
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC748",
+        "restart_lsn": "0/19BC680",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 203,
+        "lag_events": 10
+      },
+      "elapsed_ms": 780074,
+      "journal": {
+        "head_lsn": "00000000019BC7D8",
+        "head_seq": 213
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 26944560
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC7D8",
+        "restart_lsn": "0/19BC680",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 204,
+        "lag_events": 10
+      },
+      "elapsed_ms": 785079,
+      "journal": {
+        "head_lsn": "00000000019BC868",
+        "head_seq": 214
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 27109360
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC868",
+        "restart_lsn": "0/19BC680",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 205,
+        "lag_events": 10
+      },
+      "elapsed_ms": 790076,
+      "journal": {
+        "head_lsn": "00000000019BC8F8",
+        "head_seq": 215
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 27245320
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC8F8",
+        "restart_lsn": "0/19BC8F8",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 207,
+        "lag_events": 9
+      },
+      "elapsed_ms": 795074,
+      "journal": {
+        "head_lsn": "00000000019BC9C0",
+        "head_seq": 216
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 27401880
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BC9C0",
+        "restart_lsn": "0/19BC8F8",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 208,
+        "lag_events": 9
+      },
+      "elapsed_ms": 800074,
+      "journal": {
+        "head_lsn": "00000000019BCA50",
+        "head_seq": 217
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 27579040
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BCA50",
+        "restart_lsn": "0/19BC8F8",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 209,
+        "lag_events": 9
+      },
+      "elapsed_ms": 805074,
+      "journal": {
+        "head_lsn": "00000000019BCAE0",
+        "head_seq": 218
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 27715000
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BCAE0",
+        "restart_lsn": "0/19BC8F8",
+        "retained_bytes": 696
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 211,
+        "lag_events": 8
+      },
+      "elapsed_ms": 810074,
+      "journal": {
+        "head_lsn": "00000000019BD5F0",
+        "head_seq": 219
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 27892160
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BD5F0",
+        "restart_lsn": "0/19BD5F0",
+        "retained_bytes": 56
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 212,
+        "lag_events": 8
+      },
+      "elapsed_ms": 815076,
+      "journal": {
+        "head_lsn": "00000000019BD6B8",
+        "head_seq": 220
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 28048720
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BD6B8",
+        "restart_lsn": "0/19BD5F0",
+        "retained_bytes": 200
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 213,
+        "lag_events": 8
+      },
+      "elapsed_ms": 820076,
+      "journal": {
+        "head_lsn": "00000000019BD748",
+        "head_seq": 221
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 28209400
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BD748",
+        "restart_lsn": "0/19BD5F0",
+        "retained_bytes": 344
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    },
+    {
+      "destination": {
+        "checkpoint_seq": 215,
+        "lag_events": 7
+      },
+      "elapsed_ms": 825075,
+      "journal": {
+        "head_lsn": "00000000019BD7D8",
+        "head_seq": 222
+      },
+      "sizes": {
+        "spool_bytes": 0,
+        "sqlite_bytes": 28378320
+      },
+      "slot": {
+        "active": true,
+        "confirmed_flush_lsn": "0/19BD7D8",
+        "restart_lsn": "0/19BD5F0",
+        "retained_bytes": 488
+      },
+      "status": {
+        "conditions": [
+          {
+            "reason": "DESTINATION_LAG",
+            "severity": "degraded"
+          }
+        ],
+        "overall_health": "degraded",
+        "ownership_state": "held"
+      }
+    }
+  ],
+  "schema_version": "article2-destination-outage/v1",
+  "timeline": {
+    "catch_up_ms": null,
+    "caught_up_ms": null,
+    "clickhouse_restarted_ms": 157743,
+    "clickhouse_stopped_ms": 37564
+  }
+}
