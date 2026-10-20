@@ -2943,23 +2943,46 @@ pub async fn run_loaded_config(
     writer_service
         .insert_owner_lease(&lease)
         .map_err(|_| CaptureFailure::at("ownership", "M2_OWNER_LEASE_STORE_FAILED"))?;
-    let mut clickhouse_pump = crate::m5_clickhouse_loop::ClickHousePump::start(
-        &mut writer_service,
-        crate::m5_clickhouse_loop::PumpStart {
-            journal_path: journal_path.clone(),
-            capture_epoch: &capture_epoch,
-            run_id: &startup_run_id,
-            destination_fingerprint: &config.fingerprints().destination,
-            public_endpoint: &public.clickhouse.endpoint,
-            runtime_dsn: config.clickhouse_runtime_dsn().unwrap_or(""),
-            max_events: usize::try_from(public.limits.max_transaction_events)
-                .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
-            max_bytes: usize::try_from(public.limits.max_transaction_bytes.0)
-                .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
-            lease_ttl_ms: public.source.ownership_deadline_ms.0,
-        },
-    )
-    .map_err(|code| CaptureFailure::at("destination", code))?;
+    let (mut destination_writer, mut destination_inbox) =
+        crate::m5_clickhouse_loop::writer_channel();
+    let destination_start = crate::m5_clickhouse_loop::PumpStart {
+        journal_path: journal_path.clone(),
+        capture_epoch: capture_epoch.clone(),
+        run_id: startup_run_id.clone(),
+        destination_fingerprint: config.fingerprints().destination.clone(),
+        public_endpoint: public.clickhouse.endpoint.clone(),
+        runtime_dsn: config.clickhouse_runtime_dsn().unwrap_or("").to_owned(),
+        max_events: usize::try_from(public.limits.max_transaction_events)
+            .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
+        max_bytes: usize::try_from(public.limits.max_transaction_bytes.0)
+            .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
+        lease_ttl_ms: public.source.ownership_deadline_ms.0,
+    };
+    let destination_stopped = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let destination_stop = std::sync::Arc::clone(&destination_stopped);
+    std::thread::Builder::new()
+        .name("clickhouse-worker".into())
+        .spawn(move || {
+            let mut pump = match crate::m5_clickhouse_loop::ClickHousePump::start(
+                &mut destination_writer,
+                destination_start,
+            ) {
+                Ok(Some(pump)) => pump,
+                Ok(None) => return,
+                Err(code) => {
+                    eprintln!("M5_DESTINATION_START_FAILED code={code}");
+                    return;
+                }
+            };
+            while !destination_stop.load(std::sync::atomic::Ordering::Relaxed) {
+                if let Err(code) = pump.tick(&mut destination_writer) {
+                    eprintln!("M5_DESTINATION_WORKER_STOPPED code={code}");
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        })
+        .map_err(|_| CaptureFailure::at("destination", "M5_DESTINATION_THREAD_UNAVAILABLE"))?;
     let mut runtime = CaptureRuntime::new(
         writer_service,
         factory,
@@ -3036,14 +3059,12 @@ pub async fn run_loaded_config(
             Ok(())
         },
         |runtime| {
-            if let Some(pump) = &mut clickhouse_pump {
-                pump.tick(&mut runtime.journal)
-                    .map_err(|code| CaptureFailure::at("destination", code))?;
-            }
+            destination_inbox.service_one(&mut runtime.journal);
             Ok(())
         },
     )
     .await;
+    destination_stopped.store(true, std::sync::atomic::Ordering::Relaxed);
     drop(heartbeat_lane);
     if matches!(&result, Err(error) if error.code == "M2_RECEIVE_FRAME_LIMIT") {
         let held = hold_capture_safe_stop(

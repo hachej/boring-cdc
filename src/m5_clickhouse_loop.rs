@@ -3,7 +3,7 @@
 use percent_encoding::percent_decode_str;
 use rusqlite::OptionalExtension;
 use std::path::PathBuf;
-use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::sync::mpsc::{self, Receiver, SyncSender, TryRecvError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use url::Url;
 
@@ -16,6 +16,7 @@ use crate::m2_journal::{
     JournalError, JournalWriterService, read_complete_range, read_exact_complete_range,
 };
 use crate::m2_leases::{LeaseIdentity, LeaseToken};
+use crate::m2_schema::WriterConnection;
 use crate::m4_clickhouse_adapter::ProductionClickHouseAdapter;
 use crate::m4_clickhouse_durability::{
     BatchContext, DurabilityError, PreparedBatch, RemoteBatch, dispatch_and_readback,
@@ -62,16 +63,64 @@ pub struct ClickHousePump {
     phase: Phase,
 }
 
-pub struct PumpStart<'a> {
+pub struct PumpStart {
     pub journal_path: PathBuf,
-    pub capture_epoch: &'a str,
-    pub run_id: &'a str,
-    pub destination_fingerprint: &'a str,
-    pub public_endpoint: &'a str,
-    pub runtime_dsn: &'a str,
+    pub capture_epoch: String,
+    pub run_id: String,
+    pub destination_fingerprint: String,
+    pub public_endpoint: String,
+    pub runtime_dsn: String,
     pub max_events: usize,
     pub max_bytes: usize,
     pub lease_ttl_ms: u64,
+}
+
+type WriterRequest = Box<dyn FnOnce(&mut JournalWriterService) + Send>;
+
+pub struct DestinationWriterClient {
+    sender: SyncSender<WriterRequest>,
+}
+
+pub struct DestinationWriterInbox {
+    receiver: Receiver<WriterRequest>,
+}
+
+pub fn writer_channel() -> (DestinationWriterClient, DestinationWriterInbox) {
+    let (sender, receiver) = mpsc::sync_channel(8);
+    (
+        DestinationWriterClient { sender },
+        DestinationWriterInbox { receiver },
+    )
+}
+
+impl DestinationWriterClient {
+    fn service_destination<T: Send + 'static>(
+        &mut self,
+        max_writer_hold: Duration,
+        action: impl FnOnce(&mut WriterConnection) -> Result<T, JournalError> + Send + 'static,
+    ) -> Result<T, JournalError> {
+        let (response, result) = mpsc::sync_channel(1);
+        self.sender
+            .send(Box::new(move |writer| {
+                let _ = response.send(writer.service_destination(max_writer_hold, action));
+            }))
+            .map_err(|_| JournalError::Conflict("destination writer unavailable"))?;
+        result
+            .recv()
+            .map_err(|_| JournalError::Conflict("destination writer unavailable"))?
+    }
+}
+
+impl DestinationWriterInbox {
+    /// Service at most one short destination action per capture control tick.
+    pub fn service_one(&mut self, writer: &mut JournalWriterService) -> bool {
+        if let Ok(request) = self.receiver.try_recv() {
+            request(writer);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 fn monotonic_ms() -> Result<u64, &'static str> {
@@ -114,8 +163,8 @@ impl ClickHousePump {
     /// Start only after a complete anchor and verified snapshot batch exist for the configured
     /// destination. An absent candidate is not converted into a suffix-only live generation.
     pub fn start(
-        writer: &mut JournalWriterService,
-        start: PumpStart<'_>,
+        writer: &mut DestinationWriterClient,
+        start: PumpStart,
     ) -> Result<Option<Self>, &'static str> {
         let PumpStart {
             journal_path,
@@ -128,8 +177,8 @@ impl ClickHousePump {
             max_bytes,
             lease_ttl_ms,
         } = start;
-        let epoch = capture_epoch.to_owned();
-        let fingerprint = destination_fingerprint.to_owned();
+        let epoch = capture_epoch.clone();
+        let fingerprint = destination_fingerprint.clone();
         let selected = writer
             .service_destination(Duration::from_secs(5), move |owner| {
                 owner
@@ -146,14 +195,14 @@ impl ClickHousePump {
         let Some((destination_id, generation, anchor_id)) = selected else {
             return Ok(None);
         };
-        let connection = ClickHouseConnection::parse(public_endpoint, runtime_dsn)?;
+        let connection = ClickHouseConnection::parse(&public_endpoint, &runtime_dsn)?;
         let baseline_context = BatchContext {
             destination_id: destination_id.clone(),
-            capture_epoch: capture_epoch.to_owned(),
+            capture_epoch: capture_epoch.clone(),
             generation,
-            configuration_fingerprint: destination_fingerprint.to_owned(),
+            configuration_fingerprint: destination_fingerprint.clone(),
             lease_id: "preflight".to_owned(),
-            run_id: run_id.to_owned(),
+            run_id: run_id.clone(),
         };
         let baseline_anchor = anchor_id.clone();
         let verified = writer
@@ -175,11 +224,11 @@ impl ClickHousePump {
         let identity = LeaseIdentity {
             lease_id: format!("{run_id}:clickhouse:{generation}"),
             destination_id,
-            capture_epoch: capture_epoch.to_owned(),
+            capture_epoch,
             anchor_id: Some(anchor_id.clone()),
             generation,
-            configuration_fingerprint: destination_fingerprint.to_owned(),
-            run_id: run_id.to_owned(),
+            configuration_fingerprint: destination_fingerprint,
+            run_id,
         };
         let acquired = writer
             .service_destination(Duration::from_secs(5), move |owner| {
@@ -275,7 +324,7 @@ impl ClickHousePump {
         }))
     }
 
-    pub fn tick(&mut self, writer: &mut JournalWriterService) -> Result<(), &'static str> {
+    pub fn tick(&mut self, writer: &mut DestinationWriterClient) -> Result<(), &'static str> {
         self.renew_if_due(writer)?;
         let phase = std::mem::replace(&mut self.phase, Phase::Idle);
         match phase {
@@ -310,7 +359,7 @@ impl ClickHousePump {
         }
     }
 
-    fn renew_if_due(&mut self, writer: &mut JournalWriterService) -> Result<(), &'static str> {
+    fn renew_if_due(&mut self, writer: &mut DestinationWriterClient) -> Result<(), &'static str> {
         let now = monotonic_ms()?;
         if now.saturating_add(self.lease_ttl_ms / 2) < self.lease.expires_mono_ms {
             return Ok(());
@@ -326,7 +375,7 @@ impl ClickHousePump {
         Ok(())
     }
 
-    fn start_next(&mut self, writer: &mut JournalWriterService) -> Result<(), &'static str> {
+    fn start_next(&mut self, writer: &mut DestinationWriterClient) -> Result<(), &'static str> {
         let destination_id = self.lease.identity.destination_id.clone();
         let (after_seq, revision) = writer
             .service_destination(Duration::from_secs(5), move |owner| {
@@ -400,7 +449,7 @@ impl ClickHousePump {
 
     fn finish_remote(
         &mut self,
-        writer: &mut JournalWriterService,
+        writer: &mut DestinationWriterClient,
         in_flight: InFlight,
         remote: RemoteBatch,
     ) -> Result<(), &'static str> {
@@ -455,7 +504,7 @@ impl ClickHousePump {
 
     fn record_remote_failure(
         &mut self,
-        writer: &mut JournalWriterService,
+        writer: &mut DestinationWriterClient,
         in_flight: InFlight,
         error: DurabilityError,
     ) -> Result<(), &'static str> {
@@ -559,6 +608,69 @@ impl ClickHouseConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn destination_thread_uses_the_capture_owned_sqlite_writer() {
+        let path = std::env::temp_dir().join(format!(
+            "m5-writer-channel-{}-{}.sqlite",
+            std::process::id(),
+            random_u64().unwrap()
+        ));
+        let owner = crate::m2_schema::open_writer(&path, "run", 1, 0).unwrap();
+        let store = crate::m2_journal::JournalStore::new(
+            owner,
+            crate::m2_journal::SourceIdentity {
+                capture_epoch: "1".into(),
+                source_system_id: "source".into(),
+                timeline_id: "timeline".into(),
+                database_id: "database".into(),
+                slot_name: "slot".into(),
+                publication_fingerprint: "publication".into(),
+                protocol_fingerprint: "pgoutput-v1".into(),
+            },
+            crate::m2_journal::CommitLimits {
+                max_events: 8,
+                max_copied_bytes: 1024,
+                max_writer_hold: Duration::from_secs(2),
+            },
+        )
+        .unwrap();
+        let mut writer = JournalWriterService::new(store, [8, 4, 2, 1], 4).unwrap();
+        let (mut client, mut inbox) = writer_channel();
+        let remote = std::thread::spawn(move || {
+            client.service_destination(Duration::from_secs(1), |owner| {
+                owner
+                    .connection()
+                    .execute("CREATE TABLE worker_boundary(value INTEGER)", [])?;
+                Ok(())
+            })
+        });
+        let mut serviced = false;
+        for _ in 0..100 {
+            if inbox.service_one(&mut writer) {
+                serviced = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(serviced);
+        remote.join().unwrap().unwrap();
+        assert_eq!(
+            writer
+                .service_destination(Duration::from_secs(1), |owner| {
+                    owner
+                        .connection()
+                        .query_row(
+                            "SELECT count(*) FROM sqlite_master WHERE name='worker_boundary'",
+                            [],
+                            |row| row.get::<_, u64>(0),
+                        )
+                        .map_err(JournalError::from)
+                })
+                .unwrap(),
+            1
+        );
+    }
 
     #[test]
     fn runtime_credentials_must_target_fingerprinted_https_endpoint() {
