@@ -12,9 +12,7 @@ use crate::failure_policy::{
     PreparedFailureOperation, StableErrorCode, load_failure, transition,
 };
 use crate::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
-use crate::m2_journal::{
-    JournalError, JournalWriterService, read_complete_range, read_exact_complete_range,
-};
+use crate::m2_journal::{JournalError, JournalWriterService, read_exact_complete_range};
 use crate::m2_leases::{LeaseIdentity, LeaseToken};
 use crate::m2_schema::WriterConnection;
 use crate::m4_clickhouse_adapter::ProductionClickHouseAdapter;
@@ -391,17 +389,31 @@ impl ClickHousePump {
                     .map_err(JournalError::from)
             })
             .map_err(|_| "M5_CHECKPOINT_READ_FAILED")?;
-        let Some(range) = read_complete_range(
+        let next_seq = after_seq
+            .checked_add(1)
+            .ok_or("M5_CHECKPOINT_CURSOR_INVALID")?;
+        let epoch = self.lease.identity.capture_epoch.clone();
+        let boundary = writer
+            .service_destination(Duration::from_secs(5), move |owner| {
+                owner.connection().query_row(
+                    "SELECT first_seq,last_seq FROM source_transactions WHERE capture_epoch=?1 AND first_seq=?2 AND state='committed'",
+                    rusqlite::params![epoch, next_seq],
+                    |row| Ok((row.get::<_, u64>(0)?, row.get::<_, u64>(1)?)),
+                ).optional().map_err(JournalError::from)
+            })
+            .map_err(|_| "M5_JOURNAL_BOUNDARY_READ_FAILED")?;
+        let Some((first, last)) = boundary else {
+            return Ok(());
+        };
+        let range = read_exact_complete_range(
             &self.journal_path,
-            after_seq,
+            first,
+            last,
             self.max_events,
             self.max_bytes,
             Duration::from_secs(5),
         )
-        .map_err(|_| "M5_JOURNAL_READ_FAILED")?
-        else {
-            return Ok(());
-        };
+        .map_err(|_| "M5_JOURNAL_READ_FAILED")?;
         let token = self.lease.clone();
         let prepared = writer
             .service_destination(Duration::from_secs(5), move |owner| {
