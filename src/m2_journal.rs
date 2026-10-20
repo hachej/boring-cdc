@@ -1174,11 +1174,13 @@ impl ServiceCommand {
         }
     }
 }
+type DestinationAction = Box<dyn FnOnce(&mut WriterConnection) -> Result<(), JournalError>>;
+
 enum PendingWork {
     Capture(SourceCommit, CommitFault),
     Failure(crate::failure_policy::PreparedFailureOperation, Instant),
     Destination {
-        action: Box<dyn FnOnce(&mut WriterConnection) -> Result<(), JournalError>>,
+        action: DestinationAction,
         enqueued_at: Instant,
         max_writer_hold: Duration,
     },

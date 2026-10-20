@@ -62,6 +62,18 @@ pub struct ClickHousePump {
     phase: Phase,
 }
 
+pub struct PumpStart<'a> {
+    pub journal_path: PathBuf,
+    pub capture_epoch: &'a str,
+    pub run_id: &'a str,
+    pub destination_fingerprint: &'a str,
+    pub public_endpoint: &'a str,
+    pub runtime_dsn: &'a str,
+    pub max_events: usize,
+    pub max_bytes: usize,
+    pub lease_ttl_ms: u64,
+}
+
 fn monotonic_ms() -> Result<u64, &'static str> {
     let mut time = std::mem::MaybeUninit::<libc::timespec>::uninit();
     if unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, time.as_mut_ptr()) } != 0 {
@@ -103,16 +115,19 @@ impl ClickHousePump {
     /// destination. An absent candidate is not converted into a suffix-only live generation.
     pub fn start(
         writer: &mut JournalWriterService,
-        journal_path: PathBuf,
-        capture_epoch: &str,
-        run_id: &str,
-        destination_fingerprint: &str,
-        public_endpoint: &str,
-        runtime_dsn: &str,
-        max_events: usize,
-        max_bytes: usize,
-        lease_ttl_ms: u64,
+        start: PumpStart<'_>,
     ) -> Result<Option<Self>, &'static str> {
+        let PumpStart {
+            journal_path,
+            capture_epoch,
+            run_id,
+            destination_fingerprint,
+            public_endpoint,
+            runtime_dsn,
+            max_events,
+            max_bytes,
+            lease_ttl_ms,
+        } = start;
         let epoch = capture_epoch.to_owned();
         let fingerprint = destination_fingerprint.to_owned();
         let selected = writer
@@ -368,7 +383,7 @@ impl ClickHousePump {
             .name("clickhouse-batch".into())
             .spawn(move || {
                 let result = PinnedClickHouseWire::new(connection.client())
-                    .map(|wire| ProductionClickHouseAdapter::new(wire))
+                    .map(ProductionClickHouseAdapter::new)
                     .map_err(|_| DurabilityError::Dispatch)
                     .and_then(|mut adapter| dispatch_and_readback(&mut adapter, &remote_batch));
                 let _ = sender.send(result);

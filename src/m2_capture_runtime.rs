@@ -1658,6 +1658,10 @@ fn enforce_capture_ownership<J: DurableJournal, S: SpoolFactory, G: FeedbackGate
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "capture loop lifecycle callbacks are independently owned"
+)]
 async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G: FeedbackGate>(
     config: &CaptureConfig,
     cancellation: &CancellationToken,
@@ -1735,6 +1739,10 @@ struct CaptureLoopBounds {
     control_cadence: std::time::Duration,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "capture loop lifecycle callbacks are independently owned"
+)]
 async fn capture_copyboth_on_connection_until_with_probe<
     J: DurableJournal,
     S: SpoolFactory,
@@ -2937,17 +2945,19 @@ pub async fn run_loaded_config(
         .map_err(|_| CaptureFailure::at("ownership", "M2_OWNER_LEASE_STORE_FAILED"))?;
     let mut clickhouse_pump = crate::m5_clickhouse_loop::ClickHousePump::start(
         &mut writer_service,
-        journal_path.clone(),
-        &capture_epoch,
-        &startup_run_id,
-        &config.fingerprints().destination,
-        &public.clickhouse.endpoint,
-        config.clickhouse_runtime_dsn().unwrap_or(""),
-        usize::try_from(public.limits.max_transaction_events)
-            .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
-        usize::try_from(public.limits.max_transaction_bytes.0)
-            .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
-        public.source.ownership_deadline_ms.0,
+        crate::m5_clickhouse_loop::PumpStart {
+            journal_path: journal_path.clone(),
+            capture_epoch: &capture_epoch,
+            run_id: &startup_run_id,
+            destination_fingerprint: &config.fingerprints().destination,
+            public_endpoint: &public.clickhouse.endpoint,
+            runtime_dsn: config.clickhouse_runtime_dsn().unwrap_or(""),
+            max_events: usize::try_from(public.limits.max_transaction_events)
+                .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
+            max_bytes: usize::try_from(public.limits.max_transaction_bytes.0)
+                .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
+            lease_ttl_ms: public.source.ownership_deadline_ms.0,
+        },
     )
     .map_err(|code| CaptureFailure::at("destination", code))?;
     let mut runtime = CaptureRuntime::new(
