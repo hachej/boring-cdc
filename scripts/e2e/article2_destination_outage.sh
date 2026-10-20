@@ -5,7 +5,7 @@ ulimit -c 0
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 packet_dir=${BCDC_ARTICLE2_PACKET_DIR:-$repo/evidence/article2/destination_outage/run-$(date -u +%Y%m%dT%H%M%SZ)-$$}
 outage_seconds=${BCDC_ARTICLE2_OUTAGE_SECONDS:-120}
-workload_transactions=${BCDC_ARTICLE2_WORKLOAD_TRANSACTIONS:-90}
+workload_transactions=${BCDC_ARTICLE2_WORKLOAD_TRANSACTIONS:-60}
 recovery_wait_seconds=${BCDC_ARTICLE2_RECOVERY_WAIT_SECONDS:-120}
 work=$(mktemp -d /var/tmp/article2-destination-outage.XXXXXX)
 project="article2-outage-$RANDOM-$$"
@@ -160,7 +160,7 @@ for number in range(2,int(total)+2):
          f"UPDATE public.m3_bootstrap_fixture SET payload='tick-{number}' WHERE id=1; COMMIT;")
     subprocess.run(['psql','-v','ON_ERROR_STOP=1','-q','-h','127.0.0.1','-p',port,'-U','boring_cdc','-d','boring_cdc','-c',sql],
                    check=True,stdout=subprocess.DEVNULL)
-    time.sleep(2)
+    time.sleep(5)
 open(os.path.join(work,'workload-complete'),'w').write(total+'\n')
 PY
 workload_pid=$!

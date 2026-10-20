@@ -46,6 +46,13 @@ def main():
     db = sqlite3.connect(work / "state/boring.db")
     try:
         expected = {row[0] for row in db.execute("SELECT event_id FROM journal_events WHERE control_kind IS NULL")}
+        failures = [
+            {"component": row[0], "class": row[1], "retry_class": row[2], "attempt": row[3], "armed": bool(row[4])}
+            for row in db.execute(
+                "SELECT component,failure_class,retry_class,attempt,armed FROM processing_failures "
+                "WHERE destination_id='snapshot-probe' ORDER BY component,failure_id"
+            )
+        ]
     finally:
         db.close()
     remote_ids = (work / "remote-event-ids.txt").read_text().splitlines()
@@ -64,6 +71,8 @@ def main():
         errors.append("FOREIGN_EVENT_IDS")
     if not oracle_match:
         errors.append("ORACLE_MISMATCH")
+    if any(row["retry_class"] == "exhausted" for row in failures):
+        errors.append("DESTINATION_RETRY_EXHAUSTED")
     if samples:
         max_retained = max(sample["slot"]["retained_bytes"] for sample in samples)
         max_lag = max(sample["destination"]["lag_events"] for sample in samples)
@@ -74,10 +83,11 @@ def main():
         "schema_version": "article2-destination-outage/v1",
         "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip(),
         "images": {"postgres": "17.6", "clickhouse": "25.8.2.29"},
-        "profile": {"sample_interval_seconds": 5, "outage_seconds": outage_seconds, "workload_transactions": int((work / "workload-complete").read_text()), "retained_wal_limit_bytes": 268435456},
+        "profile": {"sample_interval_seconds": 5, "workload_interval_seconds": 5, "outage_seconds": outage_seconds, "workload_transactions": int((work / "workload-complete").read_text()), "retained_wal_limit_bytes": 268435456},
         "timeline": {"clickhouse_stopped_ms": stopped_ms, "clickhouse_restarted_ms": restarted_ms, "caught_up_ms": caught_up_ms, "catch_up_ms": caught_up_ms - restarted_ms if caught_up_ms is not None else None},
         "samples": samples,
         "outcome": {"oracle_match": oracle_match, "lost_event_ids": lost, "foreign_event_ids": extra, "remote_physical_rows": physical, "remote_distinct_event_ids": len(distinct_remote), "duplicate_rows": duplicates, "operator_steps": []},
+        "destination_failures": failures,
         "peak_retained_wal_bytes": max_retained,
         "peak_destination_lag_events": max_lag,
         "failure_codes": errors,
