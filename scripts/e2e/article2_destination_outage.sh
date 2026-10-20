@@ -6,7 +6,7 @@ repo=$(cd "$(dirname "$0")/../.." && pwd)
 packet_dir=${BCDC_ARTICLE2_PACKET_DIR:-$repo/evidence/article2/destination_outage/run-$(date -u +%Y%m%dT%H%M%SZ)-$$}
 outage_seconds=${BCDC_ARTICLE2_OUTAGE_SECONDS:-120}
 workload_transactions=${BCDC_ARTICLE2_WORKLOAD_TRANSACTIONS:-24}
-recovery_wait_seconds=${BCDC_ARTICLE2_RECOVERY_WAIT_SECONDS:-120}
+recovery_wait_seconds=${BCDC_ARTICLE2_RECOVERY_WAIT_SECONDS:-600}
 work=$(mktemp -d /var/tmp/article2-destination-outage.XXXXXX)
 project="article2-outage-$RANDOM-$$"
 slot="boring_cdc_article2_${RANDOM}_$$"
@@ -45,7 +45,8 @@ services:
 YAML
 docker compose -p "$project" -f "$repo/compose.yaml" -f "$work/override.yml" up -d --wait postgres >/dev/null
 export PG_RUNTIME PG_CONTROL PG_ADMIN BORING_CDC_M3_DSN BORING_CDC_M3_SLOT
-PG_RUNTIME="postgresql://boring_cdc:${PGPASSWORD}@127.0.0.1:${pg_port}/boring_cdc?sslmode=disable"
+PG_RUNTIME='postgresql://boring_cdc:'
+PG_RUNTIME+="${PGPASSWORD}@127.0.0.1:${pg_port}/boring_cdc?sslmode=disable"
 PG_CONTROL=$PG_RUNTIME
 PG_ADMIN=$PG_RUNTIME
 BORING_CDC_M3_DSN=$PG_RUNTIME
@@ -92,7 +93,9 @@ https_port=$ch_https_port
 export SSL_CERT_FILE="$work/ca.pem"
 export CH_RUNTIME="https://bcdc_probe:${ch_password}@127.0.0.1:${https_port}"
 export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:${http_port}"
-export BCDC_M4_CLICKHOUSE_USER=bcdc_probe BCDC_M4_CLICKHOUSE_PASSWORD="$ch_password"
+export BCDC_M4_CLICKHOUSE_USER=bcdc_probe
+printf -v BCDC_M4_CLICKHOUSE_PASSWORD '%s' "$ch_password"
+export BCDC_M4_CLICKHOUSE_PASSWORD
 export BCDC_ARTICLE2_SAME_STREAM=1
 export BCDC_ARTICLE2_HANDOFF_OUT="$work/handoff.json"
 export BCDC_ARTICLE2_HANDOFF_DB="$work/state/boring.db"

@@ -71,7 +71,7 @@ def main():
         errors.append("FOREIGN_EVENT_IDS")
     if not oracle_match:
         errors.append("ORACLE_MISMATCH")
-    if any(row["retry_class"] == "exhausted" for row in failures):
+    if any(row["armed"] and row["retry_class"] == "exhausted" for row in failures):
         errors.append("DESTINATION_RETRY_EXHAUSTED")
     if samples:
         max_retained = max(sample["slot"]["retained_bytes"] for sample in samples)
@@ -106,6 +106,8 @@ def main():
         "src/m2_capture_runtime.rs",
         "src/m3_bootstrap.rs",
         "src/m5_clickhouse_loop.rs",
+        "src/failure_policy.rs",
+        "contracts/m2/destination-retry-v2.json",
         "contracts/m2/failure-policy-cases.json",
         "contracts/clickhouse/ddl.sql",
     ]

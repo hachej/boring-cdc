@@ -10,7 +10,11 @@ on:
       - src/m2_journal.rs
       - src/m3_bootstrap.rs
       - src/m5_clickhouse_loop.rs
+      - src/failure_policy.rs
+      - src/m2_destination_rearm.rs
       - contracts/m2/failure-policy-cases.json
+      - contracts/m2/destination-retry-v2.json
+      - scripts/validate/destination_retry_v2.py
   workflow_dispatch:
 permissions:
   contents: read
