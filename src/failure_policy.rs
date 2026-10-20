@@ -549,10 +549,15 @@ fn rearm(
         return PolicyAction::RejectedRearm;
     }
     let allowed = match record.class {
-        FailureClass::TransientIo
-        | FailureClass::TransientSource
-        | FailureClass::TransientDestination
-        | FailureClass::RateLimited => false,
+        FailureClass::TransientDestination => {
+            request.explicit_operator_authorization
+                && record.destination_id.is_some()
+                && record.next_retry_at_ms.is_none()
+                && matches!(&record.boundary, FailedBoundary::Destination { .. })
+        }
+        FailureClass::TransientIo | FailureClass::TransientSource | FailureClass::RateLimited => {
+            false
+        }
         FailureClass::Unsupported => request.explicit_operator_authorization,
         FailureClass::Integrity => request.integrity_recovery_proven,
         FailureClass::OwnershipLost => {
@@ -573,7 +578,8 @@ fn rearm(
     rearmed.attempt = record.attempt;
     rearmed.armed = true;
     rearmed.last_failed_at_ms = context.clock.now().max(record.last_failed_at_ms);
-    rearmed.next_retry_at_ms = None;
+    rearmed.next_retry_at_ms =
+        (record.class == FailureClass::TransientDestination).then_some(rearmed.last_failed_at_ms);
     rearmed.last_rearm_token_digest = Some(token_digest);
     PolicyAction::Rearmed {
         record: rearmed,
@@ -960,10 +966,17 @@ impl PreparedFailureOperation {
                         return Err(rusqlite::Error::QueryReturnedNoRows);
                     }
                 }
-                transaction.execute(
-                    "UPDATE processing_failures SET last_failed_at=?1 WHERE failure_id=?2 AND fingerprint=?3 AND attempt=?4 AND armed=1 AND last_failed_at=?5",
-                    params![persisted_last_failed_at(record.last_failed_at_ms, Some(consumed_token)), record.failure_id, record.fingerprint, record.attempt, persisted_last_failed_at(*expected_last_failed_at_ms, expected_last_rearm_token_digest.as_deref())],
-                )?;
+                if record.class == FailureClass::TransientDestination {
+                    transaction.execute(
+                        "UPDATE processing_failures SET last_failed_at=?1,retry_class='transient',next_retry_at=?2 WHERE failure_id=?3 AND fingerprint=?4 AND attempt=?5 AND armed=1 AND failure_class='transient_destination' AND last_failed_at=?6",
+                        params![persisted_last_failed_at(record.last_failed_at_ms, Some(consumed_token)),record.next_retry_at_ms.map(timestamp),record.failure_id,record.fingerprint,record.attempt,persisted_last_failed_at(*expected_last_failed_at_ms, expected_last_rearm_token_digest.as_deref())],
+                    )?;
+                } else {
+                    transaction.execute(
+                        "UPDATE processing_failures SET last_failed_at=?1 WHERE failure_id=?2 AND fingerprint=?3 AND attempt=?4 AND armed=1 AND last_failed_at=?5",
+                        params![persisted_last_failed_at(record.last_failed_at_ms, Some(consumed_token)), record.failure_id, record.fingerprint, record.attempt, persisted_last_failed_at(*expected_last_failed_at_ms, expected_last_rearm_token_digest.as_deref())],
+                    )?;
+                }
                 if transaction.changes() != 1 {
                     return Err(rusqlite::Error::QueryReturnedNoRows);
                 }
@@ -2377,6 +2390,213 @@ pub mod tests {
         tx.rollback().unwrap();
         drop(writer);
         let _ = fs::remove_file(&path);
+    }
+
+    #[test]
+    fn explicit_destination_rearm_wakes_legacy_exhausted_failure_once() {
+        let path = temp_path();
+        let mut writer = open_writer(&path, "run", 1, 0).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','archive','config-a','epoch-a',7)", []).unwrap();
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientDestination, 10_000)),
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: record.clone(),
+            expected_current_failure_id: None,
+        }
+        .execute(&tx)
+        .unwrap();
+        tx.commit().unwrap();
+        writer.connection().execute(
+            "UPDATE processing_failures SET retry_class='exhausted',next_retry_at=NULL WHERE failure_id=?1",
+            [&record.failure_id],
+        ).unwrap();
+        let stuck = load_failure(writer.connection(), &record.failure_id, boundary())
+            .unwrap()
+            .unwrap();
+        let request = RearmRequest {
+            expected_failure_id: stuck.failure_id.clone(),
+            expected_fingerprint: stuck.fingerprint.clone(),
+            authorization_token: rearm_authorization(&stuck, "operator-nonce"),
+            relevant_configuration_change: None,
+            retained_wal_proven: false,
+            integrity_recovery_proven: false,
+            continuity_recovery_proven: false,
+            explicit_operator_authorization: true,
+        };
+        let action = run_transition_at(Some(&stuck), PolicyEvent::Rearm(request.clone()), 20_000);
+        let operation = PreparedFailureOperation::from_policy_action(action, None).unwrap();
+        let tx = writer.connection_mut().transaction().unwrap();
+        operation.execute(&tx).unwrap();
+        tx.commit().unwrap();
+        let resumed = load_failure(writer.connection(), &record.failure_id, boundary())
+            .unwrap()
+            .unwrap();
+        assert_eq!(resumed.attempt, stuck.attempt);
+        assert_eq!(resumed.next_retry_at_ms, Some(20_000));
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT retry_class FROM processing_failures WHERE failure_id=?1",
+                    [&record.failure_id],
+                    |row| row.get::<_, String>(0)
+                )
+                .unwrap(),
+            "transient"
+        );
+        assert!(matches!(
+            run_transition_at(Some(&resumed), PolicyEvent::Rearm(request), 21_000),
+            PolicyAction::RejectedRearm
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        assert!(operation.execute(&tx).is_err());
+        tx.rollback().unwrap();
+        drop(writer);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn owner_rearm_command_requires_a_fresh_plan_and_is_idempotent() {
+        use crate::m1_cli_contract::{OperatorWireRequest, OperatorWireResponse};
+        let path = temp_path();
+        let mut writer = open_writer(&path, "run", 1, 0).unwrap();
+        writer.connection().execute("INSERT INTO runtime_ownership(run_id,backend_pid,connection_nonce,ownership_deadline_mono_ms,state,connection_generation) VALUES('run',1,'rearm-test',9223372036854775807,'held',1)",[]).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','clickhouse','config-a','epoch-a',7)", []).unwrap();
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientDestination, 10_000)),
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: record.clone(),
+            expected_current_failure_id: None,
+        }
+        .execute(&tx)
+        .unwrap();
+        tx.commit().unwrap();
+        writer.connection().execute(
+            "UPDATE processing_failures SET retry_class='exhausted',next_retry_at=NULL WHERE failure_id=?1",
+            [&record.failure_id],
+        ).unwrap();
+        let invoke = OperatorWireRequest::Invoke {
+            schema_version: 1,
+            expected_run_id: "run".into(),
+            argv: vec![
+                "destination".into(),
+                "rearm".into(),
+                "destination-a".into(),
+                "--dry-run".into(),
+            ],
+        };
+        let OperatorWireResponse::Plan { plan, .. } =
+            crate::m2_destination_rearm::handle(&mut writer, "run", invoke)
+        else {
+            panic!("fresh owner plan required");
+        };
+        let token = plan.confirmation.confirm_token.clone().unwrap();
+        let apply = OperatorWireRequest::Apply {
+            schema_version: 1,
+            expected_run_id: "run".into(),
+            request_id: plan.request_id,
+            canonical_payload_digest: plan.canonical_payload_digest,
+            plan_digest: plan.plan_digest,
+            confirm_token: token,
+        };
+        let result = crate::m2_destination_rearm::handle(&mut writer, "run", apply.clone());
+        assert!(
+            matches!(&result, OperatorWireResponse::Result { result, .. } if result.code == "M2_DESTINATION_REARMED")
+        );
+        assert_eq!(
+            result,
+            crate::m2_destination_rearm::handle(&mut writer, "run", apply)
+        );
+        let resumed = load_failure(writer.connection(), &record.failure_id, boundary())
+            .unwrap()
+            .unwrap();
+        assert_eq!(resumed.attempt, record.attempt);
+        assert!(resumed.next_retry_at_ms.is_some());
+        assert!(matches!(
+            crate::m2_destination_rearm::handle(
+                &mut writer,
+                "run",
+                OperatorWireRequest::Invoke {
+                    schema_version: 1,
+                    expected_run_id: "run".into(),
+                    argv: vec![
+                        "destination".into(),
+                        "rearm".into(),
+                        "destination-a".into(),
+                        "--dry-run".into()
+                    ],
+                }
+            ),
+            OperatorWireResponse::Error { .. }
+        ));
+        drop(writer);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn owner_rearm_rejects_a_changed_destination_generation() {
+        use crate::m1_cli_contract::{OperatorWireRequest, OperatorWireResponse};
+        let path = temp_path();
+        let mut writer = open_writer(&path, "run", 1, 0).unwrap();
+        writer.connection().execute("INSERT INTO runtime_ownership(run_id,backend_pid,connection_nonce,ownership_deadline_mono_ms,state,connection_generation) VALUES('run',1,'rearm-stale-test',9223372036854775807,'held',1)",[]).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','clickhouse','config-a','epoch-a',7)", []).unwrap();
+        let record = persisted(run_transition(
+            None,
+            PolicyEvent::Observe(observation(FailureClass::TransientDestination, 10_000)),
+        ));
+        let tx = writer.connection_mut().transaction().unwrap();
+        PreparedFailureOperation::StoreAndArm {
+            record: record.clone(),
+            expected_current_failure_id: None,
+        }
+        .execute(&tx)
+        .unwrap();
+        tx.commit().unwrap();
+        writer.connection().execute("UPDATE processing_failures SET retry_class='exhausted',next_retry_at=NULL WHERE failure_id=?1",[&record.failure_id]).unwrap();
+        let OperatorWireResponse::Plan { plan, .. } = crate::m2_destination_rearm::handle(
+            &mut writer,
+            "run",
+            OperatorWireRequest::Invoke {
+                schema_version: 1,
+                expected_run_id: "run".into(),
+                argv: vec![
+                    "destination".into(),
+                    "rearm".into(),
+                    "destination-a".into(),
+                    "--dry-run".into(),
+                ],
+            },
+        ) else {
+            panic!("fresh plan required");
+        };
+        writer.connection().execute("UPDATE destinations SET generation=8,revision=revision+1 WHERE destination_id='destination-a'",[]).unwrap();
+        assert!(matches!(
+            crate::m2_destination_rearm::handle(
+                &mut writer,
+                "run",
+                OperatorWireRequest::Apply {
+                    schema_version: 1,
+                    expected_run_id: "run".into(),
+                    request_id: plan.request_id,
+                    canonical_payload_digest: plan.canonical_payload_digest,
+                    plan_digest: plan.plan_digest,
+                    confirm_token: plan.confirmation.confirm_token.unwrap(),
+                }
+            ),
+            OperatorWireResponse::Error { .. }
+        ));
+        let stuck = load_failure(writer.connection(), &record.failure_id, boundary())
+            .unwrap()
+            .unwrap();
+        assert!(stuck.next_retry_at_ms.is_none());
+        drop(writer);
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]

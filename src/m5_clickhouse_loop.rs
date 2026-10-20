@@ -59,6 +59,7 @@ pub struct ClickHousePump {
     max_bytes: usize,
     lease_ttl_ms: u64,
     phase: Phase,
+    last_blocked_poll_ms: u64,
 }
 
 pub struct PumpStart {
@@ -75,6 +76,7 @@ pub struct PumpStart {
 
 type WriterRequest = Box<dyn FnOnce(&mut JournalWriterService) + Send>;
 
+#[derive(Clone)]
 pub struct DestinationWriterClient {
     sender: SyncSender<WriterRequest>,
 }
@@ -92,8 +94,8 @@ pub fn writer_channel() -> (DestinationWriterClient, DestinationWriterInbox) {
 }
 
 impl DestinationWriterClient {
-    fn service_destination<T: Send + 'static>(
-        &mut self,
+    pub fn service_destination<T: Send + 'static>(
+        &self,
         max_writer_hold: Duration,
         action: impl FnOnce(&mut WriterConnection) -> Result<T, JournalError> + Send + 'static,
     ) -> Result<T, JournalError> {
@@ -239,8 +241,29 @@ impl ClickHousePump {
             })
             .map_err(|_| "M5_LEASE_STORE_FAILED")?
             .map_err(|_| "M5_LEASE_UNAVAILABLE")?;
+        let mut pump = Self {
+            journal_path,
+            connection,
+            lease: acquired,
+            max_events,
+            max_bytes,
+            lease_ttl_ms,
+            phase: Phase::Blocked,
+            last_blocked_poll_ms: 0,
+        };
+        pump.refresh_blocked(writer)?;
+        Ok(Some(pump))
+    }
+
+    fn refresh_blocked(&mut self, writer: &DestinationWriterClient) -> Result<(), &'static str> {
+        let now = monotonic_ms()?;
+        if self.last_blocked_poll_ms != 0 && now.saturating_sub(self.last_blocked_poll_ms) < 1_000 {
+            self.phase = Phase::Blocked;
+            return Ok(());
+        }
+        self.last_blocked_poll_ms = now;
         let failure_row = {
-            let destination_id = acquired.identity.destination_id.clone();
+            let destination_id = self.lease.identity.destination_id.clone();
             writer
                 .service_destination(Duration::from_secs(5), move |owner| {
                     owner.connection().query_row(
@@ -257,21 +280,25 @@ impl ClickHousePump {
                 if retry_class == "transient" =>
             {
                 let range = read_exact_complete_range(
-                    &journal_path,
+                    &self.journal_path,
                     first,
                     last,
-                    max_events,
-                    max_bytes,
+                    self.max_events,
+                    self.max_bytes,
                     Duration::from_secs(5),
                 )
                 .map_err(|_| "M5_FAILED_RANGE_UNAVAILABLE")?;
                 let context = BatchContext {
-                    destination_id: acquired.identity.destination_id.clone(),
-                    capture_epoch: acquired.identity.capture_epoch.clone(),
-                    generation: acquired.identity.generation,
-                    configuration_fingerprint: acquired.identity.configuration_fingerprint.clone(),
-                    lease_id: acquired.identity.lease_id.clone(),
-                    run_id: acquired.identity.run_id.clone(),
+                    destination_id: self.lease.identity.destination_id.clone(),
+                    capture_epoch: self.lease.identity.capture_epoch.clone(),
+                    generation: self.lease.identity.generation,
+                    configuration_fingerprint: self
+                        .lease
+                        .identity
+                        .configuration_fingerprint
+                        .clone(),
+                    lease_id: self.lease.identity.lease_id.clone(),
+                    run_id: self.lease.identity.run_id.clone(),
                 };
                 let epoch = context.capture_epoch.clone();
                 let generation = context.generation;
@@ -293,7 +320,7 @@ impl ClickHousePump {
                     .map_err(|_| "M5_FAILED_BATCH_LOAD_FAILED")?;
                 let batch = batch.map_err(|_| "M5_FAILED_BATCH_INVALID")?;
                 let failure = failure.ok_or("M5_FAILED_RECORD_MISSING")?;
-                let destination_id = acquired.identity.destination_id.clone();
+                let destination_id = self.lease.identity.destination_id.clone();
                 let revision = writer
                     .service_destination(Duration::from_secs(5), move |owner| {
                         owner.connection().query_row(
@@ -311,15 +338,8 @@ impl ClickHousePump {
             }
             Some(_) => Phase::Blocked,
         };
-        Ok(Some(Self {
-            journal_path,
-            connection,
-            lease: acquired,
-            max_events,
-            max_bytes,
-            lease_ttl_ms,
-            phase,
-        }))
+        self.phase = phase;
+        Ok(())
     }
 
     pub fn tick(&mut self, writer: &mut DestinationWriterClient) -> Result<(), &'static str> {
@@ -327,10 +347,7 @@ impl ClickHousePump {
         let phase = std::mem::replace(&mut self.phase, Phase::Idle);
         match phase {
             Phase::Idle => self.start_next(writer),
-            Phase::Blocked => {
-                self.phase = Phase::Blocked;
-                Ok(())
-            }
+            Phase::Blocked => self.refresh_blocked(writer),
             Phase::Retry(retry) => {
                 if retry
                     .failure
@@ -648,7 +665,7 @@ mod tests {
         )
         .unwrap();
         let mut writer = JournalWriterService::new(store, [8, 4, 2, 1], 4).unwrap();
-        let (mut client, mut inbox) = writer_channel();
+        let (client, mut inbox) = writer_channel();
         let remote = std::thread::spawn(move || {
             client.service_destination(Duration::from_secs(1), |owner| {
                 owner

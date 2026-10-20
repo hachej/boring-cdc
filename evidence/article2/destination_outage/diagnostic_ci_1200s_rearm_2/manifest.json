@@ -1,0 +1,29 @@
+{
+  "config_sha256": "b78528877debaeb7533252991884e48439627ee538d785e014ad38388db890fa",
+  "git_commit": "b7f4d53a151441022d669f864ff12782602b275c",
+  "image_digests": {
+    "clickhouse": "sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f",
+    "postgres": "sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929"
+  },
+  "input_sha256": {
+    "Cargo.lock": "922ade0537f6d1bfb3514ea1dde9722804d55c7e189774038afcbe0017b98118",
+    "Cargo.toml": "368c88f6b52d1ee1c47f1fe2ccfbbf1af95a081f0581088e7ba45e8abeff46dd",
+    "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
+    "contracts/m2/destination-retry-v2.json": "d3805639262559ce95d90898d0690641e549f4afffd9da6c7acfe4ee84d2e4c2",
+    "contracts/m2/failure-policy-cases.json": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+    "scripts/e2e/article2_destination_outage.sh": "6927308b58d7d625905508e0a48a08de133be126d3cc09ddc6bb2ea2dcc9b5e3",
+    "scripts/e2e/article2_destination_packet.py": "77172a4e69da9e25f95333f4e88ea13e5f3eb212c11383305cd540460831e539",
+    "scripts/e2e/article2_destination_sample.py": "1ad56df85ae2e9877a9429f21e4237da879928b0dae2855f11b3d909d3ec3b4b",
+    "src/failure_policy.rs": "2d848f8da040ce765deae7adddc5b11ec2c1bd0a7d8e7261b6080fc9c0dac245",
+    "src/m2_capture_runtime.rs": "37b060f6fea9a434859590a38264e54fbe601fc1361a40d468f61a577f962c6d",
+    "src/m3_bootstrap.rs": "1bade2e2c65127ffa72c3d4eeb2cb0c2b16cc383427846ea99700b0a496a786a",
+    "src/m4_clickhouse_durability.rs": "15c7817d72e388174de3185d98b7a02f465b182727c1a2f5fa078df38e56f366",
+    "src/m4_clickhouse_wire.rs": "9f1c79bea582eb2ff96070f4019aed6fb5a077a52f0e1ec3e0e14a739671baab",
+    "src/m5_clickhouse_loop.rs": "c925551398abd8768e17b790f439eb0081da90bc12abf22defc798dee3d49189",
+    "src/main.rs": "0319a7821e7d31be7dae84444a945e29b721aee5435bd941fb0ffe8c2ebaa0b3"
+  },
+  "observation_sha256": "d9ae7f51795b97ecc782be8c40c2de27ebfada78e0debbdc9e9cde683df87166",
+  "oracle_sha256": "5316733f93bb1e53ce35e9dcb7660f1428e49e4df6bf0f5e098bae193d62b723",
+  "schema_version": "article2-destination-outage-manifest/v1",
+  "validator_sha256": "998792be7f19ff302b0ffdcfa98ea89dbc659ba95653985fb354cdd5b5b242c3"
+}

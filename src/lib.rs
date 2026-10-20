@@ -18,6 +18,7 @@ pub mod m1_cli_contract;
 
 pub mod m2_capture_runtime;
 pub mod m2_catalog_reader;
+pub mod m2_destination_rearm;
 pub mod m2_event_envelope;
 pub mod m2_fault_status;
 pub mod m2_heartbeat;
