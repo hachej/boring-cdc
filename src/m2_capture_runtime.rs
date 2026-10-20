@@ -2956,7 +2956,12 @@ pub async fn run_loaded_config(
             .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
         max_bytes: usize::try_from(public.limits.max_transaction_bytes.0)
             .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
-        lease_ttl_ms: public.source.ownership_deadline_ms.0,
+        lease_ttl_ms: public
+            .source
+            .maximum_operation_ms
+            .0
+            .saturating_mul(3)
+            .max(30_000),
     };
     let destination_stopped = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let destination_stop = std::sync::Arc::clone(&destination_stopped);
