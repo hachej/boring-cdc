@@ -1320,6 +1320,7 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
         std::time::Duration::from_millis(250),
         |_| Ok(true),
         || Ok(()),
+        |_| Ok(()),
     )
     .await
 }
@@ -1657,6 +1658,10 @@ fn enforce_capture_ownership<J: DurableJournal, S: SpoolFactory, G: FeedbackGate
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "capture loop lifecycle callbacks are independently owned"
+)]
 async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G: FeedbackGate>(
     config: &CaptureConfig,
     cancellation: &CancellationToken,
@@ -1665,6 +1670,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     control_cadence: std::time::Duration,
     ownership_probe: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<bool, JournalError>,
     on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
+    destination_tick: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<(), CaptureFailure>,
 ) -> Result<(), CaptureFailure> {
     if runtime.state() == RuntimeState::ExpectedClose {
         return Err(CaptureFailure::at(
@@ -1684,6 +1690,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         },
         ownership_probe,
         on_ready,
+        destination_tick,
     )
     .await
 }
@@ -1722,6 +1729,7 @@ pub(crate) async fn capture_existing_copyboth_until<
         },
         ownership_probe,
         || Ok(()),
+        |_| Ok(()),
     )
     .await
 }
@@ -1731,6 +1739,10 @@ struct CaptureLoopBounds {
     control_cadence: std::time::Duration,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "capture loop lifecycle callbacks are independently owned"
+)]
 async fn capture_copyboth_on_connection_until_with_probe<
     J: DurableJournal,
     S: SpoolFactory,
@@ -1743,6 +1755,7 @@ async fn capture_copyboth_on_connection_until_with_probe<
     bounds: CaptureLoopBounds,
     mut ownership_probe: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<bool, JournalError>,
     on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
+    mut destination_tick: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<(), CaptureFailure>,
 ) -> Result<(), CaptureFailure> {
     if runtime.state() == RuntimeState::ExpectedClose {
         return Err(CaptureFailure::at(
@@ -1773,6 +1786,7 @@ async fn capture_copyboth_on_connection_until_with_probe<
             })?;
             return Ok(());
         }
+        destination_tick(runtime)?;
         // Reserve the application frame budget; the native transport rejects an oversized
         // CopyData header before reading its full payload. The read future is cancelled and
         // awaited at every control tick so a quiet source cannot starve ownership.
@@ -2929,6 +2943,51 @@ pub async fn run_loaded_config(
     writer_service
         .insert_owner_lease(&lease)
         .map_err(|_| CaptureFailure::at("ownership", "M2_OWNER_LEASE_STORE_FAILED"))?;
+    let (mut destination_writer, mut destination_inbox) =
+        crate::m5_clickhouse_loop::writer_channel();
+    let destination_start = crate::m5_clickhouse_loop::PumpStart {
+        journal_path: journal_path.clone(),
+        capture_epoch: capture_epoch.clone(),
+        run_id: startup_run_id.clone(),
+        destination_fingerprint: config.fingerprints().destination.clone(),
+        public_endpoint: public.clickhouse.endpoint.clone(),
+        runtime_dsn: config.clickhouse_runtime_dsn().unwrap_or("").to_owned(),
+        max_events: usize::try_from(public.limits.max_transaction_events)
+            .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
+        max_bytes: usize::try_from(public.limits.max_transaction_bytes.0)
+            .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
+        lease_ttl_ms: public
+            .source
+            .maximum_operation_ms
+            .0
+            .saturating_mul(3)
+            .max(30_000),
+    };
+    let destination_stopped = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let destination_stop = std::sync::Arc::clone(&destination_stopped);
+    std::thread::Builder::new()
+        .name("clickhouse-worker".into())
+        .spawn(move || {
+            let mut pump = match crate::m5_clickhouse_loop::ClickHousePump::start(
+                &mut destination_writer,
+                destination_start,
+            ) {
+                Ok(Some(pump)) => pump,
+                Ok(None) => return,
+                Err(code) => {
+                    eprintln!("M5_DESTINATION_START_FAILED code={code}");
+                    return;
+                }
+            };
+            while !destination_stop.load(std::sync::atomic::Ordering::Relaxed) {
+                if let Err(code) = pump.tick(&mut destination_writer) {
+                    eprintln!("M5_DESTINATION_WORKER_STOPPED code={code}");
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        })
+        .map_err(|_| CaptureFailure::at("destination", "M5_DESTINATION_THREAD_UNAVAILABLE"))?;
     let mut runtime = CaptureRuntime::new(
         writer_service,
         factory,
@@ -3004,8 +3063,13 @@ pub async fn run_loaded_config(
             );
             Ok(())
         },
+        |runtime| {
+            destination_inbox.service_one(&mut runtime.journal);
+            Ok(())
+        },
     )
     .await;
+    destination_stopped.store(true, std::sync::atomic::Ordering::Relaxed);
     drop(heartbeat_lane);
     if matches!(&result, Err(error) if error.code == "M2_RECEIVE_FRAME_LIMIT") {
         let held = hold_capture_safe_stop(
@@ -3377,6 +3441,7 @@ pub mod tests {
                 started.set(true);
                 Ok(())
             },
+            |_| Ok(()),
         ));
         assert!(failure.is_err());
         assert!(
@@ -3412,6 +3477,7 @@ pub mod tests {
             Duration::from_millis(10),
             |_| Ok(true),
             || panic!("old generation must not become ready"),
+            |_| Ok(()),
         ));
         assert_eq!(result.unwrap_err().code, "M2_SUPERVISED_RESTART_REQUIRED");
         drop(capture);

@@ -1174,9 +1174,16 @@ impl ServiceCommand {
         }
     }
 }
+type DestinationAction = Box<dyn FnOnce(&mut WriterConnection) -> Result<(), JournalError>>;
+
 enum PendingWork {
     Capture(SourceCommit, CommitFault),
     Failure(crate::failure_policy::PreparedFailureOperation, Instant),
+    Destination {
+        action: DestinationAction,
+        enqueued_at: Instant,
+        max_writer_hold: Duration,
+    },
     Service {
         class: WorkClass,
         command: ServiceCommand,
@@ -1322,6 +1329,41 @@ pub(crate) fn capture_startup_gate(
 }
 
 impl JournalWriterService {
+    /// Run one bounded destination state transition through the capture-priority writer queue.
+    /// The caller must perform network I/O after this method returns.
+    pub fn service_destination<T: 'static>(
+        &mut self,
+        max_writer_hold: Duration,
+        action: impl FnOnce(&mut WriterConnection) -> Result<T, JournalError> + 'static,
+    ) -> Result<T, JournalError> {
+        if max_writer_hold.is_zero() {
+            return Err(JournalError::Invalid("zero destination writer hold bound"));
+        }
+        let result = std::rc::Rc::new(std::cell::RefCell::new(None));
+        let output = std::rc::Rc::clone(&result);
+        self.scheduler
+            .enqueue(
+                WorkClass::Checkpoint,
+                PendingWork::Destination {
+                    action: Box::new(move |writer| {
+                        let value = action(writer)?;
+                        *output.borrow_mut() = Some(value);
+                        Ok(())
+                    }),
+                    enqueued_at: Instant::now(),
+                    max_writer_hold,
+                },
+            )
+            .map_err(|_| JournalError::BusyBoundExceeded)?;
+        loop {
+            self.service_next().ok_or(JournalError::Conflict(
+                "writer queue lost destination action",
+            ))??;
+            if let Some(value) = result.borrow_mut().take() {
+                return Ok(value);
+            }
+        }
+    }
     pub fn active_capture_retry_at_ms(&self) -> Result<Option<u64>, JournalError> {
         let mut statement = self.store.writer.connection().prepare(
             "SELECT next_retry_at FROM processing_failures WHERE component='capture' AND armed=1 AND retry_class='transient'",
@@ -1428,6 +1470,24 @@ impl JournalWriterService {
                         })
                     })
                     .map_err(JournalError::from)
+            }
+            PendingWork::Destination {
+                action,
+                enqueued_at,
+                max_writer_hold,
+            } => {
+                let queue_wait = enqueued_at.elapsed();
+                let started = Instant::now();
+                action(&mut self.store.writer).and_then(|()| {
+                    if started.elapsed() > max_writer_hold {
+                        return Err(JournalError::BusyBoundExceededAfterCommit);
+                    }
+                    Ok(WorkOutcome::Serviced(ServiceReport {
+                        class: WorkClass::Checkpoint,
+                        queue_wait,
+                        completed_in: started.elapsed(),
+                    }))
+                })
             }
             PendingWork::Service {
                 class: expected,
@@ -1993,6 +2053,38 @@ pub mod tests {
                 ..
             })
         ));
+        assert!(matches!(
+            service.service_next().unwrap().unwrap(),
+            WorkOutcome::Durable(_)
+        ));
+    }
+    #[test]
+    fn destination_transition_observes_prior_capture_and_releases_writer() {
+        let (_path, store) = store("destination-service");
+        let mut service = JournalWriterService::new(store, [4, 2, 2, 2], 1).unwrap();
+        service
+            .enqueue_capture(
+                commit("tx1", "0000000000000010", vec![event("e1", 0, b"one")]),
+                CommitFault::None,
+            )
+            .unwrap();
+        let committed: u64 = service
+            .service_destination(Duration::from_secs(1), |writer| {
+                writer
+                    .connection()
+                    .query_row("SELECT count(*) FROM source_transactions", [], |row| {
+                        row.get(0)
+                    })
+                    .map_err(JournalError::from)
+            })
+            .unwrap();
+        assert_eq!(committed, 1);
+        service
+            .enqueue_capture(
+                commit("tx2", "0000000000000020", vec![event("e2", 0, b"two")]),
+                CommitFault::None,
+            )
+            .unwrap();
         assert!(matches!(
             service.service_next().unwrap().unwrap(),
             WorkOutcome::Durable(_)

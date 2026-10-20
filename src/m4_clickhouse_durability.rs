@@ -185,6 +185,26 @@ pub fn dispatch_owned_batch<C>(
 where
     C: FnMut() -> u64,
 {
+    mark_owned_batch_dispatched(writer, token, clock_mono_ms, batch)?;
+    let mut adapter = BatchSideEffect { executor, batch };
+    match dispatch_with_lease(writer, token, clock_mono_ms, &mut adapter).map_err(lease_error)? {
+        SideEffectOutcome::Live(remote) => Ok(remote),
+        SideEffectOutcome::StaleArtifact(_) => Err(DurabilityError::OwnershipLost),
+    }
+}
+
+/// Persist the ambiguous external-effect phase under the current lease. A caller may release the
+/// sole SQLite writer after this step while a separate task performs ClickHouse I/O. It must use
+/// `finalize_owned_batch` after readback, which rejects a stale lease or checkpoint.
+pub fn mark_owned_batch_dispatched<C>(
+    writer: &mut WriterConnection,
+    token: &LeaseToken,
+    clock_mono_ms: &mut C,
+    batch: &PreparedBatch,
+) -> Result<(), DurabilityError>
+where
+    C: FnMut() -> u64,
+{
     let context = context_from_lease(token);
     if batch.destination_id != context.destination_id
         || batch.capture_epoch_text != context.capture_epoch
@@ -201,12 +221,7 @@ where
             _ => LeaseError::Conflict,
         })
     })
-    .map_err(lease_error)?;
-    let mut adapter = BatchSideEffect { executor, batch };
-    match dispatch_with_lease(writer, token, clock_mono_ms, &mut adapter).map_err(lease_error)? {
-        SideEffectOutcome::Live(remote) => Ok(remote),
-        SideEffectOutcome::StaleArtifact(_) => Err(DurabilityError::OwnershipLost),
-    }
+    .map_err(lease_error)
 }
 
 /// Production finalization path. M2 holds the sole-writer transaction and validates the exact
@@ -269,6 +284,45 @@ pub fn prepare_batch(
     context: &BatchContext,
     range: CopiedRange,
 ) -> Result<PreparedBatch, DurabilityError> {
+    prepare_batch_for_failure(transaction, context, range, None)
+}
+
+/// Reconstruct the exact failed batch after process restart. Only an armed transient failure at
+/// this same complete range may bypass the ordinary destination block. The immutable intent and
+/// current lease are still checked before the remote retry.
+pub fn prepare_retry_batch(
+    transaction: &Transaction<'_>,
+    context: &BatchContext,
+    range: CopiedRange,
+    failure_id: &str,
+) -> Result<PreparedBatch, DurabilityError> {
+    let boundary = FailedBoundary::Destination {
+        capture_epoch: context.capture_epoch.clone(),
+        generation: context.generation,
+        first_seq: range.first_seq,
+        last_seq: range.last_seq,
+    };
+    let failure = load_failure(transaction, failure_id, boundary)?
+        .ok_or(DurabilityError::Conflict("failed batch record missing"))?;
+    if !failure.armed
+        || failure.destination_id.as_deref() != Some(context.destination_id.as_str())
+        || !matches!(
+            failure.class,
+            FailureClass::TransientDestination | FailureClass::TransientIo
+        )
+        || failure.next_retry_at_ms.is_none()
+    {
+        return Err(DurabilityError::Conflict("failed batch is not retryable"));
+    }
+    prepare_batch_for_failure(transaction, context, range, Some(failure_id))
+}
+
+fn prepare_batch_for_failure(
+    transaction: &Transaction<'_>,
+    context: &BatchContext,
+    range: CopiedRange,
+    failure_id: Option<&str>,
+) -> Result<PreparedBatch, DurabilityError> {
     if range.events.is_empty()
         || range.first_seq == 0
         || range.last_seq < range.first_seq
@@ -278,7 +332,7 @@ pub fn prepare_batch(
         return Err(DurabilityError::Invalid("invalid copied range"));
     }
     validate_context(context)?;
-    validate_destination_and_lease(transaction, context)?;
+    validate_destination_and_lease(transaction, context, failure_id)?;
     validate_checkpoint_cursor(transaction, context, range.first_seq)?;
 
     let complete_transaction_id = range
@@ -469,7 +523,7 @@ pub fn finalize_checkpoint(
     {
         return Err(DurabilityError::Conflict("stale batch context"));
     }
-    validate_destination_and_lease(transaction, context)?;
+    validate_destination_and_lease(transaction, context, None)?;
     validate_prepared_batch(transaction, batch)?;
     verify_remote_batch(batch, remote)?;
     if intent_state(transaction, &batch.intent_id)? != "dispatched" {
@@ -618,10 +672,11 @@ fn validate_context(context: &BatchContext) -> Result<(), DurabilityError> {
 fn validate_destination_and_lease(
     transaction: &Transaction<'_>,
     context: &BatchContext,
+    failure_id: Option<&str>,
 ) -> Result<(), DurabilityError> {
     let valid_destination: bool = transaction.query_row(
-        "SELECT EXISTS(SELECT 1 FROM destinations WHERE destination_id=?1 AND kind='clickhouse' AND capture_epoch=?2 AND generation=?3 AND configuration_fingerprint=?4 AND current_failure_id IS NULL)",
-        params![context.destination_id, context.capture_epoch, context.generation, context.configuration_fingerprint],
+        "SELECT EXISTS(SELECT 1 FROM destinations WHERE destination_id=?1 AND kind='clickhouse' AND capture_epoch=?2 AND generation=?3 AND configuration_fingerprint=?4 AND current_failure_id IS ?5)",
+        params![context.destination_id, context.capture_epoch, context.generation, context.configuration_fingerprint, failure_id],
         |row| row.get(0),
     )?;
     let valid_lease: bool = transaction.query_row(
@@ -1914,6 +1969,47 @@ mod tests {
         transaction.commit().unwrap();
         assert_eq!(second.failure_id, first.failure_id);
         assert_eq!(second.attempt, 2);
+    }
+
+    #[test]
+    fn restart_reconstructs_only_the_exact_armed_transient_batch() {
+        let (_path, mut writer) = writer("retry-after-restart");
+        seed(&mut writer);
+        let original = prepare(&mut writer, copied(false));
+        let clock = VirtualClock::new(10_000);
+        let mut randomness = FixedRandomness;
+        let transaction = writer.connection_mut().transaction().unwrap();
+        let mut policy = TransitionContext {
+            clock: &clock,
+            randomness: &mut randomness,
+        };
+        let failure = persist_failure(
+            &transaction,
+            &context(),
+            &original,
+            FailureClass::TransientDestination,
+            StableErrorCode::TransportUnavailable,
+            &mut policy,
+        )
+        .unwrap();
+        transaction.commit().unwrap();
+
+        writer.connection().execute("UPDATE destination_generation_leases SET state='released',revision=revision+1 WHERE lease_id='lease-a'", []).unwrap();
+        writer.connection().execute("DELETE FROM destination_generation_leases WHERE lease_id='lease-a' AND state='released'", []).unwrap();
+        writer.connection().execute("INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES('lease-b','clickhouse-a','7',NULL,2,'cfg-a','run-b',999999,'held')", []).unwrap();
+        let mut restarted = context();
+        restarted.lease_id = "lease-b".into();
+        restarted.run_id = "run-b".into();
+        let transaction = writer.connection_mut().transaction().unwrap();
+        assert!(prepare_batch(&transaction, &restarted, copied(false)).is_err());
+        assert!(prepare_retry_batch(&transaction, &restarted, copied(false), "wrong").is_err());
+        let replay =
+            prepare_retry_batch(&transaction, &restarted, copied(false), &failure.failure_id)
+                .unwrap();
+        assert_eq!(replay.intent_id, original.intent_id);
+        assert_eq!(replay.lease_id, "lease-b");
+        assert_eq!(replay.run_id, "run-b");
+        transaction.rollback().unwrap();
     }
 
     #[test]
