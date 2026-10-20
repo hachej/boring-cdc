@@ -183,7 +183,27 @@ PY
   then in_sync=true; break; fi
   sleep 1
 done
-[[ "$in_sync" == true ]]
+if [[ "$in_sync" != true ]]; then
+  mkdir -p "$packet_dir"
+  python3 - "$work/state/boring.db" "$packet_dir/setup-failure.json" <<'PY'
+import json,sqlite3,sys
+db=sqlite3.connect(sys.argv[1])
+def one(query):
+    row=db.execute(query).fetchone()
+    return row[0] if row else None
+result={
+    'phase':'initial_sync',
+    'journal_head_seq':one('SELECT durable_journal_seq FROM source_state'),
+    'checkpoint_seq':one("SELECT journal_seq FROM destination_checkpoints WHERE destination_id='snapshot-probe'"),
+    'destination_lease_run_id':one("SELECT run_id FROM destination_generation_leases WHERE destination_id='snapshot-probe' AND state='held'"),
+    'source_owner_run_id':one("SELECT run_id FROM runtime_ownership WHERE state='held' ORDER BY rowid DESC LIMIT 1"),
+    'failures':[{'component':row[0],'class':row[1],'retry_class':row[2],'attempt':row[3]} for row in db.execute("SELECT component,failure_class,retry_class,attempt FROM processing_failures WHERE destination_id='snapshot-probe'")],
+}
+with open(sys.argv[2],'w') as stream:json.dump(result,stream,sort_keys=True)
+print(json.dumps(result,sort_keys=True),file=sys.stderr)
+PY
+  exit 1
+fi
 docker stop "$clickhouse_container" >/dev/null
 stopped_ms=$(elapsed_ms)
 run_workload "$workload_transactions" 5 workload-complete >"$work/workload.log" 2>&1 &
