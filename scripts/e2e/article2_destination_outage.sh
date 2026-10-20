@@ -258,5 +258,5 @@ docker exec -i "$clickhouse_container" clickhouse-client --user bcdc_probe --pas
   --queries-file /dev/stdin <"$work/candidate-query.sql" >"$work/candidate-rows.jsonl"
 mkdir -p "$(dirname "$packet_dir")"
 python3 "$repo/scripts/e2e/article2_destination_packet.py" "$work" "$repo" "$packet_dir" \
-  "$stopped_ms" "$restarted_ms" "$catch_up_ms" "$outage_seconds"
+  "$stopped_ms" "$restarted_ms" "$catch_up_ms" "$outage_seconds" "$recovery_wait_seconds"
 python3 "$packet_dir/validate.py" "$packet_dir/observation.json"

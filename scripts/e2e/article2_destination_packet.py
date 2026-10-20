@@ -29,6 +29,7 @@ def main():
     restarted_ms = int(sys.argv[5])
     caught_up_ms = int(sys.argv[6]) if sys.argv[6] else None
     outage_seconds = int(sys.argv[7])
+    recovery_wait_seconds = int(sys.argv[8])
     packet.mkdir(parents=True, exist_ok=False)
     samples = [json.loads(line) for line in (work / "samples.jsonl").read_text().splitlines() if line]
     source_rows = {}
@@ -83,7 +84,7 @@ def main():
         "schema_version": "article2-destination-outage/v1",
         "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip(),
         "images": {"postgres": "17.6", "clickhouse": "25.8.2.29"},
-        "profile": {"sample_interval_seconds": 5, "workload_interval_seconds": 5, "prelude_transactions": int((work / "prelude-complete").read_text()), "outage_seconds": outage_seconds, "workload_transactions": int((work / "workload-complete").read_text()), "retained_wal_limit_bytes": 268435456},
+        "profile": {"sample_interval_seconds": 5, "workload_interval_seconds": 5, "prelude_transactions": int((work / "prelude-complete").read_text()), "outage_seconds": outage_seconds, "recovery_allowance_seconds": recovery_wait_seconds, "workload_transactions": int((work / "workload-complete").read_text()), "retained_wal_limit_bytes": 268435456},
         "timeline": {"clickhouse_stopped_ms": stopped_ms, "clickhouse_restarted_ms": restarted_ms, "caught_up_ms": caught_up_ms, "catch_up_ms": caught_up_ms - restarted_ms if caught_up_ms is not None else None},
         "samples": samples,
         "outcome": {"oracle_match": oracle_match, "lost_event_ids": lost, "foreign_event_ids": extra, "remote_physical_rows": physical, "remote_distinct_event_ids": len(distinct_remote), "duplicate_rows": duplicates, "operator_steps": []},
@@ -100,12 +101,17 @@ def main():
     validator_path = packet / "validate.py"
     shutil.copyfile(repo / "scripts/validate/article2_destination_outage.py", validator_path)
     inputs = [
+        "Cargo.lock",
+        "Cargo.toml",
         "scripts/e2e/article2_destination_outage.sh",
         "scripts/e2e/article2_destination_sample.py",
         "scripts/e2e/article2_destination_packet.py",
         "src/m2_capture_runtime.rs",
+        "src/main.rs",
         "src/m3_bootstrap.rs",
         "src/m5_clickhouse_loop.rs",
+        "src/m4_clickhouse_wire.rs",
+        "src/m4_clickhouse_durability.rs",
         "src/failure_policy.rs",
         "contracts/m2/destination-retry-v2.json",
         "contracts/m2/failure-policy-cases.json",
@@ -131,6 +137,7 @@ def main():
         "The M3 live fixture used actual PostgreSQL snapshot/import/fence and verified the initial ClickHouse batch. "
         "The shipped `boring-cdc run` process then owned capture and destination delivery. "
         f"ClickHouse was stopped with `docker stop` for {outage_seconds} seconds while PostgreSQL transactions continued. "
+        f"Recovery was observed for up to {recovery_wait_seconds} seconds. "
         "The candidate keyed query was compared with a separate PostgreSQL query. "
         "Managed Estuary comparison remains unavailable.\n\n"
         "Run `python3 validate.py observation.json` offline. A failing outcome exits nonzero and is retained.\n"

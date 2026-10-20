@@ -29,6 +29,7 @@ def validate(observation):
     profile = observation.get("profile", {})
     require(profile.get("sample_interval_seconds") == 5, "five-second sampling", errors)
     require(profile.get("outage_seconds", 0) >= 120, "fixed outage window", errors)
+    require(profile.get("recovery_allowance_seconds", 0) >= 120, "declared recovery allowance", errors)
     require(profile.get("workload_transactions", 0) > 0, "measured workload", errors)
     timeline = observation.get("timeline", {})
     stopped = timeline.get("clickhouse_stopped_ms")
