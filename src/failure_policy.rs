@@ -1963,7 +1963,7 @@ pub mod tests {
             assert!(
                 record
                     .next_retry_at_ms
-                    .is_some_and(|due| due >= 10_000 && due <= 40_000)
+                    .is_some_and(|due| (10_000..=40_000).contains(&due))
             );
             let tx = writer.connection_mut().transaction().unwrap();
             PreparedFailureOperation::StoreAndArm {

@@ -12,6 +12,8 @@ project="article2-outage-$RANDOM-$$"
 slot="boring_cdc_article2_${RANDOM}_$$"
 clickhouse_container="article2-outage-ch-$RANDOM-$$"
 pg_port=$((52000 + $$ % 1000))
+ch_https_port=$((54000 + $$ % 1000))
+ch_http_port=$((55000 + $$ % 1000))
 connector_pid=""
 cleanup() {
   if [[ "${BCDC_ARTICLE2_DEBUG_KEEP:-0}" == 1 ]]; then
@@ -72,7 +74,7 @@ ch_password=$(cat "$work/clickhouse_password")
 printf 'CLICKHOUSE_USER=bcdc_probe\nCLICKHOUSE_PASSWORD=%s\nCLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1\n' "$ch_password" >"$work/clickhouse.env"
 chmod 600 "$work/clickhouse.env"
 docker run -d --name "$clickhouse_container" --platform linux/amd64 \
-  -p 127.0.0.1::8123 -p 127.0.0.1::8443 --env-file "$work/clickhouse.env" \
+  -p "127.0.0.1:${ch_http_port}:8123" -p "127.0.0.1:${ch_https_port}:8443" --env-file "$work/clickhouse.env" \
   -v "$work/clickhouse-https.xml:/etc/clickhouse-server/config.d/article2-https.xml:ro" \
   -v "$work/server.crt:/etc/clickhouse-server/tls/server.crt:ro" \
   -v "$work/server.key:/etc/clickhouse-server/tls/server.key:ro" \
@@ -85,8 +87,8 @@ for _ in $(seq 1 90); do
 done
 [[ "$ready" == true && "$(cat "$work/ch-version")" == 25.8.2.29 ]]
 docker exec -i "$clickhouse_container" clickhouse-client --user bcdc_probe --password "$ch_password" --multiquery < "$repo/contracts/clickhouse/ddl.sql"
-http_port=$(docker port "$clickhouse_container" 8123/tcp | sed 's/.*://')
-https_port=$(docker port "$clickhouse_container" 8443/tcp | sed 's/.*://')
+http_port=$ch_http_port
+https_port=$ch_https_port
 export SSL_CERT_FILE="$work/ca.pem"
 export CH_RUNTIME="https://bcdc_probe:${ch_password}@127.0.0.1:${https_port}"
 export BCDC_M4_CLICKHOUSE_URL="http://127.0.0.1:${http_port}"
@@ -212,6 +214,8 @@ run_workload "$workload_transactions" 5 workload-complete >"$work/workload.log" 
 workload_pid=$!
 sleep "$outage_seconds"
 docker start "$clickhouse_container" >/dev/null
+[[ "$(docker port "$clickhouse_container" 8443/tcp)" == "127.0.0.1:${https_port}" ]]
+[[ "$(docker port "$clickhouse_container" 8123/tcp)" == "127.0.0.1:${http_port}" ]]
 restarted_ms=$(elapsed_ms)
 wait "$workload_pid"
 catch_up_ms=""
