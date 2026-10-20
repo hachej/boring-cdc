@@ -1320,6 +1320,7 @@ pub async fn capture_copyboth_until<J: DurableJournal, S: SpoolFactory, G: Feedb
         std::time::Duration::from_millis(250),
         |_| Ok(true),
         || Ok(()),
+        |_| Ok(()),
     )
     .await
 }
@@ -1665,6 +1666,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
     control_cadence: std::time::Duration,
     ownership_probe: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<bool, JournalError>,
     on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
+    destination_tick: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<(), CaptureFailure>,
 ) -> Result<(), CaptureFailure> {
     if runtime.state() == RuntimeState::ExpectedClose {
         return Err(CaptureFailure::at(
@@ -1684,6 +1686,7 @@ async fn capture_copyboth_until_with_probe<J: DurableJournal, S: SpoolFactory, G
         },
         ownership_probe,
         on_ready,
+        destination_tick,
     )
     .await
 }
@@ -1722,6 +1725,7 @@ pub(crate) async fn capture_existing_copyboth_until<
         },
         ownership_probe,
         || Ok(()),
+        |_| Ok(()),
     )
     .await
 }
@@ -1743,6 +1747,7 @@ async fn capture_copyboth_on_connection_until_with_probe<
     bounds: CaptureLoopBounds,
     mut ownership_probe: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<bool, JournalError>,
     on_ready: impl FnOnce() -> Result<(), CaptureFailure>,
+    mut destination_tick: impl FnMut(&mut CaptureRuntime<J, S, G>) -> Result<(), CaptureFailure>,
 ) -> Result<(), CaptureFailure> {
     if runtime.state() == RuntimeState::ExpectedClose {
         return Err(CaptureFailure::at(
@@ -1773,6 +1778,7 @@ async fn capture_copyboth_on_connection_until_with_probe<
             })?;
             return Ok(());
         }
+        destination_tick(runtime)?;
         // Reserve the application frame budget; the native transport rejects an oversized
         // CopyData header before reading its full payload. The read future is cancelled and
         // awaited at every control tick so a quiet source cannot starve ownership.
@@ -2929,6 +2935,21 @@ pub async fn run_loaded_config(
     writer_service
         .insert_owner_lease(&lease)
         .map_err(|_| CaptureFailure::at("ownership", "M2_OWNER_LEASE_STORE_FAILED"))?;
+    let mut clickhouse_pump = crate::m5_clickhouse_loop::ClickHousePump::start(
+        &mut writer_service,
+        journal_path.clone(),
+        &capture_epoch,
+        &startup_run_id,
+        &config.fingerprints().destination,
+        &public.clickhouse.endpoint,
+        config.clickhouse_runtime_dsn().unwrap_or(""),
+        usize::try_from(public.limits.max_transaction_events)
+            .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
+        usize::try_from(public.limits.max_transaction_bytes.0)
+            .map_err(|_| CaptureFailure::at("destination", "M5_RANGE_LIMIT_INVALID"))?,
+        public.source.ownership_deadline_ms.0,
+    )
+    .map_err(|code| CaptureFailure::at("destination", code))?;
     let mut runtime = CaptureRuntime::new(
         writer_service,
         factory,
@@ -3002,6 +3023,13 @@ pub async fn run_loaded_config(
                 )
                 .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?,
             );
+            Ok(())
+        },
+        |runtime| {
+            if let Some(pump) = &mut clickhouse_pump {
+                pump.tick(&mut runtime.journal)
+                    .map_err(|code| CaptureFailure::at("destination", code))?;
+            }
             Ok(())
         },
     )
@@ -3377,6 +3405,7 @@ pub mod tests {
                 started.set(true);
                 Ok(())
             },
+            |_| Ok(()),
         ));
         assert!(failure.is_err());
         assert!(
@@ -3412,6 +3441,7 @@ pub mod tests {
             Duration::from_millis(10),
             |_| Ok(true),
             || panic!("old generation must not become ready"),
+            |_| Ok(()),
         ));
         assert_eq!(result.unwrap_err().code, "M2_SUPERVISED_RESTART_REQUIRED");
         drop(capture);

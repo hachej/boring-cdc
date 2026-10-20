@@ -85,6 +85,7 @@ dependencies = [
  "chrono",
  "clickhouse",
  "libc",
+ "percent-encoding",
  "pg_walstream",
  "rand_chacha",
  "rand_core 0.9.5",
@@ -96,6 +97,7 @@ dependencies = [
  "tokio",
  "toml 0.9.12+spec-1.1.0",
  "trybuild",
+ "url",
 ]
 
 [[package]]
