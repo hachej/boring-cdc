@@ -19,6 +19,13 @@ pub const BASE_DELAY_MS: u64 = 250;
 pub const MAX_DELAY_MS: u64 = 30_000;
 pub const MAX_ATTEMPTS: u32 = 10;
 
+/// The v2 destination rule leaves the v1 budget in place for the other automatic classes.
+fn retry_exhausted(class: FailureClass, attempt: u32) -> bool {
+    is_automatic_retry(class)
+        && class != FailureClass::TransientDestination
+        && attempt > MAX_ATTEMPTS
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FailureClass {
@@ -474,7 +481,7 @@ fn observe(
     let first_failed_at_ms = same.map_or(now_ms, |record| record.first_failed_at_ms);
     let effective_now = same.map_or(now_ms, |record| now_ms.max(record.last_failed_at_ms));
     let class = observation.fingerprint.class;
-    let exhausted = is_automatic_retry(class) && attempt > MAX_ATTEMPTS;
+    let exhausted = retry_exhausted(class, attempt);
     let next_retry_at_ms = if is_automatic_retry(class) && !exhausted {
         Some(effective_now.saturating_add(retry_delay_ms(context.randomness.next_u64(), attempt)))
     } else {
@@ -892,12 +899,11 @@ impl PreparedFailureOperation {
                 expected_current_failure_id,
             } => {
                 let (start, end) = record.boundary.seq_range();
-                let retry_class =
-                    if is_automatic_retry(record.class) && record.attempt > MAX_ATTEMPTS {
-                        "exhausted"
-                    } else {
-                        record.class.persisted_retry_class()
-                    };
+                let retry_class = if retry_exhausted(record.class, record.attempt) {
+                    "exhausted"
+                } else {
+                    record.class.persisted_retry_class()
+                };
                 transaction.execute(
                     "INSERT INTO processing_failures(failure_id,destination_id,component,failure_class,fingerprint,failed_boundary_start_seq,failed_boundary_end_seq,retry_class,attempt,next_retry_at,armed,first_failed_at,last_failed_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13) ON CONFLICT(failure_id) DO UPDATE SET retry_class=excluded.retry_class,attempt=excluded.attempt,next_retry_at=excluded.next_retry_at,armed=excluded.armed,last_failed_at=excluded.last_failed_at WHERE processing_failures.fingerprint=excluded.fingerprint AND (processing_failures.attempt+1=excluded.attempt OR (processing_failures.attempt=excluded.attempt AND processing_failures.armed=excluded.armed AND processing_failures.next_retry_at IS excluded.next_retry_at AND processing_failures.last_failed_at=excluded.last_failed_at))",
                     params![record.failure_id,record.destination_id,record.component,record.class.as_str(),record.fingerprint,start,end,retry_class,record.attempt,record.next_retry_at_ms.map(timestamp),i64::from(record.armed),timestamp(record.first_failed_at_ms),persisted_last_failed_at(record.last_failed_at_ms, record.last_rearm_token_digest.as_deref())],
@@ -1939,6 +1945,57 @@ pub mod tests {
         ));
         assert_eq!(exhausted.attempt, MAX_ATTEMPTS + 1);
         assert_eq!(exhausted.next_retry_at_ms, None);
+    }
+
+    #[test]
+    fn destination_retry_remains_scheduled_after_ten_failures_and_reopen() {
+        let path = temp_path();
+        let mut writer = open_writer(&path, "run", 1, 0).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('destination-a','archive','config-a','epoch-a',7)", []).unwrap();
+        let mut current: Option<FailureRecord> = None;
+        for attempt in 1..=12 {
+            let record = persisted(run_transition_at(
+                current.as_ref(),
+                PolicyEvent::Observe(observation(FailureClass::TransientDestination, 10_000)),
+                10_000,
+            ));
+            assert_eq!(record.attempt, attempt);
+            assert!(
+                record
+                    .next_retry_at_ms
+                    .is_some_and(|due| (10_000..=40_000).contains(&due))
+            );
+            let tx = writer.connection_mut().transaction().unwrap();
+            PreparedFailureOperation::StoreAndArm {
+                record: record.clone(),
+                expected_current_failure_id: current.as_ref().map(|prior| prior.failure_id.clone()),
+            }
+            .execute(&tx)
+            .unwrap();
+            tx.commit().unwrap();
+            current = Some(record);
+        }
+        drop(writer);
+        let writer = open_writer(&path, "run", 1, 0).unwrap();
+        let record = current.unwrap();
+        let reopened = load_failure(writer.connection(), &record.failure_id, boundary())
+            .unwrap()
+            .unwrap();
+        assert_eq!(reopened.attempt, 12);
+        assert!(reopened.next_retry_at_ms.is_some());
+        assert_eq!(
+            writer
+                .connection()
+                .query_row(
+                    "SELECT retry_class FROM processing_failures WHERE failure_id=?1",
+                    [&record.failure_id],
+                    |row| row.get::<_, String>(0)
+                )
+                .unwrap(),
+            "transient"
+        );
+        drop(writer);
+        std::fs::remove_file(path).unwrap();
     }
 
     #[test]

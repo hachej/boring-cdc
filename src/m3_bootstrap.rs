@@ -1288,6 +1288,14 @@ mod live_tests {
                 .parse::<usize>()
                 .unwrap();
             let mut writer = open_writer(&path, "m3-live", 1, 0).unwrap();
+            let configuration_fingerprint: String = writer
+                .connection()
+                .query_row(
+                    "SELECT configuration_fingerprint FROM destinations WHERE destination_id='snapshot-probe'",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
             let copied = crate::m2_journal::read_complete_range(
                 &path,
                 first - 1,
@@ -1301,7 +1309,7 @@ mod live_tests {
                 destination_id: "snapshot-probe".into(),
                 capture_epoch: "1".into(),
                 generation: 1,
-                configuration_fingerprint: "live-config".into(),
+                configuration_fingerprint,
                 lease_id: "article2-anchor-lease".into(),
                 run_id: "article2-same-stream".into(),
             };
@@ -1332,19 +1340,72 @@ mod live_tests {
             std::process::abort();
         }
         let article2_same_stream = std::env::var_os("BCDC_ARTICLE2_SAME_STREAM").is_some();
+        let handoff_out = std::env::var_os("BCDC_ARTICLE2_HANDOFF_OUT");
+        let handoff_config = handoff_out.as_ref().map(|_| {
+            struct FixtureEnvironment;
+            impl crate::m1_config::Environment for FixtureEnvironment {
+                fn get(&self, name: &str) -> Option<String> {
+                    std::env::var(name).ok()
+                }
+                fn names(&self) -> Vec<String> {
+                    std::env::vars_os()
+                        .filter_map(|(name, _)| name.into_string().ok())
+                        .filter(|name| {
+                            !name.starts_with("BORING_CDC_M3_")
+                                && name != "BORING_CDC_POSTGRES_PASSWORD_FILE"
+                        })
+                        .collect()
+                }
+            }
+            let path = std::env::var("BCDC_ARTICLE2_HANDOFF_CONFIG").unwrap();
+            let text = std::fs::read_to_string(path).unwrap();
+            crate::m1_config::load_str_for(
+                &text,
+                &FixtureEnvironment,
+                crate::m1_config::LoadPurpose::Run,
+            )
+            .unwrap()
+        });
+        assert!(handoff_config.is_none() || article2_same_stream);
         let dsn = std::env::var("BORING_CDC_M3_DSN").expect("BORING_CDC_M3_DSN");
         let slot = std::env::var("BORING_CDC_M3_SLOT")
             .unwrap_or_else(|_| "boring_cdc_m3_bootstrap_test".into());
         let mut admin = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
         let _=admin.exec(&format!("SELECT pg_drop_replication_slot('{slot}') WHERE EXISTS(SELECT 1 FROM pg_replication_slots WHERE slot_name='{slot}')"));
         admin.exec("DROP PUBLICATION IF EXISTS boring_cdc_m3_pub; DROP TABLE IF EXISTS public.m3_bootstrap_fixture; DROP SCHEMA IF EXISTS boring_cdc_control CASCADE; CREATE TABLE public.m3_bootstrap_fixture(id bigint PRIMARY KEY,payload text); INSERT INTO public.m3_bootstrap_fixture VALUES(1,'before'); CREATE SCHEMA boring_cdc_control; CREATE TABLE boring_cdc_control.heartbeat(id smallint PRIMARY KEY CHECK(id=1),nonce bigint NOT NULL,updated_at timestamptz NOT NULL); INSERT INTO boring_cdc_control.heartbeat VALUES(1,0,'-infinity'); CREATE TABLE boring_cdc_control.capture_fences(id smallint PRIMARY KEY CHECK(id=1),capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint bytea NOT NULL CHECK(octet_length(table_set_fingerprint)=32),unique_nonce bytea NOT NULL CHECK(octet_length(unique_nonce)=16)); INSERT INTO boring_cdc_control.capture_fences VALUES(1,0,0,decode(repeat('00',32),'hex'),decode(repeat('00',16),'hex')); CREATE PUBLICATION boring_cdc_m3_pub FOR TABLE public.m3_bootstrap_fixture,boring_cdc_control.heartbeat,boring_cdc_control.capture_fences").unwrap();
-        let path =
-            std::env::temp_dir().join(format!("m3-live-{}-{}.sqlite", std::process::id(), slot));
+        let path = std::env::var_os("BCDC_ARTICLE2_HANDOFF_DB")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| {
+                std::env::temp_dir().join(format!("m3-live-{}-{}.sqlite", std::process::id(), slot))
+            });
         let writer = open_writer(&path, "m3-live", 1, 0).unwrap();
         let (system_id, timeline_id, database_id, publication_fp, protocol_fp) =
             live_identity(&dsn, "boring_cdc_m3_pub", "public.m3_bootstrap_fixture");
+        let configuration_fingerprint = handoff_config
+            .as_ref()
+            .map(|config| config.fingerprints().destination.clone())
+            .unwrap_or_else(|| "live-config".into());
+        let table_set_fingerprint = handoff_config
+            .as_ref()
+            .map(|config| config.fingerprints().table_set.clone())
+            .unwrap_or_else(|| "aa".repeat(32));
+        let table_set_bytes =
+            crate::m1_source_identity::Fingerprint::from_lower_hex(&table_set_fingerprint)
+                .unwrap()
+                .bytes();
+        let anchor_id = handoff_config.as_ref().map_or_else(
+            || "b".repeat(64),
+            |_| {
+                format!(
+                    "{:x}",
+                    Sha256::digest(
+                        format!("{slot}:{system_id}:{configuration_fingerprint}").as_bytes()
+                    )
+                )
+            },
+        );
         writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'1',?1,?2,?3,?4,'pgoutput',?5,?6)",rusqlite::params![system_id,timeline_id,database_id,slot,publication_fp,protocol_fp]).unwrap();
-        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('snapshot-probe',?1,'live-config','1',1)",[if article2_same_stream {"clickhouse"} else {"archive"}]).unwrap();
+        writer.connection().execute("INSERT INTO destinations(destination_id,kind,configuration_fingerprint,capture_epoch,generation) VALUES('snapshot-probe',?1,?2,'1',1)",rusqlite::params![if article2_same_stream {"clickhouse"} else {"archive"},configuration_fingerprint]).unwrap();
         let relations = vec!["public.m3_bootstrap_fixture".to_string()];
         let assignment_digest = digest_assignment(&[0; 8]);
         let intent = PrepareIntent {
@@ -1354,8 +1415,8 @@ mod live_tests {
             database_id: database_id.clone(),
             slot_name: slot.clone(),
             generation: 1,
-            table_set_fingerprint: "aa".repeat(32),
-            configuration_fingerprint: "live-config".into(),
+            table_set_fingerprint: table_set_fingerprint.clone(),
+            configuration_fingerprint: configuration_fingerprint.clone(),
             importers: vec![ImporterAssignment {
                 importer_id: "worker-0".into(),
                 assigned_ranges_digest: assignment_digest.clone(),
@@ -1551,8 +1612,8 @@ mod live_tests {
                 capture_epoch: 1,
                 generation: 1,
                 nonce: [0x17; 16],
-                table_set_fingerprint: [0xaa; 32],
-                anchor_id: "b".repeat(64),
+                table_set_fingerprint: table_set_bytes,
+                anchor_id: anchor_id.clone(),
                 expires_at: "future".into(),
             })
             .unwrap();
@@ -1569,7 +1630,7 @@ mod live_tests {
         assert_eq!(result.get_value(0, 1).as_deref(), Some("1"));
         assert_eq!(
             result.get_value(0, 2).as_deref(),
-            Some("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            Some(table_set_fingerprint.as_str())
         );
         assert_eq!(
             result.get_value(0, 3).as_deref(),
@@ -1801,7 +1862,7 @@ mod live_tests {
         let mut writer = fence.into_writer();
         let anchor: (String,String,String) = writer.connection().query_row(
             "SELECT a.state,a.snapshot_schema_fingerprints,r.schema_fingerprint FROM bootstrap_anchors a JOIN relation_schemas r ON r.capture_epoch=a.capture_epoch WHERE a.anchor_id=?1",
-            ["b".repeat(64)], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
+            [&anchor_id], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?)),
         ).unwrap();
         assert_eq!(anchor.0, "complete");
         assert_eq!(anchor.1, format!("[\"{snapshot_schema_fingerprint}\"]"));
@@ -1858,13 +1919,13 @@ mod live_tests {
                 destination_id: "snapshot-probe".into(),
                 capture_epoch: "1".into(),
                 generation: 1,
-                configuration_fingerprint: "live-config".into(),
+                configuration_fingerprint: configuration_fingerprint.clone(),
                 lease_id: "article2-anchor-lease".into(),
                 run_id: "article2-same-stream".into(),
             };
             writer.connection().execute(
-                "INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES(?1,?2,'1',?3,1,'live-config',?4,999999,'held')",
-                rusqlite::params![context.lease_id,context.destination_id,"b".repeat(64),context.run_id],
+                "INSERT INTO destination_generation_leases(lease_id,destination_id,capture_epoch,anchor_id,generation,configuration_fingerprint,run_id,expires_mono_ms,state) VALUES(?1,?2,'1',?3,1,?4,?5,999999,'held')",
+                rusqlite::params![context.lease_id,context.destination_id,anchor_id,configuration_fingerprint,context.run_id],
             ).unwrap();
             crate::m4_initial_load::install(writer.connection()).unwrap();
             let client = clickhouse::Client::default()
@@ -1876,13 +1937,7 @@ mod live_tests {
             let snapshot = {
                 let tx = writer.connection_mut().transaction().unwrap();
                 let prepared = crate::m4_initial_load::prepare_snapshot_batch(
-                    &tx,
-                    &context,
-                    &"b".repeat(64),
-                    &contract,
-                    relation,
-                    1,
-                    1,
+                    &tx, &context, &anchor_id, &contract, relation, 1, 1,
                 )
                 .unwrap();
                 tx.commit().unwrap();
@@ -1974,7 +2029,7 @@ mod live_tests {
             assert!(saw_user_crash_window);
             let (checkpoint,checkpoint_anchor):(u64,String)=writer.connection().query_row("SELECT journal_seq,anchor_id FROM destination_checkpoints WHERE destination_id='snapshot-probe'",[],|row|Ok((row.get(0)?,row.get(1)?))).unwrap();
             assert_eq!(checkpoint, 4);
-            assert_eq!(checkpoint_anchor, "b".repeat(64));
+            assert_eq!(checkpoint_anchor, anchor_id);
             let oracle = admin
                 .exec("SELECT id::text,payload FROM public.m3_bootstrap_fixture ORDER BY id")
                 .unwrap();
@@ -1985,12 +2040,45 @@ mod live_tests {
                 std::fs::write(path,serde_json::to_vec(&serde_json::json!({"id":1,"payload":"after","anchor_id":checkpoint_anchor,"generation":1,"checkpoint":checkpoint})).unwrap()).unwrap();
             }
         }
+        if let Some(config) = handoff_config.as_ref() {
+            let fingerprints =
+                crate::m2_capture_runtime::capture_recovery_fingerprints(config.public()).unwrap();
+            writer.connection().execute(
+                "INSERT INTO capture_configuration_receipts(singleton,capture_epoch,runtime_fingerprint,non_limit_fingerprint,limit_fingerprint) VALUES(1,'1',?1,?2,?3)",
+                rusqlite::params![config.fingerprints().runtime,fingerprints.non_limit,fingerprints.limits],
+            ).unwrap();
+        }
         assert!(writer.connection().execute(
             "UPDATE m3_snapshot_schema_proofs SET schema_checksum='wrong' WHERE intent_id='live-intent'",
             [],
         ).is_err());
         drop(sessions);
+        if handoff_out.is_some() {
+            let released = writer.connection().execute(
+                "UPDATE destination_generation_leases SET state='released',revision=revision+1 WHERE lease_id='article2-anchor-lease' AND run_id='article2-same-stream' AND state='held'",
+                [],
+            ).unwrap();
+            assert_eq!(released, 1);
+        }
         drop(writer);
+        if let Some(output) = handoff_out {
+            std::fs::write(
+                output,
+                serde_json::to_vec(&serde_json::json!({
+                    "sqlite_path": path,
+                    "slot": slot,
+                    "anchor_id": anchor_id,
+                    "destination_fingerprint": configuration_fingerprint,
+                    "table_set_fingerprint": table_set_fingerprint,
+                    "capture_epoch": "1",
+                    "generation": 1
+                }))
+                .unwrap(),
+            )
+            .unwrap();
+            let _ = std::fs::remove_dir_all(spool_cleanup);
+            return;
+        }
         let mut cleanup = pg_walstream::PgReplicationConnection::connect(&dsn).unwrap();
         cleanup
             .exec(&format!("SELECT pg_drop_replication_slot('{slot}')"))

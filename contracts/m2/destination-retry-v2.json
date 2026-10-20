@@ -1,0 +1,40 @@
+{
+  "schema_version": "destination-retry-policy/v2",
+  "owner_bead": "boring-cdc-m5-loops.1",
+  "decision_id": "DEC-SHARED-FAILURE-RETRY-POLICY",
+  "approved_on": "2026-10-20",
+  "supersedes": {
+    "path": "contracts/m0/failure-policy.json",
+    "sha256": "d0e3e956bc79ddcde4fc77bb8804100a7d56cda6778059028d3b940f98fce831",
+    "scope": ["transient_destination retry limit", "transient_destination operator re-arm"]
+  },
+  "unchanged": {
+    "fingerprint_version": "failure-policy-v1",
+    "other_classes_maximum_attempts": 10,
+    "base_delay_ms": 250,
+    "maximum_delay_ms": 30000,
+    "jitter": "full inclusive [0, capped delay]",
+    "failed_boundary_and_epoch_fencing": true,
+    "checkpoint_or_feedback_advance_on_failure": false
+  },
+  "transient_destination": {
+    "maximum_attempts": null,
+    "attempt_counter": "persisted saturating u32; never reset on restart",
+    "retry": "persist a next retry timestamp after every failed attempt, including attempt 11 and later; retry the same immutable failed boundary",
+    "status": "destination remains degraded while its failure is armed, including during retry wait",
+    "startup": "legacy exhausted failures stay blocked until explicit operator re-arm"
+  },
+  "operator_rearm": {
+    "command": ["destination", "rearm"],
+    "target": "one armed transient_destination failure linked to the selected destination",
+    "authorization": "local owner endpoint, dry-run then explicit confirmation with a fresh nonce",
+    "fences": ["run_id", "capture_epoch", "generation", "destination_id", "failure_id", "fingerprint", "attempt", "failed_boundary"],
+    "effect": "consume the confirmation nonce, keep the attempt and failed boundary, persist an immediate retry timestamp, and wake the destination worker",
+    "stale_or_duplicate": "reject stale identity; repeat of the same confirmed request returns its recorded result without a second mutation",
+    "other_classes": "unchanged class-specific recovery proofs"
+  },
+  "evidence": {
+    "previous_packets": "historical failures remain immutable and do not prove v2 recovery",
+    "required": "two exact-head 120-second Docker ClickHouse outage runs with active capture, bounded WAL, degraded status, catch-up and PostgreSQL oracle match"
+  }
+}

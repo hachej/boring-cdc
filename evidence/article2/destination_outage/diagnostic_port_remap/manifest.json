@@ -1,0 +1,22 @@
+{
+  "config_sha256": "2739172288d3a2dc2460f48d1aa713e0b600d448dc70d25c2c42902bf03f9625",
+  "git_commit": "8c2693532206eea6e2a87a423cecefe1fd2399e3",
+  "image_digests": {
+    "clickhouse": "sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f",
+    "postgres": "sha256:00bc86618629af00d2937fdc5a5d63db3ff8450acf52f0636ec813c7f4902929"
+  },
+  "input_sha256": {
+    "contracts/clickhouse/ddl.sql": "6762a99a357c01641af779be27a819909794097080a44ffaae0619266ccbb351",
+    "contracts/m2/failure-policy-cases.json": "722f368a71aa9729e8800e52d6caa7ba8e3b85337071c0b611bd970f0fd09709",
+    "scripts/e2e/article2_destination_outage.sh": "b4cea04bc53bc4eefb3e1ebe9cda5b7c319e56c9d5cbe119765c306068abae37",
+    "scripts/e2e/article2_destination_packet.py": "1fe26f8883a7ec0606cfc3c8e773bfe117d50798ef83b2c0d8044e00e40763b9",
+    "scripts/e2e/article2_destination_sample.py": "1ad56df85ae2e9877a9429f21e4237da879928b0dae2855f11b3d909d3ec3b4b",
+    "src/m2_capture_runtime.rs": "a61d94bfda73410d801a3c1a5eb6d26eb995959a478358b88c55fed7624132c0",
+    "src/m3_bootstrap.rs": "1bade2e2c65127ffa72c3d4eeb2cb0c2b16cc383427846ea99700b0a496a786a",
+    "src/m5_clickhouse_loop.rs": "022e86a7502f230eae8e025ab7a464cfeb0498e366002e59d38facf324f0b5bd"
+  },
+  "observation_sha256": "4160e5de1755a086bbae5b568dae6b68e2ac84033e82882f66bfe6deac2a2e59",
+  "oracle_sha256": "5316733f93bb1e53ce35e9dcb7660f1428e49e4df6bf0f5e098bae193d62b723",
+  "schema_version": "article2-destination-outage-manifest/v1",
+  "validator_sha256": "ba6a7613ae5546d55bf3c8eeff727cfb2c130a051830ed96015f90a59419f3fa"
+}
