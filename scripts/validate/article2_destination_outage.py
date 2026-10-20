@@ -41,6 +41,8 @@ def validate(observation):
         require(timeline.get("catch_up_ms") == caught_up - restarted, "catch-up duration", errors)
     samples = observation.get("samples", [])
     require(len(samples) >= 3, "time series", errors)
+    if samples and isinstance(samples[0].get("elapsed_ms"), int):
+        require(samples[0]["elapsed_ms"] <= 5000, "sampling begins at start", errors)
     previous_ms = None
     outage = []
     recovery = []
@@ -79,7 +81,10 @@ def validate(observation):
             require(destination["checkpoint_seq"] <= journal["head_seq"], f"sample {index} checkpoint ahead", errors)
             require(destination.get("lag_events") == journal["head_seq"] - destination["checkpoint_seq"], f"sample {index} lag arithmetic", errors)
         require(isinstance(status.get("overall_health"), str), f"sample {index} health", errors)
+        require(isinstance(status.get("ownership_state"), str), f"sample {index} ownership state", errors)
         require(isinstance(status.get("conditions"), list), f"sample {index} conditions", errors)
+        if isinstance(status.get("conditions"), list):
+            require(all(isinstance(condition.get("severity"), str) for condition in status["conditions"]), f"sample {index} condition severity", errors)
         if isinstance(elapsed, int) and isinstance(stopped, int) and isinstance(restarted, int):
             if stopped <= elapsed < restarted:
                 outage.append(sample)
@@ -117,6 +122,7 @@ def validate(observation):
         require(physical - distinct == duplicates, "duplicate arithmetic", errors)
     require(isinstance(outcome.get("operator_steps"), list), "operator steps", errors)
     if samples and isinstance(caught_up, int):
+        require(samples[-1].get("elapsed_ms", -1) >= caught_up, "sampling covers catch-up", errors)
         require(any(s.get("elapsed_ms", -1) >= caught_up and s.get("destination", {}).get("lag_events") == 0 for s in samples), "observed catch-up checkpoint", errors)
     require(observation.get("result") == ("pass" if not errors else "fail"), "result agrees with measurements", errors)
     return errors
