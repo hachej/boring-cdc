@@ -1,0 +1,34 @@
+name: Article 3 bootstrap through shipped CLI
+on:
+  pull_request:
+    paths:
+      - .github/workflows/article3-bootstrap.yml
+      - scripts/e2e/article3_bootstrap*
+      - src/**
+      - contracts/clickhouse/**
+      - compose.yaml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TMPDIR: /var/tmp
+      BCDC_ARTICLE3_PACKET_DIR: /var/tmp/article3-bootstrap-packet
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --no-self-update
+      - name: Verify bootstrap, overlapping capture, and keyed convergence
+        run: scripts/e2e/article3_bootstrap.sh
+      - name: Preserve observations from successful and failed attempts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: article3-bootstrap-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: /var/tmp/article3-bootstrap-packet
+          if-no-files-found: error
