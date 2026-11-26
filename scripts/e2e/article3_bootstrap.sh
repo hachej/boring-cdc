@@ -188,7 +188,8 @@ python3 "$repo/scripts/e2e/article3_bootstrap_progress.py" state/boring.db "$pac
   | del(.progress.run_id)
   | select(.generation > 0 and .progress.total_chunks > 0
       and .progress.completed_rows >= 0 and (.progress | has("eta_ms")))
-' >"$packet/backfill-status.json"
+' >"$work/backfill-status.json"
+cp -f "$work/backfill-status.json" "$packet/backfill-status.json"
 wait "$workload_pid"
 workload_pid=""
 
