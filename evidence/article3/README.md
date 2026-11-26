@@ -1,0 +1,5 @@
+# Article 3 evidence
+
+The shipped initial backfill copied 10,000 rows in 400 chunks. WAL capture continued during the copy. The durable journal recorded three additional business events as completed chunks advanced from 3 to 111. After the durable fence at journal sequence 20, the ClickHouse checkpoint caught up to the journal at sequence 29. The keyed ClickHouse candidate matched PostgreSQL across all 10,000 final keys. The packet contains the executed command, sample values, independent oracle, and an offline validator. [Bootstrap packet](bootstrap/README.md) · [CI run 45839078649](https://github.com/hachej/boring-cdc/actions/runs/45839078649) · tested commit `8c67d9068de3c90e8f3e5b78a9e11905c024a10a`
+
+The interruption and restart, targeted mutation, and source impact with naive control scenarios are pending.
