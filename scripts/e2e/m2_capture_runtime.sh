@@ -7,7 +7,7 @@ fi
 if [[ ${M2_SOURCE_COMMIT_PROOF:-0} != 1 && ${M2_SQLITE_CONTENTION_PROOF:-0} != 1 && ${M2_SQLITE_PERSISTENCE_OUTAGE_PROOF:-0} != 1 ]]; then
   cargo test --locked m2_capture_runtime::tests
 fi
-work=$(mktemp -d /var/tmp/m2-capture-e2e.XXXXXX); project="m2-capture-$RANDOM-$$"; port=$((56000 + $$ % 2000)); bootstrap_pid=; pid=; contention_pid=
+work=$(mktemp -d /var/tmp/m2-capture-e2e.XXXXXX); project="m2-capture-$RANDOM-$$"; port=$((56000 + $$ % 2000)); pid=; contention_pid=
 record_feedback_abort() {
   local phase=$1 child=$2 rc=$3 observed_feedback=$4 elapsed_ms
   [[ -n ${M2_FEEDBACK_RECEIPT_DIR:-} ]] || return 0
@@ -50,7 +50,7 @@ cleanup_child() {
   [[ $rc -eq 134 ]] && echo "Aborted runtime child $child" >&2
   return 0
 }
-cleanup(){ [[ -z "$bootstrap_pid" ]] || cleanup_child "$bootstrap_pid"; [[ -z "$pid" ]] || cleanup_child "$pid"; [[ -z "$contention_pid" ]] || cleanup_child "$contention_pid"; docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
+cleanup(){ [[ -z "$pid" ]] || cleanup_child "$pid"; [[ -z "$contention_pid" ]] || cleanup_child "$contention_pid"; docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"; }; trap cleanup EXIT INT TERM
 stop_bounded() {
   local child=$1 signal=$2 label=$3 deadline
   kill -"$signal" "$child"
@@ -97,13 +97,10 @@ unset PG_ADMIN CH_MAINT
 export PG_RUNTIME=postgresql:"//boring_cdc_runtime:${runtime_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_CONTROL=postgresql:"//boring_cdc_control_writer:${control_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export CH_RUNTIME='https://unused.invalid'
-(cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run --bootstrap >"$work/bootstrap.out" 2>"$work/bootstrap.err") & bootstrap_pid=$!
-deadline=$((SECONDS+30)); until [[ "$(psqlc -Atqc "SELECT count(*) FROM pg_replication_slots WHERE slot_name='runtime_slot' AND plugin='pgoutput'")" == 1 ]]; do
-  (( SECONDS < deadline )) || { cat "$work/bootstrap.err" >&2; exit 1; }
-  kill -0 "$bootstrap_pid" 2>/dev/null || { wait "$bootstrap_pid"; exit 1; }
-  sleep .1
-done
-sleep 1; stop_bounded "$bootstrap_pid" INT bootstrap; bootstrap_pid=
+env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u BORING_CDC_M2_FAULT_HOOK \
+  BCDC_M2_SLOT_FIXTURE_DIR="$work/run" cargo test --quiet --locked --lib \
+  m3_bootstrap::live_tests::prepare_slot_only_for_m2_fixture -- --ignored --exact
+[[ "$(psqlc -Atqc "SELECT count(*) FROM pg_replication_slots WHERE slot_name='runtime_slot' AND plugin='pgoutput'")" == 1 ]]
 (
   cd "$work/run"
   if [[ ${BORING_CDC_M2_FAULT_HOOK:-} == after_feedback ]]; then
