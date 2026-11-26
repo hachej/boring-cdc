@@ -22,22 +22,28 @@ finish() {
   if [[ -n "$connector_pid" ]]; then kill "$connector_pid" 2>/dev/null || true; wait "$connector_pid" || true; fi
   docker rm -f "$clickhouse_container" >/dev/null 2>&1 || true
   BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password" docker compose -p "$project" -f "$repo/compose.yaml" -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true
-  rm -rf "$work"
-  python3 - "$packet" "$stage" "$status" <<'PY_PACKET'
+  python3 - "$packet" "$stage" "$status" "$work" <<'PY_PACKET'
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
-root, stage, status = Path(sys.argv[1]), sys.argv[2], int(sys.argv[3])
+root, stage, status, work = Path(sys.argv[1]), sys.argv[2], int(sys.argv[3]), Path(sys.argv[4])
 observation = {
     "scenario": "article3-bootstrap-cli",
     "stage": stage,
     "exit_code": status,
     "result": "pass" if stage == "complete" and status == 0 else "fail",
 }
+log = work / "connector.log"
+if log.is_file():
+    observation["connector_codes"] = sorted(set(re.findall(
+        r"\b(?:M[0-9]|BCDC|E)_[A-Z0-9]+(?:_[A-Z0-9]+)+\b",
+        log.read_text(errors="replace"),
+    )))
 for field, name in (("overlap", "progress.json"), ("convergence", "checkpoint.json"), ("oracle", "oracle.json")):
     if (root / name).is_file():
         observation[field] = json.loads((root / name).read_text())
@@ -51,6 +57,7 @@ manifest = {
 }
 (root / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
 PY_PACKET
+  rm -rf "$work"
   echo "Article 3 bootstrap exited at $stage ($status). Packet: $packet"
   exit "$status"
 }
