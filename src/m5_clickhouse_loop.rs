@@ -687,29 +687,48 @@ fn prepare_next_snapshot(
     max_bytes: usize,
 ) -> Result<Option<PreparedSnapshotBatch>, crate::m2_leases::LeaseError> {
     use crate::m2_leases::LeaseError;
-    if m4_initial_load::baseline_verified(tx, context, anchor).map_err(|_| LeaseError::Conflict)? {
-        return Ok(None);
-    }
     let (limit, generation_id): (u64, String) = tx.query_row(
         "SELECT snapshot_complete_seq,generation_id FROM bootstrap_anchors WHERE anchor_id=?1",
         [anchor],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
-    let first: u64 = tx.query_row(
-        "SELECT coalesce(max(last_snapshot_seq),0)+1 FROM m4_snapshot_batch_intents
-         WHERE destination_id=?1 AND anchor_id=?2 AND configuration_fingerprint=?3 AND state='verified'",
-        rusqlite::params![context.destination_id, anchor, context.configuration_fingerprint],
-        |r| r.get(0),
-    )?;
-    if first > limit || max_rows == 0 {
+    let latest: Option<(u64, u64, String)> = tx
+        .query_row(
+            "SELECT first_snapshot_seq,last_snapshot_seq,state FROM m4_snapshot_batch_intents
+         WHERE destination_id=?1 AND capture_epoch=?2 AND generation=?3 AND anchor_id=?4
+           AND configuration_fingerprint=?5 ORDER BY first_snapshot_seq DESC LIMIT 1",
+            rusqlite::params![
+                context.destination_id,
+                context.capture_epoch,
+                context.generation,
+                anchor,
+                context.configuration_fingerprint
+            ],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .optional()?;
+    let (first, prior) = match latest {
+        Some((_, last, state)) if state == "verified" => {
+            (last.checked_add(1).ok_or(LeaseError::Conflict)?, None)
+        }
+        Some((first, last, state)) if matches!(state.as_str(), "prepared" | "dispatched") => {
+            (first, Some(last))
+        }
+        Some(_) => return Err(LeaseError::Conflict),
+        None => (1, None),
+    };
+    if first > limit {
+        return if m4_initial_load::baseline_verified(tx, context, anchor)
+            .map_err(|_| LeaseError::Conflict)?
+        {
+            Ok(None)
+        } else {
+            Err(LeaseError::Conflict)
+        };
+    }
+    if max_rows == 0 {
         return Err(LeaseError::Conflict);
     }
-    let prior: Option<u64> = tx.query_row(
-        "SELECT last_snapshot_seq FROM m4_snapshot_batch_intents
-         WHERE destination_id=?1 AND anchor_id=?2 AND configuration_fingerprint=?3 AND first_snapshot_seq=?4",
-        rusqlite::params![context.destination_id, anchor, context.configuration_fingerprint, first],
-        |r| r.get(0),
-    ).optional()?;
     let last = if let Some(last) = prior {
         if last < first || last > limit || last - first >= max_rows as u64 {
             return Err(LeaseError::Conflict);
