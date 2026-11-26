@@ -212,6 +212,14 @@ impl ClickHousePump {
             run_id: run_id.clone(),
         };
         let baseline_anchor = anchor_id.clone();
+        if snapshot_relation.is_some() {
+            writer
+                .service_destination(Duration::from_secs(5), |owner| {
+                    m4_initial_load::install(owner.connection())
+                        .map_err(|_| JournalError::Conflict("snapshot store installation failed"))
+                })
+                .map_err(|_| "M5_BASELINE_STORE_FAILED")?;
+        }
         let verified = writer
             .service_destination(Duration::from_secs(5), move |owner| {
                 let transaction = owner.connection_mut().transaction()?;
