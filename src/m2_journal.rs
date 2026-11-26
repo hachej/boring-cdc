@@ -430,6 +430,10 @@ impl JournalStore {
                 )?;
             }
         }
+        if let Some(row) = fence_row {
+            crate::m3_fence::observe_source_commit(&transaction, &commit.transaction_id, row)
+                .map_err(|_| JournalError::Conflict("M3_FENCE_COMMIT_PROOF_INVALID"))?;
+        }
         if started.elapsed() > self.limits.max_writer_hold && fault != CommitFault::SlowSqliteCommit
         {
             return Err(JournalError::BusyBoundExceeded);

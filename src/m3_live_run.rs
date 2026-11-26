@@ -468,19 +468,12 @@ impl InitialCopy {
                 return Ok(());
             }
             self.next_fence_poll = Instant::now() + Duration::from_millis(25);
-            let intent = self.fence.intent_id.clone();
-            let epoch = self.plan.capture_epoch.clone();
+            let fence = format!("fence:{}", self.fence.intent_id);
             let observed = writer.service_backfill(self.limits.writer_hold, move |writer| {
-                let transaction = writer.connection().query_row(
-                    "SELECT transaction_id FROM journal_events WHERE control_kind='capture_fence' AND capture_epoch=?1 ORDER BY journal_seq LIMIT 1",
-                    [&epoch], |r| r.get::<_, String>(0)
-                ).optional()?;
-                if let Some(tx) = transaction {
-                    FenceStore::borrow_writer(writer).observe_durable(&intent, &tx).map_err(fence_error)?;
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
+                writer.connection().query_row(
+                    "SELECT EXISTS(SELECT 1 FROM durable_capture_fences WHERE fence_id=?1 AND first_proof=1)",
+                    [&fence], |r| r.get::<_, bool>(0),
+                ).map_err(JournalError::from)
             }).map_err(journal_error)?;
             if observed {
                 self.release_guard(writer)?;
