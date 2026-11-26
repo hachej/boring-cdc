@@ -11,6 +11,8 @@ project="article3-bootstrap-$RANDOM-$$"
 clickhouse_container="$project-ch"
 pg_port=$((52000 + $$ % 1000))
 ch_https_port=$((54000 + $$ % 1000))
+status_port=$((60000 + $$ % 1000))
+metrics_port=$((61000 + $$ % 1000))
 connector_pid=""
 workload_pid=""
 stage=provision
@@ -140,6 +142,8 @@ sed -e 's/total = "numeric:nullable"/payload = "text:nullable"/' \
   -e 's/verify_tls = true/verify_tls = false/' \
   -e 's/unsafe_local_experiment = false/unsafe_local_experiment = true/' \
   -e 's/chunk_rows = 1000/chunk_rows = 25/' \
+  -e "s#127.0.0.1:8787#127.0.0.1:$status_port#" \
+  -e "s#127.0.0.1:8788#127.0.0.1:$metrics_port#" \
   -e "s#https://clickhouse.local:8443#https://127.0.0.1:$ch_https_port#" \
   tests/fixtures/m1_config/representative.toml >"$work/run/boring-cdc.toml"
 
