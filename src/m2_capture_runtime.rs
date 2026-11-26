@@ -86,6 +86,19 @@ where
 }
 
 pub trait DurableJournal {
+    fn commit_with_fence(
+        &mut self,
+        commit: &SourceCommit,
+        fence_row: Option<Vec<u8>>,
+    ) -> Result<DurableCommit, JournalError> {
+        if fence_row.is_some() {
+            return Err(JournalError::Unavailable(
+                "M3_FENCE_EVIDENCE_WRITER_REQUIRED",
+            ));
+        }
+        self.commit(commit)
+    }
+
     fn commit(&mut self, commit: &SourceCommit) -> Result<DurableCommit, JournalError>;
     fn load_failure(
         &self,
@@ -115,10 +128,26 @@ impl DurableJournal for JournalStore {
     fn commit(&mut self, commit: &SourceCommit) -> Result<DurableCommit, JournalError> {
         self.commit_atomic(commit, crate::m2_journal::CommitFault::None)
     }
+
+    fn commit_with_fence(
+        &mut self,
+        commit: &SourceCommit,
+        fence_row: Option<Vec<u8>>,
+    ) -> Result<DurableCommit, JournalError> {
+        self.commit_atomic_with_fence(commit, CommitFault::None, fence_row.as_deref())
+    }
 }
 impl DurableJournal for JournalWriterService {
     fn commit(&mut self, commit: &SourceCommit) -> Result<DurableCommit, JournalError> {
-        self.enqueue_capture(commit.clone(), CommitFault::None)
+        self.commit_with_fence(commit, None)
+    }
+
+    fn commit_with_fence(
+        &mut self,
+        commit: &SourceCommit,
+        fence_row: Option<Vec<u8>>,
+    ) -> Result<DurableCommit, JournalError> {
+        self.enqueue_capture_with_fence(commit.clone(), CommitFault::None, fence_row)
             .map_err(|_| JournalError::BusyBoundExceeded)?;
         loop {
             match self
@@ -915,6 +944,7 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             return self.safe_stop(RuntimeError::Protocol("row_count_mismatch"));
         }
         let mut events = Vec::new();
+        let mut fence_row = None;
         let mut schemas = BTreeMap::new();
         for (row_ordinal, staged) in payloads.into_iter().enumerate() {
             let staged: StagedEventOwned = serde_json::from_slice(&staged)
@@ -939,6 +969,10 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
                     std::str::from_utf8(bytes).ok()?.parse::<u64>().ok()
                 };
                 let generation = if kind == "capture_fence" {
+                    if fence_row.replace(staged.payload).is_some() {
+                        return self.safe_stop(RuntimeError::Protocol("multiple_capture_fences"));
+                    }
+
                     if parse_column(1) != Some(canonical.capture_epoch.get()) {
                         return self.safe_stop(RuntimeError::Protocol("fence_epoch_mismatch"));
                     }
@@ -1083,18 +1117,21 @@ impl<J: DurableJournal, S: SpoolFactory, G: FeedbackGate> CaptureRuntime<J, S, G
             schemas: schemas.into_values().collect(),
             events,
         };
-        let durable = self.journal.commit(&commit).map_err(|error| {
-            self.state = RuntimeState::CaptureSafeStopped;
-            match error {
-                JournalError::Sqlite(_)
-                | JournalError::BusyBoundExceeded
-                | JournalError::BusyBoundExceededAfterCommit
-                | JournalError::AmbiguousAfterCommit => {
-                    RuntimeError::JournalTransient(error.to_string())
+        let durable = self
+            .journal
+            .commit_with_fence(&commit, fence_row)
+            .map_err(|error| {
+                self.state = RuntimeState::CaptureSafeStopped;
+                match error {
+                    JournalError::Sqlite(_)
+                    | JournalError::BusyBoundExceeded
+                    | JournalError::BusyBoundExceededAfterCommit
+                    | JournalError::AmbiguousAfterCommit => {
+                        RuntimeError::JournalTransient(error.to_string())
+                    }
+                    _ => RuntimeError::JournalIntegrity(error.to_string()),
                 }
-                _ => RuntimeError::JournalIntegrity(error.to_string()),
-            }
-        })?;
+            })?;
         let durable_lsn = parse_lsn(durable.feedback_eligible_end_lsn())?;
         if durable_lsn != end_lsn || commit_lsn > end_lsn {
             return self.safe_stop(RuntimeError::Protocol("durable_boundary_mismatch"));
@@ -2616,6 +2653,7 @@ pub async fn run_loaded_config(
     ownership: &mut crate::m2_ownership::OwnershipGuard<PgSourceLock>,
     mut destination_writer: crate::m5_clickhouse_loop::DestinationWriterClient,
     mut destination_inbox: crate::m5_clickhouse_loop::DestinationWriterInbox,
+    bootstrap: bool,
 ) -> Result<(), CaptureFailure> {
     use crate::m2_journal::{CommitLimits, SourceIdentity};
     use crate::m2_schema::open_writer;
@@ -2747,21 +2785,52 @@ pub async fn run_loaded_config(
             "M2_RECOVERY_RECEIPT_MISMATCH",
         ));
     }
-    let receipt = crate::m2_reconcile::reconcile_startup(
-        &journal_path,
-        &startup_run_id,
-        &live_source,
-        &[],
-        &mut ProductionArchiveInspection,
-    )
-    .map_err(|_| CaptureFailure::at("reconciliation", "M2_STARTUP_RECONCILIATION_FAILED"))?;
-    if matches!(
-        receipt.outcome,
-        crate::m2_reconcile::StartupOutcome::Blocked
-            | crate::m2_reconcile::StartupOutcome::RequiresReseed
-            | crate::m2_reconcile::StartupOutcome::BootstrapAmbiguousRequiresRestart
-    ) {
-        return Err(CaptureFailure::at("reconciliation", "M2_STARTUP_BLOCKED"));
+    if bootstrap {
+        let initial = rusqlite::Connection::open_with_flags(
+            &journal_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+        )
+        .map_err(|_| CaptureFailure::at("bootstrap", "M3_SOURCE_STATE_UNAVAILABLE"))?;
+        let identity_matches: bool = initial.query_row(
+            "SELECT EXISTS(SELECT 1 FROM source_state WHERE singleton=1 AND source_system_id=?1 AND timeline_id=?2 AND database_id=?3 AND slot_name=?4 AND publication_fingerprint=?5 AND protocol_fingerprint=?6 AND plugin='pgoutput')",
+            rusqlite::params![live_source.source_system_id, live_source.timeline_id, live_source.database_id, live_source.slot_name, live_source.publication_fingerprint, live_source.protocol_fingerprint],
+            |row| row.get(0),
+        ).map_err(|_| CaptureFailure::at("bootstrap", "M3_SOURCE_STATE_UNAVAILABLE"))?;
+        if !identity_matches {
+            return Err(CaptureFailure::at(
+                "bootstrap",
+                "M3_SOURCE_IDENTITY_MISMATCH",
+            ));
+        }
+        if live_source.slot_exists {
+            return Err(CaptureFailure::at(
+                "bootstrap",
+                "M3_BOOTSTRAP_RECOVERY_REQUIRED",
+            ));
+        }
+        if changed_limit {
+            return Err(CaptureFailure::at(
+                "bootstrap",
+                "M3_BOOTSTRAP_CONFIG_CHANGED",
+            ));
+        }
+    } else {
+        let receipt = crate::m2_reconcile::reconcile_startup(
+            &journal_path,
+            &startup_run_id,
+            &live_source,
+            &[],
+            &mut ProductionArchiveInspection,
+        )
+        .map_err(|_| CaptureFailure::at("reconciliation", "M2_STARTUP_RECONCILIATION_FAILED"))?;
+        if matches!(
+            receipt.outcome,
+            crate::m2_reconcile::StartupOutcome::Blocked
+                | crate::m2_reconcile::StartupOutcome::RequiresReseed
+                | crate::m2_reconcile::StartupOutcome::BootstrapAmbiguousRequiresRestart
+        ) {
+            return Err(CaptureFailure::at("reconciliation", "M2_STARTUP_BLOCKED"));
+        }
     }
     if changed_limit {
         ownership
@@ -2843,7 +2912,12 @@ pub async fn run_loaded_config(
             .parse()
             .map_err(|_| CaptureFailure::at("reconciliation", "M2_SOURCE_IDENTITY_INVALID"))?,
         slot_name: live_source.slot_name.clone(),
-        plugin: live_source.plugin.clone(),
+        plugin: if bootstrap {
+            // The guarded slot creation uses pgoutput and verifies it before capture starts.
+            crate::m1_source_identity::SUPPORTED_SOURCE_PLUGIN.into()
+        } else {
+            live_source.plugin.clone()
+        },
         publication_fingerprint: crate::m1_source_identity::Fingerprint::from_lower_hex(
             &live_source.publication_fingerprint,
         )
@@ -2860,6 +2934,68 @@ pub async fn run_loaded_config(
         .ok_or_else(|| CaptureFailure::at("journal", "M2_CAPTURE_EPOCH_NOT_CANONICAL"))?;
     let catalog = PgReplicationConnection::connect(&dsn)
         .map_err(|_| CaptureFailure::at("catalog", "M2_CATALOG_CONNECT_FAILED"))?;
+    let (writer, mut bootstrap_copy, bootstrap_connection) = if bootstrap {
+        let started = crate::m3_live_run::start(
+            writer,
+            config,
+            &capture_config,
+            &capture_epoch,
+            &startup_run_id,
+            now,
+        )?;
+        // Record the active slot's creation floor through the normal startup receipt.
+        // Capture owns the source lock throughout and holds only one writer at a time.
+        drop(started.writer);
+        let live_bootstrap =
+            observe_live_source(&dsn, &public.source.publication, &public.source.slot)?;
+        let receipt = crate::m2_reconcile::reconcile_startup(
+            &journal_path,
+            &startup_run_id,
+            &live_bootstrap,
+            &[],
+            &mut ProductionArchiveInspection,
+        )
+        .map_err(|_| CaptureFailure::at("bootstrap", "M3_BOOTSTRAP_RECONCILIATION_FAILED"))?;
+        if receipt.outcome != crate::m2_reconcile::StartupOutcome::CreationFloorOnly {
+            return Err(CaptureFailure::at(
+                "bootstrap",
+                "M3_BOOTSTRAP_CREATION_FLOOR_INVALID",
+            ));
+        }
+        let writer = open_writer(&journal_path, &startup_run_id, 1, now)
+            .map_err(|_| CaptureFailure::at("journal", "M2_JOURNAL_OPEN_FAILED"))?;
+        (
+            writer,
+            Some(started.copy),
+            Some((started.connection, started.contracts)),
+        )
+    } else {
+        (writer, None, None)
+    };
+    let gate_reader = if bootstrap {
+        Some(
+            rusqlite::Connection::open_with_flags(
+                &journal_path,
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            )
+            .map_err(|_| CaptureFailure::at("bootstrap", "M3_FEEDBACK_GATE_OPEN_FAILED"))?,
+        )
+    } else {
+        None
+    };
+    let intent_id = bootstrap_copy.as_ref().map(|copy| copy.intent_id());
+    let feedback_gate = match (
+        gate_reader.as_ref(),
+        bootstrap_copy.as_ref(),
+        intent_id.as_deref(),
+    ) {
+        (Some(reader), Some(copy), Some(intent)) => {
+            crate::m3_live_run::BootstrapFeedbackGate::Initial(
+                crate::m3_fence::PersistedFeedbackGate::new(reader, intent, copy.generation()),
+            )
+        }
+        _ => crate::m3_live_run::BootstrapFeedbackGate::None,
+    };
     let store = JournalStore::new(
         writer,
         SourceIdentity {
@@ -2945,7 +3081,17 @@ pub async fn run_loaded_config(
     writer_service
         .insert_owner_lease(&lease)
         .map_err(|_| CaptureFailure::at("ownership", "M2_OWNER_LEASE_STORE_FAILED"))?;
+    let snapshot_relation = bootstrap_connection.as_ref().and_then(|(_, contracts)| {
+        let table = &public.tables[0].source_relation;
+        contracts
+            .values()
+            .find(|contract| {
+                format!("{}.{}", contract.relation.namespace, contract.relation.name) == *table
+            })
+            .cloned()
+    });
     let destination_start = crate::m5_clickhouse_loop::PumpStart {
+        snapshot_relation,
         journal_path: journal_path.clone(),
         capture_epoch: capture_epoch.clone(),
         run_id: startup_run_id.clone(),
@@ -2965,9 +3111,17 @@ pub async fn run_loaded_config(
     };
     let destination_stopped = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let destination_stop = std::sync::Arc::clone(&destination_stopped);
+    let destination_ready = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(!bootstrap));
+    let destination_wait = std::sync::Arc::clone(&destination_ready);
     std::thread::Builder::new()
         .name("clickhouse-worker".into())
         .spawn(move || {
+            while !destination_wait.load(std::sync::atomic::Ordering::Acquire) {
+                if destination_stop.load(std::sync::atomic::Ordering::Acquire) {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(50));
+            }
             let mut pump = match crate::m5_clickhouse_loop::ClickHousePump::start(
                 &mut destination_writer,
                 destination_start,
@@ -2975,13 +3129,17 @@ pub async fn run_loaded_config(
                 Ok(Some(pump)) => pump,
                 Ok(None) => return,
                 Err(code) => {
-                    eprintln!("M5_DESTINATION_START_FAILED code={code}");
+                    if !destination_stop.load(std::sync::atomic::Ordering::Acquire) {
+                        eprintln!("M5_DESTINATION_START_FAILED code={code}");
+                    }
                     return;
                 }
             };
-            while !destination_stop.load(std::sync::atomic::Ordering::Relaxed) {
+            while !destination_stop.load(std::sync::atomic::Ordering::Acquire) {
                 if let Err(code) = pump.tick(&mut destination_writer) {
-                    eprintln!("M5_DESTINATION_WORKER_STOPPED code={code}");
+                    if !destination_stop.load(std::sync::atomic::Ordering::Acquire) {
+                        eprintln!("M5_DESTINATION_WORKER_STOPPED code={code}");
+                    }
                     return;
                 }
                 std::thread::sleep(Duration::from_millis(50));
@@ -2991,7 +3149,7 @@ pub async fn run_loaded_config(
     let mut runtime = CaptureRuntime::new(
         writer_service,
         factory,
-        NoSnapshotGate,
+        feedback_gate,
         Default::default(),
         durable,
     );
@@ -3019,57 +3177,94 @@ pub async fn run_loaded_config(
         Duration::from_millis(public.source.lock_probe_interval_ms.0),
     )?;
     let mut heartbeat_lane = None;
-    let result = capture_copyboth_until_with_probe(
-        &capture_config,
-        cancellation,
-        &mut runtime,
-        u64::MAX,
-        Duration::from_millis(public.source.lock_probe_interval_ms.0),
-        |runtime| {
-            if !control_lane.ownership_live() {
-                return Ok(false);
+    let probe = |runtime: &mut CaptureRuntime<JournalWriterService, _, _>| {
+        if !control_lane.ownership_live() {
+            return Ok(false);
+        }
+        let Ok(lease) = ownership.refreshed_lease(1, owner_deadline) else {
+            return Ok(false);
+        };
+        match runtime.journal.refresh_owner_lease(&lease) {
+            Ok(()) => Ok(true),
+            Err(JournalError::Conflict(_)) => Ok(false),
+            Err(error) => Err(error),
+        }
+    };
+    let start_heartbeat = || {
+        let cadence_ms = public.source.heartbeat_cadence_ms.0;
+        let initial_retry_ms = (cadence_ms / 10).max(1);
+        heartbeat_lane = Some(
+            crate::m2_heartbeat::PublishedHeartbeatLane::start(
+                heartbeat_dsn,
+                crate::m2_heartbeat::HeartbeatPolicy {
+                    cadence_ms,
+                    initial_retry_ms,
+                    max_retry_ms: (cadence_ms / 2).max(initial_retry_ms),
+                },
+                now as u64,
+                Duration::from_millis(public.source.maximum_operation_ms.0),
+                crate::m2_heartbeat::HeartbeatLogContext {
+                    scenario_id: "SCN-HEARTBEAT-PERMISSION-OUTAGE".into(),
+                    correlation_id: format!("heartbeat:{startup_run_id}"),
+                    run_id: startup_run_id.clone(),
+                    capture_epoch: capture_epoch.clone(),
+                    config_fingerprint: config.fingerprints().runtime.clone(),
+                },
+            )
+            .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?,
+        );
+        Ok(())
+    };
+    let mut service_work = |runtime: &mut CaptureRuntime<JournalWriterService, _, _>| {
+        if let Some(copy) = bootstrap_copy.as_mut() {
+            copy.tick(&mut runtime.journal)?;
+            if copy.complete() {
+                destination_ready.store(true, std::sync::atomic::Ordering::Release);
             }
-            let Ok(lease) = ownership.refreshed_lease(1, owner_deadline) else {
-                return Ok(false);
-            };
-            match runtime.journal.refresh_owner_lease(&lease) {
-                Ok(()) => Ok(true),
-                Err(JournalError::Conflict(_)) => Ok(false),
-                Err(error) => Err(error),
-            }
-        },
-        || {
-            let cadence_ms = public.source.heartbeat_cadence_ms.0;
-            let initial_retry_ms = (cadence_ms / 10).max(1);
-            heartbeat_lane = Some(
-                crate::m2_heartbeat::PublishedHeartbeatLane::start(
-                    heartbeat_dsn,
-                    crate::m2_heartbeat::HeartbeatPolicy {
-                        cadence_ms,
-                        initial_retry_ms,
-                        max_retry_ms: (cadence_ms / 2).max(initial_retry_ms),
-                    },
-                    now as u64,
-                    Duration::from_millis(public.source.maximum_operation_ms.0),
-                    crate::m2_heartbeat::HeartbeatLogContext {
-                        scenario_id: "SCN-HEARTBEAT-PERMISSION-OUTAGE".into(),
-                        correlation_id: format!("heartbeat:{startup_run_id}"),
-                        run_id: startup_run_id.clone(),
-                        capture_epoch: capture_epoch.clone(),
-                        config_fingerprint: config.fingerprints().runtime.clone(),
-                    },
-                )
-                .map_err(|_| CaptureFailure::at("heartbeat", "M2_HEARTBEAT_LANE_INVALID"))?,
-            );
-            Ok(())
-        },
-        |runtime| {
-            destination_inbox.service_one(&mut runtime.journal);
-            Ok(())
-        },
-    )
-    .await;
-    destination_stopped.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+        destination_inbox.service_one(&mut runtime.journal);
+        Ok(())
+    };
+    let control_cadence = Duration::from_millis(public.source.lock_probe_interval_ms.0);
+    let mut result = if let Some((mut connection, contracts)) = bootstrap_connection {
+        capture_copyboth_on_connection_until_with_probe(
+            &mut connection,
+            contracts,
+            cancellation,
+            &mut runtime,
+            CaptureLoopBounds {
+                stop_after_commits: u64::MAX,
+                control_cadence: control_cadence.min(Duration::from_millis(25)),
+            },
+            probe,
+            start_heartbeat,
+            &mut service_work,
+        )
+        .await
+    } else {
+        capture_copyboth_until_with_probe(
+            &capture_config,
+            cancellation,
+            &mut runtime,
+            u64::MAX,
+            control_cadence,
+            probe,
+            start_heartbeat,
+            service_work,
+        )
+        .await
+    };
+    if let Some(copy) = bootstrap_copy.as_mut() {
+        let lost = if matches!(&result, Err(error) if error.code == "M3_DDL_WAITER") {
+            "guard"
+        } else {
+            "importer"
+        };
+        if let Err(error) = copy.invalidate(&mut runtime.journal, lost) {
+            result = Err(error);
+        }
+    }
+    destination_stopped.store(true, std::sync::atomic::Ordering::Release);
     drop(heartbeat_lane);
     if matches!(&result, Err(error) if error.code == "M2_RECEIVE_FRAME_LIMIT") {
         let held = hold_capture_safe_stop(

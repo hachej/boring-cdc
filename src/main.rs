@@ -19,12 +19,7 @@ use boring_cdc::m2_operator_requests::{
 };
 use boring_cdc::m2_operator_socket::OperatorSocket;
 use boring_cdc::m2_reconcile::{journal_report, recover_report};
-use boring_cdc::m2_schema::open_writer;
 use boring_cdc::m2_status_listener::{StatusListener, server_tls_config};
-use boring_cdc::m3_bootstrap::{
-    BootstrapError, BootstrapRuntime, ImporterAssignment, PrepareIntent, SessionBounds,
-    digest_assignment,
-};
 use pg_walstream::CancellationToken;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -215,7 +210,7 @@ fn capture_article1(
     }
 }
 
-fn run_m2() -> Result<(), ReaderFailure> {
+fn run_m2(bootstrap: bool) -> Result<(), ReaderFailure> {
     let text = std::fs::read_to_string("boring-cdc.toml").map_err(|_| {
         ReaderFailure::unavailable(
             "M2_CONFIG_UNAVAILABLE",
@@ -306,6 +301,7 @@ fn run_m2() -> Result<(), ReaderFailure> {
             &mut ownership,
             destination_writer,
             destination_inbox,
+            bootstrap,
         ))
         .map_err(|e| ReaderFailure::unavailable(e.code, "capture runtime failed"))
 }
@@ -538,158 +534,6 @@ fn operator_result_dispatch(
     }
 }
 
-fn bootstrap_failure(error: BootstrapError) -> ReaderFailure {
-    let code = match error {
-        BootstrapError::Invalid(code) | BootstrapError::Conflict(code) => code,
-        BootstrapError::Sqlite(_) => "M3_BOOTSTRAP_STORE_FAILED",
-    };
-    ReaderFailure::unavailable(code, "bootstrap runtime failed closed")
-}
-
-fn run_m3_bootstrap() -> Result<(), ReaderFailure> {
-    let text = std::fs::read_to_string("boring-cdc.toml").map_err(|_| {
-        ReaderFailure::unavailable(
-            "M3_CONFIG_UNAVAILABLE",
-            "bootstrap configuration is unavailable",
-        )
-    })?;
-    let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Run)
-        .map_err(|e| ReaderFailure::unavailable(e.code, "bootstrap configuration is invalid"))?;
-    let _ownership = acquire_production_ownership(&config, "bootstrap-run")
-        .map_err(|e| ReaderFailure::unavailable(e.code, "bootstrap ownership unavailable"))?;
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_err(|_| {
-            ReaderFailure::unavailable("M3_CLOCK_INVALID", "bootstrap clock is invalid")
-        })?;
-    let writer = open_writer(
-        std::path::Path::new(&config.public().storage.sqlite_path),
-        "bootstrap-run",
-        1,
-        now.as_millis() as i64,
-    )
-    .map_err(|_| {
-        ReaderFailure::unavailable(
-            "M3_BOOTSTRAP_STORE_FAILED",
-            "bootstrap state is unavailable",
-        )
-    })?;
-    let (capture_epoch, source_system_id, database_id, slot_name, start_seq): (
-        String,
-        String,
-        String,
-        String,
-        Option<i64>,
-    ) = writer
-        .connection()
-        .query_row(
-            "SELECT capture_epoch,source_system_id,database_id,slot_name,durable_journal_seq FROM source_state WHERE singleton=1",
-            [],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
-        )
-        .map_err(|_| {
-            ReaderFailure::unavailable(
-                "M3_SOURCE_STATE_UNAVAILABLE",
-                "initialized source state is required",
-            )
-        })?;
-    if slot_name != config.public().source.slot {
-        return Err(ReaderFailure::unavailable(
-            "M3_SLOT_IDENTITY_MISMATCH",
-            "configured slot does not match initialized source state",
-        ));
-    }
-    let intent_id = format!(
-        "bootstrap-{:x}",
-        Sha256::digest(
-            format!(
-                "{}:{}:{}",
-                config.fingerprints().runtime,
-                capture_epoch,
-                now.as_nanos()
-            )
-            .as_bytes()
-        )
-    );
-    let relations = config
-        .public()
-        .tables
-        .iter()
-        .map(|table| table.source_relation.clone())
-        .collect::<Vec<_>>();
-    let intent = PrepareIntent {
-        intent_id,
-        capture_epoch,
-        source_system_id,
-        database_id,
-        slot_name,
-        generation: 1,
-        table_set_fingerprint: config.fingerprints().table_set.clone(),
-        // M3 binds this intent to the destination row and M4 generation lease. The source
-        // runtime fingerprint is tracked separately in capture_configuration_receipts.
-        configuration_fingerprint: config.fingerprints().destination.clone(),
-        importers: vec![ImporterAssignment {
-            importer_id: "bootstrap-worker-0".into(),
-            assigned_ranges_digest: digest_assignment(b"all-configured-relations"),
-        }],
-        created_at: format!("unix-ms:{}", now.as_millis()),
-    };
-    let dsn = config.runtime_dsn().ok_or_else(|| {
-        ReaderFailure::unavailable(
-            "M3_RUNTIME_DSN_UNAVAILABLE",
-            "bootstrap credential is unavailable",
-        )
-    })?;
-    let timeout = config.public().backfill.session_timeout_ms.0;
-    let mut runtime = BootstrapRuntime::start(
-        writer,
-        intent,
-        dsn,
-        &relations,
-        &config.public().source.publication,
-        SessionBounds {
-            statement_timeout_ms: timeout,
-            idle_timeout_ms: timeout,
-        },
-        start_seq.unwrap_or(0) as u64,
-    )
-    .map_err(bootstrap_failure)?;
-    let cancellation = cancellation_for_signals();
-    let keepalive_interval = Duration::from_millis(config.public().backfill.guard_keepalive_ms.0);
-    let waiter_poll_interval = keepalive_interval.min(Duration::from_millis(250));
-    let mut next_keepalive = std::time::Instant::now() + keepalive_interval;
-    while !signal_received() {
-        thread::sleep(waiter_poll_interval);
-        match runtime
-            .conflicting_ddl_waiter_exceeded(config.public().backfill.ddl_waiter_bound_ms.0)
-        {
-            Ok(true) => {
-                runtime
-                    .invalidate_for_ddl_waiter()
-                    .map_err(bootstrap_failure)?;
-                return Err(ReaderFailure::unavailable(
-                    "M3_DDL_WAITER",
-                    "snapshot generation was invalidated after a conflicting DDL waiter",
-                ));
-            }
-            Ok(false) => {}
-            Err(error) => {
-                runtime.invalidate("guard").map_err(bootstrap_failure)?;
-                return Err(bootstrap_failure(error));
-            }
-        }
-        if std::time::Instant::now() >= next_keepalive {
-            if let Err(error) = runtime.keepalive() {
-                runtime.invalidate("guard").map_err(bootstrap_failure)?;
-                return Err(bootstrap_failure(error));
-            }
-            next_keepalive = std::time::Instant::now() + keepalive_interval;
-        }
-    }
-    cancellation.cancel();
-    runtime.invalidate("importer").map_err(bootstrap_failure)
-}
-
 fn run_article1() -> Result<(), ReaderFailure> {
     let config = load_article1_config()?;
     let cancellation = cancellation_for_signals();
@@ -825,15 +669,24 @@ fn read_only_journal_command(
         mutation_trace: None,
     })
 }
-fn fresh_status_report() -> Result<M2SystemSnapshot, ReaderFailure> {
+fn load_status_config() -> Result<boring_cdc::m1_config::LoadedConfig, ReaderFailure> {
     let text = std::fs::read_to_string("boring-cdc.toml").map_err(|_| {
         ReaderFailure::unavailable(
             "M2_STATUS_CONFIG_UNAVAILABLE",
             "status configuration is unavailable",
         )
     })?;
-    let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Status)
-        .map_err(|e| ReaderFailure::unavailable(e.code, "status configuration is invalid"))?;
+    load_str_for(&text, &ProcessEnvironment, LoadPurpose::Status)
+        .map_err(|e| ReaderFailure::unavailable(e.code, "status configuration is invalid"))
+}
+
+fn fresh_status_report() -> Result<M2SystemSnapshot, ReaderFailure> {
+    fresh_status_report_for(&load_status_config()?)
+}
+
+fn fresh_status_report_for(
+    config: &boring_cdc::m1_config::LoadedConfig,
+) -> Result<M2SystemSnapshot, ReaderFailure> {
     status_snapshot(
         std::path::Path::new(&config.public().storage.sqlite_path),
         &config.fingerprints().runtime,
@@ -847,7 +700,8 @@ fn fresh_status_report() -> Result<M2SystemSnapshot, ReaderFailure> {
 }
 
 fn status_command() -> Result<CliEnvelope, ReaderFailure> {
-    let report = fresh_status_report()?;
+    let config = load_status_config()?;
+    let report = fresh_status_report_for(&config)?;
     let mut extensions = std::collections::BTreeMap::new();
     extensions.insert(
         "overall_health".into(),
@@ -866,6 +720,14 @@ fn status_command() -> Result<CliEnvelope, ReaderFailure> {
         "action_causality".into(),
         serde_json::json!(report.action_causality),
     );
+    if let Some(backfill) = boring_cdc::m3_live_run::status_extension(std::path::Path::new(
+        &config.public().storage.sqlite_path,
+    ))
+    .map_err(|_| {
+        ReaderFailure::unavailable("M3_STATUS_UNAVAILABLE", "backfill progress unavailable")
+    })? {
+        extensions.insert("backfill".into(), backfill);
+    }
     let canonical = SystemSnapshot {
         schema_version: 1,
         snapshot_id: report.snapshot_id.clone(),
@@ -1182,7 +1044,7 @@ fn main() {
                 }
             }
             if parsed.spec.id == "CMD-RUN-BOOTSTRAP" {
-                match run_m3_bootstrap() {
+                match run_m2(true) {
                     Ok(()) => return,
                     Err(error) => {
                         eprintln!("{}: {}", error.code, error.message);
@@ -1192,7 +1054,7 @@ fn main() {
             }
             if parsed.spec.id == "CMD-RUN" {
                 let result = if std::path::Path::new("boring-cdc.toml").exists() {
-                    run_m2()
+                    run_m2(false)
                 } else {
                     run_article1()
                 };

@@ -10,7 +10,6 @@ work=$(mktemp -d /var/tmp/article3-bootstrap.XXXXXX)
 project="article3-bootstrap-$RANDOM-$$"
 clickhouse_container="$project-ch"
 pg_port=$((52000 + $$ % 1000))
-ch_https_port=$((54000 + $$ % 1000))
 status_port=$((60000 + $$ % 1000))
 metrics_port=$((61000 + $$ % 1000))
 connector_pid=""
@@ -46,7 +45,7 @@ if log.is_file():
         r"\b(?:M[0-9]|BCDC|E)_[A-Z0-9]+(?:_[A-Z0-9]+)+\b",
         log.read_text(errors="replace"),
     )))
-for field, name in (("overlap", "progress.json"), ("convergence", "checkpoint.json"), ("oracle", "oracle.json")):
+for field, name in (("overlap", "progress.json"), ("convergence", "checkpoint.json"), ("oracle", "oracle.json"), ("status", "backfill-status.json")):
     if (root / name).is_file():
         observation[field] = json.loads((root / name).read_text())
 (root / "observation.json").write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n")
@@ -104,11 +103,13 @@ ch_password=$(cat "$work/clickhouse_password")
 printf 'CLICKHOUSE_USER=bcdc_probe\nCLICKHOUSE_PASSWORD=%s\nCLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1\n' "$ch_password" >"$work/clickhouse.env"
 chmod 600 "$work/clickhouse.env"
 docker run -d --name "$clickhouse_container" --platform linux/amd64 \
-  -p "127.0.0.1:${ch_https_port}:8443" --env-file "$work/clickhouse.env" \
+  -p "127.0.0.1::8443" --env-file "$work/clickhouse.env" \
   -v "$work/clickhouse-https.xml:/etc/clickhouse-server/config.d/article3-https.xml:ro" \
   -v "$work/server.crt:/etc/clickhouse-server/tls/server.crt:ro" \
   -v "$work/server.key:/etc/clickhouse-server/tls/server.key:ro" \
   docker.io/clickhouse/clickhouse-server:25.8.2.29@sha256:74c213b4d4cb4854c2497694df0c2d153c041003eadbb0457ae62c28cb8d723f >/dev/null
+ch_https_port=$(docker port "$clickhouse_container" 8443/tcp)
+ch_https_port=${ch_https_port##*:}
 ch() { docker exec "$clickhouse_container" clickhouse-client --user bcdc_probe --password "$ch_password" "$@"; }
 ready=false
 for _ in $(seq 1 90); do
@@ -182,6 +183,12 @@ SQL
 ) &
 workload_pid=$!
 python3 "$repo/scripts/e2e/article3_bootstrap_progress.py" state/boring.db "$packet/progress.json" "$connector_pid"
+"$binary" status --json | jq -e '
+  .. | objects | select(has("backfill")) | .backfill
+  | del(.progress.run_id)
+  | select(.generation > 0 and .progress.total_chunks > 0
+      and .progress.completed_rows >= 0 and (.progress | has("eta_ms")))
+' >"$packet/backfill-status.json"
 wait "$workload_pid"
 workload_pid=""
 

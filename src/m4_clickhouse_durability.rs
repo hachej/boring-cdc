@@ -908,6 +908,9 @@ fn verify_remote_events(
     batch: &PreparedBatch,
     remote_events: &[RemoteEventIdentity],
 ) -> Result<(), DurabilityError> {
+    if batch.marker.first_journal_seq == 0 && batch.marker.last_journal_seq == 0 {
+        return verify_remote_snapshot_events(batch, remote_events);
+    }
     let expected = batch
         .events
         .iter()
@@ -979,6 +982,61 @@ fn verify_remote_events(
     {
         return Err(DurabilityError::Conflict(
             "remote event set is incomplete or foreign",
+        ));
+    }
+    Ok(())
+}
+
+fn verify_remote_snapshot_events(
+    batch: &PreparedBatch,
+    remote_events: &[RemoteEventIdentity],
+) -> Result<(), DurabilityError> {
+    // Snapshot rows share the reserved zero journal sequence. Their stable IDs instead
+    // bind the imported key, chunk and generation. Keep the batch's snapshot order for its digest.
+    let mut ordered_ids = std::collections::BTreeSet::new();
+    let mut observed = BTreeMap::new();
+    for event in remote_events {
+        let proof = (
+            event.payload_hash.as_str(),
+            event.canonical_payload.as_slice(),
+        );
+        if event.journal_seq != 0
+            || format!("{:x}", Sha256::digest(proof.1)) != proof.0
+            || observed
+                .insert(event.connector_event_id.as_str(), proof)
+                .is_some_and(|previous| previous != proof)
+        {
+            return Err(DurabilityError::Conflict(
+                "remote snapshot event proof differs",
+            ));
+        }
+    }
+    let mut ordered = Vec::with_capacity(batch.events.len());
+    for event in &batch.events {
+        let id = event.connector_event_id.as_str();
+        let Some(&(hash, payload)) = observed.get(id) else {
+            return Err(DurabilityError::Conflict("remote snapshot event missing"));
+        };
+        if event.journal_seq != 0
+            || !ordered_ids.insert(id)
+            || (hash, payload)
+                != (
+                    event.payload_hash.as_str(),
+                    event.canonical_payload.as_slice(),
+                )
+        {
+            return Err(DurabilityError::Conflict(
+                "remote snapshot event binding differs",
+            ));
+        }
+        ordered.push((0, id, hash));
+    }
+    if observed.len() != ordered.len()
+        || observed.len() as u64 != batch.marker.event_count
+        || ordered_identity_digest(ordered) != batch.marker.ordered_event_digest
+    {
+        return Err(DurabilityError::Conflict(
+            "remote snapshot batch contains foreign events",
         ));
     }
     Ok(())
@@ -1573,6 +1631,36 @@ mod tests {
         let batch = prepare_batch(&transaction, &context(), range).unwrap();
         transaction.commit().unwrap();
         batch
+    }
+
+    #[test]
+    fn snapshot_readback_checks_multiple_zero_sequence_rows_by_event_id() {
+        let (_path, mut writer) = writer("snapshot-readback");
+        seed(&mut writer);
+        let mut batch = prepare(&mut writer, copied(false));
+        for event in &mut batch.events {
+            event.journal_seq = 0;
+        }
+        batch.marker.first_journal_seq = 0;
+        batch.marker.last_journal_seq = 0;
+        batch.marker.ordered_event_digest = ordered_event_digest(&batch.events);
+        let mut readback: Vec<_> = batch
+            .events
+            .iter()
+            .rev()
+            .map(|event| RemoteEventIdentity {
+                journal_seq: event.journal_seq,
+                connector_event_id: event.connector_event_id.clone(),
+                payload_hash: event.payload_hash.clone(),
+                canonical_payload: event.canonical_payload.clone(),
+            })
+            .collect();
+        readback.push(readback[0].clone());
+        assert_eq!(verify_remote_events(&batch, &readback), Ok(()));
+        readback[2].connector_event_id = "foreign-snapshot-event".into();
+        assert!(verify_remote_events(&batch, &readback).is_err());
+        readback.truncate(1);
+        assert!(verify_remote_events(&batch, &readback).is_err());
     }
 
     #[test]

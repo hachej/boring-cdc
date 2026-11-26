@@ -39,6 +39,7 @@ def sample(db):
 def main():
     database, output, pid, *mode = sys.argv[1:]
     deadline = time.monotonic() + (1 if mode else 180)
+    incomplete = None
     with sqlite3.connect(f"file:{Path(database).resolve()}?mode=ro", uri=True, timeout=1) as db:
         while time.monotonic() < deadline:
             os.kill(int(pid), 0)
@@ -52,8 +53,12 @@ def main():
                 head = observed["journal_head"]
                 caught_up = head is not None and observed["clickhouse_checkpoints"] == [head]
                 return 0 if anchor and 0 < done == total and events >= 18 and caught_up else 1
-            if 0 < done < total and events > 0 and anchor is None:
-                return 0
+            if 0 < done < total and anchor is None:
+                if incomplete is None:
+                    incomplete = observed
+                elif done > incomplete["chunks_done"] and events > incomplete["durable_business_events"]:
+                    Path(output).write_text(json.dumps({"before":incomplete,"after":observed}, indent=2, sort_keys=True) + "\n")
+                    return 0
             if anchor is not None:
                 print("Anchor completed before overlap was observed", file=sys.stderr)
                 return 1

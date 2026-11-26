@@ -767,6 +767,9 @@ fn prepare_next_snapshot(
         |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?,
             r.get(3)?, r.get(4)?, r.get::<_, String>(5)?, r.get::<_, String>(6)?)),
     )?;
+    if source.6 != "pgoutput-v1" {
+        return Err(LeaseError::Conflict);
+    }
     let identity = SourceIdentity {
         system_identifier: source.0.parse().map_err(|_| LeaseError::Conflict)?,
         timeline: source.1.parse().map_err(|_| LeaseError::Conflict)?,
@@ -775,7 +778,7 @@ fn prepare_next_snapshot(
         plugin: source.4,
         publication_fingerprint: Fingerprint::from_lower_hex(&source.5)
             .ok_or(LeaseError::Conflict)?,
-        protocol_fingerprint: Fingerprint::from_lower_hex(&source.6).ok_or(LeaseError::Conflict)?,
+        protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
     };
     let table = LogicalTableIdentity::derive(
         &identity,

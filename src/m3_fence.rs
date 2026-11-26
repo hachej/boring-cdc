@@ -11,6 +11,7 @@ use pg_walstream::{PgParameter, PgReplicationConnection, ReplicationError};
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::borrow::BorrowMut;
 use std::fmt;
 
 pub const OWNER_BEAD: &str = "boring-cdc-m3-fence";
@@ -347,8 +348,8 @@ impl FeedbackGate for PersistedFeedbackGate<'_> {
     }
 }
 
-pub struct FenceStore {
-    writer: WriterConnection,
+pub struct FenceStore<W = WriterConnection> {
+    writer: W,
 }
 impl FenceStore {
     pub fn open(writer: WriterConnection) -> Result<Self, FenceError> {
@@ -359,6 +360,12 @@ impl FenceStore {
     pub fn into_writer(self) -> WriterConnection {
         self.writer
     }
+}
+
+impl<W: BorrowMut<WriterConnection>> FenceStore<W> {
+    pub(crate) fn borrow_writer(writer: W) -> Self {
+        Self { writer }
+    }
 
     /// Dispatch only the persisted intent. A crash after the source UPDATE retries the same nonce.
     pub fn dispatch_source(
@@ -367,20 +374,7 @@ impl FenceStore {
         source: &mut PgReplicationConnection,
     ) -> Result<(), FenceError> {
         let dispatch = self.load_dispatch(intent_id)?;
-        let epoch = dispatch.capture_epoch.to_string();
-        let generation = dispatch.generation.to_string();
-        let result = source.exec_params(
-            &dispatch.sql,
-            &[
-                PgParameter::Text(epoch),
-                PgParameter::Text(generation),
-                PgParameter::Binary(dispatch.table_set_fingerprint.to_vec()),
-                PgParameter::Binary(dispatch.nonce.to_vec()),
-            ],
-        )?;
-        if result.ntuples() != 1 || result.get_value(0, 0).as_deref() != Some("1") {
-            return Err(FenceError::Conflict("M3_FENCE_CONTROL_CARDINALITY"));
-        }
+        execute_fence_dispatch(dispatch, source)?;
         self.mark_dispatched(intent_id, 1)
     }
 
@@ -392,6 +386,7 @@ impl FenceStore {
         validate_input(input)?;
         let tx = self
             .writer
+            .borrow_mut()
             .connection_mut()
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         type DispatchProof = (
@@ -452,7 +447,7 @@ impl FenceStore {
 
     /// Reloads the immutable dispatch after a crash before or after the source UPDATE.
     pub fn load_dispatch(&self, intent_id: &str) -> Result<FenceDispatch, FenceError> {
-        let row:Option<(String,i64,String,String)>=self.writer.connection().query_row(
+        let row:Option<(String,i64,String,String)>=self.writer.borrow().connection().query_row(
             "SELECT fi.capture_epoch,fi.generation,fi.table_set_fingerprint,fi.nonce FROM m3_fence_intents fi JOIN bootstrap_imports bi ON bi.import_id=fi.import_id AND bi.intent_id=fi.bootstrap_intent_id AND bi.destination_id=fi.destination_id AND bi.state='acknowledged' JOIN m3_canonical_import_proofs q ON q.import_id=fi.import_id AND q.destination_id=fi.destination_id AND q.capture_epoch=fi.capture_epoch AND q.generation=fi.generation AND q.configuration_fingerprint=fi.configuration_fingerprint JOIN m3_bootstrap_runtime x ON x.intent_id=fi.bootstrap_intent_id AND x.generation=fi.generation AND x.configuration_fingerprint=fi.configuration_fingerprint AND x.table_set_fingerprint=fi.table_set_fingerprint JOIN m3_feedback_gates f ON f.intent_id=fi.bootstrap_intent_id AND f.generation=fi.generation AND f.state='open' JOIN backfill_generations g ON g.generation_id=fi.generation_id AND g.generation=fi.generation AND g.intended_fence_nonce=fi.nonce AND g.state='fencing' JOIN backfill_runs b ON b.run_id=g.run_id AND b.destination_id=fi.destination_id AND b.capture_epoch=fi.capture_epoch JOIN destinations d ON d.destination_id=fi.destination_id AND d.capture_epoch=fi.capture_epoch AND d.generation=fi.generation AND d.configuration_fingerprint=fi.configuration_fingerprint WHERE fi.intent_id=?1 AND fi.state IN ('intended','dispatched') AND NOT EXISTS(SELECT 1 FROM backfill_chunks c WHERE c.generation_id=fi.generation_id AND c.state!='complete') AND NOT EXISTS(SELECT 1 FROM m3_bootstrap_importers i WHERE i.intent_id=fi.bootstrap_intent_id AND i.state!='acknowledged')",
             [intent_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
         ).optional()?;
@@ -479,7 +474,7 @@ impl FenceStore {
         if affected_rows != 1 {
             return Err(FenceError::Conflict("M3_FENCE_CONTROL_CARDINALITY"));
         }
-        let state: String = self.writer.connection().query_row(
+        let state: String = self.writer.borrow().connection().query_row(
             "SELECT state FROM m3_fence_intents WHERE intent_id=?1",
             [intent_id],
             |r| r.get(0),
@@ -487,7 +482,7 @@ impl FenceStore {
         if state == "dispatched" {
             return Ok(());
         }
-        let changed=self.writer.connection().execute("UPDATE m3_fence_intents SET state='dispatched',revision=revision+1 WHERE intent_id=?1 AND state='intended'",[intent_id])?;
+        let changed=self.writer.borrow().connection().execute("UPDATE m3_fence_intents SET state='dispatched',revision=revision+1 WHERE intent_id=?1 AND state='intended'",[intent_id])?;
         if changed != 1 {
             return Err(FenceError::Conflict("M3_FENCE_DISPATCH_STALE"));
         }
@@ -503,6 +498,7 @@ impl FenceStore {
     ) -> Result<AnchorProof, FenceError> {
         let tx = self
             .writer
+            .borrow_mut()
             .connection_mut()
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         type Intent = (
@@ -527,6 +523,23 @@ impl FenceStore {
         let Some((lsn, seq, payload)) = durable else {
             return Err(FenceError::Conflict("M3_FENCE_DURABLE_PAIR_MISSING"));
         };
+        let split_payload_installed: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='m3_captured_fence_rows')",
+            [], |r| r.get(0),
+        )?;
+        let source_row: Option<Vec<u8>> = if split_payload_installed {
+            tx.query_row(
+                "SELECT source_row FROM m3_captured_fence_rows WHERE journal_seq=?1",
+                [seq],
+                |r| r.get(0),
+            )
+            .optional()?
+        } else {
+            None
+        };
+        // The original component journal stores the raw control row in its payload. Production
+        // uses the canonical control envelope and stores the raw proof in the same commit.
+        let payload = source_row.unwrap_or(payload);
         let decoded: CapturedFenceRow = serde_json::from_slice(&payload)
             .map_err(|_| FenceError::Conflict("M3_FENCE_PAYLOAD_INVALID"))?;
         let values = decoded
@@ -762,6 +775,27 @@ fn decode_fixed<const N: usize>(value: &str) -> Result<[u8; N], FenceError> {
     }
     Ok(out)
 }
+pub(crate) fn execute_fence_dispatch(
+    dispatch: FenceDispatch,
+    source: &mut PgReplicationConnection,
+) -> Result<(), FenceError> {
+    let epoch = dispatch.capture_epoch.to_string();
+    let generation = dispatch.generation.to_string();
+    let result = source.exec_params(
+        &dispatch.sql,
+        &[
+            PgParameter::Text(epoch),
+            PgParameter::Text(generation),
+            PgParameter::Binary(dispatch.table_set_fingerprint.to_vec()),
+            PgParameter::Binary(dispatch.nonce.to_vec()),
+        ],
+    )?;
+    if result.ntuples() != 1 || result.get_value(0, 0).as_deref() != Some("1") {
+        return Err(FenceError::Conflict("M3_FENCE_CONTROL_CARDINALITY"));
+    }
+    Ok(())
+}
+
 fn dispatch(
     capture_epoch: i64,
     generation: i64,

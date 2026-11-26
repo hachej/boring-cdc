@@ -11,7 +11,7 @@ use sha2::{Digest as _, Sha256};
 use std::fmt;
 
 // M0-RECONCILED: boring-cdc-d-pg-protocol
-const SUPPORTED_SOURCE_PLUGIN: &str = "pgoutput";
+pub(crate) const SUPPORTED_SOURCE_PLUGIN: &str = "pgoutput";
 // M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED protocol zero sentinel).
 pub const PROTOCOL_ZERO_SENTINEL: ReceivedLsn = ReceivedLsn::from_wire(0);
 // M0-RECONCILED: boring-cdc-d-pg-protocol (RECOMMENDED origin policy).
