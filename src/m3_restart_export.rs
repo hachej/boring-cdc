@@ -52,6 +52,7 @@ impl fmt::Debug for ExportError {
     }
 }
 
+#[derive(Clone)]
 pub struct GuardReceipt {
     pub(crate) restart_id: String,
     pub(crate) owner_run_id: String,
@@ -74,7 +75,7 @@ pub fn record_guard_acquired(
     record_guard_pid(writer, lower, owner_run_id, guard.backend_pid, now_mono_ms)
 }
 
-fn record_guard_pid(
+pub(crate) fn record_guard_pid(
     writer: &mut WriterConnection,
     lower: &LowerStitch,
     owner_run_id: &str,
@@ -153,11 +154,19 @@ impl ExistingSlotExporter {
         if !assigned {
             return Err(ExportError::Stale);
         }
+        Self::open_sql(dsn, receipt, None)
+    }
+
+    pub(crate) fn open_sql(
+        dsn: &str,
+        receipt: &GuardReceipt,
+        bounds: Option<&crate::m3_bootstrap::SessionBounds>,
+    ) -> Result<Self, ExportError> {
         let mut connection = pg_walstream::PgReplicationConnection::connect(dsn).map_err(|_| {
             ExportError::Source(BootstrapError::Conflict("M3_RESTART_EXPORT_CONNECT_FAILED"))
         })?;
         let backend_pid = query_pid(&mut connection).map_err(ExportError::Source)?;
-        if backend_pid == guard.backend_pid {
+        if backend_pid == receipt.guard_backend_pid {
             return Err(ExportError::Stale);
         }
         connection
@@ -165,6 +174,12 @@ impl ExistingSlotExporter {
             .map_err(|_| {
                 ExportError::Source(BootstrapError::Conflict("M3_RESTART_EXPORT_BEGIN_FAILED"))
             })?;
+        if let Some(bounds) = bounds {
+            connection.exec(&format!(
+                "SET LOCAL statement_timeout={}; SET LOCAL idle_in_transaction_session_timeout={}",
+                bounds.statement_timeout_ms, bounds.idle_timeout_ms,
+            )).map_err(|_| ExportError::Source(BootstrapError::Conflict("M3_RESTART_EXPORT_BOUNDS_FAILED")))?;
+        }
         let snapshot_token = connection
             .exec("SELECT pg_export_snapshot()")
             .ok()
@@ -212,6 +227,14 @@ impl ExistingSlotExporter {
         Ok(())
     }
 
+    pub(crate) fn export_response(&self) -> (i32, String) {
+        (self.backend_pid, self.snapshot_token.clone())
+    }
+
+    pub(crate) fn note_persisted(&mut self) {
+        self.persisted = true;
+    }
+
     pub fn snapshot_token(&self) -> Result<&str, ExportError> {
         if self.persisted && self.connection.is_alive() {
             Ok(&self.snapshot_token)
@@ -221,7 +244,7 @@ impl ExistingSlotExporter {
     }
 }
 
-fn persist_export_row(
+pub(crate) fn persist_export_row(
     writer: &mut WriterConnection,
     receipt: &GuardReceipt,
     exporter_backend_pid: i32,

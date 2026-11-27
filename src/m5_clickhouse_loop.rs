@@ -115,6 +115,21 @@ impl DestinationWriterClient {
             .recv()
             .map_err(|_| JournalError::Conflict("destination writer unavailable"))?
     }
+    pub(crate) fn service_backfill<T: Send + 'static>(
+        &self,
+        max_writer_hold: Duration,
+        action: impl FnOnce(&mut WriterConnection) -> Result<T, JournalError> + Send + 'static,
+    ) -> Result<T, JournalError> {
+        let (response, result) = mpsc::sync_channel(1);
+        self.sender
+            .send(Box::new(move |writer| {
+                let _ = response.send(writer.service_backfill(max_writer_hold, action));
+            }))
+            .map_err(|_| JournalError::Conflict("backfill writer unavailable"))?;
+        result
+            .recv()
+            .map_err(|_| JournalError::Conflict("backfill writer unavailable"))?
+    }
 }
 
 impl DestinationWriterInbox {
@@ -191,7 +206,7 @@ impl ClickHousePump {
                 owner
                     .connection()
                     .query_row(
-                        "SELECT d.destination_id,d.generation,a.anchor_id FROM destinations d JOIN bootstrap_anchors a ON a.capture_epoch=d.capture_epoch AND a.generation=d.generation AND a.state='complete' AND a.start_seq=0 WHERE d.kind='clickhouse' AND d.capture_epoch=?1 AND d.configuration_fingerprint=?2 LIMIT 1",
+                        "SELECT d.destination_id,d.generation,a.anchor_id FROM destinations d JOIN bootstrap_anchors a ON a.capture_epoch=d.capture_epoch AND a.generation=d.generation AND a.state='complete' WHERE d.kind='clickhouse' AND d.capture_epoch=?1 AND d.configuration_fingerprint=?2 LIMIT 1",
                         rusqlite::params![epoch, fingerprint],
                         |row| Ok((row.get::<_, String>(0)?, row.get::<_, u64>(1)?, row.get::<_, String>(2)?)),
                     )
@@ -488,6 +503,7 @@ impl ClickHousePump {
 
     fn start_next(&mut self, writer: &mut DestinationWriterClient) -> Result<(), &'static str> {
         let destination_id = self.lease.identity.destination_id.clone();
+        let anchor = self.lease.identity.anchor_id.clone();
         let (after_seq, revision) = writer
             .service_destination(Duration::from_secs(5), move |owner| {
                 owner
@@ -498,7 +514,11 @@ impl ClickHousePump {
                         |row| Ok((row.get::<_, u64>(0)?, Some(row.get::<_, u64>(1)?))),
                     )
                     .optional()
-                    .map(|value| value.unwrap_or((0, None)))
+                    .and_then(|value| match (value, anchor) {
+                        (Some(cursor), _) => Ok(cursor),
+                        (None, Some(anchor)) => owner.connection().query_row("SELECT start_seq FROM bootstrap_anchors WHERE anchor_id=?1 AND state='complete'",[anchor], |r| Ok((r.get(0)?, None))),
+                        (None,None) => Ok((0,None)),
+                    })
                     .map_err(JournalError::from)
             })
             .map_err(|_| "M5_CHECKPOINT_READ_FAILED")?;
@@ -695,10 +715,10 @@ fn prepare_next_snapshot(
     max_bytes: usize,
 ) -> Result<Option<PreparedSnapshotBatch>, crate::m2_leases::LeaseError> {
     use crate::m2_leases::LeaseError;
-    let (limit, generation_id): (u64, String) = tx.query_row(
-        "SELECT snapshot_complete_seq,generation_id FROM bootstrap_anchors WHERE anchor_id=?1",
+    let (limit, generation_id, start): (u64, String, u64) = tx.query_row(
+        "SELECT snapshot_complete_seq,generation_id,start_seq FROM bootstrap_anchors WHERE anchor_id=?1",
         [anchor],
-        |r| Ok((r.get(0)?, r.get(1)?)),
+        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
     )?;
     let latest: Option<(u64, u64, String)> = tx
         .query_row(
@@ -723,7 +743,7 @@ fn prepare_next_snapshot(
             (first, Some(last))
         }
         Some(_) => return Err(LeaseError::Conflict),
-        None => (1, None),
+        None => (start.checked_add(1).ok_or(LeaseError::Conflict)?, None),
     };
     if first > limit {
         return if m4_initial_load::baseline_verified(tx, context, anchor)
