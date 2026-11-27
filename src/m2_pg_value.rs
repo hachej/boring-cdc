@@ -445,14 +445,20 @@ fn pg_timestamptz(text: &str) -> Result<i64, ValueError> {
         "infinity" => return Ok(i64::MAX),
         _ => {}
     }
-    if text.ends_with(':') {
-        return Err(ValueError::InvalidValue);
+    let mut normalized = text.replacen(' ', "T", 1);
+    if matches!(
+        normalized
+            .as_bytes()
+            .get(normalized.len().saturating_sub(3)..),
+        Some([b'+' | b'-', b'0'..=b'9', b'0'..=b'9'])
+    ) {
+        normalized.push_str(":00");
     }
-    let value = OffsetDateTime::parse(&text.replacen(' ', "T", 1), &Rfc3339)
+    let value = OffsetDateTime::parse(&normalized, &Rfc3339)
         .or_else(|_| {
             OffsetDateTime::parse(
-                text,
-                format_description!("[year]-[month]-[day] [hour]:[minute]:[second][optional [.[subsecond]]][offset_hour sign:mandatory][optional [:]][optional [offset_minute]]"),
+                &normalized,
+                format_description!("[year]-[month]-[day]T[hour]:[minute]:[second][optional [.[subsecond]]][offset_hour sign:mandatory][optional [:]][offset_minute]"),
             )
         })
         .map_err(|_| ValueError::InvalidValue)?;
@@ -679,7 +685,8 @@ mod tests {
             ),
         ];
         for (oid, wire, expected) in cases {
-            let value = canonical_scalar(oid, -1, wire.as_bytes()).unwrap();
+            let value = canonical_scalar(oid, -1, wire.as_bytes())
+                .unwrap_or_else(|error| panic!("OID {oid} with {wire:?}: {error:?}"));
             let actual: String = value
                 .bytes
                 .iter()
