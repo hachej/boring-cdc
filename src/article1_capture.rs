@@ -317,6 +317,12 @@ pub(crate) fn preflight_active_capture(
     preflight(config, &config.expectations(), Some(expected_backend_pid))
 }
 
+pub(crate) fn preflight_idle_capture(
+    config: &CaptureConfig,
+) -> Result<BTreeMap<u32, RelationContract>, CaptureFailure> {
+    preflight(config, &config.expectations(), None)
+}
+
 fn preflight(
     config: &CaptureConfig,
     expected: &Expectations<'_>,

@@ -45,7 +45,7 @@ if log.is_file():
         r"\b(?:M[0-9]|BCDC|E)_[A-Z0-9]+(?:_[A-Z0-9]+)+\b",
         log.read_text(errors="replace"),
     )))
-for field, name in (("overlap", "progress.json"), ("convergence", "checkpoint.json"), ("oracle", "oracle.json"), ("status", "backfill-status.json")):
+for field, name in (("overlap", "progress.json"), ("convergence", "checkpoint.json"), ("oracle", "oracle.json"), ("status", "backfill-status.json"), ("before_restart", "before-restart.json")):
     if (root / name).is_file():
         observation[field] = json.loads((root / name).read_text())
 (root / "observation.json").write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n")
@@ -102,8 +102,13 @@ chmod 644 "$work/clickhouse-https.xml"
 ch_password=$(cat "$work/clickhouse_password")
 printf 'CLICKHOUSE_USER=bcdc_probe\nCLICKHOUSE_PASSWORD=%s\nCLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1\n' "$ch_password" >"$work/clickhouse.env"
 chmod 600 "$work/clickhouse.env"
+clickhouse_publish=127.0.0.1::8443
+if [[ "${BCDC_ARTICLE3_BASELINE_OUTAGE:-0}" == 1 ]]; then
+  ch_https_port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
+  clickhouse_publish="127.0.0.1:$ch_https_port:8443"
+fi
 docker run -d --name "$clickhouse_container" --platform linux/amd64 \
-  -p "127.0.0.1::8443" --env-file "$work/clickhouse.env" \
+  -p "$clickhouse_publish" --env-file "$work/clickhouse.env" \
   -v "$work/clickhouse-https.xml:/etc/clickhouse-server/config.d/article3-https.xml:ro" \
   -v "$work/server.crt:/etc/clickhouse-server/tls/server.crt:ro" \
   -v "$work/server.key:/etc/clickhouse-server/tls/server.key:ro" \
@@ -135,9 +140,9 @@ ALTER TABLE public.orders RENAME COLUMN total TO payload;
 ALTER TABLE public.orders ALTER COLUMN payload TYPE text;
 INSERT INTO public.orders SELECT id, 'seed-' || id FROM generate_series(1, 10000) id;
 SQL
-export PG_ADMIN="postgresql://boring_cdc_admin:$admin_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
-export PG_RUNTIME="postgresql://boring_cdc_runtime:$runtime_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
-export PG_CONTROL="postgresql://boring_cdc_control_writer:$control_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
+export PG_ADMIN=postgresql:"//boring_cdc_admin:$admin_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
+export PG_RUNTIME=postgresql:"//boring_cdc_runtime:$runtime_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
+export PG_CONTROL=postgresql:"//boring_cdc_control_writer:$control_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
 mkdir -p "$work/run/state/tmp" "$work/run/state/spool" "$work/run/archive/root"
 sed -e 's/total = "numeric:nullable"/payload = "text:nullable"/' \
   -e 's/verify_tls = true/verify_tls = false/' \
@@ -190,8 +195,35 @@ python3 "$repo/scripts/e2e/article3_bootstrap_progress.py" state/boring.db "$pac
       and .progress.completed_rows >= 0 and (.progress | has("eta_ms")))
 ' >"$work/backfill-status.json"
 cp -f "$work/backfill-status.json" "$packet/backfill-status.json"
+if [[ "${BCDC_ARTICLE3_BASELINE_OUTAGE:-0}" == 1 ]]; then
+  stage=stop_clickhouse_before_baseline
+  docker stop "$clickhouse_container" >/dev/null
+fi
 wait "$workload_pid"
 workload_pid=""
+
+if [[ "${BCDC_ARTICLE3_BASELINE_OUTAGE:-0}" == 1 ]]; then
+  stage=wait_for_failed_baseline_dispatch
+  deadline=$((SECONDS+120))
+  until grep -q 'code=M5_SNAPSHOT_READBACK_FAILED' "$work/connector.log"; do
+    kill -0 "$connector_pid"
+    (( SECONDS < deadline ))
+    sleep .2
+  done
+  python3 "$repo/scripts/e2e/article3_bootstrap_progress.py" state/boring.db "$packet/before-restart.json" "$connector_pid" checkpoint && exit 1
+  jq -e '.complete_anchor != null and .clickhouse_checkpoints == []' "$packet/before-restart.json" >/dev/null
+  stage=restore_clickhouse_and_restart
+  docker start "$clickhouse_container" >/dev/null
+  deadline=$((SECONDS+60))
+  until ch --query 'SELECT 1' >/dev/null 2>&1; do
+    (( SECONDS < deadline ))
+    sleep .2
+  done
+  kill -TERM "$connector_pid"
+  wait "$connector_pid"
+  "$binary" run >>"$work/connector.log" 2>&1 &
+  connector_pid=$!
+fi
 
 stage=converge
 deadline=$((SECONDS+900))

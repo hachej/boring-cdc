@@ -9,10 +9,8 @@ work=$(mktemp -d /var/tmp/volume-bound-probe.XXXXXX)
 project="volume-bound-probe-$RANDOM-$$"
 port=$((54000 + $$ % 1000))
 runtime_pid=
-bootstrap_pid=
 cleanup() {
   [[ -z "$runtime_pid" ]] || kill -KILL "$runtime_pid" >/dev/null 2>&1 || true
-  [[ -z "$bootstrap_pid" ]] || kill -KILL "$bootstrap_pid" >/dev/null 2>&1 || true
   docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true
   rm -rf "$work"
 }
@@ -60,6 +58,8 @@ binary="$PWD/target/debug/boring-cdc"
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"
 chmod 700 "$work/run" "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
 cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
+sed -i -e "s/127.0.0.1:8787/127.0.0.1:$((62000 + $$ % 1000))/" \
+  -e "s/127.0.0.1:8788/127.0.0.1:$((63000 + $$ % 1000))/" "$work/run/boring-cdc.toml"
 python3 - "$work/run/boring-cdc.toml" <<'PYC'
 from pathlib import Path
 import sys
@@ -77,17 +77,10 @@ export PG_RUNTIME=postgresql:"//boring_cdc_runtime:${runtime_credential}@127.0.0
 export PG_CONTROL=postgresql:"//boring_cdc_control_writer:${control_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export CH_RUNTIME='https://unused.invalid'
 
-(cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run --bootstrap >"$work/bootstrap.out" 2>"$work/bootstrap.err") &
-bootstrap_pid=$!
-deadline=$((SECONDS+30))
-until [[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot' and plugin='pgoutput'")" == 1 ]]; do
-  (( SECONDS < deadline )) || { cat "$work/bootstrap.err" >&2; exit 1; }
-  kill -0 "$bootstrap_pid" 2>/dev/null || { wait "$bootstrap_pid"; exit 1; }
-  sleep .1
-done
-sleep 1
-stop_bounded "$bootstrap_pid" INT bootstrap
-bootstrap_pid=
+env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u BORING_CDC_M2_FAULT_HOOK \
+  BCDC_M2_SLOT_FIXTURE_DIR="$work/run" cargo test --quiet --locked --lib \
+  m3_bootstrap::live_tests::prepare_slot_only_for_m2_fixture -- --ignored --exact
+[[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot' and plugin='pgoutput'")" == 1 ]]
 
 journal="$work/run/state/boring.db"
 journal_transactions() {
