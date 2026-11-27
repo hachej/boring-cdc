@@ -8,4 +8,6 @@ The source impact run completed the bounded backfill in 272.570 seconds, and an 
 
 The steady initial bootstrap also passed on the updated runtime at `000b0ca3e7ec6fdfa6fc508506eed06519b731da`. [Steady packet](bootstrap/ci-45951142035-steady/observation.json) · [CI run 45951142035](https://github.com/hachej/boring-cdc/actions/runs/45951142035)
 
+The same CI run stopped ClickHouse before baseline delivery and left the completed anchor with no destination checkpoint. After ClickHouse returned, an ordinary `run` on the same configuration recovered baseline delivery. The final ClickHouse checkpoint and journal head were both 123, and all 10,000 candidate keys matched PostgreSQL. [Baseline restart packet](bootstrap/ci-45951142035-baseline-restart/observation.json)
+
 Replacement generation recovery and the full targeted mutation run still need passing CI packets.
