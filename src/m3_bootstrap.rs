@@ -1296,7 +1296,7 @@ fn quote_relation(v: &str) -> Result<String, BootstrapError> {
 }
 
 #[cfg(test)]
-mod live_tests {
+pub(crate) mod live_tests {
     /// Provisions the slot for M2-only capture tests without producing any M3 events.
     #[test]
     #[ignore = "needs initialized isolated PostgreSQL and SQLite fixture"]
@@ -1359,7 +1359,7 @@ mod live_tests {
     }
 
     use super::*;
-    fn live_identity(
+    pub(crate) fn live_identity(
         dsn: &str,
         publication: &str,
         relation: &str,

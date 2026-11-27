@@ -29,14 +29,18 @@ psql_cmd=(psql -X -v ON_ERROR_STOP=1 -At -h 127.0.0.1 -p "$port" -U boring_cdc -
 cat >"$work/fixture.sql" <<'SQL'
 DROP PUBLICATION IF EXISTS boring_cdc_m3_planner_pub;
 DROP TABLE IF EXISTS m3_planner_fixture;
-CREATE TABLE m3_planner_fixture(tenant bigint NOT NULL, id uuid NOT NULL, payload text NOT NULL, PRIMARY KEY(tenant,id));
-CREATE PUBLICATION boring_cdc_m3_planner_pub FOR TABLE m3_planner_fixture;
+-- Capture admits a single primary key. The planner test reads the separate composite index.
+CREATE TABLE m3_planner_fixture(capture_id bigint PRIMARY KEY, tenant bigint NOT NULL, id uuid NOT NULL, payload text NOT NULL, UNIQUE(tenant,id));
+CREATE SCHEMA boring_cdc_control;
+CREATE TABLE boring_cdc_control.heartbeat(id smallint PRIMARY KEY CHECK(id=1),nonce bigint NOT NULL,updated_at timestamptz NOT NULL);
+CREATE TABLE boring_cdc_control.capture_fences(id smallint PRIMARY KEY CHECK(id=1),capture_epoch bigint NOT NULL,generation bigint NOT NULL,table_set_fingerprint bytea NOT NULL,unique_nonce bytea NOT NULL);
+CREATE PUBLICATION boring_cdc_m3_planner_pub FOR TABLE m3_planner_fixture,boring_cdc_control.heartbeat,boring_cdc_control.capture_fences;
 INSERT INTO m3_planner_fixture VALUES
-(-9223372036854775808,'00000000-0000-0000-0000-000000000000','min'),
-(-7,'00000000-0000-0000-0000-000000000001','sparse-a'),
-(-7,'80000000-0000-0000-0000-000000000000','sparse-b'),
-(0,'ffffffff-ffff-ffff-ffff-ffffffffffff','zero'),
-(9223372036854775807,'ffffffff-ffff-ffff-ffff-ffffffffffff','max');
+(1,-9223372036854775808,'00000000-0000-0000-0000-000000000000','min'),
+(2,-7,'00000000-0000-0000-0000-000000000001','sparse-a'),
+(3,-7,'80000000-0000-0000-0000-000000000000','sparse-b'),
+(4,0,'ffffffff-ffff-ffff-ffff-ffffffffffff','zero'),
+(5,9223372036854775807,'ffffffff-ffff-ffff-ffff-ffffffffffff','max');
 SQL
 "${psql_cmd[@]}" -f "$work/fixture.sql" >/dev/null
 for attempt in 1 2; do
