@@ -4,4 +4,8 @@ The shipped initial backfill copied 10,000 rows in 400 chunks. WAL capture conti
 
 The killed-backfill run ended at 900 of 2,000 chunks. The restart exited with `M3_BOOTSTRAP_RECOVERY_REQUIRED` before any replacement generation appeared. [Failed recovery packet](kill_backfill/attempt-45950921196/README.md) · [CI run 45950921196](https://github.com/hachej/boring-cdc/actions/runs/45950921196)
 
-Replacement generation recovery, targeted mutation, and source impact with naive control still need passing CI packets.
+The source impact run completed the bounded backfill in 272.570 seconds, and an actual `ALTER TABLE` succeeded after 5.242 seconds once the connector invalidated the generation and released its guard. The plain stream took 0.449 seconds and yielded just five latency samples. [Source impact packet](source_impact/attempt-45950920225/README.md) · [CI run 45950920225](https://github.com/hachej/boring-cdc/actions/runs/45950920225)
+
+The steady initial bootstrap also passed on the updated runtime at `000b0ca3e7ec6fdfa6fc508506eed06519b731da`. [Steady packet](bootstrap/ci-45951142035-steady/observation.json) · [CI run 45951142035](https://github.com/hachej/boring-cdc/actions/runs/45951142035)
+
+Replacement generation recovery and the full targeted mutation run still need passing CI packets.

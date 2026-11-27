@@ -9,8 +9,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-packet = Path(__file__).resolve().parent
-repo = packet.parents[2]
+default_packet = Path(__file__).resolve().parent
+repo = default_packet.parents[2]
 
 
 def require(condition, code):
@@ -19,11 +19,15 @@ def require(condition, code):
 
 
 def main():
+    packet = Path(sys.argv[1]).resolve() if len(sys.argv) == 2 else default_packet
     manifest = json.loads((packet / "manifest.json").read_text())
     require(re.fullmatch(r"[0-9a-f]{40}", manifest["git_commit"]), "E_COMMIT")
     require(re.fullmatch(r"[0-9]+", manifest["ci_run_id"] or ""), "E_CI_RUN")
     expected = {"backfill-status.json", "candidate-rows.jsonl", "checkpoint.json",
                 "observation.json", "oracle.json", "progress.json", "source-oracle.tsv"}
+    has_restart = "before-restart.json" in manifest["files"]
+    if has_restart:
+        expected.add("before-restart.json")
     require(set(manifest["files"]) == expected, "E_INVENTORY")
     for name, digest in manifest["files"].items():
         require(hashlib.sha256((packet / name).read_bytes()).hexdigest() == digest, "E_DIGEST_" + name)
@@ -39,6 +43,15 @@ def main():
         "E_OVERLAP",
     )
     convergence = obs["convergence"]
+    if has_restart:
+        before_restart = json.loads((packet / "before-restart.json").read_text())
+        require(
+            obs["before_restart"] == before_restart
+            and before_restart["complete_anchor"] == convergence["complete_anchor"]
+            and before_restart["clickhouse_checkpoints"] == []
+            and "M5_SNAPSHOT_READBACK_FAILED" in obs["connector_codes"],
+            "E_BASELINE_RESTART",
+        )
     rows, fence_seq = convergence["complete_anchor"]
     head = convergence["journal_head"]
     require(

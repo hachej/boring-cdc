@@ -1,0 +1,95 @@
+{
+  "arm": "naive",
+  "copied_bytes": 103888895,
+  "copied_rows": 200000,
+  "duration_ms": 449.316239,
+  "end_copy_metrics": {
+    "backend_xmin_age_xids": null,
+    "dead_tuples_estimate": 1,
+    "elapsed_ms": 544.656397,
+    "longest_transaction_ms": null,
+    "retained_slot_wal_bytes": null,
+    "slot_active": null,
+    "snapshot_session_transaction_ms": null,
+    "source_cpu_usage_usec": 2094876,
+    "source_io_rbytes": 0,
+    "source_io_wbytes": 317349888,
+    "table_lock_waiters": []
+  },
+  "latency": {
+    "count": 5,
+    "p50_ms": 0.494866,
+    "p95_ms": 1.817477,
+    "p99_ms": 1.817477
+  },
+  "pre_copy_metrics": {
+    "backend_xmin_age_xids": null,
+    "dead_tuples_estimate": 0,
+    "elapsed_ms": 77.184202,
+    "longest_transaction_ms": null,
+    "retained_slot_wal_bytes": null,
+    "slot_active": null,
+    "snapshot_session_transaction_ms": null,
+    "source_cpu_usage_usec": 1623310,
+    "source_io_rbytes": 0,
+    "source_io_wbytes": 317341696,
+    "table_lock_waiters": []
+  },
+  "reader_samples": [
+    {
+      "elapsed_ms": 31.837376,
+      "latency_ms": 1.817477
+    },
+    {
+      "elapsed_ms": 130.776731,
+      "latency_ms": 0.669786
+    },
+    {
+      "elapsed_ms": 230.668822,
+      "latency_ms": 0.466814
+    },
+    {
+      "elapsed_ms": 330.794517,
+      "latency_ms": 0.494866
+    },
+    {
+      "elapsed_ms": 430.772488,
+      "latency_ms": 0.379432
+    }
+  ],
+  "result": "pass",
+  "sampled_peaks": {
+    "backend_xmin_age_xids": null,
+    "dead_tuples_estimate": 1,
+    "longest_transaction_ms": null,
+    "retained_slot_wal_bytes": null,
+    "snapshot_session_transaction_ms": null
+  },
+  "samples": [
+    {
+      "backend_xmin_age_xids": null,
+      "dead_tuples_estimate": 0,
+      "elapsed_ms": 98.639733,
+      "longest_transaction_ms": null,
+      "reader_latency_in_second": {
+        "count": 5,
+        "p50_ms": 0.494866,
+        "p95_ms": 1.817477,
+        "p99_ms": 1.817477
+      },
+      "retained_slot_wal_bytes": null,
+      "slot_active": null,
+      "snapshot_session_transaction_ms": null,
+      "source_cpu_usage_usec": 1722545,
+      "source_io_rbytes": 0,
+      "source_io_wbytes": 317349888,
+      "table_lock_waiters": []
+    }
+  ],
+  "source_counter_delta": {
+    "source_cpu_usage_usec": 471566,
+    "source_io_rbytes": 0,
+    "source_io_wbytes": 8192
+  },
+  "workload_commits_during_copy": 1
+}
