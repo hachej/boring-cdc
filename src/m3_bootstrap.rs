@@ -9,6 +9,7 @@ use crate::m2_schema::WriterConnection;
 use rusqlite::params;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use std::borrow::BorrowMut;
 use std::fmt;
 
 pub const OWNER_BEAD: &str = "boring-cdc-m3-bootstrap";
@@ -154,8 +155,8 @@ pub struct RedactedStatus {
     pub revision: u64,
 }
 
-pub struct BootstrapStore {
-    writer: WriterConnection,
+pub struct BootstrapStore<W = WriterConnection> {
+    writer: W,
 }
 impl BootstrapStore {
     pub fn open(writer: WriterConnection) -> Result<Self, BootstrapError> {
@@ -168,10 +169,16 @@ impl BootstrapStore {
     pub fn into_writer(self) -> WriterConnection {
         self.writer
     }
+}
+
+impl<W: BorrowMut<WriterConnection>> BootstrapStore<W> {
+    pub(crate) fn borrow_writer(writer: W) -> Self {
+        Self { writer }
+    }
 
     pub fn prepare(&mut self, input: &PrepareIntent) -> Result<(), BootstrapError> {
         validate_prepare(input)?;
-        let tx = self.writer.connection_mut().transaction()?;
+        let tx = self.writer.borrow_mut().connection_mut().transaction()?;
         tx.execute(
             "INSERT INTO bootstrap_intents(intent_id,capture_epoch,source_system_id,database_id,slot_name,creation_floor_lsn,state,revision,created_at) VALUES(?1,?2,?3,?4,?5,NULL,'prepared',0,?6)",
             params![input.intent_id,input.capture_epoch,input.source_system_id,input.database_id,input.slot_name,input.created_at],
@@ -198,7 +205,7 @@ impl BootstrapStore {
         if guard_backend_pid <= 0 {
             return Err(BootstrapError::Invalid("M3_GUARD_PID_INVALID"));
         }
-        let changed = self.writer.connection().execute(
+        let changed = self.writer.borrow().connection().execute(
             "UPDATE m3_bootstrap_runtime SET guard_liveness='held',guard_backend_pid=?2,revision=revision+1 WHERE intent_id=?1 AND state='prepared' AND guard_liveness='not_started' AND guard_backend_pid IS NULL",
             params![intent_id, guard_backend_pid],
         )?;
@@ -224,7 +231,7 @@ impl BootstrapStore {
             return Err(BootstrapError::Invalid("M3_EXPORT_RESPONSE_INVALID"));
         }
         let lsn = format!("{:016X}", response.consistent_lsn);
-        let tx = self.writer.connection_mut().transaction()?;
+        let tx = self.writer.borrow_mut().connection_mut().transaction()?;
         let changed = tx.execute(
             "UPDATE m3_bootstrap_runtime SET snapshot_token=?2,consistent_lsn=?3,start_seq=?4,exporter_liveness='command_idle',exporter_backend_pid=?5,snapshot_promotable=1,state='imports_pending',revision=revision+1 WHERE intent_id=?1 AND state='prepared' AND guard_liveness='held' AND exporter_liveness='not_started'",
             params![intent_id,response.snapshot_token,lsn,response.start_seq,response.exporter_backend_pid],
@@ -256,7 +263,7 @@ impl BootstrapStore {
         if capture_backend_pid <= 0 {
             return Err(BootstrapError::Invalid("M3_CAPTURE_PID_INVALID"));
         }
-        let changed = self.writer.connection().execute(
+        let changed = self.writer.borrow().connection().execute(
             "UPDATE m3_bootstrap_runtime SET capture_backend_pid=?2,revision=revision+1 WHERE intent_id=?1 AND state='imports_pending' AND capture_backend_pid IS NULL AND exporter_backend_pid!=?2",
             params![intent_id, capture_backend_pid],
         )?;
@@ -308,7 +315,7 @@ impl BootstrapStore {
         importer_id: &str,
         proof: &SnapshotSchemaProof,
     ) -> Result<(), BootstrapError> {
-        let tx = self.writer.connection_mut().transaction()?;
+        let tx = self.writer.borrow_mut().connection_mut().transaction()?;
         let changed = tx.execute("UPDATE m3_bootstrap_importers SET state='contract_bound',snapshot_schema_fingerprint=?3,revision=revision+1 WHERE intent_id=?1 AND importer_id=?2 AND state='snapshot_set_first' AND NOT EXISTS(SELECT 1 FROM m3_snapshot_schema_proofs WHERE intent_id=?1 AND importer_id=?2)",params![intent_id,importer_id,proof.schema_fingerprint])?;
         if changed != 1 {
             return Err(BootstrapError::Conflict("M3_IMPORTED_SCHEMA_STALE"));
@@ -322,13 +329,13 @@ impl BootstrapStore {
         intent_id: &str,
         importer_id: &str,
     ) -> Result<(), BootstrapError> {
-        let generation: i64 = self.writer.connection().query_row(
+        let generation: i64 = self.writer.borrow().connection().query_row(
             "SELECT generation FROM m3_bootstrap_runtime WHERE intent_id=?1",
             [intent_id],
             |r| r.get(0),
         )?;
         crate::m3_fence::acknowledge_and_open(
-            self.writer.connection_mut(),
+            self.writer.borrow_mut().connection_mut(),
             intent_id,
             importer_id,
             generation as u64,
@@ -336,7 +343,7 @@ impl BootstrapStore {
         .map_err(|_| BootstrapError::Conflict("M3_IMPORT_ACK_GATE_STALE"))
     }
     pub fn release_exporter(&mut self, intent_id: &str) -> Result<(), BootstrapError> {
-        let changed=self.writer.connection().execute("UPDATE m3_bootstrap_runtime SET state='exporter_released',exporter_liveness='released',revision=revision+1 WHERE intent_id=?1 AND state='exporter_release_permitted' AND NOT EXISTS(SELECT 1 FROM m3_bootstrap_importers WHERE intent_id=?1 AND state!='acknowledged')",[intent_id])?;
+        let changed=self.writer.borrow().connection().execute("UPDATE m3_bootstrap_runtime SET state='exporter_released',exporter_liveness='released',revision=revision+1 WHERE intent_id=?1 AND state='exporter_release_permitted' AND NOT EXISTS(SELECT 1 FROM m3_bootstrap_importers WHERE intent_id=?1 AND state!='acknowledged')",[intent_id])?;
         if changed != 1 {
             return Err(BootstrapError::Conflict(
                 "M3_EXPORTER_RELEASE_NOT_PERMITTED",
@@ -352,13 +359,13 @@ impl BootstrapStore {
         intent_id: &str,
         lost_session: &str,
     ) -> Result<(), BootstrapError> {
-        let generation: i64 = self.writer.connection().query_row(
+        let generation: i64 = self.writer.borrow().connection().query_row(
             "SELECT generation FROM m3_bootstrap_runtime WHERE intent_id=?1",
             [intent_id],
             |r| r.get(0),
         )?;
         crate::m3_fence::invalidate_and_release(
-            self.writer.connection_mut(),
+            self.writer.borrow_mut().connection_mut(),
             intent_id,
             generation as u64,
             lost_session,
@@ -373,17 +380,18 @@ impl BootstrapStore {
         wal_continuous: bool,
         provenance_matches: bool,
     ) -> Result<ReconcileDecision, BootstrapError> {
-        let (state, token): (String, Option<String>) = self.writer.connection().query_row(
-            "SELECT state,snapshot_token FROM m3_bootstrap_runtime WHERE intent_id=?1",
-            [intent_id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
-        )?;
+        let (state, token): (String, Option<String>) =
+            self.writer.borrow().connection().query_row(
+                "SELECT state,snapshot_token FROM m3_bootstrap_runtime WHERE intent_id=?1",
+                [intent_id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )?;
         if state == "prepared" && !remote_slot_exists {
             return Ok(ReconcileDecision::RetryPreparedCreation);
         }
         if state == "prepared" && remote_slot_exists && token.is_none() {
             crate::m3_fence::reconcile_and_release(
-                self.writer.connection_mut(),
+                self.writer.borrow_mut().connection_mut(),
                 intent_id,
                 "bootstrap_ambiguous_requires_restart",
             )
@@ -393,7 +401,7 @@ impl BootstrapStore {
         if state == "bootstrap_ambiguous_requires_restart" || state == "snapshot_unusable" {
             if remote_slot_exists && wal_continuous && provenance_matches {
                 crate::m3_fence::reconcile_and_release(
-                    self.writer.connection_mut(),
+                    self.writer.borrow_mut().connection_mut(),
                     intent_id,
                     "existing_slot_generation_required",
                 )
@@ -401,7 +409,7 @@ impl BootstrapStore {
                 return Ok(ReconcileDecision::ExistingSlotGenerationRequired);
             }
             crate::m3_fence::reconcile_and_release(
-                self.writer.connection_mut(),
+                self.writer.borrow_mut().connection_mut(),
                 intent_id,
                 "full_reseed_required",
             )
@@ -412,8 +420,8 @@ impl BootstrapStore {
     }
 
     pub fn status(&self, intent_id: &str) -> Result<RedactedStatus, BootstrapError> {
-        let mut status=self.writer.connection().query_row("SELECT intent_id,state,exporter_liveness,guard_liveness,consistent_lsn,start_seq,snapshot_promotable,feedback_gate_open,revision FROM m3_bootstrap_runtime WHERE intent_id=?1",[intent_id],|r|Ok(RedactedStatus{intent_id:r.get(0)?,state:r.get(1)?,exporter_liveness:r.get(2)?,guard_liveness:r.get(3)?,creation_floor_lsn:r.get(4)?,start_seq:r.get::<_,Option<i64>>(5)?.map(|v|v as u64),acknowledged_importers:0,expected_importers:0,snapshot_promotable:r.get::<_,i64>(6)?==1,feedback_gate_open:r.get::<_,i64>(7)?==1,revision:r.get::<_,i64>(8)? as u64}))?;
-        (status.expected_importers,status.acknowledged_importers)=self.writer.connection().query_row("SELECT count(*),sum(state='acknowledged') FROM m3_bootstrap_importers WHERE intent_id=?1",[intent_id],|r|Ok((r.get::<_,i64>(0)? as u64,r.get::<_,i64>(1)? as u64)))?;
+        let mut status=self.writer.borrow().connection().query_row("SELECT intent_id,state,exporter_liveness,guard_liveness,consistent_lsn,start_seq,snapshot_promotable,feedback_gate_open,revision FROM m3_bootstrap_runtime WHERE intent_id=?1",[intent_id],|r|Ok(RedactedStatus{intent_id:r.get(0)?,state:r.get(1)?,exporter_liveness:r.get(2)?,guard_liveness:r.get(3)?,creation_floor_lsn:r.get(4)?,start_seq:r.get::<_,Option<i64>>(5)?.map(|v|v as u64),acknowledged_importers:0,expected_importers:0,snapshot_promotable:r.get::<_,i64>(6)?==1,feedback_gate_open:r.get::<_,i64>(7)?==1,revision:r.get::<_,i64>(8)? as u64}))?;
+        (status.expected_importers,status.acknowledged_importers)=self.writer.borrow().connection().query_row("SELECT count(*),sum(state='acknowledged') FROM m3_bootstrap_importers WHERE intent_id=?1",[intent_id],|r|Ok((r.get::<_,i64>(0)? as u64,r.get::<_,i64>(1)? as u64)))?;
         Ok(status)
     }
 
@@ -426,7 +434,7 @@ impl BootstrapStore {
         pid: Option<i32>,
         schema: Option<&str>,
     ) -> Result<(), BootstrapError> {
-        let changed=self.writer.connection().execute("UPDATE m3_bootstrap_importers SET state=?3,backend_pid=coalesce(?4,backend_pid),snapshot_schema_fingerprint=coalesce(?5,snapshot_schema_fingerprint),revision=revision+1 WHERE intent_id=?1 AND importer_id=?2 AND state=?6",params![intent_id,importer_id,to,pid,schema,from])?;
+        let changed=self.writer.borrow().connection().execute("UPDATE m3_bootstrap_importers SET state=?3,backend_pid=coalesce(?4,backend_pid),snapshot_schema_fingerprint=coalesce(?5,snapshot_schema_fingerprint),revision=revision+1 WHERE intent_id=?1 AND importer_id=?2 AND state=?6",params![intent_id,importer_id,to,pid,schema,from])?;
         if changed != 1 {
             return Err(BootstrapError::Conflict("M3_IMPORTER_COMPLETION_STALE"));
         }
@@ -538,6 +546,11 @@ pub struct GuardSession {
     pub backend_pid: i32,
     guarded_relations: Vec<String>,
 }
+pub(crate) struct ImporterIdentity {
+    pid: i32,
+    started: String,
+}
+
 impl GuardSession {
     pub fn acquire(
         dsn: &str,
@@ -618,7 +631,72 @@ impl GuardSession {
         }
     }
 
-    fn release_and_verify(&mut self) -> Result<(), BootstrapError> {
+    pub(crate) fn source_impact(
+        &mut self,
+        importer: &ImporterIdentity,
+    ) -> Result<serde_json::Value, BootstrapError> {
+        self.connection
+            .exec("SELECT pg_stat_clear_snapshot()")
+            .map_err(|_| BootstrapError::Conflict("M3_SOURCE_IMPACT_PROBE_FAILED"))?;
+        let relations = self
+            .guarded_relations
+            .iter()
+            .map(|relation| format!("to_regclass('{relation}')::oid"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!(
+            "SELECT jsonb_build_object(
+              'observed_unix_ms',(extract(epoch FROM clock_timestamp())*1000)::bigint,
+              'snapshot_age_ms',(SELECT (extract(epoch FROM clock_timestamp()-xact_start)*1000)::bigint FROM pg_stat_activity WHERE pid=$1::int AND backend_start=$2::timestamptz),
+              'oldest_backend_xmin_age_xids',(SELECT max(age(backend_xmin)) FROM pg_stat_activity WHERE datname=current_database()),
+              'lock_waiters',coalesce((SELECT jsonb_agg(to_jsonb(w)) FROM
+                (SELECT pid,relation::regclass::text AS relation,mode,
+                  (extract(epoch FROM clock_timestamp()-waitstart)*1000)::bigint AS age_ms
+                 FROM pg_locks WHERE NOT granted AND relation=ANY(ARRAY[{relations}])
+                 AND waitstart IS NOT NULL ORDER BY waitstart LIMIT 16) w),'[]'::jsonb)
+            )::text"
+        );
+        let result = self
+            .connection
+            .exec_params(
+                &sql,
+                &[
+                    pg_walstream::PgParameter::Text(importer.pid.to_string()),
+                    pg_walstream::PgParameter::Text(importer.started.clone()),
+                ],
+            )
+            .map_err(|_| BootstrapError::Conflict("M3_SOURCE_IMPACT_PROBE_FAILED"))?;
+        serde_json::from_str(
+            &result
+                .get_value(0, 0)
+                .ok_or(BootstrapError::Conflict("M3_SOURCE_IMPACT_PROBE_FAILED"))?,
+        )
+        .map_err(|_| BootstrapError::Conflict("M3_SOURCE_IMPACT_PROBE_FAILED"))
+    }
+
+    pub(crate) fn end_importer(
+        &mut self,
+        importer: &ImporterIdentity,
+    ) -> Result<(), BootstrapError> {
+        self.connection
+            .exec("SELECT pg_stat_clear_snapshot()")
+            .map_err(|_| BootstrapError::Conflict("M3_IMPORTER_RELEASE_UNVERIFIED"))?;
+        let result = self.connection.exec_params(
+            "SELECT pg_terminate_backend(pid,500)::text FROM pg_stat_activity WHERE pid=$1::int AND backend_start=$2::timestamptz",
+            &[
+                pg_walstream::PgParameter::Text(importer.pid.to_string()),
+                pg_walstream::PgParameter::Text(importer.started.clone())
+            ],
+        ).map_err(|_| BootstrapError::Conflict("M3_IMPORTER_RELEASE_UNVERIFIED"))?;
+        if result.ntuples() == 0 || matches!(result.get_value(0, 0).as_deref(), Some("t" | "true"))
+        {
+            Ok(())
+        } else {
+            Err(BootstrapError::Conflict("M3_IMPORTER_RELEASE_UNVERIFIED"))
+        }
+    }
+
+    pub(crate) fn release_and_verify(&mut self) -> Result<(), BootstrapError> {
         self.connection
             .exec("ROLLBACK")
             .map_err(|_| BootstrapError::Conflict("M3_GUARD_RELEASE_UNVERIFIED"))?;
@@ -661,6 +739,25 @@ pub struct ImportedSnapshotSession {
     guarded_relations: Vec<String>,
 }
 impl ImportedSnapshotSession {
+    pub(crate) fn schema_fingerprint(&self) -> &str {
+        &self.table_set_fingerprint
+    }
+
+    pub(crate) fn identity(&mut self) -> Result<ImporterIdentity, BootstrapError> {
+        let result = self.connection
+            .exec("SELECT pg_backend_pid()::text, backend_start::text FROM pg_stat_activity WHERE pid=pg_backend_pid()")
+            .map_err(|_| BootstrapError::Conflict("M3_IMPORTER_IDENTITY_FAILED"))?;
+        let pid = result
+            .get_value(0, 0)
+            .and_then(|v| v.parse::<i32>().ok())
+            .filter(|v| *v > 0)
+            .ok_or(BootstrapError::Conflict("M3_IMPORTER_IDENTITY_FAILED"))?;
+        let started = result
+            .get_value(0, 1)
+            .ok_or(BootstrapError::Conflict("M3_IMPORTER_IDENTITY_FAILED"))?;
+        Ok(ImporterIdentity { pid, started })
+    }
+
     pub(crate) fn into_planner_connection(
         self,
         importer_id: &str,
@@ -922,6 +1019,22 @@ fn take_importer(
     Ok(importers.swap_remove(position).1)
 }
 impl BootstrapRuntime {
+    pub(crate) fn into_live_parts(
+        self,
+    ) -> (
+        WriterConnection,
+        GuardSession,
+        pg_walstream::PgReplicationConnection,
+        i32,
+    ) {
+        (
+            self.store.into_writer(),
+            self.guard,
+            self._capture.connection,
+            self._capture.backend_pid,
+        )
+    }
+
     /// Move, rather than reopen, the only SQLite writer into the planner. A caller must return
     /// that writer with `BootstrapSessions::resume` before using the canonical invalidation path.
     pub fn into_planner_handoff(self) -> (WriterConnection, BootstrapSessions) {
@@ -954,6 +1067,33 @@ impl BootstrapRuntime {
         bounds: SessionBounds,
         start_seq: u64,
     ) -> Result<Self, BootstrapError> {
+        Self::start_with_exporter_bound(
+            writer,
+            intent,
+            dsn,
+            relations,
+            publication,
+            bounds,
+            start_seq,
+            None,
+        )
+        .map(|(runtime, _)| runtime)
+    }
+
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "source sessions and durable intent are separately configured"
+    )]
+    pub(crate) fn start_with_exporter_bound(
+        writer: WriterConnection,
+        intent: PrepareIntent,
+        dsn: &str,
+        relations: &[String],
+        publication: &str,
+        bounds: SessionBounds,
+        start_seq: u64,
+        exporter_lifetime: Option<std::time::Duration>,
+    ) -> Result<(Self, u64), BootstrapError> {
         if relations.len() != 1 {
             return Err(BootstrapError::Invalid(
                 "M3_SINGLE_RELATION_PROFILE_REQUIRED",
@@ -969,6 +1109,7 @@ impl BootstrapRuntime {
         )?;
         guard.verify_relations(relations)?;
         store.record_guard_acquired(&intent.intent_id, guard.backend_pid)?;
+        let exporter_started = std::time::Instant::now();
         let exporter = ExportedSlotSession::create(dsn, &intent.slot_name)?;
         store.persist_export_response(
             &intent.intent_id,
@@ -1059,15 +1200,23 @@ impl BootstrapRuntime {
                 ),
             ));
         }
+        let exporter_age = exporter_started.elapsed();
+        if exporter_lifetime.is_some_and(|limit| exporter_age >= limit) {
+            store.invalidate_generation(&intent.intent_id, "exporter")?;
+            return Err(BootstrapError::Conflict("M3_EXPORTER_LIFETIME_EXCEEDED"));
+        }
         store.release_exporter(&intent.intent_id)?;
         drop(exporter);
-        Ok(Self {
-            store,
-            intent_id: intent.intent_id,
-            guard,
-            _capture: capture,
-            importers,
-        })
+        Ok((
+            Self {
+                store,
+                intent_id: intent.intent_id,
+                guard,
+                _capture: capture,
+                importers,
+            },
+            exporter_age.as_millis().min(u64::MAX as u128) as u64,
+        ))
     }
 
     /// Transfers one acknowledged imported session to its assigned planner worker. The runtime
@@ -1147,9 +1296,70 @@ fn quote_relation(v: &str) -> Result<String, BootstrapError> {
 }
 
 #[cfg(test)]
-mod live_tests {
+pub(crate) mod live_tests {
+    /// Provisions the slot for M2-only capture tests without producing any M3 events.
+    #[test]
+    #[ignore = "needs initialized isolated PostgreSQL and SQLite fixture"]
+    fn prepare_slot_only_for_m2_fixture() {
+        use crate::m1_config::{LoadPurpose, ProcessEnvironment, load_str_for};
+        use crate::m2_schema::open_writer;
+        use std::path::Path;
+
+        let fixture =
+            std::env::var_os("BCDC_M2_SLOT_FIXTURE_DIR").expect("isolated fixture directory");
+        std::env::set_current_dir(fixture).expect("isolated fixture directory");
+        let text = std::fs::read_to_string("boring-cdc.toml").expect("fixture configuration");
+        let config = load_str_for(&text, &ProcessEnvironment, LoadPurpose::Run)
+            .expect("valid fixture configuration");
+        let run_id = "m2-slot-fixture";
+        let _ownership = crate::m2_capture_runtime::acquire_production_ownership(&config, run_id)
+            .expect("fixture source and local locks");
+        let public = config.public();
+        let writer = open_writer(Path::new(&public.storage.sqlite_path), run_id, 1, 0)
+            .expect("initialized fixture store");
+        let (epoch, system, database): (String, String, String) = writer.connection().query_row(
+            "SELECT capture_epoch,source_system_id,database_id FROM source_state WHERE singleton=1 AND slot_name=?1 AND durable_journal_seq IS NULL AND slot_creation_floor_lsn IS NULL",
+            [&public.source.slot], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?))
+        ).expect("initialized empty fixture");
+        let timeout = public.backfill.session_timeout_ms.0;
+        let relations = public
+            .tables
+            .iter()
+            .map(|table| table.source_relation.clone())
+            .collect::<Vec<_>>();
+        BootstrapRuntime::start(
+            writer,
+            PrepareIntent {
+                intent_id: run_id.into(),
+                capture_epoch: epoch,
+                source_system_id: system,
+                database_id: database,
+                slot_name: public.source.slot.clone(),
+                generation: 1,
+                table_set_fingerprint: config.fingerprints().table_set.clone(),
+                configuration_fingerprint: config.fingerprints().destination.clone(),
+                importers: vec![ImporterAssignment {
+                    importer_id: "m2-fixture-importer".into(),
+                    assigned_ranges_digest: digest_assignment(&[0; 8]),
+                }],
+                created_at: "m2-test-fixture".into(),
+            },
+            config.runtime_dsn().expect("fixture runtime credential"),
+            &relations,
+            &public.source.publication,
+            SessionBounds {
+                statement_timeout_ms: timeout,
+                idle_timeout_ms: timeout,
+            },
+            0,
+        )
+        .expect("fixture slot creation")
+        .invalidate("importer")
+        .expect("fixture snapshot invalidated");
+    }
+
     use super::*;
-    fn live_identity(
+    pub(crate) fn live_identity(
         dsn: &str,
         publication: &str,
         relation: &str,

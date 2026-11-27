@@ -1,5 +1,7 @@
 # Durable simple-stream operator path
 
+> This capture-only walkthrough describes the [Article 2 code at `c842c5c9`](https://github.com/hachej/boring-cdc/tree/c842c5c9a9b905dbdb1cba0793fa1e738166d010). On a build with Article 3 bootstrap, `run --bootstrap` starts live capture and copies the selected table. The interruption sequence in this walkthrough belongs to the Article 2 build.
+
 This is the bounded one-source, one-publication, one-slot, one-binary, one-SQLite path. It was exercised against the repository-pinned PostgreSQL 17.6 image. It does not configure backfill or a destination.
 
 ## 1. Start with an empty operator database

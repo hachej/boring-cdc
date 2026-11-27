@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 INPUTS = (
     "src/m2_init_recovery.rs",
     "src/m2_capture_runtime.rs",
+    "src/m3_bootstrap.rs",
     "scripts/e2e/m2_init_recovery.sh",
     "scripts/validate/m2_init_receipt.py",
     "contracts/m2/init-recovery-cases.json",

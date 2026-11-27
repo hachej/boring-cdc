@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."; export TMPDIR="${TMPDIR:-/tmp}"
-work=$(mktemp -d "${TMPDIR%/}/m2-init-e2e.XXXXXX"); project="m2-init-$RANDOM-$$"; port=$((58000 + $$ % 1000)); bootstrap_pid=; runtime_pid=
+work=$(mktemp -d "${TMPDIR%/}/m2-init-e2e.XXXXXX"); project="m2-init-$RANDOM-$$"; port=$((58000 + $$ % 1000)); runtime_pid=
 : >"$work/cases.tsv"
 cleanup(){
   local status=$?
   trap - EXIT INT TERM
-  for child in "$runtime_pid" "$bootstrap_pid"; do
-    if [[ -n "$child" ]]; then kill -INT "$child" 2>/dev/null || true; wait "$child" 2>/dev/null || true; fi
-  done
+  if [[ -n "$runtime_pid" ]]; then kill -INT "$runtime_pid" 2>/dev/null || true; wait "$runtime_pid" 2>/dev/null || true; fi
   docker compose -p "$project" -f compose.yaml -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || status=1
   rm -rf "$work" || status=1
   exit "$status"
@@ -33,6 +31,8 @@ psqlc -v "admin_password=$admin_credential" -v "runtime_password=$runtime_creden
 [[ "$(psqlc -Atqc "select has_schema_privilege('boring_cdc_app','public','CREATE')::int,has_table_privilege('boring_cdc_runtime','public.orders','UPDATE')::int,(select count(*) from pg_auth_members where member='boring_cdc_runtime'::regrole)::int")" == '0|0|0' ]]
 cargo build --quiet --locked --bin boring-cdc
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"; chmod 700 "$work/run" "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"; cp tests/fixtures/m1_config/representative.toml "$work/run/boring-cdc.toml"
+sed -i -e "s/127.0.0.1:8787/127.0.0.1:$((62000 + $$ % 1000))/" \
+  -e "s/127.0.0.1:8788/127.0.0.1:$((63000 + $$ % 1000))/" "$work/run/boring-cdc.toml"
 admin_dsn=postgresql:"//boring_cdc_admin:${admin_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_ADMIN="$admin_dsn" CH_MAINT='https://unused.invalid'; unset PG_RUNTIME PG_CONTROL CH_RUNTIME || true
 binary="${CARGO_TARGET_DIR:-$PWD/target}/debug/boring-cdc"
@@ -136,7 +136,7 @@ expect_init_failure M2_INIT_CONTROL_ROLE_MEMBERSHIP_EXCESS membership
 psqlc -qc 'REVOKE boring_cdc_runtime FROM boring_cdc_control_writer'
 psqlc -qc 'GRANT USAGE ON SCHEMA boring_cdc_control TO boring_cdc_control_writer; GRANT SELECT(id),UPDATE(nonce,updated_at) ON boring_cdc_control.heartbeat TO boring_cdc_control_writer; GRANT SELECT(id),UPDATE(capture_epoch,generation,table_set_fingerprint,unique_nonce) ON boring_cdc_control.capture_fences TO boring_cdc_control_writer'
 
-# Re-initialize clean local state, then exercise the documented capture-only bootstrap handoff.
+# Re-initialize clean local state and verify that runtime and init share the source lock.
 reset_local_state
 init_dry_run >"$work/final-dry.json"; final_token=$(confirm_token "$work/final-dry.json")
 (cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" init --confirm --confirm-token "$final_token" --json) >"$work/final.json"
@@ -166,15 +166,10 @@ unset PG_ADMIN CH_MAINT
 export PG_RUNTIME=postgresql:"//boring_cdc_runtime:${runtime_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_CONTROL=postgresql:"//boring_cdc_control_writer:${control_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export CH_RUNTIME='https://unused.invalid'
-(cd "$work/run"; env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run --bootstrap) & bootstrap_pid=$!
-slot_ready=false
-for _ in $(seq 1 100); do
-  if [[ "$(psqlc -Atqc "select count(*) from pg_replication_slots where slot_name='boring_slot' and plugin='pgoutput'")" == 1 ]]; then slot_ready=true; break; fi
-  kill -0 "$bootstrap_pid" 2>/dev/null || { wait "$bootstrap_pid"; exit 1; }
-  sleep 0.1
-done
-[[ "$slot_ready" == true ]]; sleep 1; kill -INT "$bootstrap_pid"; wait "$bootstrap_pid"
-bootstrap_pid=
+env -u BORING_CDC_POSTGRES_PASSWORD_FILE -u BORING_CDC_M2_FAULT_HOOK \
+  BCDC_M2_SLOT_FIXTURE_DIR="$work/run" cargo test --quiet --locked --lib \
+  m3_bootstrap::live_tests::prepare_slot_only_for_m2_fixture -- --ignored --exact
+[[ "$(psqlc -Atqc "SELECT count(*) FROM pg_replication_slots WHERE slot_name='boring_slot' AND plugin='pgoutput'")" == 1 ]]
 (cd "$work/run"; exec env -u BORING_CDC_POSTGRES_PASSWORD_FILE "$binary" run >"$work/runtime.out" 2>"$work/runtime.err") & runtime_pid=$!
 runtime_lock=false
 for _ in $(seq 1 100); do
@@ -232,6 +227,7 @@ receipt = {
         for name in (
             "src/m2_init_recovery.rs",
             "src/m2_capture_runtime.rs",
+            "src/m3_bootstrap.rs",
             "scripts/e2e/m2_init_recovery.sh",
             "scripts/validate/m2_init_receipt.py",
             "contracts/m2/init-recovery-cases.json",
@@ -280,5 +276,5 @@ pathlib.Path(output).write_text(serialized)
 PY
 fi
 
-echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 empty_database=true documented_sql=true init_bootstrap_run=true idempotent=true replay=blocked relation_set=diagnosed owner=diagnosed publish_flags=diagnosed privilege=diagnosed membership=diagnosed exact_fence_lengths=true validated_fence_lengths=true slot=pgoutput runtime_init_source_lock=shared'
+echo 'M2_INIT_RECOVERY_E2E_OK postgres=17.6 empty_database=true documented_sql=true init_slot_fixture_runtime=true idempotent=true replay=blocked relation_set=diagnosed owner=diagnosed publish_flags=diagnosed privilege=diagnosed membership=diagnosed exact_fence_lengths=true validated_fence_lengths=true slot=pgoutput runtime_init_source_lock=shared'
 

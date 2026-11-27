@@ -11,6 +11,10 @@ use crate::failure_policy::{
     CompletionToken, FailedBoundary, FailureClass, FailureRecord, PolicyEvent,
     PreparedFailureOperation, StableErrorCode, load_failure, transition,
 };
+use crate::m1_decoder::RelationContract;
+use crate::m1_source_identity::{
+    Fingerprint, LogicalTableIdentity, RelationSchemaVersion, SourceIdentity,
+};
 use crate::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
 use crate::m2_journal::{JournalError, JournalWriterService, read_exact_complete_range};
 use crate::m2_leases::{LeaseIdentity, LeaseToken};
@@ -21,6 +25,7 @@ use crate::m4_clickhouse_durability::{
     finalize_owned_batch, mark_owned_batch_dispatched, prepare_owned_batch, prepare_retry_batch,
 };
 use crate::m4_clickhouse_wire::PinnedClickHouseWire;
+use crate::m4_initial_load::{self, PreparedSnapshotBatch};
 
 #[derive(Clone)]
 pub struct ClickHouseConnection {
@@ -72,6 +77,7 @@ pub struct PumpStart {
     pub max_events: usize,
     pub max_bytes: usize,
     pub lease_ttl_ms: u64,
+    pub snapshot_relation: Option<RelationContract>,
 }
 
 type WriterRequest = Box<dyn FnOnce(&mut JournalWriterService) + Send>;
@@ -176,6 +182,7 @@ impl ClickHousePump {
             max_events,
             max_bytes,
             lease_ttl_ms,
+            snapshot_relation,
         } = start;
         let epoch = capture_epoch.clone();
         let fingerprint = destination_fingerprint.clone();
@@ -205,6 +212,14 @@ impl ClickHousePump {
             run_id: run_id.clone(),
         };
         let baseline_anchor = anchor_id.clone();
+        if snapshot_relation.is_some() {
+            writer
+                .service_destination(Duration::from_secs(5), |owner| {
+                    m4_initial_load::install(owner.connection())
+                        .map_err(|_| JournalError::Conflict("snapshot store installation failed"))
+                })
+                .map_err(|_| "M5_BASELINE_STORE_FAILED")?;
+        }
         let verified = writer
             .service_destination(Duration::from_secs(5), move |owner| {
                 let transaction = owner.connection_mut().transaction()?;
@@ -218,8 +233,8 @@ impl ClickHousePump {
             })
             .map_err(|_| "M5_BASELINE_STORE_FAILED")?
             .map_err(|_| "M5_BASELINE_INVALID")?;
-        if !verified {
-            return Ok(None);
+        if !verified && snapshot_relation.is_none() {
+            return Err("M5_SNAPSHOT_RELATION_UNAVAILABLE");
         }
         let identity = LeaseIdentity {
             lease_id: format!("{run_id}:clickhouse:{generation}"),
@@ -251,8 +266,89 @@ impl ClickHousePump {
             phase: Phase::Blocked,
             last_blocked_poll_ms: 0,
         };
+        if !verified {
+            let relation = snapshot_relation.ok_or("M5_SNAPSHOT_RELATION_UNAVAILABLE")?;
+            if let Err(code) = pump.load_snapshot(writer, &anchor_id, relation) {
+                let lease = pump.lease.clone();
+                let _ = writer.service_destination(Duration::from_secs(5), move |owner| {
+                    let now = monotonic_ms().map_err(JournalError::Unavailable)?;
+                    crate::m2_leases::release(owner, &lease, now)
+                        .map_err(|_| JournalError::Conflict("snapshot lease release failed"))
+                });
+                return Err(code);
+            }
+        }
         pump.refresh_blocked(writer)?;
         Ok(Some(pump))
+    }
+
+    fn load_snapshot(
+        &mut self,
+        writer: &mut DestinationWriterClient,
+        anchor_id: &str,
+        contract: RelationContract,
+    ) -> Result<(), &'static str> {
+        let context = BatchContext {
+            destination_id: self.lease.identity.destination_id.clone(),
+            capture_epoch: self.lease.identity.capture_epoch.clone(),
+            generation: self.lease.identity.generation,
+            configuration_fingerprint: self.lease.identity.configuration_fingerprint.clone(),
+            lease_id: self.lease.identity.lease_id.clone(),
+            run_id: self.lease.identity.run_id.clone(),
+        };
+        let mut adapter = ProductionClickHouseAdapter::new(
+            PinnedClickHouseWire::new(self.connection.client())
+                .map_err(|_| "M5_SNAPSHOT_CONNECTION_FAILED")?,
+        );
+        let contract = std::sync::Arc::new(contract);
+        loop {
+            self.renew_if_due(writer)?;
+            let leased = self.lease.clone();
+            let binding = context.clone();
+            let anchor = anchor_id.to_owned();
+            let contract = contract.clone();
+            let max_rows = self.max_events.min(256);
+            let max_bytes = self.max_bytes;
+            let prepared = writer
+                .service_destination(Duration::from_secs(5), move |owner| {
+                    crate::m2_leases::complete_local(
+                        owner,
+                        &leased,
+                        &mut || monotonic_ms().unwrap_or(u64::MAX),
+                        |tx| {
+                            prepare_next_snapshot(
+                                tx, &binding, &anchor, &contract, max_rows, max_bytes,
+                            )
+                        },
+                    )
+                    .map_err(|_| JournalError::Conflict("snapshot prepare failed"))
+                })
+                .map_err(|_| "M5_SNAPSHOT_PREPARE_FAILED")?;
+            let Some(batch) = prepared else {
+                return Ok(());
+            };
+
+            // Only this destination thread waits for the remote response. Capture keeps the writer.
+            let remote = dispatch_and_readback(&mut adapter, &batch.batch)
+                .map_err(|_| "M5_SNAPSHOT_READBACK_FAILED")?;
+            self.renew_if_due(writer)?;
+            let leased = self.lease.clone();
+            let binding = context.clone();
+            writer
+                .service_destination(Duration::from_secs(5), move |owner| {
+                    crate::m2_leases::complete_local(
+                        owner,
+                        &leased,
+                        &mut || monotonic_ms().unwrap_or(u64::MAX),
+                        |tx| {
+                            m4_initial_load::finalize_verified(tx, &binding, &batch, &remote)
+                                .map_err(|_| crate::m2_leases::LeaseError::Conflict)
+                        },
+                    )
+                    .map_err(|_| JournalError::Conflict("snapshot finalization failed"))
+                })
+                .map_err(|_| "M5_SNAPSHOT_FINALIZE_FAILED")?;
+        }
     }
 
     fn refresh_blocked(&mut self, writer: &DestinationWriterClient) -> Result<(), &'static str> {
@@ -588,6 +684,131 @@ impl ClickHousePump {
         };
         Ok(())
     }
+}
+
+fn prepare_next_snapshot(
+    tx: &rusqlite::Transaction<'_>,
+    context: &BatchContext,
+    anchor: &str,
+    contract: &RelationContract,
+    max_rows: usize,
+    max_bytes: usize,
+) -> Result<Option<PreparedSnapshotBatch>, crate::m2_leases::LeaseError> {
+    use crate::m2_leases::LeaseError;
+    let (limit, generation_id): (u64, String) = tx.query_row(
+        "SELECT snapshot_complete_seq,generation_id FROM bootstrap_anchors WHERE anchor_id=?1",
+        [anchor],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    let latest: Option<(u64, u64, String)> = tx
+        .query_row(
+            "SELECT first_snapshot_seq,last_snapshot_seq,state FROM m4_snapshot_batch_intents
+         WHERE destination_id=?1 AND capture_epoch=?2 AND generation=?3 AND anchor_id=?4
+           AND configuration_fingerprint=?5 ORDER BY first_snapshot_seq DESC LIMIT 1",
+            rusqlite::params![
+                context.destination_id,
+                context.capture_epoch,
+                context.generation,
+                anchor,
+                context.configuration_fingerprint
+            ],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .optional()?;
+    let (first, prior) = match latest {
+        Some((_, last, state)) if state == "verified" => {
+            (last.checked_add(1).ok_or(LeaseError::Conflict)?, None)
+        }
+        Some((first, last, state)) if matches!(state.as_str(), "prepared" | "dispatched") => {
+            (first, Some(last))
+        }
+        Some(_) => return Err(LeaseError::Conflict),
+        None => (1, None),
+    };
+    if first > limit {
+        return if m4_initial_load::baseline_verified(tx, context, anchor)
+            .map_err(|_| LeaseError::Conflict)?
+        {
+            Ok(None)
+        } else {
+            Err(LeaseError::Conflict)
+        };
+    }
+    if max_rows == 0 {
+        return Err(LeaseError::Conflict);
+    }
+    let last = if let Some(last) = prior {
+        if last < first || last > limit || last - first >= max_rows as u64 {
+            return Err(LeaseError::Conflict);
+        }
+        last
+    } else {
+        let mut lengths = tx.prepare(
+            "SELECT snapshot_seq,length(canonical_key)+length(payload) FROM m3_snapshot_events
+             WHERE generation_id=?1 AND snapshot_seq>=?2 ORDER BY snapshot_seq LIMIT ?3",
+        )?;
+        let mut total = 0usize;
+        let mut last = None;
+        for row in lengths.query_map(rusqlite::params![generation_id, first, max_rows], |r| {
+            Ok((r.get::<_, u64>(0)?, r.get::<_, usize>(1)?))
+        })? {
+            let (seq, bytes) = row?;
+            total = total.saturating_add(bytes);
+            if total > max_bytes / 4 {
+                break;
+            }
+            last = Some(seq);
+        }
+        last.ok_or(LeaseError::Conflict)?
+    };
+    let schema: Vec<u8> = tx.query_row(
+        "SELECT p.canonical_schema FROM m3_snapshot_schema_proofs p
+         JOIN bootstrap_anchors a ON a.bootstrap_intent_id=p.intent_id
+         JOIN m3_planner_runs r ON r.generation_id=a.generation_id AND r.snapshot_schema_fingerprint=p.schema_fingerprint
+         WHERE a.anchor_id=?1 AND p.capture_epoch=?2 AND p.relation_id=?3",
+        rusqlite::params![anchor, context.capture_epoch, contract.relation.id.to_string()], |r| r.get(0),
+    )?;
+    let source = tx.query_row(
+        "SELECT source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint
+         FROM source_state WHERE singleton=1 AND capture_epoch=?1",
+        [&context.capture_epoch],
+        |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?,
+            r.get(3)?, r.get(4)?, r.get::<_, String>(5)?, r.get::<_, String>(6)?)),
+    )?;
+    if source.6 != "pgoutput-v1" {
+        return Err(LeaseError::Conflict);
+    }
+    let identity = SourceIdentity {
+        system_identifier: source.0.parse().map_err(|_| LeaseError::Conflict)?,
+        timeline: source.1.parse().map_err(|_| LeaseError::Conflict)?,
+        database_identity: source.2.parse().map_err(|_| LeaseError::Conflict)?,
+        slot_name: source.3,
+        plugin: source.4,
+        publication_fingerprint: Fingerprint::from_lower_hex(&source.5)
+            .ok_or(LeaseError::Conflict)?,
+        protocol_fingerprint: crate::m1_source_identity::supported_protocol_fingerprint(),
+    };
+    let table = LogicalTableIdentity::derive(
+        &identity,
+        &contract.relation.namespace,
+        &contract.relation.name,
+    );
+    let relation = RelationSchemaVersion::derive(table, contract.relation.id, &schema)
+        .map_err(|_| LeaseError::Conflict)?;
+    let prepared = m4_initial_load::prepare_snapshot_batch(
+        tx, context, anchor, contract, relation, first, last,
+    )
+    .map_err(|_| LeaseError::Conflict)?;
+    let encoded_bytes = prepared.batch.events.iter().fold(0usize, |bytes, event| {
+        bytes
+            .saturating_add(event.payload.len())
+            .saturating_add(event.canonical_payload.len())
+    });
+    if encoded_bytes > max_bytes {
+        return Err(LeaseError::Conflict);
+    }
+    m4_initial_load::mark_dispatched(tx, context, &prepared).map_err(|_| LeaseError::Conflict)?;
+    Ok(Some(prepared))
 }
 
 impl ClickHouseConnection {

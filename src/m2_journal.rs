@@ -175,13 +175,44 @@ impl JournalStore {
         commit: &SourceCommit,
         fault: CommitFault,
     ) -> Result<DurableCommit, JournalError> {
-        validate_commit(commit, self.limits)?;
+        self.commit_atomic_with_fence(commit, fault, None)
+    }
+
+    pub(crate) fn commit_atomic_with_fence(
+        &mut self,
+        commit: &SourceCommit,
+        fault: CommitFault,
+        fence_row: Option<&[u8]>,
+    ) -> Result<DurableCommit, JournalError> {
+        let mut limits = self.limits;
+        if let Some(row) = fence_row {
+            if row.is_empty()
+                || commit.events.len() != 1
+                || commit.events[0].control_kind.as_deref() != Some("capture_fence")
+            {
+                return Err(JournalError::Invalid("M3_FENCE_CAPTURE_PROOF_INVALID"));
+            }
+            limits.max_copied_bytes = limits
+                .max_copied_bytes
+                .checked_sub(row.len())
+                .ok_or(JournalError::Limit("copied bytes"))?;
+        }
+        validate_commit(commit, limits)?;
         let started = Instant::now();
         let identity = &self.identity;
         let transaction = self
             .writer
             .connection_mut()
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        if fence_row.is_some() {
+            transaction.execute_batch(
+                "CREATE TABLE IF NOT EXISTS m3_captured_fence_rows(
+                   journal_seq INTEGER PRIMARY KEY REFERENCES journal_events(journal_seq) ON DELETE CASCADE,
+                   source_row BLOB NOT NULL
+                ) STRICT;"
+            )?;
+        }
 
         let existing: Option<(String, String, i64, i64, i64, String)> = transaction.query_row(
             "SELECT transaction_id,xid,first_seq,last_seq,event_count,payload_checksum FROM source_transactions WHERE capture_epoch=?1 AND source_system_id=?2 AND database_id=?3 AND slot_name=?4 AND end_lsn=?5",
@@ -190,7 +221,7 @@ impl JournalStore {
         ).optional()?;
         if let Some((txid, xid, first, last, count, checksum)) = existing {
             let bound = bind_sequence_templates(commit, first as u64)?;
-            validate_commit(&bound, self.limits)?;
+            validate_commit(&bound, limits)?;
             let commit = &bound;
             verify_schemas(&transaction, identity, &commit.schemas)?;
             verify_duplicate(
@@ -203,6 +234,18 @@ impl JournalStore {
                 count,
                 &checksum,
             )?;
+            if let Some(row) = fence_row {
+                let stored: Option<Vec<u8>> = transaction
+                    .query_row(
+                        "SELECT source_row FROM m3_captured_fence_rows WHERE journal_seq=?1",
+                        [last],
+                        |r| r.get(0),
+                    )
+                    .optional()?;
+                if stored.as_deref() != Some(row) {
+                    return Err(JournalError::Conflict("M3_FENCE_REPLAY_PROOF_MISMATCH"));
+                }
+            }
             let durable: Option<(String, String, String, String, String, String, String)> = transaction.query_row(
                 "SELECT capture_epoch,source_system_id,timeline_id,database_id,slot_name,publication_fingerprint,protocol_fingerprint FROM source_state WHERE singleton=1 AND durable_journal_seq>=?1 AND durable_transaction_end_lsn>=?2",
                 params![last, commit.end_lsn],
@@ -251,7 +294,7 @@ impl JournalStore {
             |r| r.get(0),
         )?;
         let bound = bind_sequence_templates(commit, next as u64)?;
-        validate_commit(&bound, self.limits)?;
+        validate_commit(&bound, limits)?;
         let commit = &bound;
         let last = next
             .checked_add(commit.events.len() as i64 - 1)
@@ -324,6 +367,12 @@ impl JournalStore {
                     }
                 })?;
         }
+        if let Some(row) = fence_row {
+            transaction.execute(
+                "INSERT INTO m3_captured_fence_rows(journal_seq,source_row) VALUES (?1,?2)",
+                params![last, row],
+            )?;
+        }
         let state: Option<SourceStateRow> = transaction.query_row(
             "SELECT capture_epoch,source_system_id,timeline_id,database_id,slot_name,publication_fingerprint,protocol_fingerprint,durable_transaction_end_lsn FROM source_state WHERE singleton=1", [],
             |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(7)?)),
@@ -380,6 +429,10 @@ impl JournalStore {
                     params![run_id, identity.capture_epoch, heartbeat_seq, commit.end_lsn],
                 )?;
             }
+        }
+        if let Some(row) = fence_row {
+            crate::m3_fence::observe_source_commit(&transaction, &commit.transaction_id, row)
+                .map_err(|_| JournalError::Conflict("M3_FENCE_COMMIT_PROOF_INVALID"))?;
         }
         if started.elapsed() > self.limits.max_writer_hold && fault != CommitFault::SlowSqliteCommit
         {
@@ -1174,13 +1227,13 @@ impl ServiceCommand {
         }
     }
 }
-type DestinationAction = Box<dyn FnOnce(&mut WriterConnection) -> Result<(), JournalError>>;
+type WriterAction = Box<dyn FnOnce(&mut WriterConnection) -> Result<(), JournalError>>;
 
 enum PendingWork {
-    Capture(SourceCommit, CommitFault),
+    Capture(SourceCommit, CommitFault, Option<Vec<u8>>),
     Failure(crate::failure_policy::PreparedFailureOperation, Instant),
-    Destination {
-        action: DestinationAction,
+    Action {
+        action: WriterAction,
         enqueued_at: Instant,
         max_writer_hold: Duration,
     },
@@ -1270,8 +1323,19 @@ impl JournalWriterService {
         commit: SourceCommit,
         fault: CommitFault,
     ) -> Result<(), EnqueueError> {
-        self.scheduler
-            .enqueue(WorkClass::Capture, PendingWork::Capture(commit, fault))
+        self.enqueue_capture_with_fence(commit, fault, None)
+    }
+
+    pub(crate) fn enqueue_capture_with_fence(
+        &mut self,
+        commit: SourceCommit,
+        fault: CommitFault,
+        fence_row: Option<Vec<u8>>,
+    ) -> Result<(), EnqueueError> {
+        self.scheduler.enqueue(
+            WorkClass::Capture,
+            PendingWork::Capture(commit, fault, fence_row),
+        )
     }
     pub fn enqueue_failure(
         &mut self,
@@ -1336,15 +1400,32 @@ impl JournalWriterService {
         max_writer_hold: Duration,
         action: impl FnOnce(&mut WriterConnection) -> Result<T, JournalError> + 'static,
     ) -> Result<T, JournalError> {
+        self.service_action(WorkClass::Checkpoint, max_writer_hold, action)
+    }
+
+    pub(crate) fn service_backfill<T: 'static>(
+        &mut self,
+        max_writer_hold: Duration,
+        action: impl FnOnce(&mut WriterConnection) -> Result<T, JournalError> + 'static,
+    ) -> Result<T, JournalError> {
+        self.service_action(WorkClass::Gc, max_writer_hold, action)
+    }
+
+    fn service_action<T: 'static>(
+        &mut self,
+        class: WorkClass,
+        max_writer_hold: Duration,
+        action: impl FnOnce(&mut WriterConnection) -> Result<T, JournalError> + 'static,
+    ) -> Result<T, JournalError> {
         if max_writer_hold.is_zero() {
-            return Err(JournalError::Invalid("zero destination writer hold bound"));
+            return Err(JournalError::Invalid("zero writer hold bound"));
         }
         let result = std::rc::Rc::new(std::cell::RefCell::new(None));
         let output = std::rc::Rc::clone(&result);
         self.scheduler
             .enqueue(
-                WorkClass::Checkpoint,
-                PendingWork::Destination {
+                class,
+                PendingWork::Action {
                     action: Box::new(move |writer| {
                         let value = action(writer)?;
                         *output.borrow_mut() = Some(value);
@@ -1356,9 +1437,8 @@ impl JournalWriterService {
             )
             .map_err(|_| JournalError::BusyBoundExceeded)?;
         loop {
-            self.service_next().ok_or(JournalError::Conflict(
-                "writer queue lost destination action",
-            ))??;
+            self.service_next()
+                .ok_or(JournalError::Conflict("writer queue lost action"))??;
             if let Some(value) = result.borrow_mut().take() {
                 return Ok(value);
             }
@@ -1445,9 +1525,9 @@ impl JournalWriterService {
     pub fn service_next(&mut self) -> Option<Result<WorkOutcome, JournalError>> {
         let (class, work, _tick) = self.scheduler.next()?;
         Some(match work {
-            PendingWork::Capture(commit, fault) => self
+            PendingWork::Capture(commit, fault, fence_row) => self
                 .store
-                .commit_atomic(&commit, fault)
+                .commit_atomic_with_fence(&commit, fault, fence_row.as_deref())
                 .map(WorkOutcome::Durable),
             PendingWork::Failure(operation, enqueued_at) => {
                 let queue_wait = enqueued_at.elapsed();
@@ -1471,7 +1551,7 @@ impl JournalWriterService {
                     })
                     .map_err(JournalError::from)
             }
-            PendingWork::Destination {
+            PendingWork::Action {
                 action,
                 enqueued_at,
                 max_writer_hold,
@@ -1483,7 +1563,7 @@ impl JournalWriterService {
                         return Err(JournalError::BusyBoundExceededAfterCommit);
                     }
                     Ok(WorkOutcome::Serviced(ServiceReport {
-                        class: WorkClass::Checkpoint,
+                        class,
                         queue_wait,
                         completed_in: started.elapsed(),
                     }))
@@ -1572,6 +1652,58 @@ pub mod tests {
             }],
             events,
         }
+    }
+
+    #[test]
+    fn fence_source_row_commits_with_its_journal_event_and_replay_checks_it() {
+        let (path, mut store) = store("fence-proof");
+        let mut control = event("fence-event", 0, b"control");
+        control.control_kind = Some("capture_fence".into());
+        control.relation_schema_fingerprint = None;
+        let commit = commit("fence", "0000000000000001", vec![control]);
+        let source_row = b"admitted source fence row";
+
+        assert_eq!(
+            store.commit_atomic_with_fence(
+                &commit,
+                CommitFault::BeforeSqliteCommit,
+                Some(source_row)
+            ),
+            Err(JournalError::FaultBeforeCommit),
+        );
+        assert!(
+            !store
+                .writer
+                .connection()
+                .query_row("SELECT EXISTS(SELECT 1 FROM journal_events)", [], |r| r
+                    .get::<_, bool>(0),)
+                .unwrap()
+        );
+        assert!(!store.writer.connection().query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE name='m3_captured_fence_rows')",
+            [], |r| r.get::<_, bool>(0),
+        ).unwrap());
+
+        let durable = store
+            .commit_atomic_with_fence(&commit, CommitFault::None, Some(source_row))
+            .unwrap();
+        let attached: Vec<u8> = store.writer.connection().query_row(
+            "SELECT source_row FROM m3_captured_fence_rows JOIN journal_events USING(journal_seq) WHERE transaction_id=?1",
+            [durable.transaction_id()], |r| r.get(0),
+        ).unwrap();
+        assert_eq!(attached, source_row);
+        assert!(
+            store
+                .commit_atomic_with_fence(&commit, CommitFault::None, Some(source_row))
+                .unwrap()
+                .duplicate
+        );
+        assert_eq!(
+            store.commit_atomic_with_fence(&commit, CommitFault::None, Some(b"other row")),
+            Err(JournalError::Conflict("M3_FENCE_REPLAY_PROOF_MISMATCH")),
+        );
+        drop(store);
+        let _ = fs::remove_file(path);
     }
 
     #[test]
