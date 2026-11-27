@@ -14,6 +14,17 @@ status_port=$((60000 + $$ % 1000))
 metrics_port=$((61000 + $$ % 1000))
 connector_pid=""
 workload_pid=""
+scenario=article3-bootstrap-cli
+fixture_rows=10000
+chunk_rows=25
+workload_writes=6
+if [[ "${BCDC_ARTICLE3_MUTATION:-0}" == 1 ]]; then
+  scenario=article3-concurrent-mutation
+  fixture_rows=${BCDC_ARTICLE3_MUTATION_ROWS:-200000}
+  chunk_rows=200
+  workload_writes=${BCDC_ARTICLE3_MUTATION_WRITES:-72}
+fi
+[[ "$fixture_rows" =~ ^[0-9]+$ && "$workload_writes" =~ ^[0-9]+$ ]]
 stage=provision
 finish() {
   local status=$?
@@ -23,7 +34,7 @@ finish() {
   if [[ -n "$connector_pid" ]]; then kill "$connector_pid" 2>/dev/null || true; wait "$connector_pid" || true; fi
   docker rm -f "$clickhouse_container" >/dev/null 2>&1 || true
   BORING_CDC_POSTGRES_PASSWORD_FILE="$work/postgres_password" docker compose -p "$project" -f "$repo/compose.yaml" -f "$work/override.yml" down -v --remove-orphans >/dev/null 2>&1 || true
-  python3 - "$packet" "$stage" "$status" "$work" <<'PY_PACKET'
+  python3 - "$packet" "$stage" "$status" "$work" "$scenario" <<'PY_PACKET'
 import hashlib
 import json
 import os
@@ -34,7 +45,7 @@ from pathlib import Path
 
 root, stage, status, work = Path(sys.argv[1]), sys.argv[2], int(sys.argv[3]), Path(sys.argv[4])
 observation = {
-    "scenario": "article3-bootstrap-cli",
+    "scenario": sys.argv[5],
     "stage": stage,
     "exit_code": status,
     "result": "pass" if stage == "complete" and status == 0 else "fail",
@@ -45,7 +56,7 @@ if log.is_file():
         r"\b(?:M[0-9]|BCDC|E)_[A-Z0-9]+(?:_[A-Z0-9]+)+\b",
         log.read_text(errors="replace"),
     )))
-for field, name in (("overlap", "progress.json"), ("convergence", "checkpoint.json"), ("oracle", "oracle.json"), ("status", "backfill-status.json"), ("before_restart", "before-restart.json")):
+for field, name in (("overlap", "progress.json"), ("convergence", "checkpoint.json"), ("oracle", "oracle.json"), ("status", "backfill-status.json"), ("before_restart", "before-restart.json"), ("mutation", "mutation-result.json")):
     if (root / name).is_file():
         observation[field] = json.loads((root / name).read_text())
 (root / "observation.json").write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n")
@@ -53,7 +64,7 @@ manifest = {
     "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
     "ci_run_id": os.getenv("GITHUB_RUN_ID"),
     "ci_run_attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
-    "command": ["scripts/e2e/article3_bootstrap.sh"],
+    "command": ["scripts/e2e/article3_concurrent_mutation.sh" if observation["scenario"] == "article3-concurrent-mutation" else "scripts/e2e/article3_bootstrap.sh"],
     "files": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.iterdir()) if p.is_file() and p.name != "manifest.json"},
 }
 (root / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
@@ -135,10 +146,10 @@ app_password=$(openssl rand -hex 24)
 pg -v "admin_password=$admin_password" -v "runtime_password=$runtime_password" \
   -v "control_password=$control_password" -v "application_password=$app_password" \
   < scripts/setup/durable_simple_prerequisites.sql >/dev/null
-pg <<'SQL' >/dev/null
+pg -v fixture_rows="$fixture_rows" <<'SQL' >/dev/null
 ALTER TABLE public.orders RENAME COLUMN total TO payload;
 ALTER TABLE public.orders ALTER COLUMN payload TYPE text;
-INSERT INTO public.orders SELECT id, 'seed-' || id FROM generate_series(1, 10000) id;
+INSERT INTO public.orders SELECT id, 'seed-' || id FROM generate_series(1, :'fixture_rows'::integer) id;
 SQL
 export PG_ADMIN=postgresql:"//boring_cdc_admin:$admin_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
 export PG_RUNTIME=postgresql:"//boring_cdc_runtime:$runtime_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
@@ -147,7 +158,7 @@ mkdir -p "$work/run/state/tmp" "$work/run/state/spool" "$work/run/archive/root"
 sed -e 's/total = "numeric:nullable"/payload = "text:nullable"/' \
   -e 's/verify_tls = true/verify_tls = false/' \
   -e 's/unsafe_local_experiment = false/unsafe_local_experiment = true/' \
-  -e 's/chunk_rows = 1000/chunk_rows = 25/' \
+  -e "s/chunk_rows = 1000/chunk_rows = $chunk_rows/" \
   -e "s#127.0.0.1:8787#127.0.0.1:$status_port#" \
   -e "s#127.0.0.1:8788#127.0.0.1:$metrics_port#" \
   -e "s#https://clickhouse.local:8443#https://127.0.0.1:$ch_https_port#" \
@@ -175,12 +186,12 @@ done
 
 stage=concurrent_writes
 (
-  for i in $(seq 1 6); do
+  for i in $(seq 1 "$workload_writes"); do
     PGPASSWORD=$app_password psql -X -h 127.0.0.1 -p "$pg_port" -U boring_cdc_app -d boring_cdc -v ON_ERROR_STOP=1 -q <<SQL
 BEGIN;
 UPDATE public.orders SET payload='updated-$i' WHERE id=$i;
 DELETE FROM public.orders WHERE id=5000+$i;
-INSERT INTO public.orders VALUES(10000+$i,'new-$i');
+INSERT INTO public.orders VALUES($fixture_rows+$i,'new-$i');
 COMMIT;
 SQL
     sleep 5
@@ -198,6 +209,9 @@ cp -f "$work/backfill-status.json" "$packet/backfill-status.json"
 if [[ "${BCDC_ARTICLE3_BASELINE_OUTAGE:-0}" == 1 ]]; then
   stage=stop_clickhouse_before_baseline
   docker stop "$clickhouse_container" >/dev/null
+elif [[ "$scenario" == article3-concurrent-mutation ]]; then
+  PGHOST=127.0.0.1 PGPORT=$pg_port PGDATABASE=boring_cdc PGUSER=boring_cdc_app PGPASSWORD=$app_password \
+    python3 "$repo/scripts/e2e/article3_mutation_driver.py" write state/boring.db "$packet/mutation-ledger.json"
 fi
 wait "$workload_pid"
 workload_pid=""
@@ -249,4 +263,8 @@ docker exec -i "$clickhouse_container" clickhouse-client --user bcdc_probe --pas
   --param_capture_epoch=1 --param_logical_table_id="$id" --format JSONEachRow \
   --queries-file /dev/stdin <"$work/candidate.sql" >"$packet/candidate-rows.jsonl"
 python3 "$repo/scripts/e2e/article3_bootstrap_oracle.py" "$packet/source-oracle.tsv" "$packet/candidate-rows.jsonl" "$packet/oracle.json"
+if [[ "$scenario" == article3-concurrent-mutation ]]; then
+  python3 "$repo/scripts/e2e/article3_mutation_driver.py" verify state/boring.db \
+    "$packet/mutation-ledger.json" "$packet/source-oracle.tsv" "$packet/candidate-rows.jsonl" "$packet/mutation-result.json"
+fi
 stage=complete
