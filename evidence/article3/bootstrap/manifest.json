@@ -1,0 +1,17 @@
+{
+  "ci_run_attempt": "1",
+  "ci_run_id": "45839078649",
+  "command": [
+    "scripts/e2e/article3_bootstrap.sh"
+  ],
+  "files": {
+    "backfill-status.json": "dccc759998c0fda585fcbb5bbe007ff473eac9747ea87dbaaeb6af313fb4bbbe",
+    "candidate-rows.jsonl": "1a1811e8b0a41f67a1fd80b40c75c820dd95f0e2d337aa543322301b82e48c85",
+    "checkpoint.json": "af9b1a22be9f2259442b306da6b694d5339ec8a726f717357e1ad1d970e2e526",
+    "observation.json": "40ae72b9fc65db14820e77d3853d5af043dd9725b46055937442309c02e0b3d1",
+    "oracle.json": "5e03aba92f90a10f53005001ce965950fa466496aa6272ff3ddfcf458d810575",
+    "progress.json": "b233ccdc522dab01a07179544e35632663c9f425758f4c6b74d60c3b8080d8c5",
+    "source-oracle.tsv": "c7b3b785d5491be2d80afcdfc74a37d79dff8d6978312c177f83212131648197"
+  },
+  "git_commit": "8c67d9068de3c90e8f3e5b78a9e11905c024a10a"
+}

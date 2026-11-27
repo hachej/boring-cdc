@@ -1,0 +1,14 @@
+{
+  "ci_run_attempt": "1",
+  "ci_run_id": "45950920225",
+  "command": [
+    "scripts/e2e/article3_source_impact.sh"
+  ],
+  "files": {
+    "backfill.json": "777df86d3ab7311c6db3d03962ebc73340b54d67d4c95330945f43ee651abc13",
+    "ddl.json": "28d26347237aaa483b0bfbfffadeb59301a2c6ee999414500c34ad5b173175c8",
+    "naive.json": "961a0ad831542915960318f571047c62352670c6d77fe1bea6756df08af3220a",
+    "observation.json": "ceae4287479abb73efe4222f37ec7a34dafc23782483089a440aad73e2e2bb3c"
+  },
+  "git_commit": "7c1ab2a149a08c8fd7a2df995ee291564d2c72e5"
+}

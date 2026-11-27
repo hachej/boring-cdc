@@ -1,0 +1,15 @@
+{
+  "capture_epoch": "1",
+  "clickhouse_checkpoints": [],
+  "complete_anchors": [],
+  "durable_business_events": 66,
+  "generations": [
+    {
+      "chunks_done": 900,
+      "chunks_total": 2000,
+      "generation": 1,
+      "state": "copying"
+    }
+  ],
+  "journal_head": 87
+}

@@ -1,0 +1,439 @@
+{
+  "arm": "ddl",
+  "backfill": {
+    "bootstrap_state": "snapshot_unusable",
+    "exporter_liveness": "released",
+    "failure_code": "M3_DDL_WAITER",
+    "generation": 1,
+    "generation_state": "invalidated",
+    "guard_liveness": "released",
+    "progress": {
+      "complete_chunks": 80,
+      "completed_bytes": 2154893,
+      "completed_rows": 4000,
+      "elapsed_ms": 7273,
+      "eta_ms": null,
+      "generation": 1,
+      "state": "invalidated",
+      "total_chunks": 4001
+    },
+    "source_impact_last_sample": {
+      "exporter_age_at_release_ms": 262,
+      "lock_waiters": [
+        {
+          "age_ms": 5054,
+          "mode": "AccessExclusiveLock",
+          "relation": "orders"
+        },
+        {
+          "age_ms": 4955,
+          "mode": "AccessShareLock",
+          "relation": "orders"
+        },
+        {
+          "age_ms": 1959,
+          "mode": "RowExclusiveLock",
+          "relation": "orders"
+        }
+      ],
+      "observed_unix_ms": 1795760845514,
+      "oldest_backend_xmin_age_xids": 0,
+      "snapshot_age_ms": 6362
+    }
+  },
+  "connector_codes": [
+    "M3_DDL_WAITER"
+  ],
+  "connector_exit_code": 4,
+  "ddl_duration_ms": 5242.166795,
+  "ddl_exit_code": 0,
+  "duration_ms": 7949.633204,
+  "end_copy_metrics": {
+    "backend_xmin_age_xids": null,
+    "dead_tuples_estimate": 3,
+    "elapsed_ms": 8061.533156,
+    "longest_transaction_ms": null,
+    "retained_slot_wal_bytes": 2048,
+    "slot_active": false,
+    "snapshot_session_transaction_ms": null,
+    "source_cpu_usage_usec": 2745007,
+    "source_io_rbytes": 0,
+    "source_io_wbytes": 317411328,
+    "table_lock_waiters": []
+  },
+  "latency": {
+    "count": 30,
+    "p50_ms": 0.40732999999999997,
+    "p95_ms": 1.476128,
+    "p99_ms": 5081.22633
+  },
+  "pre_copy_metrics": {
+    "backend_xmin_age_xids": null,
+    "dead_tuples_estimate": 0,
+    "elapsed_ms": 77.006331,
+    "longest_transaction_ms": null,
+    "retained_slot_wal_bytes": null,
+    "slot_active": null,
+    "snapshot_session_transaction_ms": null,
+    "source_cpu_usage_usec": 1600337,
+    "source_io_rbytes": 0,
+    "source_io_wbytes": 317341696,
+    "table_lock_waiters": []
+  },
+  "reader_samples": [
+    {
+      "elapsed_ms": 30.14686,
+      "latency_ms": 0.396278
+    },
+    {
+      "elapsed_ms": 130.328766,
+      "latency_ms": 0.479644
+    },
+    {
+      "elapsed_ms": 230.292603,
+      "latency_ms": 0.355236
+    },
+    {
+      "elapsed_ms": 330.437513,
+      "latency_ms": 0.41129
+    },
+    {
+      "elapsed_ms": 430.494731,
+      "latency_ms": 0.369477
+    },
+    {
+      "elapsed_ms": 530.61927,
+      "latency_ms": 0.40456
+    },
+    {
+      "elapsed_ms": 630.674966,
+      "latency_ms": 0.417159
+    },
+    {
+      "elapsed_ms": 730.7531,
+      "latency_ms": 0.386043
+    },
+    {
+      "elapsed_ms": 831.52758,
+      "latency_ms": 1.065929
+    },
+    {
+      "elapsed_ms": 930.870996,
+      "latency_ms": 0.325035
+    },
+    {
+      "elapsed_ms": 1030.95905,
+      "latency_ms": 0.323994
+    },
+    {
+      "elapsed_ms": 1131.051366,
+      "latency_ms": 0.332187
+    },
+    {
+      "elapsed_ms": 1231.114297,
+      "latency_ms": 0.306097
+    },
+    {
+      "elapsed_ms": 1331.260334,
+      "latency_ms": 0.361165
+    },
+    {
+      "elapsed_ms": 1431.337402,
+      "latency_ms": 0.343148
+    },
+    {
+      "elapsed_ms": 1531.433073,
+      "latency_ms": 0.343133
+    },
+    {
+      "elapsed_ms": 1631.534778,
+      "latency_ms": 0.347525
+    },
+    {
+      "elapsed_ms": 1731.700309,
+      "latency_ms": 0.409288
+    },
+    {
+      "elapsed_ms": 1831.857698,
+      "latency_ms": 0.464531
+    },
+    {
+      "elapsed_ms": 1931.839252,
+      "latency_ms": 0.361445
+    },
+    {
+      "elapsed_ms": 7112.794925,
+      "latency_ms": 5081.22633
+    },
+    {
+      "elapsed_ms": 7114.292004,
+      "latency_ms": 1.476128
+    },
+    {
+      "elapsed_ms": 7213.358246,
+      "latency_ms": 0.454596
+    },
+    {
+      "elapsed_ms": 7313.468143,
+      "latency_ms": 0.477922
+    },
+    {
+      "elapsed_ms": 7413.641415,
+      "latency_ms": 0.56339
+    },
+    {
+      "elapsed_ms": 7513.670099,
+      "latency_ms": 0.495348
+    },
+    {
+      "elapsed_ms": 7613.671453,
+      "latency_ms": 0.419413
+    },
+    {
+      "elapsed_ms": 7713.782,
+      "latency_ms": 0.444551
+    },
+    {
+      "elapsed_ms": 7813.865517,
+      "latency_ms": 0.443629
+    },
+    {
+      "elapsed_ms": 7913.911548,
+      "latency_ms": 0.405372
+    }
+  ],
+  "result": "pass",
+  "sampled_peaks": {
+    "backend_xmin_age_xids": 2,
+    "dead_tuples_estimate": 3,
+    "longest_transaction_ms": 6688.863,
+    "retained_slot_wal_bytes": 2048,
+    "snapshot_session_transaction_ms": 6688.921
+  },
+  "samples": [
+    {
+      "backend_xmin_age_xids": null,
+      "dead_tuples_estimate": 0,
+      "elapsed_ms": 86.959565,
+      "longest_transaction_ms": null,
+      "reader_latency_in_second": {
+        "count": 10,
+        "p50_ms": 0.40041899999999997,
+        "p95_ms": 1.065929,
+        "p99_ms": 1.065929
+      },
+      "retained_slot_wal_bytes": null,
+      "slot_active": null,
+      "snapshot_session_transaction_ms": null,
+      "source_cpu_usage_usec": 1639742,
+      "source_io_rbytes": 0,
+      "source_io_wbytes": 317349888,
+      "table_lock_waiters": []
+    },
+    {
+      "backend_xmin_age_xids": 0,
+      "dead_tuples_estimate": 1,
+      "elapsed_ms": 1122.946807,
+      "longest_transaction_ms": 707.618,
+      "reader_latency_in_second": {
+        "count": 10,
+        "p50_ms": 0.3453365,
+        "p95_ms": 0.464531,
+        "p99_ms": 0.464531
+      },
+      "retained_slot_wal_bytes": 56,
+      "slot_active": true,
+      "snapshot_session_transaction_ms": 707.704,
+      "source_cpu_usage_usec": 1973064,
+      "source_io_rbytes": 0,
+      "source_io_wbytes": 317378560,
+      "table_lock_waiters": []
+    },
+    {
+      "backend_xmin_age_xids": 1,
+      "dead_tuples_estimate": 1,
+      "elapsed_ms": 2089.896221,
+      "longest_transaction_ms": 1678.644,
+      "reader_latency_in_second": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "retained_slot_wal_bytes": 56,
+      "slot_active": true,
+      "snapshot_session_transaction_ms": 1678.706,
+      "source_cpu_usage_usec": 2322182,
+      "source_io_rbytes": 0,
+      "source_io_wbytes": 317378560,
+      "table_lock_waiters": [
+        {
+          "mode": "AccessShareLock",
+          "wait_ms": 10.038
+        },
+        {
+          "mode": "AccessExclusiveLock",
+          "wait_ms": 108.921
+        }
+      ]
+    },
+    {
+      "backend_xmin_age_xids": 1,
+      "dead_tuples_estimate": 1,
+      "elapsed_ms": 3119.858702,
+      "longest_transaction_ms": 2709.908,
+      "reader_latency_in_second": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "retained_slot_wal_bytes": 56,
+      "slot_active": true,
+      "snapshot_session_transaction_ms": 2709.965,
+      "source_cpu_usage_usec": 2424203,
+      "source_io_rbytes": 0,
+      "source_io_wbytes": 317378560,
+      "table_lock_waiters": [
+        {
+          "mode": "AccessShareLock",
+          "wait_ms": 1041.304
+        },
+        {
+          "mode": "AccessExclusiveLock",
+          "wait_ms": 1140.188
+        }
+      ]
+    },
+    {
+      "backend_xmin_age_xids": 1,
+      "dead_tuples_estimate": 1,
+      "elapsed_ms": 4102.459954,
+      "longest_transaction_ms": 3689.983,
+      "reader_latency_in_second": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "retained_slot_wal_bytes": 56,
+      "slot_active": true,
+      "snapshot_session_transaction_ms": 3690.078,
+      "source_cpu_usage_usec": 2474698,
+      "source_io_rbytes": 0,
+      "source_io_wbytes": 317378560,
+      "table_lock_waiters": [
+        {
+          "mode": "AccessShareLock",
+          "wait_ms": 2021.462
+        },
+        {
+          "mode": "AccessExclusiveLock",
+          "wait_ms": 2120.347
+        }
+      ]
+    },
+    {
+      "backend_xmin_age_xids": 1,
+      "dead_tuples_estimate": 1,
+      "elapsed_ms": 5084.333984,
+      "longest_transaction_ms": 4673.407,
+      "reader_latency_in_second": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "retained_slot_wal_bytes": 56,
+      "slot_active": true,
+      "snapshot_session_transaction_ms": 4673.471,
+      "source_cpu_usage_usec": 2527549,
+      "source_io_rbytes": 0,
+      "source_io_wbytes": 317378560,
+      "table_lock_waiters": [
+        {
+          "mode": "AccessShareLock",
+          "wait_ms": 3004.799
+        },
+        {
+          "mode": "RowExclusiveLock",
+          "wait_ms": 8.427
+        },
+        {
+          "mode": "AccessExclusiveLock",
+          "wait_ms": 3103.685
+        }
+      ]
+    },
+    {
+      "backend_xmin_age_xids": 2,
+      "dead_tuples_estimate": 1,
+      "elapsed_ms": 6119.022351,
+      "longest_transaction_ms": 5705.759,
+      "reader_latency_in_second": {
+        "count": 0,
+        "p50_ms": null,
+        "p95_ms": null,
+        "p99_ms": null
+      },
+      "retained_slot_wal_bytes": 200,
+      "slot_active": true,
+      "snapshot_session_transaction_ms": 5705.832,
+      "source_cpu_usage_usec": 2586032,
+      "source_io_rbytes": 0,
+      "source_io_wbytes": 317386752,
+      "table_lock_waiters": [
+        {
+          "mode": "AccessShareLock",
+          "wait_ms": 4037.239
+        },
+        {
+          "mode": "RowExclusiveLock",
+          "wait_ms": 1040.869
+        },
+        {
+          "mode": "AccessExclusiveLock",
+          "wait_ms": 4136.127
+        }
+      ]
+    },
+    {
+      "backend_xmin_age_xids": 2,
+      "dead_tuples_estimate": 1,
+      "elapsed_ms": 7098.161685,
+      "longest_transaction_ms": 6688.863,
+      "reader_latency_in_second": {
+        "count": 10,
+        "p50_ms": 0.466259,
+        "p95_ms": 5081.22633,
+        "p99_ms": 5081.22633
+      },
+      "retained_slot_wal_bytes": 200,
+      "slot_active": false,
+      "snapshot_session_transaction_ms": 6688.921,
+      "source_cpu_usage_usec": 2646567,
+      "source_io_rbytes": 0,
+      "source_io_wbytes": 317386752,
+      "table_lock_waiters": [
+        {
+          "mode": "AccessShareLock",
+          "wait_ms": 5020.246
+        },
+        {
+          "mode": "RowExclusiveLock",
+          "wait_ms": 2023.874
+        },
+        {
+          "mode": "AccessExclusiveLock",
+          "wait_ms": 5119.131
+        }
+      ]
+    }
+  ],
+  "source_counter_delta": {
+    "source_cpu_usage_usec": 1144670,
+    "source_io_rbytes": 0,
+    "source_io_wbytes": 69632
+  },
+  "workload_commits_during_copy": 2
+}

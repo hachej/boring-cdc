@@ -1,0 +1,13 @@
+{
+  "chunks_done": 400,
+  "chunks_total": 400,
+  "clickhouse_checkpoints": [
+    123
+  ],
+  "complete_anchor": [
+    10000,
+    25
+  ],
+  "durable_business_events": 18,
+  "journal_head": 123
+}

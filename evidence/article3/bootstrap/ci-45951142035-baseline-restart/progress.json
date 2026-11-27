@@ -1,0 +1,18 @@
+{
+  "after": {
+    "chunks_done": 87,
+    "chunks_total": 400,
+    "clickhouse_checkpoints": [],
+    "complete_anchor": null,
+    "durable_business_events": 6,
+    "journal_head": 7
+  },
+  "before": {
+    "chunks_done": 1,
+    "chunks_total": 400,
+    "clickhouse_checkpoints": [],
+    "complete_anchor": null,
+    "durable_business_events": 3,
+    "journal_head": 3
+  }
+}

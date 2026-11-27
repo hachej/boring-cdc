@@ -1,0 +1,34 @@
+{
+  "capture_epoch": "1",
+  "chunks_read_in_replacement_generation": 2000,
+  "clickhouse_checkpoints": [
+    343
+  ],
+  "complete_anchors": [
+    {
+      "copied_rows": 200000,
+      "fence_seq": 288,
+      "generation": 2,
+      "lower_stitch_lsn": "00000000035B7AF0",
+      "lower_stitch_seq": 91
+    }
+  ],
+  "durable_business_events": 216,
+  "elapsed_to_anchor_ms": 249264,
+  "generations": [
+    {
+      "chunks_done": 900,
+      "chunks_total": 2000,
+      "generation": 1,
+      "state": "invalidated"
+    },
+    {
+      "chunks_done": 2000,
+      "chunks_total": 2000,
+      "generation": 2,
+      "state": "complete"
+    }
+  ],
+  "journal_head": 343,
+  "restart_behavior": "new_generation"
+}

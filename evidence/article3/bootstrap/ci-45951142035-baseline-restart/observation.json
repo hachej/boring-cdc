@@ -1,0 +1,87 @@
+{
+  "before_restart": {
+    "chunks_done": 400,
+    "chunks_total": 400,
+    "clickhouse_checkpoints": [],
+    "complete_anchor": [
+      10000,
+      25
+    ],
+    "durable_business_events": 18,
+    "journal_head": 25
+  },
+  "connector_codes": [
+    "M5_DESTINATION_START_FAILED",
+    "M5_SNAPSHOT_READBACK_FAILED"
+  ],
+  "convergence": {
+    "chunks_done": 400,
+    "chunks_total": 400,
+    "clickhouse_checkpoints": [
+      123
+    ],
+    "complete_anchor": [
+      10000,
+      25
+    ],
+    "durable_business_events": 18,
+    "journal_head": 123
+  },
+  "exit_code": 0,
+  "oracle": {
+    "candidate_rows": 10000,
+    "candidate_sha256": "eef23764a3430d76a1ba3f97d4a5c9e223eb777e1f3453f7e5799976bc677c7c",
+    "extra_keys": 0,
+    "missing_keys": 0,
+    "result": "pass",
+    "source_rows": 10000,
+    "source_sha256": "eef23764a3430d76a1ba3f97d4a5c9e223eb777e1f3453f7e5799976bc677c7c",
+    "wrong_values": 0
+  },
+  "overlap": {
+    "after": {
+      "chunks_done": 87,
+      "chunks_total": 400,
+      "clickhouse_checkpoints": [],
+      "complete_anchor": null,
+      "durable_business_events": 6,
+      "journal_head": 7
+    },
+    "before": {
+      "chunks_done": 1,
+      "chunks_total": 400,
+      "clickhouse_checkpoints": [],
+      "complete_anchor": null,
+      "durable_business_events": 3,
+      "journal_head": 3
+    }
+  },
+  "result": "pass",
+  "scenario": "article3-bootstrap-cli",
+  "stage": "complete",
+  "status": {
+    "bootstrap_state": "exporter_released",
+    "exporter_liveness": "released",
+    "failure_code": null,
+    "generation": 1,
+    "generation_state": "copying",
+    "guard_liveness": "held",
+    "progress": {
+      "complete_chunks": 87,
+      "completed_bytes": 76086,
+      "completed_rows": 2175,
+      "elapsed_ms": 4891,
+      "eta_ms": 17596,
+      "generation": 1,
+      "state": "copying",
+      "total_chunks": 400
+    },
+    "source_impact_last_sample": {
+      "exporter_age_at_release_ms": 345,
+      "lock_waiters": [],
+      "observed_unix_ms": 1795760661061,
+      "oldest_backend_xmin_age_xids": 1,
+      "snapshot_age_ms": 4024
+    }
+  }
+}

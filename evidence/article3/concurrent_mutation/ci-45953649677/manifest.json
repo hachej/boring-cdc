@@ -1,0 +1,19 @@
+{
+  "ci_run_attempt": "1",
+  "ci_run_id": "45953649677",
+  "command": [
+    "scripts/e2e/article3_concurrent_mutation.sh"
+  ],
+  "files": {
+    "backfill-status.json": "e113cf291d93ecf82449c7b8a990d757e32196a82048d64213772a14b3bd0717",
+    "candidate-rows.jsonl": "647376137adb65d021ba2d0225e5458c90d424afda29ff6535592dd96af83ac3",
+    "checkpoint.json": "85ad1c3985644eea193e9de8b02f29de7136a325851de51e88392225e2bbb994",
+    "mutation-ledger.json": "8b285be4485068a7711ea640351dd759b7aaae4cf6a2af2579b4c9d07b1ac2d1",
+    "mutation-result.json": "b6ef745898cdbae75f44ff7140d2104eafc42e8049360bac805926e26f49f92f",
+    "observation.json": "90eddc427a514a195f9ad507ff6df2c342ec7869ea5e9b0ffb3730731db37afe",
+    "oracle.json": "eaadfced252d0846a58a548a3b5d2bd2e05512d3a806d87473746f4485f1bad7",
+    "progress.json": "f4634ec9a0f33484262d5541914b4537fd50dcd7fde16870c68b2ea08cd6afe6",
+    "source-oracle.tsv": "e26f6b1c1d3a5dbfa3f1be437a12208edbded9d04e39045e526b7585b1951602"
+  },
+  "git_commit": "1530af7d83a1678258b78f387cfe7652031726cf"
+}

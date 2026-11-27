@@ -1,0 +1,10 @@
+{
+  "candidate_rows": 199994,
+  "candidate_sha256": "1af2731cfddd862d4aa251f3e7c9872aae80527aef99bd82ade7dd2905e0fd94",
+  "extra_keys": 0,
+  "missing_keys": 0,
+  "result": "pass",
+  "source_rows": 199994,
+  "source_sha256": "1af2731cfddd862d4aa251f3e7c9872aae80527aef99bd82ade7dd2905e0fd94",
+  "wrong_values": 0
+}

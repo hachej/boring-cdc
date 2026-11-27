@@ -1,0 +1,19 @@
+{
+  "ci_run_attempt": "1",
+  "ci_run_id": "45950921196",
+  "command": [
+    "scripts/e2e/article3_kill_backfill.sh"
+  ],
+  "files": {
+    "backfill-status.json": "18969040c769e4b8228d80481b5ae71d18b76cd26252e4e68780b61f03479cb0",
+    "interrupted-exit.json": "e3b9c2844b5a5c2677b3a2279db2ec8487491dd9a23d6b22fac153391b3bb63c",
+    "interrupted.json": "633d3ebe2e7c90331a26e39d199f03a4ae0e54982e175361556cc0fcf13830cc",
+    "midpoint.json": "633d3ebe2e7c90331a26e39d199f03a4ae0e54982e175361556cc0fcf13830cc",
+    "observation.json": "d8a68ab6fcae0f09dd7c498b94fc10f95e8f69559b87cfe537a36c52c0c5901c",
+    "progress.json": "88d2fc6405da4aa650a3185345d3cd1bcbeb07eb9e4ffbce7c96f14af392f276",
+    "restart-exit.json": "7de1555df0c2700329e815b93b32c571c3ea54dc967b89e81ab73b9972b72d1d",
+    "restart.json": "90533eccbd2b888296ad1b33fad6b694c7878bcc2e871d6aad686dc111f6f5e7",
+    "workload.json": "dcd7a46604a99c3c37803c3efeba1812ca9f6903eafeeb15af2829b6d461eb90"
+  },
+  "git_commit": "94c4f27d0b3a45e7b1a4fc582c50cd8995ee0b47"
+}

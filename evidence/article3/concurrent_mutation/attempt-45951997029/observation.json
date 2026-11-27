@@ -1,0 +1,172 @@
+{
+  "connector_codes": [],
+  "convergence": {
+    "chunks_done": 400,
+    "chunks_total": 400,
+    "clickhouse_checkpoints": [
+      313
+    ],
+    "complete_anchor": [
+      200000,
+      182
+    ],
+    "durable_business_events": 226,
+    "journal_head": 313
+  },
+  "exit_code": 1,
+  "mutation": {
+    "changes": [
+      {
+        "category": "copied",
+        "chunk": "backfill:production-192294df07d389f5b31c60d42bb13865:00000008",
+        "clickhouse": "mutation-4011",
+        "expected": "mutation-4011",
+        "key": 4011,
+        "operation": "update",
+        "postgres": "mutation-4011"
+      },
+      {
+        "category": "copied",
+        "chunk": "backfill:production-192294df07d389f5b31c60d42bb13865:00000008",
+        "clickhouse": null,
+        "expected": null,
+        "key": 4012,
+        "operation": "delete",
+        "postgres": null
+      },
+      {
+        "category": "copied",
+        "chunk": "backfill:production-192294df07d389f5b31c60d42bb13865:00000008",
+        "clickhouse": null,
+        "expected": null,
+        "key": 4013,
+        "operation": "update_then_delete",
+        "postgres": null
+      },
+      {
+        "category": "copying",
+        "chunk": "backfill:production-192294df07d389f5b31c60d42bb13865:00000009",
+        "clickhouse": "mutation-4511",
+        "expected": "mutation-4511",
+        "key": 4511,
+        "operation": "update",
+        "postgres": "mutation-4511"
+      },
+      {
+        "category": "copying",
+        "chunk": "backfill:production-192294df07d389f5b31c60d42bb13865:00000009",
+        "clickhouse": null,
+        "expected": null,
+        "key": 4512,
+        "operation": "delete",
+        "postgres": null
+      },
+      {
+        "category": "copying",
+        "chunk": "backfill:production-192294df07d389f5b31c60d42bb13865:00000009",
+        "clickhouse": null,
+        "expected": null,
+        "key": 4513,
+        "operation": "update_then_delete",
+        "postgres": null
+      },
+      {
+        "category": "pending",
+        "chunk": "backfill:production-192294df07d389f5b31c60d42bb13865:00000010",
+        "clickhouse": null,
+        "expected": "mutation-5011",
+        "key": 5011,
+        "operation": "update",
+        "postgres": null
+      },
+      {
+        "category": "pending",
+        "chunk": "backfill:production-192294df07d389f5b31c60d42bb13865:00000010",
+        "clickhouse": null,
+        "expected": null,
+        "key": 5012,
+        "operation": "delete",
+        "postgres": null
+      },
+      {
+        "category": "pending",
+        "chunk": "backfill:production-192294df07d389f5b31c60d42bb13865:00000010",
+        "clickhouse": null,
+        "expected": null,
+        "key": 5013,
+        "operation": "update_then_delete",
+        "postgres": null
+      }
+    ],
+    "commit_end_lsn": "00000000035970F0",
+    "commit_lsn_u64": 56193216,
+    "commit_returned_mono_ms": 512269,
+    "copied_before_mutation": true,
+    "copy_elapsed_ms": 212108,
+    "durable_events": 12,
+    "minimum_copy_ms": 180000,
+    "missing_keys": 1,
+    "result": "fail",
+    "resurrected_deletes": 0,
+    "selected_mono_ms": 512245,
+    "stale_values": 1,
+    "unfinished_at_commit": true,
+    "xid": 775
+  },
+  "oracle": {
+    "candidate_rows": 199996,
+    "candidate_sha256": "c1e6f56f825383c0815297942b4ebead136099917e29ca21781957bbb0bc13a6",
+    "extra_keys": 0,
+    "missing_keys": 0,
+    "result": "pass",
+    "source_rows": 199996,
+    "source_sha256": "c1e6f56f825383c0815297942b4ebead136099917e29ca21781957bbb0bc13a6",
+    "wrong_values": 0
+  },
+  "overlap": {
+    "after": {
+      "chunks_done": 9,
+      "chunks_total": 400,
+      "clickhouse_checkpoints": [],
+      "complete_anchor": null,
+      "durable_business_events": 6,
+      "journal_head": 7
+    },
+    "before": {
+      "chunks_done": 1,
+      "chunks_total": 400,
+      "clickhouse_checkpoints": [],
+      "complete_anchor": null,
+      "durable_business_events": 3,
+      "journal_head": 3
+    }
+  },
+  "result": "fail",
+  "scenario": "article3-concurrent-mutation",
+  "stage": "oracle",
+  "status": {
+    "bootstrap_state": "exporter_released",
+    "exporter_liveness": "released",
+    "failure_code": null,
+    "generation": 1,
+    "generation_state": "copying",
+    "guard_liveness": "held",
+    "progress": {
+      "complete_chunks": 9,
+      "completed_bytes": 159786,
+      "completed_rows": 4500,
+      "elapsed_ms": 5187,
+      "eta_ms": 225346,
+      "generation": 1,
+      "state": "copying",
+      "total_chunks": 400
+    },
+    "source_impact_last_sample": {
+      "exporter_age_at_release_ms": 177,
+      "lock_waiters": [],
+      "observed_unix_ms": 1795761261426,
+      "oldest_backend_xmin_age_xids": 1,
+      "snapshot_age_ms": 4409
+    }
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "connector_codes": [],
+  "exit_code": 1,
+  "interrupted": {
+    "capture_epoch": "1",
+    "clickhouse_checkpoints": [],
+    "complete_anchors": [],
+    "durable_business_events": 66,
+    "generations": [
+      {
+        "chunks_done": 900,
+        "chunks_total": 2000,
+        "generation": 1,
+        "state": "copying"
+      }
+    ],
+    "journal_head": 87
+  },
+  "interrupted_exit": 137,
+  "overlap": {
+    "after": {
+      "chunks_done": 39,
+      "chunks_total": 2000,
+      "clickhouse_checkpoints": [],
+      "complete_anchor": null,
+      "durable_business_events": 6,
+      "journal_head": 7
+    },
+    "before": {
+      "chunks_done": 1,
+      "chunks_total": 2000,
+      "clickhouse_checkpoints": [],
+      "complete_anchor": null,
+      "durable_business_events": 3,
+      "journal_head": 3
+    }
+  },
+  "restart": {
+    "capture_epoch": "1",
+    "clickhouse_checkpoints": [],
+    "complete_anchors": [],
+    "durable_business_events": 66,
+    "generations": [
+      {
+        "chunks_done": 900,
+        "chunks_total": 2000,
+        "generation": 1,
+        "state": "copying"
+      }
+    ],
+    "journal_head": 87,
+    "restart_behavior": "replacement_not_observed"
+  },
+  "restart_codes": [
+    "M3_BOOTSTRAP_RECOVERY_REQUIRED"
+  ],
+  "restart_exit": 4,
+  "result": "fail",
+  "scenario": "article3-kill-backfill",
+  "stage": "restart",
+  "status": {
+    "bootstrap_state": "exporter_released",
+    "exporter_liveness": "released",
+    "failure_code": null,
+    "generation": 1,
+    "generation_state": "copying",
+    "guard_liveness": "held",
+    "progress": {
+      "complete_chunks": 39,
+      "completed_bytes": 138186,
+      "completed_rows": 3900,
+      "elapsed_ms": 5214,
+      "eta_ms": 262170,
+      "generation": 1,
+      "state": "copying",
+      "total_chunks": 2000
+    },
+    "source_impact_last_sample": {
+      "exporter_age_at_release_ms": 156,
+      "lock_waiters": [],
+      "observed_unix_ms": 1795760388946,
+      "oldest_backend_xmin_age_xids": 0,
+      "snapshot_age_ms": 4368
+    }
+  },
+  "workload": {
+    "chunk_rows": 100,
+    "seed": "workload-v1-orders",
+    "seed_rows": 200000,
+    "write_interval_seconds": 5
+  }
+}
