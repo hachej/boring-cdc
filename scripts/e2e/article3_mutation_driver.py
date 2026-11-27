@@ -26,7 +26,7 @@ def connection(path):
     return sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True, timeout=1)
 
 
-def pick(db):
+def pick(db, reserved):
     db.execute("BEGIN")
     try:
         copying = db.execute(
@@ -48,24 +48,26 @@ def pick(db):
         )
         if copied is None or pending is None:
             return None
-        return [
-            {"category": category, "chunk": row[0], "key": key(row[1]) + 10 + i,
-             "operation": operation}
-            for category, row in zip(CATEGORIES, (copied, copying, pending), strict=True)
-            for i, operation in enumerate(OPERATIONS)
-            if key(row[1]) + 10 + i < key(row[2])
-        ]
+        selected = []
+        for category, row in zip(CATEGORIES, (copied, copying, pending), strict=True):
+            candidates = (ident for ident in range(key(row[1]) + 10, key(row[2])) if ident not in reserved)
+            for operation, ident in zip(OPERATIONS, candidates):
+                selected.append({"category": category, "chunk": row[0], "key": ident,
+                                 "operation": operation})
+        return selected
     finally:
         db.rollback()
 
 
-def write(db_path, ledger):
+def write(db_path, ledger, concurrent_writes):
+    reserved = set(range(1, concurrent_writes + 1))
+    reserved.update(range(5001, 5001 + concurrent_writes))
     deadline = time.monotonic() + 180
     selected = None
     while time.monotonic() < deadline:
         try:
             with closing(connection(db_path)) as db:
-                selected = pick(db)
+                selected = pick(db, reserved)
         except sqlite3.OperationalError as error:
             if "no such table" not in str(error):
                 raise
@@ -165,9 +167,11 @@ def main():
         entry = modes.add_parser(mode)
         for path in paths:
             entry.add_argument(path, type=Path)
+        if mode == "write":
+            entry.add_argument("--concurrent-writes", type=int, required=True)
     args = parser.parse_args()
     if args.mode == "write":
-        return write(args.database, args.ledger)
+        return write(args.database, args.ledger, args.concurrent_writes)
     return verify(args.database, args.ledger, args.source, args.candidate, args.result)
 
 

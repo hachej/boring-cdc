@@ -211,7 +211,8 @@ if [[ "${BCDC_ARTICLE3_BASELINE_OUTAGE:-0}" == 1 ]]; then
   docker stop "$clickhouse_container" >/dev/null
 elif [[ "$scenario" == article3-concurrent-mutation ]]; then
   PGHOST=127.0.0.1 PGPORT=$pg_port PGDATABASE=boring_cdc PGUSER=boring_cdc_app PGPASSWORD=$app_password \
-    python3 "$repo/scripts/e2e/article3_mutation_driver.py" write state/boring.db "$packet/mutation-ledger.json"
+    python3 "$repo/scripts/e2e/article3_mutation_driver.py" write state/boring.db "$packet/mutation-ledger.json" \
+      --concurrent-writes "$workload_writes"
 fi
 wait "$workload_pid"
 workload_pid=""
