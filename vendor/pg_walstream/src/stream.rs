@@ -1868,8 +1868,9 @@ mod reached_stop_lsn_tests {
     use super::*;
     use crate::column_value::{ColumnValue, RowData};
 
-    fn ts() -> chrono::DateTime<chrono::Utc> {
-        chrono::DateTime::<chrono::Utc>::from_timestamp(0, 0).unwrap()
+    fn ts() -> crate::types::WalTimestamp {
+        crate::types::postgres_timestamp_to_utc(-crate::types::PG_EPOCH_OFFSET_SECS * 1_000_000)
+            .unwrap()
     }
     fn commit(end: u64) -> ChangeEvent {
         ChangeEvent {
@@ -7560,7 +7561,7 @@ mod tests {
         let event = ChangeEvent {
             event_type: EventType::Begin {
                 final_lsn: crate::types::Lsn::new(0x1000),
-                commit_timestamp: chrono::Utc::now(),
+                commit_timestamp: crate::types::WalTimestamp::now(),
                 transaction_id: 42,
             },
             lsn: crate::types::Lsn::new(0x1000),
@@ -7752,7 +7753,7 @@ mod tests {
             event_type: EventType::Commit {
                 commit_lsn: crate::types::Lsn::new(0x2000),
                 end_lsn: crate::types::Lsn::new(0x2100),
-                commit_timestamp: chrono::Utc::now(),
+                commit_timestamp: crate::types::WalTimestamp::now(),
             },
             lsn: crate::types::Lsn::new(0x2000),
             metadata: None,

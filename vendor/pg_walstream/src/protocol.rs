@@ -14,7 +14,7 @@ use crate::prelude::*;
 #[cfg(feature = "std")]
 use crate::types::system_time_to_postgres_timestamp;
 use crate::types::{
-    format_lsn, postgres_timestamp_to_chrono, ChangeEvent, EventType, Lsn, Oid, RelationColumn,
+    format_lsn, postgres_timestamp_to_utc, ChangeEvent, EventType, Lsn, Oid, RelationColumn,
     ReplicaIdentity, TimestampTz, XLogRecPtr, Xid,
 };
 use bytes::Bytes;
@@ -1574,7 +1574,7 @@ pub(crate) fn message_to_change_event(
                 event_type: EventType::Begin {
                     transaction_id: xid,
                     final_lsn: Lsn::new(final_lsn),
-                    commit_timestamp: postgres_timestamp_to_chrono(timestamp),
+                    commit_timestamp: postgres_timestamp_to_utc(timestamp)?,
                 },
                 lsn: Lsn::new(lsn),
                 metadata: None,
@@ -1595,7 +1595,7 @@ pub(crate) fn message_to_change_event(
             );
             ChangeEvent {
                 event_type: EventType::Commit {
-                    commit_timestamp: postgres_timestamp_to_chrono(timestamp),
+                    commit_timestamp: postgres_timestamp_to_utc(timestamp)?,
                     commit_lsn: Lsn::new(commit_lsn),
                     end_lsn: Lsn::new(end_lsn),
                 },
@@ -1668,7 +1668,7 @@ pub(crate) fn message_to_change_event(
                     transaction_id: xid,
                     commit_lsn: Lsn::new(commit_lsn),
                     end_lsn: Lsn::new(end_lsn),
-                    commit_timestamp: postgres_timestamp_to_chrono(timestamp),
+                    commit_timestamp: postgres_timestamp_to_utc(timestamp)?,
                 },
                 lsn: Lsn::new(lsn),
                 metadata: None,
@@ -1693,7 +1693,7 @@ pub(crate) fn message_to_change_event(
                     transaction_id: xid,
                     subtransaction_xid,
                     abort_lsn: abort_lsn.map(Lsn::new),
-                    abort_timestamp: abort_timestamp.map(postgres_timestamp_to_chrono),
+                    abort_timestamp: abort_timestamp.map(postgres_timestamp_to_utc).transpose()?,
                 },
                 lsn: Lsn::new(lsn),
                 metadata: None,
@@ -1756,7 +1756,7 @@ pub(crate) fn message_to_change_event(
                 xid,
                 Lsn::new(prepare_lsn),
                 Lsn::new(end),
-                postgres_timestamp_to_chrono(timestamp),
+                postgres_timestamp_to_utc(timestamp)?,
                 gid,
                 Lsn::new(lsn),
             )
@@ -1781,7 +1781,7 @@ pub(crate) fn message_to_change_event(
                 xid,
                 Lsn::new(prepare_lsn),
                 Lsn::new(end),
-                postgres_timestamp_to_chrono(timestamp),
+                postgres_timestamp_to_utc(timestamp)?,
                 gid,
                 Lsn::new(lsn),
             )
@@ -1806,7 +1806,7 @@ pub(crate) fn message_to_change_event(
                 xid,
                 Lsn::new(commit_lsn),
                 Lsn::new(end),
-                postgres_timestamp_to_chrono(timestamp),
+                postgres_timestamp_to_utc(timestamp)?,
                 gid,
                 Lsn::new(lsn),
             )
@@ -1832,8 +1832,8 @@ pub(crate) fn message_to_change_event(
                 xid,
                 Lsn::new(prepare_end_lsn),
                 Lsn::new(rollback_end_lsn),
-                postgres_timestamp_to_chrono(prepare_timestamp),
-                postgres_timestamp_to_chrono(rollback_timestamp),
+                postgres_timestamp_to_utc(prepare_timestamp)?,
+                postgres_timestamp_to_utc(rollback_timestamp)?,
                 gid,
                 Lsn::new(lsn),
             )
@@ -1858,7 +1858,7 @@ pub(crate) fn message_to_change_event(
                 xid,
                 Lsn::new(prepare_lsn),
                 Lsn::new(end),
-                postgres_timestamp_to_chrono(timestamp),
+                postgres_timestamp_to_utc(timestamp)?,
                 gid,
                 Lsn::new(lsn),
             )
