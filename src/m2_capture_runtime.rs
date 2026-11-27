@@ -2786,6 +2786,13 @@ pub async fn run_loaded_config(
             "M2_RECOVERY_RECEIPT_MISMATCH",
         ));
     }
+    let restart_backfill = bootstrap && live_source.slot_exists;
+    let initial_bootstrap = bootstrap && !restart_backfill;
+    let restart_drain_target = if restart_backfill {
+        Some(crate::m3_live_run::restart_drain_target(&dsn)?)
+    } else {
+        None
+    };
     if bootstrap {
         let initial = rusqlite::Connection::open_with_flags(
             &journal_path,
@@ -2803,19 +2810,14 @@ pub async fn run_loaded_config(
                 "M3_SOURCE_IDENTITY_MISMATCH",
             ));
         }
-        if live_source.slot_exists {
-            return Err(CaptureFailure::at(
-                "bootstrap",
-                "M3_BOOTSTRAP_RECOVERY_REQUIRED",
-            ));
-        }
         if changed_limit {
             return Err(CaptureFailure::at(
                 "bootstrap",
                 "M3_BOOTSTRAP_CONFIG_CHANGED",
             ));
         }
-    } else {
+    }
+    if !initial_bootstrap {
         let receipt = crate::m2_reconcile::reconcile_startup(
             &journal_path,
             &startup_run_id,
@@ -2935,7 +2937,7 @@ pub async fn run_loaded_config(
         .ok_or_else(|| CaptureFailure::at("journal", "M2_CAPTURE_EPOCH_NOT_CANONICAL"))?;
     let mut catalog = PgReplicationConnection::connect(&dsn)
         .map_err(|_| CaptureFailure::at("catalog", "M2_CATALOG_CONNECT_FAILED"))?;
-    let (writer, mut bootstrap_copy, bootstrap_connection) = if bootstrap {
+    let (writer, mut bootstrap_copy, bootstrap_connection) = if initial_bootstrap {
         let started = crate::m3_live_run::start(
             writer,
             config,
@@ -2982,7 +2984,8 @@ pub async fn run_loaded_config(
                 "SELECT a.anchor_id FROM bootstrap_anchors a JOIN destinations d
                ON d.capture_epoch=a.capture_epoch AND d.generation=a.generation
              WHERE a.capture_epoch=?1 AND d.kind='clickhouse' AND d.configuration_fingerprint=?2
-               AND a.state='complete' AND a.start_seq=0 LIMIT 1",
+               AND a.state='complete'
+               AND (a.start_seq=0 OR a.lower_stitch_lsn=a.snapshot_boundary_lsn) LIMIT 1",
                 rusqlite::params![capture_epoch, config.fingerprints().destination],
                 |row| row.get::<_, String>(0),
             )
@@ -3016,7 +3019,7 @@ pub async fn run_loaded_config(
             .ok()?;
         matches.then_some(relation)
     });
-    let gate_reader = if bootstrap {
+    let gate_reader = if initial_bootstrap {
         Some(
             rusqlite::Connection::open_with_flags(
                 &journal_path,
@@ -3125,19 +3128,43 @@ pub async fn run_loaded_config(
     writer_service
         .insert_owner_lease(&lease)
         .map_err(|_| CaptureFailure::at("ownership", "M2_OWNER_LEASE_STORE_FAILED"))?;
+    let select_relation = |contracts: &BTreeMap<u32, RelationContract>| {
+        let table = &public.tables.first()?.source_relation;
+        contracts
+            .values()
+            .find(|contract| {
+                format!("{}.{}", contract.relation.namespace, contract.relation.name) == *table
+            })
+            .cloned()
+    };
+
+    let (restart_connection, restart_request) = if let Some(drained_through) = restart_drain_target
+    {
+        let (connection, contracts) = setup_runtime(&capture_config)?;
+        let relation = select_relation(&contracts)
+            .ok_or_else(|| CaptureFailure::at("bootstrap", "M3_RELATION_CONTRACT_MISSING"))?;
+        let request = crate::m3_live_run::RestartSnapshot {
+            public: public.clone(),
+            fingerprints: config.fingerprints().clone(),
+            dsn: dsn.clone(),
+            control_dsn: heartbeat_dsn.clone(),
+            source: canonical_source.clone(),
+            relation,
+            capture_epoch: capture_epoch.clone(),
+            run_id: startup_run_id.clone(),
+            drained_through,
+            now_ms: now,
+        };
+        (Some((connection, contracts)), Some(request))
+    } else {
+        (None, None)
+    };
     let snapshot_relation = bootstrap_connection
         .as_ref()
-        .map(|(_, contracts)| contracts)
-        .and_then(|contracts| {
-            let table = &public.tables.first()?.source_relation;
-            contracts
-                .values()
-                .find(|contract| {
-                    format!("{}.{}", contract.relation.namespace, contract.relation.name) == *table
-                })
-                .cloned()
-        })
+        .and_then(|(_, contracts)| select_relation(contracts))
+        .or_else(|| restart_request.as_ref().map(|req| req.relation.clone()))
         .or(recovered_relation);
+    let bootstrap_connection = bootstrap_connection.or(restart_connection);
     let destination_start = crate::m5_clickhouse_loop::PumpStart {
         snapshot_relation,
         journal_path: journal_path.clone(),
@@ -3157,6 +3184,7 @@ pub async fn run_loaded_config(
             .saturating_mul(3)
             .max(30_000),
     };
+    let restart_writer = destination_writer.clone();
     let destination_stopped = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     let destination_stop = std::sync::Arc::clone(&destination_stopped);
     let destination_ready = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(!bootstrap));
@@ -3263,7 +3291,50 @@ pub async fn run_loaded_config(
         );
         Ok(())
     };
+    let mut restart_request = restart_request;
+    let mut restart_worker = None;
     let mut service_work = |runtime: &mut CaptureRuntime<JournalWriterService, _, _>| {
+        if let Some(request) = &restart_request
+            && runtime
+                .durable_end_lsn()
+                .is_some_and(|lsn| lsn >= request.drained_through)
+        {
+            let request = restart_request.take().expect("known pending restart");
+            let writer = restart_writer.clone();
+            let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+            std::thread::Builder::new()
+                .name("existing-slot-snapshot".into())
+                .spawn(move || {
+                    let _ = sender.send(request.start(&writer));
+                })
+                .map_err(|_| {
+                    CaptureFailure::at("restart_backfill", "M3_RESTART_WORKER_UNAVAILABLE")
+                })?;
+            restart_worker = Some(receiver);
+        }
+        if let Some(worker) = &restart_worker {
+            use std::sync::mpsc::TryRecvError;
+            match worker.try_recv() {
+                Ok(result) => {
+                    bootstrap_copy = Some(result.map_err(|error| match error {
+                        JournalError::Invalid(code)
+                        | JournalError::Conflict(code)
+                        | JournalError::Unavailable(code) => {
+                            CaptureFailure::at("restart_backfill", code)
+                        }
+                        _ => CaptureFailure::at("restart_backfill", "M3_RESTART_SNAPSHOT_FAILED"),
+                    })?);
+                    restart_worker = None;
+                }
+                Err(TryRecvError::Empty) => {}
+                Err(TryRecvError::Disconnected) => {
+                    return Err(CaptureFailure::at(
+                        "restart_backfill",
+                        "M3_RESTART_WORKER_UNAVAILABLE",
+                    ));
+                }
+            }
+        }
         if let Some(copy) = bootstrap_copy.as_mut() {
             copy.tick(&mut runtime.journal)?;
             if copy.complete() {

@@ -88,7 +88,8 @@ pub fn prepare_snapshot_batch(
         "SELECT a.generation_id,a.snapshot_complete_seq,a.snapshot_boundary_lsn,a.start_seq,p.snapshot_schema_fingerprint,r.destination_id
          FROM bootstrap_anchors a JOIN m3_planner_runs p ON p.generation_id=a.generation_id
          JOIN backfill_runs r ON r.run_id=p.run_id
-         WHERE a.anchor_id=?1 AND a.capture_epoch=?2 AND a.generation=?3 AND a.state='complete'",
+         WHERE a.anchor_id=?1 AND a.capture_epoch=?2 AND a.generation=?3 AND a.state='complete'
+           AND (a.start_seq=0 OR a.lower_stitch_lsn=a.snapshot_boundary_lsn)",
         params![anchor_id, context.capture_epoch, context.generation],
         |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?)),
     ).optional()?;
@@ -105,7 +106,7 @@ pub fn prepare_snapshot_batch(
             "complete initial anchor unavailable",
         ));
     };
-    if start_seq != 0
+    if first_snapshot_seq <= start_seq
         || last_snapshot_seq > complete_seq
         || schema_fingerprint != relation_fingerprint
         || destination_id != context.destination_id
@@ -293,11 +294,13 @@ pub(crate) fn baseline_verified(
     context: &BatchContext,
     anchor_id: &str,
 ) -> Result<bool, DurabilityError> {
-    let total: Option<u64>=transaction.query_row(
-        "SELECT snapshot_complete_seq FROM bootstrap_anchors WHERE anchor_id=?1 AND capture_epoch=?2 AND generation=?3 AND state='complete' AND start_seq=0",
-        params![anchor_id,context.capture_epoch,context.generation],|row|row.get(0),
+    let extent: Option<(u64,u64)>=transaction.query_row(
+        "SELECT start_seq,snapshot_complete_seq FROM bootstrap_anchors WHERE anchor_id=?1 AND capture_epoch=?2 AND generation=?3 AND state='complete'",
+        params![anchor_id,context.capture_epoch,context.generation],|row|Ok((row.get(0)?,row.get(1)?)),
     ).optional()?;
-    let Some(total) = total else { return Ok(false) };
+    let Some((start, total)) = extent else {
+        return Ok(false);
+    };
     let mut stmt=transaction.prepare(
         "SELECT first_snapshot_seq,last_snapshot_seq FROM m4_snapshot_batch_intents WHERE destination_id=?1 AND capture_epoch=?2 AND generation=?3 AND anchor_id=?4 AND configuration_fingerprint=?5 AND state='verified' ORDER BY first_snapshot_seq",
     )?;
@@ -311,7 +314,9 @@ pub(crate) fn baseline_verified(
         ],
         |row| Ok((row.get::<_, u64>(0)?, row.get::<_, u64>(1)?)),
     )?;
-    let mut next = 1;
+    let mut next = start
+        .checked_add(1)
+        .ok_or(DurabilityError::Conflict("snapshot sequence overflow"))?;
     for range in ranges {
         let (first, last) = range?;
         if first != next || last > total {
@@ -321,7 +326,7 @@ pub(crate) fn baseline_verified(
             .checked_add(1)
             .ok_or(DurabilityError::Conflict("snapshot sequence overflow"))?;
     }
-    Ok(next == total + 1)
+    Ok(next.checked_sub(1) == Some(total))
 }
 
 fn validate_intent(
@@ -517,7 +522,7 @@ mod tests {
         let mut connection = rusqlite::Connection::open_in_memory().unwrap();
         connection.execute_batch("CREATE TABLE destinations(destination_id TEXT PRIMARY KEY,kind TEXT,capture_epoch TEXT,generation INTEGER,configuration_fingerprint TEXT,current_failure_id TEXT);
             CREATE TABLE destination_generation_leases(lease_id TEXT PRIMARY KEY,destination_id TEXT,capture_epoch TEXT,generation INTEGER,anchor_id TEXT,configuration_fingerprint TEXT,run_id TEXT,state TEXT);
-            CREATE TABLE bootstrap_anchors(anchor_id TEXT PRIMARY KEY,capture_epoch TEXT,generation INTEGER,state TEXT,start_seq INTEGER,snapshot_boundary_lsn TEXT,snapshot_complete_seq INTEGER,generation_id TEXT,bootstrap_intent_id TEXT);
+            CREATE TABLE bootstrap_anchors(anchor_id TEXT PRIMARY KEY,capture_epoch TEXT,generation INTEGER,state TEXT,start_seq INTEGER,snapshot_boundary_lsn TEXT,lower_stitch_lsn TEXT,snapshot_complete_seq INTEGER,generation_id TEXT,bootstrap_intent_id TEXT);
             CREATE TABLE backfill_runs(run_id TEXT PRIMARY KEY,destination_id TEXT);
             CREATE TABLE m3_planner_runs(run_id TEXT,generation_id TEXT PRIMARY KEY,snapshot_schema_fingerprint TEXT);
             CREATE TABLE backfill_chunks(chunk_id TEXT PRIMARY KEY,generation_id TEXT,state TEXT);
@@ -532,7 +537,7 @@ mod tests {
             )
             .unwrap();
         connection.execute("INSERT INTO destination_generation_leases VALUES('lease','ch','7',3,'anchor','cfg','run','held')",[]).unwrap();
-        connection.execute("INSERT INTO bootstrap_anchors VALUES('anchor','7',3,'complete',0,'0000000000000070',1,'gen','boot')",[]).unwrap();
+        connection.execute("INSERT INTO bootstrap_anchors(anchor_id,capture_epoch,generation,state,start_seq,snapshot_boundary_lsn,snapshot_complete_seq,generation_id,bootstrap_intent_id) VALUES('anchor','7',3,'complete',0,'0000000000000070',1,'gen','boot')",[]).unwrap();
         connection
             .execute("INSERT INTO backfill_runs VALUES('run','ch')", [])
             .unwrap();

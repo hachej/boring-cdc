@@ -213,7 +213,7 @@ pub fn import_and_acknowledge(
     ))
 }
 
-fn record_acknowledgement(
+pub(crate) fn record_acknowledgement(
     writer: &mut WriterConnection,
     receipt: &GuardReceipt,
     importer_id: &str,
@@ -281,7 +281,7 @@ pub fn exporter_release_permitted(
     persisted_release_proof(writer, receipt, now_mono_ms)
 }
 
-fn persisted_release_proof(
+pub(crate) fn persisted_release_proof(
     writer: &WriterConnection,
     receipt: &GuardReceipt,
     now_mono_ms: u64,
