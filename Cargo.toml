@@ -28,10 +28,10 @@ path = "src/main.rs"
 # ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
 pg_walstream = { version = "=0.8.1", default-features = false, features = ["rustls-tls"] }
 # ARTICLE1-PROVISIONAL: boring-cdc-d-pg-protocol
-tokio = { version = "=1.53.1", features = ["rt-multi-thread"] }
+tokio = { version = "=1.53.3", features = ["rt-multi-thread"] }
 serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
-rusqlite = { version = "0.37.0", features = ["bundled", "hooks"] }
+rusqlite = { version = "=0.41.0", features = ["bundled", "fallible_uint", "hooks"] }
 libc = "0.2.175"
 sha2 = "0.10.8"
 toml = "0.9.5"
@@ -39,7 +39,7 @@ clickhouse = { version = "=0.13.3", default-features = false, features = ["rustl
 chrono = { version = "=0.4.45", default-features = false, features = ["std"] }
 base64 = "=0.22.1"
 rustls = "=0.23.46"
-url = "=2.5.8"
+url = "=2.5.9"
 percent-encoding = "=2.3.2"
 
 [dev-dependencies]

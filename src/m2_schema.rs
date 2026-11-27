@@ -202,7 +202,7 @@ pub fn open_reader_with_limits(
     if max_age.is_zero() || max_rows == 0 {
         return Err(rusqlite::Error::InvalidQuery);
     }
-    let connection = Connection::open_with_flags(
+    let mut connection = Connection::open_with_flags(
         path,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
