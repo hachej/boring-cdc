@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 import sqlite3
 import subprocess
 import time
@@ -113,6 +114,10 @@ def verify(db_path, ledger, source_path, candidate_path, result_path):
         if len(matches) != 1:
             raise RuntimeError("expected one durable source transaction for mutation XID")
         end_lsn, event_count, commit_lsn = matches[0]
+        copy_ms, = db.execute(
+            """SELECT max(c.committed_mono_ms)-min(p.started_mono_ms)
+               FROM m3_planner_runs p JOIN m3_chunk_commits c USING(generation_id)"""
+        ).fetchone()
         copy = {
             chunk: committed for chunk, committed in db.execute(
                 "SELECT chunk_id,committed_mono_ms FROM m3_chunk_commits"
@@ -137,9 +142,12 @@ def verify(db_path, ledger, source_path, candidate_path, result_path):
         copy[change["chunk"]] <= run["selected_mono_ms"]
         for change in run["changes"] if change["category"] == "copied"
     )
-    passed = (copied_before_mutation and unfinished_at_commit and event_count == 12
+    minimum_copy_ms = int(os.environ.get("BCDC_ARTICLE3_MUTATION_MIN_COPY_MS", "0"))
+    passed = (isinstance(copy_ms, int) and copy_ms >= minimum_copy_ms
+              and copied_before_mutation and unfinished_at_commit and event_count == 12
               and isinstance(commit_lsn, int) and not any((missing, resurrected, stale)))
     run.update(commit_lsn_u64=commit_lsn, commit_end_lsn=end_lsn, durable_events=event_count,
+               copy_elapsed_ms=copy_ms, minimum_copy_ms=minimum_copy_ms,
                copied_before_mutation=copied_before_mutation,
                unfinished_at_commit=unfinished_at_commit, missing_keys=missing,
                resurrected_deletes=resurrected, stale_values=stale, result="pass" if passed else "fail")

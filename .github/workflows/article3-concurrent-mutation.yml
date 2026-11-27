@@ -18,6 +18,7 @@ jobs:
     timeout-minutes: 40
     env:
       TMPDIR: /var/tmp
+      BCDC_ARTICLE3_MUTATION_MIN_COPY_MS: "180000"
       BCDC_ARTICLE3_PACKET_DIR: /var/tmp/article3-concurrent-mutation-packet
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
