@@ -210,7 +210,7 @@ pub fn open_reader_with_limits(
     connection.pragma_update(None, "foreign_keys", "ON")?;
     let opened_at = Instant::now();
     let deadline = opened_at + max_age;
-    connection.progress_handler(1_000, Some(move || Instant::now() >= deadline));
+    connection.progress_handler(1_000, Some(move || Instant::now() >= deadline))?;
     Ok(ReaderHandle {
         connection,
         opened_at,
