@@ -202,7 +202,7 @@ pub fn open_reader_with_limits(
     if max_age.is_zero() || max_rows == 0 {
         return Err(rusqlite::Error::InvalidQuery);
     }
-    let connection = Connection::open_with_flags(
+    let mut connection = Connection::open_with_flags(
         path,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )?;
@@ -210,7 +210,7 @@ pub fn open_reader_with_limits(
     connection.pragma_update(None, "foreign_keys", "ON")?;
     let opened_at = Instant::now();
     let deadline = opened_at + max_age;
-    connection.progress_handler(1_000, Some(move || Instant::now() >= deadline));
+    connection.progress_handler(1_000, Some(move || Instant::now() >= deadline))?;
     Ok(ReaderHandle {
         connection,
         opened_at,
