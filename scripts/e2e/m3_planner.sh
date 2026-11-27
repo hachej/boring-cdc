@@ -29,13 +29,25 @@ psql_cmd=(psql -X -v ON_ERROR_STOP=1 -At -h 127.0.0.1 -p "$port" -U boring_cdc -
 cat >"$work/fixture.sql" <<'SQL'
 DROP PUBLICATION IF EXISTS boring_cdc_m3_planner_pub;
 DROP TABLE IF EXISTS m3_planner_fixture;
-CREATE TABLE m3_planner_fixture(tenant bigint NOT NULL, id uuid NOT NULL, payload text NOT NULL, PRIMARY KEY(tenant,id));
-CREATE PUBLICATION boring_cdc_m3_planner_pub FOR TABLE m3_planner_fixture;
+-- The runtime admits a simple primary key. Exercise composite keyset paging through a unique index.
+CREATE TABLE m3_planner_fixture(tenant bigint NOT NULL, id uuid PRIMARY KEY, payload text NOT NULL);
+CREATE UNIQUE INDEX m3_planner_fixture_range ON m3_planner_fixture(tenant,id);
+CREATE SCHEMA boring_cdc_control;
+CREATE TABLE boring_cdc_control.heartbeat(
+  id smallint PRIMARY KEY CHECK(id=1), nonce bigint NOT NULL, updated_at timestamptz NOT NULL
+);
+CREATE TABLE boring_cdc_control.capture_fences(
+  id smallint PRIMARY KEY CHECK(id=1), capture_epoch bigint NOT NULL, generation bigint NOT NULL,
+  table_set_fingerprint bytea NOT NULL CHECK(octet_length(table_set_fingerprint)=32),
+  unique_nonce bytea NOT NULL CHECK(octet_length(unique_nonce)=16)
+);
+CREATE PUBLICATION boring_cdc_m3_planner_pub
+  FOR TABLE public.m3_planner_fixture,boring_cdc_control.heartbeat,boring_cdc_control.capture_fences;
 INSERT INTO m3_planner_fixture VALUES
 (-9223372036854775808,'00000000-0000-0000-0000-000000000000','min'),
 (-7,'00000000-0000-0000-0000-000000000001','sparse-a'),
 (-7,'80000000-0000-0000-0000-000000000000','sparse-b'),
-(0,'ffffffff-ffff-ffff-ffff-ffffffffffff','zero'),
+(0,'ffffffff-ffff-ffff-ffff-fffffffffffe','zero'),
 (9223372036854775807,'ffffffff-ffff-ffff-ffff-ffffffffffff','max');
 SQL
 "${psql_cmd[@]}" -f "$work/fixture.sql" >/dev/null

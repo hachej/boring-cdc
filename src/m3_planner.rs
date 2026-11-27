@@ -1661,12 +1661,8 @@ mod tests {
     fn key(v: i64) -> CanonicalKey {
         CanonicalKey::encode(&[KeyPartType::I64], &[KeyPart::I64(v)]).unwrap()
     }
-    fn plan_with_schema(
-        s: &mut PlannerStore,
-        b: Vec<CanonicalKey>,
-        schema: Vec<KeyPartType>,
-    ) -> String {
-        let ranges = half_open_ranges(&b).unwrap();
+    fn fixture_assignment_digest(boundaries: &[CanonicalKey]) -> String {
+        let ranges = half_open_ranges(boundaries).unwrap();
         let mut assigned = Vec::new();
         for range in &ranges {
             for bound in [&range.start, &range.end] {
@@ -1675,10 +1671,24 @@ mod tests {
                 assigned.extend_from_slice(bytes);
             }
         }
-        let digest = crate::m3_bootstrap::digest_assignment(&assigned);
+        crate::m3_bootstrap::digest_assignment(&assigned)
+    }
+    fn plan_with_schema(
+        s: &mut PlannerStore,
+        b: Vec<CanonicalKey>,
+        schema: Vec<KeyPartType>,
+        fingerprint: &str,
+    ) {
+        let digest = fixture_assignment_digest(&b);
         s.writer.connection().execute("INSERT INTO bootstrap_intents(intent_id,capture_epoch,source_system_id,database_id,slot_name,creation_floor_lsn,state,revision,created_at) VALUES('intent','epoch','sys','db','slot','0000000000000001','slot_created',0,'now')",[]).unwrap();
         s.writer.connection().execute("INSERT INTO m3_bootstrap_runtime VALUES('intent',1,10,1,'held','exporter_released','cfg')",[]).unwrap();
-        s.writer.connection().execute("INSERT INTO m3_bootstrap_importers VALUES('intent','worker',?1,'schema-fp','acknowledged')",[&digest]).unwrap();
+        s.writer
+            .connection()
+            .execute(
+                "INSERT INTO m3_bootstrap_importers VALUES('intent','worker',?1,?2,'acknowledged')",
+                rusqlite::params![digest, fingerprint],
+            )
+            .unwrap();
         s.writer
             .connection()
             .execute(
@@ -1694,7 +1704,7 @@ mod tests {
             generation: 1,
             bootstrap_intent_id: "intent".into(),
             importer_id: "worker".into(),
-            snapshot_schema_fingerprint: "schema-fp".into(),
+            snapshot_schema_fingerprint: fingerprint.into(),
             key_schema: schema,
             boundaries: b,
             estimated_rows: 8,
@@ -1702,10 +1712,9 @@ mod tests {
             started_mono_ms: 100,
         })
         .unwrap();
-        digest
     }
     fn plan(s: &mut PlannerStore, b: Vec<CanonicalKey>) {
-        plan_with_schema(s, b, vec![KeyPartType::I64]);
+        plan_with_schema(s, b, vec![KeyPartType::I64], "schema-fp");
     }
     struct FixtureSource {
         rows: Vec<SnapshotRow>,
@@ -2204,11 +2213,11 @@ mod tests {
             &[KeyPart::I64(i64::MAX), KeyPart::Uuid([0xff; 16])],
         )
         .unwrap();
-        let planner_digest = plan_with_schema(
-            &mut s,
-            vec![boundary1, boundary2],
-            vec![KeyPartType::I64, KeyPartType::Uuid],
-        );
+        let boundaries = vec![boundary1, boundary2];
+        let key_schema = vec![KeyPartType::I64, KeyPartType::Uuid];
+        let planner_digest = fixture_assignment_digest(&boundaries);
+        let publication = "boring_cdc_m3_planner_pub";
+        let relation = "public.m3_planner_fixture";
         let dsn = std::env::var("BORING_CDC_M3_DSN").unwrap();
         let slot = std::env::var("BORING_CDC_M3_SLOT")
             .unwrap_or_else(|_| "boring_cdc_m3_planner_test".into());
@@ -2219,14 +2228,16 @@ mod tests {
             std::process::id()
         ));
         let bootstrap_writer = open_writer(&bootstrap_path, "m3-planner-live", 1, 0).unwrap();
-        bootstrap_writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch','system','1','database',?1,'pgoutput','publication','protocol')",[&slot]).unwrap();
+        let (system_id, timeline_id, database_id, publication_fp, protocol_fp) =
+            crate::m3_bootstrap::live_tests::live_identity(&dsn, publication, relation);
+        bootstrap_writer.connection().execute("INSERT INTO source_state(singleton,capture_epoch,source_system_id,timeline_id,database_id,slot_name,plugin,publication_fingerprint,protocol_fingerprint) VALUES(1,'epoch',?1,?2,?3,?4,'pgoutput',?5,?6)",rusqlite::params![system_id,timeline_id,database_id,slot,publication_fp,protocol_fp]).unwrap();
         let mut runtime = crate::m3_bootstrap::BootstrapRuntime::start(
             bootstrap_writer,
             crate::m3_bootstrap::PrepareIntent {
                 intent_id: "planner-live-intent".into(),
                 capture_epoch: "epoch".into(),
-                source_system_id: "system".into(),
-                database_id: "database".into(),
+                source_system_id: system_id,
+                database_id,
                 slot_name: slot.clone(),
                 generation: 1,
                 table_set_fingerprint: "schema-fp".into(),
@@ -2248,8 +2259,8 @@ mod tests {
                 created_at: "unix-ms:0".into(),
             },
             &dsn,
-            &["public.m3_planner_fixture".into()],
-            "boring_cdc_m3_planner_pub",
+            &[relation.into()],
+            publication,
             crate::m3_bootstrap::SessionBounds {
                 statement_timeout_ms: 10_000,
                 idle_timeout_ms: 30_000,
@@ -2257,14 +2268,24 @@ mod tests {
             0,
         )
         .unwrap();
+        let fingerprint: String = crate::m2_schema::open_reader(&bootstrap_path)
+            .unwrap()
+            .query_one_bounded(
+                "SELECT snapshot_schema_fingerprint FROM m3_bootstrap_importers
+                 WHERE intent_id='planner-live-intent' AND importer_id='worker' AND state='acknowledged'",
+                |row| row.get(0),
+            )
+            .unwrap()
+            .expect("acknowledged importer must persist its schema fingerprint");
+        plan_with_schema(&mut s, boundaries, key_schema, &fingerprint);
         let binding_probe = runtime.take_importer("binding-probe").unwrap();
         let capability_mismatch_rejected = matches!(
             PostgresRangeSource::from_imported(
                 binding_probe,
                 "wrong-worker",
                 &planner_digest,
-                "schema-fp",
-                "public.m3_planner_fixture",
+                &fingerprint,
+                relation,
                 &["tenant", "id"],
             ),
             Err(PlannerError::Conflict("M3_IMPORTER_CAPABILITY_MISMATCH"))
@@ -2277,8 +2298,8 @@ mod tests {
             imported,
             "worker",
             &planner_digest,
-            "schema-fp",
-            "public.m3_planner_fixture",
+            &fingerprint,
+            relation,
             &["tenant", "id"],
         )
         .unwrap();
@@ -2312,8 +2333,8 @@ mod tests {
             probe,
             "memory-probe",
             &planner_digest,
-            "schema-fp",
-            "public.m3_planner_fixture",
+            &fingerprint,
+            relation,
             &["tenant", "id"],
         )
         .unwrap();
