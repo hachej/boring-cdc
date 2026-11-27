@@ -6,7 +6,9 @@
 use crate::m1_decoder::{Relation, RelationContract, TupleValue};
 use crate::m1_ordering::{CanonicalValue, ColumnState};
 use crate::m1_source_identity::CanonicalKeyComponent;
-use chrono::{DateTime, NaiveDate, NaiveDateTime};
+use time::format_description::well_known::Rfc3339;
+use time::macros::{date, datetime, format_description};
+use time::{Date, OffsetDateTime, PrimitiveDateTime};
 
 const MAX_SCALAR_BYTES: usize = 1_048_576;
 
@@ -415,9 +417,9 @@ fn pg_date(text: &str) -> Result<i32, ValueError> {
         "infinity" => return Ok(i32::MAX),
         _ => {}
     }
-    let date = NaiveDate::parse_from_str(text, "%Y-%m-%d").map_err(|_| ValueError::InvalidValue)?;
-    let epoch = NaiveDate::from_ymd_opt(2000, 1, 1).expect("valid PostgreSQL epoch");
-    i32::try_from(date.signed_duration_since(epoch).num_days()).map_err(|_| ValueError::Limit)
+    let date = Date::parse(text, format_description!("[year]-[month]-[day]"))
+        .map_err(|_| ValueError::InvalidValue)?;
+    Ok(date.to_julian_day() - date!(2000 - 01 - 01).to_julian_day())
 }
 
 fn pg_timestamp(text: &str) -> Result<i64, ValueError> {
@@ -426,16 +428,15 @@ fn pg_timestamp(text: &str) -> Result<i64, ValueError> {
         "infinity" => return Ok(i64::MAX),
         _ => {}
     }
-    let value = NaiveDateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S%.f")
-        .map_err(|_| ValueError::InvalidValue)?;
-    let epoch = NaiveDate::from_ymd_opt(2000, 1, 1)
-        .expect("valid PostgreSQL epoch")
-        .and_hms_opt(0, 0, 0)
-        .expect("valid epoch time");
-    value
-        .signed_duration_since(epoch)
-        .num_microseconds()
-        .ok_or(ValueError::Limit)
+    let value = PrimitiveDateTime::parse(
+        text,
+        format_description!(
+            "[year]-[month]-[day] [hour]:[minute]:[second][optional [.[subsecond]]]"
+        ),
+    )
+    .map_err(|_| ValueError::InvalidValue)?;
+    i64::try_from((value - datetime!(2000-01-01 0:00)).whole_microseconds())
+        .map_err(|_| ValueError::Limit)
 }
 
 fn pg_timestamptz(text: &str) -> Result<i64, ValueError> {
@@ -444,15 +445,26 @@ fn pg_timestamptz(text: &str) -> Result<i64, ValueError> {
         "infinity" => return Ok(i64::MAX),
         _ => {}
     }
-    let rfc = text.replacen(' ', "T", 1);
-    let value = DateTime::parse_from_rfc3339(&rfc)
-        .or_else(|_| DateTime::parse_from_str(text, "%Y-%m-%d %H:%M:%S%.f%#z"))
+    let mut normalized = text.replacen(' ', "T", 1);
+    if matches!(
+        normalized
+            .as_bytes()
+            .get(normalized.len().saturating_sub(3)..),
+        Some([b'+' | b'-', b'0'..=b'9', b'0'..=b'9'])
+    ) {
+        normalized.push_str(":00");
+    }
+    let value = OffsetDateTime::parse(&normalized, &Rfc3339)
+        .or_else(|_| {
+            OffsetDateTime::parse(
+                &normalized,
+                format_description!("[year]-[month]-[day]T[hour]:[minute]:[second][optional [.[subsecond]]][offset_hour sign:mandatory][optional [:]][offset_minute]"),
+            )
+        })
         .map_err(|_| ValueError::InvalidValue)?;
-    let pg_epoch_micros = 946_684_800_000_000_i64;
-    value
-        .timestamp_micros()
-        .checked_sub(pg_epoch_micros)
-        .ok_or(ValueError::Limit)
+    let pg_epoch_nanos = datetime!(2000-01-01 0:00 UTC).unix_timestamp_nanos();
+    i64::try_from((value.unix_timestamp_nanos() - pg_epoch_nanos).div_euclid(1_000))
+        .map_err(|_| ValueError::Limit)
 }
 
 fn uuid_bytes(text: &str) -> Result<Vec<u8>, ValueError> {
@@ -651,8 +663,14 @@ mod tests {
             (701, "-0.0", "8000000000000000"),
             (1700, "-123.4500", "2d3132332e3435"),
             (1082, "2000-01-02", "00000001"),
+            (1082, "1999-12-31", "ffffffff"),
+            (1082, "infinity", "7fffffff"),
             (1114, "2000-01-01 00:00:00.000001", "0000000000000001"),
             (1184, "1999-12-31 23:59:59.999999+00:00", "ffffffffffffffff"),
+            (1184, "1999-12-31 23:59:59.999999+00", "ffffffffffffffff"),
+            (1184, "2000-01-01 00:30:00+0030", "0000000000000000"),
+            (1114, "1999-12-31 23:59:59.999999", "ffffffffffffffff"),
+            (1114, "-infinity", "8000000000000000"),
             (
                 2950,
                 "00112233-4455-6677-8899-aabbccddeeff",
@@ -667,7 +685,8 @@ mod tests {
             ),
         ];
         for (oid, wire, expected) in cases {
-            let value = canonical_scalar(oid, -1, wire.as_bytes()).unwrap();
+            let value = canonical_scalar(oid, -1, wire.as_bytes())
+                .unwrap_or_else(|error| panic!("OID {oid} with {wire:?}: {error:?}"));
             let actual: String = value
                 .bytes
                 .iter()
@@ -685,6 +704,7 @@ mod tests {
             (21, "32768"),
             (1700, "NaN"),
             (1082, "not a date"),
+            (1184, "2000-01-01 00:00:00+00:"),
             (2950, "short"),
             (17, "\\x0"),
             (1007, "{{1}}"),

@@ -1474,7 +1474,7 @@ mod tests {
 
     #[test]
     fn test_deserialize_insert_wrong_event() {
-        let ts = chrono::Utc::now();
+        let ts = crate::types::WalTimestamp::now();
         let event = ChangeEvent::begin(1, Lsn::new(100), ts, Lsn::new(100));
         let result: crate::error::Result<UserModel> = event.deserialize_insert();
         assert!(result.is_err());
@@ -1609,7 +1609,7 @@ mod tests {
 
     #[test]
     fn test_deserialize_data_non_dml_errors() {
-        let ts = chrono::Utc::now();
+        let ts = crate::types::WalTimestamp::now();
         let event = ChangeEvent::begin(1, Lsn::new(100), ts, Lsn::new(100));
         let result: crate::error::Result<UserModel> = event.deserialize_data();
         assert!(result.is_err());
@@ -3012,7 +3012,7 @@ mod tests {
 
     #[test]
     fn test_deserialize_data_commit_errors() {
-        let ts = chrono::Utc::now();
+        let ts = crate::types::WalTimestamp::now();
         let event = ChangeEvent::commit(ts, Lsn::new(100), Lsn::new(200), Lsn::new(200));
         let result: crate::error::Result<UserModel> = event.deserialize_data();
         assert!(result.is_err());
@@ -3416,7 +3416,7 @@ mod tests {
 
     #[test]
     fn test_event_type_str_all_variants() {
-        let ts = chrono::Utc::now();
+        let ts = crate::types::WalTimestamp::now();
 
         let insert = ChangeEvent::insert("public", "t", 1, RowData::new(), Lsn::new(1));
         assert_eq!(insert.event_type_str(), "insert");

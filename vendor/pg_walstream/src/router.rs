@@ -377,7 +377,7 @@ mod tests {
             event_type: crate::EventType::Begin {
                 transaction_id: 1,
                 final_lsn: Lsn::new(1),
-                commit_timestamp: chrono::Utc::now(),
+                commit_timestamp: crate::types::WalTimestamp::now(),
             },
             lsn: Lsn::new(1),
             metadata: None,
@@ -451,7 +451,7 @@ mod tests {
             event_type: crate::EventType::Begin {
                 transaction_id: 1,
                 final_lsn: Lsn::new(1),
-                commit_timestamp: chrono::Utc::now(),
+                commit_timestamp: crate::types::WalTimestamp::now(),
             },
             lsn: Lsn::new(1),
             metadata: None,

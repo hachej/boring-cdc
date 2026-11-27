@@ -10,7 +10,6 @@ use crate::m1_cli_contract::{
 };
 use crate::m1_transition_kernel::{Randomness, TransitionContext, VirtualClock};
 use crate::m2_schema::WriterConnection;
-use chrono::{TimeZone, Utc};
 use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -18,6 +17,7 @@ use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::io::Read;
 use std::time::{SystemTime, UNIX_EPOCH};
+use time::{OffsetDateTime, macros::format_description};
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 struct Target {
@@ -54,9 +54,12 @@ fn digest(value: &[u8]) -> String {
 }
 
 fn timestamp(ms: u64) -> Option<String> {
-    Utc.timestamp_millis_opt(i64::try_from(ms).ok()?)
-        .single()
-        .map(|value| value.format("%Y-%m-%dT%H:%M:%SZ").to_string())
+    OffsetDateTime::from_unix_timestamp(i64::try_from(ms / 1_000).ok()?)
+        .ok()?
+        .format(format_description!(
+            "[year]-[month]-[day]T[hour]:[minute]:[second]Z"
+        ))
+        .ok()
 }
 
 fn now_ms() -> Option<u64> {

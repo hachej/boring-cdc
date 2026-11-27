@@ -29,6 +29,8 @@ jobs:
         run: |
           cargo test --manifest-path vendor/pg_walstream/Cargo.toml bounded_query
           cargo test --manifest-path vendor/pg_walstream/Cargo.toml configured_copy_data_limit
+      - name: Vendored event encoding and timestamp regressions
+        run: cargo test --manifest-path vendor/pg_walstream/Cargo.toml --lib types::tests
       - name: PostgreSQL 17.6 planner component
         run: scripts/e2e/m3_planner.sh
       - name: Planner fault boundaries
