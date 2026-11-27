@@ -11,7 +11,7 @@
 
 [package]
 edition = "2021"
-rust-version = "1.87"
+rust-version = "1.88"
 name = "pg_walstream"
 version = "0.8.1"
 authors = ["danielshih <dog830228@gmail.com>"]
@@ -68,8 +68,7 @@ rustls-tls = [
 ]
 std = [
     "serde/std",
-    "chrono/std",
-    "chrono/clock",
+    "time/serde-well-known",
     "bytes/std",
     "tracing/std",
     "futures-core/std",
@@ -89,12 +88,9 @@ version = "1.12.1"
 features = ["serde"]
 default-features = false
 
-[dependencies.chrono]
-version = "0.4.45"
-features = [
-    "serde",
-    "alloc",
-]
+[dependencies.time]
+version = "=0.3.55"
+features = ["large-dates", "macros", "serde"]
 default-features = false
 
 [dependencies.futures-core]

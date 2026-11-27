@@ -11,6 +11,7 @@ use bytes::{Bytes, BytesMut};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "std")]
 use std::time::{SystemTime, UNIX_EPOCH};
+use time::OffsetDateTime;
 
 // PostgreSQL constants
 /// Seconds from Unix epoch (1970-01-01) to PostgreSQL epoch (2000-01-01)
@@ -135,20 +136,35 @@ pub fn system_time_to_postgres_timestamp(time: SystemTime) -> TimestampTz {
     unix_micros - PG_EPOCH_OFFSET_SECS * 1_000_000
 }
 
-/// Convert PostgreSQL timestamp (microseconds since 2000-01-01) into `chrono::DateTime<Utc>`.
-pub fn postgres_timestamp_to_chrono(ts: i64) -> chrono::DateTime<chrono::Utc> {
-    use chrono::{TimeZone, Utc};
+/// A UTC instant represented on the binary event wire as Unix epoch microseconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct WalTimestamp(
+    #[cfg_attr(feature = "std", serde(with = "time::serde::rfc3339"))] OffsetDateTime,
+);
 
-    // Convert back to Unix epoch microseconds
-    let unix_micros = ts + PG_EPOCH_OFFSET_SECS * 1_000_000;
+impl WalTimestamp {
+    #[cfg(all(test, feature = "std"))]
+    pub(crate) fn now() -> Self {
+        Self(OffsetDateTime::now_utc())
+    }
 
-    let secs = unix_micros / 1_000_000;
-    let micros = (unix_micros % 1_000_000) as u32;
+    fn unix_micros(self) -> i64 {
+        i64::try_from(self.0.unix_timestamp_nanos().div_euclid(1_000))
+            .expect("validated WAL timestamp")
+    }
+}
 
-    // Construct chrono DateTime<Utc>
-    Utc.timestamp_opt(secs, micros * 1000)
-        .single()
-        .expect("Invalid timestamp conversion")
+/// Convert PostgreSQL epoch microseconds to a UTC timestamp.
+pub fn postgres_timestamp_to_utc(ts: i64) -> Result<WalTimestamp> {
+    let unix_micros = ts
+        .checked_add(PG_EPOCH_OFFSET_SECS * 1_000_000)
+        .ok_or_else(|| {
+            ReplicationError::protocol(format!(
+                "PostgreSQL timestamp {ts} µs out of representable range"
+            ))
+        })?;
+    micros_to_wal_timestamp(unix_micros)
 }
 
 /// Parse LSN from string format (e.g., "0/12345678")
@@ -505,10 +521,10 @@ pub enum EventType {
     Begin {
         transaction_id: u32,
         final_lsn: Lsn,
-        commit_timestamp: chrono::DateTime<chrono::Utc>,
+        commit_timestamp: WalTimestamp,
     },
     Commit {
-        commit_timestamp: chrono::DateTime<chrono::Utc>,
+        commit_timestamp: WalTimestamp,
         commit_lsn: Lsn,
         end_lsn: Lsn,
     },
@@ -524,14 +540,14 @@ pub enum EventType {
         transaction_id: u32,
         commit_lsn: Lsn,
         end_lsn: Lsn,
-        commit_timestamp: chrono::DateTime<chrono::Utc>,
+        commit_timestamp: WalTimestamp,
     },
     /// Streaming transaction abort
     StreamAbort {
         transaction_id: u32,
         subtransaction_xid: u32,
         abort_lsn: Option<Lsn>,
-        abort_timestamp: Option<chrono::DateTime<chrono::Utc>>,
+        abort_timestamp: Option<WalTimestamp>,
     },
     /// Relation (schema) definition — emitted on schema changes
     Relation {
@@ -565,7 +581,7 @@ pub enum EventType {
         transaction_id: u32,
         prepare_lsn: Lsn,
         end_lsn: Lsn,
-        prepare_timestamp: chrono::DateTime<chrono::Utc>,
+        prepare_timestamp: WalTimestamp,
         gid: Arc<str>,
     },
     /// Two-phase transaction prepared (protocol v3+)
@@ -574,7 +590,7 @@ pub enum EventType {
         transaction_id: u32,
         prepare_lsn: Lsn,
         end_lsn: Lsn,
-        prepare_timestamp: chrono::DateTime<chrono::Utc>,
+        prepare_timestamp: WalTimestamp,
         gid: Arc<str>,
     },
     /// Two-phase transaction committed (protocol v3+)
@@ -583,7 +599,7 @@ pub enum EventType {
         transaction_id: u32,
         commit_lsn: Lsn,
         end_lsn: Lsn,
-        commit_timestamp: chrono::DateTime<chrono::Utc>,
+        commit_timestamp: WalTimestamp,
         gid: Arc<str>,
     },
     /// Two-phase transaction rolled back (protocol v3+)
@@ -592,8 +608,8 @@ pub enum EventType {
         transaction_id: u32,
         prepare_end_lsn: Lsn,
         rollback_end_lsn: Lsn,
-        prepare_timestamp: chrono::DateTime<chrono::Utc>,
-        rollback_timestamp: chrono::DateTime<chrono::Utc>,
+        prepare_timestamp: WalTimestamp,
+        rollback_timestamp: WalTimestamp,
         gid: Arc<str>,
     },
     /// Streaming two-phase transaction prepare (protocol v3+)
@@ -602,7 +618,7 @@ pub enum EventType {
         transaction_id: u32,
         prepare_lsn: Lsn,
         end_lsn: Lsn,
-        prepare_timestamp: chrono::DateTime<chrono::Utc>,
+        prepare_timestamp: WalTimestamp,
         gid: Arc<str>,
     },
 }
@@ -821,7 +837,7 @@ impl ChangeEvent {
     pub fn begin(
         transaction_id: u32,
         final_lsn: Lsn,
-        commit_timestamp: chrono::DateTime<chrono::Utc>,
+        commit_timestamp: WalTimestamp,
         lsn: Lsn,
     ) -> Self {
         Self {
@@ -843,12 +859,7 @@ impl ChangeEvent {
     ///
     /// * `commit_timestamp` - Transaction commit timestamp
     /// * `lsn` - Log Sequence Number for this event
-    pub fn commit(
-        commit_timestamp: chrono::DateTime<chrono::Utc>,
-        lsn: Lsn,
-        commit_lsn: Lsn,
-        end_lsn: Lsn,
-    ) -> Self {
+    pub fn commit(commit_timestamp: WalTimestamp, lsn: Lsn, commit_lsn: Lsn, end_lsn: Lsn) -> Self {
         Self {
             event_type: EventType::Commit {
                 commit_timestamp,
@@ -981,7 +992,7 @@ impl ChangeEvent {
         transaction_id: u32,
         prepare_lsn: Lsn,
         end_lsn: Lsn,
-        prepare_timestamp: chrono::DateTime<chrono::Utc>,
+        prepare_timestamp: WalTimestamp,
         gid: impl Into<Arc<str>>,
         lsn: Lsn,
     ) -> Self {
@@ -1004,7 +1015,7 @@ impl ChangeEvent {
         transaction_id: u32,
         prepare_lsn: Lsn,
         end_lsn: Lsn,
-        prepare_timestamp: chrono::DateTime<chrono::Utc>,
+        prepare_timestamp: WalTimestamp,
         gid: impl Into<Arc<str>>,
         lsn: Lsn,
     ) -> Self {
@@ -1028,7 +1039,7 @@ impl ChangeEvent {
         transaction_id: u32,
         commit_lsn: Lsn,
         end_lsn: Lsn,
-        commit_timestamp: chrono::DateTime<chrono::Utc>,
+        commit_timestamp: WalTimestamp,
         gid: impl Into<Arc<str>>,
         lsn: Lsn,
     ) -> Self {
@@ -1053,8 +1064,8 @@ impl ChangeEvent {
         transaction_id: u32,
         prepare_end_lsn: Lsn,
         rollback_end_lsn: Lsn,
-        prepare_timestamp: chrono::DateTime<chrono::Utc>,
-        rollback_timestamp: chrono::DateTime<chrono::Utc>,
+        prepare_timestamp: WalTimestamp,
+        rollback_timestamp: WalTimestamp,
         gid: impl Into<Arc<str>>,
         lsn: Lsn,
     ) -> Self {
@@ -1079,7 +1090,7 @@ impl ChangeEvent {
         transaction_id: u32,
         prepare_lsn: Lsn,
         end_lsn: Lsn,
-        prepare_timestamp: chrono::DateTime<chrono::Utc>,
+        prepare_timestamp: WalTimestamp,
         gid: impl Into<Arc<str>>,
         lsn: Lsn,
     ) -> Self {
@@ -1392,7 +1403,7 @@ impl ChangeEvent {
                 buf.extend_from_slice(&[message_types::BEGIN]);
                 buf.extend_from_slice(&transaction_id.to_be_bytes());
                 buf.extend_from_slice(&final_lsn.0.to_be_bytes());
-                buf.extend_from_slice(&commit_timestamp.timestamp_micros().to_be_bytes());
+                buf.extend_from_slice(&commit_timestamp.unix_micros().to_be_bytes());
             }
             EventType::Commit {
                 commit_timestamp,
@@ -1400,7 +1411,7 @@ impl ChangeEvent {
                 end_lsn,
             } => {
                 buf.extend_from_slice(&[message_types::COMMIT]);
-                buf.extend_from_slice(&commit_timestamp.timestamp_micros().to_be_bytes());
+                buf.extend_from_slice(&commit_timestamp.unix_micros().to_be_bytes());
                 buf.extend_from_slice(&commit_lsn.0.to_be_bytes());
                 buf.extend_from_slice(&end_lsn.0.to_be_bytes());
             }
@@ -1425,7 +1436,7 @@ impl ChangeEvent {
                 buf.extend_from_slice(&transaction_id.to_be_bytes());
                 buf.extend_from_slice(&commit_lsn.0.to_be_bytes());
                 buf.extend_from_slice(&end_lsn.0.to_be_bytes());
-                buf.extend_from_slice(&commit_timestamp.timestamp_micros().to_be_bytes());
+                buf.extend_from_slice(&commit_timestamp.unix_micros().to_be_bytes());
             }
             EventType::StreamAbort {
                 transaction_id,
@@ -1447,7 +1458,7 @@ impl ChangeEvent {
                     None => buf.extend_from_slice(&[0u8]),
                     Some(ts) => {
                         buf.extend_from_slice(&[1u8]);
-                        buf.extend_from_slice(&ts.timestamp_micros().to_be_bytes());
+                        buf.extend_from_slice(&ts.unix_micros().to_be_bytes());
                     }
                 }
             }
@@ -1513,7 +1524,7 @@ impl ChangeEvent {
                 buf.extend_from_slice(&transaction_id.to_be_bytes());
                 buf.extend_from_slice(&prepare_lsn.0.to_be_bytes());
                 buf.extend_from_slice(&end_lsn.0.to_be_bytes());
-                buf.extend_from_slice(&prepare_timestamp.timestamp_micros().to_be_bytes());
+                buf.extend_from_slice(&prepare_timestamp.unix_micros().to_be_bytes());
                 encode_arc_str(buf, gid);
             }
             EventType::Prepare {
@@ -1529,7 +1540,7 @@ impl ChangeEvent {
                 buf.extend_from_slice(&transaction_id.to_be_bytes());
                 buf.extend_from_slice(&prepare_lsn.0.to_be_bytes());
                 buf.extend_from_slice(&end_lsn.0.to_be_bytes());
-                buf.extend_from_slice(&prepare_timestamp.timestamp_micros().to_be_bytes());
+                buf.extend_from_slice(&prepare_timestamp.unix_micros().to_be_bytes());
                 encode_arc_str(buf, gid);
             }
             EventType::CommitPrepared {
@@ -1545,7 +1556,7 @@ impl ChangeEvent {
                 buf.extend_from_slice(&transaction_id.to_be_bytes());
                 buf.extend_from_slice(&commit_lsn.0.to_be_bytes());
                 buf.extend_from_slice(&end_lsn.0.to_be_bytes());
-                buf.extend_from_slice(&commit_timestamp.timestamp_micros().to_be_bytes());
+                buf.extend_from_slice(&commit_timestamp.unix_micros().to_be_bytes());
                 encode_arc_str(buf, gid);
             }
             EventType::RollbackPrepared {
@@ -1562,8 +1573,8 @@ impl ChangeEvent {
                 buf.extend_from_slice(&transaction_id.to_be_bytes());
                 buf.extend_from_slice(&prepare_end_lsn.0.to_be_bytes());
                 buf.extend_from_slice(&rollback_end_lsn.0.to_be_bytes());
-                buf.extend_from_slice(&prepare_timestamp.timestamp_micros().to_be_bytes());
-                buf.extend_from_slice(&rollback_timestamp.timestamp_micros().to_be_bytes());
+                buf.extend_from_slice(&prepare_timestamp.unix_micros().to_be_bytes());
+                buf.extend_from_slice(&rollback_timestamp.unix_micros().to_be_bytes());
                 encode_arc_str(buf, gid);
             }
             EventType::StreamPrepare {
@@ -1579,7 +1590,7 @@ impl ChangeEvent {
                 buf.extend_from_slice(&transaction_id.to_be_bytes());
                 buf.extend_from_slice(&prepare_lsn.0.to_be_bytes());
                 buf.extend_from_slice(&end_lsn.0.to_be_bytes());
-                buf.extend_from_slice(&prepare_timestamp.timestamp_micros().to_be_bytes());
+                buf.extend_from_slice(&prepare_timestamp.unix_micros().to_be_bytes());
                 encode_arc_str(buf, gid);
             }
         }
@@ -1691,7 +1702,7 @@ impl ChangeEvent {
                 let transaction_id = reader.read_u32()?;
                 let final_lsn = Lsn(reader.read_u64()?);
                 let ts_micros = reader.read_i64()?;
-                let commit_timestamp = micros_to_chrono(ts_micros)?;
+                let commit_timestamp = micros_to_wal_timestamp(ts_micros)?;
                 EventType::Begin {
                     transaction_id,
                     final_lsn,
@@ -1700,7 +1711,7 @@ impl ChangeEvent {
             }
             message_types::COMMIT => {
                 let ts_micros = reader.read_i64()?;
-                let commit_timestamp = micros_to_chrono(ts_micros)?;
+                let commit_timestamp = micros_to_wal_timestamp(ts_micros)?;
                 let commit_lsn = Lsn(reader.read_u64()?);
                 let end_lsn = Lsn(reader.read_u64()?);
                 EventType::Commit {
@@ -1723,7 +1734,7 @@ impl ChangeEvent {
                 let commit_lsn = Lsn(reader.read_u64()?);
                 let end_lsn = Lsn(reader.read_u64()?);
                 let ts_micros = reader.read_i64()?;
-                let commit_timestamp = micros_to_chrono(ts_micros)?;
+                let commit_timestamp = micros_to_wal_timestamp(ts_micros)?;
                 EventType::StreamCommit {
                     transaction_id,
                     commit_lsn,
@@ -1742,7 +1753,7 @@ impl ChangeEvent {
                 };
                 let has_ts = reader.read_u8()?;
                 let abort_timestamp = if has_ts != 0 {
-                    Some(micros_to_chrono(reader.read_i64()?)?)
+                    Some(micros_to_wal_timestamp(reader.read_i64()?)?)
                 } else {
                     None
                 };
@@ -1820,7 +1831,7 @@ impl ChangeEvent {
                 let transaction_id = reader.read_u32()?;
                 let prepare_lsn = Lsn(reader.read_u64()?);
                 let end_lsn = Lsn(reader.read_u64()?);
-                let prepare_timestamp = micros_to_chrono(reader.read_i64()?)?;
+                let prepare_timestamp = micros_to_wal_timestamp(reader.read_i64()?)?;
                 let gid = decode_arc_str(&mut reader)?;
                 EventType::BeginPrepare {
                     transaction_id,
@@ -1835,7 +1846,7 @@ impl ChangeEvent {
                 let transaction_id = reader.read_u32()?;
                 let prepare_lsn = Lsn(reader.read_u64()?);
                 let end_lsn = Lsn(reader.read_u64()?);
-                let prepare_timestamp = micros_to_chrono(reader.read_i64()?)?;
+                let prepare_timestamp = micros_to_wal_timestamp(reader.read_i64()?)?;
                 let gid = decode_arc_str(&mut reader)?;
                 EventType::Prepare {
                     flags,
@@ -1851,7 +1862,7 @@ impl ChangeEvent {
                 let transaction_id = reader.read_u32()?;
                 let commit_lsn = Lsn(reader.read_u64()?);
                 let end_lsn = Lsn(reader.read_u64()?);
-                let commit_timestamp = micros_to_chrono(reader.read_i64()?)?;
+                let commit_timestamp = micros_to_wal_timestamp(reader.read_i64()?)?;
                 let gid = decode_arc_str(&mut reader)?;
                 EventType::CommitPrepared {
                     flags,
@@ -1867,8 +1878,8 @@ impl ChangeEvent {
                 let transaction_id = reader.read_u32()?;
                 let prepare_end_lsn = Lsn(reader.read_u64()?);
                 let rollback_end_lsn = Lsn(reader.read_u64()?);
-                let prepare_timestamp = micros_to_chrono(reader.read_i64()?)?;
-                let rollback_timestamp = micros_to_chrono(reader.read_i64()?)?;
+                let prepare_timestamp = micros_to_wal_timestamp(reader.read_i64()?)?;
+                let rollback_timestamp = micros_to_wal_timestamp(reader.read_i64()?)?;
                 let gid = decode_arc_str(&mut reader)?;
                 EventType::RollbackPrepared {
                     flags,
@@ -1885,7 +1896,7 @@ impl ChangeEvent {
                 let transaction_id = reader.read_u32()?;
                 let prepare_lsn = Lsn(reader.read_u64()?);
                 let end_lsn = Lsn(reader.read_u64()?);
-                let prepare_timestamp = micros_to_chrono(reader.read_i64()?)?;
+                let prepare_timestamp = micros_to_wal_timestamp(reader.read_i64()?)?;
                 let gid = decode_arc_str(&mut reader)?;
                 EventType::StreamPrepare {
                     flags,
@@ -1933,28 +1944,26 @@ fn decode_string(reader: &mut BufferReader) -> Result<String> {
         .map_err(|e| ReplicationError::protocol(format!("Invalid UTF-8 in wire format: {e}")))
 }
 
-/// Convert Unix timestamp microseconds to chrono DateTime.
-///
-/// Returns an error if the value is outside the representable range
-/// (e.g. from a corrupted binary message) instead of silently falling
-/// back to the Unix epoch.
-fn micros_to_chrono(micros: i64) -> Result<chrono::DateTime<chrono::Utc>> {
-    use chrono::{TimeZone, Utc};
-    let secs = micros.div_euclid(1_000_000);
-    let subsec_nanos = (micros.rem_euclid(1_000_000) as u32) * 1000;
-    Utc.timestamp_opt(secs, subsec_nanos)
-        .single()
-        .ok_or_else(|| {
+fn micros_to_wal_timestamp(micros: i64) -> Result<WalTimestamp> {
+    let timestamp =
+        OffsetDateTime::from_unix_timestamp_nanos(i128::from(micros) * 1_000).map_err(|_| {
             ReplicationError::protocol(format!("timestamp {micros} µs out of representable range"))
-        })
+        })?;
+    // Preserve the timestamp bounds of the existing binary event decoder.
+    if !(-262_143..=262_142).contains(&timestamp.year()) {
+        return Err(ReplicationError::protocol(format!(
+            "timestamp {micros} µs out of representable range"
+        )));
+    }
+    Ok(WalTimestamp(timestamp))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use bytes::Bytes;
-    use chrono::{TimeZone, Utc};
     use std::time::{SystemTime, UNIX_EPOCH};
+    use time::macros::datetime;
 
     #[test]
     fn test_cache_padded_deref_and_mut() {
@@ -1987,8 +1996,8 @@ mod tests {
     #[test]
     fn test_postgres_epoch() {
         let ts = 0; // PostgreSQL epoch (2000-01-01 UTC)
-        let dt = postgres_timestamp_to_chrono(ts);
-        assert_eq!(dt, Utc.with_ymd_and_hms(2000, 1, 1, 0, 0, 0).unwrap());
+        let dt = postgres_timestamp_to_utc(ts).unwrap();
+        assert_eq!(dt, WalTimestamp(datetime!(2000-01-01 00:00:00 UTC)));
     }
 
     #[test]
@@ -1997,24 +2006,31 @@ mod tests {
         let pg_ts = system_time_to_postgres_timestamp(unix_epoch);
 
         // Convert back
-        let dt = postgres_timestamp_to_chrono(pg_ts);
-        assert_eq!(dt, Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).unwrap());
+        let dt = postgres_timestamp_to_utc(pg_ts).unwrap();
+        assert_eq!(dt, WalTimestamp(datetime!(1970-01-01 00:00:00 UTC)));
+    }
+
+    #[test]
+    fn postgres_timestamp_preserves_negative_subseconds_and_rejects_overflow() {
+        let before_unix_epoch = -PG_EPOCH_OFFSET_SECS * 1_000_000 - 1;
+        assert_eq!(
+            postgres_timestamp_to_utc(before_unix_epoch)
+                .unwrap()
+                .unix_micros(),
+            -1
+        );
+        assert!(postgres_timestamp_to_utc(i64::MAX).is_err());
     }
 
     #[test]
     fn test_round_trip_now() {
         let now = SystemTime::now();
         let pg_ts = system_time_to_postgres_timestamp(now);
-        let dt = postgres_timestamp_to_chrono(pg_ts);
+        let dt = postgres_timestamp_to_utc(pg_ts).unwrap();
 
-        // Convert SystemTime to chrono for comparison
-        let duration = now.duration_since(UNIX_EPOCH).unwrap();
-        let unix_secs = duration.as_secs() as i64;
-        let unix_nanos = duration.subsec_nanos();
-        let chrono_now = Utc.timestamp_opt(unix_secs, unix_nanos).unwrap();
-
-        // Allow slight difference due to truncation to microseconds
-        let diff = (dt.timestamp_micros() - chrono_now.timestamp_micros()).abs();
+        let unix_micros =
+            i64::try_from(now.duration_since(UNIX_EPOCH).unwrap().as_micros()).unwrap();
+        let diff = (dt.unix_micros() - unix_micros).abs();
         assert!(diff < 2, "Round trip difference too large: {diff}");
     }
 
@@ -2249,7 +2265,7 @@ mod tests {
 
     #[test]
     fn test_change_event_begin() {
-        let ts = Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-01-15 10:30:00 UTC));
         let event = ChangeEvent::begin(42, Lsn::new(5000), ts, Lsn::new(4000));
 
         assert_eq!(event.lsn.value(), 4000);
@@ -2269,7 +2285,7 @@ mod tests {
 
     #[test]
     fn test_change_event_commit() {
-        let ts = Utc.with_ymd_and_hms(2024, 1, 15, 10, 30, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-01-15 10:30:00 UTC));
         let event = ChangeEvent::commit(ts, Lsn::new(6000), Lsn::new(5000), Lsn::new(5500));
 
         assert_eq!(event.lsn.value(), 6000);
@@ -2407,7 +2423,7 @@ mod tests {
         assert!(truncate.get_key_columns().is_none());
 
         // Begin has no key_columns
-        let ts = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-01-01 00:00:00 UTC));
         let begin = ChangeEvent::begin(1, Lsn::new(500), ts, Lsn::new(500));
         assert!(begin.get_key_columns().is_none());
     }
@@ -2493,7 +2509,7 @@ mod tests {
         );
         assert_eq!(relation.event_type_str(), "relation");
 
-        let ts = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-01-01 00:00:00 UTC));
         let begin = ChangeEvent::begin(1, Lsn::new(600), ts, Lsn::new(600));
         assert_eq!(begin.event_type_str(), "begin");
 
@@ -2687,14 +2703,14 @@ mod tests {
 
     #[test]
     fn test_encode_decode_begin() {
-        let ts = Utc.with_ymd_and_hms(2024, 6, 15, 12, 30, 45).unwrap();
+        let ts = WalTimestamp(datetime!(2024-06-15 12:30:45 UTC));
         let event = ChangeEvent::begin(12345, Lsn::new(5000), ts, Lsn::new(4900));
         assert_encode_decode_round_trip(&event);
     }
 
     #[test]
     fn test_encode_decode_commit() {
-        let ts = Utc.with_ymd_and_hms(2024, 6, 15, 12, 31, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-06-15 12:31:00 UTC));
         let event = ChangeEvent::commit(ts, Lsn::new(6000), Lsn::new(5900), Lsn::new(6100));
         assert_encode_decode_round_trip(&event);
     }
@@ -2735,7 +2751,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode_stream_commit() {
-        let ts = Utc.with_ymd_and_hms(2024, 8, 1, 0, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-08-01 00:00:00 UTC));
         let event = ChangeEvent {
             event_type: EventType::StreamCommit {
                 transaction_id: 99,
@@ -2751,7 +2767,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode_stream_abort_with_all_fields() {
-        let ts = Utc.with_ymd_and_hms(2024, 9, 1, 12, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-09-01 12:00:00 UTC));
         let event = ChangeEvent {
             event_type: EventType::StreamAbort {
                 transaction_id: 50,
@@ -2854,7 +2870,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode_begin_prepare() {
-        let ts = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
         let event = ChangeEvent::begin_prepare(
             42,
             Lsn::new(5000),
@@ -2868,7 +2884,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode_prepare() {
-        let ts = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
         let event = ChangeEvent::prepare(
             0,
             42,
@@ -2883,7 +2899,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode_commit_prepared() {
-        let ts = Utc.with_ymd_and_hms(2024, 7, 1, 12, 1, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-07-01 12:01:00 UTC));
         let event = ChangeEvent::commit_prepared(
             0,
             42,
@@ -2898,8 +2914,8 @@ mod tests {
 
     #[test]
     fn test_encode_decode_rollback_prepared() {
-        let ts1 = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
-        let ts2 = Utc.with_ymd_and_hms(2024, 7, 1, 12, 2, 0).unwrap();
+        let ts1 = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
+        let ts2 = WalTimestamp(datetime!(2024-07-01 12:02:00 UTC));
         let event = ChangeEvent::rollback_prepared(
             0,
             42,
@@ -2915,7 +2931,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode_stream_prepare() {
-        let ts = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
         let event = ChangeEvent::stream_prepare(
             0,
             42,
@@ -2996,30 +3012,30 @@ mod tests {
     }
 
     #[test]
-    fn test_micros_to_chrono_zero() {
+    fn test_micros_to_wal_timestamp_zero() {
         // Zero micros = Unix epoch
-        let dt = micros_to_chrono(0).unwrap();
-        assert_eq!(dt, Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).unwrap());
+        let dt = micros_to_wal_timestamp(0).unwrap();
+        assert_eq!(dt, WalTimestamp(datetime!(1970-01-01 00:00:00 UTC)));
     }
 
     #[test]
-    fn test_micros_to_chrono_negative() {
+    fn test_micros_to_wal_timestamp_negative() {
         // Negative micros = before Unix epoch
-        let dt = micros_to_chrono(-1_000_000).unwrap();
-        assert_eq!(dt, Utc.with_ymd_and_hms(1969, 12, 31, 23, 59, 59).unwrap());
+        let dt = micros_to_wal_timestamp(-1_000_000).unwrap();
+        assert_eq!(dt, WalTimestamp(datetime!(1969-12-31 23:59:59 UTC)));
     }
 
     #[test]
-    fn test_micros_to_chrono_with_subsecond() {
-        let dt = micros_to_chrono(1_500_000).unwrap(); // 1.5 seconds
-        assert_eq!(dt.timestamp(), 1);
-        assert_eq!(dt.timestamp_subsec_micros(), 500_000);
+    fn test_micros_to_wal_timestamp_with_subsecond() {
+        let dt = micros_to_wal_timestamp(1_500_000).unwrap(); // 1.5 seconds
+        assert_eq!(dt.0.unix_timestamp(), 1);
+        assert_eq!(dt.0.microsecond(), 500_000);
     }
 
     #[test]
-    fn test_micros_to_chrono_out_of_range() {
-        // i64::MAX µs is far beyond what chrono can represent — must return Err
-        let result = micros_to_chrono(i64::MAX);
+    fn test_micros_to_wal_timestamp_out_of_range() {
+        // i64::MAX µs is outside the binary event timestamp range — must return Err
+        let result = micros_to_wal_timestamp(i64::MAX);
         assert!(result.is_err(), "expected Err for i64::MAX, got {result:?}");
         let msg = result.unwrap_err().to_string();
         assert!(
@@ -3126,7 +3142,7 @@ mod tests {
     #[test]
     fn test_event_type_debug_all_variants() {
         let data = RowData::new();
-        let ts = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-01-01 00:00:00 UTC));
 
         let variants: Vec<EventType> = vec![
             EventType::Insert {
@@ -3254,7 +3270,7 @@ mod tests {
 
     #[test]
     fn test_change_event_begin_prepare_fields() {
-        let ts = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
         let event = ChangeEvent::begin_prepare(
             42,
             Lsn::new(5000),
@@ -3286,7 +3302,7 @@ mod tests {
 
     #[test]
     fn test_change_event_prepare_fields() {
-        let ts = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
         let event = ChangeEvent::prepare(
             3,
             99,
@@ -3321,7 +3337,7 @@ mod tests {
 
     #[test]
     fn test_change_event_commit_prepared_fields() {
-        let ts = Utc.with_ymd_and_hms(2024, 7, 1, 12, 1, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-07-01 12:01:00 UTC));
         let event = ChangeEvent::commit_prepared(
             1,
             50,
@@ -3356,8 +3372,8 @@ mod tests {
 
     #[test]
     fn test_change_event_rollback_prepared_fields() {
-        let ts1 = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
-        let ts2 = Utc.with_ymd_and_hms(2024, 7, 1, 12, 5, 0).unwrap();
+        let ts1 = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
+        let ts2 = WalTimestamp(datetime!(2024-07-01 12:05:00 UTC));
         let event = ChangeEvent::rollback_prepared(
             2,
             60,
@@ -3395,7 +3411,7 @@ mod tests {
 
     #[test]
     fn test_change_event_stream_prepare_fields() {
-        let ts = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
         let event = ChangeEvent::stream_prepare(
             4,
             70,
@@ -3554,7 +3570,7 @@ mod tests {
 
     #[test]
     fn test_event_type_str_two_phase_variants() {
-        let ts = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-01-01 00:00:00 UTC));
 
         let bp = ChangeEvent::begin_prepare(1, Lsn::new(1), Lsn::new(2), ts, "g1", Lsn::new(1));
         assert_eq!(bp.event_type_str(), "begin_prepare");
@@ -3621,7 +3637,7 @@ mod tests {
         };
         assert_eq!(stream_stop.event_type_str(), "stream_stop");
 
-        let ts = chrono::Utc::now();
+        let ts = crate::types::WalTimestamp::now();
         let stream_commit = ChangeEvent {
             event_type: EventType::StreamCommit {
                 transaction_id: 1,
@@ -3836,7 +3852,7 @@ mod tests {
 
     #[test]
     fn test_get_key_columns_returns_none_for_new_variants() {
-        let ts = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-01-01 00:00:00 UTC));
 
         let events: Vec<ChangeEvent> = vec![
             ChangeEvent::relation(1, "s", "t", ReplicaIdentity::Default, vec![], Lsn::new(1)),
@@ -3870,7 +3886,7 @@ mod tests {
 
     #[test]
     fn test_get_replica_identity_returns_none_for_new_variants() {
-        let ts = Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-01-01 00:00:00 UTC));
 
         let events: Vec<ChangeEvent> = vec![
             ChangeEvent::relation(1, "s", "t", ReplicaIdentity::Default, vec![], Lsn::new(1)),
@@ -3906,7 +3922,7 @@ mod tests {
 
     #[test]
     fn test_encode_decode_begin_prepare_with_metadata() {
-        let ts = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
         let mut meta = BTreeMap::new();
         meta.insert("source".to_string(), "test".to_string());
         let event = ChangeEvent::begin_prepare(
@@ -3923,8 +3939,8 @@ mod tests {
 
     #[test]
     fn test_encode_decode_rollback_prepared_with_metadata() {
-        let ts1 = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
-        let ts2 = Utc.with_ymd_and_hms(2024, 7, 1, 12, 5, 0).unwrap();
+        let ts1 = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
+        let ts2 = WalTimestamp(datetime!(2024-07-01 12:05:00 UTC));
         let mut meta = BTreeMap::new();
         meta.insert("reason".to_string(), "timeout".to_string());
         let event = ChangeEvent::rollback_prepared(
@@ -4076,7 +4092,7 @@ mod tests {
             name: &'a str,
         }
         // Begin carries no row data → error, not panic.
-        let ts = Utc.with_ymd_and_hms(2024, 7, 1, 12, 0, 0).unwrap();
+        let ts = WalTimestamp(datetime!(2024-07-01 12:00:00 UTC));
         let begin = ChangeEvent::begin(7, Lsn::new(10), ts, Lsn::new(11));
         let r: Result<Row> = begin.deserialize_data_borrowed();
         assert!(r.is_err(), "Begin has no row data");

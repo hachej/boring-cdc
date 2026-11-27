@@ -192,7 +192,7 @@ pub use types::{
     // Utility functions
     format_lsn,
     parse_lsn,
-    postgres_timestamp_to_chrono,
+    postgres_timestamp_to_utc,
     // High-level CDC types
     BaseBackupOptions,
     ChangeEvent,
@@ -205,6 +205,7 @@ pub use types::{
     ReplicationSlotOptions,
     SlotType,
     TimestampTz,
+    WalTimestamp,
     // Type aliases matching PostgreSQL types
     XLogRecPtr,
     Xid,
@@ -249,7 +250,9 @@ pub use tokio_util::sync::CancellationToken;
 
 // Re-export libpq-specific types
 #[cfg(any(feature = "libpq", feature = "rustls-tls"))]
-pub use connection::{BoundedQueryLimits, PgParameter, PgReplicationConnection, PgResult, ReceiveBufferStats};
+pub use connection::{
+    BoundedQueryLimits, PgParameter, PgReplicationConnection, PgResult, ReceiveBufferStats,
+};
 
 // Re-export retry types
 #[cfg(any(feature = "libpq", feature = "rustls-tls"))]
