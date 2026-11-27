@@ -1,0 +1,37 @@
+name: Article 3 concurrent snapshot mutation
+on:
+  pull_request:
+    paths:
+      - .github/workflows/article3-concurrent-mutation.yml
+      - scripts/e2e/article3_bootstrap*
+      - scripts/e2e/article3_mutation_driver.py
+      - scripts/e2e/article3_concurrent_mutation.sh
+      - src/**
+      - contracts/clickhouse/**
+      - compose.yaml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TMPDIR: /var/tmp
+      BCDC_ARTICLE3_MUTATION_MIN_COPY_MS: "180000"
+      BCDC_ARTICLE3_PACKET_DIR: /var/tmp/article3-concurrent-mutation-packet
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --no-self-update
+      - name: Verify bootstrap, overlapping capture, and keyed convergence
+        run: scripts/e2e/article3_concurrent_mutation.sh
+      - name: Preserve observations from successful and failed attempts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: article3-concurrent-mutation-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: /var/tmp/article3-concurrent-mutation-packet
+          if-no-files-found: error

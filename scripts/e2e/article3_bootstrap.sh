@@ -7,6 +7,8 @@ if [[ "${1:-}" == --kill-backfill && $# == 1 ]]; then
 elif [[ $# != 0 ]]; then
   echo "Usage: $0 [--kill-backfill]" >&2
   exit 2
+elif [[ "${BCDC_ARTICLE3_MUTATION:-0}" == 1 ]]; then
+  scenario=article3-concurrent-mutation
 fi
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$repo"
@@ -19,11 +21,21 @@ clickhouse_container="$project-ch"
 seed_rows=10000
 chunk_rows=25
 workload_limit=6
-if [[ "$scenario" == article3-kill-backfill ]]; then
-  seed_rows=200000
-  chunk_rows=100
-  workload_limit=400
-fi
+delete_base=5000
+case "$scenario" in
+  article3-kill-backfill)
+    seed_rows=200000
+    chunk_rows=100
+    workload_limit=400
+    delete_base=$((seed_rows / 2))
+    ;;
+  article3-concurrent-mutation)
+    seed_rows=${BCDC_ARTICLE3_MUTATION_ROWS:-200000}
+    chunk_rows=500
+    workload_limit=${BCDC_ARTICLE3_MUTATION_WRITES:-72}
+    ;;
+esac
+[[ "$seed_rows" =~ ^[0-9]+$ && "$workload_limit" =~ ^[0-9]+$ ]]
 status_port=$((60000 + $$ % 1000))
 metrics_port=$((61000 + $$ % 1000))
 connector_pid=""
@@ -63,16 +75,20 @@ for field, name in (("overlap", "progress.json"), ("convergence", "checkpoint.js
                     ("interrupted", "interrupted.json"), ("restart", "restart.json"),
                     ("interrupted_exit", "interrupted-exit.json"), ("restart_exit", "restart-exit.json"),
                     ("duplicates", "duplicates.json"), ("workload", "workload.json"),
-                    ("before_restart", "before-restart.json")):
+                    ("before_restart", "before-restart.json"), ("mutation", "mutation-result.json")):
     if (root / name).is_file():
         observation[field] = json.loads((root / name).read_text())
 (root / "observation.json").write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n")
+script = {
+    "article3-kill-backfill": "scripts/e2e/article3_kill_backfill.sh",
+    "article3-concurrent-mutation": "scripts/e2e/article3_concurrent_mutation.sh",
+    "article3-bootstrap-cli": "scripts/e2e/article3_bootstrap.sh",
+}[observation["scenario"]]
 manifest = {
     "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
     "ci_run_id": os.getenv("GITHUB_RUN_ID"),
     "ci_run_attempt": os.getenv("GITHUB_RUN_ATTEMPT"),
-    "command": ["scripts/e2e/article3_kill_backfill.sh"
-                if observation["scenario"] == "article3-kill-backfill" else "scripts/e2e/article3_bootstrap.sh"],
+    "command": [script],
     "files": {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(root.iterdir()) if p.is_file() and p.name != "manifest.json"},
 }
 (root / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
@@ -159,7 +175,7 @@ pg -v "admin_password=$admin_password" -v "runtime_password=$runtime_password" \
 pg -v seed_rows="$seed_rows" <<'SQL' >/dev/null
 ALTER TABLE public.orders RENAME COLUMN total TO payload;
 ALTER TABLE public.orders ALTER COLUMN payload TYPE text;
-INSERT INTO public.orders SELECT id, 'seed-' || id FROM generate_series(1, :seed_rows) id;
+INSERT INTO public.orders SELECT id, 'seed-' || id FROM generate_series(1, :'seed_rows'::integer) id;
 SQL
 export PG_ADMIN=postgresql:"//boring_cdc_admin:$admin_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
 export PG_RUNTIME=postgresql:"//boring_cdc_runtime:$runtime_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
@@ -208,7 +224,7 @@ stage=concurrent_writes
     PGPASSWORD=$app_password psql -X -h 127.0.0.1 -p "$pg_port" -U boring_cdc_app -d boring_cdc -v ON_ERROR_STOP=1 -q <<SQL
 BEGIN;
 UPDATE public.orders SET payload='updated-$i' WHERE id=$i;
-DELETE FROM public.orders WHERE id=$seed_rows/2+$i;
+DELETE FROM public.orders WHERE id=$delete_base+$i;
 INSERT INTO public.orders VALUES($seed_rows+$i,'new-$i');
 COMMIT;
 SQL
@@ -257,9 +273,13 @@ if [[ "$scenario" == article3-kill-backfill ]]; then
   done
   touch "$work/stop-workload"
   generation=$(jq -er '.complete_anchors | map(.generation) | max | select(. > 1)' "$packet/restart.json")
-elif [[ "${BCDC_ARTICLE3_BASELINE_OUTAGE:-0}" == 1 ]]; then
+elif [[ "$scenario" == article3-bootstrap-cli && "${BCDC_ARTICLE3_BASELINE_OUTAGE:-0}" == 1 ]]; then
   stage=stop_clickhouse_before_baseline
   docker stop "$clickhouse_container" >/dev/null
+elif [[ "$scenario" == article3-concurrent-mutation ]]; then
+  PGHOST=127.0.0.1 PGPORT=$pg_port PGDATABASE=boring_cdc PGUSER=boring_cdc_app PGPASSWORD=$app_password \
+    python3 "$repo/scripts/e2e/article3_mutation_driver.py" write state/boring.db "$packet/mutation-ledger.json" \
+      --concurrent-writes "$workload_limit"
 fi
 wait "$workload_pid"
 workload_pid=""
@@ -298,7 +318,7 @@ if [[ "$scenario" == article3-kill-backfill ]]; then
     sleep 1
   done
 fi
-while [[ "$scenario" == article3-bootstrap-cli ]] \
+while [[ "$scenario" != article3-kill-backfill ]] \
     && ! python3 "$repo/scripts/e2e/article3_bootstrap_progress.py" state/boring.db "$packet/checkpoint.json" "$connector_pid" checkpoint; do
   kill -0 "$connector_pid"
   (( SECONDS < deadline ))
@@ -327,5 +347,8 @@ if [[ "$scenario" == article3-kill-backfill ]]; then
            physical_rows-distinct_event_ids AS duplicate_rows
     FROM boring_cdc.event_history_v1 WHERE capture_epoch=1 AND generation={generation:UInt64}
     FORMAT JSONEachRow' >"$packet/duplicates.json"
+elif [[ "$scenario" == article3-concurrent-mutation ]]; then
+  python3 "$repo/scripts/e2e/article3_mutation_driver.py" verify state/boring.db \
+    "$packet/mutation-ledger.json" "$packet/source-oracle.tsv" "$packet/candidate-rows.jsonl" "$packet/mutation-result.json"
 fi
 stage=complete
