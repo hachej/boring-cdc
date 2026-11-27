@@ -21,7 +21,7 @@ workload_writes=6
 if [[ "${BCDC_ARTICLE3_MUTATION:-0}" == 1 ]]; then
   scenario=article3-concurrent-mutation
   fixture_rows=${BCDC_ARTICLE3_MUTATION_ROWS:-200000}
-  chunk_rows=200
+  chunk_rows=500
   workload_writes=${BCDC_ARTICLE3_MUTATION_WRITES:-72}
 fi
 [[ "$fixture_rows" =~ ^[0-9]+$ && "$workload_writes" =~ ^[0-9]+$ ]]
