@@ -67,8 +67,11 @@ binary="${CARGO_TARGET_DIR:-$PWD/target}/debug/boring-cdc"
 mkdir -p "$work/run/state/spool" "$work/run/state/tmp" "$work/run/archive/root"
 chmod 700 "$work/run" "$work/run/state" "$work/run/state/spool" "$work/run/archive" "$work/run/archive/root"
 cp -f "${M2_STATUS_FIXTURE_CONFIG:-tests/fixtures/m1_config/representative.toml}" "$work/run/boring-cdc.toml"
-sed -i -e "s/127.0.0.1:8787/127.0.0.1:$((62000 + $$ % 1000))/" \
-  -e "s/127.0.0.1:8788/127.0.0.1:$((63000 + $$ % 1000))/" "$work/run/boring-cdc.toml"
+# Capture evidence binds the checked-in configuration byte for byte.
+if [[ -z "${M2_CAPTURE_OBSERVATION_OUT:-}" ]]; then
+  sed -i -e "s/127.0.0.1:8787/127.0.0.1:$((62000 + $$ % 1000))/" \
+    -e "s/127.0.0.1:8788/127.0.0.1:$((63000 + $$ % 1000))/" "$work/run/boring-cdc.toml"
+fi
 
 admin_dsn=postgresql:"//boring_cdc_admin:${admin_credential}@127.0.0.1:${port}/boring_cdc?sslmode=disable"
 export PG_ADMIN="$admin_dsn" CH_MAINT='https://unused.invalid'
