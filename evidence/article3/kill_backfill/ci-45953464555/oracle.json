@@ -1,0 +1,10 @@
+{
+  "candidate_rows": 200000,
+  "candidate_sha256": "fd12b0826aa95b0e3637541d2a51d648f462fdcedef558da03bb23f62fbca145",
+  "extra_keys": 0,
+  "missing_keys": 0,
+  "result": "pass",
+  "source_rows": 200000,
+  "source_sha256": "fd12b0826aa95b0e3637541d2a51d648f462fdcedef558da03bb23f62fbca145",
+  "wrong_values": 0
+}

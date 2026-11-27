@@ -1,0 +1,22 @@
+{
+  "ci_run_attempt": "1",
+  "ci_run_id": "45953464555",
+  "command": [
+    "scripts/e2e/article3_kill_backfill.sh"
+  ],
+  "files": {
+    "backfill-status.json": "3a8dc2ff8267df5d41537635c8607d4d81d369ed1c194e27194fecf2cc58ebc6",
+    "candidate-rows.jsonl": "9fc5cb885436e81d3e6a593b0afa0965db50bff01fadee2969f02a18a17835b9",
+    "duplicates.json": "41d4c2293215ea35da7c8dee01ffb8033c29ba82c6974300ef709660c307c792",
+    "interrupted-exit.json": "e3b9c2844b5a5c2677b3a2279db2ec8487491dd9a23d6b22fac153391b3bb63c",
+    "interrupted.json": "0945405176954328c46e3e18ce146ea0a08bb80c1cd1ab2e7e8b28f914db5263",
+    "midpoint.json": "0945405176954328c46e3e18ce146ea0a08bb80c1cd1ab2e7e8b28f914db5263",
+    "observation.json": "8d22bde8f5ec1a3c3e27642604318b9dc8355e909b2ddf492c661483c892b451",
+    "oracle.json": "a2b29231de873d2c6ab8a3e1892c458459bae6bd52117c8ee8555b426171a8fc",
+    "progress.json": "a4b3403a0db2aa31fd6fe029da49e939656c934aedd6eb0f13884889a26defbe",
+    "restart.json": "b85a1704d687366a7f756b5ea71f2bf8fecbcf72f4ef88819e7b10a09bc1bf15",
+    "source-oracle.tsv": "3836591d00c005b01b76dc859b38085d60ceeebe535e5656ae8f1cab6e30eaa5",
+    "workload.json": "dcd7a46604a99c3c37803c3efeba1812ca9f6903eafeeb15af2829b6d461eb90"
+  },
+  "git_commit": "3b27454a598eee7ba5b38ce8a77e741e2cb22fbe"
+}

@@ -1,0 +1,25 @@
+{
+  "bootstrap_state": "exporter_released",
+  "exporter_liveness": "released",
+  "failure_code": null,
+  "generation": 1,
+  "generation_state": "copying",
+  "guard_liveness": "held",
+  "progress": {
+    "complete_chunks": 9,
+    "completed_bytes": 159786,
+    "completed_rows": 4500,
+    "elapsed_ms": 5227,
+    "eta_ms": 227084,
+    "generation": 1,
+    "state": "copying",
+    "total_chunks": 400
+  },
+  "source_impact_last_sample": {
+    "exporter_age_at_release_ms": 165,
+    "lock_waiters": [],
+    "observed_unix_ms": 1795761979041,
+    "oldest_backend_xmin_age_xids": 0,
+    "snapshot_age_ms": 4467
+  }
+}
