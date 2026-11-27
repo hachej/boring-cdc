@@ -803,7 +803,30 @@ fn observe_in_transaction(
         };
         tx.execute("UPDATE backfill_generations SET state='complete' WHERE generation_id=?1 AND state='fencing'",[&intent.0])?;
         tx.execute("UPDATE backfill_runs SET state='complete',revision=revision+1 WHERE run_id=(SELECT run_id FROM backfill_generations WHERE generation_id=?1) AND state='running'",[&intent.0])?;
-        tx.execute("INSERT INTO bootstrap_anchors(anchor_id,capture_epoch,generation,lower_stitch_lsn,start_seq,snapshot_boundary_lsn,snapshot_complete_seq,post_copy_fence_nonce,post_copy_fence_lsn,post_copy_fence_seq,table_set_fingerprint,snapshot_schema_fingerprints,state,expires_at,generation_id,bootstrap_intent_id) VALUES(?1,?2,?3,NULL,?14,?4,?5,?6,?7,?8,?9,?10,'complete',?11,?12,?13)",params![intent.6,intent.2,intent.3,snapshot.0,snapshot.1,intent.4,lsn,seq,snapshot.2,snapshot.3,intent.7,intent.0,intent.1,snapshot.4])?;
+        let restart_installed: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type='table' AND name='m3_restart_lower_stitches')",
+            [], |r| r.get(0),
+        )?;
+        let lower_stitch: Option<String> = if restart_installed {
+            tx.query_row(
+                "SELECT l.lower_stitch_lsn FROM m3_restart_lower_stitches l
+                 JOIN logical_range_pins p ON p.pin_id=l.pin_id AND p.owner_id=l.generation_id
+                 WHERE l.restart_id=?1 AND l.generation_id=?2 AND l.capture_epoch=?3
+                   AND l.generation=?4 AND l.lower_stitch_seq=?5 AND l.lower_stitch_lsn=?6
+                   AND p.capture_epoch=l.capture_epoch AND p.start_seq=l.lower_stitch_seq AND p.state='active'",
+                params![intent.1,intent.0,intent.2,intent.3,snapshot.4,snapshot.0], |r| r.get(0),
+            ).optional()?
+        } else {
+            None
+        };
+        let needs_lower: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM bootstrap_intents WHERE intent_id=?1 AND state='copying' AND creation_floor_lsn IS NULL)",
+            [&intent.1], |r| r.get(0),
+        )?;
+        if needs_lower && lower_stitch.is_none() {
+            return Err(FenceError::Conflict("M3_FENCE_LOWER_STITCH_MISSING"));
+        }
+        tx.execute("INSERT INTO bootstrap_anchors(anchor_id,capture_epoch,generation,lower_stitch_lsn,start_seq,snapshot_boundary_lsn,snapshot_complete_seq,post_copy_fence_nonce,post_copy_fence_lsn,post_copy_fence_seq,table_set_fingerprint,snapshot_schema_fingerprints,state,expires_at,generation_id,bootstrap_intent_id) VALUES(?1,?2,?3,?15,?14,?4,?5,?6,?7,?8,?9,?10,'complete',?11,?12,?13)",params![intent.6,intent.2,intent.3,snapshot.0,snapshot.1,intent.4,lsn,seq,snapshot.2,snapshot.3,intent.7,intent.0,intent.1,snapshot.4,lower_stitch])?;
         tx.execute("UPDATE m3_fence_intents SET state='complete',revision=revision+1 WHERE intent_id=?1 AND state IN ('intended','dispatched')",[intent_id])?;
     } else if existing
         .as_ref()

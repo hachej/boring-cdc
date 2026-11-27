@@ -43,7 +43,7 @@ type BootstrapProofRow = (
 
 const INSTALL_SQL: &str = r#"
 CREATE TABLE IF NOT EXISTS m3_planner_runs(
- run_id TEXT PRIMARY KEY REFERENCES backfill_runs(run_id), generation_id TEXT NOT NULL UNIQUE REFERENCES backfill_generations(generation_id),
+ run_id TEXT NOT NULL REFERENCES backfill_runs(run_id), generation_id TEXT PRIMARY KEY NOT NULL REFERENCES backfill_generations(generation_id),
  bootstrap_intent_id TEXT NOT NULL, importer_id TEXT NOT NULL, snapshot_schema_fingerprint TEXT NOT NULL,
  key_schema BLOB NOT NULL, key_schema_digest TEXT NOT NULL, estimated_rows INTEGER NOT NULL CHECK(estimated_rows>=0), completed_rows INTEGER NOT NULL DEFAULT 0 CHECK(completed_rows>=0),
  completed_bytes INTEGER NOT NULL DEFAULT 0 CHECK(completed_bytes>=0), started_mono_ms INTEGER NOT NULL CHECK(started_mono_ms>=0), next_snapshot_seq INTEGER NOT NULL CHECK(next_snapshot_seq>=0),
@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS m3_snapshot_events(
 CREATE TABLE IF NOT EXISTS m3_chunk_commits(
  chunk_id TEXT PRIMARY KEY REFERENCES backfill_chunks(chunk_id), generation_id TEXT NOT NULL, row_count INTEGER NOT NULL, byte_count INTEGER NOT NULL,
  elapsed_ms INTEGER NOT NULL, checksum TEXT NOT NULL, committed_mono_ms INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS m3_planner_by_run ON m3_planner_runs(run_id,generation_id);
 CREATE TRIGGER IF NOT EXISTS m3_planner_revision BEFORE UPDATE ON m3_planner_runs
  WHEN NEW.revision!=OLD.revision+1 BEGIN SELECT RAISE(ABORT,'stale m3 planner revision'); END;
 "#;
@@ -375,8 +376,8 @@ impl PlannerStore {
             Ok(limits) => limits,
             Err(error) => return Err((error, Box::new(writer))),
         };
-        if let Err(error) = writer.connection().execute_batch(INSTALL_SQL) {
-            return Err((PlannerError::Sqlite(error), Box::new(writer)));
+        if let Err(error) = install(writer.connection()) {
+            return Err((error, Box::new(writer)));
         }
         Ok(Self { writer, limits })
     }
@@ -504,8 +505,30 @@ impl<W: BorrowMut<WriterConnection>> PlannerStore<W> {
         if bound != 1 {
             return Err(PlannerError::Conflict("M3_CANONICAL_IMPORT_PROOF_MISSING"));
         }
-        tx.execute("INSERT INTO backfill_runs(run_id,destination_id,capture_epoch,state,revision) VALUES(?1,?2,?3,'running',0)", params![input.run_id,input.destination_id,input.capture_epoch])?;
-        tx.execute("INSERT INTO backfill_generations(generation_id,run_id,generation,state) VALUES(?1,?2,?3,'copying')", params![input.generation_id,input.run_id,input.generation])?;
+        let existing_generation: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM backfill_generations WHERE generation_id=?1)",
+            [&input.generation_id],
+            |r| r.get(0),
+        )?;
+        if existing_generation {
+            let transitioned = tx.execute(
+                "UPDATE backfill_generations SET state='copying'
+                 WHERE generation_id=?1 AND run_id=?2 AND generation=?3 AND state='prepared'
+                   AND EXISTS(SELECT 1 FROM m3_restart_lower_stitches l
+                     JOIN logical_range_pins p ON p.pin_id=l.pin_id AND p.state='active'
+                     JOIN backfill_runs b ON b.run_id=l.backfill_run_id AND b.state='running'
+                     WHERE l.restart_id=?4 AND l.generation_id=?1 AND l.backfill_run_id=?2
+                     AND l.generation=?3 AND l.destination_id=?5 AND l.capture_epoch=?6 AND l.lower_stitch_seq=?7
+                     AND p.owner_id=l.generation_id AND p.start_seq=l.lower_stitch_seq)",
+                params![input.generation_id,input.run_id,input.generation,input.bootstrap_intent_id,input.destination_id,input.capture_epoch,input.start_seq],
+            )?;
+            if transitioned != 1 {
+                return Err(PlannerError::Conflict("M3_RESTART_LOWER_STITCH_MISSING"));
+            }
+        } else {
+            tx.execute("INSERT INTO backfill_runs(run_id,destination_id,capture_epoch,state,revision) VALUES(?1,?2,?3,'running',0)", params![input.run_id,input.destination_id,input.capture_epoch])?;
+            tx.execute("INSERT INTO backfill_generations(generation_id,run_id,generation,state) VALUES(?1,?2,?3,'copying')", params![input.generation_id,input.run_id,input.generation])?;
+        }
         tx.execute("INSERT INTO m3_planner_runs(run_id,generation_id,bootstrap_intent_id,importer_id,snapshot_schema_fingerprint,key_schema,key_schema_digest,estimated_rows,started_mono_ms,next_snapshot_seq,max_concurrency) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)", params![input.run_id,input.generation_id,input.bootstrap_intent_id,input.importer_id,input.snapshot_schema_fingerprint,schema,schema_digest,input.estimated_rows,input.started_mono_ms,input.start_seq,self.limits.concurrency])?;
         for (index, range) in ranges.iter().enumerate() {
             let start = range.start.as_ref().map_or_else(Vec::new, |v| v.0.clone());
@@ -893,7 +916,25 @@ impl<W: BorrowMut<WriterConnection>> PlannerStore<W> {
 }
 
 pub(crate) fn install(connection: &rusqlite::Connection) -> Result<(), PlannerError> {
-    connection.execute_batch(INSTALL_SQL)?;
+    let single_generation: bool = connection.query_row(
+        "SELECT EXISTS(SELECT 1 FROM pragma_table_info('m3_planner_runs') WHERE name='run_id' AND pk=1)",
+        [], |r| r.get(0),
+    )?;
+    if !single_generation {
+        connection.execute_batch(INSTALL_SQL)?;
+        return Ok(());
+    }
+    let tx = connection.unchecked_transaction()?;
+    tx.execute_batch(
+        "DROP TRIGGER IF EXISTS m3_planner_revision;
+         ALTER TABLE m3_planner_runs RENAME TO m3_planner_runs_v1;",
+    )?;
+    tx.execute_batch(INSTALL_SQL)?;
+    tx.execute_batch(
+        "INSERT INTO m3_planner_runs SELECT * FROM m3_planner_runs_v1;
+         DROP TABLE m3_planner_runs_v1;",
+    )?;
+    tx.commit()?;
     Ok(())
 }
 
@@ -902,7 +943,7 @@ pub(crate) fn read_progress(
     run_id: &str,
     now_mono_ms: u64,
 ) -> Result<Progress, PlannerError> {
-    let row=connection.query_row("SELECT g.generation,r.state,count(c.chunk_id),sum(CASE WHEN c.state='complete' THEN 1 ELSE 0 END),p.completed_rows,p.completed_bytes,p.started_mono_ms,p.estimated_rows FROM backfill_runs r JOIN backfill_generations g ON g.run_id=r.run_id JOIN backfill_chunks c ON c.generation_id=g.generation_id JOIN m3_planner_runs p ON p.run_id=r.run_id WHERE r.run_id=?1 GROUP BY g.generation,r.state,p.completed_rows,p.completed_bytes,p.started_mono_ms,p.estimated_rows",[run_id],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,String>(1)?,r.get::<_,i64>(2)?,r.get::<_,i64>(3)?,r.get::<_,i64>(4)?,r.get::<_,i64>(5)?,r.get::<_,i64>(6)?,r.get::<_,i64>(7)?))).optional()?.ok_or(PlannerError::Conflict("M3_RUN_NOT_FOUND"))?;
+    let row=connection.query_row("SELECT g.generation,r.state,count(c.chunk_id),sum(CASE WHEN c.state='complete' THEN 1 ELSE 0 END),p.completed_rows,p.completed_bytes,p.started_mono_ms,p.estimated_rows FROM backfill_runs r JOIN backfill_generations g ON g.run_id=r.run_id JOIN backfill_chunks c ON c.generation_id=g.generation_id JOIN m3_planner_runs p ON p.run_id=r.run_id AND p.generation_id=g.generation_id WHERE r.run_id=?1 GROUP BY g.generation,r.state,p.completed_rows,p.completed_bytes,p.started_mono_ms,p.estimated_rows ORDER BY g.generation DESC LIMIT 1",[run_id],|r|Ok((r.get::<_,i64>(0)?,r.get::<_,String>(1)?,r.get::<_,i64>(2)?,r.get::<_,i64>(3)?,r.get::<_,i64>(4)?,r.get::<_,i64>(5)?,r.get::<_,i64>(6)?,r.get::<_,i64>(7)?))).optional()?.ok_or(PlannerError::Conflict("M3_RUN_NOT_FOUND"))?;
     let elapsed = now_mono_ms.saturating_sub(row.6 as u64);
     let remaining = (row.7 as u64).saturating_sub(row.4 as u64);
     let eta = if row.4 > 0 && elapsed > 0 {
@@ -1958,6 +1999,66 @@ mod tests {
             },
             now,
         )
+    }
+
+    #[test]
+    fn planner_migration_retains_the_old_generation_and_accepts_a_second() {
+        let (_path, mut store) = store();
+        let v1 = INSTALL_SQL.replace(
+            "run_id TEXT NOT NULL REFERENCES backfill_runs(run_id), generation_id TEXT PRIMARY KEY NOT NULL REFERENCES backfill_generations(generation_id),",
+            "run_id TEXT PRIMARY KEY REFERENCES backfill_runs(run_id), generation_id TEXT NOT NULL UNIQUE REFERENCES backfill_generations(generation_id),",
+        );
+        store
+            .writer
+            .connection()
+            .execute_batch("DROP TABLE m3_planner_runs;")
+            .unwrap();
+        store.writer.connection().execute_batch(&v1).unwrap();
+        plan(&mut store, vec![key(3)]);
+        let revision: u64 = store
+            .writer
+            .connection()
+            .query_row(
+                "SELECT revision FROM m3_planner_runs WHERE generation_id='gen'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        install(store.writer.connection()).unwrap();
+        install(store.writer.connection()).unwrap();
+        assert_eq!(
+            store
+                .writer
+                .connection()
+                .query_row(
+                    "SELECT revision FROM m3_planner_runs WHERE generation_id='gen'",
+                    [],
+                    |r| r.get::<_, u64>(0),
+                )
+                .unwrap(),
+            revision
+        );
+        store.writer.connection().execute(
+            "INSERT INTO backfill_generations(generation_id,run_id,generation,state) VALUES('next','run',2,'prepared')",
+            [],
+        ).unwrap();
+        store.writer.connection().execute(
+            "INSERT INTO m3_planner_runs SELECT run_id,'next',bootstrap_intent_id,importer_id,snapshot_schema_fingerprint,key_schema,key_schema_digest,estimated_rows,completed_rows,completed_bytes,started_mono_ms,next_snapshot_seq,max_concurrency,revision
+             FROM m3_planner_runs WHERE generation_id='gen'",
+            [],
+        ).unwrap();
+        assert_eq!(
+            store
+                .writer
+                .connection()
+                .query_row(
+                    "SELECT count(*) FROM m3_planner_runs WHERE run_id='run'",
+                    [],
+                    |r| r.get::<_, u64>(0),
+                )
+                .unwrap(),
+            2
+        );
     }
 
     #[test]

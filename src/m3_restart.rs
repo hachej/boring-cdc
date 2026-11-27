@@ -45,7 +45,7 @@ pub struct LowerStitchRequest<'a> {
     pub now_mono_ms: u64,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LowerStitch {
     pub restart_id: String,
     pub generation_id: String,

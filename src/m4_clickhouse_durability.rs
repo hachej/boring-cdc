@@ -543,7 +543,7 @@ pub fn finalize_checkpoint(
             "UPDATE destination_checkpoints SET complete_transaction_id=?1,journal_seq=?2,revision=revision+1 WHERE destination_id=?3 AND capture_epoch=?4 AND configuration_fingerprint=?5 AND generation=?6 AND journal_seq=?7 AND revision=?8 AND anchor_id IS ?9 AND current_failure_id IS NULL",
             params![batch.complete_transaction_id, batch.marker.last_journal_seq, context.destination_id, context.capture_epoch, context.configuration_fingerprint, context.generation, batch.marker.first_journal_seq - 1, revision, anchor_id],
         )?,
-        None if batch.marker.first_journal_seq == 1 => transaction.execute(
+        None if anchor_cursor(transaction, anchor_id.as_deref())?.checked_add(1) == Some(batch.marker.first_journal_seq) => transaction.execute(
             "INSERT INTO destination_checkpoints(destination_id,capture_epoch,anchor_id,configuration_fingerprint,generation,complete_transaction_id,journal_seq,current_failure_id,revision) SELECT ?1,?2,?3,?4,?5,?6,?7,NULL,0 WHERE NOT EXISTS(SELECT 1 FROM destination_checkpoints WHERE destination_id=?1)",
             params![context.destination_id, context.capture_epoch, anchor_id, context.configuration_fingerprint, context.generation, batch.complete_transaction_id, batch.marker.last_journal_seq],
         )?,
@@ -704,6 +704,22 @@ fn lease_anchor(
         .map_err(DurabilityError::from)
 }
 
+fn anchor_cursor(
+    transaction: &Transaction<'_>,
+    anchor_id: Option<&str>,
+) -> Result<u64, DurabilityError> {
+    match anchor_id {
+        None => Ok(0),
+        Some(anchor) => transaction
+            .query_row(
+                "SELECT start_seq FROM bootstrap_anchors WHERE anchor_id=?1 AND state='complete'",
+                [anchor],
+                |row| row.get(0),
+            )
+            .map_err(DurabilityError::from),
+    }
+}
+
 fn validate_checkpoint_cursor(
     transaction: &Transaction<'_>,
     context: &BatchContext,
@@ -725,7 +741,11 @@ fn validate_checkpoint_cursor(
         )
         .optional()?;
     match checkpoint {
-        None if first_seq == 1 => Ok(()),
+        None if anchor_cursor(transaction, anchor_id.as_deref())?.checked_add(1)
+            == Some(first_seq) =>
+        {
+            Ok(())
+        }
         Some((epoch, generation, fingerprint, journal_seq, checkpoint_anchor))
             if epoch == context.capture_epoch
                 && generation == context.generation

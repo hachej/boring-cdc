@@ -1,0 +1,35 @@
+name: Article 3 kill backfill
+on:
+  pull_request:
+    paths:
+      - .github/workflows/article3-kill-backfill.yml
+      - scripts/e2e/article3_kill_backfill*
+      - scripts/e2e/article3_bootstrap*
+      - src/**
+      - contracts/clickhouse/**
+      - compose.yaml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  kill-backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      TMPDIR: /var/tmp
+      BCDC_ARTICLE3_PACKET_DIR: /var/tmp/article3-kill-backfill-packet
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Install repository-pinned Rust toolchain
+        run: rustup toolchain install 1.89.0 --profile minimal --no-self-update
+      - name: Interrupt and restart the shipped backfill CLI
+        run: scripts/e2e/article3_kill_backfill.sh
+      - name: Retain measured and failed observations
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: article3-kill-backfill-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          path: /var/tmp/article3-kill-backfill-packet
+          if-no-files-found: error
