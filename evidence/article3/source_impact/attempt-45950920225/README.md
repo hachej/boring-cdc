@@ -4,7 +4,7 @@
 
 | Arm | Observed result |
 | --- | --- |
-| Shipped CLI to durable anchor | 200,001 rows in 4,001 chunks over 272.570 seconds. The workload committed 55 writes. There were 2,723 reader measurements and peak slot WAL retention was 930,992 bytes. |
+| CLI run to durable anchor | 200,001 rows in 4,001 chunks over 272.570 seconds. The workload committed 55 writes. There were 2,723 reader measurements and peak slot WAL retention was 930,992 bytes. |
 | Plain PostgreSQL stream | 200,000 rows in 0.449 seconds, with one workload commit and five reader measurements. There was no replication slot. |
 | DDL during copy | The actual `ALTER TABLE` succeeded after 5.242 seconds. The connector invalidated the generation at 80 chunks, verified guard release, and exited with `M3_DDL_WAITER`. |
 
