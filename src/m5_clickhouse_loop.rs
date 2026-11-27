@@ -234,7 +234,7 @@ impl ClickHousePump {
             .map_err(|_| "M5_BASELINE_STORE_FAILED")?
             .map_err(|_| "M5_BASELINE_INVALID")?;
         if !verified && snapshot_relation.is_none() {
-            return Ok(None);
+            return Err("M5_SNAPSHOT_RELATION_UNAVAILABLE");
         }
         let identity = LeaseIdentity {
             lease_id: format!("{run_id}:clickhouse:{generation}"),
@@ -268,7 +268,15 @@ impl ClickHousePump {
         };
         if !verified {
             let relation = snapshot_relation.ok_or("M5_SNAPSHOT_RELATION_UNAVAILABLE")?;
-            pump.load_snapshot(writer, &anchor_id, relation)?;
+            if let Err(code) = pump.load_snapshot(writer, &anchor_id, relation) {
+                let lease = pump.lease.clone();
+                let _ = writer.service_destination(Duration::from_secs(5), move |owner| {
+                    let now = monotonic_ms().map_err(JournalError::Unavailable)?;
+                    crate::m2_leases::release(owner, &lease, now)
+                        .map_err(|_| JournalError::Conflict("snapshot lease release failed"))
+                });
+                return Err(code);
+            }
         }
         pump.refresh_blocked(writer)?;
         Ok(Some(pump))

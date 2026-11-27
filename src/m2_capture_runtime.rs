@@ -2661,6 +2661,7 @@ pub async fn run_loaded_config(
         DiskAdmission, FilesystemAdmissionController, FilesystemLimit, MemoryBudget, MemoryLimits,
         PosixAllocation, SpoolLimits, StatvfsSpace,
     };
+    use rusqlite::OptionalExtension;
     use std::os::unix::fs::MetadataExt;
     use std::path::PathBuf;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -2932,7 +2933,7 @@ pub async fn run_loaded_config(
         .ok()
         .filter(|value| *value > 0)
         .ok_or_else(|| CaptureFailure::at("journal", "M2_CAPTURE_EPOCH_NOT_CANONICAL"))?;
-    let catalog = PgReplicationConnection::connect(&dsn)
+    let mut catalog = PgReplicationConnection::connect(&dsn)
         .map_err(|_| CaptureFailure::at("catalog", "M2_CATALOG_CONNECT_FAILED"))?;
     let (writer, mut bootstrap_copy, bootstrap_connection) = if bootstrap {
         let started = crate::m3_live_run::start(
@@ -2972,6 +2973,49 @@ pub async fn run_loaded_config(
     } else {
         (writer, None, None)
     };
+    let anchored = if bootstrap {
+        None
+    } else {
+        writer
+            .connection()
+            .query_row(
+                "SELECT a.anchor_id FROM bootstrap_anchors a JOIN destinations d
+               ON d.capture_epoch=a.capture_epoch AND d.generation=a.generation
+             WHERE a.capture_epoch=?1 AND d.kind='clickhouse' AND d.configuration_fingerprint=?2
+               AND a.state='complete' AND a.start_seq=0 LIMIT 1",
+                rusqlite::params![capture_epoch, config.fingerprints().destination],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()
+            .map_err(|_| CaptureFailure::at("destination", "M5_BASELINE_STORE_FAILED"))?
+    };
+    let recovered_relation = anchored.and_then(|anchor| {
+        let table = &public.tables.first()?.source_relation;
+        let contracts = crate::article1_capture::preflight_idle_capture(&capture_config).ok()?;
+        let relation = contracts.into_values().find(|contract| {
+            format!("{}.{}", contract.relation.namespace, contract.relation.name) == *table
+        })?;
+        let current = crate::m2_catalog_reader::read_simple_relation(
+            &mut catalog,
+            &public.source.publication,
+            &canonical_source,
+            &relation,
+        )
+        .ok()?
+        .encode()
+        .ok()?;
+        let matches = writer
+            .connection()
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM bootstrap_anchors a
+               JOIN m3_snapshot_schema_proofs p ON p.intent_id=a.bootstrap_intent_id
+               WHERE a.anchor_id=?1 AND p.relation_id=?2 AND p.canonical_schema=?3)",
+                rusqlite::params![anchor, relation.relation.id.to_string(), current],
+                |row| row.get::<_, bool>(0),
+            )
+            .ok()?;
+        matches.then_some(relation)
+    });
     let gate_reader = if bootstrap {
         Some(
             rusqlite::Connection::open_with_flags(
@@ -3081,15 +3125,19 @@ pub async fn run_loaded_config(
     writer_service
         .insert_owner_lease(&lease)
         .map_err(|_| CaptureFailure::at("ownership", "M2_OWNER_LEASE_STORE_FAILED"))?;
-    let snapshot_relation = bootstrap_connection.as_ref().and_then(|(_, contracts)| {
-        let table = &public.tables[0].source_relation;
-        contracts
-            .values()
-            .find(|contract| {
-                format!("{}.{}", contract.relation.namespace, contract.relation.name) == *table
-            })
-            .cloned()
-    });
+    let snapshot_relation = bootstrap_connection
+        .as_ref()
+        .map(|(_, contracts)| contracts)
+        .and_then(|contracts| {
+            let table = &public.tables.first()?.source_relation;
+            contracts
+                .values()
+                .find(|contract| {
+                    format!("{}.{}", contract.relation.namespace, contract.relation.name) == *table
+                })
+                .cloned()
+        })
+        .or(recovered_relation);
     let destination_start = crate::m5_clickhouse_loop::PumpStart {
         snapshot_relation,
         journal_path: journal_path.clone(),

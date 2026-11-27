@@ -62,7 +62,8 @@ for field, filename in (("connector_codes", "connector.log"), ("restart_codes", 
 for field, name in (("overlap", "progress.json"), ("convergence", "checkpoint.json"), ("oracle", "oracle.json"), ("status", "backfill-status.json"),
                     ("interrupted", "interrupted.json"), ("restart", "restart.json"),
                     ("interrupted_exit", "interrupted-exit.json"), ("restart_exit", "restart-exit.json"),
-                    ("duplicates", "duplicates.json"), ("workload", "workload.json")):
+                    ("duplicates", "duplicates.json"), ("workload", "workload.json"),
+                    ("before_restart", "before-restart.json")):
     if (root / name).is_file():
         observation[field] = json.loads((root / name).read_text())
 (root / "observation.json").write_text(json.dumps(observation, indent=2, sort_keys=True) + "\n")
@@ -122,8 +123,13 @@ chmod 644 "$work/clickhouse-https.xml"
 ch_password=$(cat "$work/clickhouse_password")
 printf 'CLICKHOUSE_USER=bcdc_probe\nCLICKHOUSE_PASSWORD=%s\nCLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1\n' "$ch_password" >"$work/clickhouse.env"
 chmod 600 "$work/clickhouse.env"
+clickhouse_publish=127.0.0.1::8443
+if [[ "${BCDC_ARTICLE3_BASELINE_OUTAGE:-0}" == 1 ]]; then
+  ch_https_port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
+  clickhouse_publish="127.0.0.1:$ch_https_port:8443"
+fi
 docker run -d --name "$clickhouse_container" --platform linux/amd64 \
-  -p "127.0.0.1::8443" --env-file "$work/clickhouse.env" \
+  -p "$clickhouse_publish" --env-file "$work/clickhouse.env" \
   -v "$work/clickhouse-https.xml:/etc/clickhouse-server/config.d/article3-https.xml:ro" \
   -v "$work/server.crt:/etc/clickhouse-server/tls/server.crt:ro" \
   -v "$work/server.key:/etc/clickhouse-server/tls/server.key:ro" \
@@ -251,9 +257,35 @@ if [[ "$scenario" == article3-kill-backfill ]]; then
   done
   touch "$work/stop-workload"
   generation=$(jq -er '.complete_anchors | map(.generation) | max | select(. > 1)' "$packet/restart.json")
+elif [[ "${BCDC_ARTICLE3_BASELINE_OUTAGE:-0}" == 1 ]]; then
+  stage=stop_clickhouse_before_baseline
+  docker stop "$clickhouse_container" >/dev/null
 fi
 wait "$workload_pid"
 workload_pid=""
+
+if [[ "$scenario" == article3-bootstrap-cli && "${BCDC_ARTICLE3_BASELINE_OUTAGE:-0}" == 1 ]]; then
+  stage=wait_for_failed_baseline_dispatch
+  deadline=$((SECONDS+120))
+  until grep -q 'code=M5_SNAPSHOT_READBACK_FAILED' "$work/connector.log"; do
+    kill -0 "$connector_pid"
+    (( SECONDS < deadline ))
+    sleep .2
+  done
+  python3 "$repo/scripts/e2e/article3_bootstrap_progress.py" state/boring.db "$packet/before-restart.json" "$connector_pid" checkpoint && exit 1
+  jq -e '.complete_anchor != null and .clickhouse_checkpoints == []' "$packet/before-restart.json" >/dev/null
+  stage=restore_clickhouse_and_restart
+  docker start "$clickhouse_container" >/dev/null
+  deadline=$((SECONDS+60))
+  until ch --query 'SELECT 1' >/dev/null 2>&1; do
+    (( SECONDS < deadline ))
+    sleep .2
+  done
+  kill -TERM "$connector_pid"
+  wait "$connector_pid"
+  "$binary" run >>"$work/connector.log" 2>&1 &
+  connector_pid=$!
+fi
 
 stage=converge
 deadline=$((SECONDS+900))
