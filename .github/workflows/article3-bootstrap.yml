@@ -12,10 +12,15 @@ permissions:
   contents: read
 jobs:
   bootstrap:
+    strategy:
+      fail-fast: false
+      matrix:
+        baseline_outage: ['0', '1']
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
       TMPDIR: /var/tmp
+      BCDC_ARTICLE3_BASELINE_OUTAGE: ${{ matrix.baseline_outage }}
       BCDC_ARTICLE3_PACKET_DIR: /var/tmp/article3-bootstrap-packet
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -29,6 +34,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: article3-bootstrap-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}
+          name: article3-bootstrap-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.run_attempt }}-${{ matrix.baseline_outage }}
           path: /var/tmp/article3-bootstrap-packet
           if-no-files-found: error
