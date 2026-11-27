@@ -10,6 +10,6 @@ The steady initial bootstrap also passed on the updated runtime at `000b0ca3e7ec
 
 The same CI run stopped ClickHouse before baseline delivery and left the completed anchor with no destination checkpoint. After ClickHouse returned, an ordinary `run` on the same configuration recovered baseline delivery. The final ClickHouse checkpoint and journal head were both 123, and all 10,000 candidate keys matched PostgreSQL. [Baseline restart packet](bootstrap/ci-45951142035-baseline-restart/observation.json)
 
-The replacement generation test passed on a 200,000-row workload. After `SIGKILL`, the ordinary `run` command with the same configuration replaced the interrupted generation. The final ClickHouse state matched all PostgreSQL keys, with zero duplicate physical event rows. [Passing recovery packet](kill_backfill/ci-45953464555/README.md)
+The replacement generation test passed on a 200,000-row workload. After `SIGKILL`, `boring-cdc run --bootstrap` with the same configuration replaced the interrupted generation. The final ClickHouse state matched all PostgreSQL keys, with zero duplicate physical event rows. [Passing recovery packet](kill_backfill/ci-45953464555/README.md)
 
 The targeted mutation test passed with updates and deletes in copied, copying, and pending ranges. All 199,994 final keys matched PostgreSQL, and the journal contained all 12 targeted events. [Passing mutation packet](concurrent_mutation/ci-45953649677/README.md) · [Earlier fixture failure](concurrent_mutation/attempt-45951997029/README.md)
