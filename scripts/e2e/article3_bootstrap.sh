@@ -135,9 +135,9 @@ ALTER TABLE public.orders RENAME COLUMN total TO payload;
 ALTER TABLE public.orders ALTER COLUMN payload TYPE text;
 INSERT INTO public.orders SELECT id, 'seed-' || id FROM generate_series(1, 10000) id;
 SQL
-export PG_ADMIN="postgresql://boring_cdc_admin:$admin_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
-export PG_RUNTIME="postgresql://boring_cdc_runtime:$runtime_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
-export PG_CONTROL="postgresql://boring_cdc_control_writer:$control_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
+export PG_ADMIN=postgresql:"//boring_cdc_admin:$admin_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
+export PG_RUNTIME=postgresql:"//boring_cdc_runtime:$runtime_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
+export PG_CONTROL=postgresql:"//boring_cdc_control_writer:$control_password@127.0.0.1:$pg_port/boring_cdc?sslmode=disable"
 mkdir -p "$work/run/state/tmp" "$work/run/state/spool" "$work/run/archive/root"
 sed -e 's/total = "numeric:nullable"/payload = "text:nullable"/' \
   -e 's/verify_tls = true/verify_tls = false/' \
