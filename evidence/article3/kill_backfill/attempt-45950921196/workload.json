@@ -1,0 +1,6 @@
+{
+  "seed": "workload-v1-orders",
+  "seed_rows": 200000,
+  "chunk_rows": 100,
+  "write_interval_seconds": 5
+}
