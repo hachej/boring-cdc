@@ -22,7 +22,7 @@ def sample(db):
             "SELECT capture_epoch,durable_journal_seq FROM source_state"
         ).fetchone()
         anchors = db.execute(
-            """SELECT generation,snapshot_complete_seq,post_copy_fence_seq
+            """SELECT generation,snapshot_complete_seq-start_seq,post_copy_fence_seq,start_seq,lower_stitch_lsn
                FROM bootstrap_anchors WHERE capture_epoch=? AND state='complete'""",
             (epoch,),
         ).fetchall()
@@ -41,8 +41,9 @@ def sample(db):
                 for gen, state, done, total in generations
             ],
             "complete_anchors": [
-                {"generation": gen, "copied_rows": rows, "fence_seq": fence}
-                for gen, rows, fence in anchors
+                {"generation": gen, "copied_rows": rows, "fence_seq": fence,
+                 "lower_stitch_seq": lower, "lower_stitch_lsn": lsn}
+                for gen, rows, fence, lower, lsn in anchors
             ],
             "clickhouse_checkpoints": [seq for (seq,) in checkpoints],
         }
@@ -122,6 +123,9 @@ def main():
             and observed["capture_epoch"] == before["capture_epoch"]
             and old["state"] == "invalidated"
             and not previous_anchor
+            and anchor["copied_rows"] > 0
+            and anchor["lower_stitch_lsn"] is not None
+            and before["journal_head"] <= anchor["lower_stitch_seq"] < anchor["fence_seq"]
             and 0 < replacement["chunks_done"] == replacement["chunks_total"]
         )
         if mode == "replacement":
